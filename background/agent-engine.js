@@ -2,7 +2,7 @@
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext } from './llm-client.js';
+import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 
@@ -148,7 +148,21 @@ async function runAgentLoop(goal, workingTabId) {
   // Generate a plan before execution
   sendSilentUpdate('Planning task...');
   const planSettings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  agentPlan = await generatePlan(goal, planSettings);
+
+  // Gather context for plan generation
+  const currentTabInfo = await getTabInfo(workingTabId);
+  const platformCtx = getPlatformContext(
+    currentTabInfo?.url || '',
+    goal
+  );
+  const patterns = await getRelevantPatterns(goal);
+
+  agentPlan = await generatePlan(goal, planSettings, {
+    currentUrl: currentTabInfo?.url || '',
+    pageTitle: currentTabInfo?.title || '',
+    platformContext: platformCtx,
+    relevantPatterns: patterns
+  });
   if (agentPlan) {
     sendSilentUpdate(`Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
   } else {

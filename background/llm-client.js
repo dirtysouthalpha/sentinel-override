@@ -151,22 +151,43 @@ export function isAnthropicEndpoint(endpoint) {
 // Generates a numbered plan from the goal before execution begins.
 // This gives the agent a map of what it's accomplished and what's left,
 // dramatically improving reliability on multi-step and multi-site tasks.
-export async function generatePlan(goal, settings) {
+export async function generatePlan(goal, settings, context = {}) {
   const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
   const apiKey = settings.api_key;
   const model = settings.model || 'glm-5.1';
   if (!apiKey) return null;
 
-  const planPrompt = `You are a browser automation planner. Given a user goal, produce a concise numbered execution plan.
+  const urlContext = context.currentUrl
+    ? `Current page: ${context.currentUrl}${context.pageTitle ? ` (${context.pageTitle})` : ''}\n`
+    : '';
 
+  const platformContext = context.platformContext || '';
+
+  const patternContext = context.relevantPatterns && context.relevantPatterns.length > 0
+    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => `- "${p.goal}" -> ${p.steps.map(s => s.type).join(', ')}`).join('\n')}\n`
+    : '';
+
+  const planPrompt = `You are a browser automation planner. Given a user goal and current context, produce a concise numbered execution plan.
+
+${urlContext}${platformContext}${patternContext}
 Goal: ${goal}
 
 Rules:
 - Each step should be one specific browser action or data collection task
-- Be concrete: "Navigate to etsy.com" not "Go to a website"
+- Be concrete: "Navigate to sonicwall.example.com and click Firewall > Rules" not "Go to the website"
+- Reference exact URLs, selectors, and UI elements when provided
 - Multi-site tasks need explicit steps for EACH site
 - Maximum 15 steps
-- Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }`;
+- For runbooks/investigations, create one step per phase
+- Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
+
+Example of a GOOD plan:
+Goal: "Check the SonicWall firewall at 192.168.1.1 for blocked connections from 10.0.0.5"
+{ "plan": ["Navigate to 192.168.1.1 and log in", "Click Log > View in the navigation", "Set filter to source IP 10.0.0.5 and apply", "Read the filtered log entries and extract blocked connection details", "Note the rule IDs and zones involved", "Finish with a summary of blocked connections"] }
+
+Example of a BAD plan:
+Goal: "Check the SonicWall firewall for blocked connections"
+{ "plan": ["Go to the website", "Find the information", "Get the data"] }`;
 
   try {
     const controller = new AbortController();
@@ -492,7 +513,7 @@ export function parseLLMResponse(content) {
 }
 
 // ========== Self-Learning ==========
-async function getRelevantPatterns(goal) {
+export async function getRelevantPatterns(goal) {
   try {
     const stored = await chrome.storage.local.get(['learned_patterns']);
     const patterns = stored.learned_patterns || [];
