@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Phase 2 - Complex UI Interactions (plan 01 complete, plan 02 remaining)
+**Current focus:** Phase 2 complete -- moving to Phase 3
 
 ## Current Position
 
-Phase: 2 of 4 (Complex UI Interactions)
-Plan: 1 of 2 in current phase (plan 01 complete)
-Status: In progress
-Last activity: 2026-04-24 -- Completed 02-01-PLAN.md
+Phase: 2 of 4 (Complex UI Interactions) -- PHASE COMPLETE
+Plan: 2 of 2 in current phase (both complete)
+Status: Phase complete
+Last activity: 2026-04-24 -- Completed 02-02-PLAN.md
 
-Progress: [████████░░░░░░░░░░] 30% (phase 2 plan 01 done)
+Progress: [████████████████████] 40% (phase 2 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: --
 - Total execution time: 0 hours
 
@@ -28,7 +28,7 @@ Progress: [████████░░░░░░░░░░] 30% (phase 2 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1     | 2     | 2     | --       |
-| 2     | 1     | 2     | --       |
+| 2     | 2     | 2     | --       |
 
 *Updated after each plan completion*
 
@@ -49,6 +49,11 @@ Progress: [████████░░░░░░░░░░] 30% (phase 2 
 - [02-01]: attachShadow patch at document_start via manifest content_scripts for closed shadow root capture
 - [02-01]: All dispatched events use { bubbles: true, composed: true } for shadow DOM boundary crossing
 - [02-01]: Old content.js preserved as reference, not deleted
+- [02-02]: Overlay detection is reactive (on action) not proactive -- avoids false positives on legitimate full-screen UIs
+- [02-02]: Cross-origin iframe commands use two-step injection (utility files first, then command runner function) because inline functions cannot access separately loaded content script modules
+- [02-02]: Frame index to Chrome frameId mapping is positional via webNavigation.getAllFrames
+- [02-02]: dismissOverlay never removes elements from DOM -- only clicks close buttons or presses Escape
+- [02-02]: Rich text editor APIs (Quill, TinyMCE, CKEditor) checked before execCommand fallback
 
 ### Pending Todos
 
@@ -60,9 +65,10 @@ None yet.
 - [Codebase]: `new Function()` in content.js -- security review needed but not blocking v1
 - [Codebase]: No test infrastructure -- deferred to v2 (TST-01, TST-02, TST-03)
 - [02-01]: Old content.js still exists alongside new content/ directory -- should be cleaned up after Phase 2 verification
+- [02-02]: Agent-engine.js LLM prompt context does not yet describe iframe/dropdown/overlay capabilities -- separate enhancement needed
 
 ## Session Continuity
 
 Last session: 2026-04-24
-Stopped at: Completed 02-01-PLAN.md
+Stopped at: Completed 02-02-PLAN.md (Phase 2 complete)
 Resume file: None
