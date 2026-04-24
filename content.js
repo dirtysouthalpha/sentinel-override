@@ -508,6 +508,74 @@ if (window.__sentinelInitialized) {
     return null;
   }
 
+  // ========== SPA Page Transition Detection ==========
+  function setupSPAObservers() {
+    let spaDebounce = null;
+
+    // 1. MutationObserver for DOM content changes (catches SPA renders)
+    const domObserver = new MutationObserver((mutations) => {
+      const significantChange = mutations.some(m =>
+        m.addedNodes.length > 0 || m.removedNodes.length > 0
+      );
+      if (significantChange) {
+        clearTimeout(spaDebounce);
+        spaDebounce = setTimeout(() => {
+          chrome.runtime.sendMessage({
+            action: 'spa_content_changed',
+            url: window.location.href
+          }).catch(() => {}); // non-critical, best-effort
+        }, 500); // 500ms debounce: wait for SPA render to settle
+      }
+    });
+
+    domObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    // 2. URL change detection (hash routing, pushState/replaceState)
+    let lastUrl = window.location.href;
+
+    const dispatchSPATransition = (url) => {
+      clearTimeout(spaDebounce);
+      spaDebounce = setTimeout(() => {
+        chrome.runtime.sendMessage({
+          action: 'spa_navigation',
+          url: url
+        }).catch(() => {});
+      }, 300);
+    };
+
+    // Patch pushState/replaceState for SPA routers
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    };
+
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    };
+
+    window.addEventListener('popstate', () => {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    });
+  }
+
+  setupSPAObservers();
+
   // Signal ready
   chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {});
 }
