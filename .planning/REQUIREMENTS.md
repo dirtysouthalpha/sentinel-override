@@ -13,11 +13,11 @@
 
 ### Complex UI Interactions
 
-- [ ] **UIX-01**: Agent reliably interacts with dropdowns and nested menus (hover, click, select)
-- [ ] **UIX-02**: Agent handles special input types — date pickers, file uploads, rich text editors
-- [ ] **UIX-03**: Agent interacts with elements inside iframes (cross-origin aware)
-- [ ] **UIX-04**: Agent interacts with shadow DOM elements
-- [ ] **UIX-05**: Agent handles modal dialogs, confirmation prompts, and overlay dismissal
+- [x] **UIX-01**: Agent reliably interacts with dropdowns and nested menus (hover, click, select) ✓ (2026-04-24)
+- [x] **UIX-02**: Agent handles special input types — date pickers, file uploads, rich text editors ✓ (2026-04-24)
+- [x] **UIX-03**: Agent interacts with elements inside iframes (cross-origin aware) ✓ (2026-04-24)
+- [x] **UIX-04**: Agent interacts with shadow DOM elements ✓ (2026-04-24)
+- [x] **UIX-05**: Agent handles modal dialogs, confirmation prompts, and overlay dismissal ✓ (2026-04-24)
 
 ### Multi-Tab Workflows
 
@@ -41,7 +41,7 @@
 
 - [x] **HEA-01**: Background.js is refactored into modular components (agent engine, LLM client, tab manager) ✓ (2026-04-24)
 - [x] **HEA-02**: Error handling is standardized across all message passing ✓ (2026-04-24)
-- [ ] **HEA-03**: Content script DOM operations are extracted into reusable utilities
+- [x] **HEA-03**: Content script DOM operations are extracted into reusable utilities ✓ (2026-04-24)
 
 ## v2 Requirements
 
@@ -76,12 +76,12 @@
 | REL-01 | Phase 1 | Complete |
 | REL-02 | Phase 1 | Complete |
 | REL-03 | Phase 1 | Complete |
-| UIX-01 | Phase 2 | Pending |
-| UIX-02 | Phase 2 | Pending |
-| UIX-03 | Phase 2 | Pending |
-| UIX-04 | Phase 2 | Pending |
-| UIX-05 | Phase 2 | Pending |
-| HEA-03 | Phase 2 | Pending |
+| UIX-01 | Phase 2 | Complete |
+| UIX-02 | Phase 2 | Complete |
+| UIX-03 | Phase 2 | Complete |
+| UIX-04 | Phase 2 | Complete |
+| UIX-05 | Phase 2 | Complete |
+| HEA-03 | Phase 2 | Complete |
 | TAB-01 | Phase 3 | Pending |
 | TAB-02 | Phase 3 | Pending |
 | TAB-03 | Phase 3 | Pending |

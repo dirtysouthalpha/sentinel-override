@@ -13,7 +13,7 @@ Transform the existing v3.1.3 Chrome extension from a functional prototype into 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Agent Engine Foundation** ✓ (2026-04-24) - Refactor background.js into modular components, standardize error handling, and fix agent reliability (stall recovery, planning accuracy, SPA transitions)
-- [ ] **Phase 2: Complex UI Interactions** - Enable the agent to handle dropdowns, iframes, shadow DOM, modals, special inputs, and extract content script DOM operations into reusable utilities
+- [x] **Phase 2: Complex UI Interactions** ✓ (2026-04-24) - Enable the agent to handle dropdowns, iframes, shadow DOM, modals, special inputs, and extract content script DOM operations into reusable utilities
 - [ ] **Phase 3: Multi-Tab Workflows** - Give the agent the ability to operate across multiple browser tabs with context tracking and cross-tab data correlation
 - [ ] **Phase 4: Reports & Multi-Provider LLM** - Add structured investigation report generation and support for switching between Claude and OpenAI backends
 
@@ -48,8 +48,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Extract content.js into content/ utility modules, implement shadow DOM piercing, and dropdown/nested menu interaction
-- [ ] 02-02: Implement special input types, iframe (cross-origin) support, and modal/overlay detection and dismissal
+- [x] 02-01: Extract content.js into content/ utility modules, implement shadow DOM piercing, and dropdown/nested menu interaction ✓ (2026-04-24)
+- [x] 02-02: Implement special input types, iframe (cross-origin) support, and modal/overlay detection and dismissal ✓ (2026-04-24)
 
 ### Phase 3: Multi-Tab Workflows
 **Goal**: The agent can operate across multiple browser tabs simultaneously, tracking context per tab and correlating data between them
@@ -87,7 +87,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Agent Engine Foundation | 2/2 | ✓ Complete | 2026-04-24 |
-| 2. Complex UI Interactions | 0/2 | Not started | - |
+| 2. Complex UI Interactions | 2/2 | ✓ Complete | 2026-04-24 |
 | 3. Multi-Tab Workflows | 0/1 | Not started | - |
 | 4. Reports & Multi-Provider LLM | 0/2 | Not started | - |
 
