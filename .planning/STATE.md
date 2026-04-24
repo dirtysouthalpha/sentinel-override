@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Phase 1 - Agent Engine Foundation
+**Current focus:** Phase 1 - Agent Engine Foundation (all plans complete)
 
 ## Current Position
 
 Phase: 1 of 4 (Agent Engine Foundation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-04-24 -- Completed 01-01-PLAN.md (modular refactor)
+Plan: 2 of 2 in current phase
+Status: All plans complete, ready for verification
+Last activity: 2026-04-24 -- Plan 01-02 complete (reliability features)
 
-Progress: [██        ] 14%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
+- Total plans completed: 2
 - Average duration: --
 - Total execution time: 0 hours
 
@@ -27,10 +27,7 @@ Progress: [██        ] 14%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1. Agent Engine Foundation | 1 | 2 | -- |
-| 2. Complex UI Interactions | 0 | 2 | -- |
-| 3. Multi-Tab Workflows | 0 | 1 | -- |
-| 4. Reports & Multi-Provider LLM | 0 | 2 | -- |
+| 1     | 2     | --    | --       |
 
 *Updated after each plan completion*
 
@@ -38,15 +35,13 @@ Progress: [██        ] 14%
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
 - [Roadmap]: Phase 1 prioritizes agent engine refactoring and reliability -- everything else depends on a solid foundation
-- [Roadmap]: Reports and multi-provider LLM combined into Phase 4 as independent value-adds (quick depth compression)
-- [01-01]: Strict one-way dependency graph: message-protocol -> llm-client/tab-manager -> agent-engine -> index.js (no circular imports)
-- [01-01]: content.js follows { ok, data, error } envelope pattern manually since content scripts cannot use ES module imports
-- [01-01]: saveLearnedPattern stays in agent-engine.js (needs agentMemory), getRelevantPatterns moved to llm-client.js (called from callLLM prompt building)
-- [01-01]: callLLM/callLLMWithRetry receive CONFIG and agentState as explicit parameters instead of closure access
+- [Roadmap]: Reports and multi-provider LLM combined into Phase 4 as independent value-adds
+- [01-01]: Dependency graph is strictly one-way: message-protocol has no imports; llm-client and tab-manager import only from message-protocol; agent-engine imports from all three; index.js imports from all
+- [01-01]: callLLM/callLLMWithRetry pass CONFIG and agentState as parameters (not closures) for clean module boundaries
+- [01-01]: getRelevantPatterns moved to llm-client.js, saveLearnedPattern stays in agent-engine.js
+- [01-02]: SPA transition flag lives in dedicated shared-state.js (not message-protocol.js) to maintain pure utility invariant
+- [01-02]: Stall detection uses `continue` for RESCAN_AND_REPLAN but not for FORCE_STRATEGY_SHIFT
 
 ### Pending Todos
 
@@ -55,11 +50,11 @@ None yet.
 ### Blockers/Concerns
 
 - [Codebase]: popup-full.js is ~12,571 lines (noted in concerns but not a v1 requirement -- monitor)
-- [Codebase]: `new Function()` in content.js line 229 -- security review needed but not blocking v1
+- [Codebase]: `new Function()` in content.js -- security review needed but not blocking v1
 - [Codebase]: No test infrastructure -- deferred to v2 (TST-01, TST-02, TST-03)
 
 ## Session Continuity
 
 Last session: 2026-04-24
-Stopped at: Completed 01-01-PLAN.md
+Stopped at: Phase 1 all plans complete, pending verification
 Resume file: None
