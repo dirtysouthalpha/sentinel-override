@@ -97,13 +97,22 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (el) return el;
     }
 
+    // Fallback: search inside shadow roots via queryDeepFirst
+    const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
+    if (shadow && shadow.queryDeepFirst) {
+      const shadowEl = shadow.queryDeepFirst(doc, selector);
+      if (shadowEl) return shadowEl;
+    }
+
     return null;
   };
 
   // ========== Document Scanning ==========
   dom.scanDocument = function(doc, interactiveElements, selectorMap, prefix) {
-    // Extended selector list -- includes enterprise/dashboard UI patterns
-    const elements = doc.querySelectorAll([
+    const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
+
+    // Interactive element selectors
+    const interactiveSelectors = [
       'button', 'a', 'input', 'select', 'textarea',
       '[role="button"]', '[role="link"]', '[role="checkbox"]', '[role="textbox"]',
       '[role="combobox"]', '[role="listbox"]', '[role="option"]', '[role="menuitem"]',
@@ -111,26 +120,53 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       '[contenteditable="true"]',
       '[tabindex]:not([tabindex="-1"])',
       '[onclick]'
-    ].join(', '));
+    ].join(', ');
 
+    // Scan light DOM
+    const elements = doc.querySelectorAll(interactiveSelectors);
     elements.forEach((el) => {
-      // Skip hidden, disabled, zero-size, or off-screen elements
       if (!dom.isVisible(el)) return;
-
-      const text = dom.getLabel(el);
-
-      const selector = prefix + dom.getUniqueSelector(el);
-      if (selectorMap.has(selector)) return;
-      selectorMap.set(selector, true);
-
-      interactiveElements.push({
-        index: interactiveElements.length,
-        tag: el.tagName,
-        text: text.substring(0, 100),
-        selector: selector,
-        role: el.getAttribute('role') || 'none',
-        type: el.getAttribute('type') || 'none'
-      });
+      dom._addElement(el, interactiveElements, selectorMap, prefix, false);
     });
+
+    // Also scan inside shadow roots for interactive elements
+    if (shadow && shadow.walkShadowTree && shadow.isInShadowDOM) {
+      shadow.walkShadowTree(doc, function(el) {
+        // Skip elements already in the light DOM (doc contains them)
+        if (el === doc || doc.contains(el)) return;
+        // Check if this element matches any interactive selector
+        try {
+          if (el.matches && el.matches(interactiveSelectors)) {
+            if (dom.isVisible(el)) {
+              dom._addElement(el, interactiveElements, selectorMap, prefix, shadow.isInShadowDOM(el));
+            }
+          }
+        } catch (e) { /* matches() not supported */ }
+      });
+    }
+  };
+
+  // Internal helper: add an element to the interactive elements list
+  dom._addElement = function(el, interactiveElements, selectorMap, prefix, inShadowDOM) {
+    const text = dom.getLabel(el);
+    const selector = prefix + dom.getUniqueSelector(el);
+    if (selectorMap.has(selector)) return;
+    selectorMap.set(selector, true);
+
+    const elementData = {
+      index: interactiveElements.length,
+      tag: el.tagName,
+      text: text.substring(0, 100),
+      selector: selector,
+      role: el.getAttribute('role') || 'none',
+      type: el.getAttribute('type') || 'none'
+    };
+
+    // Include shadow DOM metadata when applicable
+    if (inShadowDOM) {
+      elementData.inShadowDOM = true;
+    }
+
+    interactiveElements.push(elementData);
   };
 })();

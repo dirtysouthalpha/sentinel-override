@@ -130,7 +130,7 @@ if (window.__sentinelInitialized) {
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
         // Dispatch full mouse sequence -- many enterprise UIs (SonicWall, Cisco, etc.)
         // bind to mousedown/mouseup rather than click and won't respond to el.click() alone.
-        const mouseOpts = { bubbles: true, cancelable: true, view: targetDoc.defaultView };
+        const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
         el.click();
@@ -150,16 +150,16 @@ if (window.__sentinelInitialized) {
         // contenteditable div/span -- used by many enterprise dashboard filter/search inputs
         if (el.isContentEditable) {
           el.textContent = '';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
           // Use execCommand for broadest compatibility with SPA frameworks
           targetDoc.execCommand('selectAll', false, null);
           targetDoc.execCommand('delete', false, null);
           for (const char of text) {
             targetDoc.execCommand('insertText', false, char);
-            el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: char }));
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
           }
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-          el.dispatchEvent(new Event('blur', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
           return 'Typed into contenteditable ' + cmd.selector;
         }
@@ -173,21 +173,21 @@ if (window.__sentinelInitialized) {
             'value'
           ).set;
           nativeSetter.call(el, '');
-          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
           for (const char of text) {
             const currentVal = el.value;
             nativeSetter.call(el, currentVal + char);
-            el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: char }));
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
           }
-          el.dispatchEvent(new Event('change', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
           return 'Typed into ' + cmd.selector;
         }
 
         // Fallback for any other focusable element
         el.value = text;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
         return 'Typed into ' + cmd.selector;
       }
@@ -203,7 +203,7 @@ if (window.__sentinelInitialized) {
         if (el.tagName !== 'SELECT') return 'Element is not a <select>: ' + cmd.selector;
         hl.highlightElement(el);
         el.value = cmd.value;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
         return 'Selected "' + cmd.value + '" in ' + cmd.selector;
       }
@@ -213,9 +213,9 @@ if (window.__sentinelInitialized) {
         if (!el) return 'Element not found: ' + cmd.selector;
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
-        const hoverEvent = new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: targetDoc.defaultView });
+        const hoverEvent = new MouseEvent('mouseover', { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView });
         el.dispatchEvent(hoverEvent);
-        el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+        el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
         return 'Hovered over ' + cmd.selector;
       }
@@ -229,9 +229,9 @@ if (window.__sentinelInitialized) {
         };
         const keyVal = keyMap[key] || key;
         const activeEl = targetDoc.activeElement || document.body;
-        activeEl.dispatchEvent(new KeyboardEvent('keydown', { key: keyVal, bubbles: true }));
-        activeEl.dispatchEvent(new KeyboardEvent('keyup', { key: keyVal, bubbles: true }));
-        if (keyVal === 'Enter') activeEl.dispatchEvent(new KeyboardEvent('keypress', { key: keyVal, bubbles: true }));
+        activeEl.dispatchEvent(new KeyboardEvent('keydown', { key: keyVal, bubbles: true, composed: true }));
+        activeEl.dispatchEvent(new KeyboardEvent('keyup', { key: keyVal, bubbles: true, composed: true }));
+        if (keyVal === 'Enter') activeEl.dispatchEvent(new KeyboardEvent('keypress', { key: keyVal, bubbles: true, composed: true }));
         return 'Pressed key: ' + key;
       }
 
