@@ -50,6 +50,9 @@ const CONTENT_SCRIPT_FILES = [
   'content/highlight.js',
   'content/wait-utils.js',
   'content/dropdown-utils.js',
+  'content/special-inputs.js',
+  'content/overlay-detector.js',
+  'content/frame-manager.js',
   'content/index.js'
 ];
 

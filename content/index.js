@@ -15,6 +15,9 @@ if (window.__sentinelInitialized) {
   const hl = window.__sentinelUtils.highlight;
   const wait = window.__sentinelUtils.wait;
   const dd = window.__sentinelUtils.dropdown;
+  const si = window.__sentinelUtils.specialInputs;
+  const ov = window.__sentinelUtils.overlay;
+  const fm = window.__sentinelUtils.frame;
 
   // ========== Message Handler ==========
   async function handleMessage(request) {
@@ -23,16 +26,15 @@ if (window.__sentinelInitialized) {
         const interactiveElements = [];
         const selectorMap = new Map();
         dom.scanDocument(document, interactiveElements, selectorMap, '');
-        // Scan iframes
-        try {
-          const iframes = document.querySelectorAll('iframe');
-          iframes.forEach((iframe, frameIndex) => {
-            try {
-              const iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
-              if (iframeDoc) dom.scanDocument(iframeDoc, interactiveElements, selectorMap, `frame:${frameIndex}:`);
-            } catch (e) { /* cross-origin */ }
-          });
-        } catch (e) {}
+        // Scan iframes using frame-manager (handles same-origin and cross-origin placeholders)
+        if (fm && fm.scanIframes) {
+          try {
+            const iframeResult = fm.scanIframes(document);
+            if (iframeResult.elements) {
+              iframeResult.elements.forEach(el => interactiveElements.push(el));
+            }
+          } catch (e) { /* fallback: no iframe scanning */ }
+        }
         return { elements: interactiveElements };
       }
 
@@ -88,6 +90,32 @@ if (window.__sentinelInitialized) {
         return await wait.handleWaitFor(request.condition);
       }
 
+      case 'read_iframe': {
+        const frameIndex = request.frameIndex || 0;
+        const iframes = document.querySelectorAll('iframe');
+        if (!iframes[frameIndex]) throw new Error('Iframe not found at index ' + frameIndex);
+        try {
+          const iframeDoc = iframes[frameIndex].contentWindow.document;
+          const title = iframeDoc.title || '';
+          const url = iframes[frameIndex].src || '';
+          let content = '';
+          const mainSelectors = ['main', '[role="main"]', 'article', '#main-content', '#content'];
+          let mainEl = null;
+          for (const sel of mainSelectors) {
+            mainEl = iframeDoc.querySelector(sel);
+            if (mainEl) break;
+          }
+          if (mainEl) {
+            content = (mainEl.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+          } else {
+            content = (iframeDoc.body ? iframeDoc.body.innerText : '').replace(/\n{3,}/g, '\n\n').trim();
+          }
+          return { content: 'Iframe Title: ' + title + '\nURL: ' + url + '\n\n' + content };
+        } catch (e) {
+          return { ok: false, error: 'Cross-origin iframe -- use background routing' };
+        }
+      }
+
       default:
         throw new Error('Unknown action: ' + request.action);
     }
@@ -107,19 +135,48 @@ if (window.__sentinelInitialized) {
 
     // Check if command targets an iframe
     if (selector && selector.startsWith('frame:')) {
-      const parts = selector.split(':');
-      const frameIndex = parseInt(parts[1]);
-      const iframeSelector = parts.slice(2).join(':');
-      const iframes = document.querySelectorAll('iframe');
-      if (iframes[frameIndex]) {
-        try {
-          targetDoc = iframes[frameIndex].contentWindow.document;
-          selector = iframeSelector;
-        } catch (e) {
-          return 'Cannot access iframe (cross-origin)';
+      if (fm && fm.findInIframe) {
+        const iframeResult = fm.findInIframe(document, selector);
+        if (!iframeResult) return 'Iframe not found for selector: ' + selector;
+
+        if (iframeResult.crossOrigin) {
+          // Cross-origin: delegate to background script via chrome.runtime.sendMessage
+          return new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+              action: 'execute_in_frame',
+              frameIndex: iframeResult.frameIndex,
+              command: cmd
+            }, (response) => {
+              if (chrome.runtime.lastError) {
+                resolve('Cross-origin iframe error: ' + chrome.runtime.lastError.message);
+              } else if (response && response.ok) {
+                resolve(JSON.stringify(response.data || response));
+              } else {
+                resolve('Cross-origin iframe error: ' + (response ? response.error : 'Unknown error'));
+              }
+            });
+          });
         }
+
+        // Same-origin: use the iframe's document
+        targetDoc = iframeResult.frameDoc;
+        selector = iframeResult.remainingSelector || '';
       } else {
-        return 'Iframe not found at index ' + frameIndex;
+        // Fallback: basic iframe handling without frame-manager
+        const parts = selector.split(':');
+        const frameIndex = parseInt(parts[1]);
+        const iframeSelector = parts.slice(2).join(':');
+        const iframes = document.querySelectorAll('iframe');
+        if (iframes[frameIndex]) {
+          try {
+            targetDoc = iframes[frameIndex].contentWindow.document;
+            selector = iframeSelector;
+          } catch (e) {
+            return 'Cannot access iframe (cross-origin)';
+          }
+        } else {
+          return 'Iframe not found at index ' + frameIndex;
+        }
       }
     }
 
@@ -127,6 +184,19 @@ if (window.__sentinelInitialized) {
       case 'click': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        // Reactive overlay check: is the target element blocked?
+        if (ov && ov.isOverlayBlocking) {
+          const blocking = ov.isOverlayBlocking(targetDoc, el);
+          if (blocking) {
+            const dismissed = ov.dismissOverlay(targetDoc, blocking);
+            if (!dismissed) {
+              return 'Element blocked by overlay that could not be dismissed: ' + cmd.selector;
+            }
+            await wait.sleep(300);
+          }
+        }
+
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
         // Dispatch full mouse sequence -- many enterprise UIs (SonicWall, Cisco, etc.)
@@ -138,39 +208,44 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         hl.removeHighlight(el);
 
-        // Basic overlay check: if click had no effect, check for blocking modal/dialog
-        // Full overlay handling is Plan 02-02; this is a minimal reactive check
-        const overlays = targetDoc.querySelectorAll('[aria-modal="true"], [role="dialog"]');
-        let blockingOverlay = null;
-        overlays.forEach(function(overlay) {
-          if (dom.isVisible(overlay)) blockingOverlay = overlay;
-        });
-        if (blockingOverlay) {
-          // Try pressing Escape to dismiss the overlay, then retry
-          const activeEl = targetDoc.activeElement || targetDoc.body;
-          activeEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
-          activeEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true, composed: true }));
-          await wait.sleep(300);
-          // Retry click after dismiss
-          hl.highlightElement(el);
-          el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-          el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-          el.click();
-          el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
-          hl.removeHighlight(el);
-          return 'Clicked ' + cmd.selector + ' (dismissed overlay and retried)';
-        }
-
         return 'Clicked ' + cmd.selector;
       }
 
       case 'type': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        // Reactive overlay check: is the target element blocked?
+        if (ov && ov.isOverlayBlocking) {
+          const blocking = ov.isOverlayBlocking(targetDoc, el);
+          if (blocking) {
+            const dismissed = ov.dismissOverlay(targetDoc, blocking);
+            if (!dismissed) {
+              return 'Element blocked by overlay that could not be dismissed: ' + cmd.selector;
+            }
+            await wait.sleep(300);
+          }
+        }
+
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
         el.focus();
         const text = cmd.text || '';
+
+        // Rich text editor (Quill, TinyMCE, CKEditor, contenteditable with rich content)
+        if (si && si.isRichTextEditor && si.isRichTextEditor(el)) {
+          const result = si.setRichTextValue(el, text);
+          hl.removeHighlight(el);
+          return 'Typed into rich text editor ' + cmd.selector + ' (' + result.method + ')';
+        }
+
+        // Date input
+        if (si && si.isDateInput && si.isDateInput(el)) {
+          const result = si.setDatePickerValue(el, text);
+          hl.removeHighlight(el);
+          if (result.success) return 'Set date to ' + text + ' (' + result.method + ')';
+          return 'Failed to set date: ' + (result.error || 'unknown error');
+        }
 
         // contenteditable div/span -- used by many enterprise dashboard filter/search inputs
         if (el.isContentEditable) {
@@ -217,6 +292,17 @@ if (window.__sentinelInitialized) {
         return 'Typed into ' + cmd.selector;
       }
 
+      case 'upload_file': {
+        const el = dom.findElementBySelector(targetDoc, selector);
+        if (!el) return 'Element not found: ' + cmd.selector;
+        if (el.type !== 'file') return 'Element is not a file input: ' + cmd.selector;
+        hl.highlightElement(el);
+        const uploaded = si && si.uploadFile && si.uploadFile(el, cmd.file_name || 'file.txt', cmd.mime_type || 'text/plain', cmd.content || '');
+        hl.removeHighlight(el);
+        if (uploaded) return 'Uploaded file ' + (cmd.file_name || 'file.txt') + ' to ' + cmd.selector;
+        return 'Failed to upload file to ' + cmd.selector;
+      }
+
       case 'scroll': {
         targetDoc.defaultView.scrollBy(0, cmd.amount || 0);
         return 'Scrolled ' + (cmd.amount || 0);
@@ -225,6 +311,18 @@ if (window.__sentinelInitialized) {
       case 'select': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        // Reactive overlay check: is the target element blocked?
+        if (ov && ov.isOverlayBlocking) {
+          const blocking = ov.isOverlayBlocking(targetDoc, el);
+          if (blocking) {
+            const dismissed = ov.dismissOverlay(targetDoc, blocking);
+            if (!dismissed) {
+              return 'Element blocked by overlay that could not be dismissed: ' + cmd.selector;
+            }
+            await wait.sleep(300);
+          }
+        }
 
         // Check for custom dropdown (non-native <select>)
         if (dd && dd.isCustomDropdown && dd.isCustomDropdown(el)) {
@@ -274,6 +372,19 @@ if (window.__sentinelInitialized) {
       case 'hover': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        // Reactive overlay check: is the target element blocked?
+        if (ov && ov.isOverlayBlocking) {
+          const blocking = ov.isOverlayBlocking(targetDoc, el);
+          if (blocking) {
+            const dismissed = ov.dismissOverlay(targetDoc, blocking);
+            if (!dismissed) {
+              return 'Element blocked by overlay that could not be dismissed: ' + cmd.selector;
+            }
+            await wait.sleep(300);
+          }
+        }
+
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
         const hoverEvent = new MouseEvent('mouseover', { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView });

@@ -5,6 +5,7 @@ import { startAgent, stopAgent, agentTabId, agentRunning } from './agent-engine.
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending } from './shared-state.js';
+import { enumerateFrames, executeInFrame, resolveFrameForSelector } from './frame-router.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -58,6 +59,18 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         setSPATransitionPending();
       }
       return null;
+
+    // Cross-origin iframe commands from content script
+    case 'execute_in_frame': {
+      const { frameIndex, command } = request;
+      const frameId = await resolveFrameForSelector(agentTabId, frameIndex);
+      if (!frameId) throw new Error('Frame ' + frameIndex + ' not found');
+      return await executeInFrame(agentTabId, frameId, command);
+    }
+
+    case 'enumerate_frames': {
+      return await enumerateFrames(agentTabId);
+    }
 
     default:
       throw new Error(`Unknown action: ${request.action}`);
