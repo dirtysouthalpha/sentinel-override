@@ -45,11 +45,11 @@ Plans:
   3. Agent interacts with elements inside iframes (including cross-origin) and shadow DOM elements that were previously inaccessible
   4. Agent dismisses modal dialogs, confirmation prompts, and overlay popups that block the main UI
   5. Content script DOM operations are extracted into reusable utility functions rather than being scattered inline
-**Plans**: 2-3 plans
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Extract content script DOM operations into reusable utilities and implement dropdown/nested menu interaction
-- [ ] 02-02: Implement special input types (date pickers, file uploads, rich text), iframe and shadow DOM interaction, and modal/overlay handling
+- [ ] 02-01: Extract content.js into content/ utility modules, implement shadow DOM piercing, and dropdown/nested menu interaction
+- [ ] 02-02: Implement special input types, iframe (cross-origin) support, and modal/overlay detection and dismissal
 
 ### Phase 3: Multi-Tab Workflows
 **Goal**: The agent can operate across multiple browser tabs simultaneously, tracking context per tab and correlating data between them
