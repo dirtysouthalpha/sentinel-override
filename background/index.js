@@ -1,9 +1,10 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentTabId } from './agent-engine.js';
+import { startAgent, stopAgent, agentTabId, agentRunning } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
+import { setSPATransitionPending } from './shared-state.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -49,9 +50,13 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return stopAgent();
     }
 
-    // SPA messages from content script (handled in 01-02)
+    // SPA messages from content script
     case 'spa_navigation':
     case 'spa_content_changed':
+      // Only set flag if agent is running (ignore transitions when idle)
+      if (agentRunning) {
+        setSPATransitionPending();
+      }
       return null;
 
     default:

@@ -5,6 +5,7 @@
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
+import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -179,6 +180,19 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate(`Reached step limit (${CONFIG.maxSteps}). Finishing.`, stepCount);
         chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Reached step limit of ${CONFIG.maxSteps}. Task may be incomplete.` }).catch(() => {});
         break;
+      }
+
+      // Check for pending SPA transition -- if the page changed under us,
+      // re-scan instead of using stale observation data
+      if (isSPATransitionPending()) {
+        sendSilentUpdate('SPA page transition detected -- re-scanning...', stepCount);
+        clearSPATransition();
+        // Invalidate screenshot cache
+        cachedBase64Image = null;
+        lastScreenshotUrl = null;
+        // Don't skip the iteration -- just let the normal observe/scan flow run
+        // with fresh data. The continue is NOT used here because we want the
+        // normal flow to pick up the new page state.
       }
 
       let tab = workingTabId;
