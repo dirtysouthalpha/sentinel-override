@@ -42,6 +42,11 @@ const CONFIG = {
   maxStoredHistory: 20,
   maxLearnedPatterns: 100,
   strategyShiftThreshold: 3,
+  stallConfig: {
+    similarityWindow: 3,        // Look at last N actions for repeated identical failures
+    maxConsecutiveFailures: 5,  // Hard limit: force recovery after this many total failures
+    stateRecheckSteps: 3,       // After N same-result steps, force re-scan
+  },
 };
 
 // ========== State Reset ==========
@@ -83,6 +88,43 @@ export function stopAgent() {
   agentRunning = false;
   agentTabId = null;
   return 'Agent stopped';
+}
+
+// ========== Stall Detection ==========
+function detectStall(history, consecutiveFailures, currentStrategies) {
+  const recent = history.slice(-CONFIG.stallConfig.similarityWindow);
+
+  // Check 1: All recent actions are the same type with the same failure result
+  if (recent.length >= CONFIG.stallConfig.similarityWindow) {
+    const allSameType = recent.every(h => h.action.type === recent[0].action.type);
+    const allSameResult = recent.every(h => h.result === recent[0].result);
+    const allFailed = recent.every(h =>
+      h.result.includes('not found') ||
+      h.result.startsWith('Error') ||
+      h.result.includes('timed out') ||
+      h.result.includes('Element not found') ||
+      h.result.includes('No element')
+    );
+
+    if (allSameType && allSameResult && allFailed) {
+      return {
+        stalled: true,
+        reason: `Repeated "${recent[0].action.type}" with same failure: "${recent[0].result}"`,
+        recoveryAction: 'RESCAN_AND_REPLAN'
+      };
+    }
+  }
+
+  // Check 2: High consecutive failures regardless of action type
+  if (consecutiveFailures >= CONFIG.stallConfig.maxConsecutiveFailures) {
+    return {
+      stalled: true,
+      reason: `${consecutiveFailures} consecutive failures without progress`,
+      recoveryAction: 'FORCE_STRATEGY_SHIFT'
+    };
+  }
+
+  return { stalled: false };
 }
 
 // ========== Main Agent Loop ==========
@@ -448,6 +490,38 @@ async function runAgentLoop(goal, workingTabId) {
       } else {
         consecutiveFailures = 0;
         currentStrategies = [];
+      }
+
+      // Check for stall
+      const stall = detectStall(history, consecutiveFailures, currentStrategies);
+      if (stall.stalled) {
+        sendSilentUpdate(`Stall detected: ${stall.reason}. Recovering...`, stepCount);
+
+        if (stall.recoveryAction === 'RESCAN_AND_REPLAN') {
+          // Force re-scan and replan from current page state
+          agentPlan = null;
+          currentPlanStep = 0;
+          consecutiveFailures = 0;
+          currentStrategies = [];
+
+          // Inject stall context into history so the LLM knows what happened
+          history.push({
+            step: stepCount,
+            action: { type: 'note', text: `STALL RECOVERY: Re-assessing page state. Previous approach: ${stall.reason}` },
+            result: 'Stall detected -- forcing page re-scan and strategy change'
+          });
+          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+
+          // Skip the normal sleep to recover faster
+          continue;
+        }
+
+        if (stall.recoveryAction === 'FORCE_STRATEGY_SHIFT') {
+          // Bump consecutiveFailures above threshold to ensure strategyCtx fires in callLLM
+          consecutiveFailures = Math.max(consecutiveFailures, CONFIG.strategyShiftThreshold);
+          // Don't continue -- let the normal flow proceed with the strategy shift prompt injected
+        }
       }
 
       sendActionResult(stepCount, result, actionFailed);
