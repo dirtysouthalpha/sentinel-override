@@ -7,9 +7,9 @@
 
 ### Agent Reliability
 
-- [ ] **REL-01**: Agent detects when it's stuck (no progress after N iterations) and autonomously recovers by re-assessing page state
-- [ ] **REL-02**: Agent planning produces step sequences that accurately reflect the user's stated goal, not generic approximations
-- [ ] **REL-03**: Agent handles SPA page transitions — detects content changes without full navigation and re-scans DOM
+- [x] **REL-01**: Agent detects when it's stuck (no progress after N iterations) and autonomously recovers by re-assessing page state ✓ (2026-04-24)
+- [x] **REL-02**: Agent planning produces step sequences that accurately reflect the user's stated goal, not generic approximations ✓ (2026-04-24)
+- [x] **REL-03**: Agent handles SPA page transitions — detects content changes without full navigation and re-scans DOM ✓ (2026-04-24)
 
 ### Complex UI Interactions
 
@@ -39,8 +39,8 @@
 
 ### Codebase Health
 
-- [ ] **HEA-01**: Background.js is refactored into modular components (agent engine, LLM client, tab manager)
-- [ ] **HEA-02**: Error handling is standardized across all message passing
+- [x] **HEA-01**: Background.js is refactored into modular components (agent engine, LLM client, tab manager) ✓ (2026-04-24)
+- [x] **HEA-02**: Error handling is standardized across all message passing ✓ (2026-04-24)
 - [ ] **HEA-03**: Content script DOM operations are extracted into reusable utilities
 
 ## v2 Requirements
@@ -71,11 +71,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HEA-01 | Phase 1 | Pending |
-| HEA-02 | Phase 1 | Pending |
-| REL-01 | Phase 1 | Pending |
-| REL-02 | Phase 1 | Pending |
-| REL-03 | Phase 1 | Pending |
+| HEA-01 | Phase 1 | Complete |
+| HEA-02 | Phase 1 | Complete |
+| REL-01 | Phase 1 | Complete |
+| REL-02 | Phase 1 | Complete |
+| REL-03 | Phase 1 | Complete |
 | UIX-01 | Phase 2 | Pending |
 | UIX-02 | Phase 2 | Pending |
 | UIX-03 | Phase 2 | Pending |
