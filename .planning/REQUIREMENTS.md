@@ -71,6 +71,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| HEA-01 | Phase 1 | Pending |
+| HEA-02 | Phase 1 | Pending |
 | REL-01 | Phase 1 | Pending |
 | REL-02 | Phase 1 | Pending |
 | REL-03 | Phase 1 | Pending |
@@ -79,24 +81,22 @@
 | UIX-03 | Phase 2 | Pending |
 | UIX-04 | Phase 2 | Pending |
 | UIX-05 | Phase 2 | Pending |
+| HEA-03 | Phase 2 | Pending |
 | TAB-01 | Phase 3 | Pending |
 | TAB-02 | Phase 3 | Pending |
 | TAB-03 | Phase 3 | Pending |
 | RPT-01 | Phase 4 | Pending |
 | RPT-02 | Phase 4 | Pending |
 | RPT-03 | Phase 4 | Pending |
-| LLM-01 | Phase 5 | Pending |
-| LLM-02 | Phase 5 | Pending |
-| LLM-03 | Phase 5 | Pending |
-| HEA-01 | Phase 1 | Pending |
-| HEA-02 | Phase 1 | Pending |
-| HEA-03 | Phase 2 | Pending |
+| LLM-01 | Phase 4 | Pending |
+| LLM-02 | Phase 4 | Pending |
+| LLM-03 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 17 total
-- Mapped to phases: 17
-- Unmapped: 0 ✓
+- v1 requirements: 20 total
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-24*
-*Last updated: 2026-04-24 after initial definition*
+*Last updated: 2026-04-24 after roadmap creation*
