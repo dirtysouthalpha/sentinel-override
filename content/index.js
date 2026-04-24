@@ -14,6 +14,7 @@ if (window.__sentinelInitialized) {
   const dom = window.__sentinelUtils.dom;
   const hl = window.__sentinelUtils.highlight;
   const wait = window.__sentinelUtils.wait;
+  const dd = window.__sentinelUtils.dropdown;
 
   // ========== Message Handler ==========
   async function handleMessage(request) {
@@ -136,6 +137,30 @@ if (window.__sentinelInitialized) {
         el.click();
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         hl.removeHighlight(el);
+
+        // Basic overlay check: if click had no effect, check for blocking modal/dialog
+        // Full overlay handling is Plan 02-02; this is a minimal reactive check
+        const overlays = targetDoc.querySelectorAll('[aria-modal="true"], [role="dialog"]');
+        let blockingOverlay = null;
+        overlays.forEach(function(overlay) {
+          if (dom.isVisible(overlay)) blockingOverlay = overlay;
+        });
+        if (blockingOverlay) {
+          // Try pressing Escape to dismiss the overlay, then retry
+          const activeEl = targetDoc.activeElement || targetDoc.body;
+          activeEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
+          activeEl.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', bubbles: true, composed: true }));
+          await wait.sleep(300);
+          // Retry click after dismiss
+          hl.highlightElement(el);
+          el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+          el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+          el.click();
+          el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+          hl.removeHighlight(el);
+          return 'Clicked ' + cmd.selector + ' (dismissed overlay and retried)';
+        }
+
         return 'Clicked ' + cmd.selector;
       }
 
@@ -200,6 +225,44 @@ if (window.__sentinelInitialized) {
       case 'select': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        // Check for custom dropdown (non-native <select>)
+        if (dd && dd.isCustomDropdown && dd.isCustomDropdown(el)) {
+          hl.highlightElement(el);
+          const options = await dd.openDropdown(targetDoc, el);
+          if (!options) {
+            // Failed to open via dropdown utils, fall back to standard click
+            el.click();
+            await wait.sleep(500);
+            const retryOptions = dd.findDropdownOptions(targetDoc, el);
+            if (!retryOptions || retryOptions.length === 0) {
+              hl.removeHighlight(el);
+              return 'Failed to open dropdown: ' + cmd.selector;
+            }
+            const selected = await dd.selectDropdownOption(targetDoc, retryOptions, cmd.value);
+            if (!selected) {
+              const availableTexts = retryOptions.map(o => (o.innerText || o.textContent || '').trim()).join(', ');
+              dd.dismissDropdown(targetDoc);
+              hl.removeHighlight(el);
+              return 'Error: No matching option "' + cmd.value + '". Available: ' + availableTexts;
+            }
+            dd.dismissDropdown(targetDoc);
+            hl.removeHighlight(el);
+            return 'Selected "' + cmd.value + '" in dropdown ' + cmd.selector;
+          }
+          const selected = await dd.selectDropdownOption(targetDoc, options, cmd.value);
+          if (!selected) {
+            const availableTexts = options.map(o => (o.innerText || o.textContent || '').trim()).join(', ');
+            dd.dismissDropdown(targetDoc);
+            hl.removeHighlight(el);
+            return 'Error: No matching option "' + cmd.value + '". Available: ' + availableTexts;
+          }
+          dd.dismissDropdown(targetDoc);
+          hl.removeHighlight(el);
+          return 'Selected "' + cmd.value + '" in dropdown ' + cmd.selector;
+        }
+
+        // Native <select> element
         if (el.tagName !== 'SELECT') return 'Element is not a <select>: ' + cmd.selector;
         hl.highlightElement(el);
         el.value = cmd.value;
@@ -217,7 +280,21 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(hoverEvent);
         el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
-        return 'Hovered over ' + cmd.selector;
+
+        // Check if a submenu appeared after hovering
+        let result = 'Hovered over ' + cmd.selector;
+        if (dd) {
+          await wait.sleep(500);
+          const subItems = dd.findDropdownOptions(targetDoc, el);
+          if (subItems && subItems.length > 0) {
+            const submenuTexts = subItems
+              .map(item => (item.innerText || item.textContent || '').trim())
+              .filter(t => t.length > 0)
+              .slice(0, 20);
+            result += '. Submenu items available: ' + submenuTexts.join(', ');
+          }
+        }
+        return result;
       }
 
       case 'press_key': {
@@ -307,6 +384,27 @@ if (window.__sentinelInitialized) {
           return item;
         });
         return JSON.stringify({ key: cmd.key, value: items });
+      }
+
+      case 'open_dropdown': {
+        const el = dom.findElementBySelector(targetDoc, selector);
+        if (!el) return 'Element not found: ' + cmd.selector;
+        hl.highlightElement(el);
+        if (dd) {
+          const options = await dd.openDropdown(targetDoc, el);
+          if (!options || options.length === 0) {
+            hl.removeHighlight(el);
+            return 'Failed to open dropdown or no options found: ' + cmd.selector;
+          }
+          const optionTexts = options
+            .map(o => (o.innerText || o.textContent || '').trim())
+            .filter(t => t.length > 0)
+            .slice(0, 50);
+          hl.removeHighlight(el);
+          return 'Dropdown opened. Options: ' + optionTexts.join(', ');
+        }
+        hl.removeHighlight(el);
+        return 'Dropdown utilities not available';
       }
 
       default:

@@ -9,7 +9,8 @@
     "tabs",
     "sidePanel",
     "storage",
-    "debugger"
+    "debugger",
+    "webNavigation"
   ],
   "action": {
     "default_title": "Sentinel Override",
@@ -35,5 +36,13 @@
   },
   "host_permissions": [
     "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/shadow-intercept.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
   ]
 }

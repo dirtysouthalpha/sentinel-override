@@ -44,11 +44,20 @@ export function createContentScriptListener(tabId, timeout = 3000) {
  * @param {number} [maxAttempts=3]
  * @returns {Promise<boolean>}
  */
+const CONTENT_SCRIPT_FILES = [
+  'content/dom-utils.js',
+  'content/shadow-dom.js',
+  'content/highlight.js',
+  'content/wait-utils.js',
+  'content/dropdown-utils.js',
+  'content/index.js'
+];
+
 export async function injectContentScript(tabId, maxAttempts = 3) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const csListener = createContentScriptListener(tabId);
     try {
-      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES });
       const scriptReady = await csListener.promise;
       if (scriptReady) return true;
     } catch (err) { csListener.cancel(); }
@@ -65,7 +74,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
     } catch (err) {
       if (i < maxRetries - 1) {
         const csListener = createContentScriptListener(tabId, 2000);
-        try { await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] }); await csListener.promise; } catch (e) { csListener.cancel(); }
+        try { await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES }); await csListener.promise; } catch (e) { csListener.cancel(); }
         await sleep(500 * (i + 1));
       } else { throw err; }
     }
