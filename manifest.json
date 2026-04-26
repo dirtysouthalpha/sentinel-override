@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "SentinelAgent Browser",
+  "version": "1.1",
+  "description": "Professional browser automation powered by Sentient AI",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "sidePanel",
+    "storage"
+  ],
+  "action": {
+    "default_title": "SentinelAgent",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png",
+    "256": "icon-256.png"
+  },
+  "background": {
+    "service_worker": "background.js", "type": "module"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}

@@ -1,0 +1,23 @@
+# Backups
+*.BACKUP
+*.venice-backup
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+.gitkeep
+
+# Node (if any)
+node_modules/
+package-lock.json
+package.json
+
+# IDE
+.vscode/
+.idea/
+
+# Secrets (never commit API keys)
+*.env
+*.key
+secrets*
