@@ -166,8 +166,73 @@ const COST_SAFETY = {
   }
 };
 
+// ---------- OpenRouter Affordable Models ----------
+const OPENROUTER_AFFORDABLE = {
+    // model identifier : { input_per_1k, output_per_1k }
+    'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 }, // $0.20 per 1k tokens total
+    'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },   // $0.12 per 1k tokens total
+    'cohere/command-r-plus': { input: 0.25, output: 0.25 }               // $0.50 per 1k tokens total
+};
 
+function validateOpenRouterModel(modelName) {
+    const cfg = OPENROUTER_AFFORDABLE[modelName];
+    if (!cfg) {
+        console.warn('[CostSafety] Model not in affordable list, using default safe model.');
+        return 'mistralai/mistral-7b-instruct-v0.2';
+    }
+    const total = cfg.input + cfg.output;
+    if (total > 0.50) {
+        console.warn(`[CostSafety] Model ${modelName} exceeds $0.50/1k (currently $${total.toFixed(2)}). Falling back.`);
+        return 'mistralai/mistral-7b-instruct-v0.2';
+    }
+    return modelName;
+}
+
+async function callLLM(prompt, opts = {}) {
+    let model = opts.model || 'mistralai/mistral-7b-instruct-v0.2';
+    model = validateOpenRouterModel(model);
+    const settings = await chrome.storage.local.get(['api_endpoint', 'api_key']);
+    const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+    const apiKey = settings.api_key;
+    const body = {
+        model: model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: opts.max_tokens || 1024,
+        temperature: opts.temperature || 0.3
+    };
+    const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    return data.choices[0].message.content;
+}
+// ---------- Claude‑style tab handling ----------
+function openOrFocusTab(url) {
+    chrome.tabs.query({ url: url }, function (tabs) {
+        if (tabs.length > 0) {
+            chrome.tabs.update(tabs[0].id, { active: true });
+        } else {
+            chrome.tabs.create({ url: url, active: true });
+        }
+    });
+}
+
+// ---------- Message routing (popup ↔ background ↔ content) ----------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "runPrompt") {
+        callLLM(request.prompt).then(resp => {
+            sendResponse({ reply: resp });
+            if (request.openInNewTab && resp.resultUrl) {
+                openOrFocusTab(resp.resultUrl);
+            }
+        }).catch(err => sendResponse({ error: err.message }));
+        return true; // async response
+    }
+    // Existing handlers continue below…
+    return false;
+});
   if (request.action === 'execute_command') {
     // Execute on the specific agent tab, not the active tab
     if (!agentTabId) {

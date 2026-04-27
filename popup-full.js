@@ -137,47 +137,29 @@ function removeApprovalCard() {
 function respondApproval(decision) {
   removeApprovalCard();
   chrome.runtime.sendMessage({
-    action: 'approval_response',
-    approved: decision === 'approved',
-    skipped: decision === 'skipped',
-    rejected: decision === 'rejected'
-  }).catch(() => {});
-
-  if (decision === 'rejected') {
-    addMessage('Command rejected by user.', 'assistant');
-  }
+// Replace direct LLM call with background message routing
+if (sendBtn) {
+    sendBtn.addEventListener('click', () => {
+        const promptInput = document.getElementById('goalInput') || document.getElementById('promptInput');
+        const prompt = promptInput ? promptInput.value : '';
+        if (!prompt) return;
+        // Show typing indicator
+        showTypingIndicator();
+        chrome.runtime.sendMessage({
+            action: 'runPrompt',
+            prompt: prompt,
+            openInNewTab: true
+        }, response => {
+            removeTypingIndicator();
+            if (response.error) {
+                console.error('Prompt error:', response.error);
+                addMessage('Error: ' + response.error, 'assistant');
+            } else {
+                addMessage(response.reply, 'assistant');
+            }
+        });
+    });
 }
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ========== Claude-style Action Cards ==========
-function addActionCard(payload) {
-  const welcome = chatContainer.querySelector('.welcome-message');
-  if (welcome) welcome.remove();
-
-  const group = document.createElement('div');
-  group.className = 'message-group agent-action-group';
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper assistant-wrapper';
-
-  const msg = document.createElement('div');
-  msg.className = 'message assistant-msg agent-action-card';
-  msg.id = `agent-action-${payload.stepNumber}`;
-
-  const inner = document.createElement('div');
-  inner.className = 'agent-action-inner';
-
-  const header = document.createElement('div');
-  header.className = 'agent-action-header';
-
-  const typeLabel = document.createElement('span');
-  typeLabel.className = 'agent-action-type';
-  typeLabel.textContent = payload.type;
 
   const stepLabel = document.createElement('span');
   stepLabel.className = 'agent-action-step';
