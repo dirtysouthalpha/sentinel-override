@@ -49,7 +49,7 @@ What makes Sentinel Override *different* from Claude for Chrome, Browser Use, et
 | **Multi-Provider** | ✅ OpenRouter, Venice, z.ai | ❌ Claude only | ❌ Limited |
 | **Plan-Decompose** | ✅ Show + Approve + Execute | ✅ Similar | ❌ Direct execution |
 | **Local TTS** | ✅ JennyNeural on port 8765 | ❌ No | ❌ No |
-| **Memory & Persistence** | ⏳ Coming | ✅ Full | ✅ Full |
+| **Memory & Persistence** | ✅ Implemented (v2.4) | ✅ Full | ✅ Full |
 | **Scheduled Tasks** | ⏳ Coming | ❌ No | ❌ No |
 
 ### Content Engine
