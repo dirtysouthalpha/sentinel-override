@@ -333,6 +333,8 @@ async function runAgentLoop(goal, workingTabId) {
       try {
         observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
         pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
+        const structuredData = await sendMessageWithRetry(tab, { action: 'extract_data' });
+        taskContext.intermediateData['structured_data'] = structuredData;
       } catch (err) {
         console.error('Failed to get page data:', err);
         sendSilentUpdate(`[Step ${stepCount}] ⚠️ Error reading page: ${err.message}. Retrying...`);

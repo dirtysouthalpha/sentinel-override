@@ -19,11 +19,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ elements: interactiveElements });
       return false;
     } else if (request.action === 'read_page') {
-      // Extract content and convert to a simple Markdown-like structure
       const body = document.body.innerText;
       const title = document.title;
       const url = window.location.href;
       sendResponse({ content: `Page Title: ${title}\nURL: ${url}\n\n${body}` });
+      return false;
+    } else if (request.action === 'extract_data') {
+      const data = {
+        tables: extractTables(),
+        metadata: extractMetadata(),
+        forms: extractForms(),
+        url: window.location.href,
+        title: document.title
+      };
+      sendResponse(data);
       return false;
     } else if (request.action === 'execute_command') {
       const cmd = request.command;
@@ -44,7 +53,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (el) {
             el.scrollIntoView({ behavior: 'instant', block: 'center' });
             el.focus();
-            // Use native setter to trigger React/Angular/Vue internal state
             if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
               const nativeSetter = Object.getOwnPropertyDescriptor(
                 el.tagName === 'TEXTAREA'
@@ -79,7 +87,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Signal that content script is ready to receive messages
 chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {});
 
 function getUniqueSelector(el) {
@@ -97,4 +104,46 @@ function getUniqueSelector(el) {
     el = el.parentElement;
   }
   return path.join(' > ');
+}
+
+// v2.4: Structured Data Extraction
+function extractTables() {
+  const tables = [];
+  document.querySelectorAll('table').forEach(table => {
+    const rows = [];
+    table.querySelectorAll('tr').forEach(tr => {
+      const cells = [];
+      tr.querySelectorAll('th, td').forEach(td => cells.push(td.innerText.trim()));
+      rows.push(cells);
+    });
+    tables.push({ headers: rows[0], data: rows.slice(1) });
+  });
+  return tables;
+}
+
+function extractMetadata() {
+  const metadata = {};
+  document.querySelectorAll('meta').forEach(meta => {
+    const name = meta.getAttribute('name') || meta.getAttribute('property');
+    const content = meta.getAttribute('content');
+    if (name && content) metadata[name] = content;
+  });
+  return metadata;
+}
+
+function extractForms() {
+  const forms = [];
+  document.querySelectorAll('form').forEach(form => {
+    const fields = [];
+    form.querySelectorAll('input, select, textarea').forEach(field => {
+      fields.push({
+        name: field.name,
+        type: field.type,
+        value: field.value,
+        selector: getUniqueSelector(field)
+      });
+    });
+    forms.push({ selector: getUniqueSelector(form), fields });
+  });
+  return forms;
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SentinelAgent Browser",
-  "version": "2.3",
+  "version": "2.4",
   "description": "Professional browser automation powered by Sentient AI",
   "permissions": [
     "activeTab",
