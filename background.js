@@ -9,6 +9,92 @@ let currentPlan = null;   // Stores the current decomposed plan
 let currentStepIndex = 0; // Tracks which step we're executing
 
 
+// ========== Task Context — Goal Retention ==========
+let taskContext = {
+  goal: null,
+  completedSteps: [],
+  intermediateData: {},
+  failedAttempts: [],
+  currentPhase: 'idle',
+  startTime: null
+};
+
+// ========== Shortcuts ==========
+let savedShortcuts = {};
+
+// ========== Site-Specific Knowledge ==========
+const SITE_PATTERNS = {
+  'github.com': { platform: 'github', loginSelector: '#login_field', passwordSelector: '#password' },
+  'gmail.com': { platform: 'gmail', searchSelector: 'input[type="search"]' },
+  'google.com': { platform: 'google', searchSelector: 'input[name="q"]' },
+  'calendar.google.com': { platform: 'google-calendar' }
+};
+
+function getSitePattern(url) {
+  try {
+    var parsed = new URL(url);
+    for (var domain in SITE_PATTERNS) {
+      if (parsed.hostname.includes(domain)) return SITE_PATTERNS[domain];
+    }
+  } catch (e) {}
+  return null;
+}
+
+// ========== Auto-Tool Generation ==========
+async function generateMissingTool(error, step, workingTabId) {
+  sendSilentUpdate('[Auto-Tool] Generating workaround for: ' + (error.message || String(error)).substring(0, 60));
+  var settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
+  var endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  var apiKey = settings.api_key;
+  var model = settings.model || 'deepseek-v4-flash';
+  var genPrompt = 'A browser step failed. ERROR: ' + (error.message || String(error)) + '. STEP: ' + step.description + '. Generate a short JavaScript snippet (max 15 lines) to work around this. Use creative selectors (text content, aria-label, title). Return ONLY the code, no markdown.';
+  try {
+    var response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: 'user', content: genPrompt }],
+        max_tokens: 400,
+        temperature: 0.3
+      })
+    });
+    var data = await response.json();
+    var script = data.choices[0].message.content;
+    script = script.replace(/```javascript?\n?/gi, '').replace(/```\n?/g, '').trim();
+    if (script.length < 5) return null;
+    sendSilentUpdate('[Auto-Tool] Script generated (' + script.length + ' chars), injecting...');
+    var results = await chrome.scripting.executeScript({
+      target: { tabId: workingTabId },
+      func: new Function('return (' + script + ')'),
+      world: 'MAIN'
+    });
+    return results[0] && results[0].result ? results[0].result : { success: true };
+  } catch (genError) {
+    console.error('Auto-tool generation failed:', genError);
+    return null;
+  }
+}
+
+// ========== Shortcut Management ==========
+function saveShortcut(name, prompt) {
+  savedShortcuts[name] = prompt;
+  chrome.storage.local.set({ savedShortcuts: savedShortcuts });
+}
+
+function executeShortcut(name) {
+  var prompt = savedShortcuts[name];
+  if (prompt) chrome.runtime.sendMessage({ action: 'plan_task', goal: prompt }).catch(function() {});
+}
+
+function getContextSummary() {
+  var completed = taskContext.completedSteps.length;
+  var data = Object.entries(taskContext.intermediateData).slice(-5);
+  var fails = taskContext.failedAttempts.slice(-3);
+  return 'Goal: ' + taskContext.goal + '\nSteps done: ' + completed + '\nData: ' + data.map(function(d) { return d[0] + '=' + String(d[1]).substring(0, 40); }).join(', ') + '\nFailures: ' + fails.map(function(f) { return f.error.substring(0, 60); }).join(' | ');
+}
+
+
 // ========== Action Button Handler ==========
 chrome.action.onClicked.addListener((tab) => {
   // Open sidebar for this specific tab only
@@ -195,6 +281,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function runAgentLoop(goal, workingTabId) {
   console.log('Agent starting loop for goal:', goal);
   console.log('Working on tab:', workingTabId);
+  taskContext = { goal: goal, completedSteps: [], intermediateData: {}, failedAttempts: [], currentPhase: 'executing', startTime: new Date().toISOString() };
   let finished = false;
   let history = [];
   let stepCount = 0;
@@ -347,6 +434,15 @@ async function planTask(goal, workingTabId) {
 
     sendSilentUpdate('[Plan] Analyzing your instruction...');
 
+    // Detect site-specific patterns for better plans
+    try {
+      var tab = await chrome.tabs.get(workingTabId);
+      var pattern = getSitePattern(tab.url || '');
+      if (pattern) {
+        sendSilentUpdate('[Plan] Detected platform: ' + pattern.platform);
+      }
+    } catch (e) {}
+
     const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.
 
 User instruction: "${goal}"
@@ -445,6 +541,8 @@ Rules:
 async function executePlan(plan, workingTabId) {
   console.log('Executing plan:', plan.plan_title);
   console.log('Working on tab:', workingTabId);
+  // Initialize task context for this execution
+  taskContext = { goal: taskContext.goal || 'User instruction', completedSteps: [], intermediateData: {}, failedAttempts: [], currentPhase: 'executing', startTime: new Date().toISOString() };
   let history = [];
 
   while (currentStepIndex < plan.steps.length && agentRunning) {
@@ -463,6 +561,8 @@ async function executePlan(plan, workingTabId) {
       if (step.action_type === 'navigate') {
         await chrome.tabs.update(workingTabId, { url: step.url || 'https://www.google.com' });
         await sleep(2500);
+        taskContext.completedSteps.push({ step: step.step_number, description: step.description, result: 'navigated to ' + (step.url || 'google'), timestamp: new Date().toISOString() });
+        taskContext.intermediateData['lastPage'] = step.url || 'google';
       } else if (step.action_type === 'wait') {
         await sleep((step.duration || 2) * 1000);
       } else if (step.action_type === 'ask_user') {
@@ -502,6 +602,26 @@ async function executePlan(plan, workingTabId) {
 
     } catch (err) {
       console.error('Step error:', err);
+      
+      // Log failure to task context
+      taskContext.failedAttempts.push({ step: step.step_number, error: err.message || String(err), timestamp: new Date().toISOString() });
+      
+      // Try auto-tool generation once per step
+      var failCount = taskContext.failedAttempts.filter(function(f) { return f.step === step.step_number; }).length;
+      if (failCount <= 1 && typeof generateMissingTool === 'function') {
+        sendSilentUpdate('[Auto-Recovery] Generating workaround for step ' + step.step_number + '...');
+        try {
+          var recovery = await generateMissingTool(err, step, workingTabId);
+          if (recovery && recovery.success) {
+            taskContext.completedSteps.push({ step: step.step_number, description: step.description, result: 'auto-recovered', timestamp: new Date().toISOString() });
+            currentStepIndex++;
+            history.push({ step: step.step_number, action: step, status: 'done', result: 'auto-recovered' });
+            continue;
+          }
+        } catch (rErr) {
+          console.log('Auto-recovery failed:', rErr.message);
+        }
+      }
 
       // Send step failure
       chrome.runtime.sendMessage({
@@ -644,9 +764,13 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   const last_result = history.length > 0 ? history[history.length - 1].result : null;
   const resultStr = typeof last_result === 'string' ? last_result : JSON.stringify(last_result);
 
+  // Build task context summary for the LLM
+  var ctx = getContextSummary();
   const prompt = `You are a skilled browser automation agent performing a multi-step task.
 Current step: ${stepCount}
 Goal: ${goal}
+
+CONTEXT SO FAR: ${ctx}
 
 CURRENT PAGE CONTENT:
 ${pageContent}
