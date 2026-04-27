@@ -61,7 +61,6 @@ window.addEventListener('DOMContentLoaded', () => {
   loadChatHistory();
   setupVoiceInput();
   setupApprovalModeToggle();
-  addProviderSelector();
 });
 
 // ========== Approval Mode ==========
@@ -460,212 +459,13 @@ function sendMessage() {
   updateStatus('Agent is starting...');
   setAgentActive(true);
 
-  chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
+  chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: goal }, (response) => {
     if (chrome.runtime.lastError) {
       removeTypingIndicator();
       addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
       resetUI();
     }
   });
-}
-
-// ========== PLAN: Show decomposed plan to user ==========
-function showPlanCard(plan, goal) {
-  removeTypingIndicator();
-
-  const welcome = chatContainer.querySelector('.welcome-message');
-  if (welcome) welcome.remove();
-
-  // Remove any existing plan card
-  const existing = document.getElementById('plan-card-container');
-  if (existing) existing.remove();
-
-  // Create plan container
-  const container = document.createElement('div');
-  container.className = 'plan-card-container';
-  container.id = 'plan-card-container';
-
-  // Header
-  const header = document.createElement('div');
-  header.className = 'plan-card-header';
-  header.innerHTML = '<span class="plan-card-icon">📋</span> <strong>Execution Plan:</strong> ' + escapeHtml(plan.plan_title || goal.substring(0, 50));
-  container.appendChild(header);
-
-  // Goal
-  const goalDisplay = document.createElement('div');
-  goalDisplay.className = 'plan-card-goal';
-  goalDisplay.textContent = 'Goal: ' + goal;
-  container.appendChild(goalDisplay);
-
-  // Steps list
-  const stepsList = document.createElement('div');
-  stepsList.className = 'plan-steps-list';
-
-  plan.steps.forEach(function(step, idx) {
-    const stepEl = document.createElement('div');
-    stepEl.className = 'plan-step';
-    stepEl.id = 'plan-step-' + step.step_number;
-
-    const stepNum = document.createElement('span');
-    stepNum.className = 'plan-step-number';
-    stepNum.textContent = step.step_number;
-
-    const stepContent = document.createElement('div');
-    stepContent.className = 'plan-step-content';
-
-    const stepTitle = document.createElement('div');
-    stepTitle.className = 'plan-step-title';
-    stepTitle.textContent = step.description;
-
-    const stepType = document.createElement('div');
-    stepType.className = 'plan-step-type';
-    if (step.selector) {
-      stepType.textContent = 'Action: ' + step.action_type + ' → ' + step.selector;
-    } else {
-      stepType.textContent = 'Action: ' + step.action_type;
-    }
-
-    stepContent.appendChild(stepTitle);
-    stepContent.appendChild(stepType);
-
-    const stepStatus = document.createElement('span');
-    stepStatus.className = 'plan-step-status';
-    stepStatus.id = 'plan-step-status-' + step.step_number;
-    stepStatus.textContent = '⏳';
-
-    stepEl.appendChild(stepNum);
-    stepEl.appendChild(stepContent);
-    stepEl.appendChild(stepStatus);
-    stepsList.appendChild(stepEl);
-  });
-
-  container.appendChild(stepsList);
-
-  // Warning section
-  if (plan.warnings && plan.warnings.length > 0) {
-    const warnDiv = document.createElement('div');
-    warnDiv.className = 'plan-card-warnings';
-    warnDiv.innerHTML = '<span class="plan-card-icon">⚠️</span> <strong>Things to note:</strong><ul>' +
-      plan.warnings.map(function(w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') +
-      '</ul>';
-    container.appendChild(warnDiv);
-  }
-
-  // Buttons
-  const buttons = document.createElement('div');
-  buttons.className = 'plan-card-buttons';
-
-  const executeBtn = document.createElement('button');
-  executeBtn.className = 'plan-btn primary';
-  executeBtn.textContent = '▶ Execute Plan (' + plan.steps.length + ' steps)';
-  executeBtn.addEventListener('click', function() {
-    approvePlan();
-  });
-
-  const rejectBtn = document.createElement('button');
-  rejectBtn.className = 'plan-btn secondary';
-  rejectBtn.textContent = '✏️ Modify';
-  rejectBtn.addEventListener('click', function() {
-    rejectPlan();
-  });
-
-  buttons.appendChild(executeBtn);
-  buttons.appendChild(rejectBtn);
-  container.appendChild(buttons);
-
-  // Progress bar (hidden initially)
-  const progressBar = document.createElement('div');
-  progressBar.className = 'plan-progress-bar';
-  progressBar.id = 'plan-progress-bar';
-
-  const progressFill = document.createElement('div');
-  progressFill.className = 'plan-progress-fill';
-  progressFill.id = 'plan-progress-fill';
-  progressBar.appendChild(progressFill);
-  container.appendChild(progressBar);
-
-  chatContainer.appendChild(container);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-function approvePlan() {
-  const executeBtn = document.querySelector('.plan-btn.primary');
-  const rejectBtn = document.querySelector('.plan-btn.secondary');
-  if (executeBtn) { executeBtn.disabled = true; executeBtn.textContent = '⏳ Executing...'; }
-  if (rejectBtn) rejectBtn.disabled = true;
-
-  chrome.runtime.sendMessage({ action: 'execute_plan' }).catch(function() {});
-  updateStatus('Executing plan...');
-}
-
-function rejectPlan() {
-  document.getElementById('plan-card-container').remove();
-  chrome.runtime.sendMessage({ action: 'reject_plan' }).catch(function() {});
-  addMessage('Plan rejected. What would you like to change?', 'assistant');
-  resetUI();
-}
-
-function updateStepStatus(stepNumber, status) {
-  const statusEl = document.getElementById('plan-step-status-' + stepNumber);
-  if (!statusEl) return;
-
-  if (status === 'executing') {
-    statusEl.textContent = '🔄';
-    statusEl.parentElement.classList.add('active');
-  } else if (status === 'done') {
-    statusEl.textContent = '✅';
-    statusEl.parentElement.classList.remove('active');
-    statusEl.parentElement.classList.add('done');
-  } else if (status === 'failed') {
-    statusEl.textContent = '❌';
-    statusEl.parentElement.classList.add('failed');
-  }
-}
-
-function updatePlanProgress(stepNumber, totalSteps) {
-  const fill = document.getElementById('plan-progress-fill');
-  if (!fill) return;
-  const pct = Math.round((stepNumber / totalSteps) * 100);
-  fill.style.width = pct + '%';
-}
-
-function addProviderSelector() {
-  // Find the settings modal fields
-  const endpointField = document.getElementById('set-api-endpoint');
-  const modelField = document.getElementById('set-api-model');
-  if (!endpointField || !modelField) return;
-
-  // Add provider selector before endpoint field
-  const modalFields = document.querySelector('.modal-fields');
-  if (!modalFields) return;
-
-  // Check if provider field already exists
-  if (document.getElementById('provider-select')) return;
-
-  const providerDiv = document.createElement('div');
-  providerDiv.className = 'modal-field';
-  const label = document.createElement('label');
-  label.setAttribute('for', 'provider-select');
-  label.textContent = 'Provider';
-  const select = document.createElement('select');
-  select.id = 'provider-select';
-  select.innerHTML = '' +
-    '<option value="openrouter">OpenRouter (default)</option>' +
-    '<option value="venice">Venice.ai</option>' +
-    '<option value="zai">z.ai Coding Plan</option>' +
-    '<option value="custom">Custom Endpoint</option>';
-
-  select.addEventListener('change', function() {
-    const preset = PROVIDER_PRESETS[select.value];
-    if (preset) {
-      endpointField.value = preset.endpoint;
-      modelField.value = preset.defaultModel;
-    }
-  });
-
-  providerDiv.appendChild(label);
-  providerDiv.appendChild(select);
-  modalFields.insertBefore(providerDiv, modalFields.firstChild);
 }
 
 function resetUI() {
@@ -964,26 +764,6 @@ const COMMANDS = [
   { name: 'Customize Theme', desc: 'Customize colors', action: 'theme', icon: '🎨' },
   { name: 'About', desc: 'About SentinelAgent', action: 'about', icon: 'ℹ️' },
 ];
-
-// ========== Provider Presets ==========
-// Updated endpoint + model when user selects a provider
-const PROVIDER_PRESETS = {
-  'openrouter': {
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    models: ['deepseek-v4-flash', 'gpt-4o-mini', 'qwen-2.5-72b-instruct', 'claude-3-haiku'],
-    defaultModel: 'deepseek-v4-flash'
-  },
-  'venice': {
-    endpoint: 'https://api.venice.ai/api/v1/chat/completions',
-    models: ['gemma-4-uncensored', 'grok-41-fast', 'deepseek-v4-flash', 'mistral-small-3-2-24b-instruct'],
-    defaultModel: 'gemma-4-uncensored'
-  },
-  'zai': {
-    endpoint: 'https://api.z.ai/v1/chat/completions',
-    models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
-    defaultModel: 'deepseek-v4-flash'
-  }
-};
 
 function filterCommands() {
   const query = commandInput.value.toLowerCase();
@@ -1365,35 +1145,6 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'agent_action_result') {
     updateActionCardResult(message.stepNumber, message.result, message.isError);
-  }
-  if (message.action === 'show_plan') {
-    showPlanCard(message.plan, message.goal);
-  }
-  if (message.action === 'plan_error') {
-    removeTypingIndicator();
-    addMessage('❌ Plan failed: ' + escapeHtml(message.error), 'assistant');
-    resetUI();
-  }
-  if (message.action === 'step_executing') {
-    updateStepStatus(message.stepNumber, 'executing');
-    updatePlanProgress(message.stepNumber - 1, message.totalSteps);
-  }
-  if (message.action === 'step_complete') {
-    updateStepStatus(message.stepNumber, message.status);
-    updatePlanProgress(message.stepNumber, message.totalSteps || message.stepNumber);
-    if (message.status === 'failed') {
-      addActionCard({
-        stepNumber: message.stepNumber,
-        type: 'Failed',
-        description: message.error || 'Step failed'
-      });
-    }
-  }
-  if (message.action === 'plan_finished') {
-    removeTypingIndicator();
-    document.getElementById('plan-card-container')?.remove();
-    addMessage('✅ **Plan Complete!** ' + message.summary, 'assistant');
-    resetUI();
   }
 });
 

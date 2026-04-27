@@ -2,11 +2,8 @@ let agentRunning = false;
 let agentTabId = null;  // Track which tab the agent is working on
 let apiCallCount = 0;
 let lastApiCallTime = 0;
-let sessionCost = 0.0;  // Track cumulative spend per session
+let sessionCost = 0.0;  // Track cumulative Venice spend per session
 let costLog = [];       // Audit trail of all API calls
-let isOpenRouter = false; // Tracks if current endpoint is OpenRouter
-let currentPlan = null;   // Stores the current decomposed plan
-let currentStepIndex = 0; // Tracks which step we're executing
 
 
 // ========== Action Button Handler ==========
@@ -153,42 +150,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     agentTabId = null;
     sessionCost = 0.0;
     sendResponse({status: 'Agent stopped'});
-  } else if (request.action === 'plan_task') {
-    if (agentRunning) {
-      sendResponse({status: 'Agent already running'});
-      return;
-    }
-    agentRunning = true;
-    agentTabId = sender.tab ? sender.tab.id : request.tabId;
-    if (!agentTabId) {
-      chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-        if (tabs && tabs.length > 0) {
-          agentTabId = tabs[0].id;
-          planTask(request.goal, agentTabId);
-          sendResponse({status: 'Planning started'});
-        } else {
-          agentRunning = false;
-          sendResponse({status: 'Error: No active tab'});
-        }
-      });
-      return true;
-    }
-    planTask(request.goal, agentTabId);
-    sendResponse({status: 'Planning started'});
-  } else if (request.action === 'execute_plan') {
-    if (!currentPlan) {
-      sendResponse({status: 'No plan to execute'});
-      return;
-    }
-    currentStepIndex = 0;
-    agentRunning = true;
-    executePlan(currentPlan, agentTabId || request.tabId);
-    sendResponse({status: 'Executing plan'});
-  } else if (request.action === 'reject_plan') {
-    currentPlan = null;
-    currentStepIndex = 0;
-    agentRunning = false;
-    sendResponse({status: 'Plan rejected'});
   }
 });
 
@@ -337,211 +298,6 @@ function sendSilentUpdate(text) {
   });
 }
 
-// ========== PLAN: Decompose instruction into steps ==========
-async function planTask(goal, workingTabId) {
-  try {
-    const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-    const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-    const apiKey = settings.api_key;
-    const model = settings.model || 'deepseek-v4-flash';
-
-    sendSilentUpdate('[Plan] Analyzing your instruction...');
-
-    const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.
-
-User instruction: "${goal}"
-
-Return ONLY a JSON object with this exact structure:
-{
-  "plan_title": "Brief 5-word title",
-  "steps": [
-    {
-      "step_number": 1,
-      "action_type": "navigate|click|type|scroll|read_page|ask_user|wait",
-      "description": "Clear description of what to do"
-    }
-  ],
-  "estimated_steps": 3,
-  "warnings": []  // optional array of strings for potential issues
-}
-
-Rules:
-- Each step should be a single action
-- First step is usually 'navigate' to a URL
-- If user needs to provide information (like a password), use action_type "ask_user"
-- Keep descriptions brief but clear (10-20 words each)
-- Return ONLY valid JSON, no markdown, no explanations`;
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: 'You are a precise task decomposition assistant. Return ONLY valid JSON.' },
-          { role: 'user', content: planPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error('Plan API error: ' + response.status);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-
-    // Parse the JSON plan
-    let parsed;
-    try {
-      let jsonStr = content.trim();
-      if (jsonStr.includes('```')) {
-        const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-        if (match && match[1]) jsonStr = match[1].trim();
-      }
-      const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) jsonStr = jsonMatch[0];
-      parsed = JSON.parse(jsonStr);
-    } catch (e) {
-      throw new Error('Failed to parse plan: ' + e.message);
-    }
-
-    if (!parsed.steps || !Array.isArray(parsed.steps) || parsed.steps.length === 0) {
-      throw new Error('Plan has no steps');
-    }
-
-    currentPlan = parsed;
-    currentStepIndex = 0;
-
-    // Send plan to popup for approval
-    chrome.runtime.sendMessage({
-      action: 'show_plan',
-      plan: parsed,
-      goal: goal
-    }).catch(() => {
-      // Popup may not be open
-      console.log('Plan ready:', parsed.plan_title);
-    });
-
-    sendSilentUpdate('[Plan] ' + parsed.plan_title + ' - ' + parsed.steps.length + ' steps');
-
-  } catch (err) {
-    console.error('Plan error:', err);
-    agentRunning = false;
-    chrome.runtime.sendMessage({
-      action: 'plan_error',
-      error: err.message
-    }).catch(() => {});
-    sendSilentUpdate('[Plan] Error: ' + err.message);
-  }
-}
-
-// ========== EXECUTE: Run pre-planned steps ==========
-async function executePlan(plan, workingTabId) {
-  console.log('Executing plan:', plan.plan_title);
-  console.log('Working on tab:', workingTabId);
-  let history = [];
-
-  while (currentStepIndex < plan.steps.length && agentRunning) {
-    const step = plan.steps[currentStepIndex];
-
-    try {
-      // Send step status to popup
-      chrome.runtime.sendMessage({
-        action: 'step_executing',
-        stepNumber: step.step_number,
-        totalSteps: plan.steps.length
-      }).catch(() => {});
-
-      sendSilentUpdate('[Step ' + step.step_number + '/' + plan.steps.length + '] ' + step.description);
-
-      if (step.action_type === 'navigate') {
-        await chrome.tabs.update(workingTabId, { url: step.url || 'https://www.google.com' });
-        await sleep(2500);
-      } else if (step.action_type === 'wait') {
-        await sleep((step.duration || 2) * 1000);
-      } else if (step.action_type === 'ask_user') {
-        // Skip - handled by user manually
-        sendSilentUpdate('[Step ' + step.step_number + '] Waiting for user input: ' + step.description);
-        await sleep(1000);
-      } else {
-        // Execute action via content script
-        await chrome.scripting.executeScript({
-          target: { tabId: workingTabId },
-          files: ['content.js']
-        });
-
-        const result = await sendMessageWithRetry(workingTabId, {
-          action: 'execute_command',
-          command: {
-            type: step.action_type,
-            selector: step.selector || '',
-            text: step.text || '',
-            url: step.url || ''
-          }
-        });
-
-        sendSilentUpdate('[Step ' + step.step_number + '] Done: ' + (result && result.result ? result.result : 'executed'));
-      }
-
-      // Mark step complete
-      chrome.runtime.sendMessage({
-        action: 'step_complete',
-        stepNumber: step.step_number,
-        status: 'done'
-      }).catch(() => {});
-
-      history.push({ step: step.step_number, action: step, status: 'done' });
-      currentStepIndex++;
-      await sleep(1000);
-
-    } catch (err) {
-      console.error('Step error:', err);
-
-      // Send step failure
-      chrome.runtime.sendMessage({
-        action: 'step_complete',
-        stepNumber: step.step_number,
-        status: 'failed',
-        error: err.message
-      }).catch(() => {});
-
-      sendSilentUpdate('[Step ' + step.step_number + '] Failed: ' + err.message);
-      history.push({ step: step.step_number, action: step, status: 'failed', error: err.message });
-
-      // Break on critical failure
-      if (err.message.includes('was closed')) {
-        agentRunning = false;
-        break;
-      }
-      currentStepIndex++;
-      await sleep(2000);
-    }
-  }
-
-  // Report completion
-  const completedSteps = history.filter(h => h.status === 'done').length;
-  const failedSteps = history.filter(h => h.status === 'failed').length;
-
-  chrome.runtime.sendMessage({
-    action: 'plan_finished',
-    summary: 'Completed ' + completedSteps + '/' + plan.steps.length + ' steps' + (failedSteps > 0 ? ' (' + failedSteps + ' failed)' : ''),
-    history: history,
-    plan: plan
-  }).catch(() => {});
-
-  sendSilentUpdate('[Plan] Complete - ' + completedSteps + '/' + plan.steps.length + ' steps done');
-
-  currentPlan = null;
-  currentStepIndex = 0;
-  agentRunning = false;
-}
-
 // ========== Rate Limiting ==========
 async function enforceRateLimit() {
   const timeSinceLastCall = Date.now() - lastApiCallTime;
@@ -630,7 +386,7 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
 // ========== API Call ==========
 async function callLLM(observation, pageContent, base64Image, goal, history, stepCount) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  const endpoint = settings.api_endpoint || 'https://api.venice.ai/api/v1/chat/completions';
   const apiKey = settings.api_key;
   const model = settings.model || 'deepseek-v4-flash';
 
@@ -691,8 +447,6 @@ Return ONLY a JSON object.`;
 
   // Check if model is in whitelist (for Venice endpoint)
   const isVenice = endpoint.includes('venice.ai') || endpoint.includes('venice');
-  const isZAI = endpoint.includes('z.ai');
-  isOpenRouter = endpoint.includes('openrouter.ai') || endpoint.includes('openrouter');
   if (isVenice && !COST_SAFETY.VENICE_ALLOWED_MODELS.has(model)) {
     const allowedList = Array.from(COST_SAFETY.VENICE_ALLOWED_MODELS).join(', ');
     const msg = 'COST SAFETY: Model "' + model + '" is NOT in Venice whitelist. Allowed: ' + allowedList;
