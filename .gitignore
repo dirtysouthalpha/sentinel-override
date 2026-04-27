@@ -21,3 +21,6 @@ package.json
 *.env
 *.key
 secrets*
+
+# Screenshots (mockup HTML files)
+screenshots/

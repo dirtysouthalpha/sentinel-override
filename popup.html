@@ -1775,6 +1775,7 @@
     <button class="small-btn" id="previewBtn" title="Markdown preview">👁️ Preview</button>
     <button class="small-btn" id="attachBtn" title="Attach file">📎 Attach</button>
     <button class="small-btn" id="exportBtn" title="Export conversation">💾 Export</button>
+    <button class="small-btn" id="shortcutsBtn" title="Saved shortcuts">U00002328 Shortcuts</button>
     <button class="small-btn" id="speakBtn" title="Read last assistant response aloud (JennyNeural TTS)">U0001f50a Speak</button>
   </div>
 
@@ -1927,5 +1928,19 @@
 
   <script src="marked.min.js"></script>
   <script src="popup-full.js"></script>
+
+  <!-- Shortcuts Modal -->
+  <div id="shortcuts-modal" class="modal">
+    <div class="modal-content">
+      <h2>⌨️ Saved Shortcuts</h2>
+      <div id="shortcuts-list" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;">
+        <p style="color: var(--text-tertiary); text-align: center; padding: 20px;">No shortcuts saved yet. Run a task and save it as a shortcut!</p>
+      </div>
+      <div class="modal-actions">
+        <button id="closeShortcutsBtn" class="modal-btn btn-cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

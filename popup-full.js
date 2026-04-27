@@ -1415,3 +1415,108 @@ window.addEventListener('click', (e) => {
     themeModal.classList.remove('show');
   }
 });
+
+
+// ========== Shortcut Management ==========
+var savedShortcuts = [];
+
+// Load shortcuts from storage on init
+chrome.storage.local.get(['savedShortcuts'], function(result) {
+  if (result.savedShortcuts && Array.isArray(result.savedShortcuts)) {
+    savedShortcuts = result.savedShortcuts;
+  }
+});
+
+// Shortcuts button handler
+document.getElementById('shortcutsBtn').addEventListener('click', function() {
+  renderShortcutsModal();
+  document.getElementById('shortcuts-modal').classList.add('show');
+});
+
+document.getElementById('closeShortcutsBtn').addEventListener('click', function() {
+  document.getElementById('shortcuts-modal').classList.remove('show');
+});
+
+function renderShortcutsModal() {
+  var list = document.getElementById('shortcuts-list');
+  if (!list) return;
+  if (savedShortcuts.length === 0) {
+    list.innerHTML = '<p style="color: var(--text-tertiary); text-align: center; padding: 20px;">No shortcuts saved yet. Run a task and save it as a shortcut!</p>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < savedShortcuts.length; i++) {
+    var sc = savedShortcuts[i];
+    html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; margin-bottom:6px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px;">';
+    html += '  <div style="flex:1; overflow:hidden;">';
+    html += '    <div style="font-weight:500; font-size:13px; color:var(--text-primary);">' + escHtml(sc.name) + '</div>';
+    html += '    <div style="font-size:11px; color:var(--text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(sc.prompt.substring(0, 60)) + '</div>';
+    html += '  </div>';
+    html += '  <div style="display:flex; gap:6px; flex-shrink:0;">';
+    html += '    <button class="modal-btn btn-save" style="padding:6px 12px; font-size:12px;" onclick="runShortcut(' + i + ')">Run</button>';
+    html += '    <button class="modal-btn btn-cancel" style="padding:6px 12px; font-size:12px;" onclick="deleteShortcut(' + i + ')">Delete</button>';
+    html += '  </div>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function runShortcut(index) {
+  var sc = savedShortcuts[index];
+  if (!sc) return;
+  document.getElementById('goalInput').value = sc.prompt;
+  document.getElementById('shortcuts-modal').classList.remove('show');
+  sendMessage();
+}
+
+function deleteShortcut(index) {
+  savedShortcuts.splice(index, 1);
+  chrome.storage.local.set({ savedShortcuts: savedShortcuts });
+  renderShortcutsModal();
+}
+
+function saveCurrentPromptAsShortcut() {
+  var prompt = document.getElementById('goalInput').value.trim();
+  if (!prompt) {
+    showToast('Type a prompt first!', 'error');
+    return;
+  }
+  var name = prompt.substring(0, 40).replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'Shortcut ' + (savedShortcuts.length + 1);
+  for (var i = 0; i < savedShortcuts.length; i++) {
+    if (savedShortcuts[i].name === name) {
+      savedShortcuts[i].prompt = prompt;
+      chrome.storage.local.set({ savedShortcuts: savedShortcuts });
+      showToast('Shortcut updated: ' + name, 'success');
+      return;
+    }
+  }
+  savedShortcuts.push({ name: name, prompt: prompt, created: new Date().toISOString() });
+  chrome.storage.local.set({ savedShortcuts: savedShortcuts });
+  showToast('Shortcut saved: ' + name, 'success');
+}
+
+function escHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Ctrl+Shift+S to save
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'S' && e.shiftKey && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    saveCurrentPromptAsShortcut();
+  }
+});
+
+// Add save shortcut button
+var saveShortcutBtn = document.createElement('button');
+saveShortcutBtn.className = 'action-btn';
+saveShortcutBtn.id = 'saveShortcutBtn';
+saveShortcutBtn.title = 'Save as shortcut (Ctrl+Shift+S)';
+saveShortcutBtn.innerHTML = '⭐';
+saveShortcutBtn.style.cssText = 'background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:20px;width:36px;height:36px;min-width:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;';
+saveShortcutBtn.addEventListener('click', saveCurrentPromptAsShortcut);
+
+var voiceBtn = document.getElementById('voiceBtn');
+if (voiceBtn && voiceBtn.parentNode) {
+  voiceBtn.parentNode.insertBefore(saveShortcutBtn, voiceBtn);
+}
