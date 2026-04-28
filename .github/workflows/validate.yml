@@ -1,0 +1,115 @@
+name: Validate Extension
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate manifest.json
+        run: |
+          echo "=== Validating manifest.json ==="
+          if ! python3 -c "import json; json.load(open('manifest.json'))" 2>/dev/null; then
+            echo "ERROR: manifest.json is not valid JSON"
+            exit 1
+          fi
+          echo "manifest.json is valid JSON"
+          
+          # Check required fields
+          python3 -c "
+          import json, sys
+          m = json.load(open('manifest.json'))
+          required = ['manifest_version', 'name', 'version', 'description']
+          missing = [f for f in required if f not in m]
+          if missing:
+              print(f'ERROR: Missing required fields: {missing}')
+              sys.exit(1)
+          if m.get('manifest_version') != 3:
+              print(f'WARNING: Expected manifest_version 3, got {m.get(\"manifest_version\")}')
+          print(f'Extension: {m[\"name\"]} v{m[\"version\"]}')
+          "
+
+      - name: Check JS syntax
+        run: |
+          echo "=== Checking JavaScript syntax ==="
+          FAILED=0
+          for f in *.js; do
+            if [ -f "$f" ]; then
+              if ! node --check "$f" 2>/dev/null; then
+                echo "SYNTAX ERROR in $f"
+                FAILED=1
+              else
+                echo "OK: $f"
+              fi
+            fi
+          done
+          if [ $FAILED -eq 1 ]; then
+            exit 1
+          fi
+          echo "All JS files pass syntax check"
+
+      - name: Check for console.log in production
+        run: |
+          echo "=== Checking for debug statements ==="
+          COUNT=$(grep -rn "console\.log" background.js content.js popup-full.js 2>/dev/null | wc -l || true)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "WARNING: Found $COUNT console.log statements"
+            grep -rn "console\.log" background.js content.js popup-full.js 2>/dev/null || true
+            echo "Consider removing debug logs before release"
+          fi
+
+      - name: Validate icon files
+        run: |
+          echo "=== Validating icon files ==="
+          for size in 16 32 48 128 256; do
+            if [ -f "icon-${size}.png" ]; then
+              echo "OK: icon-${size}.png exists"
+            else
+              echo "WARNING: icon-${size}.png missing"
+            fi
+          done
+
+  package:
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create release package
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          echo "version=$VERSION" >> $GITHUB_ENV
+          zip -r "sentinel-override-v${VERSION}.zip" \
+            manifest.json \
+            background.js \
+            content.js \
+            popup.html \
+            popup-full.js \
+            marked.min.js \
+            icon-*.png \
+            logo-*.png \
+            icon.svg \
+            logo.png \
+            emblem.svg \
+            banner.png \
+            banner.svg \
+            CHANGELOG.md \
+            USAGE.md \
+            README.md \
+            -x "*.git*"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-override-${{ env.version }}
+          path: sentinel-override-v${{ env.version }}.zip
+          retention-days: 30
