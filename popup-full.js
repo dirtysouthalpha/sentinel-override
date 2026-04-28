@@ -193,95 +193,58 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ========== Claude-style Action Cards ==========
+// ========== Compact Step Progress Indicator (Claude-style) ==========
+let stepProgressContainer = null;
+
+function ensureStepProgress() {
+  if (stepProgressContainer && stepProgressContainer.parentNode) return;
+  stepProgressContainer = document.createElement('div');
+  stepProgressContainer.id = 'step-progress-container';
+  stepProgressContainer.style.cssText = 'display:none; padding:6px 12px; margin:4px 8px; background:var(--bg-secondary, #0d1628); border:1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius:8px; font-size:11px; color:var(--text-secondary, #7aa8c4); align-items:center; gap:8px;';
+  stepProgressContainer.innerHTML = '<span id="step-progress-label" style="flex-shrink:0;">⏳ Working...</span><div style="flex:1; height:4px; background:rgba(0,212,255,0.1); border-radius:2px; overflow:hidden;"><div id="step-progress-fill" style="width:0%; height:100%; background:var(--color-primary-cyan, #00d4ff); border-radius:2px; transition:width 0.3s ease;"></div></div>';
+  const chatContainer = document.getElementById('chat-container');
+  if (chatContainer) chatContainer.insertBefore(stepProgressContainer, chatContainer.firstChild);
+}
+
+function updateStepIndicatorProgress(stepNumber, totalSteps, description) {
+  ensureStepProgress();
+  stepProgressContainer.style.display = 'flex';
+  const pct = Math.min(100, Math.round((stepNumber / totalSteps) * 100));
+  const fill = document.getElementById('step-progress-fill');
+  const label = document.getElementById('step-progress-label');
+  if (fill) fill.style.width = pct + '%';
+  if (label) label.textContent = '⏳ Step ' + stepNumber + '/' + totalSteps + (description ? ': ' + description.substring(0, 40) : '');
+}
+
+function completeStepIndicator() {
+  if (stepProgressContainer) {
+    const fill = document.getElementById('step-progress-fill');
+    const label = document.getElementById('step-progress-label');
+    if (fill) fill.style.width = '100%';
+    if (label) label.textContent = '✅ All steps complete';
+    setTimeout(() => { if (stepProgressContainer) stepProgressContainer.style.display = 'none'; }, 2000);
+  }
+}
+
+// Replaced raw action cards with compact progress indicator
 function addActionCard(payload) {
-  const welcome = chatContainer.querySelector('.welcome-message');
-  if (welcome) welcome.remove();
-
-  const group = document.createElement('div');
-  group.className = 'message-group agent-action-group';
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper assistant-wrapper';
-
-  const msg = document.createElement('div');
-  msg.className = 'message assistant-msg agent-action-card';
-  msg.id = `agent-action-${payload.stepNumber}`;
-
-  const inner = document.createElement('div');
-  inner.className = 'agent-action-inner';
-
-  const header = document.createElement('div');
-  header.className = 'agent-action-header';
-
-  const typeLabel = document.createElement('span');
-  typeLabel.className = 'agent-action-type';
-  typeLabel.textContent = payload.type;
-
-  const stepLabel = document.createElement('span');
-  stepLabel.className = 'agent-action-step';
-  stepLabel.textContent = `Step ${payload.stepNumber}`;
-
-  const collapseIndicator = document.createElement('span');
-  collapseIndicator.className = 'collapse-indicator';
-
-  const resultBadge = document.createElement('span');
-  resultBadge.className = 'collapse-result-badge';
-  resultBadge.id = `agent-badge-${payload.stepNumber}`;
-
-  header.appendChild(typeLabel);
-  header.appendChild(stepLabel);
-  header.appendChild(resultBadge);
-  header.appendChild(collapseIndicator);
-
-  const desc = document.createElement('div');
-  desc.className = 'agent-action-desc';
-  desc.textContent = payload.description;
-
-  inner.appendChild(header);
-  inner.appendChild(desc);
-
-  // Click to expand/collapse
-  inner.addEventListener('click', () => {
-    inner.classList.toggle('collapsed');
-  });
-
-  msg.appendChild(inner);
-  wrapper.appendChild(msg);
-  group.appendChild(wrapper);
-
-  chatContainer.appendChild(group);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
+  // Show compact progress instead of adding chat message
+  if (payload && payload.stepNumber) {
+    ensureStepProgress();
+    stepProgressContainer.style.display = 'flex';
+    const fill = document.getElementById('step-progress-fill');
+    const label = document.getElementById('step-progress-label');
+    if (fill) fill.style.width = Math.min(100, payload.stepNumber * 14) + '%';
+    if (label) label.textContent = '⏳ ' + (payload.type || 'Working') + ': ' + (payload.description || '').substring(0, 50);
+  }
 }
 
 function updateActionCardResult(stepNumber, resultText, isError) {
-  const card = document.getElementById(`agent-action-${stepNumber}`);
-  if (!card) return;
-
-  const inner = card.querySelector('.agent-action-inner');
-  if (!inner) return;
-
-  const existing = inner.querySelector('.agent-action-result');
-  if (existing) existing.remove();
-
-  const result = document.createElement('div');
-  result.className = `agent-action-result ${isError ? 'error' : 'success'}`;
-  result.textContent = isError ? `Failed: ${resultText}` : resultText;
-  inner.appendChild(result);
-
-  // Update the collapsed badge
-  const badge = document.getElementById(`agent-badge-${stepNumber}`);
-  if (badge) {
-    badge.className = `collapse-result-badge ${isError ? 'error' : 'success'}`;
-    badge.innerHTML = isError
-      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
-      : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  ensureStepProgress();
+  const label = document.getElementById('step-progress-label');
+  if (label) {
+    label.textContent = (isError ? '⚠️ ' : '✅ Step ' + stepNumber + ' done: ') + (resultText ? resultText.substring(0, 50) : '');
   }
-
-  // Auto-collapse after 2 seconds (Claude-style: show then vanish)
-  setTimeout(() => {
-    inner.classList.add('collapsed');
-  }, 2000);
 }
 
 // ========== Theme Management ==========
