@@ -988,20 +988,32 @@ function parseLLMResponse(content) {
       jsonStr = jsonMatch[0];
     }
 
-    const parsed = JSON.parse(jsonStr);
+    let parsed = JSON.parse(jsonStr);
 
-    if (!parsed.type) throw new Error('Missing type field in LLM response');
+    // Fix 1: If the LLM returned {action: 'click', ...} instead of {type: 'click', ...}
+    if (!parsed.type && parsed.action && typeof parsed.action === 'string') {
+      parsed.type = parsed.action;
+      delete parsed.action;
+    }
 
-    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page'];
+    // Fix 2: If the LLM returned a plan/status object with no type field (e.g. {current_step: 2, instructions: '...'})
+    // Convert it to a 'note' action so the agent continues gracefully
+    if (!parsed.type) {
+      const summary = parsed.summary
+        ? (Array.isArray(parsed.summary) ? parsed.summary.join('. ') : parsed.summary)
+        : parsed.instructions || parsed.notes || parsed.description || JSON.stringify(parsed).slice(0, 200);
+      return { type: 'note', text: '[Processed] ' + summary };
+    }
+
+    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js'];
     if (!validTypes.includes(parsed.type)) {
       throw new Error('Invalid command type: ' + parsed.type);
     }
 
     return parsed;
   } catch (err) {
-    console.error('Failed to parse LLM response:', err);
-    console.error('Response content was:', content);
-    return { type: 'finish', summary: 'Error parsing response: ' + err.message };
+    console.error('Failed to parse LLM response:', err.message, 'Content:', content);
+    return { type: 'note', text: 'Parse error (will retry): ' + err.message };
   }
 }
 
