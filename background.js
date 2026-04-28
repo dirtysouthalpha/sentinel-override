@@ -233,117 +233,116 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }).catch(err => sendResponse({ error: err.message }));
         return true; // async response
     }
-    // Existing handlers continue below…
+
+    if (request.action === 'execute_command') {
+        // Execute on the specific agent tab, not the active tab
+        if (!agentTabId) {
+            sendResponse({result: 'No agent tab specified'});
+            return;
+        }
+
+        const tab = agentTabId;
+        const cmd = request.command;
+
+        if (cmd.type === 'navigate') {
+            if (!isValidUrl(cmd.url)) {
+                sendResponse({result: 'Invalid URL provided'});
+                return;
+            }
+            chrome.tabs.update(tab, { url: cmd.url }, () => {
+                sendResponse({result: 'Navigated to ' + cmd.url});
+            });
+            return;
+        }
+
+        chrome.scripting.executeScript({
+            target: {tabId: tab},
+            files: ['content.js']
+        }, () => {
+            chrome.tabs.sendMessage(tab, { action: 'execute_command', command: cmd }, (res) => {
+                if (chrome.runtime.lastError) {
+                    sendResponse({result: 'Error: ' + chrome.runtime.lastError.message});
+                } else {
+                    sendResponse(res || {result: 'No response from content script'});
+                }
+            });
+        });
+        return true;
+    } else if (request.action === 'run_agent_loop') {
+        if (agentRunning) {
+            sendResponse({status: 'Agent already running'});
+            return;
+        }
+
+        // Get the tab where the command came from
+        if (!sender.tab || !sender.tab.id) {
+            // If sender.tab is not available, get the active tab
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                if (tabs && tabs.length > 0) {
+                    agentTabId = tabs[0].id;
+                    agentRunning = true;
+                    apiCallCount = 0;
+                    sessionCost = 0.0;
+                    costLog = [];
+                    runAgentLoop(request.goal, agentTabId);
+                    sendResponse({status: 'Agent started in background'});
+                } else {
+                    sendResponse({status: 'Error: No active tab found'});
+                }
+            });
+            return true;
+        }
+
+        agentTabId = sender.tab.id;
+        agentRunning = true;
+        apiCallCount = 0;
+        sessionCost = 0.0;
+        costLog = [];
+        runAgentLoop(request.goal, agentTabId);
+        sendResponse({status: 'Agent started in background'});
+    } else if (request.action === 'stop_agent_loop') {
+        agentRunning = false;
+        agentTabId = null;
+        sessionCost = 0.0;
+        sendResponse({status: 'Agent stopped'});
+    } else if (request.action === 'plan_task') {
+        if (agentRunning) {
+            sendResponse({status: 'Agent already running'});
+            return;
+        }
+        agentRunning = true;
+        agentTabId = sender.tab ? sender.tab.id : request.tabId;
+        if (!agentTabId) {
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                if (tabs && tabs.length > 0) {
+                    agentTabId = tabs[0].id;
+                    planTask(request.goal, agentTabId);
+                    sendResponse({status: 'Planning started'});
+                } else {
+                    agentRunning = false;
+                    sendResponse({status: 'Error: No active tab'});
+                }
+            });
+            return true;
+        }
+        planTask(request.goal, agentTabId);
+        sendResponse({status: 'Planning started'});
+    } else if (request.action === 'execute_plan') {
+        if (!currentPlan) {
+            sendResponse({status: 'No plan to execute'});
+            return;
+        }
+        currentStepIndex = 0;
+        agentRunning = true;
+        executePlan(currentPlan, agentTabId || request.tabId);
+        sendResponse({status: 'Executing plan'});
+    } else if (request.action === 'reject_plan') {
+        currentPlan = null;
+        currentStepIndex = 0;
+        agentRunning = false;
+        sendResponse({status: 'Plan rejected'});
+    }
     return false;
-});
-  if (request.action === 'execute_command') {
-    // Execute on the specific agent tab, not the active tab
-    if (!agentTabId) {
-      sendResponse({result: 'No agent tab specified'});
-      return;
-    }
-
-    const tab = agentTabId;
-    const cmd = request.command;
-
-    if (cmd.type === 'navigate') {
-      if (!isValidUrl(cmd.url)) {
-        sendResponse({result: 'Invalid URL provided'});
-        return;
-      }
-      chrome.tabs.update(tab, { url: cmd.url }, () => {
-        sendResponse({result: 'Navigated to ' + cmd.url});
-      });
-      return;
-    }
-
-    chrome.scripting.executeScript({
-      target: {tabId: tab},
-      files: ['content.js']
-    }, () => {
-      chrome.tabs.sendMessage(tab, { action: 'execute_command', command: cmd }, (res) => {
-        if (chrome.runtime.lastError) {
-          sendResponse({result: 'Error: ' + chrome.runtime.lastError.message});
-        } else {
-          sendResponse(res || {result: 'No response from content script'});
-        }
-      });
-    });
-    return true;
-  } else if (request.action === 'run_agent_loop') {
-    if (agentRunning) {
-      sendResponse({status: 'Agent already running'});
-      return;
-    }
-
-    // Get the tab where the command came from
-    if (!sender.tab || !sender.tab.id) {
-      // If sender.tab is not available, get the active tab
-      chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-        if (tabs && tabs.length > 0) {
-          agentTabId = tabs[0].id;
-          agentRunning = true;
-          apiCallCount = 0;
-          sessionCost = 0.0;
-          costLog = [];
-          runAgentLoop(request.goal, agentTabId);
-          sendResponse({status: 'Agent started in background'});
-        } else {
-          sendResponse({status: 'Error: No active tab found'});
-        }
-      });
-      return true;
-    }
-
-    agentTabId = sender.tab.id;
-    agentRunning = true;
-    apiCallCount = 0;
-    sessionCost = 0.0;
-    costLog = [];
-    runAgentLoop(request.goal, agentTabId);
-    sendResponse({status: 'Agent started in background'});
-  } else if (request.action === 'stop_agent_loop') {
-    agentRunning = false;
-    agentTabId = null;
-    sessionCost = 0.0;
-    sendResponse({status: 'Agent stopped'});
-  } else if (request.action === 'plan_task') {
-    if (agentRunning) {
-      sendResponse({status: 'Agent already running'});
-      return;
-    }
-    agentRunning = true;
-    agentTabId = sender.tab ? sender.tab.id : request.tabId;
-    if (!agentTabId) {
-      chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
-        if (tabs && tabs.length > 0) {
-          agentTabId = tabs[0].id;
-          planTask(request.goal, agentTabId);
-          sendResponse({status: 'Planning started'});
-        } else {
-          agentRunning = false;
-          sendResponse({status: 'Error: No active tab'});
-        }
-      });
-      return true;
-    }
-    planTask(request.goal, agentTabId);
-    sendResponse({status: 'Planning started'});
-  } else if (request.action === 'execute_plan') {
-    if (!currentPlan) {
-      sendResponse({status: 'No plan to execute'});
-      return;
-    }
-    currentStepIndex = 0;
-    agentRunning = true;
-    executePlan(currentPlan, agentTabId || request.tabId);
-    sendResponse({status: 'Executing plan'});
-  } else if (request.action === 'reject_plan') {
-    currentPlan = null;
-    currentStepIndex = 0;
-    agentRunning = false;
-    sendResponse({status: 'Plan rejected'});
-  }
 });
 
 async function runAgentLoop(goal, workingTabId) {
