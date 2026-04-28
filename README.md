@@ -1,7 +1,6 @@
-# Sentinel Overdrive
+# Sentinel Override
 
-![Logo](logo.png)
-![Banner](banner.png)
+![Emblem](emblem.svg)
 
 [![Version](https://img.shields.io/github/v/tag/dirtysouthalpha/sentinel-override?label=version)](https://github.com/dirtysouthalpha/sentinel-override/releases)
 [![License](https://img.shields.io/github/license/dirtysouthalpha/sentinel-override)](https://github.com/dirtysouthalpha/sentinel-override/blob/main/LICENSE)
