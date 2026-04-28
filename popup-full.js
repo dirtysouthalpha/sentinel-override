@@ -646,42 +646,85 @@ function updatePlanProgress(stepNumber, totalSteps) {
 }
 
 function addProviderSelector() {
-  // Find the settings modal fields
   const endpointField = document.getElementById('set-api-endpoint');
-  const modelField = document.getElementById('set-api-model');
-  if (!endpointField || !modelField) return;
+  const modelFieldContainer = document.getElementById('set-api-model').parentNode;
+  const modelInput = document.getElementById('set-api-model');
+  if (!endpointField || !modelFieldContainer || !modelInput) return;
 
-  // Add provider selector before endpoint field
   const modalFields = document.querySelector('.modal-fields');
   if (!modalFields) return;
 
-  // Check if provider field already exists
   if (document.getElementById('provider-select')) return;
 
+  // Create provider select
   const providerDiv = document.createElement('div');
   providerDiv.className = 'modal-field';
-  const label = document.createElement('label');
-  label.setAttribute('for', 'provider-select');
-  label.textContent = 'Provider';
-  const select = document.createElement('select');
-  select.id = 'provider-select';
-  select.innerHTML = '' +
+  const pLabel = document.createElement('label');
+  pLabel.setAttribute('for', 'provider-select');
+  pLabel.textContent = 'Provider';
+  const pSelect = document.createElement('select');
+  pSelect.id = 'provider-select';
+  pSelect.innerHTML = '' +
     '<option value="openrouter">OpenRouter (default)</option>' +
     '<option value="venice">Venice.ai</option>' +
     '<option value="zai">z.ai Coding Plan</option>' +
     '<option value="custom">Custom Endpoint</option>';
 
-  select.addEventListener('change', function() {
-    const preset = PROVIDER_PRESETS[select.value];
+  // Create model select element (hidden initially)
+  const modelSelect = document.createElement('select');
+  modelSelect.id = 'model-select';
+  modelSelect.style.display = 'none';
+
+  function populateModelSelect(providerValue) {
+    const preset = PROVIDER_PRESETS[providerValue];
+    if (preset && preset.models) {
+      modelSelect.innerHTML = preset.models.map(function(m) {
+        return '<option value="' + m + '">' + m + '</option>';
+      }).join('');
+      modelSelect.value = preset.defaultModel || preset.models[0];
+      modelSelect.style.display = '';
+      modelFieldContainer.querySelector('input').style.display = 'none';
+      modelFieldContainer.querySelector('label').textContent = 'Model ID';
+    } else {
+      // Custom — show text input, hide select
+      modelSelect.style.display = 'none';
+      modelFieldContainer.querySelector('input').style.display = '';
+      modelFieldContainer.querySelector('label').textContent = 'Model ID';
+    }
+  }
+
+  pSelect.addEventListener('change', function() {
+    const val = pSelect.value;
+    const preset = PROVIDER_PRESETS[val];
     if (preset) {
       endpointField.value = preset.endpoint;
-      modelField.value = preset.defaultModel;
+      populateModelSelect(val);
+    } else {
+      // Custom — keep existing endpoint, show text input
+      modelSelect.style.display = 'none';
+      modelFieldContainer.querySelector('input').style.display = '';
     }
   });
 
-  providerDiv.appendChild(label);
-  providerDiv.appendChild(select);
+  // Insert model select into the model field container (before the existing input)
+  modelFieldContainer.insertBefore(modelSelect, modelInput);
+
+  providerDiv.appendChild(pLabel);
+  providerDiv.appendChild(pSelect);
   modalFields.insertBefore(providerDiv, modalFields.firstChild);
+
+  // Auto-trigger on modal open if provider was previously saved
+  chrome.storage.local.get(['endpoint'], function(r) {
+    if (r.endpoint) {
+      for (var key in PROVIDER_PRESETS) {
+        if (PROVIDER_PRESETS[key].endpoint === r.endpoint) {
+          pSelect.value = key;
+          pSelect.dispatchEvent(new Event('change'));
+          return;
+        }
+      }
+    }
+  });
 }
 
 function resetUI() {
