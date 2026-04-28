@@ -1,45 +1,5 @@
 // ========== Global State ==========
 let conversationHistory = [];
-<div id="header" style="text-align:center; margin-bottom:10px;">
-  <img src="emblem.svg" alt="Emblem" style="height:48px; vertical-align:middle;"/>
-  <img src="banner.svg" alt="Banner" style="height:48px; vertical-align:middle; margin-left:10px;"/>
-</div>
-<style>
-:root {
-  --color-primary-cyan: #00d4ff;
-  --color-primary-cyan-alt: #00f5ff;
-  --color-magenta-accent: #ff2a6d;
-  --color-bg-primary: #080e1c;
-  --color-bg-secondary: #0d1628;
-  --color-bg-tertiary: #111e35;
-  --color-input-bg: #0f1a2e;
-  --color-text-primary: #e0f4ff;
-  --color-text-secondary: #7aa8c4;
-  --color-text-muted: #3d6080;
-  --color-border-dim: #1a3a52;
-  --color-border-bright: rgba(0,212,255,0.27);
-  --color-user-bubble-bg: #003a52;
-  --color-user-bubble-text: #a0e8ff;
-  --color-assist-bubble-bg: #0d1628;
-  --color-assist-bubble-text: #c8e8f8;
-  --color-code-bg: #060d18;
-  --color-success: #00dd55;
-  --color-error: #ff2a6d;
-  --border-radius-panel: 12px;
-  --border-radius-card: 8px;
-  --border-radius-input: 6px;
-  --border-radius-pill: 18px;
-  --animation-dot-glow: 2s infinite;
-  --animation-typing-bounce: 0.9s infinite;
-}
-body { background: var(--color-bg-primary); color: var(--color-text-primary); font-family: system-ui, sans-serif; }
-#chat-container { max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; }
-.message { margin: 8px; padding: 8px 12px; border-radius: var(--border-radius-card); max-width: 80%; }
-.message.user-msg { background: var(--color-user-bubble-bg); color: var(--color-user-bubble-text); align-self: flex-end; }
-.message.assistant-msg { background: var(--color-assist-bubble-bg); color: var(--color-assist-bubble-text); align-self: flex-start; }
-#sendBtn { background: var(--color-primary-cyan); color: #000; border: none; border-radius: var(--border-radius-input); padding: 6px 12px; cursor: pointer; }
-#sendBtn:hover { background: var(--color-primary-cyan-alt); }
-</style>
 let selectedAttachments = [];
 let currentSearchQuery = '';
 let currentSearchIndex = 0;
@@ -102,7 +62,26 @@ window.addEventListener('DOMContentLoaded', () => {
   setupVoiceInput();
   setupApprovalModeToggle();
   addProviderSelector();
+  injectTRONHeader();
 });
+
+// ========== TRON Theme Header ==========
+function injectTRONHeader() {
+  const headerTitle = document.querySelector('.header-title');
+  if (!headerTitle) return;
+  headerTitle.innerHTML = `
+    <img src="emblem.svg" alt="Sentinel Override Emblem" style="height:32px; width:32px; margin-right:8px;">
+    <span style="font-size:14px; font-weight:600; color:var(--text-primary);">SENTINEL OVERRIDE</span>
+  `;
+  // Insert banner after header
+  const header = document.querySelector('.header');
+  if (header) {
+    const banner = document.createElement('div');
+    banner.className = 'tron-banner';
+    banner.innerHTML = '<img src="banner.svg" alt="Banner" style="width:100%; height:auto; display:block; margin:0; padding:0;">';
+    header.parentNode.insertBefore(banner, header.nextSibling);
+  }
+}
 
 // ========== Approval Mode ==========
 function loadApprovalMode() {
@@ -177,29 +156,47 @@ function removeApprovalCard() {
 function respondApproval(decision) {
   removeApprovalCard();
   chrome.runtime.sendMessage({
-// Replace direct LLM call with background message routing
-if (sendBtn) {
-    sendBtn.addEventListener('click', () => {
-        const promptInput = document.getElementById('goalInput') || document.getElementById('promptInput');
-        const prompt = promptInput ? promptInput.value : '';
-        if (!prompt) return;
-        // Show typing indicator
-        showTypingIndicator();
-        chrome.runtime.sendMessage({
-            action: 'runPrompt',
-            prompt: prompt,
-            openInNewTab: true
-        }, response => {
-            removeTypingIndicator();
-            if (response.error) {
-                console.error('Prompt error:', response.error);
-                addMessage('Error: ' + response.error, 'assistant');
-            } else {
-                addMessage(response.reply, 'assistant');
-            }
-        });
-    });
+    action: 'approval_response',
+    approved: decision === 'approved',
+    skipped: decision === 'skipped',
+    rejected: decision === 'rejected'
+  }).catch(() => {});
+
+  if (decision === 'rejected') {
+    addMessage('Command rejected by user.', 'assistant');
+  }
 }
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ========== Claude-style Action Cards ==========
+function addActionCard(payload) {
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
+
+  const group = document.createElement('div');
+  group.className = 'message-group agent-action-group';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message-wrapper assistant-wrapper';
+
+  const msg = document.createElement('div');
+  msg.className = 'message assistant-msg agent-action-card';
+  msg.id = `agent-action-${payload.stepNumber}`;
+
+  const inner = document.createElement('div');
+  inner.className = 'agent-action-inner';
+
+  const header = document.createElement('div');
+  header.className = 'agent-action-header';
+
+  const typeLabel = document.createElement('span');
+  typeLabel.className = 'agent-action-type';
+  typeLabel.textContent = payload.type;
 
   const stepLabel = document.createElement('span');
   stepLabel.className = 'agent-action-step';
@@ -482,13 +479,28 @@ function sendMessage() {
   updateStatus('Agent is starting...');
   setAgentActive(true);
 
-  chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
-    if (chrome.runtime.lastError) {
-      removeTypingIndicator();
-      addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
-      resetUI();
-    }
-  });
+  // Simple prompt routing: if the prompt contains a URL or action keywords like 'plan', 'execute', 'task',
+  // use the full plan_task loop. Otherwise use the faster runPrompt.
+  const complexKeywords = /\b(plan|execute|task|extract|automate|monitor|crawl|scrape)\b|https?:\/\//i;
+  const isComplex = complexKeywords.test(goal);
+
+  if (isComplex) {
+    chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
+      if (chrome.runtime.lastError) {
+        removeTypingIndicator();
+        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
+        resetUI();
+      }
+    });
+  } else {
+    chrome.runtime.sendMessage({ action: 'runPrompt', prompt: goal, openInNewTab: true }, (response) => {
+      if (chrome.runtime.lastError) {
+        removeTypingIndicator();
+        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
+        resetUI();
+      }
+    });
+  }
 }
 
 // ========== PLAN: Show decomposed plan to user ==========
@@ -989,8 +1001,6 @@ const COMMANDS = [
 
 // ========== Provider Presets ==========
 // Updated endpoint + model when user selects a provider
-// ========== Provider Presets ==========
-// Updated endpoint + model when user selects a provider
 const PROVIDER_PRESETS = {
   'openrouter': {
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -1006,16 +1016,6 @@ const PROVIDER_PRESETS = {
     endpoint: 'https://api.z.ai/v1/chat/completions',
     models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
     defaultModel: 'deepseek-v4-flash'
-  },
-  'openai': {
-    endpoint: 'https://api.openai.com/v1/chat/completions',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
-    defaultModel: 'gpt-4o-mini'
-  },
-  'claude': {
-    endpoint: 'https://api.anthropic.com/v1/messages',
-    models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
-    defaultModel: 'claude-3-5-sonnet-20241022'
   }
 };
 
@@ -1389,6 +1389,16 @@ chrome.runtime.onMessage.addListener((message) => {
     }
     resetUI();
   }
+  if (message.action === 'prompt_result') {
+    removeTypingIndicator();
+    addMessage(message.reply, 'assistant');
+    resetUI();
+  }
+  if (message.action === 'prompt_error') {
+    removeTypingIndicator();
+    addMessage('❌ Error: ' + escapeHtml(message.error), 'assistant');
+    resetUI();
+  }
   if (message.action === 'request_approval') {
     removeTypingIndicator();
     showApprovalCard(message.payload);
@@ -1550,7 +1560,6 @@ saveShortcutBtn.innerHTML = '⭐';
 saveShortcutBtn.style.cssText = 'background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:20px;width:36px;height:36px;min-width:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;';
 saveShortcutBtn.addEventListener('click', saveCurrentPromptAsShortcut);
 
-var voiceBtn = document.getElementById('voiceBtn');
 if (voiceBtn && voiceBtn.parentNode) {
   voiceBtn.parentNode.insertBefore(saveShortcutBtn, voiceBtn);
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SentinelAgent Browser",
-  "version": "2.4.2",
+  "version": "2.4.4",
   "description": "Professional browser automation powered by Sentient AI",
   "permissions": [
     "activeTab",
@@ -27,7 +27,8 @@
     "256": "icon-256.png"
   },
   "background": {
-    "service_worker": "background.js", "type": "module"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "side_panel": {
     "default_path": "popup.html"
