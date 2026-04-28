@@ -44,6 +44,25 @@ const modeBadge = document.getElementById('modeBadge');
 const approvalCardContainer = document.getElementById('approvalCardContainer');
 const activeIndicator = document.getElementById('activeIndicator');
 
+// ========== Provider Presets (must be defined before init) ==========
+const PROVIDER_PRESETS = {
+  'openrouter': {
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    models: ['deepseek-v4-flash', 'gpt-4o-mini', 'qwen-2.5-72b-instruct', 'claude-3-haiku'],
+    defaultModel: 'deepseek-v4-flash'
+  },
+  'venice': {
+    endpoint: 'https://api.venice.ai/api/v1/chat/completions',
+    models: ['gemma-4-uncensored', 'grok-41-fast', 'deepseek-v4-flash', 'mistral-small-3-2-24b-instruct'],
+    defaultModel: 'gemma-4-uncensored'
+  },
+  'zai': {
+    endpoint: 'https://api.z.ai/v1/chat/completions',
+    models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
+    defaultModel: 'deepseek-v4-flash'
+  }
+};
+
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -999,25 +1018,6 @@ const COMMANDS = [
   { name: 'About', desc: 'About SentinelAgent', action: 'about', icon: 'ℹ️' },
 ];
 
-// ========== Provider Presets ==========
-// Updated endpoint + model when user selects a provider
-const PROVIDER_PRESETS = {
-  'openrouter': {
-    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-    models: ['deepseek-v4-flash', 'gpt-4o-mini', 'qwen-2.5-72b-instruct', 'claude-3-haiku'],
-    defaultModel: 'deepseek-v4-flash'
-  },
-  'venice': {
-    endpoint: 'https://api.venice.ai/api/v1/chat/completions',
-    models: ['gemma-4-uncensored', 'grok-41-fast', 'deepseek-v4-flash', 'mistral-small-3-2-24b-instruct'],
-    defaultModel: 'gemma-4-uncensored'
-  },
-  'zai': {
-    endpoint: 'https://api.z.ai/v1/chat/completions',
-    models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
-    defaultModel: 'deepseek-v4-flash'
-  }
-};
 
 function filterCommands() {
   const query = commandInput.value.toLowerCase();
