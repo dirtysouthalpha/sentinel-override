@@ -90,8 +90,8 @@ function injectTRONHeader() {
   if (!headerTitle) return;
   // Use smaller emblem and text to prevent overflow
   headerTitle.innerHTML = `
-    <img src="emblem.svg" alt="Sentinel Override Emblem" style="height:22px; width:22px; margin-right:6px; flex-shrink:0;">
-    <span style="font-size:11px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">SENTINEL OVERRIDE</span>
+    <img src="logo-128.png" alt="Sentinel Override Logo" style="height:26px; width:26px; margin-right:8px; flex-shrink:0; border-radius:4px;">
+    <span style="font-size:13px; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">SENTINEL OVERRIDE</span>
   `;
   // Insert banner after header
   const header = document.querySelector('.header');
