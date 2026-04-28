@@ -188,7 +188,7 @@ function validateOpenRouterModel(modelName) {
     return modelName;
 }
 
-async function callLLM(prompt, opts = {}) {
+async function callLLMSimple(prompt, opts = {}) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
   const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
@@ -225,7 +225,7 @@ function openOrFocusTab(url) {
 // ---------- Message routing (popup ↔ background ↔ content) ----------
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "runPrompt") {
-        callLLM(request.prompt).then(resp => {
+        callLLMSimple(request.prompt).then(resp => {
             sendResponse({ reply: resp });
             if (request.openInNewTab && resp.resultUrl) {
                 openOrFocusTab(resp.resultUrl);
