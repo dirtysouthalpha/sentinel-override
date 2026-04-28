@@ -88,9 +88,10 @@ window.addEventListener('DOMContentLoaded', () => {
 function injectTRONHeader() {
   const headerTitle = document.querySelector('.header-title');
   if (!headerTitle) return;
+  // Use smaller emblem and text to prevent overflow
   headerTitle.innerHTML = `
-    <img src="emblem.svg" alt="Sentinel Override Emblem" style="height:32px; width:32px; margin-right:8px;">
-    <span style="font-size:14px; font-weight:600; color:var(--text-primary);">SENTINEL OVERRIDE</span>
+    <img src="emblem.svg" alt="Sentinel Override Emblem" style="height:22px; width:22px; margin-right:6px; flex-shrink:0;">
+    <span style="font-size:11px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">SENTINEL OVERRIDE</span>
   `;
   // Insert banner after header
   const header = document.querySelector('.header');
@@ -302,7 +303,6 @@ function updateThemeToggle() {
 }
 
 function toggleTheme() {
-  document.body.classList.toggle('dark-mode');
   updateThemeToggle();
 }
 
@@ -1481,24 +1481,74 @@ document.getElementById('closeShortcutsBtn').addEventListener('click', function(
   document.getElementById('shortcuts-modal').classList.remove('show');
 });
 
+function getShortcutEmoji(prompt) {
+  const p = prompt.toLowerCase();
+  if (p.includes('extract') || p.includes('scrape') || p.includes('grab') || p.includes('collect')) return '📋';
+  if (p.includes('search') || p.includes('find') || p.includes('look up') || p.includes('google')) return '🔍';
+  if (p.includes('translate') || p.includes('language')) return '🌐';
+  if (p.includes('summarize') || p.includes('summary') || p.includes('tl;dr')) return '📝';
+  if (p.includes('analyze') || p.includes('analyse') || p.includes('audit')) return '📊';
+  if (p.includes('generate') || p.includes('create') || p.includes('write') || p.includes('draft')) return '✏️';
+  if (p.includes('monitor') || p.includes('watch') || p.includes('track') || p.includes('check')) return '👁️';
+  if (p.includes('compare') || p.includes('diff') || p.includes('versus')) return '⚖️';
+  if (p.includes('test') || p.includes('debug') || p.includes('validate')) return '🧪';
+  if (p.includes('deploy') || p.includes('release') || p.includes('publish')) return '🚀';
+  if (p.includes('organize') || p.includes('sort') || p.includes('categorize')) return '🗂️';
+  if (p.includes('automate') || p.includes('schedule') || p.includes('cron')) return '⚡';
+  return '⚙️';
+}
+
+function getShortcutCategory(prompt) {
+  const p = prompt.toLowerCase();
+  if (p.includes('extract') || p.includes('scrape')) return { label: 'Data', color: '#00d4ff' };
+  if (p.includes('search')) return { label: 'Search', color: '#e040fb' };
+  if (p.includes('translate')) return { label: 'Translate', color: '#00dd55' };
+  if (p.includes('summarize') || p.includes('summary')) return { label: 'Summarize', color: '#ffa000' };
+  if (p.includes('analyze') || p.includes('audit')) return { label: 'Analyze', color: '#ff2a6d' };
+  if (p.includes('generate') || p.includes('create') || p.includes('write')) return { label: 'Generate', color: '#7c4dff' };
+  if (p.includes('monitor') || p.includes('track') || p.includes('watch')) return { label: 'Monitor', color: '#00bcd4' };
+  if (p.includes('automate') || p.includes('schedule') || p.includes('cron') || p.includes('batch')) return { label: 'Auto', color: '#ff6d00' };
+  if (p.includes('compare') || p.includes('diff')) return { label: 'Compare', color: '#aa00ff' };
+  if (p.includes('test') || p.includes('debug') || p.includes('validate')) return { label: 'Test', color: '#76ff03' };
+  if (p.includes('deploy') || p.includes('release') || p.includes('publish')) return { label: 'Deploy', color: '#00e676' };
+  if (p.includes('organize') || p.includes('sort') || p.includes('categorize') || p.includes('clean')) return { label: 'Clean', color: '#8d6e63' };
+  return { label: 'Task', color: '#9e9e9e' };
+}
+
+function formatShortcutDate(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  } catch(e) { return ''; }
+}
+
 function renderShortcutsModal() {
   var list = document.getElementById('shortcuts-list');
   if (!list) return;
   if (savedShortcuts.length === 0) {
-    list.innerHTML = '<p style="color: var(--text-tertiary); text-align: center; padding: 20px;">No shortcuts saved yet. Run a task and save it as a shortcut!</p>';
+    list.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; color:var(--text-tertiary);"><div style="font-size:48px; margin-bottom:12px;">⌨️</div><div style="font-size:14px; font-weight:500;">No shortcuts saved yet</div><div style="font-size:12px; margin-top:4px;">Type a prompt and click ⭐ or press Ctrl+Shift+S to save it!</div></div>';
     return;
   }
   var html = '';
   for (var i = 0; i < savedShortcuts.length; i++) {
     var sc = savedShortcuts[i];
-    html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; margin-bottom:6px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px;">';
-    html += '  <div style="flex:1; overflow:hidden;">';
-    html += '    <div style="font-weight:500; font-size:13px; color:var(--text-primary);">' + escHtml(sc.name) + '</div>';
-    html += '    <div style="font-size:11px; color:var(--text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(sc.prompt.substring(0, 60)) + '</div>';
+    var emoji = getShortcutEmoji(sc.prompt);
+    var cat = getShortcutCategory(sc.prompt);
+    var dateStr = sc.created ? formatShortcutDate(sc.created) : '';
+    var promptPreview = sc.prompt.length > 50 ? sc.prompt.substring(0, 50) + '...' : sc.prompt;
+    html += '<div style="display:flex; align-items:center; padding:12px 14px; margin-bottom:8px; background:var(--bg-secondary, #0d1628); border:1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius:10px; transition:all 0.15s ease; cursor:default; position:relative;">';
+    html += '  <div style="font-size:24px; margin-right:12px; flex-shrink:0; width:36px; text-align:center;">' + emoji + '</div>';
+    html += '  <div style="flex:1; min-width:0;">';
+    html += '    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">';
+    html += '      <span style="font-weight:600; font-size:13px; color:var(--text-primary, #e0f4ff); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(sc.name) + '</span>';
+    html += '      <span style="font-size:10px; font-weight:500; padding:2px 8px; border-radius:10px; background:' + cat.color + '22; color:' + cat.color + '; border:1px solid ' + cat.color + '44;">' + cat.label + '</span>';
+    html += '    </div>';
+    html += '    <div style="font-size:11px; color:var(--text-secondary, #7aa8c4); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(promptPreview) + '</div>';
+    html += '    ' + (dateStr ? '<div style="font-size:10px; color:var(--text-muted, #3d6080); margin-top:2px;">' + dateStr + '</div>' : '');
     html += '  </div>';
-    html += '  <div style="display:flex; gap:6px; flex-shrink:0;">';
-    html += '    <button class="modal-btn btn-save" style="padding:6px 12px; font-size:12px;" onclick="runShortcut(' + i + ')">Run</button>';
-    html += '    <button class="modal-btn btn-cancel" style="padding:6px 12px; font-size:12px;" onclick="deleteShortcut(' + i + ')">Delete</button>';
+    html += '  <div style="display:flex; gap:4px; flex-shrink:0; margin-left:8px;">';
+    html += '    <button class="modal-btn btn-save" style="padding:6px 14px; font-size:11px; font-weight:500; border:none; border-radius:6px; background:' + cat.color + '22; color:' + cat.color + '; cursor:pointer; transition:all 0.1s;" onclick="runShortcut(' + i + ')" title="Run this shortcut">▶ Run</button>';
+    html += '    <button class="modal-btn btn-cancel" style="padding:6px 10px; font-size:11px; border:none; border-radius:6px; background:rgba(255,42,109,0.15); color:#ff2a6d; cursor:pointer; transition:all 0.1s;" onclick="deleteShortcut(' + i + ')" title="Delete this shortcut">✕</button>';
     html += '  </div>';
     html += '</div>';
   }
