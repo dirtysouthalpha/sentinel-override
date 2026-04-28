@@ -1,5 +1,45 @@
 // ========== Global State ==========
 let conversationHistory = [];
+<div id="header" style="text-align:center; margin-bottom:10px;">
+  <img src="emblem.svg" alt="Emblem" style="height:48px; vertical-align:middle;"/>
+  <img src="banner.svg" alt="Banner" style="height:48px; vertical-align:middle; margin-left:10px;"/>
+</div>
+<style>
+:root {
+  --color-primary-cyan: #00d4ff;
+  --color-primary-cyan-alt: #00f5ff;
+  --color-magenta-accent: #ff2a6d;
+  --color-bg-primary: #080e1c;
+  --color-bg-secondary: #0d1628;
+  --color-bg-tertiary: #111e35;
+  --color-input-bg: #0f1a2e;
+  --color-text-primary: #e0f4ff;
+  --color-text-secondary: #7aa8c4;
+  --color-text-muted: #3d6080;
+  --color-border-dim: #1a3a52;
+  --color-border-bright: rgba(0,212,255,0.27);
+  --color-user-bubble-bg: #003a52;
+  --color-user-bubble-text: #a0e8ff;
+  --color-assist-bubble-bg: #0d1628;
+  --color-assist-bubble-text: #c8e8f8;
+  --color-code-bg: #060d18;
+  --color-success: #00dd55;
+  --color-error: #ff2a6d;
+  --border-radius-panel: 12px;
+  --border-radius-card: 8px;
+  --border-radius-input: 6px;
+  --border-radius-pill: 18px;
+  --animation-dot-glow: 2s infinite;
+  --animation-typing-bounce: 0.9s infinite;
+}
+body { background: var(--color-bg-primary); color: var(--color-text-primary); font-family: system-ui, sans-serif; }
+#chat-container { max-height: 70vh; overflow-y: auto; display: flex; flex-direction: column; }
+.message { margin: 8px; padding: 8px 12px; border-radius: var(--border-radius-card); max-width: 80%; }
+.message.user-msg { background: var(--color-user-bubble-bg); color: var(--color-user-bubble-text); align-self: flex-end; }
+.message.assistant-msg { background: var(--color-assist-bubble-bg); color: var(--color-assist-bubble-text); align-self: flex-start; }
+#sendBtn { background: var(--color-primary-cyan); color: #000; border: none; border-radius: var(--border-radius-input); padding: 6px 12px; cursor: pointer; }
+#sendBtn:hover { background: var(--color-primary-cyan-alt); }
+</style>
 let selectedAttachments = [];
 let currentSearchQuery = '';
 let currentSearchIndex = 0;
