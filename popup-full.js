@@ -989,6 +989,8 @@ const COMMANDS = [
 
 // ========== Provider Presets ==========
 // Updated endpoint + model when user selects a provider
+// ========== Provider Presets ==========
+// Updated endpoint + model when user selects a provider
 const PROVIDER_PRESETS = {
   'openrouter': {
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -1004,6 +1006,16 @@ const PROVIDER_PRESETS = {
     endpoint: 'https://api.z.ai/v1/chat/completions',
     models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
     defaultModel: 'deepseek-v4-flash'
+  },
+  'openai': {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'],
+    defaultModel: 'gpt-4o-mini'
+  },
+  'claude': {
+    endpoint: 'https://api.anthropic.com/v1/messages',
+    models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
+    defaultModel: 'claude-3-5-sonnet-20241022'
   }
 };
 

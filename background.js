@@ -189,24 +189,27 @@ function validateOpenRouterModel(modelName) {
 }
 
 async function callLLM(prompt, opts = {}) {
-    let model = opts.model || 'mistralai/mistral-7b-instruct-v0.2';
+  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
+  let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
+  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  const apiKey = settings.api_key;
+  // Only validate model if using OpenRouter endpoint
+  if (endpoint.includes('openrouter.ai')) {
     model = validateOpenRouterModel(model);
-    const settings = await chrome.storage.local.get(['api_endpoint', 'api_key']);
-    const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-    const apiKey = settings.api_key;
-    const body = {
-        model: model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: opts.max_tokens || 1024,
-        temperature: opts.temperature || 0.3
-    };
-    const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-        body: JSON.stringify(body)
-    });
-    const data = await resp.json();
-    return data.choices[0].message.content;
+  }
+  const body = {
+    model: model,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: opts.max_tokens || 1024,
+    temperature: opts.temperature || 0.3
+  };
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify(body)
+  });
+  const data = await resp.json();
+  return data.choices[0].message.content;
 }
 // ---------- Claude‑style tab handling ----------
 function openOrFocusTab(url) {
