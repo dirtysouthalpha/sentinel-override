@@ -5,7 +5,23 @@ All notable changes to Sentinel Override will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.0] - 2026-04-27
+
+## [2.5.0] - 2026-04-29
+
+### Added
+- **Analysis Mode**: Claude-style incident analysis reports with professional formatting
+- **Analysis System Prompt**: Structured output rules for KEY FINDINGS, ROOT CAUSE ASSESSMENT, IMMEDIATE ACTIONS
+- **Conversation Memory**: Multi-turn context continuity for analysis sessions (last 10 turns)
+- **Page Context Extraction**: Automatic injection of page URL, title, content, tables, and metadata
+- **Rich Markdown Rendering**: Analysis results displayed with cyan accent styling and copy button
+- **Analysis History Management**: Auto-clear on new chat for fresh context
+
+### Changed
+- **Prompt Routing**: New 3-tier routing (Analysis → Plan → Simple) based on keyword detection
+- **Background.js**: Added `analyzeWithPage()`, `buildAnalysisMessages()`, and `runAnalysis()` functions
+- **Popup-full.js**: Added `addAnalysisMessage()` for rich analysis rendering
+- **Message Handling**: New `analysis_result` and `analysis_error` message actions
+
 
 ### Added
 - **Structured Data Extraction**: `content.js` now extracts tables, metadata, and forms as structured JSON.
