@@ -43,6 +43,7 @@ const headerTitle = document.getElementById('headerTitle');
 const welcomeMessage = document.getElementById('welcomeMessage');
 
 // ========== Provider Presets (must be defined before init) ==========
+// ========== Provider Presets (must be defined before init) ==========
 const PROVIDER_PRESETS = {
   'openrouter': {
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -63,6 +64,11 @@ const PROVIDER_PRESETS = {
     endpoint: 'https://api.xiaomimimo.com/v1/chat/completions',
     models: ['mimo-v2.5-pro', 'mimo-v2.5', 'mimo-v2-pro', 'mimo-v2-flash'],
     defaultModel: 'mimo-v2.5-pro'
+  },
+  'poolside': {
+    endpoint: 'https://api.poolside.ai/v1/chat/completions',
+    models: ['poolside/mistral-small-3-24b-instruct', 'poolside/llama-3.3-70b-instruct', 'poolside/qwen2.5-72b-instruct', 'poolside/gemma-3-27b-instruct', 'poolside/phi-4'],
+    defaultModel: 'poolside/mistral-small-3-24b-instruct'
   }
 };
 

@@ -217,8 +217,30 @@ const OPENROUTER_AFFORDABLE = {
     'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 },
     'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },
     'cohere/command-r-plus': { input: 0.25, output: 0.25 }
+// ---------- OpenRouter Affordable Models ----------
+const OPENROUTER_AFFORDABLE = {
+    'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 },
+    'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },
+    'cohere/command-r-plus': { input: 0.25, output: 0.25 }
 };
 
+// ---------- Poolside AI Models ----------
+const POOLSIDE_MODELS = {
+    'poolside/mistral-small-3-24b-instruct': { input: 0.10, output: 0.10 },
+    'poolside/llama-3.3-70b-instruct': { input: 0.15, output: 0.15 },
+    'poolside/qwen2.5-72b-instruct': { input: 0.12, output: 0.12 },
+    'poolside/gemma-3-27b-instruct': { input: 0.08, output: 0.08 },
+    'poolside/phi-4': { input: 0.10, output: 0.10 }
+};
+
+function validatePoolsideModel(modelName) {
+    const cfg = POOLSIDE_MODELS[modelName];
+    if (!cfg) {
+        console.warn('[Poolside] Model not in list, using default safe model.');
+        return 'poolside/mistral-small-3-24b-instruct';
+    }
+    return modelName;
+}
 function validateOpenRouterModel(modelName) {
     const cfg = OPENROUTER_AFFORDABLE[modelName];
     if (!cfg) {
@@ -236,11 +258,19 @@ function validateOpenRouterModel(modelName) {
 async function callLLMSimple(prompt, opts = {}) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
-  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-  const apiKey = settings.api_key;
+  let endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  let apiKey = settings.api_key;
+  
+  // Handle Poolside AI endpoint
+  if (endpoint.includes('poolside.ai') || endpoint.includes('platform.poolside.ai')) {
+    model = validatePoolsideModel(model);
+    endpoint = 'https://api.poolside.ai/v1/chat/completions';
+  }
+  
   if (endpoint.includes('openrouter.ai')) {
     model = validateOpenRouterModel(model);
   }
+  
   const body = {
     model: model,
     messages: [{ role: 'user', content: prompt }],
