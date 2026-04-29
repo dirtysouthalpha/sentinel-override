@@ -490,25 +490,6 @@ async function openResearchTabWithScraping(query, purpose = 'research') {
     return tabId;
 }
 
-// Auto-trigger research based on goal keywords
-async function checkAndTriggerAutoResearch(goal) {
-    const goalLower = goal.toLowerCase();
-    const triggeredQueries = [];
-    
-    for (const trigger of AUTO_RESEARCH_TRIGGERS) {
-        const hasKeyword = trigger.keywords.some(kw => goalLower.includes(kw));
-        if (hasKeyword && trigger.queries.length > 0) {
-            const randomQuery = trigger.queries[Math.floor(Math.random() * trigger.queries.length)];
-            if (!triggeredQueries.includes(randomQuery)) {
-                await openResearchTabWithScraping(randomQuery, 'auto-research');
-                triggeredQueries.push(randomQuery);
-            }
-        }
-    }
-    
-    return triggeredQueries;
-}
-
 function closeResearchTabs() {
     researchTabs.forEach((info, query) => {
         chrome.tabs.remove(info.tabId).catch(() => {});
