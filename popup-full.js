@@ -4,6 +4,29 @@ let selectedAttachments = [];
 let currentSearchQuery = '';
 let currentSearchIndex = 0;
 
+// ========== Helper: Set Tooltips ==========
+function setButtonTooltips() {
+  const tooltips = {
+    'previewBtn': 'Markdown Preview',
+    'attachBtn': 'Attach File',
+    'exportBtn': 'Export Chat',
+    'voiceBtn': 'Voice Input',
+    'speakBtn': 'Text to Speech',
+    'commandPaletteBtn': 'Command Palette (Ctrl+K)',
+    'newChatBtn': 'New Chat',
+    'settingsBtn': 'Settings',
+    'themeToggle': 'Toggle Theme',
+    'shortcutsBtn': 'Saved Shortcuts',
+    'investigationModeBtn': 'Investigation Mode',
+    'closeResearchTabsBtn': 'Close Research Tabs',
+    'exportInvestigationBtn': 'Export Report'
+  };
+  Object.entries(tooltips).forEach(([id, title]) => {
+    const el = document.getElementById(id);
+    if (el) el.title = title;
+  });
+}
+
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
@@ -63,6 +86,105 @@ const PROVIDER_PRESETS = {
   }
 };
 
+// ========== API Connection Test Functions ==========
+function testApiConnection() {
+  const endpoint = document.getElementById('set-api-endpoint').value.trim();
+  const apiKey = document.getElementById('set-api-key').value.trim();
+  
+  if (!endpoint || !apiKey) {
+    showToast('Please enter both API endpoint and key', 'error');
+    return;
+  }
+  
+  showToast('Testing connection...', 'info');
+  
+  fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'user', content: 'test' }],
+      max_tokens: 1
+    })
+  })
+  .then(response => {
+    if (response.ok) {
+      showToast('✓ Connection successful!', 'success');
+    } else {
+      showToast(`Connection failed: ${response.status} ${response.statusText}`, 'error');
+    }
+  })
+  .catch(error => {
+    showToast(`Error: ${error.message}`, 'error');
+  });
+}
+
+function fetchModels() {
+  const endpoint = document.getElementById('set-api-endpoint').value.trim();
+  const apiKey = document.getElementById('set-api-key').value.trim();
+  const modelListEl = document.getElementById('model-list');
+  
+  if (!endpoint || !apiKey) {
+    showToast('Please enter both API endpoint and key', 'error');
+    return;
+  }
+  
+  showToast('Fetching models...', 'info');
+  modelListEl.innerHTML = 'Loading...';
+  
+  // Try to find models endpoint from common providers
+  let modelsEndpoint = endpoint.replace('/chat/completions', '/models');
+  
+  // If it's a known provider, use provider-specific endpoint
+  if (endpoint.includes('openrouter')) {
+    modelsEndpoint = 'https://openrouter.ai/api/v1/models';
+  } else if (endpoint.includes('venice')) {
+    modelsEndpoint = 'https://api.venice.ai/api/v1/models';
+  }
+  
+  fetch(modelsEndpoint, {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    let models = [];
+    if (data.data) {
+      models = data.data.map(m => m.id || m.name);
+    } else if (data.models) {
+      models = data.models.map(m => m.id || m.name);
+    } else if (Array.isArray(data)) {
+      models = data.map(m => m.id || m.name || m);
+    }
+    
+    if (models.length > 0) {
+      modelListEl.innerHTML = models.slice(0, 10).map(m => 
+        `<div style="padding: 4px 0; cursor: pointer;" onclick="document.getElementById('set-api-model').value='${m}">${m}</div>`
+      ).join('');
+      showToast(`Found ${models.length} models`, 'success');
+    } else {
+      modelListEl.innerHTML = 'No models found. Enter model ID manually.';
+    }
+  })
+  .catch(error => {
+    // If models endpoint fails, try common provider defaults
+    const knownProvider = Object.values(PROVIDER_PRESETS).find(p => endpoint.includes(p.endpoint.split('/')[2]));
+    if (knownProvider) {
+      modelListEl.innerHTML = knownProvider.models.map(m => 
+        `<div style="padding: 4px 0; cursor: pointer;" onclick="document.getElementById('set-api-model').value='${m}">${m}</div>`
+      ).join('');
+      showToast('Using provider presets', 'info');
+    } else {
+      modelListEl.innerHTML = 'Could not fetch models. Enter model ID manually.';
+      showToast('Could not fetch models', 'error');
+    }
+  });
+}
+
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -81,26 +203,25 @@ window.addEventListener('DOMContentLoaded', () => {
   setupVoiceInput();
   setupApprovalModeToggle();
   addProviderSelector();
-  injectTRONHeader();
+  injectHeader();
+  setButtonTooltips();
 });
 
-// ========== TRON Theme Header ==========
-function injectTRONHeader() {
-  const headerTitle = document.querySelector('.header-title');
-  if (!headerTitle) return;
-  // Use smaller emblem and text to prevent overflow
-  headerTitle.innerHTML = `
-    <img src="logo-128.png" alt="Sentinel Override Logo" style="height:26px; width:26px; margin-right:8px; flex-shrink:0; border-radius:4px;">
-    <span style="font-size:13px; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">SENTINEL OVERRIDE</span>
-  `;
-  // Insert banner after header
+// ========== Compact Header ==========
+function injectHeader() {
   const header = document.querySelector('.header');
-  if (header) {
-    const banner = document.createElement('div');
-    banner.className = 'tron-banner';
-    banner.innerHTML = '<img src="banner.svg" alt="Banner" style="width:100%; height:auto; display:block; margin:0; padding:0;">';
-    header.parentNode.insertBefore(banner, header.nextSibling);
+  if (!header) return;
+  // Use smaller emblem to save space
+  const headerTitle = document.querySelector('.header-title');
+  if (headerTitle) {
+    headerTitle.innerHTML = `
+      <img src="logo-128.png" alt="Logo" style="height:24px; width:24px; margin-right:6px; flex-shrink:0; border-radius:4px;">
+      <span style="font-size:12px; font-weight:600; color:var(--text-primary);">SENTINEL</span>
+    `;
   }
+  // Remove banner if it exists
+  const existingBanner = document.querySelector('.tron-banner');
+  if (existingBanner) existingBanner.remove();
 }
 
 // ========== Approval Mode ==========
@@ -804,6 +925,55 @@ saveSettingsBtn.addEventListener('click', () => {
   });
 });
 
+// ========== API Connection Test ==========
+document.getElementById('testConnectionBtn')?.addEventListener('click', testApiConnection);
+document.getElementById('fetchModelsBtn')?.addEventListener('click', fetchModels);
+
+// ========== Investigation Mode Buttons ==========
+const investigationModeBtn = document.getElementById('investigationModeBtn');
+const closeResearchTabsBtn = document.getElementById('closeResearchTabsBtn');
+const exportInvestigationBtn = document.getElementById('exportInvestigationBtn');
+
+let investigationMode = false;
+
+if (investigationModeBtn) {
+  investigationModeBtn.addEventListener('click', () => {
+    investigationMode = !investigationMode;
+    investigationModeBtn.classList.toggle('active');
+    investigationModeBtn.textContent = investigationMode ? '🔍 Investigating' : '🔍 Investigate';
+    showToast('Investigation mode: ' + (investigationMode ? 'ON' : 'OFF'), 'success');
+  });
+}
+
+if (closeResearchTabsBtn) {
+  closeResearchTabsBtn.addEventListener('click', () => {
+    chrome.tabs.query({}, (tabs) => {
+      tabs.forEach(tab => {
+        if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+          chrome.tabs.remove(tab.id, () => {});
+        }
+      });
+      showToast('Closed all research tabs', 'success');
+    });
+  });
+}
+
+if (exportInvestigationBtn) {
+  exportInvestigationBtn.addEventListener('click', () => {
+    const content = conversationHistory.map(turn => 
+      `[${turn.role.toUpperCase()}]\n${turn.text}`
+    ).join('\n\n---\n\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `investigation-report-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Investigation report exported', 'success');
+  });
+}
+
 // ========== Message Search ==========
 searchInput.addEventListener('input', (e) => {
   currentSearchQuery = e.target.value.toLowerCase();
@@ -1372,7 +1542,9 @@ function speakLastMessage() {
 }
 
 // ========== TTS Event Listener ==========
-speakBtn.addEventListener('click', speakLastMessage);
+if (speakBtn) {
+  speakBtn.addEventListener('click', speakLastMessage);
+}
 
 // ========== Markdown Configuration ==========
 marked.setOptions({

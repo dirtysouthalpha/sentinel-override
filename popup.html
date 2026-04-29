@@ -1191,6 +1191,12 @@
       color: var(--error-color);
     }
 
+    .toast.info {
+      border-color: var(--accent-primary);
+      background: rgba(0, 132, 255, 0.1);
+      color: var(--accent-primary);
+    }
+
     /* Approval Mode Toggle */
     .toggle-row {
       display: flex;
@@ -1943,6 +1949,7 @@
       <div class="modal-field">
         <label>Model ID</label>
         <input type="text" id="set-api-model" placeholder="gpt-4 or your model name">
+        <div id="model-list" style="margin-top: 8px; font-size: 12px; color: var(--text-tertiary); max-height: 120px; overflow-y: auto;"></div>
       </div>
       <div class="modal-field">
         <label>Export Format</label>
@@ -1951,6 +1958,10 @@
           <option value="json">JSON (.json)</option>
           <option value="txt">Text (.txt)</option>
         </select>
+      </div>
+      <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <button id="testConnectionBtn" class="modal-btn" style="flex: 1;">Test Connection</button>
+        <button id="fetchModelsBtn" class="modal-btn" style="flex: 1;">Fetch Models</button>
       </div>
       <div class="toggle-row">
         <div class="toggle-row-label">
