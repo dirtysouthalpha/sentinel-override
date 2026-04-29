@@ -16,11 +16,81 @@ let taskContext = {
   intermediateData: {},
   failedAttempts: [],
   currentPhase: 'idle',
-  startTime: null
+  startTime: null,
+  sessionId: null,
+  memory: {}  // Persistent memory across the session
 };
 
-// ========== Shortcuts ==========
-let savedShortcuts = {};
+// Session management
+const SESSION_STORAGE_KEY = 'sentinel_agent_session_v2';
+const MAX_SESSION_HISTORY = 50; // Keep last 50 steps in history
+
+// ========== Session Persistence ==========
+async function saveSessionState() {
+  const sessionData = {
+    taskContext: taskContext,
+    conversationHistory: conversationHistory,
+    apiCallCount: apiCallCount,
+    sessionCost: sessionCost,
+    costLog: costLog.slice(-100), // Keep last 100 log entries
+    primaryAgentTabId: primaryAgentTabId,
+    primaryAgentWindowId: primaryAgentWindowId,
+    timestamp: Date.now()
+  };
+  try {
+    await chrome.storage.local.set({ [SESSION_STORAGE_KEY]: sessionData });
+  } catch (e) {
+    console.warn('Failed to save session:', e);
+  }
+}
+
+async function loadSessionState() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([SESSION_STORAGE_KEY], (result) => {
+      if (result[SESSION_STORAGE_KEY]) {
+        const data = result[SESSION_STORAGE_KEY];
+        // Only restore if session is less than 2 hours old
+        if (Date.now() - data.timestamp < 2 * 60 * 60 * 1000) {
+          taskContext = { ...taskContext, ...data.taskContext };
+          conversationHistory = data.conversationHistory || [];
+          apiCallCount = data.apiCallCount || 0;
+          sessionCost = data.sessionCost || 0;
+          costLog = data.costLog || [];
+          primaryAgentTabId = data.primaryAgentTabId;
+          primaryAgentWindowId = data.primaryAgentWindowId;
+          resolve(true);
+        }
+      }
+      resolve(false);
+    });
+  });
+}
+
+async function clearSessionState() {
+  try {
+    await chrome.storage.local.remove([SESSION_STORAGE_KEY]);
+  } catch (e) {}
+  // Reset in-memory state
+  taskContext = {
+    goal: null,
+    completedSteps: [],
+    intermediateData: {},
+    failedAttempts: [],
+    currentPhase: 'idle',
+    startTime: null,
+    sessionId: null,
+    memory: {}
+  };
+  conversationHistory = [];
+  apiCallCount = 0;
+  sessionCost = 0.0;
+  costLog = [];
+}
+
+// Generate unique session ID
+function generateSessionId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
 
 // ========== Site-Specific Knowledge ==========
 const SITE_PATTERNS = {
@@ -61,6 +131,54 @@ function getSitePattern(url) {
     }
   } catch (e) {}
   return null;
+}
+
+// ========== Task Type Detection ==========
+function detectTaskType(goal) {
+  const goalLower = goal.toLowerCase();
+  
+  // Network/infrastructure investigation patterns
+  const investigationKeywords = ['investigate', 'troubleshoot', 'diagnos', 'outage', 'offline', 'failure', 'root cause', 'impact', 'cause of'];
+  if (investigationKeywords.some(kw => goalLower.includes(kw))) {
+    return 'investigation';
+  }
+  
+  // Coding patterns
+  const codingKeywords = ['code', 'function', 'class', 'method', 'algorithm', 'debug', 'fix', 'implement', 'create'];
+  if (codingKeywords.some(kw => goalLower.includes(kw))) {
+    return 'coding';
+  }
+  
+  // Research patterns
+  const researchKeywords = ['research', 'find', 'look up', 'search', 'learn about', 'explain', 'understand'];
+  if (researchKeywords.some(kw => goalLower.includes(kw))) {
+    return 'research';
+  }
+  
+  // Navigation patterns
+  const navKeywords = ['go to', 'open', 'visit', 'navigate', 'load', 'find'];
+  if (navKeywords.some(kw => goalLower.includes(kw))) {
+    return 'navigation';
+  }
+  
+  return 'general';
+}
+
+// Smart model selection based on task type
+async function getOptimalModel(taskType, settings) {
+  const endpoint = settings.api_endpoint || '';
+  const preferredModels = settings.preferred_models || {};
+  
+  // Default model mappings - optimized for each task type
+  const modelMap = {
+    investigation: preferredModels.investigation || 'deepseek-v4-flash',
+    coding: preferredModels.coding || 'google-gemma-4-31b-it',
+    research: preferredModels.research || 'mistral-small-3-2-24b-instruct',
+    navigation: preferredModels.navigation || 'qwen3-5-9b',
+    general: preferredModels.general || 'deepseek-v4-flash'
+  };
+  
+  return modelMap[taskType] || modelMap.general;
 }
 
 // ========== Auto-Tool Generation ==========
@@ -305,17 +423,24 @@ function openOrFocusTab(url) {
 // ---------- Research Tab Management ----------
 let researchTabs = new Map(); // Store research tabs by query
 let researchTabData = new Map(); // Store scraped data from research tabs
+let activeResearchTabs = new Set(); // Track currently open research tab IDs
+
+// Track the initial agent tab - NEVER changed once set
+let primaryAgentTabId = null; // This is the tab the agent stays on
+let primaryAgentWindowId = null; // Track window for research tabs to open in same window
 
 // Auto-research triggers - keywords that should trigger automatic research
 const AUTO_RESEARCH_TRIGGERS = [
-  { keywords: ['outage', 'offline', 'intermittent', 'network failure'], 
-    queries: ['Aruba Instant On device offline troubleshooting', 'network switch power event recovery'] },
-  { keywords: ['poe', 'power budget', 'power denied'], 
-    queries: ['PoE power budget calculation', 'PoE port power denial troubleshooting'] },
-  { keywords: ['uplink', 'port error', 'link flap'], 
-    queries: ['network uplink troubleshooting', 'link flap diagnosis'] },
-  { keywords: ['voip', 'phone', 'polycom'], 
-    queries: ['VoIP phone PoE requirements', 'Polycom VVX reboot causes'] }
+  { keywords: ['outage', 'offline', 'intermittent', 'network failure', 'uptime', 'down'], 
+    queries: ['Aruba Instant On device offline troubleshooting', 'network switch power event recovery', 'network outage root cause analysis'] },
+  { keywords: ['poe', 'power budget', 'power denied', 'poached', 'powered device'], 
+    queries: ['PoE power budget calculation', 'PoE port power denial troubleshooting', 'VoIP phone power cycling causes'] },
+  { keywords: ['uplink', 'port error', 'link flap', 'interface down'], 
+    queries: ['network uplink troubleshooting', 'link flap diagnosis', 'switch port error analysis'] },
+  { keywords: ['voip', 'phone', 'polycom', 'desk phone'], 
+    queries: ['VoIP phone PoE requirements', 'Polycom VVX reboot causes', 'VoIP call quality troubleshooting'] },
+  { keywords: ['investigat', 'troubleshoot', 'diagnos', 'root cause'], 
+    queries: ['IT infrastructure incident response', 'network monitoring best practices'] }
 ];
 
 function openResearchTab(query, purpose = 'research') {
@@ -324,7 +449,7 @@ function openResearchTab(query, purpose = 'research') {
         chrome.tabs.create({ 
             url: searchUrl, 
             active: false,
-            windowId: agentTabId ? null : undefined
+            windowId: primaryAgentWindowId || undefined
         }, (tab) => {
             researchTabs.set(query, { 
                 tabId: tab.id, 
@@ -390,6 +515,8 @@ function closeResearchTabs() {
     });
     researchTabs.clear();
     researchTabData.clear();
+    activeResearchTabs.clear();
+    sendSilentUpdate('[Research] All research tabs closed');
 }
 
 function getResearchTabs() {
@@ -409,6 +536,55 @@ function getResearchData() {
         content: data.content,
         links: data.links
     }));
+}
+
+// Get aggregated research summary
+function getResearchSummary() {
+    const data = getResearchData();
+    if (data.length === 0) return '';
+    
+    return `
+RESEARCH SUMMARY (from ${data.length} research tabs):
+${data.map(r => `
+## ${r.query}
+${r.content ? r.content.mainContent?.substring(0, 500) + '...' : 'No content'}
+`).join('\n')}`;
+}
+
+// Close specific research tab
+function closeResearchTab(tabId) {
+    researchTabs.delete(researchTabs.get(tabId));
+    researchTabData.delete(tabId);
+    activeResearchTabs.delete(tabId);
+    chrome.tabs.remove(tabId).catch(() => {});
+}
+
+// Auto-trigger research based on goal keywords
+async function checkAndTriggerAutoResearch(goal) {
+    const goalLower = goal.toLowerCase();
+    const triggeredQueries = [];
+    
+    // Enhanced keyword detection for investigation mode
+    const investigationKeywords = ['investigat', 'troubleshoot', 'diagnos', 'root cause', 'outage', 'offline', 'failure'];
+    const isInvestigation = investigationKeywords.some(kw => goalLower.includes(kw));
+    
+    for (const trigger of AUTO_RESEARCH_TRIGGERS) {
+        const hasKeyword = trigger.keywords.some(kw => goalLower.includes(kw));
+        if (hasKeyword && trigger.queries.length > 0) {
+            // For investigations, open more tabs (up to 5 total)
+            const maxTabs = isInvestigation ? Math.min(5, trigger.queries.length) : 2;
+            const queriesToOpen = trigger.queries.slice(0, maxTabs);
+            
+            for (const query of queriesToOpen) {
+                if (!triggeredQueries.includes(query) && researchTabs.size < 10) {
+                    await openResearchTabWithScraping(query, 'auto-research');
+                    triggeredQueries.push(query);
+                }
+            }
+        }
+    }
+    
+    return triggeredQueries;
 }
 
 // ---------- Message routing (popup ↔ background ↔ content) ----------
@@ -537,7 +713,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function runAgentLoop(goal, workingTabId) {
   console.log('Agent starting loop for goal:', goal);
   console.log('Working on tab:', workingTabId);
-  taskContext = { goal: goal, completedSteps: [], intermediateData: {}, failedAttempts: [], currentPhase: 'executing', startTime: new Date().toISOString() };
+  
+  // CRITICAL: Set the primary tab ONCE at the start of the session
+  // This is the tab the agent will NEVER leave (stay stuck to it)
+  if (!primaryAgentTabId) {
+    primaryAgentTabId = workingTabId;
+    primaryAgentWindowId = (await new Promise(resolve => {
+      chrome.tabs.get(workingTabId, (tab) => resolve(tab ? tab.windowId : null));
+    }));
+    console.log('Primary agent tab set to:', primaryAgentTabId, 'in window:', primaryAgentWindowId);
+  }
+  
+  // Initialize or restore session
+  if (!taskContext.sessionId) {
+    taskContext = { 
+      goal: goal, 
+      completedSteps: [], 
+      intermediateData: {}, 
+      failedAttempts: [], 
+      currentPhase: 'executing', 
+      startTime: new Date().toISOString(),
+      sessionId: generateSessionId(),
+      memory: {}
+    };
+    conversationHistory = [];
+    await clearSessionState(); // Clear old session data
+  } else {
+    taskContext.goal = goal;
+    taskContext.currentPhase = 'executing';
+    taskContext.startTime = new Date().toISOString();
+  }
+  
   let finished = false;
   let history = [];
   let stepCount = 0;
@@ -551,8 +757,9 @@ async function runAgentLoop(goal, workingTabId) {
     try {
       stepCount++;
 
-      // Always work on the agent's assigned tab, not the active one
-      const tab = workingTabId;
+      // CRITICAL: Always work on the PRIMARY agent tab, never change it
+      // The agent stays on the initial tab throughout the session
+      const tab = primaryAgentTabId;
 
       // Get tab info to check current URL
       const tabInfo = await new Promise(resolve => {
@@ -659,6 +866,9 @@ async function runAgentLoop(goal, workingTabId) {
 
       history.push({ step: stepCount, observation, action: command, result });
       await chrome.storage.local.set({ agent_history: history });
+      
+      // Save session state periodically
+      await saveSessionState();
 
       // Smart pause between steps
       await sleep(1500);
@@ -1075,10 +1285,13 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
 
 // ========== API Call ==========
 async function callLLM(observation, pageContent, base64Image, goal, history, stepCount, researchData = null, autoResearchQueries = []) {
-  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
+  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model', 'preferred_models']);
   const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
   const apiKey = settings.api_key;
-  const model = settings.model || 'deepseek-v4-flash';
+  
+  // Detect task type and select optimal model
+  const taskType = detectTaskType(goal);
+  const model = await getOptimalModel(taskType, settings);
 
   if (!apiKey) {
     throw new Error('API key not configured. Please set it in extension settings.');
@@ -1100,6 +1313,13 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
 Current step: ${stepCount}
 Goal: ${goal}
 
+CRITICAL NAVIGATION RULES:
+- You are STAYING ON THIS TAB (ID: ${tab ? tab.id : 'unknown'}) throughout the entire session
+- Research tabs are opened in separate background tabs - DO NOT navigate the primary tab
+- Use in-page navigation only: clicks on links, buttons, form submissions
+- NEVER use browser Back/Forward buttons - they break portal sessions
+- Navigate via menus, tabs, breadcrumbs, and direct element clicks only
+
 CONTEXT SOFAR: ${ctx}${researchContext}
 
 CURRENT PAGE CONTENT:
@@ -1118,7 +1338,7 @@ IMPORTANT: You are making step-by-step progress toward the goal.
 - Reuse previous successful selectors when possible
 - If something failed, learn from it and try a different approach
 - Only return { "type": "finish" } when the goal is fully achieved
-- Do NOT use browser Back/Forward buttons - use in-page navigation only (menus, tabs, breadcrumbs)
+- Keep the primary tab stable - open research in background tabs if needed
 
 Based on the current page, what is the NEXT single action to reach the goal?
 

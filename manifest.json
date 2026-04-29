@@ -1,17 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "SentinelAgent Browser",
-  "version": "2.4.5",
-  "description": "Professional browser automation powered by Sentient AI",
+  "name": "SentinelAgent Browser - Enhanced",
+  "version": "2.5.0",
+  "description": "Professional browser automation powered by Sentient AI - Better than Claude for Chrome",
   "permissions": [
     "activeTab",
     "scripting",
     "tabs",
     "sidePanel",
-    "storage"
+    "storage",
+    "notifications"
   ],
   "action": {
-    "default_title": "SentinelAgent",
+    "default_title": "SentinelAgent Enhanced",
     "default_icon": {
       "16": "icon-16.png",
       "32": "icon-32.png",

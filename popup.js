@@ -58,7 +58,48 @@ window.addEventListener('DOMContentLoaded', () => {
   loadChatHistory();
   setupEventListeners();
   setupVoiceInput();
+  checkForRestorableSession();
 });
+
+// Check if there's a restorable session
+async function checkForRestorableSession() {
+  const now = Date.now();
+  const twoHoursAgo = now - (2 * 60 * 60 * 1000);
+  
+  chrome.storage.local.get(['sentinel_agent_session_v2'], (result) => {
+    if (result.sentinel_agent_session_v2) {
+      const session = result.sentinel_agent_session_v2;
+      if (session.timestamp && session.timestamp > twoHoursAgo) {
+        // Show restore option
+        const restoreBanner = document.createElement('div');
+        restoreBanner.className = 'restore-banner';
+        restoreBanner.innerHTML = `
+          <div class="restore-info">
+            <span>💾 Previous session found</span>
+            <small>Last active: ${new Date(session.timestamp).toLocaleTimeString()}</small>
+          </div>
+          <button id="restore-session-btn" class="restore-btn">Restore Session</button>
+          <button id="dismiss-session-btn" class="dismiss-btn">✕</button>
+        `;
+        restoreBanner.style.cssText = `
+          display: flex; align-items: center; gap: 12px; padding: 8px 12px; 
+          background: var(--accent-primary); color: white; border-radius: 6px;
+          margin-bottom: 10px; animation: slideIn 0.3s ease;
+        `;
+        document.querySelector('.container').prepend(restoreBanner);
+        
+        document.getElementById('restore-session-btn').onclick = () => {
+          restoreBanner.remove();
+          // The session data is already loaded in background
+          showToast('Session restored - continuing from last state', 'success');
+        };
+        document.getElementById('dismiss-session-btn').onclick = () => {
+          restoreBanner.remove();
+        };
+      }
+    }
+  });
+}
 
 // ========== Theme Management ==========
 function loadThemePreference() {
@@ -863,42 +904,45 @@ if (investigationModeBtn) {
 
 // Investigation prompt template for structured output
 function getInvestigationPrompt(userInput) {
-  return `INVESTIGATION MODE: Provide output in the following structured format:
+  return `You are an expert IT investigator. Provide output in Claude's structured format.
+
+INVESTIGATION MODE:
 
 ---
 
-**FACT vs INFERENCE** (separate clearly)
+**FACT vs INFERENCE**
 
 **FACTS GATHERED:**
-- [List verifiable facts only]
-- [Device names, models, timestamps, values]
+- [List only verifiable facts: device names, models, timestamps, values, statuses]
 
 **INFERENCES:**
-- [Analysis based on facts]
-- [Root cause hypotheses]
+- [Analysis and hypothesis based on facts]
+- [Root cause ranking with probability percentages]
 
 ---
 
-**TIMELINE** (chronological, with EDT/UTC timezone noted)
-- [Date/Time] Event description
+**TIMELINE** (EDT timezone)
+- [Chronological sequence of events]
 
 ---
 
 **TOP SUSPECT ANALYSIS**
-1. [Most likely cause with probability %]
-2. [Second most likely]
-3. [Third most likely]
+1. [Most likely cause] (XX% probability)
+   - Evidence: [specific facts supporting this]
+2. [Second candidate] (XX% probability)
+3. [Third candidate] (XX% probability)
 
 ---
 
 **NEXT ACTIONS** (ticket-ready)
-- [Action 1 - who, what, when]
-- [Action 2 - who, what, when]
+- [Action item] - Who: [person], What: [task], When: [timeline]
+- Internal notes: [staff observations]
+- Customer-facing: [what to tell the client]
 
 ---
 
-**MISSING DATA** (if any)
-- [MISSING DATA: What critical info is needed]
+**MISSING DATA:**
+[MISSING DATA: List critical information needed to complete investigation]
 
 ---
 
@@ -959,6 +1003,15 @@ function enhanceInvestigationFormatting(text) {
   
   // Add visual separator between major sections
   formatted = formatted.replace(/\n---\n/g, '\n\n---\n\n');
+  
+  // Add Claude-style header if not present
+  if (!formatted.includes('---') || !formatted.includes('FACTS GATHERED')) {
+    formatted = `**FACT vs INFERENCE**
+
+---
+
+` + formatted;
+  }
   
   return formatted;
 }
