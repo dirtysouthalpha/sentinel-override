@@ -3,20 +3,17 @@ let conversationHistory = [];
 let selectedAttachments = [];
 let currentSearchQuery = '';
 let currentSearchIndex = 0;
-
+let sessionCost = 0;
+let sessionCap = 5.00;
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
 const sendBtn = document.getElementById('sendBtn');
 const stopBtn = document.getElementById('stopBtn');
-const voiceBtn = document.getElementById('voiceBtn');
-const speakBtn = document.getElementById("speakBtn");
 const status = document.getElementById('status');
 const statusText = document.getElementById('status-text');
 const newChatBtn = document.getElementById('newChatBtn');
 const settingsBtn = document.getElementById('settingsBtn');
-const themeToggle = document.getElementById('themeToggle');
-const commandPaletteBtn = document.getElementById('commandPaletteBtn');
 const settingsModal = document.getElementById('settings-modal');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
@@ -24,25 +21,26 @@ const setApiEndpoint = document.getElementById('set-api-endpoint');
 const setApiKey = document.getElementById('set-api-key');
 const setApiModel = document.getElementById('set-api-model');
 const exportFormatSelect = document.getElementById('export-format');
-const searchInput = document.getElementById('searchInput');
-const previewBtn = document.getElementById('previewBtn');
-const markdownPreview = document.getElementById('markdownPreview');
-const previewContent = document.getElementById('previewContent');
-const attachBtn = document.getElementById('attachBtn');
 const fileInput = document.getElementById('file-input');
 const attachmentPreview = document.getElementById('attachmentPreview');
-const exportBtn = document.getElementById('exportBtn');
 const commandPalette = document.getElementById('commandPalette');
 const commandInput = document.getElementById('commandInput');
 const commandList = document.getElementById('commandList');
-const themeModal = document.getElementById('theme-modal');
-const closeThemeBtn = document.getElementById('closeThemeBtn');
-const saveThemeBtn = document.getElementById('saveThemeBtn');
 const approvalModeToggle = document.getElementById('approvalModeToggle');
 const approvalModeLabel = document.getElementById('approvalModeLabel');
 const modeBadge = document.getElementById('modeBadge');
 const approvalCardContainer = document.getElementById('approvalCardContainer');
 const activeIndicator = document.getElementById('activeIndicator');
+const costBar = document.getElementById('costBar');
+const costFill = document.getElementById('costFill');
+const costVal = document.getElementById('costVal');
+const providerSelect = document.getElementById('provider-select');
+const shortcutsModal = document.getElementById('shortcuts-modal');
+const shortcutsList = document.getElementById('shortcuts-list');
+const closeShortcutsBtn = document.getElementById('closeShortcutsBtn');
+const shortcutsBtnHdr = document.getElementById('shortcutsBtnHdr');
+const headerTitle = document.getElementById('headerTitle');
+const welcomeMessage = document.getElementById('welcomeMessage');
 
 // ========== Provider Presets (must be defined before init) ==========
 const PROVIDER_PRESETS = {
@@ -60,6 +58,11 @@ const PROVIDER_PRESETS = {
     endpoint: 'https://api.z.ai/v1/chat/completions',
     models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
     defaultModel: 'deepseek-v4-flash'
+  },
+  'xiaomi': {
+    endpoint: 'https://api.xiaomimimo.com/v1/chat/completions',
+    models: ['mimo-v2.5-pro', 'mimo-v2.5', 'mimo-v2-pro', 'mimo-v2-flash'],
+    defaultModel: 'mimo-v2.5-pro'
   }
 };
 
@@ -81,27 +84,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setupVoiceInput();
   setupApprovalModeToggle();
   addProviderSelector();
-  injectTRONHeader();
 });
-
-// ========== TRON Theme Header ==========
-function injectTRONHeader() {
-  const headerTitle = document.querySelector('.header-title');
-  if (!headerTitle) return;
-  // Use smaller emblem and text to prevent overflow
-  headerTitle.innerHTML = `
-    <img src="logo-128.png" alt="Sentinel Override Logo" style="height:26px; width:26px; margin-right:8px; flex-shrink:0; border-radius:4px;">
-    <span style="font-size:13px; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">SENTINEL OVERRIDE</span>
-  `;
-  // Insert banner after header
-  const header = document.querySelector('.header');
-  if (header) {
-    const banner = document.createElement('div');
-    banner.className = 'tron-banner';
-    banner.innerHTML = '<img src="banner.svg" alt="Banner" style="width:100%; height:auto; display:block; margin:0; padding:0;">';
-    header.parentNode.insertBefore(banner, header.nextSibling);
-  }
-}
 
 // ========== Approval Mode ==========
 function loadApprovalMode() {
@@ -299,8 +282,7 @@ function saveChatHistory() {
 
 // ========== Message Handling ==========
 function addMessage(text, role = 'assistant') {
-  const welcome = chatContainer.querySelector('.welcome-message');
-  if (welcome) welcome.remove();
+  if (welcomeMessage) welcomeMessage.remove();
 
   // Ensure text is always a string
   const textStr = typeof text === 'string' ? text : JSON.stringify(text);
@@ -316,7 +298,7 @@ function addMessage(text, role = 'assistant') {
   wrapper.className = `message-wrapper ${role === 'user' ? 'user-wrapper' : 'assistant-wrapper'}`;
 
   const msg = document.createElement('div');
-  msg.className = `message ${role === 'user' ? 'user-msg' : 'assistant-msg'}`;
+  msg.className = `message ${role === 'user' ? 'msg-user' : 'assistant-msg'}`;
 
   if (role === 'user') {
     msg.textContent = textStr;
@@ -352,6 +334,171 @@ function addMessage(text, role = 'assistant') {
   messageGroup.appendChild(wrapper);
   chatContainer.appendChild(messageGroup);
   chatContainer.scrollTop = chatContainer.scrollHeight;
+
+// ========== Analysis Message Renderer (Claude-style rich markdown) ==========
+function addAnalysisMessage(text, suggestions = []) {
+  if (welcomeMessage) welcomeMessage.remove();
+
+  const textStr = typeof text === 'string' ? text : JSON.stringify(text);
+
+  conversationHistory.push({ text: textStr, role: 'assistant' });
+  saveChatHistory();
+
+  const messageGroup = document.createElement('div');
+  messageGroup.className = 'message-group';
+  messageGroup.dataset.messageIndex = conversationHistory.length - 1;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message-wrapper assistant-wrapper';
+
+  const msg = document.createElement('div');
+  msg.className = 'message assistant-msg analysis-result';
+  msg.style.cssText = 'border-left: 3px solid #00d4ff; padding-left: 12px; background: rgba(0, 212, 255, 0.03);';
+
+  try {
+    msg.innerHTML = sanitizeHtml(marked.parse(textStr));
+    addCodeCopyButtons(msg);
+    makeSectionsCollapsible(msg);
+  } catch (err) {
+    msg.textContent = textStr;
+    console.warn('Markdown parse failed for analysis, showing raw text:', err);
+  }
+
+  // Action buttons container
+  const actionBtns = document.createElement('div');
+  actionBtns.className = 'analysis-actions';
+  actionBtns.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; padding-left: 12px;';
+
+  // Export button
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'analysis-action-btn';
+  exportBtn.style.cssText = 'background: var(--bg-secondary, #0d1628); border: 1px solid var(--border-color, rgba(0,212,255,0.3)); color: var(--text-primary, #e6f4f1); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;';
+  exportBtn.textContent = '💾 Export';
+  exportBtn.addEventListener('click', () => exportAnalysisAsMarkdown(textStr));
+
+  // Copy button
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'message-copy-btn';
+  copyBtn.title = 'Copy analysis';
+  copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+  copyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(textStr).then(() => {
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    });
+  });
+
+  actionBtns.appendChild(exportBtn);
+  actionBtns.appendChild(copyBtn);
+
+  wrapper.appendChild(msg);
+  wrapper.appendChild(copyBtn);
+  messageGroup.appendChild(wrapper);
+  messageGroup.appendChild(actionBtns);
+  chatContainer.appendChild(messageGroup);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  // Add follow-up suggestions if provided
+  if (suggestions && suggestions.length > 0) {
+    const suggestionsDiv = document.createElement('div');
+    suggestionsDiv.className = 'followup-suggestions';
+    suggestionsDiv.style.cssText = 'margin: 8px 0; padding: 8px 12px; background: var(--bg-secondary, #0d1628); border-radius: 6px; font-size: 13px;';
+    suggestionsDiv.innerHTML = '<strong>Suggested follow-ups:</strong><br>';
+    suggestions.forEach(s => {
+      const chip = document.createElement('span');
+      chip.className = 'suggestion-chip';
+      chip.style.cssText = 'display: inline-block; margin: 4px 4px 4px 0; padding: 4px 8px; background: rgba(0, 212, 255, 0.15); border-radius: 12px; cursor: pointer; font-size: 12px;';
+      chip.textContent = s;
+      chip.addEventListener('click', () => {
+        goalInput.value = s;
+        goalInput.focus();
+        sendMessage();
+      });
+      suggestionsDiv.appendChild(chip);
+    });
+    messageGroup.appendChild(suggestionsDiv);
+  }
+}
+// ========== Collapsible Sections for Analysis ==========
+function makeSectionsCollapsible(messageElement) {
+  const headers = messageElement.querySelectorAll('h2, h3, h4');
+  headers.forEach(header => {
+    if (header.tagName === 'H2' || header.tagName === 'H3') {
+      const nextSibling = header.nextElementSibling;
+      if (nextSibling && (nextSibling.tagName === 'P' || nextSibling.tagName === 'UL' || nextSibling.tagName === 'OL' || nextSibling.tagName === 'PRE' || nextSibling.tagName === 'TABLE')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'collapsible-section';
+        wrapper.style.cssText = 'border: 1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius: 6px; margin: 8px 0;';
+        
+        const headerWrapper = document.createElement('div');
+        headerWrapper.className = 'collapsible-header';
+        headerWrapper.style.cssText = 'display: flex; align-items: center; cursor: pointer; padding: 8px 12px; background: var(--bg-secondary, #0d1628); user-select: none;';
+        headerWrapper.innerHTML = '<span style="margin-right: 8px;">▶</span>' + header.outerHTML;
+        
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'collapsible-content';
+        contentWrapper.style.cssText = 'display: none; padding: 8px 12px;';
+        
+        let node = nextSibling;
+        const nodesToWrap = [];
+        while (node && (node.tagName !== 'H2' && node.tagName !== 'H3')) {
+          nodesToWrap.push(node);
+          node = node.nextElementSibling;
+        }
+        nodesToWrap.forEach(n => contentWrapper.appendChild(n));
+        
+        header.remove();
+        wrapper.appendChild(headerWrapper);
+        wrapper.appendChild(contentWrapper);
+        
+        headerWrapper.addEventListener('click', () => {
+          const isExpanded = contentWrapper.style.display === 'block';
+          contentWrapper.style.display = isExpanded ? 'none' : 'block';
+          headerWrapper.querySelector('span').textContent = isExpanded ? '▶' : '▼';
+        });
+        
+        headerWrapper.parentNode.insertBefore(wrapper, headerWrapper.nextSibling);
+      }
+    }
+  });
+}
+
+// ========== Export Analysis as Markdown ==========
+function exportAnalysisAsMarkdown(analysisText) {
+  const blob = new Blob([analysisText], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `analysis-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ========== Typing Animation for Analysis ==========
+function animateAnalysisText(text, element, speed = 10) {
+  element.innerHTML = '';
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i < text.length) {
+      element.innerHTML += text.charAt(i);
+      i++;
+      element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }else {
+      clearInterval(timer);
+      try {
+        element.innerHTML = sanitizeHtml(marked.parse(text));
+        addCodeCopyButtons(element);
+        makeSectionsCollapsible(element);
+      } catch (err) {
+        console.warn('Markdown parse failed:', err);
+      }
+    }
+  }, speed);
 }
 
 function addCodeCopyButtons(messageElement) {
@@ -461,12 +608,25 @@ function sendMessage() {
   updateStatus('Agent is starting...');
   setAgentActive(true);
 
-  // Simple prompt routing: if the prompt contains a URL or action keywords like 'plan', 'execute', 'task',
-  // use the full plan_task loop. Otherwise use the faster runPrompt.
+  // ========== Prompt Routing: Analysis vs Automation ==========
+  // Analysis mode: incident data, diagnostic info, troubleshooting, technical analysis
+  const analysisKeywords = /\b(incident|diagnostic|troubleshoot|root cause|analysis|uptime|downtime|outage|failure|connectivity|firewall|network|server|error log|system log|status report|assessment|verdict|findings)\b/i;
+  const isAnalysis = analysisKeywords.test(goal) || goal.length > 500;  // Long prompts with data = analysis
+
+  // Automation mode: browser actions, clicking, typing, navigating
   const complexKeywords = /\b(plan|execute|task|extract|automate|monitor|crawl|scrape)\b|https?:\/\//i;
   const isComplex = complexKeywords.test(goal);
 
-  if (isComplex) {
+  if (isAnalysis) {
+    // Route to analysis mode — returns rich markdown, not JSON actions
+    chrome.runtime.sendMessage({ action: 'analyze', prompt: goal }, (response) => {
+      if (chrome.runtime.lastError) {
+        removeTypingIndicator();
+        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
+        resetUI();
+      }
+    });
+  } else if (isComplex) {
     chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
@@ -484,13 +644,13 @@ function sendMessage() {
     });
   }
 }
+}
 
 // ========== PLAN: Show decomposed plan to user ==========
 function showPlanCard(plan, goal) {
   removeTypingIndicator();
 
-  const welcome = chatContainer.querySelector('.welcome-message');
-  if (welcome) welcome.remove();
+  if (welcomeMessage) welcomeMessage.remove();
 
   // Remove any existing plan card
   const existing = document.getElementById('plan-card-container');
@@ -668,6 +828,7 @@ function addProviderSelector() {
     '<option value="openrouter">OpenRouter (default)</option>' +
     '<option value="venice">Venice.ai</option>' +
     '<option value="zai">z.ai Coding Plan</option>' +
+    '<option value="xiaomi">Xiaomi MiMo</option>' +
     '<option value="custom">Custom Endpoint</option>';
 
   // Create model select element (hidden initially)
@@ -749,6 +910,8 @@ stopBtn.addEventListener('click', () => {
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
   if (confirm('Start a new chat? This will clear the current conversation.')) {
+    // Clear analysis history in background
+    chrome.runtime.sendMessage({ action: 'clear_analysis_history' }).catch(() => {});
     chrome.storage.local.set({ chat_history: [] }, () => {
       conversationHistory = [];
       chatContainer.innerHTML = `
@@ -1367,20 +1530,6 @@ function speakLastMessage() {
     })
     .catch(function(err) {
       console.error('TTS error:', err);
-      showToast('TTS error: ' + err.message, 'error');
-    });
-}
-
-// ========== TTS Event Listener ==========
-speakBtn.addEventListener('click', speakLastMessage);
-
-// ========== Markdown Configuration ==========
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
-
-// ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
     updateStatus(message.text);
@@ -1395,9 +1544,14 @@ chrome.runtime.onMessage.addListener((message) => {
     }
     resetUI();
   }
-  if (message.action === 'prompt_result') {
+if (message.action === 'prompt_result') {
     removeTypingIndicator();
-    addMessage(message.reply, 'assistant');
+    // Handle new response format with suggestions
+    if (typeof message.reply === 'object' && message.reply.result) {
+      addAnalysisMessage(message.reply.result, message.reply.suggestions || []);
+    } else {
+      addMessage(message.reply, 'assistant');
+    }
     resetUI();
   }
   if (message.action === 'prompt_error') {
@@ -1445,7 +1599,18 @@ chrome.runtime.onMessage.addListener((message) => {
     addMessage('✅ **Plan Complete!** ' + message.summary, 'assistant');
     resetUI();
   }
-});
+  // ========== ANALYSIS MODE HANDLERS ==========
+  if (message.action === 'analysis_result') {
+    removeTypingIndicator();
+    // Render analysis result with rich markdown
+    addAnalysisMessage(message.result);
+    resetUI();
+  }
+  if (message.action === 'analysis_error') {
+    removeTypingIndicator();
+    addMessage('❌ Analysis Error: ' + escapeHtml(message.error), 'assistant');
+    resetUI();
+  }
 
 // ========== Close Modals on Escape ==========
 document.addEventListener('keydown', (e) => {

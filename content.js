@@ -146,4 +146,34 @@ function extractForms() {
     forms.push({ selector: getUniqueSelector(form), fields });
   });
   return forms;
-}
+
+// ========== Screenshot Analysis ==========
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+  if (request.action === 'capture_screenshot') {
+    try {
+      // Load html2canvas if needed
+      if (typeof html2canvas === 'undefined') {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      
+      const canvas = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        scale: 0.5
+      });
+      
+      const imageData = canvas.toDataURL('image/png');
+      sendResponse({ success: true, imageData, prompt: request.prompt });
+    } catch (err) {
+      sendResponse({ success: false, error: err.message });
+    }
+    return true;
+  }
+});

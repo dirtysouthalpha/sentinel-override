@@ -19,6 +19,52 @@ let taskContext = {
   startTime: null
 };
 
+// ========== Conversation Memory for Analysis Mode ==========
+let analysisHistory = [];  // Stores last N analysis turns for context continuity
+const MAX_ANALYSIS_HISTORY = 10;
+
+// ========== Persistent Memory - Load/Save Analysis History ==========
+async function loadAnalysisHistory() {
+  const stored = await chrome.storage.local.get(['analysisHistory']);
+  if (stored.analysisHistory && Array.isArray(stored.analysisHistory)) {
+    analysisHistory = stored.analysisHistory.slice(-MAX_ANALYSIS_HISTORY);
+  }
+}
+
+async function saveAnalysisHistory() {
+  await chrome.storage.local.set({ analysisHistory: analysisHistory.slice(-MAX_ANALYSIS_HISTORY) });
+}
+
+// ========== Analysis Templates for Common Incident Types ==========
+const ANALYSIS_TEMPLATES = {
+  'network': {
+    name: 'Network Connectivity', keywords: ['network', 'connectivity', 'uptime', 'downtime', 'outage', 'ping', 'latency'],
+    prompt: 'Analyze this network incident. Include: KEY FINDINGS, ROOT CAUSE ASSESSMENT (ranked by probability), IMMEDIATE ACTIONS, and VERDICT. Focus on connectivity patterns, interface status, and upstream/downstream issues.'
+  },
+  'server': {
+    name: 'Server/Application', keywords: ['server', 'application', 'service', '500', 'error', 'crash', 'restart'],
+    prompt: 'Analyze this server/application incident. Include: KEY FINDINGS, ROOT CAUSE ASSESSMENT (ranked by probability), IMMEDIATE ACTIONS, and VERDICT. Focus on logs, error patterns, resource utilization, and service dependencies.'
+  },
+  'security': {
+    name: 'Security Incident', keywords: ['security', 'breach', 'unauthorized', 'access', 'login', 'malware', 'attack'],
+    prompt: 'Analyze this security incident. Include: KEY FINDINGS, ROOT CAUSE ASSESSMENT (ranked by probability), IMMEDIATE ACTIONS, and VERDICT. Follow security incident response best practices and compliance requirements.'
+  },
+  'database': {
+    name: 'Database Issue', keywords: ['database', 'db', 'query', 'sql', 'connection', 'timeout', 'deadlock'],
+    prompt: 'Analyze this database incident. Include: KEY FINDINGS, ROOT CAUSE ASSESSMENT (ranked by probability), IMMEDIATE ACTIONS, and VERDICT. Focus on query performance, locking, connection pooling, and replication status.'
+  }
+};
+
+function getAnalysisTemplate(text) {
+  const lowerText = text.toLowerCase();
+  for (const [key, template] of Object.entries(ANALYSIS_TEMPLATES)) {
+    if (template.keywords.some(kw => lowerText.includes(kw))) {
+      return template;
+    }
+  }
+  return null;
+}
+
 // ========== Shortcuts ==========
 let savedShortcuts = {};
 
@@ -168,10 +214,9 @@ const COST_SAFETY = {
 
 // ---------- OpenRouter Affordable Models ----------
 const OPENROUTER_AFFORDABLE = {
-    // model identifier : { input_per_1k, output_per_1k }
-    'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 }, // $0.20 per 1k tokens total
-    'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },   // $0.12 per 1k tokens total
-    'cohere/command-r-plus': { input: 0.25, output: 0.25 }               // $0.50 per 1k tokens total
+    'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 },
+    'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },
+    'cohere/command-r-plus': { input: 0.25, output: 0.25 }
 };
 
 function validateOpenRouterModel(modelName) {
@@ -193,7 +238,6 @@ async function callLLMSimple(prompt, opts = {}) {
   let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
   const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
   const apiKey = settings.api_key;
-  // Only validate model if using OpenRouter endpoint
   if (endpoint.includes('openrouter.ai')) {
     model = validateOpenRouterModel(model);
   }
@@ -211,6 +255,228 @@ async function callLLMSimple(prompt, opts = {}) {
   const data = await resp.json();
   return data.choices[0].message.content;
 }
+
+// ========== ANALYSIS MODE — Claude-style incident analysis ==========
+// System prompt for professional analysis output
+const ANALYSIS_SYSTEM_PROMPT = `You are SentinelAgent, an expert technical analyst and incident responder. You produce professional-grade analysis reports that rival Claude AI in quality and structure.
+
+## OUTPUT FORMAT RULES:
+- Use markdown headers (##, ###) for sections
+- Use **bold** for key findings, status values, and critical items
+- Use numbered lists for prioritized actions
+- Use bullet points for observations
+- Use tables for structured comparisons
+- Always include: KEY FINDINGS, ROOT CAUSE ASSESSMENT (ranked by probability), IMMEDIATE ACTIONS
+- Be specific with numbers, percentages, IP addresses, timestamps
+- Quote exact values from the data provided
+- End with a clear VERDICT and next steps
+
+## ANALYSIS STYLE:
+- Start with the most critical finding
+- Rank root causes from most to least probable with evidence
+- Provide actionable troubleshooting steps in priority order
+- Explain WHY each finding matters
+- Connect symptoms to causes logically
+- Use professional incident response terminology
+
+## CONTEXT AWARENESS:
+- Reference previous conversation turns when relevant
+- Build on prior findings — don't repeat what's already established
+- If new data contradicts previous analysis, explain what changed
+- Maintain continuity across multi-turn conversations`;
+
+// Build conversation messages for analysis mode
+function buildAnalysisMessages(userPrompt, pageContext, template = null) {
+  const messages = [{ role: 'system', content: ANALYSIS_SYSTEM_PROMPT }];
+
+  // Inject recent conversation history for context continuity
+  const recentHistory = analysisHistory.slice(-MAX_ANALYSIS_HISTORY);
+  for (const turn of recentHistory) {
+    messages.push({ role: 'user', content: turn.user });
+    messages.push({ role: 'assistant', content: turn.assistant });
+  }
+
+  // Build current user message with page context
+  let currentMessage = '';
+  if (pageContext) {
+    currentMessage = `## CURRENT PAGE CONTEXT
+URL: ${pageContext.url}
+Title: ${pageContext.title}
+
+## PAGE CONTENT
+${pageContext.content}
+
+${pageContext.tables && pageContext.tables.length > 0 ? '## TABLES ON PAGE\n' + JSON.stringify(pageContext.tables, null, 2) + '\n\n' : ''}
+${pageContext.metadata && Object.keys(pageContext.metadata).length > 0 ? '## PAGE METADATA\n' + JSON.stringify(pageContext.metadata, null, 2) + '\n\n' : ''}`;n    if (template) {
+      currentMessage += `\n---
+## ANALYSIS TEMPLATE: ${template.name}\n${template.prompt}\n`;n    }
+    currentMessage += `\n---
+## USER REQUEST
+${userPrompt}`;
+  } else {
+    currentMessage = userPrompt;
+  }
+
+  messages.push({ role: 'user', content: currentMessage });
+  return messages;
+}
+
+// Main analysis function — returns rich markdown, not JSON
+async function analyzeWithPage(userPrompt, tabId) {
+  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
+  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
+  const apiKey = settings.api_key;
+  const model = settings.model || 'deepseek-v4-flash';
+
+  if (!apiKey) {
+    throw new Error('API key not configured. Please set it in extension settings.');
+  }
+
+  apiCallCount++;
+  sendSilentUpdate('[Analysis] Reading page content...');
+
+  // Extract page content from the active tab
+  let pageContext = null;
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content.js'] });
+    const pageContent = await sendMessageWithRetry(tabId, { action: 'read_page' });
+    const structuredData = await sendMessageWithRetry(tabId, { action: 'extract_data' });
+    pageContext = {
+      url: pageContent.content.split('\n')[1]?.replace('URL: ', '') || 'unknown',
+      title: pageContent.content.split('\n')[0]?.replace('Page Title: ', '') || 'unknown',
+      content: pageContent.content,
+      tables: structuredData.tables || [],
+      metadata: structuredData.metadata || {}
+    };
+  } catch (err) {
+    console.warn('Could not read page context:', err.message);
+    // Continue without page context — user may have pasted data
+  }
+
+sendSilentUpdate('[Analysis] Generating analysis...');
+
+  // Check for analysis template match
+  const template = getAnalysisTemplate(userPrompt + ' ' + (pageContext ? pageContext.content : ''));
+  if (template) {
+    sendSilentUpdate('[Analysis] Using ' + template.name + ' template...');
+  }
+
+  // Build messages with conversation history
+  const messages = buildAnalysisMessages(userPrompt, pageContext, template);
+  // Cost safety check
+  const isVenice = endpoint.includes('venice.ai') || endpoint.includes('venice');
+  const isZAI = endpoint.includes('z.ai');
+  isOpenRouter = endpoint.includes('openrouter.ai') || endpoint.includes('openrouter');
+
+  if (isVenice) {
+    for (const prefix of COST_SAFETY.BLOCKED_MODEL_PREFIXES) {
+      if (model.startsWith(prefix)) {
+        throw new Error('COST SAFETY: Model "' + model + '" is BLOCKED.');
+      }
+    }
+    if (!COST_SAFETY.VENICE_ALLOWED_MODELS.has(model)) {
+      throw new Error('COST SAFETY: Model "' + model + '" is NOT in Venice whitelist.');
+    }
+  }
+
+  // Rate limiting
+  await enforceRateLimit();
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: messages,
+      temperature: 0.4,  // Slightly higher for nuanced analysis
+      max_tokens: 4096   // Much higher for detailed reports
+    })
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error('API Error: ' + response.status + ' - ' + errorData);
+  }
+
+  const data = await response.json();
+  const analysisResult = data.choices[0].message.content;
+
+  // Track cost
+  if (isVenice || isOpenRouter) {
+    const actualInputTokens = (data.usage && data.usage.prompt_tokens) ? data.usage.prompt_tokens : 0;
+    const actualOutputTokens = (data.usage && data.usage.completion_tokens) ? data.usage.completion_tokens : 0;
+    const rate = COST_SAFETY.RATES[model];
+    if (rate) {
+      const actualInputCost = (actualInputTokens / 1_000_000) * rate.input;
+      const actualOutputCost = (actualOutputTokens / 1_000_000) * rate.output;
+      const actualTotalCost = actualInputCost + actualOutputCost;
+      sessionCost += actualTotalCost;
+      logApiCall(model, actualInputTokens, actualOutputTokens, actualTotalCost, 'OK', null);
+    }
+  }
+// Store in conversation history for context continuity
+  analysisHistory.push({
+    user: userPrompt,
+    assistant: analysisResult,
+    timestamp: new Date().toISOString(),
+    url: pageContext ? pageContext.url : 'no-page'
+  });
+
+  // Save to persistent storage
+  await saveAnalysisHistory();
+
+  // Generate follow-up suggestions
+  const suggestions = generateFollowUpSuggestions(analysisResult, template);
+
+  // Keep history bounded
+  if (analysisHistory.length > MAX_ANALYSIS_HISTORY * 2) {
+    analysisHistory = analysisHistory.slice(-MAX_ANALYSIS_HISTORY);
+  }
+
+  // Return analysis result with suggestions
+  return { result: analysisResult, suggestions };
+}
+
+// Generate follow-up suggestions based on analysis content
+function generateFollowUpSuggestions(analysis, template) {
+  const suggestions = [];
+  const lowerAnalysis = analysis.toLowerCase();
+  
+  if (template) {
+    if (template.keywords.includes('network') || template.keywords.includes('connectivity')) {
+      suggestions.push('Check firewall logs for blocked connections');
+      suggestions.push('Verify DNS resolution on affected hosts');
+      suggestions.push('Test upstream gateway connectivity');
+    }
+    if (template.keywords.includes('server') || template.keywords.includes('application')) {
+      suggestions.push('Review recent deployment changes');
+      suggestions.push('Check system resource utilization');
+      suggestions.push('Examine application error logs');
+    }
+    if (template.keywords.includes('security')) {
+      suggestions.push('Review authentication logs');
+      suggestions.push('Check for suspicious IP addresses');
+      suggestions.push('Verify access control lists');
+    }
+  }
+  
+  // Generic suggestions based on content
+  if (lowerAnalysis.includes('root cause')) {
+    suggestions.push('What steps should I take to prevent recurrence?');
+  }
+  if (lowerAnalysis.includes('immediate')) {
+    suggestions.push('Can you prioritize the immediate actions?');
+  }
+  if (lowerAnalysis.includes('verdict')) {
+    suggestions.push('What monitoring should I set up for this issue?');
+  }
+  
+  return suggestions.slice(0, 3);
+}
+
 // ---------- Claude‑style tab handling ----------
 function openOrFocusTab(url) {
     chrome.tabs.query({ url: url }, function (tabs) {
@@ -234,8 +500,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true; // async response
     }
 
+    // ========== ANALYSIS MODE — Claude-style incident analysis ==========
+    if (request.action === 'analyze') {
+        if (agentRunning) {
+            sendResponse({ status: 'Agent already running' });
+            return;
+        }
+        agentRunning = true;
+
+        // Get the tab to analyze
+        const analyzeTabId = sender.tab ? sender.tab.id : request.tabId;
+        if (!analyzeTabId) {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs && tabs.length > 0) {
+                    agentTabId = tabs[0].id;
+                    runAnalysis(request.prompt, tabs[0].id, sendResponse);
+                } else {
+                    agentRunning = false;
+                    sendResponse({ error: 'No active tab found' });
+                }
+            });
+            return true;
+        }
+        agentTabId = analyzeTabId;
+        runAnalysis(request.prompt, analyzeTabId, sendResponse);
+        return true;
+    }
+
+    // Clear analysis history for fresh context
+    if (request.action === 'clear_analysis_history') {
+        analysisHistory = [];
+        sendResponse({ status: 'Analysis history cleared' });
+    }
+
     if (request.action === 'execute_command') {
-        // Execute on the specific agent tab, not the active tab
         if (!agentTabId) {
             sendResponse({result: 'No agent tab specified'});
             return;
@@ -274,9 +572,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
         }
 
-        // Get the tab where the command came from
         if (!sender.tab || !sender.tab.id) {
-            // If sender.tab is not available, get the active tab
             chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
                 if (tabs && tabs.length > 0) {
                     agentTabId = tabs[0].id;
@@ -345,6 +641,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
 });
 
+// ========== Run Analysis (Claude-style) ==========
+async function runAnalysis(prompt, tabId, sendResponse) {
+  try {
+    sendSilentUpdate('[Analysis] Starting analysis...');
+    const result = await analyzeWithPage(prompt, tabId);
+    sendSilentUpdate('[Analysis] Complete');
+
+    // Send result to popup for rendering
+    chrome.runtime.sendMessage({
+      action: 'analysis_result',
+      result: result
+    }).catch(() => {});
+
+    agentRunning = false;
+    if (sendResponse) sendResponse({ status: 'complete', result: result });
+  } catch (err) {
+    console.error('Analysis error:', err);
+    sendSilentUpdate('[Analysis] Error: ' + err.message);
+
+    chrome.runtime.sendMessage({
+      action: 'analysis_error',
+      error: err.message
+    }).catch(() => {});
+
+    agentRunning = false;
+    if (sendResponse) sendResponse({ error: err.message });
+  }
+}
+
 async function runAgentLoop(goal, workingTabId) {
   console.log('Agent starting loop for goal:', goal);
   console.log('Working on tab:', workingTabId);
@@ -362,10 +687,8 @@ async function runAgentLoop(goal, workingTabId) {
     try {
       stepCount++;
 
-      // Always work on the agent's assigned tab, not the active one
       const tab = workingTabId;
 
-      // Get tab info to check current URL
       const tabInfo = await new Promise(resolve => {
         chrome.tabs.get(tab, (info) => {
           if (chrome.runtime.lastError) {
@@ -381,21 +704,18 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       if (tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')) {
-        // Send update to UI but don't show in user's face
         sendSilentUpdate(`[Step ${stepCount}] Internal page detected. Navigating...`);
         await chrome.tabs.update(tab, { url: 'https://www.google.com' });
         await sleep(3000);
         continue;
       }
 
-      // Silent update - send to extension UI, not to user's tab
       sendSilentUpdate(`[Step ${stepCount}] Observing page...`);
       await chrome.scripting.executeScript({
         target: { tabId: tab },
         files: ['content.js']
       });
 
-      // Get page data with retry
       let observation, pageContent;
       try {
         observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
@@ -409,7 +729,6 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
-      // Capture screenshot with lower quality to save bandwidth
       sendSilentUpdate(`[Step ${stepCount}] Capturing screen...`);
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(tabInfo.windowId, {
@@ -425,7 +744,6 @@ async function runAgentLoop(goal, workingTabId) {
       });
       const base64Image = screenshot_data_url.split(',')[1];
 
-      // Rate limiting before API call
       await enforceRateLimit();
 
       sendSilentUpdate(`[Step ${stepCount}] Consulting AI (Call #${apiCallCount + 1})...`);
@@ -455,14 +773,12 @@ async function runAgentLoop(goal, workingTabId) {
       history.push({ step: stepCount, observation, action: command, result });
       await chrome.storage.local.set({ agent_history: history });
 
-      // Smart pause between steps
       await sleep(1500);
 
     } catch (err) {
       console.error('Agent loop error:', err);
       sendSilentUpdate(`[Step ${stepCount}] ❌ Error: ${err.message}`);
 
-      // If tab was closed, stop the agent
       if (err.message.includes('was closed')) {
         agentRunning = false;
         break;
@@ -482,13 +798,11 @@ async function runAgentLoop(goal, workingTabId) {
 
 // ========== Silent Updates (send to UI, not interrupting user) ==========
 function sendSilentUpdate(text) {
-  // Only send to the sidebar panel, don't bother the user
   chrome.runtime.sendMessage({
     action: 'agent_update',
     text: text,
-    silent: true  // Flag to not interrupt
+    silent: true
   }).catch(() => {
-    // Silently ignore if no receiver
     console.log(text);
   });
 }
@@ -503,7 +817,6 @@ async function planTask(goal, workingTabId) {
 
     sendSilentUpdate('[Plan] Analyzing your instruction...');
 
-    // Detect site-specific patterns for better plans
     try {
       var tab = await chrome.tabs.get(workingTabId);
       var pattern = getSitePattern(tab.url || '');
@@ -512,30 +825,7 @@ async function planTask(goal, workingTabId) {
       }
     } catch (e) {}
 
-    const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.
-
-User instruction: "${goal}"
-
-Return ONLY a JSON object with this exact structure:
-{
-  "plan_title": "Brief 5-word title",
-  "steps": [
-    {
-      "step_number": 1,
-      "action_type": "navigate|click|type|scroll|read_page|ask_user|wait",
-      "description": "Clear description of what to do"
-    }
-  ],
-  "estimated_steps": 3,
-  "warnings": []  // optional array of strings for potential issues
-}
-
-Rules:
-- Each step should be a single action
-- First step is usually 'navigate' to a URL
-- If user needs to provide information (like a password), use action_type "ask_user"
-- Keep descriptions brief but clear (10-20 words each)
-- Return ONLY valid JSON, no markdown, no explanations`;
+    const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.\n\nUser instruction: "${goal}"\n\nReturn ONLY a JSON object with this exact structure:\n{\n  "plan_title": "Brief 5-word title",\n  "steps": [\n    {\n      "step_number": 1,\n      "action_type": "navigate|click|type|scroll|read_page|ask_user|wait",\n      "description": "Clear description of what to do"\n    }\n  ],\n  "estimated_steps": 3,\n  "warnings": []\n}\n\nRules:\n- Each step should be a single action\n- First step is usually 'navigate' to a URL\n- If user needs to provide information (like a password), use action_type "ask_user"\n- Keep descriptions brief but clear (10-20 words each)\n- Return ONLY valid JSON, no markdown, no explanations`;
 
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -561,7 +851,6 @@ Rules:
     const data = await response.json();
     const content = data.choices[0].message.content;
 
-    // Parse the JSON plan
     let parsed;
     try {
       let jsonStr = content.trim();
@@ -583,13 +872,11 @@ Rules:
     currentPlan = parsed;
     currentStepIndex = 0;
 
-    // Send plan to popup for approval
     chrome.runtime.sendMessage({
       action: 'show_plan',
       plan: parsed,
       goal: goal
     }).catch(() => {
-      // Popup may not be open
       console.log('Plan ready:', parsed.plan_title);
     });
 
@@ -610,7 +897,6 @@ Rules:
 async function executePlan(plan, workingTabId) {
   console.log('Executing plan:', plan.plan_title);
   console.log('Working on tab:', workingTabId);
-  // Initialize task context for this execution
   taskContext = { goal: taskContext.goal || 'User instruction', completedSteps: [], intermediateData: {}, failedAttempts: [], currentPhase: 'executing', startTime: new Date().toISOString() };
   let history = [];
 
@@ -618,7 +904,6 @@ async function executePlan(plan, workingTabId) {
     const step = plan.steps[currentStepIndex];
 
     try {
-      // Send step status to popup
       chrome.runtime.sendMessage({
         action: 'step_executing',
         stepNumber: step.step_number,
@@ -635,11 +920,9 @@ async function executePlan(plan, workingTabId) {
       } else if (step.action_type === 'wait') {
         await sleep((step.duration || 2) * 1000);
       } else if (step.action_type === 'ask_user') {
-        // Skip - handled by user manually
         sendSilentUpdate('[Step ' + step.step_number + '] Waiting for user input: ' + step.description);
         await sleep(1000);
       } else {
-        // Execute action via content script
         await chrome.scripting.executeScript({
           target: { tabId: workingTabId },
           files: ['content.js']
@@ -658,7 +941,6 @@ async function executePlan(plan, workingTabId) {
         sendSilentUpdate('[Step ' + step.step_number + '] Done: ' + (result && result.result ? result.result : 'executed'));
       }
 
-      // Mark step complete
       chrome.runtime.sendMessage({
         action: 'step_complete',
         stepNumber: step.step_number,
@@ -672,10 +954,8 @@ async function executePlan(plan, workingTabId) {
     } catch (err) {
       console.error('Step error:', err);
       
-      // Log failure to task context
       taskContext.failedAttempts.push({ step: step.step_number, error: err.message || String(err), timestamp: new Date().toISOString() });
       
-      // Try auto-tool generation once per step
       var failCount = taskContext.failedAttempts.filter(function(f) { return f.step === step.step_number; }).length;
       if (failCount <= 1 && typeof generateMissingTool === 'function') {
         sendSilentUpdate('[Auto-Recovery] Generating workaround for step ' + step.step_number + '...');
@@ -692,7 +972,6 @@ async function executePlan(plan, workingTabId) {
         }
       }
 
-      // Send step failure
       chrome.runtime.sendMessage({
         action: 'step_complete',
         stepNumber: step.step_number,
@@ -703,7 +982,6 @@ async function executePlan(plan, workingTabId) {
       sendSilentUpdate('[Step ' + step.step_number + '] Failed: ' + err.message);
       history.push({ step: step.step_number, action: step, status: 'failed', error: err.message });
 
-      // Break on critical failure
       if (err.message.includes('was closed')) {
         agentRunning = false;
         break;
@@ -713,7 +991,6 @@ async function executePlan(plan, workingTabId) {
     }
   }
 
-  // Report completion
   const completedSteps = history.filter(h => h.status === 'done').length;
   const failedSteps = history.filter(h => h.status === 'failed').length;
 
@@ -816,7 +1093,7 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
   }
 }
 
-// ========== API Call ==========
+// ========== API Call (Automation Mode) ==========
 async function callLLM(observation, pageContent, base64Image, goal, history, stepCount) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
@@ -833,45 +1110,10 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   const last_result = history.length > 0 ? history[history.length - 1].result : null;
   const resultStr = typeof last_result === 'string' ? last_result : JSON.stringify(last_result);
 
-  // Build task context summary for the LLM
   var ctx = getContextSummary();
-  const prompt = `You are a skilled browser automation agent performing a multi-step task.
-Current step: ${stepCount}
-Goal: ${goal}
+  const prompt = `You are a skilled browser automation agent performing a multi-step task.\nCurrent step: ${stepCount}\nGoal: ${goal}\n\nCONTEXT SO FAR: ${ctx}\n\nCURRENT PAGE CONTENT:\n${pageContent}\n\nINTERACTIVE ELEMENTS:\n${JSON.stringify(observation.elements, null, 2)}\n\nCONVERSATION HISTORY (last 3 actions):\n${JSON.stringify(history.slice(-3), null, 2)}\n\n${last_action && resultStr && resultStr.includes('failed') ? 'Your last action failed. Please try a different selector or approach.' : ''}\n\nIMPORTANT: You are making step-by-step progress toward the goal.\n- Focus on ONE clear action per response\n- Reuse previous successful selectors when possible\n- If something failed, learn from it and try a different approach\n- Only return { "type": "finish" } when the goal is fully achieved\n\nBased on the current page, what is the NEXT single action to reach the goal?\n\nIf the goal is achieved, return: { "type": "finish", "summary": "Brief description of what was accomplished" }\nOtherwise, choose ONE of these actions:\n1. { "type": "click", "selector": "CSS_SELECTOR" } - Click a button or link\n2. { "type": "type", "selector": "CSS_SELECTOR", "text": "TEXT" } - Type text into a field\n3. { "type": "navigate", "url": "URL" } - Go to a different URL\n4. { "type": "scroll", "amount": INTEGER } - Scroll up (negative) or down (positive)\n5. { "type": "read_page" } - Re-read the page content to confirm state\n\nReturn ONLY a JSON object.`;
 
-CONTEXT SO FAR: ${ctx}
-
-CURRENT PAGE CONTENT:
-${pageContent}
-
-INTERACTIVE ELEMENTS:
-${JSON.stringify(observation.elements, null, 2)}
-
-CONVERSATION HISTORY (last 3 actions):
-${JSON.stringify(history.slice(-3), null, 2)}
-
-${last_action && resultStr && resultStr.includes('failed') ? 'Your last action failed. Please try a different selector or approach.' : ''}
-
-IMPORTANT: You are making step-by-step progress toward the goal.
-- Focus on ONE clear action per response
-- Reuse previous successful selectors when possible
-- If something failed, learn from it and try a different approach
-- Only return { "type": "finish" } when the goal is fully achieved
-
-Based on the current page, what is the NEXT single action to reach the goal?
-
-If the goal is achieved, return: { "type": "finish", "summary": "Brief description of what was accomplished" }
-Otherwise, choose ONE of these actions:
-1. { "type": "click", "selector": "CSS_SELECTOR" } - Click a button or link
-2. { "type": "type", "selector": "CSS_SELECTOR", "text": "TEXT" } - Type text into a field
-3. { "type": "navigate", "url": "URL" } - Go to a different URL
-4. { "type": "scroll", "amount": INTEGER } - Scroll up (negative) or down (positive)
-5. { "type": "read_page" } - Re-read the page content to confirm state
-
-Return ONLY a JSON object.`;
-
-  // ===== COST SAFETY CHECK — Hard-coded, cannot be bypassed =====
-  // Check if model is blocked by prefix
+  // ===== COST SAFETY CHECK =====
   for (const prefix of COST_SAFETY.BLOCKED_MODEL_PREFIXES) {
     if (model.startsWith(prefix)) {
       const msg = 'COST SAFETY: Model "' + model + '" is BLOCKED (matches blocked prefix "' + prefix + '").';
@@ -882,7 +1124,6 @@ Return ONLY a JSON object.`;
     }
   }
 
-  // Check if model is in whitelist (for Venice endpoint)
   const isVenice = endpoint.includes('venice.ai') || endpoint.includes('venice');
   const isZAI = endpoint.includes('z.ai');
   isOpenRouter = endpoint.includes('openrouter.ai') || endpoint.includes('openrouter');
@@ -895,7 +1136,6 @@ Return ONLY a JSON object.`;
     throw new Error(msg);
   }
 
-  // Estimate cost and enforce limits (Venice only)
   if (isVenice) {
     const estimatedInputTokens = Math.max(100, Math.round(prompt.length / 3.5)) + 500;
     const estimatedOutputTokens = 500;
@@ -908,7 +1148,6 @@ Return ONLY a JSON object.`;
       throw new Error(msg);
     }
 
-    // Check session budget
     if (sessionCost + costCheck.cost.total > COST_SAFETY.MAX_SESSION_COST) {
       const msg = 'COST SAFETY: Session budget $' + COST_SAFETY.MAX_SESSION_COST.toFixed(2) + ' would be exceeded. Current: $' + sessionCost.toFixed(4) + ', This call: $' + costCheck.cost.total.toFixed(4);
       console.error(msg);
@@ -946,7 +1185,6 @@ Return ONLY a JSON object.`;
   }
   const data = await response.json();
 
-  // Track actual cost after successful call
   if (isVenice || isOpenRouter) {
     const actualInputTokens = (data.usage && data.usage.prompt_tokens) ? data.usage.prompt_tokens : estimatedInputTokens;
     const actualOutputTokens = (data.usage && data.usage.completion_tokens) ? data.usage.completion_tokens : estimatedOutputTokens;
@@ -959,7 +1197,6 @@ Return ONLY a JSON object.`;
       logApiCall(model, actualInputTokens, actualOutputTokens, actualTotalCost, 'OK', null);
       console.log('[COST] ' + model + ': $' + actualTotalCost.toFixed(6) + ' (session total: $' + sessionCost.toFixed(4) + ')');
 
-      // Alert if session cost is significant
       if (sessionCost >= 1.00) {
         console.warn('[COST] Session has spent $' + sessionCost.toFixed(4) + ' so far.');
       }
@@ -974,7 +1211,6 @@ function parseLLMResponse(content) {
   try {
     let jsonStr = content.trim();
 
-    // Try to extract JSON from markdown code blocks
     if (jsonStr.includes('```')) {
       const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       if (match && match[1]) {
@@ -982,7 +1218,6 @@ function parseLLMResponse(content) {
       }
     }
 
-    // Try to extract JSON object directly
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonStr = jsonMatch[0];
@@ -990,14 +1225,11 @@ function parseLLMResponse(content) {
 
     let parsed = JSON.parse(jsonStr);
 
-    // Fix 1: If the LLM returned {action: 'click', ...} instead of {type: 'click', ...}
     if (!parsed.type && parsed.action && typeof parsed.action === 'string') {
       parsed.type = parsed.action;
       delete parsed.action;
     }
 
-    // Fix 2: If the LLM returned a plan/status object with no type field (e.g. {current_step: 2, instructions: '...'})
-    // Convert it to a 'note' action so the agent continues gracefully
     if (!parsed.type) {
       const summary = parsed.summary
         ? (Array.isArray(parsed.summary) ? parsed.summary.join('. ') : parsed.summary)
