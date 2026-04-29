@@ -73,6 +73,60 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else if (cmd.type === 'scroll') {
           window.scrollBy(0, cmd.amount);
           result = 'Scrolled ' + cmd.amount;
+        } else if (cmd.type === 'read_page') {
+          result = document.body.innerText;
+        } else if (cmd.type === 'scrape_page') {
+          // Scrape page content for research tabs
+          const options = cmd.options || {};
+          const scrapeResult = scrapePageContent(options.maxDepth || 3, options.includeLinks || false);
+          result = scrapeResult;
+        } else if (cmd.type === 'extract') {
+          const data = [];
+          if (cmd.selector) {
+            const elements = document.querySelectorAll(cmd.selector);
+            elements.forEach(el => data.push(el.innerText.trim()));
+          }
+          result = { extracted: data };
+        } else if (cmd.type === 'extract_list') {
+          const results = [];
+          if (cmd.selectors && Array.isArray(cmd.selectors)) {
+            cmd.selectors.forEach(s => {
+              const el = document.querySelector(s);
+              if (el) results.push({ selector: s, value: el.innerText.trim() || el.value });
+            });
+          }
+          result = { extracted: results };
+        } else if (cmd.type === 'press_key') {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: cmd.key }));
+          result = 'Pressed ' + cmd.key;
+        } else if (cmd.type === 'execute_js') {
+          try {
+            result = eval(cmd.code);
+          } catch (e) {
+            result = 'JS Error: ' + e.message;
+          }
+        } else if (cmd.type === 'wait_for_text') {
+          let waited = 0;
+          const start = Date.now();
+          while (waited < (cmd.timeout || 5000)) {
+            if (document.body.innerText.includes(cmd.text)) {
+              result = 'Found: ' + cmd.text;
+              break;
+            }
+            waited = Date.now() - start;
+          }
+          if (!result.includes('Found')) result = 'Timeout waiting for: ' + cmd.text;
+        } else if (cmd.type === 'wait_for_element') {
+          let waited = 0;
+          const start = Date.now();
+          while (waited < (cmd.timeout || 5000)) {
+            if (document.querySelector(cmd.selector)) {
+              result = 'Found element: ' + cmd.selector;
+              break;
+            }
+            waited = Date.now() - start;
+          }
+          if (!result.includes('Found')) result = 'Timeout waiting for element: ' + cmd.selector;
         }
       } catch (e) {
         result = 'Error executing ' + cmd.type + ': ' + e.message;
@@ -146,4 +200,49 @@ function extractForms() {
     forms.push({ selector: getUniqueSelector(form), fields });
   });
   return forms;
+}
+
+// Enhanced page scraping for research tabs
+function scrapePageContent(maxDepth = 3, includeLinks = false) {
+  const result = {
+    title: document.title,
+    url: window.location.href,
+    mainContent: '',
+    keyInfo: [],
+    links: [],
+    tables: [],
+    timestamp: new Date().toISOString()
+  };
+  
+  // Extract main content (from article, main, or body)
+  const main = document.querySelector('article, main, .content, .main') || document.body;
+  result.mainContent = main.innerText.substring(0, 5000);
+  
+  // Extract potential key info (headlines, important text)
+  const keyElements = document.querySelectorAll('h1, h2, h3, strong, .key-point, .important, .highlight');
+  keyElements.forEach(el => {
+    const text = el.innerText.trim();
+    if (text.length > 5 && text.length < 200) {
+      result.keyInfo.push(text);
+    }
+  });
+  
+  // Extract links if requested
+  if (includeLinks) {
+    const linkElements = document.querySelectorAll('a[href]');
+    const seenLinks = new Set();
+    linkElements.forEach(el => {
+      const href = el.getAttribute('href');
+      const text = el.innerText.trim();
+      if (href && text && !seenLinks.has(href) && href.startsWith('http')) {
+        result.links.push({ text: text.substring(0, 50), href: href });
+        seenLinks.add(href);
+      }
+    });
+  }
+  
+  // Extract tables
+  result.tables = extractTables();
+  
+  return result;
 }

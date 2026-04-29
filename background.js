@@ -27,7 +27,30 @@ const SITE_PATTERNS = {
   'github.com': { platform: 'github', loginSelector: '#login_field', passwordSelector: '#password' },
   'gmail.com': { platform: 'gmail', searchSelector: 'input[type="search"]' },
   'google.com': { platform: 'google', searchSelector: 'input[name="q"]' },
-  'calendar.google.com': { platform: 'google-calendar' }
+  'calendar.google.com': { platform: 'google-calendar' },
+  'portal.instant-on.hpe.com': { 
+    platform: 'aruba-instant-on',
+    restrictions: 'NO browser back/forward - use portal left menu, tabs, breadcrumbs only',
+    deviceListSelector: '[data-testid="device-list"]',
+    alertListSelector: '[data-testid="alert-list"]'
+  },
+  'instant-on.hpe.com': { 
+    platform: 'aruba-instant-on',
+    restrictions: 'Portal-only navigation via menus and tabs'
+  }
+};
+
+const INVESTIGATION_RESTRICTIONS = {
+  'aruba-instant-on': `
+CRITICAL NAVIGATION RESTRICTIONS - MUST FOLLOW:
+1. Do NOT instruct the user to use browser Back or Forward buttons (breaks portal session)
+2. Only use in-portal navigation: left menu, tabs, breadcrumbs, and direct clicks within pages
+3. Never say "go back" or "navigate back" - instead say "return to [specific page]" via menu
+4. Use precise selector language for portal elements`,
+  'default': `
+Navigation Guidelines:
+- Prefer in-page navigation over browser controls
+- Use specific element labels and text for actions`
 };
 
 function getSitePattern(url) {
@@ -92,6 +115,63 @@ function getContextSummary() {
   var data = Object.entries(taskContext.intermediateData).slice(-5);
   var fails = taskContext.failedAttempts.slice(-3);
   return 'Goal: ' + taskContext.goal + '\nSteps done: ' + completed + '\nData: ' + data.map(function(d) { return d[0] + '=' + String(d[1]).substring(0, 40); }).join(', ') + '\nFailures: ' + fails.map(function(f) { return f.error.substring(0, 60); }).join(' | ');
+}
+
+// ========== Investigation Guidance System ==========
+const INVESTIGATION_TEMPLATES = {
+  network_outage: {
+    title: "Network Outage Investigation",
+    questions: [
+      "What is the current time zone shown in the portal?",
+      "What are the 2-3 most recent Major/Active alerts?",
+      "Which devices went offline and at what exact times?",
+      "Were multiple devices affected simultaneously?",
+      "What is the PoE power budget vs current draw?",
+      "Are there any uplink errors or port flaps?",
+      "What is the pattern - power event or connectivity issue?"
+    ],
+    steps: [
+      "Identify all offline devices and their types",
+      "Determine exact timestamps of outages",
+      "Check PoE power status on affected switches",
+      "Verify uplink status on core devices",
+      "Look for power-related events in logs",
+      "Rank root causes by likelihood"
+    ]
+  },
+  default: {
+    title: "General Investigation",
+    questions: [
+      "What are the key facts vs assumptions?",
+      "What is the timeline of events?",
+      "What evidence supports each hypothesis?",
+      "What data is missing or needs verification?"
+    ],
+    steps: [
+      "Gather all available evidence",
+      "Separate facts from inferences",
+      "Build timeline of events",
+      "Identify root cause candidates",
+      "Recommend next actions"
+    ]
+  }
+};
+
+function getInvestigationGuidance(goal) {
+  const goalLower = goal.toLowerCase();
+  let template = INVESTIGATION_TEMPLATES.default;
+  
+  if (goalLower.includes('outage') || goalLower.includes('offline') || goalLower.includes('network')) {
+    template = INVESTIGATION_TEMPLATES.network_outage;
+  }
+  
+  return {
+    title: template.title,
+    instructions: "Follow this structured investigation:\n\n" + 
+      template.questions.map((q, i) => `Question ${i+1}: ${q}`).join('\n') +
+      "\n\nProvide output in FACT/INFERENCE format with timeline and next actions.",
+    steps: template.steps
+  };
 }
 
 
@@ -220,6 +300,115 @@ function openOrFocusTab(url) {
             chrome.tabs.create({ url: url, active: true });
         }
     });
+}
+
+// ---------- Research Tab Management ----------
+let researchTabs = new Map(); // Store research tabs by query
+let researchTabData = new Map(); // Store scraped data from research tabs
+
+// Auto-research triggers - keywords that should trigger automatic research
+const AUTO_RESEARCH_TRIGGERS = [
+  { keywords: ['outage', 'offline', 'intermittent', 'network failure'], 
+    queries: ['Aruba Instant On device offline troubleshooting', 'network switch power event recovery'] },
+  { keywords: ['poe', 'power budget', 'power denied'], 
+    queries: ['PoE power budget calculation', 'PoE port power denial troubleshooting'] },
+  { keywords: ['uplink', 'port error', 'link flap'], 
+    queries: ['network uplink troubleshooting', 'link flap diagnosis'] },
+  { keywords: ['voip', 'phone', 'polycom'], 
+    queries: ['VoIP phone PoE requirements', 'Polycom VVX reboot causes'] }
+];
+
+function openResearchTab(query, purpose = 'research') {
+    const searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent(query);
+    return new Promise((resolve) => {
+        chrome.tabs.create({ 
+            url: searchUrl, 
+            active: false,
+            windowId: agentTabId ? null : undefined
+        }, (tab) => {
+            researchTabs.set(query, { 
+                tabId: tab.id, 
+                openedAt: Date.now(),
+                purpose: purpose
+            });
+            sendSilentUpdate(`[Research] Opened research tab for: ${query}`);
+            resolve(tab.id);
+        });
+    });
+}
+
+// Enhanced research tab with auto-scraping capability
+async function openResearchTabWithScraping(query, purpose = 'research') {
+    const tabId = await openResearchTab(query, purpose);
+    
+    // Wait for page to load and scrape content
+    setTimeout(async () => {
+        try {
+            const results = await chrome.tabs.sendMessage(tabId, { 
+                action: 'scrape_page', 
+                options: { maxDepth: 3, includeLinks: true } 
+            });
+            if (results && results.content) {
+                researchTabData.set(tabId, {
+                    query: query,
+                    scrapedAt: Date.now(),
+                    content: results.content,
+                    links: results.links || []
+                });
+                sendSilentUpdate(`[Research] Scraped content from research tab: ${query}`);
+            }
+        } catch (e) {
+            console.log('Could not scrape research tab:', e.message);
+        }
+    }, 3000);
+    
+    return tabId;
+}
+
+// Auto-trigger research based on goal keywords
+async function checkAndTriggerAutoResearch(goal) {
+    const goalLower = goal.toLowerCase();
+    const triggeredQueries = [];
+    
+    for (const trigger of AUTO_RESEARCH_TRIGGERS) {
+        const hasKeyword = trigger.keywords.some(kw => goalLower.includes(kw));
+        if (hasKeyword && trigger.queries.length > 0) {
+            const randomQuery = trigger.queries[Math.floor(Math.random() * trigger.queries.length)];
+            if (!triggeredQueries.includes(randomQuery)) {
+                await openResearchTabWithScraping(randomQuery, 'auto-research');
+                triggeredQueries.push(randomQuery);
+            }
+        }
+    }
+    
+    return triggeredQueries;
+}
+
+function closeResearchTabs() {
+    researchTabs.forEach((info, query) => {
+        chrome.tabs.remove(info.tabId).catch(() => {});
+    });
+    researchTabs.clear();
+    researchTabData.clear();
+}
+
+function getResearchTabs() {
+    return Array.from(researchTabs.entries()).map(([query, info]) => ({
+        query,
+        tabId: info.tabId,
+        openedAt: info.openedAt,
+        purpose: info.purpose
+    }));
+}
+
+// Get all scraped research data
+function getResearchData() {
+    return Array.from(researchTabData.entries()).map(([tabId, data]) => ({
+        tabId,
+        query: data.query,
+        content: data.content,
+        links: data.links
+    }));
 }
 
 // ---------- Message routing (popup ↔ background ↔ content) ----------
@@ -395,13 +584,18 @@ async function runAgentLoop(goal, workingTabId) {
         files: ['content.js']
       });
 
-      // Get page data with retry
+      // Get page data in parallel with retry
       let observation, pageContent;
       try {
-        observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
-        pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
-        const structuredData = await sendMessageWithRetry(tab, { action: 'extract_data' });
-        taskContext.intermediateData['structured_data'] = structuredData;
+        // Parallel execution: observe page, read page, and extract data
+        const [obsResult, contentResult, structuredResult] = await Promise.all([
+          sendMessageWithRetry(tab, { action: 'observe_page' }),
+          sendMessageWithRetry(tab, { action: 'read_page' }),
+          sendMessageWithRetry(tab, { action: 'extract_data' })
+        ]);
+        observation = obsResult;
+        pageContent = contentResult;
+        taskContext.intermediateData['structured_data'] = structuredResult;
       } catch (err) {
         console.error('Failed to get page data:', err);
         sendSilentUpdate(`[Step ${stepCount}] ⚠️ Error reading page: ${err.message}. Retrying...`);
@@ -429,7 +623,12 @@ async function runAgentLoop(goal, workingTabId) {
       await enforceRateLimit();
 
       sendSilentUpdate(`[Step ${stepCount}] Consulting AI (Call #${apiCallCount + 1})...`);
-      const command = await callLLMWithRetry(observation, pageContent.content, base64Image, goal, history, stepCount);
+      
+      // Get research data from open research tabs
+      const researchData = getResearchData();
+      const autoResearchQueries = await checkAndTriggerAutoResearch(goal);
+      
+      const command = await callLLMWithRetry(observation, pageContent.content, base64Image, goal, history, stepCount, researchData, autoResearchQueries);
 
       if (command.type === 'finish') {
         finished = true;
@@ -448,6 +647,12 @@ async function runAgentLoop(goal, workingTabId) {
           await sleep(2000);
           result = 'Navigated to ' + command.url;
         }
+      } else if (command.type === 'research') {
+        // Open a research tab without switching the agent's tab
+        await openResearchTab(command.query, command.purpose || 'research');
+        result = 'Opened research tab for: ' + command.query;
+        // Don't add to history - it's auxiliary info
+        continue;
       } else {
         result = await chrome.tabs.sendMessage(tab, { action: 'execute_command', command });
       }
@@ -503,18 +708,56 @@ async function planTask(goal, workingTabId) {
 
     sendSilentUpdate('[Plan] Analyzing your instruction...');
 
+    // Detect investigation mode from goal
+    const goalLower = goal.toLowerCase();
+    const isInvestigation = goalLower.includes('investigat') || 
+                           goalLower.includes('outage') || 
+                           goalLower.includes('offline') ||
+                           goalLower.includes('root cause') ||
+                           goalLower.includes('why did') ||
+                           goalLower.includes('what happened');
+
     // Detect site-specific patterns for better plans
+    let siteRestrictions = '';
     try {
       var tab = await chrome.tabs.get(workingTabId);
       var pattern = getSitePattern(tab.url || '');
       if (pattern) {
         sendSilentUpdate('[Plan] Detected platform: ' + pattern.platform);
+        if (pattern.restrictions) {
+          siteRestrictions = '\n\nSITE-SPECIFIC RESTRICTIONS:\n' + pattern.restrictions;
+        }
+        // Add investigation-specific restrictions for known platforms
+        if (isInvestigation && INVESTIGATION_RESTRICTIONS[pattern.platform]) {
+          siteRestrictions += '\n\n' + INVESTIGATION_RESTRICTIONS[pattern.platform];
+        }
       }
     } catch (e) {}
 
+    // Get investigation guidance if applicable
+    let investigationGuidance = null;
+    if (isInvestigation) {
+      investigationGuidance = getInvestigationGuidance(goal);
+      sendSilentUpdate('[Plan] Investigation mode detected: ' + investigationGuidance.title);
+    }
+
+    // Build plan prompt with investigation guidance
+    let extraInstructions = '';
+    if (investigationGuidance) {
+      extraInstructions = `
+
+INVESTIGATION MODE SPECIFIC INSTRUCTIONS:
+${investigationGuidance.instructions}
+
+CRITICAL NAVIGATION RESTRICTIONS for this investigation:
+- Do NOT instruct the user to use browser Back or Forward buttons
+- Only use in-portal navigation: left menu, tabs, breadcrumbs, and direct clicks within pages
+`;
+    }
+
     const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.
 
-User instruction: "${goal}"
+User instruction: "${goal}"${extraInstructions}${siteRestrictions}
 
 Return ONLY a JSON object with this exact structure:
 {
@@ -761,6 +1004,20 @@ async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
   }
 }
 
+// ========== Research Integration ==========
+function formatResearchContext(researchData, autoResearchQueries) {
+    if (!researchData || researchData.length === 0) return '';
+    
+    return `
+RESEARCH CONTEXT (from opened research tabs):
+${researchData.map(r => `
+Query: ${r.query}
+Content: ${r.content ? r.content.substring(0, 500) + '...' : 'No content scraped'}
+`).join('\n')}
+
+Auto-research queries already triggered: ${autoResearchQueries.join(', ')}`;
+}
+
 // ========== Cost Validation ==========
 function validateModelCost(model, inputTokens, outputTokens) {
   const rate = COST_SAFETY.RATES[model];
@@ -802,22 +1059,22 @@ function logApiCall(model, inputTokens, outputTokens, cost, status, error) {
   });
 }
 
-async function callLLMWithRetry(observation, pageContent, base64Image, goal, history, stepCount, retryCount = 0) {
+async function callLLMWithRetry(observation, pageContent, base64Image, goal, history, stepCount, researchData = null, autoResearchQueries = [], retryCount = 0) {
   try {
-    return await callLLM(observation, pageContent, base64Image, goal, history, stepCount);
+    return await callLLM(observation, pageContent, base64Image, goal, history, stepCount, researchData, autoResearchQueries);
   } catch (err) {
     if (err.message.includes('429') && retryCount < CONFIG.maxRetries) {
       const backoffDelay = CONFIG.retryDelay * Math.pow(2, retryCount);
       console.log(`Rate limited. Waiting ${backoffDelay}ms before retry ${retryCount + 1}/${CONFIG.maxRetries}`);
       await sleep(backoffDelay);
-      return callLLMWithRetry(observation, pageContent, base64Image, goal, history, stepCount, retryCount + 1);
+      return callLLMWithRetry(observation, pageContent, base64Image, goal, history, stepCount, researchData, autoResearchQueries, retryCount + 1);
     }
     throw err;
   }
 }
 
 // ========== API Call ==========
-async function callLLM(observation, pageContent, base64Image, goal, history, stepCount) {
+async function callLLM(observation, pageContent, base64Image, goal, history, stepCount, researchData = null, autoResearchQueries = []) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
   const apiKey = settings.api_key;
@@ -835,11 +1092,15 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
 
   // Build task context summary for the LLM
   var ctx = getContextSummary();
+  
+  // Format research context
+  const researchContext = formatResearchContext(researchData, autoResearchQueries);
+  
   const prompt = `You are a skilled browser automation agent performing a multi-step task.
 Current step: ${stepCount}
 Goal: ${goal}
 
-CONTEXT SO FAR: ${ctx}
+CONTEXT SOFAR: ${ctx}${researchContext}
 
 CURRENT PAGE CONTENT:
 ${pageContent}
@@ -857,6 +1118,7 @@ IMPORTANT: You are making step-by-step progress toward the goal.
 - Reuse previous successful selectors when possible
 - If something failed, learn from it and try a different approach
 - Only return { "type": "finish" } when the goal is fully achieved
+- Do NOT use browser Back/Forward buttons - use in-page navigation only (menus, tabs, breadcrumbs)
 
 Based on the current page, what is the NEXT single action to reach the goal?
 
@@ -867,6 +1129,9 @@ Otherwise, choose ONE of these actions:
 3. { "type": "navigate", "url": "URL" } - Go to a different URL
 4. { "type": "scroll", "amount": INTEGER } - Scroll up (negative) or down (positive)
 5. { "type": "read_page" } - Re-read the page content to confirm state
+6. { "type": "research", "query": "search terms", "purpose": "optional purpose note" } - Open a research tab to look up info (keeps agent on current tab)
+7. { "type": "extract", "selector": "CSS_SELECTOR" } - Extract text content from elements
+8. { "type": "extract_list", "selectors": ["sel1", "sel2"] } - Extract multiple specific values
 
 Return ONLY a JSON object.`;
 
@@ -1005,7 +1270,7 @@ function parseLLMResponse(content) {
       return { type: 'note', text: '[Processed] ' + summary };
     }
 
-    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js'];
+    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js', 'research', 'wait'];
     if (!validTypes.includes(parsed.type)) {
       throw new Error('Invalid command type: ' + parsed.type);
     }

@@ -1716,6 +1716,88 @@
   border-color: var(--accent, #89b4fa);
   box-shadow: 0 0 0 2px rgba(137,180,250,0.2);
 }
+
+/* ========== Investigation Mode Styles ========== */
+.investigation-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: rgba(22, 163, 74, 0.15);
+  color: var(--success-color);
+  margin-left: 8px;
+}
+
+.investigation-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.investigation-section {
+  margin-bottom: 16px;
+}
+
+.investigation-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.investigation-section-title.fact {
+  color: var(--success-color);
+}
+
+.investigation-section-title.inference {
+  color: var(--warning-color);
+}
+
+.investigation-item {
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.investigation-timeline {
+  font-family: "Monaco", "Menlo", monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.investigation-question {
+  background: rgba(0, 132, 255, 0.1);
+  border: 1px solid var(--accent-primary);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.investigation-question-title {
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.investigation-missing {
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid var(--error-color);
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--error-color);
+}
 </style>
 </head>
 <body>
@@ -1777,8 +1859,11 @@
     <button class="small-btn" id="previewBtn" title="Markdown preview">👁️ Preview</button>
     <button class="small-btn" id="attachBtn" title="Attach file">📎 Attach</button>
     <button class="small-btn" id="exportBtn" title="Export conversation">💾 Export</button>
-     <button class="small-btn" id="shortcutsBtn" title="Saved shortcuts">⌨️ Shortcuts</button>
-     <button class="small-btn" id="speakBtn" title="Read last assistant response aloud (JennyNeural TTS)">🔊 Speak</button>
+    <button class="small-btn" id="investigationModeBtn" title="Investigation Mode">🔍 Investigate</button>
+    <button class="small-btn" id="closeResearchTabsBtn" title="Close all research tabs">🚪 Close Tabs</button>
+    <button class="small-btn" id="exportInvestigationBtn" title="Export investigation report">📄 Report</button>
+    <button class="small-btn" id="shortcutsBtn" title="Saved shortcuts">⌨️ Shortcuts</button>
+    <button class="small-btn" id="speakBtn" title="Read last assistant response aloud (JennyNeural TTS)">🔊 Speak</button>
   </div>
 
   <!-- Chat Container -->

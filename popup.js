@@ -38,6 +38,9 @@ const commandList = document.getElementById('commandList');
 const themeModal = document.getElementById('theme-modal');
 const closeThemeBtn = document.getElementById('closeThemeBtn');
 const saveThemeBtn = document.getElementById('saveThemeBtn');
+const investigationModeBtn = document.getElementById('investigationModeBtn');
+const closeResearchTabsBtn = document.getElementById('closeResearchTabsBtn');
+const exportInvestigationBtn = document.getElementById('exportInvestigationBtn');
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -117,6 +120,14 @@ function addMessage(text, role = 'assistant') {
 
   conversationHistory.push({ text, role });
   saveChatHistory();
+  
+  // Save investigation state if in investigation mode
+  if (investigationMode && role === 'assistant') {
+    saveInvestigationSession({
+      messages: conversationHistory,
+      timestamp: new Date().toISOString()
+    });
+  }
 
   const messageGroup = document.createElement('div');
   messageGroup.className = 'message-group';
@@ -131,35 +142,48 @@ function addMessage(text, role = 'assistant') {
   if (role === 'user') {
     msg.textContent = text;
   } else {
+    // Format investigation response if in investigation mode
+    if (investigationMode) {
+      text = formatInvestigationResponse(text);
+    }
     msg.innerHTML = marked.parse(text);
     addCodeCopyButtons(msg);
   }
 
   wrapper.appendChild(msg);
   messageGroup.appendChild(wrapper);
-// Replace direct LLM call with background message routing
-if (sendBtn) {
-    sendBtn.addEventListener('click', () => {
-        const promptInput = document.getElementById('goalInput') || document.getElementById('promptInput');
-        const prompt = promptInput ? promptInput.value : '';
-        if (!prompt) return;
-        // Show typing indicator
-        showTypingIndicator();
-        chrome.runtime.sendMessage({
-            action: 'runPrompt',
-            prompt: prompt,
-            openInNewTab: true
-        }, response => {
-            removeTypingIndicator();
-            if (response.error) {
-                console.error('Prompt error:', response.error);
-                addMessage('Error: ' + response.error, 'assistant');
-            } else {
-                addMessage(response.reply, 'assistant');
-            }
-        });
-    });
+  chatContainer.appendChild(messageGroup);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
+
+// ========== Code Copy Buttons ==========
+function addCodeCopyButtons(messageElement) {
+  const codeBlocks = messageElement.querySelectorAll('pre');
+  codeBlocks.forEach(pre => {
+    const code = pre.querySelector('code');
+    if (code) {
+      const lang = code.className.replace('language-', '') || 'plaintext';
+
+      const header = document.createElement('div');
+      header.className = 'code-header';
+
+      const langSpan = document.createElement('span');
+      langSpan.textContent = lang;
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'code-copy-btn';
+      copyBtn.textContent = '📋 Copy';
+
+      copyBtn.addEventListener('click', () => {
+        const text = code.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          copyBtn.textContent = '✓ Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(() => {
+            copyBtn.textContent = '📋 Copy';
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        });
       });
 
       header.appendChild(langSpan);
@@ -167,6 +191,16 @@ if (sendBtn) {
       pre.insertBefore(header, code);
     }
   });
+}
+
+// ========== Typing Indicator ==========
+function restoreInvestigationSession(session) {
+  conversationHistory = session.messages || [];
+  chatContainer.innerHTML = '';
+  conversationHistory.forEach(turn => {
+    addMessage(turn.text, turn.role);
+  });
+  showToast('Restored investigation session', 'success');
 }
 
 // ========== Typing Indicator ==========
@@ -720,6 +754,11 @@ chrome.runtime.onMessage.addListener((message) => {
     addMessage('✅ Task completed!\n\n' + message.summary, 'assistant');
     resetUI();
   }
+  if (message.action === 'close_research_tabs') {
+    if (typeof closeResearchTabs !== 'undefined') {
+      closeResearchTabs();
+    }
+  }
 });
 
 // ========== Close Modals on Escape ==========
@@ -740,3 +779,201 @@ window.addEventListener('click', (e) => {
     themeModal.classList.remove('show');
   }
 });
+
+// ========== Investigation Mode ==========
+let investigationMode = false;
+
+// Session state storage key
+const INVESTIGATION_SESSION_KEY = 'investigation_session_state';
+
+// Save investigation session state
+function saveInvestigationSession(data) {
+  const session = {
+    ...data,
+    savedAt: new Date().toISOString()
+  };
+  localStorage.setItem(INVESTIGATION_SESSION_KEY, JSON.stringify(session));
+}
+
+// Load investigation session state
+function loadInvestigationSession() {
+  try {
+    const saved = localStorage.getItem(INVESTIGATION_SESSION_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Clear investigation session state
+function clearInvestigationSession() {
+  localStorage.removeItem(INVESTIGATION_SESSION_KEY);
+}
+
+// ========== Research Tab Controls ==========
+
+if (closeResearchTabsBtn) {
+  closeResearchTabsBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'close_research_tabs' });
+    showToast('Closed all research tabs', 'success');
+  });
+}
+
+// ========== Investigation Export ==========
+
+if (exportInvestigationBtn) {
+  exportInvestigationBtn.addEventListener('click', () => {
+    const session = loadInvestigationSession();
+    if (session && session.messages && session.messages.length > 0) {
+      const content = session.messages
+        .map(turn => `### ${turn.role === 'user' ? '👤 You' : '🤖 Agent'}\n\n${turn.text}`)
+        .join('\n\n---\n\n');
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `investigation-report-${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Investigation report exported', 'success');
+    } else {
+      showToast('No investigation data to export', 'error');
+    }
+  });
+}
+
+if (investigationModeBtn) {
+  investigationModeBtn.addEventListener('click', () => {
+    investigationMode = !investigationMode;
+    investigationModeBtn.classList.toggle('active');
+    if (investigationMode) {
+      investigationModeBtn.textContent = '🔍 Investigating';
+      showToast('Investigation Mode ON - Structured output enabled', 'success');
+      // Load previous session if exists
+      const session = loadInvestigationSession();
+      if (session && confirm('Restore previous investigation session?')) {
+        restoreInvestigationSession(session);
+      }
+    } else {
+      investigationModeBtn.textContent = '🔍 Investigate';
+      showToast('Investigation Mode OFF', 'success');
+    }
+  });
+}
+
+// Investigation prompt template for structured output
+function getInvestigationPrompt(userInput) {
+  return `INVESTIGATION MODE: Provide output in the following structured format:
+
+---
+
+**FACT vs INFERENCE** (separate clearly)
+
+**FACTS GATHERED:**
+- [List verifiable facts only]
+- [Device names, models, timestamps, values]
+
+**INFERENCES:**
+- [Analysis based on facts]
+- [Root cause hypotheses]
+
+---
+
+**TIMELINE** (chronological, with EDT/UTC timezone noted)
+- [Date/Time] Event description
+
+---
+
+**TOP SUSPECT ANALYSIS**
+1. [Most likely cause with probability %]
+2. [Second most likely]
+3. [Third most likely]
+
+---
+
+**NEXT ACTIONS** (ticket-ready)
+- [Action 1 - who, what, when]
+- [Action 2 - who, what, when]
+
+---
+
+**MISSING DATA** (if any)
+- [MISSING DATA: What critical info is needed]
+
+---
+
+${userInput}`;
+}
+
+// Enhanced format investigation response with better visual sections
+function formatInvestigationResponse(text) {
+  // Already has investigation-style sections, enhance formatting
+  if (text.includes('**FACT') || text.includes('**FACTS')) {
+    return enhanceInvestigationFormatting(text);
+  }
+  
+  // Auto-detect and format if response has investigation-like content
+  const hasFacts = /facts?:\s*\n/i.test(text);
+  const hasTimeline = /timeline:\s*\n/i.test(text);
+  const hasMissing = /missing\s+data:\s*\n/i.test(text);
+  
+  if (hasFacts || hasTimeline || hasMissing) {
+    return enhanceInvestigationFormatting(text);
+  }
+  
+  return text;
+}
+
+// Apply visual enhancements to investigation output
+function enhanceInvestigationFormatting(text) {
+  // Split into sections and format each
+  const sections = [
+    { name: 'FACTS GATHERED', header: '📋 FACTS GATHERED', emoji: '📋' },
+    { name: 'INFERENCES', header: '🎯 INFERENCES', emoji: '🎯' },
+    { name: 'TIMELINE', header: '⏰ TIMELINE (EDT)', emoji: '⏰' },
+    { name: 'TOP SUSPECT', header: '🔍 TOP SUSPECT ANALYSIS', emoji: '🔍' },
+    { name: 'NEXT ACTIONS', header: '📝 NEXT ACTIONS', emoji: '📝' },
+    { name: 'MISSING DATA', header: '❓ MISSING DATA', emoji: '❓' }
+  ];
+  
+  let formatted = text;
+  
+  // Add visual dividers and ensure proper section headers
+  sections.forEach(section => {
+    if (formatted.includes(section.name) && !formatted.includes(section.header)) {
+      const regex = new RegExp(`\\*\\*${section.name}[^:]*\\*\\*`, 'i');
+      formatted = formatted.replace(regex, section.header);
+    }
+  });
+  
+  // Add proper markdown code block for missing data
+  if (formatted.includes('MISSING DATA') && !formatted.includes('```')) {
+    formatted = formatted.replace(
+      /(MISSING DATA.*?)(---|$)/gis,
+      '$1\n```\n[MISSING DATA: List critical information needed here]\n```\n\n---'
+    );
+  }
+  
+  // Ensure list items have proper bullets
+  formatted = formatted.replace(/(^\s*[-*]\s+(?=[A-Z]))/gm, '\n$1');
+  
+  // Add visual separator between major sections
+  formatted = formatted.replace(/\n---\n/g, '\n\n---\n\n');
+  
+  return formatted;
+}
+
+// Override sendMessage to use investigation format when enabled
+const originalSendMessage = sendMessage;
+sendMessage = function() {
+  const goal = goalInput.value.trim();
+  if (!goal) return;
+
+  if (investigationMode) {
+    // Prepend investigation format instructions
+    const investigationGoal = getInvestigationPrompt(goal);
+    goalInput.value = investigationGoal;
+  }
+  
+  originalSendMessage.call(this);
+};
