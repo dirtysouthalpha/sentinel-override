@@ -1295,7 +1295,7 @@ Current step: ${stepCount}
 Goal: ${goal}
 
 CRITICAL NAVIGATION RULES:
-- You are STAYING ON THIS TAB (ID: ${tab ? tab.id : 'unknown'}) throughout the entire session
+- You are STAYING ON THIS TAB (ID: ${primaryAgentTabId || 'unknown'}) throughout the entire session
 - Research tabs are opened in separate background tabs - DO NOT navigate the primary tab
 - Use in-page navigation only: clicks on links, buttons, form submissions
 - NEVER use browser Back/Forward buttons - they break portal sessions

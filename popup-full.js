@@ -1618,4 +1618,7 @@ saveShortcutBtn.addEventListener('click', saveCurrentPromptAsShortcut);
 
 if (voiceBtn && voiceBtn.parentNode) {
   voiceBtn.parentNode.insertBefore(saveShortcutBtn, voiceBtn);
+} else if (goalInput && goalInput.parentNode) {
+  // Fallback: insert after goal input if voiceBtn is not available
+  goalInput.parentNode.insertBefore(saveShortcutBtn, goalInput.nextSibling);
 }

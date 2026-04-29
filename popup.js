@@ -4,12 +4,43 @@ let selectedAttachments = [];
 let currentSearchQuery = '';
 let currentSearchIndex = 0;
 
+// ========== Provider Presets ==========
+// Common API providers with their endpoints and model lists
+const PROVIDER_PRESETS = {
+  'openai': {
+    endpoint: 'https://api.openai.com/v1/chat/completions',
+    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1-preview', 'o1-mini', 'gpt-4.5-preview'],
+    defaultModel: 'gpt-4o-mini'
+  },
+  'anthropic': {
+    endpoint: 'https://api.anthropic.com/v1/messages',
+    models: ['claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+    defaultModel: 'claude-3-5-sonnet-20241022'
+  },
+  'zai': {
+    endpoint: 'https://api.z.ai/v1/chat/completions',
+    models: ['zai-org-glm-4.7-flash', 'zai-org-glm-4.7', 'glm-4-plus'],
+    defaultModel: 'zai-org-glm-4.7-flash'
+  },
+  'venice': {
+    endpoint: 'https://api.venice.ai/api/v1/chat/completions',
+    models: ['gemma-4-uncensored', 'grok-41-fast', 'deepseek-v4-flash', 'mistral-small-3-2-24b-instruct'],
+    defaultModel: 'gemma-4-uncensored'
+  },
+  'openrouter': {
+    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+    models: ['google/gemini-2.0-flash-enterprise', 'anthropic/claude-3.5-sonnet', 'openai/gpt-4o-mini', 'google/gemini-2.5-pro'],
+    defaultModel: 'openai/gpt-4o-mini'
+  }
+};
+
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
 const sendBtn = document.getElementById('sendBtn');
 const stopBtn = document.getElementById('stopBtn');
 const voiceBtn = document.getElementById('voiceBtn');
+const speakBtn = document.getElementById('speakBtn');
 const status = document.getElementById('status');
 const statusText = document.getElementById('status-text');
 const activeIndicator = document.getElementById('activeIndicator');
@@ -41,6 +72,8 @@ const saveThemeBtn = document.getElementById('saveThemeBtn');
 const investigationModeBtn = document.getElementById('investigationModeBtn');
 const closeResearchTabsBtn = document.getElementById('closeResearchTabsBtn');
 const exportInvestigationBtn = document.getElementById('exportInvestigationBtn');
+const testApiBtn = document.getElementById('testApiBtn');
+const providerSelect = document.getElementById('provider-select');
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -58,8 +91,129 @@ window.addEventListener('DOMContentLoaded', () => {
   loadChatHistory();
   setupEventListeners();
   setupVoiceInput();
+  initProviderSelector();
+  addTestApiBtn();
   checkForRestorableSession();
 });
+
+// ========== Provider Selector ==========
+function initProviderSelector() {
+  if (!providerSelect) return;
+  
+  const providers = Object.keys(PROVIDER_PRESETS);
+  providerSelect.innerHTML = providers.map(p => `<option value="${p}">${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('');
+  
+  // Load saved provider
+  chrome.storage.local.get(['api_provider'], (result) => {
+    if (result.api_provider && PROVIDER_PRESETS[result.api_provider]) {
+      providerSelect.value = result.api_provider;
+      const preset = PROVIDER_PRESETS[result.api_provider];
+      if (!setApiEndpoint.value) setApiEndpoint.value = preset.endpoint;
+      if (!setApiModel.value) setApiModel.value = preset.defaultModel;
+    }
+  });
+  
+  providerSelect.addEventListener('change', () => {
+    const preset = PROVIDER_PRESETS[providerSelect.value];
+    if (preset) {
+      setApiEndpoint.value = preset.endpoint;
+      if (!setApiModel.value) setApiModel.value = preset.defaultModel;
+    }
+  });
+}
+
+// ========== Test API Button ==========
+function addTestApiBtn() {
+  if (!testApiBtn) return;
+  
+  testApiBtn.addEventListener('click', async () => {
+    const endpoint = setApiEndpoint.value.trim();
+    const apiKey = setApiKey.value.trim();
+    
+    if (!apiKey) {
+      showToast('Please enter an API key first', 'error');
+      return;
+    }
+    
+    if (!endpoint) {
+      showToast('Please enter an API endpoint', 'error');
+      return;
+    }
+    
+    testApiBtn.disabled = true;
+    testApiBtn.textContent = 'Testing...';
+    showToast('Testing API connection...', 'success');
+    
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: setApiModel.value || 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'test' }],
+          max_tokens: 10
+        })
+      });
+      
+      if (response.ok) {
+        showToast('✅ API connection successful!', 'success');
+      } else {
+        const error = await response.text();
+        showToast('❌ API Error: ' + response.status + ' - ' + error.substring(0, 100), 'error');
+      }
+    } catch (err) {
+      showToast('❌ Connection failed: ' + err.message, 'error');
+    } finally {
+      testApiBtn.disabled = false;
+      testApiBtn.textContent = 'Test API';
+    }
+  });
+}
+
+// ========== TTS Speak Function ==========
+function speakLastMessage() {
+  const messages = document.querySelectorAll('.assistant-msg');
+  if (messages.length === 0) {
+    showToast('No assistant message to speak', 'error');
+    return;
+  }
+  
+  const lastMsg = messages[messages.length - 1];
+  const text = (lastMsg.textContent || lastMsg.innerText).trim();
+  
+  if (!text) {
+    showToast('Message is empty', 'error');
+    return;
+  }
+  
+  // Use Web Speech API (built into browsers)
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text.substring(0, 500));
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes('Jenny') || v.lang.includes('en-US')) || speechSynthesis.getVoices()[0];
+    
+    utterance.onend = () => {
+      showToast('Speech complete', 'success');
+    };
+    
+    utterance.onerror = (e) => {
+      showToast('Speech error: ' + e.error, 'error');
+    };
+    
+    speechSynthesis.speak(utterance);
+    showToast('Speaking...', 'success');
+  } else {
+    // Fallback: Copy to clipboard
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Copied to clipboard (no TTS support)', 'success');
+    });
+  }
+}
 
 // Check if there's a restorable session
 async function checkForRestorableSession() {
