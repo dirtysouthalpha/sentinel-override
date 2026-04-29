@@ -217,11 +217,6 @@ const OPENROUTER_AFFORDABLE = {
     'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 },
     'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },
     'cohere/command-r-plus': { input: 0.25, output: 0.25 }
-// ---------- OpenRouter Affordable Models ----------
-const OPENROUTER_AFFORDABLE = {
-    'mistralai/mistral-7b-instruct-v0.2': { input: 0.10, output: 0.10 },
-    'meta-llama/llama-3.2-1b-instruct': { input: 0.06, output: 0.06 },
-    'cohere/command-r-plus': { input: 0.25, output: 0.25 }
 };
 
 // ---------- Poolside AI Models ----------
@@ -231,8 +226,7 @@ const POOLSIDE_MODELS = {
     'poolside/qwen2.5-72b-instruct': { input: 0.12, output: 0.12 },
     'poolside/gemma-3-27b-instruct': { input: 0.08, output: 0.08 },
     'poolside/phi-4': { input: 0.10, output: 0.10 }
-};
-
+}
 function validatePoolsideModel(modelName) {
     const cfg = POOLSIDE_MODELS[modelName];
     if (!cfg) {
@@ -329,24 +323,20 @@ function buildAnalysisMessages(userPrompt, pageContext, template = null) {
   // Build current user message with page context
   let currentMessage = '';
   if (pageContext) {
-    currentMessage = `## CURRENT PAGE CONTEXT
-URL: ${pageContext.url}
-Title: ${pageContext.title}
-
-## PAGE CONTENT
-${pageContext.content}
-
-${pageContext.tables && pageContext.tables.length > 0 ? '## TABLES ON PAGE\n' + JSON.stringify(pageContext.tables, null, 2) + '\n\n' : ''}
-${pageContext.metadata && Object.keys(pageContext.metadata).length > 0 ? '## PAGE METADATA\n' + JSON.stringify(pageContext.metadata, null, 2) + '\n\n' : ''}`;n    if (template) {
-      currentMessage += `\n---
-## ANALYSIS TEMPLATE: ${template.name}\n${template.prompt}\n`;n    }
-    currentMessage += `\n---
-## USER REQUEST
-${userPrompt}`;
+    currentMessage = '## CURRENT PAGE CONTEXT\n' +
+      'URL: ' + pageContext.url + '\n' +
+      'Title: ' + pageContext.title + '\n\n' +
+      '## PAGE CONTENT\n' +
+      pageContext.content + '\n\n' +
+      (pageContext.tables && pageContext.tables.length > 0 ? '## TABLES ON PAGE\n' + JSON.stringify(pageContext.tables, null, 2) + '\n\n' : '') +
+      (pageContext.metadata && Object.keys(pageContext.metadata).length > 0 ? '## PAGE METADATA\n' + JSON.stringify(pageContext.metadata, null, 2) + '\n\n' : '');
+    if (template) {
+      currentMessage += '\n---\n## ANALYSIS TEMPLATE: ' + template.name + '\n' + template.prompt + '\n';
+    }
+    currentMessage += '\n---\n## USER REQUEST\n' + userPrompt;
   } else {
     currentMessage = userPrompt;
   }
-
   messages.push({ role: 'user', content: currentMessage });
   return messages;
 }

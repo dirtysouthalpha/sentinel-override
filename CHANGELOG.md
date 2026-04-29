@@ -6,14 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [2.7.1] - 2026-04-29
+
+### Fixed
+- Fixed syntax error in background.js that caused service worker registration failure
+- Fixed duplicate POOLSIDE_MODELS definition
+- Fixed template string syntax in buildAnalysisMessages function
+
 ## [2.7.0] - 2026-04-29
 
 ### Added
 - **Poolside AI Provider**: Added support for Poolside AI (https://platform.poolside.ai/)
 - **Poolside Models**: mistral-small-3-24b-instruct, llama-3.3-70b-instruct, qwen2.5-72b-instruct, gemma-3-27b-instruct, phi-4
 - **Poolside Endpoint**: https://api.poolside.ai/v1/chat/completions
-
-## [2.6.0] - 2026-04-29
 
 ### Added
 - **Persistent Session Memory**: Analysis history saved to chrome.storage.local, survives extension reloads
