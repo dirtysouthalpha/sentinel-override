@@ -142,8 +142,9 @@ function getContextSummary() {
 
 
 // ========== Action Button Handler ==========
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+
 chrome.action.onClicked.addListener((tab) => {
-  // Open sidebar for this specific tab only
   chrome.sidePanel.open({ tabId: tab.id });
 });
 
