@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface": "#e2e2e8",
+                    "surface-container-high": "#282a2e",
+                    "error-container": "#93000a",
+                    "outline": "#849495",
+                    "on-secondary-container": "#3d6200",
+                    "on-tertiary-fixed": "#261a00",
+                    "surface-container-highest": "#333539",
+                    "surface-bright": "#37393e",
+                    "on-error-container": "#ffdad6",
+                    "primary-fixed-dim": "#00dbe9",
+                    "outline-variant": "#3b494b",
+                    "surface-container-lowest": "#0c0e12",
+                    "on-secondary-fixed": "#112000",
+                    "on-tertiary": "#402d00",
+                    "surface": "#111318",
+                    "surface-container": "#1e2024",
+                    "inverse-on-surface": "#2f3035",
+                    "on-surface-variant": "#b9cacb",
+                    "surface-container-low": "#1a1c20",
+                    "surface-dim": "#111318",
+                    "primary": "#dbfcff",
+                    "on-tertiary-container": "#7a5a00",
+                    "inverse-surface": "#e2e2e8",
+                    "primary-container": "#00f0ff",
+                    "primary-fixed": "#7df4ff",
+                    "tertiary-container": "#ffd47b",
+                    "on-primary-fixed-variant": "#004f54",
+                    "inverse-primary": "#006970",
+                    "surface-variant": "#333539",
+                    "on-secondary-fixed-variant": "#314f00",
+                    "secondary-fixed": "#a8f928",
+                    "on-primary": "#00363a",
+                    "secondary-fixed-dim": "#8fdb00",
+                    "on-tertiary-fixed-variant": "#5c4300",
+                    "background": "#111318",
+                    "secondary-container": "#95e400",
+                    "on-error": "#690005",
+                    "secondary": "#bcff5f",
+                    "tertiary": "#fff5e7",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed": "#ffdfa0",
+                    "on-secondary": "#203600",
+                    "surface-tint": "#00dbe9",
+                    "tertiary-fixed-dim": "#fbbc00",
+                    "on-primary-container": "#006970",
+                    "on-background": "#e2e2e8",
+                    "on-primary-fixed": "#002022"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "margin": "24px",
+                    "gutter": "16px",
+                    "unit": "4px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Space Grotesk"],
+                    "headline-md": ["Space Grotesk"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["Space Grotesk"],
+                    "data-mono": ["monospace"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A0C10;
+            background-image: 
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .scanline-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 100;
+        }
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+        }
+        .terminal-cursor::after {
+            content: '_';
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        .segmented-progress {
+            background: repeating-linear-gradient(90deg, #00F0FF, #00F0FF 10px, transparent 10px, transparent 14px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<div class="scanline-overlay"></div>
+<!-- Top Navigation -->
+<header class="bg-[#0A0C10] dark:bg-[#0A0C10] text-[#00F0FF] dark:text-[#00F0FF] border-b border-[#00F0FF]/30 shadow-[0_0_15px_rgba(0,240,255,0.1)] flex justify-between items-center w-full px-4 h-14 z-50 fixed top-0">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span>
+<span class="text-[#00F0FF] font-black tracking-widest text-lg italic font-headline-lg uppercase">SENTINEL_OVERRIDE</span>
+</div>
+<div class="flex items-center gap-6 font-['Space_Grotesk'] tracking-tighter uppercase font-bold text-xs">
+<nav class="hidden md:flex gap-8">
+<a class="text-[#00F0FF] drop-shadow-[0_0_5px_#00F0FF]" href="#">DASHBOARD</a>
+<a class="text-slate-500 hover:border-[#00F0FF] hover:bg-[#14171C] transition-all px-2" href="#">EXECUTION</a>
+<a class="text-slate-500 hover:border-[#00F0FF] hover:bg-[#14171C] transition-all px-2" href="#">CONFIG</a>
+<a class="text-slate-500 hover:border-[#00F0FF] hover:bg-[#14171C] transition-all px-2" href="#">HISTORY</a>
+</nav>
+<span class="material-symbols-outlined cursor-pointer" data-icon="sensors">sensors</span>
+</div>
+</header>
+<main class="pt-20 pb-24 px-4 max-w-container-max mx-auto grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Status Panel -->
+<section class="md:col-span-3 bg-[#14171C] border border-[#00F0FF]/20 p-4 relative overflow-hidden">
+<div class="flex justify-between items-start mb-6">
+<h2 class="font-headline-md text-label-caps text-[#00F0FF]">SYSTEM_STATUS</h2>
+<span class="font-data-mono text-[10px] text-outline">REF_ST_001</span>
+</div>
+<div class="space-y-6">
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="font-data-mono text-xs text-on-surface-variant">CONNECTIVITY</span>
+<span class="text-secondary font-data-mono text-xs">[ ONLINE ]</span>
+</div>
+<div class="h-1 bg-surface-container-highest w-full overflow-hidden">
+<div class="h-full segmented-progress w-[85%]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-2 border-l-2 border-primary-container pl-4 py-1 bg-primary-container/5">
+<span class="font-data-mono text-[10px] text-outline uppercase tracking-widest">Current State</span>
+<span class="font-headline-md text-primary-container tracking-wider terminal-cursor">STANDBY</span>
+</div>
+<div class="grid grid-cols-2 gap-2 font-data-mono text-[10px]">
+<div class="bg-surface-container-low p-2 border border-outline-variant">
+<div class="text-outline mb-1">LATENCY</div>
+<div class="text-on-surface">14ms</div>
+</div>
+<div class="bg-surface-container-low p-2 border border-outline-variant">
+<div class="text-outline mb-1">UPTIME</div>
+<div class="text-on-surface">104:12:05</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Deployment Hub -->
+<section class="md:col-span-6 space-y-gutter">
+<!-- Hero Initialization -->
+<div class="bg-[#14171C] border-2 border-[#00F0FF] p-8 flex flex-col items-center justify-center relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#00F0FF] to-transparent opacity-50"></div>
+<button class="relative z-10 w-48 h-48 rounded-full border-4 border-[#00F0FF] bg-[#0A0C10] flex flex-col items-center justify-center gap-2 hover:bg-primary-container/10 transition-all duration-300 shadow-[0_0_30px_rgba(0,240,255,0.2)] active:scale-95 group-hover:shadow-[0_0_50px_rgba(0,240,255,0.4)]">
+<span class="material-symbols-outlined text-5xl text-[#00F0FF]" style="font-variation-settings: 'FILL' 1;">power_settings_new</span>
+<span class="font-headline-md text-xs tracking-[0.2em] text-[#00F0FF]">INITIALIZE</span>
+</button>
+<div class="mt-8 text-center">
+<p class="font-headline-md text-sm text-[#00F0FF]/80 tracking-widest uppercase">Agent Core Ready for Deployment</p>
+<p class="font-data-mono text-[10px] text-outline mt-2 italic">Awaiting secure operator authorization sequence...</p>
+</div>
+<div class="absolute inset-0 opacity-10 pointer-events-none">
+<img class="w-full h-full object-cover" data-alt="A macro close-up of a futuristic high-tech microchip with glowing cyan circuits and liquid cooling channels. The lighting is moody and dark, emphasizing the neon blue luminescence emanating from the hardware. The overall style is cyberpunk and industrial, suggesting advanced artificial intelligence processing power within a dark terminal environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkCK0DqDseZewXDqsIkFPN35feQp5gKbPSbJBsvdrgBDUVGHp-CJY3dirwOm_FvhdwNRLIBj7iB90vCYuuy7C1ycUs39Z35ojRuYXlr3uLVu3MqSjEhpOUELBLh9sCoCe8gnqETAkSq2SQS7TrG555gonjsOHoVrYjTaa_7ejAVK2rSHu18lCZt_SVjr7JK82Xdio5nbio2xIvLs7Pt1Tqudiejgs_MPnFHXFikBDjZukJmEMjTK2eDV2p5oolRqrj-2FHlzLAivHr"/>
+</div>
+</div>
+<!-- Quick Start Bento -->
+<div class="grid grid-cols-2 gap-gutter">
+<div class="bg-surface-container border border-outline-variant p-4 hover:border-primary-container transition-colors cursor-pointer group">
+<div class="flex justify-between items-center mb-4">
+<span class="material-symbols-outlined text-primary-container" data-icon="search_insights">search_insights</span>
+<span class="font-data-mono text-[10px] text-outline">CMD_04</span>
+</div>
+<h3 class="font-headline-md text-xs text-on-surface uppercase group-hover:text-primary-container transition-colors">Analyze competitor pricing</h3>
+<p class="font-body-md text-[10px] text-outline mt-1">Cross-reference 12+ marketplaces</p>
+</div>
+<div class="bg-surface-container border border-outline-variant p-4 hover:border-primary-container transition-colors cursor-pointer group">
+<div class="flex justify-between items-center mb-4">
+<span class="material-symbols-outlined text-primary-container" data-icon="newspaper">newspaper</span>
+<span class="font-data-mono text-[10px] text-outline">CMD_09</span>
+</div>
+<h3 class="font-headline-md text-xs text-on-surface uppercase group-hover:text-primary-container transition-colors">Scrape industry news</h3>
+<p class="font-body-md text-[10px] text-outline mt-1">Daily delta analysis of tech feeds</p>
+</div>
+</div>
+</section>
+<!-- Command Console & Live Feed -->
+<section class="md:col-span-3 bg-[#0A0C10] border border-[#00F0FF]/20 flex flex-col h-full min-h-[400px]">
+<div class="bg-[#14171C] border-b border-[#00F0FF]/20 px-3 py-2 flex justify-between items-center">
+<span class="font-label-caps text-[10px] text-[#00F0FF]">LIVE_TELEMETRY</span>
+<div class="flex gap-1">
+<div class="w-1.5 h-1.5 bg-error rounded-full animate-pulse"></div>
+<div class="w-1.5 h-1.5 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+<div class="p-4 font-data-mono text-[11px] space-y-2 overflow-y-auto flex-1 custom-scrollbar">
+<div class="text-tertiary-fixed-dim">[ 14:02:11 ] <span class="text-on-surface">SYS_INIT_SEQUENCE_START</span></div>
+<div class="text-outline">&gt;&gt; Checking kernel modules...</div>
+<div class="text-secondary">[ OK ] Kernel V.4.92.1-SENTINEL</div>
+<div class="text-outline">&gt;&gt; Establishing secure handshake...</div>
+<div class="text-secondary">[ OK ] AES-256 Link established</div>
+<div class="text-tertiary-fixed-dim">[ 14:02:15 ] <span class="text-on-surface">NODE_SCAN_IN_PROGRESS</span></div>
+<div class="text-outline">&gt;&gt; Parsing 402 entities in pool...</div>
+<div class="text-primary-container">&gt;&gt; LOAD_FACTOR: 0.04</div>
+<div class="text-outline">&gt;&gt; Thread pool synchronized</div>
+<div class="text-outline">&gt;&gt; Awaiting operator instruction...</div>
+<div class="text-on-surface pt-2 terminal-cursor">&gt;</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-16 px-2 bg-[#0A0C10] dark:bg-[#0A0C10] border-t border-[#00F0FF]/30 shadow-[0_-4px_10px_rgba(0,0,0,0.5)] md:hidden">
+<a class="flex flex-col items-center justify-center text-[#00F0FF] border-t-2 border-[#00F0FF] pt-1 bg-[#14171C] shadow-[inset_0_0_10px_rgba(0,240,255,0.2)] font-['Space_Grotesk'] text-[10px] font-bold tracking-widest" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span>DASHBOARD</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-600 grayscale pt-1 font-['Space_Grotesk'] text-[10px] font-bold tracking-widest hover:text-[#00F0FF] hover:bg-[#14171C]" href="#">
+<span class="material-symbols-outlined" data-icon="precision_manufacturing">precision_manufacturing</span>
+<span>EXECUTION</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-600 grayscale pt-1 font-['Space_Grotesk'] text-[10px] font-bold tracking-widest hover:text-[#00F0FF] hover:bg-[#14171C]" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span>CONFIG</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-600 grayscale pt-1 font-['Space_Grotesk'] text-[10px] font-bold tracking-widest hover:text-[#00F0FF] hover:bg-[#14171C]" href="#">
+<span class="material-symbols-outlined" data-icon="database">database</span>
+<span>HISTORY</span>
+</a>
+</nav>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0A0C10;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #1C2026;
+            border: 1px solid rgba(0, 240, 255, 0.2);
+        }
+    </style>
+</body></html>
