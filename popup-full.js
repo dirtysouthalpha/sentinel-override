@@ -294,9 +294,21 @@ function toggleTheme() {
 // ========== Settings Management ==========
 function loadSettings() {
   chrome.storage.local.get(['api_endpoint', 'api_key', 'model', 'export_format'], (result) => {
-    if (result.api_endpoint) setApiEndpoint.value = result.api_endpoint;
-    if (result.api_key) setApiKey.value = result.api_key;
-    if (result.model) setApiModel.value = result.model;
+    if (result.api_endpoint) {
+      setApiEndpoint.value = result.api_endpoint;
+      const inlineEndpoint = document.getElementById('set-api-endpoint-inline');
+      if (inlineEndpoint) inlineEndpoint.value = result.api_endpoint;
+    }
+    if (result.api_key) {
+      setApiKey.value = result.api_key;
+      const inlineKey = document.getElementById('set-api-key-inline');
+      if (inlineKey) inlineKey.value = result.api_key;
+    }
+    if (result.model) {
+      setApiModel.value = result.model;
+      const inlineModel = document.getElementById('set-api-model-inline');
+      if (inlineModel) inlineModel.value = result.model;
+    }
     if (result.export_format) exportFormatSelect.value = result.export_format;
   });
 }
@@ -446,7 +458,6 @@ function hideStatus() {
 goalInput.addEventListener('input', () => {
   goalInput.style.height = 'auto';
   goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
-  updateMarkdownPreview();
 });
 
 // ========== Send Message ==========
@@ -648,21 +659,20 @@ function updatePlanProgress(stepNumber, totalSteps) {
 }
 
 function addProviderSelector() {
-  // Find the settings modal fields
-  const endpointField = document.getElementById('set-api-endpoint');
-  const modelField = document.getElementById('set-api-model');
-  if (!endpointField || !modelField) return;
-
-  // Get the existing provider select (static HTML dropdown)
   const select = document.getElementById('provider-select');
   if (!select) return;
 
-  // Add change event listener to populate endpoint and model
   select.addEventListener('change', function() {
     const preset = PROVIDER_PRESETS[select.value];
     if (preset) {
-      endpointField.value = preset.endpoint;
-      modelField.value = preset.defaultModel;
+      // Update inline settings fields
+      const inlineEndpoint = document.getElementById('set-api-endpoint-inline');
+      const inlineModel = document.getElementById('set-api-model-inline');
+      if (inlineEndpoint) inlineEndpoint.value = preset.endpoint;
+      if (inlineModel) inlineModel.value = preset.defaultModel;
+      // Update modal fields
+      if (setApiEndpoint) setApiEndpoint.value = preset.endpoint;
+      if (setApiModel) setApiModel.value = preset.defaultModel;
     }
   });
 }
@@ -745,6 +755,43 @@ saveSettingsBtn.addEventListener('click', () => {
 });
 
 // Search and preview removed - elements not in HTML
+
+// ========== Inline Settings Save ==========
+const saveSettingsBtnInline = document.getElementById('saveSettingsBtn-inline');
+if (saveSettingsBtnInline) {
+  saveSettingsBtnInline.addEventListener('click', () => {
+    const inlineEndpoint = document.getElementById('set-api-endpoint-inline');
+    const inlineKey = document.getElementById('set-api-key-inline');
+    const inlineModel = document.getElementById('set-api-model-inline');
+    const endpoint = inlineEndpoint ? inlineEndpoint.value.trim() : '';
+    const apiKey = inlineKey ? inlineKey.value.trim() : '';
+    const model = inlineModel ? inlineModel.value.trim() : '';
+    const format = exportFormatSelect.value;
+
+    if (!apiKey) {
+      showToast('API key is required', 'error');
+      return;
+    }
+
+    if (endpoint && !isValidUrl(endpoint)) {
+      showToast('Invalid API endpoint URL', 'error');
+      return;
+    }
+
+    chrome.storage.local.set({
+      api_endpoint: endpoint,
+      api_key: apiKey,
+      model: model,
+      export_format: format
+    }, () => {
+      // Sync to modal fields
+      if (setApiEndpoint) setApiEndpoint.value = endpoint;
+      if (setApiKey) setApiKey.value = apiKey;
+      if (setApiModel) setApiModel.value = model;
+      showToast('Settings saved', 'success');
+    });
+  });
+}
 
 function updateAttachmentPreview() {
   if (selectedAttachments.length > 0) {
@@ -1313,6 +1360,18 @@ chrome.runtime.onMessage.addListener((message) => {
     addMessage('✅ **Plan Complete!** ' + message.summary, 'assistant');
     resetUI();
   }
+  if (message.action === 'analysis_result') {
+    removeTypingIndicator();
+    if (message.result && message.result.result) {
+      addMessage(message.result.result, 'assistant');
+    }
+    resetUI();
+  }
+  if (message.action === 'analysis_error') {
+    removeTypingIndicator();
+    addMessage('❌ Analysis failed: ' + escapeHtml(message.error), 'assistant');
+    resetUI();
+  }
 });
 
 // ========== Close Modals on Escape ==========
@@ -1346,7 +1405,7 @@ chrome.storage.local.get(['savedShortcuts'], function(result) {
 });
 
 // Shortcuts button handler
-document.getElementById('shortcutsBtnHdr').addEventListener('click', function() {
+document.getElementById('shortcutsBtn').addEventListener('click', function() {
   renderShortcutsModal();
   document.getElementById('shortcuts-modal').classList.add('show');
 });
