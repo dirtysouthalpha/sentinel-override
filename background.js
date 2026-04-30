@@ -1156,9 +1156,10 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
     throw new Error(msg);
   }
 
+  const estimatedInputTokens = Math.max(100, Math.round(prompt.length / 3.5)) + 500;
+  const estimatedOutputTokens = 500;
+
   if (isVenice) {
-    const estimatedInputTokens = Math.max(100, Math.round(prompt.length / 3.5)) + 500;
-    const estimatedOutputTokens = 500;
     const costCheck = validateModelCost(model, estimatedInputTokens, estimatedOutputTokens);
     if (!costCheck.allowed) {
       const msg = 'COST SAFETY: ' + costCheck.reason + ' Model: ' + model + ', Est. ' + estimatedInputTokens + 'in/' + estimatedOutputTokens + 'out tokens.';

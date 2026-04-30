@@ -62,6 +62,13 @@ const approvalModeLabel = document.getElementById('approvalModeLabel');
 const modeBadge = document.getElementById('modeBadge');
 const approvalCardContainer = document.getElementById('approvalCardContainer');
 const activeIndicator = document.getElementById('activeIndicator');
+const attachmentPreview = document.getElementById('attachmentPreview');
+const voiceBtn = document.getElementById('voiceBtn');
+const exportBtn = document.getElementById('exportBtn');
+const speakBtn = document.getElementById('speakBtn');
+const status = document.getElementById('status');
+const statusText = document.getElementById('statusText');
+const searchInput = document.getElementById('searchInput');
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -435,12 +442,12 @@ function removeTypingIndicator() {
 
 // ========== Status Updates ==========
 function updateStatus(text) {
-  statusText.textContent = text;
-  status.style.display = 'block';
+  if (statusText) statusText.textContent = text;
+  if (status) status.style.display = 'block';
 }
 
 function hideStatus() {
-  status.style.display = 'none';
+  if (status) status.style.display = 'none';
 }
 
 // ========== Input Area ==========
@@ -707,7 +714,7 @@ newChatBtn.addEventListener('click', () => {
 });
 
 // ========== Theme Toggle ==========
-themeToggle.addEventListener('click', toggleTheme);
+if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 
 // ========== Settings Modal ==========
 settingsBtn.addEventListener('click', () => {
@@ -747,26 +754,6 @@ saveSettingsBtn.addEventListener('click', () => {
 
 // Search and preview removed - elements not in HTML
 
-// ========== Typing Indicator ==========
-function showTypingIndicator() {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'assistant-wrapper';
-  wrapper.id = 'typing-indicator';
-  
-  const msg = document.createElement('div');
-  msg.className = 'msg assistant-msg';
-  msg.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
-  
-  wrapper.appendChild(msg);
-  chatContainer.appendChild(wrapper);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-function removeTypingIndicator() {
-  const indicator = document.getElementById('typing-indicator');
-  if (indicator) indicator.remove();
-}
-
 function updateAttachmentPreview() {
   if (selectedAttachments.length > 0) {
     attachmentPreview.innerHTML = '<span>📎 Attachments:</span>';
@@ -794,6 +781,7 @@ function updateAttachmentPreview() {
 
 // ========== Voice Input ==========
 function setupVoiceInput() {
+  if (!voiceBtn) return;
   if (!recognition) {
     voiceBtn.style.opacity = '0.5';
     voiceBtn.disabled = true;
@@ -811,11 +799,11 @@ function setupVoiceInput() {
   });
 
   recognition.onstart = () => {
-    voiceBtn.classList.add('listening');
+    if (voiceBtn) voiceBtn.classList.add('listening');
   };
 
   recognition.onend = () => {
-    voiceBtn.classList.remove('listening');
+    if (voiceBtn) voiceBtn.classList.remove('listening');
   };
 
   recognition.onresult = (event) => {
@@ -839,7 +827,7 @@ function setupVoiceInput() {
 }
 
 // ========== Conversation Export ==========
-exportBtn.addEventListener('click', () => {
+if (exportBtn) exportBtn.addEventListener('click', () => {
   if (conversationHistory.length === 0) {
     showToast('No messages to export', 'error');
     return;
@@ -878,7 +866,7 @@ exportBtn.addEventListener('click', () => {
 });
 
 // ========== Command Palette ==========
-commandPaletteBtn.addEventListener('click', openCommandPalette);
+if (commandPaletteBtn) commandPaletteBtn.addEventListener('click', openCommandPalette);
 
 function openCommandPalette() {
   commandPalette.classList.add('show');
@@ -981,23 +969,22 @@ window.executeCommand = (action) => {
 
   switch(action) {
     case 'new-chat':
-      newChatBtn.click();
+      if (newChatBtn) newChatBtn.click();
       break;
     case 'export':
-      exportBtn.click();
+      if (exportBtn) exportBtn.click();
       break;
     case 'clear-search':
-      searchInput.value = '';
-      clearSearchHighlights();
+      if (searchInput) searchInput.value = '';
       break;
     case 'toggle-dark':
       toggleTheme();
       break;
     case 'settings':
-      settingsBtn.click();
+      if (settingsBtn) settingsBtn.click();
       break;
     case 'theme':
-      themeModal.classList.add('show');
+      if (themeModal) themeModal.classList.add('show');
       break;
     case 'about':
       showToast('SentinelAgent v1.0 - AI-powered browser automation', 'success');
@@ -1170,22 +1157,22 @@ function applyThemePreset(theme) {
   }
 }
 
-saveThemeBtn.addEventListener('click', () => {
-  const primary = document.getElementById('colorPrimary').value;
-  const bg = document.getElementById('colorBg').value;
-  const text = document.getElementById('colorText').value;
+if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
+  const primary = document.getElementById('colorPrimary')?.value || '#0084ff';
+  const bg = document.getElementById('colorBg')?.value || '#0d0d0d';
+  const text = document.getElementById('colorText')?.value || '#ffffff';
 
   document.documentElement.style.setProperty('--accent-primary', primary);
   document.documentElement.style.setProperty('--bg-primary', bg);
   document.documentElement.style.setProperty('--text-primary', text);
 
   localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
-  themeModal.classList.remove('show');
+  if (themeModal) themeModal.classList.remove('show');
   showToast('Theme applied', 'success');
 });
 
-closeThemeBtn.addEventListener('click', () => {
-  themeModal.classList.remove('show');
+if (closeThemeBtn) closeThemeBtn.addEventListener('click', () => {
+  if (themeModal) themeModal.classList.remove('show');
 });
 
 // ========== HTML Sanitization ==========
@@ -1268,7 +1255,7 @@ function speakLastMessage() {
 }
 
 // ========== TTS Event Listener ==========
-speakBtn.addEventListener('click', speakLastMessage);
+if (speakBtn) speakBtn.addEventListener('click', speakLastMessage);
 
 // ========== Markdown Configuration ==========
 marked.setOptions({
@@ -1336,18 +1323,18 @@ chrome.runtime.onMessage.addListener((message) => {
 // ========== Close Modals on Escape ==========
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    settingsModal.classList.remove('show');
-    themeModal.classList.remove('show');
+    if (settingsModal) settingsModal.classList.remove('show');
+    if (themeModal) themeModal.classList.remove('show');
     closeCommandPalette();
   }
 });
 
 // ========== Click outside modal to close ==========
 window.addEventListener('click', (e) => {
-  if (e.target === settingsModal) {
+  if (settingsModal && e.target === settingsModal) {
     settingsModal.classList.remove('show');
   }
-  if (e.target === themeModal) {
+  if (themeModal && e.target === themeModal) {
     themeModal.classList.remove('show');
   }
 });
@@ -1364,13 +1351,17 @@ chrome.storage.local.get(['savedShortcuts'], function(result) {
 });
 
 // Shortcuts button handler
-document.getElementById('shortcutsBtn').addEventListener('click', function() {
+const shortcutsBtn = document.getElementById('shortcutsBtn') || document.getElementById('shortcutsBtnHdr');
+if (shortcutsBtn) shortcutsBtn.addEventListener('click', function() {
   renderShortcutsModal();
-  document.getElementById('shortcuts-modal').classList.add('show');
+  const modal = document.getElementById('shortcuts-modal');
+  if (modal) modal.classList.add('show');
 });
 
-document.getElementById('closeShortcutsBtn').addEventListener('click', function() {
-  document.getElementById('shortcuts-modal').classList.remove('show');
+const closeShortcutsBtn = document.getElementById('closeShortcutsBtn');
+if (closeShortcutsBtn) closeShortcutsBtn.addEventListener('click', function() {
+  const modal = document.getElementById('shortcuts-modal');
+  if (modal) modal.classList.remove('show');
 });
 
 function renderShortcutsModal() {
@@ -1431,9 +1422,7 @@ function saveCurrentPromptAsShortcut() {
   showToast('Shortcut saved: ' + name, 'success');
 }
 
-function escHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
+const escHtml = escapeHtml;
 
 // Ctrl+Shift+S to save
 document.addEventListener('keydown', function(e) {
