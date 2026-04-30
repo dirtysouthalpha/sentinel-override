@@ -146,6 +146,7 @@ function extractForms() {
     forms.push({ selector: getUniqueSelector(form), fields });
   });
   return forms;
+}
 
 // ========== Screenshot Analysis ==========
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
