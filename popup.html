@@ -1,1020 +1,268 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <style>
-    /* ===== Sentinel Override — Tron Theme ===== */
-    :root {
-      --bg-primary: #080e1c;
-      --bg-secondary: #0d1628;
-      --bg-tertiary: #111e35;
-      --bg-input: #0f1a2e;
-      --text-primary: #e0f4ff;
-      --text-secondary: #7aa8c4;
-      --text-tertiary: #3d6080;
-      --accent: #00d4ff;
-      --accent-dim: #007a99;
-      --magenta: #ff2a6d;
-      --border: #1a3a52;
-      --border-bright: #00d4ff44;
-      --user-bg: #003a52;
-      --user-text: #a0e8ff;
-      --assist-bg: #0d1628;
-      --assist-text: #c8e8f8;
-      --code-bg: #060d18;
-      --success: #00dd55;
-      --error: #ff2a6d;
-      --warning: #ffaa33;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-      background: var(--bg-primary);
-      color: var(--text-primary);
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    /* ===== Header (mockup-style) ===== */
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-secondary);
-      flex-shrink: 0;
-      gap: 8px;
-    }
-    .header-logo {
-      width: 28px;
-      height: 28px;
-      flex-shrink: 0;
-    }
-    .header-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: 1.5px;
-      font-family: monospace;
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow: hidden;
-    }
-    .header-sub {
-      font-size: 9px;
-      color: var(--text-tertiary);
-      letter-spacing: 1px;
-      font-family: monospace;
-    }
-    .hbtns {
-      display: flex;
-      gap: 3px;
-      align-items: center;
-    }
-    .ibtn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 7px;
-      border-radius: 5px;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, color 0.2s;
-    }
-    .ibtn:hover {
-      background: var(--bg-tertiary);
-      color: var(--accent);
-    }
-    .ibtn svg {
-      width: 15px;
-      height: 15px;
-    }
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent), 0 0 12px var(--accent);
-      animation: glow 2s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-    @keyframes glow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    .mode-badge {
-      font-size: 9px;
-      font-weight: 600;
-      padding: 1px 6px;
-      border-radius: 8px;
-      letter-spacing: 0.5px;
-      font-family: monospace;
-      flex-shrink: 0;
-    }
-    .mode-badge.yolo {
-      background: rgba(0, 220, 85, 0.15);
-      color: var(--success);
-      border: 1px solid rgba(0, 220, 85, 0.3);
-    }
-    .mode-badge.approval {
-      background: rgba(255, 170, 51, 0.15);
-      color: var(--warning);
-      border: 1px solid rgba(255, 170, 51, 0.3);
-    }
-    .active-indicator {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent);
-      animation: glow 2s ease-in-out infinite;
-      flex-shrink: 0;
-      display: none;
-    }
-    .active-indicator.active {
-      display: inline-block;
-    }
-
-    /* ===== Cost Bar (mockup-style) ===== */
-    .cost-bar {
-      padding: 5px 14px;
-      background: var(--bg-secondary);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .cost-label {
-      font-family: monospace;
-      font-size: 9px;
-      color: var(--text-tertiary);
-      letter-spacing: 1px;
-      white-space: nowrap;
-    }
-    .cost-track {
-      flex: 1;
-      height: 3px;
-      background: var(--border);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .cost-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--accent);
-      border-radius: 2px;
-      transition: width 0.5s ease;
-    }
-    .cost-val {
-      font-family: monospace;
-      font-size: 9px;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-
-    /* ===== Step Progress (compact bar) ===== */
-    #step-progress-container {
-      display: none;
-      padding: 6px 12px;
-      margin: 4px 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-bright);
-      border-radius: 8px;
-      font-size: 11px;
-      color: var(--text-secondary);
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    #step-progress-container .step-pg-track {
-      flex: 1;
-      height: 4px;
-      background: rgba(0, 212, 255, 0.1);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    #step-progress-container .step-pg-fill {
-      width: 0%;
-      height: 100%;
-      background: var(--accent);
-      border-radius: 2px;
-      transition: width 0.3s ease;
-    }
-
-    /* ===== Plan Card ===== */
-    .plan-card {
-      margin: 8px 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-bright);
-      border-radius: 8px;
-      overflow: hidden;
-      flex-shrink: 0;
-    }
-    .plan-header {
-      padding: 8px 12px;
-      background: #001a2a;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .plan-tag {
-      font-family: monospace;
-      font-size: 9px;
-      color: var(--accent);
-      letter-spacing: 1.5px;
-      background: #003344;
-      padding: 2px 6px;
-      border-radius: 3px;
-      border: 1px solid var(--accent-dim);
-    }
-    .plan-title {
-      font-size: 11px;
-      color: var(--text-secondary);
-      flex: 1;
-    }
-    .plan-steps {
-      padding: 8px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .step {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
-    }
-    .step-num {
-      width: 16px;
-      height: 16px;
-      border-radius: 3px;
-      border: 1px solid;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: monospace;
-      font-size: 9px;
-      flex-shrink: 0;
-    }
-    .step-num.done { background: #002a0a; border-color: #00aa44; color: #00dd55; }
-    .step-num.active { background: #001a2e; border-color: var(--accent); color: var(--accent); }
-    .step-num.wait { background: transparent; border-color: var(--border); color: var(--text-tertiary); }
-    .step-text.done { color: #00dd55; }
-    .step-text.active { color: var(--accent); }
-    .step-text.wait { color: var(--text-tertiary); }
-    .plan-actions {
-      padding: 8px 12px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 8px;
-    }
-    .plan-btn-sm {
-      flex: 1;
-      padding: 6px;
-      border-radius: 5px;
-      border: none;
-      cursor: pointer;
-      font-family: monospace;
-      font-size: 10px;
-      letter-spacing: 1px;
-      font-weight: 600;
-    }
-    .plan-btn-sm.approve { background: #00d4ff22; border: 1px solid var(--accent); color: var(--accent); }
-    .plan-btn-sm.reject { background: #ff2a6d11; border: 1px solid var(--magenta); color: var(--magenta); }
-
-    /* ===== Chat Container ===== */
-    #chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      background: var(--bg-primary);
-    }
-    #chat-container::-webkit-scrollbar { width: 4px; }
-    #chat-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .welcome-message {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      gap: 12px;
-      color: var(--text-secondary);
-      padding: 40px 20px;
-    }
-    .welcome-message h2 {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--accent);
-      font-family: monospace;
-      letter-spacing: 2px;
-      margin: 0;
-    }
-    .welcome-message p {
-      font-size: 13px;
-      max-width: 260px;
-      margin: 0;
-      color: var(--text-tertiary);
-    }
-
-    /* Messages */
-    .message {
-      max-width: 82%;
-      padding: 9px 13px;
-      border-radius: 14px;
-      font-size: 13px;
-      line-height: 1.5;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-      font-weight: 400;
-      letter-spacing: -0.1px;
-      animation: fadeIn 0.3s ease-in;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .msg-user {
-      align-self: flex-end;
-      background: var(--user-bg);
-      color: var(--user-text);
-      border-radius: 14px 3px 14px 14px;
-      border: 1px solid #005a7a;
-    }
-    .assistant-msg {
-      align-self: flex-start;
-      background: var(--assist-bg);
-      color: var(--assist-text);
-      border-radius: 3px 14px 14px 14px;
-      border: 1px solid var(--border);
-    }
-    .assistant-msg code {
-      background: var(--code-bg);
-      color: var(--accent);
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 12px;
-      border: 1px solid var(--border);
-      font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    }
-    .assistant-msg pre {
-      background: var(--code-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px;
-      overflow-x: auto;
-      margin: 6px 0;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-    .assistant-msg pre code {
-      background: none;
-      padding: 0;
-      border: none;
-      color: var(--text-primary);
-      font-size: 12px;
-    }
-    .assistant-msg ul, .assistant-msg ol {
-      margin: 6px 0;
-      padding-left: 18px;
-    }
-    .assistant-msg li { margin: 3px 0; }
-    .assistant-msg h1, .assistant-msg h2, .assistant-msg h3 {
-      margin: 10px 0 6px;
-      font-weight: 600;
-      color: var(--accent);
-    }
-    .assistant-msg blockquote {
-      border-left: 3px solid var(--accent-dim);
-      padding-left: 10px;
-      margin: 6px 0;
-      color: var(--text-secondary);
-      font-style: italic;
-    }
-    .assistant-msg a {
-      color: var(--accent);
-      text-decoration: none;
-      border-bottom: 1px solid transparent;
-      transition: border-color 0.2s;
-    }
-    .assistant-msg a:hover { border-bottom-color: var(--accent); }
-    .assistant-msg strong { font-weight: 600; color: var(--text-primary); }
-
-    /* Typing indicator */
-    .typing-indicator {
-      align-self: flex-start;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 9px 13px;
-      background: var(--assist-bg);
-      border-radius: 3px 14px 14px 14px;
-      border: 1px solid var(--border);
-    }
-    .typing-indicator span {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: bounce 0.9s ease-in-out infinite;
-    }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes bounce {
-      0%, 60%, 100% { opacity: 0.25; }
-      30% { opacity: 1; }
-    }
-
-    /* ===== Input Area (mockup-style) ===== */
-    .input-area {
-      padding: 10px 12px 14px;
-      border-top: 1px solid var(--border);
-      background: var(--bg-secondary);
-      flex-shrink: 0;
-    }
-    .input-wrap {
-      display: flex;
-      align-items: flex-end;
-      gap: 8px;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 8px 12px;
-      transition: border-color 0.2s;
-    }
-    .input-wrap:focus-within { border-color: var(--accent); }
-    .input-wrap textarea {
-      flex: 1;
-      background: transparent;
-      border: none;
-      color: var(--text-primary);
-      font-size: 13px;
-      outline: none;
-      resize: none;
-      max-height: 80px;
-      padding: 4px 0;
-      line-height: 1.5;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
-    }
-    .input-wrap textarea::placeholder { color: var(--text-tertiary); }
-    .send-btn {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--accent);
-      border: none;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-    .send-btn:hover {
-      background: #00aacc;
-      transform: scale(1.05);
-    }
-    .send-btn svg {
-      width: 14px;
-      height: 14px;
-      fill: white;
-    }
-    .input-footer {
-      font-family: monospace;
-      font-size: 9px;
-      color: var(--text-tertiary);
-      text-align: center;
-      margin-top: 6px;
-      letter-spacing: 0.8px;
-    }
-
-    /* Approval Card */
-    #approvalCardContainer { flex-shrink: 0; }
-    .approval-card {
-      margin: 8px 0 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 14px;
-    }
-    .approval-card-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--warning);
-    }
-    .approval-card-step {
-      font-size: 10px;
-      color: var(--text-tertiary);
-      margin-bottom: 6px;
-      font-family: monospace;
-    }
-    .approval-card-action {
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 13px;
-      color: var(--text-primary);
-      margin-bottom: 10px;
-      word-break: break-word;
-      font-family: monospace;
-    }
-    .approval-card-buttons {
-      display: flex;
-      gap: 8px;
-    }
-    .approval-btn {
-      flex: 1;
-      padding: 7px 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-family: monospace;
-      letter-spacing: 1px;
-    }
-    .approval-btn.approve { background: var(--success); color: #001; }
-    .approval-btn.reject { background: var(--magenta); color: white; }
-    .approval-btn.skip { background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); }
-    .approval-btn:hover { transform: translateY(-1px); }
-
-    /* ===== Modals ===== */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.6);
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-    .modal.show { display: flex; }
-    .modal-content {
-      background: var(--bg-primary);
-      border: 1px solid var(--border-bright);
-      border-radius: 12px;
-      padding: 20px;
-      width: 100%;
-      max-width: 420px;
-      max-height: 80vh;
-      overflow-y: auto;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-    .modal-content h2 {
-      font-size: 15px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      color: var(--accent);
-      font-family: monospace;
-      letter-spacing: 2px;
-    }
-    .modal-field { margin-bottom: 14px; }
-    .modal-field label {
-      display: block;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
-      font-family: monospace;
-      letter-spacing: 1px;
-    }
-    .modal-field input, .modal-field select {
-      width: 100%;
-      padding: 8px 12px;
-      background: var(--bg-input);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text-primary);
-      font-size: 13px;
-      font-family: monospace;
-      transition: border-color 0.2s;
-    }
-    .modal-field input:focus, .modal-field select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    .modal-field select option { background: var(--bg-primary); }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .modal-btn {
-      padding: 8px 14px;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-      transition: background 0.2s;
-      font-family: monospace;
-      letter-spacing: 1px;
-    }
-    .btn-save {
-      background: var(--accent);
-      color: #000;
-    }
-    .btn-save:hover { background: #00aacc; }
-    .btn-cancel {
-      background: var(--bg-tertiary);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-    }
-    .btn-cancel:hover { background: var(--bg-input); color: var(--text-primary); }
-
-    /* ===== Toggle Switch ===== */
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-top: 1px solid var(--border);
-    }
-    .toggle-row-label { display: flex; flex-direction: column; gap: 2px; }
-    .toggle-row-label span:first-child {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-    .toggle-row-label span:last-child {
-      font-size: 10px;
-      color: var(--text-tertiary);
-    }
-    .toggle-switch {
-      position: relative;
-      width: 36px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-    .toggle-switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .toggle-slider {
-      position: absolute;
-      cursor: pointer;
-      inset: 0;
-      background: var(--border);
-      border-radius: 20px;
-      transition: all 0.3s;
-    }
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      height: 14px;
-      width: 14px;
-      left: 3px;
-      bottom: 3px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.3s;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    }
-    .toggle-switch input:checked + .toggle-slider {
-      background: var(--accent);
-    }
-    .toggle-switch input:checked + .toggle-slider::before {
-      transform: translateX(16px);
-    }
-
-    /* ===== Shortcuts List ===== */
-    #shortcuts-list { max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
-    .shortcut-card {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .shortcut-card:hover {
-      border-color: var(--accent-dim);
-      background: var(--bg-tertiary);
-    }
-    .shortcut-icon {
-      font-size: 18px;
-      width: 30px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    .shortcut-info { flex: 1; }
-    .shortcut-title {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-    .shortcut-desc {
-      font-size: 11px;
-      color: var(--text-tertiary);
-      margin-top: 2px;
-    }
-    .shortcut-date {
-      font-size: 10px;
-      color: var(--text-tertiary);
-      font-family: monospace;
-      flex-shrink: 0;
-    }
-    .shortcut-delete {
-      background: none;
-      border: none;
-      color: var(--magenta);
-      cursor: pointer;
-      font-size: 14px;
-      padding: 4px;
-    }
-
-    /* ===== Command Palette ===== */
-    .command-palette {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--bg-primary);
-      border: 1px solid var(--border-bright);
-      border-radius: 12px;
-      width: 90%;
-      max-width: 500px;
-      max-height: 400px;
-      z-index: 1000;
-      display: none;
-      flex-direction: column;
-      box-shadow: 0 20px 30px rgba(0, 0, 0, 0.5);
-    }
-    .command-palette.show { display: flex; }
-    .command-input {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-primary);
-      border-radius: 12px 12px 0 0;
-    }
-    .command-input input {
-      width: 100%;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text-primary);
-      font-size: 14px;
-      font-family: monospace;
-    }
-    .command-input input::placeholder { color: var(--text-tertiary); }
-    .command-list {
-      flex: 1;
-      overflow-y: auto;
-      max-height: 300px;
-    }
-    .command-item {
-      padding: 10px 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: background 0.2s;
-      border-bottom: 1px solid var(--border);
-    }
-    .command-item:hover { background: var(--bg-secondary); }
-    .command-item.selected { background: var(--bg-tertiary); border-left: 3px solid var(--accent); }
-    .command-icon {
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg-input);
-      border-radius: 5px;
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-    .command-text { flex: 1; }
-    .command-name { font-weight: 500; font-size: 13px; color: var(--text-primary); }
-    .command-desc { font-size: 11px; color: var(--text-tertiary); margin-top: 1px; }
-
-    /* ===== Toast ===== */
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 12px;
-      color: var(--text-primary);
-      z-index: 2000;
-      font-family: monospace;
-      animation: slideIn 0.3s ease-out;
-    }
-    .toast.success { border-color: var(--success); background: rgba(0, 220, 85, 0.1); color: var(--success); }
-    .toast.error { border-color: var(--magenta); background: rgba(255, 42, 109, 0.1); color: var(--magenta); }
-    @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-    /* File attachment */
-    #file-input { display: none; }
-    .attachment-preview {
-      display: none;
-      gap: 8px;
-      padding: 6px 10px;
-      background: var(--bg-secondary);
-      border-radius: 6px;
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-bottom: 6px;
-      align-items: center;
-      border: 1px solid var(--border);
-    }
-    .attachment-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      background: var(--bg-input);
-      padding: 3px 6px;
-      border-radius: 4px;
-    }
-    .attachment-remove {
-      cursor: pointer;
-      color: var(--magenta);
-      font-weight: bold;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SENTINEL OVERRIDE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+*:root{--bg-base:#0A0C10;--bg-card:#14171C;--bg-elevated:#1C2026;--bg-input:#0c0e12;--bg-surface:#111318;--bg-surface-low:#1a1c20;--bg-surface-mid:#1e2024;--bg-surface-high:#282a2e;--bg-surface-highest:#333539;--cyan:#00F0FF;--cyan-dim:rgba(0,240,255,0.3);--cyan-glow:rgba(0,240,255,0.15);--cyan-ghost:rgba(0,240,255,0.05);--lime:#95E400;--lime-dim:rgba(149,228,0,0.3);--lime-glow:rgba(149,228,0,0.15);--amber:#FFD47B;--amber-dim:rgba(255,212,123,0.3);--error:#FFB4AB;--error-bg:#93000A;--text-primary:#E2E2E8;--text-secondary:#849495;--text-muted:#5A6A6B;--border:#3B494B;--border-subtle:rgba(0,240,255,0.12);--border-active:rgba(0,240,255,0.4);--font-headline:"Space Grotesk",sans-serif;--font-body:"Inter",sans-serif;--font-mono:"Courier New","Consolas",monospace;--transition:150ms ease}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-base);color:var(--text-primary);font-family:var(--font-body);font-size:13px;line-height:1.5}
+body::before{content:"";position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(rgba(0,240,255,0.03) 1px,transparent 1px);background-size:100% 4px;pointer-events:none;z-index:9999}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg-base)}::-webkit-scrollbar-thumb{background:var(--bg-surface-high);border:1px solid var(--border-subtle)}
+.app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.header{display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 12px;background:var(--bg-base);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 8px rgba(0,240,255,0.08);flex-shrink:0;z-index:100}
+.header-title{display:flex;align-items:center;gap:8px;font-family:var(--font-headline);font-weight:700;font-size:14px;font-style:italic;color:var(--cyan);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-title img{height:24px;width:24px;border-radius:2px;flex-shrink:0}
+.header-right{display:flex;align-items:center;gap:6px}
+.header-btn{background:none;border:1px solid var(--border-subtle);color:var(--text-secondary);padding:4px 8px;cursor:pointer;font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:all var(--transition);display:flex;align-items:center;gap:4px}
+.header-btn:hover{color:var(--cyan);border-color:var(--cyan-dim);background:var(--cyan-ghost)}
+#activeIndicator{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);flex-shrink:0}
+#activeIndicator.inactive{background:var(--text-muted);box-shadow:none}
+.status-bar{display:flex;align-items:center;justify-content:space-between;padding:4px 12px;background:var(--bg-card);border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:10px;flex-shrink:0}
+#status{display:flex;align-items:center;gap:4px}
+.status-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pd 2s ease-in-out infinite}
+@keyframes pd{0%,100%{opacity:1}50%{opacity:.4}}
+#status-text{color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em}
+#modeBadge{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;padding:1px 6px;border:1px solid var(--amber-dim);color:var(--amber);text-transform:uppercase}
+.tab-nav{display:flex;background:var(--bg-base);border-bottom:1px solid var(--border-subtle);flex-shrink:0;padding:0 4px}
+.tab-btn{flex:1;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 4px;cursor:pointer;font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:all var(--transition)}
+.tab-btn:hover{color:var(--text-secondary);background:var(--cyan-ghost)}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);background:var(--cyan-ghost);text-shadow:0 0 8px var(--cyan-dim)}
+.tab-content{display:none;flex:1;overflow:hidden}.tab-content.active{display:flex;flex-direction:column}
+.chat-area{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+#plan-card-container{background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid var(--cyan);padding:12px;display:none}
+#plan-card-container.visible{display:block}
+.plan-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.plan-header span{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase}
+.plan-ref{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+#step-progress-label{font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);margin-bottom:4px}
+.progress-track{height:4px;background:var(--bg-surface-high);overflow:hidden}
+#plan-progress-fill{height:100%;background:repeating-linear-gradient(90deg,var(--cyan),var(--cyan) 8px,transparent 8px,transparent 10px);transition:width .3s ease}
+#step-progress-fill{height:100%;background:var(--lime);transition:width .3s ease}
+#chat-container{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.chat-msg{padding:8px 12px;border-left:2px solid var(--border);font-size:12px;line-height:1.6}
+.chat-msg.user{background:var(--cyan-ghost);border-left-color:var(--cyan)}
+.chat-msg.assistant{background:var(--bg-card);border-left-color:var(--lime)}
+.chat-msg.system{background:var(--bg-surface-low);border-left-color:var(--amber);color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
+#approvalCardContainer{display:none}#approvalCardContainer.visible{display:block}
+#approval-card{background:var(--bg-card);border:1px solid var(--amber-dim);padding:12px}
+.approval-header{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--amber);text-transform:uppercase;margin-bottom:8px}
+.approval-actions{display:flex;gap:4px;margin-top:8px}
+.approval-btn{flex:1;padding:8px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-primary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
+#approvalApprove{border-color:var(--lime-dim);color:var(--lime)}#approvalApprove:hover{background:var(--lime-glow)}
+#approvalSkip{border-color:var(--amber-dim);color:var(--amber)}#approvalSkip:hover{background:rgba(255,212,123,.1)}
+#approvalReject{border-color:rgba(255,180,171,.3);color:var(--error)}#approvalReject:hover{background:rgba(255,180,171,.1)}
+#typing-indicator{display:none;padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
+#typing-indicator.visible{display:block}
+#typing-indicator::after{content:"_";animation:bc 1s step-end infinite}
+@keyframes bc{50%{opacity:0}}
+.input-area{display:flex;flex-direction:column;background:var(--bg-card);border-top:1px solid var(--border-subtle);flex-shrink:0;padding:8px 12px;gap:4px}
+#attachmentPreview{display:none;font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);padding:4px 0}
+#attachmentPreview.visible{display:block}
+.input-row{display:flex;gap:4px;align-items:flex-end}
+#goalInput{flex:1;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-body);font-size:13px;padding:8px 12px;resize:none;min-height:42px;max-height:120px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+#goalInput::placeholder{color:var(--text-muted);font-style:italic}
+#goalInput:focus{border-color:var(--cyan-dim);box-shadow:0 0 8px rgba(0,240,255,.25)}
+.input-btn{width:36px;height:36px;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all var(--transition);flex-shrink:0}
+.input-btn:hover{color:var(--cyan);border-color:var(--cyan-dim);background:var(--cyan-ghost)}
+#sendBtn{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan);font-weight:700}
+#sendBtn:hover{background:var(--text-primary);box-shadow:0 0 15px rgba(0,240,255,.3)}
+#stopBtn{background:var(--error-bg);color:var(--error);border-color:rgba(255,180,171,.3);display:none}
+#stopBtn.visible{display:flex}#stopBtn:hover{background:rgba(255,180,171,.15)}
+.settings-content{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:16px}
+.settings-section{background:var(--bg-card);border:1px solid var(--border-subtle);padding:16px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.section-title{font-family:var(--font-headline);font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase}
+.section-ref{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
+.field-group{margin-bottom:12px}
+.field-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.field-label label{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text-secondary);text-transform:uppercase}
+.field-status{font-family:var(--font-mono);font-size:9px}
+.field-status.secure{color:var(--lime)}.field-status.unset{color:var(--error)}
+.field-input{width:100%;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
+.field-input:focus{border-color:var(--cyan-dim);box-shadow:0 0 8px rgba(0,240,255,.25)}
+select.field-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300F0FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
+.theme-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+.theme-preset{padding:6px;text-align:center;border:1px solid var(--border-subtle);background:var(--bg-input);font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);cursor:pointer;transition:all var(--transition)}
+.theme-preset:hover{border-color:var(--cyan-dim);color:var(--cyan)}
+.theme-preset.active{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-ghost);box-shadow:0 0 8px rgba(0,240,255,.25)}
+.color-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.color-field{display:flex;flex-direction:column;gap:4px}
+.color-field label{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text-secondary);text-transform:uppercase}
+.color-field input[type="color"]{width:100%;height:32px;border:1px solid var(--border-subtle);background:var(--bg-input);cursor:pointer;padding:2px}
+.history-content{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.history-search{display:flex;gap:4px;padding:12px;background:var(--bg-card);border-bottom:1px solid var(--border-subtle)}
+#searchInput{flex:1;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;padding:8px 12px;outline:none}
+#searchInput:focus{border-color:var(--cyan-dim)}
+#searchInput::placeholder{color:var(--text-muted);text-transform:uppercase;font-size:10px}
+#searchCount{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);display:flex;align-items:center;padding:0 8px;white-space:nowrap}
+.history-actions{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border-subtle)}
+.history-btn{background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-secondary);padding:4px 8px;font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
+.history-btn:hover{color:var(--cyan);border-color:var(--cyan-dim)}
+.history-btn.primary{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.9);z-index:1000;align-items:center;justify-content:center}
+.modal.visible{display:flex}
+.modal-content{background:var(--bg-card);border:1px solid var(--cyan-dim);box-shadow:0 0 30px rgba(0,240,255,.2);width:90%;max-height:80%;overflow-y:auto;padding:20px}
+.modal-content h2{font-family:var(--font-headline);font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;margin-bottom:12px}
+.modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.modal-btn{padding:8px 16px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-secondary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
+.modal-btn:hover{color:var(--text-primary);border-color:var(--text-secondary)}
+.modal-btn.save{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
+.modal-btn.save:hover{box-shadow:0 0 8px rgba(0,240,255,.25)}
+#commandPalette{position:fixed;top:0;left:0;right:0;background:var(--bg-card);border-bottom:1px solid var(--cyan-dim);box-shadow:0 0 15px rgba(0,240,255,.3);z-index:1001;padding:12px;display:none}
+#commandPalette.visible{display:block}
+#commandInput{width:100%;background:var(--bg-input);border:1px solid var(--cyan-dim);color:var(--cyan);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none}
+#commandInput::placeholder{color:var(--text-muted);text-transform:uppercase}
+#commandList{max-height:200px;overflow-y:auto;margin-top:8px}
+.command-item{padding:8px 12px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);border-left:2px solid transparent;transition:all var(--transition)}
+.command-item:hover{background:var(--cyan-ghost);color:var(--cyan);border-left-color:var(--cyan)}
+#shortcuts-list{max-height:250px;overflow-y:auto}
+.shortcut-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(0,240,255,.05);font-family:var(--font-mono);font-size:11px}
+#markdownPreview{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.95);z-index:1000;overflow-y:auto;padding:20px}
+#markdownPreview.visible{display:block}
+#previewContent{background:var(--bg-card);border:1px solid var(--border-subtle);padding:16px;color:var(--text-primary);font-size:12px;line-height:1.6;max-height:100%;overflow-y:auto}
+[data-theme="matrix"]{--cyan:#00FF41;--cyan-dim:rgba(0,255,65,.3);--cyan-glow:rgba(0,255,65,.15);--cyan-ghost:rgba(0,255,65,.05);--lime:#39FF14}
+[data-theme="cyberpunk"]{--cyan:#FF2A6D;--cyan-dim:rgba(255,42,109,.3);--cyan-glow:rgba(255,42,109,.15);--cyan-ghost:rgba(255,42,109,.05);--lime:#05D9E8}
+[data-theme="neon"]{--cyan:#E040FB;--cyan-dim:rgba(224,64,251,.3);--cyan-glow:rgba(224,64,251,.15);--cyan-ghost:rgba(224,64,251,.05)}
+[data-theme="terminal"]{--cyan:#33FF00;--cyan-dim:rgba(51,255,0,.3);--cyan-glow:rgba(51,255,0,.15);--cyan-ghost:rgba(51,255,0,.05);--bg-base:#000;--bg-card:#0a0a0a;--bg-input:#050505}
+[data-theme="blood"]{--cyan:#FF0040;--cyan-dim:rgba(255,0,64,.3);--cyan-glow:rgba(255,0,64,.15);--cyan-ghost:rgba(255,0,64,.05);--lime:#FF4444;--amber:#FF6666}
+[data-theme="dark"]{--cyan:#6C9FFF;--cyan-dim:rgba(108,159,255,.3);--cyan-glow:rgba(108,159,255,.15);--cyan-ghost:rgba(108,159,255,.05);--lime:#6CFF9F}
+</style>
 </head>
-<body>
-  <!-- Header (mockup-style) -->
-  <div class="header">
-    <svg class="header-logo" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-      <rect width="28" height="28" rx="5" fill="#080e1c"/>
-      <polygon points="14,2 24,7.5 24,20.5 14,26 4,20.5 4,7.5" fill="none" stroke="#00d4ff" stroke-width="1.2" opacity="0.85"/>
-      <circle cx="14" cy="14" r="7" fill="none" stroke="#00d4ff" stroke-width="0.8" opacity="0.5"/>
-      <circle cx="14" cy="14" r="4" fill="none" stroke="#00d4ff" stroke-width="1.1" opacity="0.9"/>
-      <line x1="14" y1="7" x2="14" y2="10" stroke="#00d4ff" stroke-width="0.8" opacity="0.7"/>
-      <line x1="14" y1="18" x2="14" y2="21" stroke="#00d4ff" stroke-width="0.8" opacity="0.7"/>
-      <line x1="7" y1="14" x2="10" y2="14" stroke="#00d4ff" stroke-width="0.8" opacity="0.7"/>
-      <line x1="18" y1="14" x2="21" y2="14" stroke="#00d4ff" stroke-width="0.8" opacity="0.7"/>
-      <polygon points="14,11 17,14 14,17 11,14" fill="#080e1c" stroke="#00d4ff" stroke-width="1"/>
-      <circle cx="14" cy="14" r="1.5" fill="#00d4ff"/>
-      <path d="M14,7 A7,7 0 0,1 21,14" fill="none" stroke="#ff2a6d" stroke-width="0.9" opacity="0.6"/>
-    </svg>
-    <div class="header-title" id="headerTitle">
-      <span>SENTINEL</span>
-       <span class="header-sub">OVERRIDE · v2.7.3</span>
-    </div>
-    <span id="activeIndicator" class="active-indicator"></span>
-    <span id="modeBadge" class="mode-badge yolo">YOLO</span>
-    <div class="hbtns">
-      <button class="ibtn" id="newChatBtn" title="New chat">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
-      </button>
-      <button class="ibtn" id="shortcutsBtnHdr" title="Shortcuts">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="3" width="5" height="4" rx="1"/><rect x="9" y="3" width="5" height="4" rx="1"/><rect x="2" y="9" width="5" height="4" rx="1"/><rect x="9" y="9" width="5" height="4" rx="1"/></svg>
-      </button>
-      <button class="ibtn" id="settingsBtn" title="Settings">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M11.2 4.8l-1.4 1.4M4.8 11.2l-1.4 1.4"/></svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Cost Bar -->
-  <div class="cost-bar" id="costBar" style="display:none;">
-    <span class="cost-label">SESSION</span>
-    <div class="cost-track"><div class="cost-fill" id="costFill"></div></div>
-    <span class="cost-val" id="costVal">$0.00 / $5.00</span>
-  </div>
-
-  <!-- Chat Container -->
-  <div id="chat-container">
-    <div class="welcome-message" id="welcomeMessage">
-      <h2>SENTINEL OVERRIDE</h2>
-      <p>Automate your browser tasks with AI. What would you like me to do?</p>
-    </div>
-  </div>
-
-  <!-- Status Bar -->
-  <div id="status" style="display:none;padding:3px 12px;background:var(--bg-secondary);border-top:1px solid var(--border);flex-shrink:0;">
-    <span id="statusText" style="font-family:monospace;font-size:10px;color:var(--text-secondary);letter-spacing:0.5px;"></span>
-  </div>
-
-  <!-- Input Area -->
-  <div class="input-area">
-    <div id="approvalCardContainer"></div>
-    <div id="attachmentPreview" class="attachment-preview"></div>
-    <div class="input-wrap">
-      <textarea id="goalInput" placeholder="Enter a goal or command…" rows="1"></textarea>
-      <button class="send-btn" id="sendBtn" title="Send">
-        <svg viewBox="0 0 16 16"><path d="M2 14L14 8 2 2v4.5l8 1.5-8 1.5z"/></svg>
-      </button>
-      <button class="send-btn" id="stopBtn" style="display:none; background:var(--magenta);" title="Stop">
-        <svg viewBox="0 0 16 16" fill="white"><rect x="4" y="4" width="8" height="8" rx="1"/></svg>
-      </button>
-    </div>
-    <div class="input-footer">ENTER to send · SHIFT+ENTER new line · ⌘K palette</div>
-  </div>
-
-  <!-- Hidden file input -->
-  <input type="file" id="file-input" multiple>
-
-  <!-- Command Palette -->
-  <div class="command-palette" id="commandPalette">
-    <div class="command-input">
-      <input type="text" id="commandInput" placeholder="Type a command…">
-    </div>
-    <div class="command-list" id="commandList"></div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="settings-modal" class="modal">
-    <div class="modal-content">
-      <h2>SETTINGS</h2>
-      <div class="modal-field">
-        <label>Provider</label>
-        <select id="provider-select">
-          <option value="openrouter">OpenRouter</option>
-          <option value="venice">Venice.ai</option>
-           <option value="zai">z.ai Coding Plan</option>
-           <option value="poolside">Poolside AI</option>
-           <option value="xiaomi">Xiaomi MiMo</option>
-        </select>
-      </div>
-      <div class="modal-field">
-        <label>API Endpoint</label>
-        <input type="text" id="set-api-endpoint" placeholder="https://api.example.com/v1/chat/completions">
-      </div>
-      <div class="modal-field">
-        <label>API Key</label>
-        <input type="password" id="set-api-key" placeholder="Your API key">
-      </div>
-      <div class="modal-field">
-        <label>Model ID</label>
-        <input type="text" id="set-api-model" placeholder="gpt-4 or model name">
-      </div>
-      <div class="modal-field">
-        <label>Export Format</label>
-        <select id="export-format">
-          <option value="markdown">Markdown (.md)</option>
-          <option value="json">JSON (.json)</option>
-          <option value="txt">Text (.txt)</option>
-        </select>
-      </div>
-      <div class="toggle-row">
-        <div class="toggle-row-label">
-          <span>Approval Mode</span>
-          <span id="approvalModeLabel">OFF — Agent executes autonomously</span>
-        </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="approvalModeToggle">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="modal-actions">
-        <button id="closeSettingsBtn" class="modal-btn btn-cancel">CANCEL</button>
-        <button id="saveSettingsBtn" class="modal-btn btn-save">SAVE</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Shortcuts Modal -->
-  <div id="shortcuts-modal" class="modal">
-    <div class="modal-content">
-      <h2>⌨ SAVED SHORTCUTS</h2>
-      <div id="shortcuts-list">
-        <p style="color: var(--text-tertiary); text-align: center; padding: 20px; font-size:12px;">No shortcuts saved yet. Run a task and save it as a shortcut!</p>
-      </div>
-      <div class="modal-actions">
-        <button id="closeShortcutsBtn" class="modal-btn btn-cancel">CLOSE</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="marked.min.js"></script>
-  <script src="popup-full.js"></script>
+<body data-theme="tron">
+<div class="app-shell">
+<div class="header">
+<div class="header-title"><img src="logo-128.png" alt="SO"><span>Sentinel Override</span></div>
+<div class="header-right">
+<button class="header-btn" id="newChatBtn" title="New Chat">+ NEW</button>
+<button class="header-btn" id="commandPaletteBtn" title="Commands">CMD</button>
+<button class="header-btn" id="shortcutsBtn" title="Shortcuts">SC</button><button id="shortcutsBtnHdr" style="display:none">SC</button>
+<button class="header-btn" id="settingsBtn" title="Settings">CFG</button>
+<button class="header-btn" id="themeToggle" title="Theme">THM</button>
+<div id="activeIndicator"></div>
+</div>
+</div>
+<div class="status-bar">
+<div id="status"><div class="status-dot"></div><span id="status-text">READY</span><span id="statusText" style="display:none">READY</span></div>
+<div style="display:flex;gap:8px;align-items:center;">
+<span id="modeBadge">AUTO</span>
+<span id="approvalModeLabel" style="cursor:pointer;color:var(--amber);"><span id="approvalModeToggle"></span></span>
+</div>
+</div>
+<div class="tab-nav">
+<button class="tab-btn active" data-tab="chat">Chat</button>
+<button class="tab-btn" data-tab="settings">Config</button>
+<button class="tab-btn" data-tab="history">History</button>
+</div>
+<div class="tab-content active" id="tab-chat">
+<div class="chat-area">
+<div id="plan-card-container">
+<div class="plan-header"><span>// Mission Plan</span><span class="plan-ref">REF_PLAN_001</span></div>
+<div id="step-progress-label">Step 0/0</div>
+<div class="progress-track"><div id="plan-progress-fill" style="width:0%"></div></div>
+<div style="margin-top:4px;height:3px;background:var(--bg-surface-high);"><div id="step-progress-fill" style="width:0%"></div></div>
+</div>
+<div id="chat-container"></div>
+<div id="approvalCardContainer">
+<div id="approval-card">
+<div class="approval-header">// Approval Required</div>
+<div id="approval-text"></div>
+<div class="approval-actions">
+<button class="approval-btn" id="approvalApprove">APPROVE</button>
+<button class="approval-btn" id="approvalSkip">SKIP</button>
+<button class="approval-btn" id="approvalReject">REJECT</button>
+</div></div></div>
+<div id="typing-indicator">PROCESSING</div>
+</div>
+<div class="input-area">
+<div id="attachmentPreview"></div>
+<div class="input-row">
+<button class="input-btn" id="attachBtn" title="Attach">+</button>
+<textarea id="goalInput" rows="1" placeholder="Enter directive..."></textarea>
+<button class="input-btn" id="voiceBtn" title="Voice">mic</button>
+<button class="input-btn" id="speakBtn" title="TTS">snd</button>
+<button class="input-btn" id="sendBtn" title="Send">▶</button>
+<button class="input-btn" id="stopBtn" title="Stop">■</button>
+</div></div>
+</div>
+<div class="tab-content" id="tab-settings">
+<div class="settings-content">
+<div class="settings-section">
+<div class="section-header"><span class="section-title">// API Authentication</span><span class="section-ref">REF_AUTH_001</span></div>
+<div class="field-group"><div class="field-label"><label for="provider-select">PROVIDER</label></div><select class="field-input" id="provider-select"><option value="openrouter">OpenRouter</option><option value="venice">Venice</option><option value="zai">ZAI</option></select></div>
+<div class="field-group"><div class="field-label"><label for="set-api-endpoint">ENDPOINT</label><span class="field-status secure">[SECURE]</span></div><input type="text" class="field-input" id="set-api-endpoint" placeholder="https://..."></div>
+<div class="field-group"><div class="field-label"><label for="set-api-key">API_KEY</label><span class="field-status secure">[VAULT]</span></div><input type="password" class="field-input" id="set-api-key" placeholder="sk-..."></div>
+<div class="field-group"><div class="field-label"><label for="set-api-model">MODEL</label></div><input type="text" class="field-input" id="set-api-model" placeholder="model-id"></div>
+</div>
+<div class="settings-section">
+<div class="section-header"><span class="section-title">// Theme</span><span class="section-ref">REF_THEME_042</span></div>
+<div class="theme-presets">
+<div class="theme-preset" data-theme="dark">Dark</div>
+<div class="theme-preset active" data-theme="tron">Tron</div>
+<div class="theme-preset" data-theme="matrix">Matrix</div>
+<div class="theme-preset" data-theme="cyberpunk">Cyber</div>
+<div class="theme-preset" data-theme="neon">Neon</div>
+<div class="theme-preset" data-theme="terminal">Termin</div>
+<div class="theme-preset" data-theme="blood">Blood</div>
+</div>
+<div class="color-picker">
+<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary" value="#00F0FF"></div>
+<div class="color-field"><label>Background</label><input type="color" id="colorBg" value="#0A0C10"></div>
+<div class="color-field"><label>Text</label><input type="color" id="colorText" value="#E2E2E8"></div>
+</div></div>
+<div class="settings-section">
+<div class="section-header"><span class="section-title">// Data</span><span class="section-ref">REF_DATA_882</span></div>
+<div class="field-group"><div class="field-label"><label for="export-format">EXPORT FORMAT</label></div><select class="field-input" id="export-format"><option value="json">JSON</option><option value="markdown">Markdown</option><option value="txt">Plain Text</option></select></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;">
+<button class="history-btn" id="exportBtn">EXPORT CHAT</button>
+<button class="history-btn" id="previewBtn">MARKDOWN PREVIEW</button>
+</div></div>
+<button class="modal-btn save" style="width:100%;" id="saveSettingsBtn">SAVE CONFIG</button>
+</div></div>
+<div class="tab-content" id="tab-history">
+<div class="history-content">
+<div class="history-search"><input type="text" id="searchInput" placeholder="Filter session logs..."><span id="searchCount">0/0</span></div>
+<div class="history-actions"><button class="history-btn primary" id="newChatBtn">NEW SESSION</button></div>
+<div style="flex:1;overflow-y:auto;padding:12px;" id="chat-container-history"></div>
+</div></div>
+</div>
+<input type="file" id="file-input" multiple style="display:none;">
+<div id="commandPalette"><input type="text" id="commandInput" placeholder="Type command..."><div id="commandList"></div></div>
+<div id="settings-modal" class="modal"><div class="modal-content"><h2>// Settings</h2>
+<div class="field-group"><div class="field-label"><label>ENDPOINT</label></div><input type="text" class="field-input" id="set-api-endpoint-modal" placeholder="https://..."></div>
+<div class="field-group"><div class="field-label"><label>API_KEY</label></div><input type="password" class="field-input" id="set-api-key-modal" placeholder="sk-..."></div>
+<div class="field-group"><div class="field-label"><label>MODEL</label></div><input type="text" class="field-input" id="set-api-model-modal" placeholder="model-id"></div>
+<div class="modal-actions"><button class="modal-btn" id="closeSettingsBtn">Close</button><button class="modal-btn save" id="saveSettingsBtn">Save</button></div>
+</div></div>
+<div id="theme-modal" class="modal"><div class="modal-content"><h2>// Theme Configuration</h2>
+<div class="theme-presets" style="margin-bottom:16px;">
+<div class="theme-preset" data-theme="dark">Dark</div>
+<div class="theme-preset" data-theme="tron">Tron</div>
+<div class="theme-preset" data-theme="matrix">Matrix</div>
+<div class="theme-preset" data-theme="cyberpunk">Cyber</div>
+<div class="theme-preset" data-theme="neon">Neon</div>
+<div class="theme-preset" data-theme="terminal">Termin</div>
+<div class="theme-preset" data-theme="blood">Blood</div>
+</div>
+<div class="color-picker">
+<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary" value="#00F0FF"></div>
+<div class="color-field"><label>Background</label><input type="color" id="colorBg" value="#0A0C10"></div>
+<div class="color-field"><label>Text</label><input type="color" id="colorText" value="#E2E2E8"></div>
+</div>
+<div class="modal-actions"><button class="modal-btn" id="closeThemeBtn">Cancel</button><button class="modal-btn save" id="saveThemeBtn">Apply</button></div>
+</div></div>
+<div id="shortcuts-modal" class="modal"><div class="modal-content"><h2>// Saved Shortcuts</h2>
+<div id="shortcuts-list"><p style="color:var(--text-muted);text-align:center;padding:20px;font-family:var(--font-mono);font-size:11px;">No shortcuts saved yet.</p></div>
+<div class="modal-actions"><button class="modal-btn" id="closeShortcutsBtn">Close</button></div>
+</div></div>
+<div id="markdownPreview"><div id="previewContent"></div></div>
+<script src="marked.min.js"></script>
+<script src="popup-full.js"></script>
+<script>
+document.querySelectorAll(".tab-btn").forEach(function(btn){btn.addEventListener("click",function(){document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active")});document.querySelectorAll(".tab-content").forEach(function(t){t.classList.remove("active")});btn.classList.add("active");document.getElementById("tab-"+btn.dataset.tab).classList.add("active")})});
+document.querySelectorAll(".theme-preset").forEach(function(preset){preset.addEventListener("click",function(){document.querySelectorAll(".theme-preset").forEach(function(p){p.classList.remove("active")});document.querySelectorAll(".theme-preset[data-theme=""+preset.dataset.theme+""]").forEach(function(p){p.classList.add("active")});document.body.setAttribute("data-theme",preset.dataset.theme)})});
+</script>
 </body>
 </html>
