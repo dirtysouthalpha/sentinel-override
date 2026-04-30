@@ -1,5 +1,6 @@
 let agentRunning = false;
 let agentTabId = null;  // Track which tab the agent is working on
+let pendingApproval = null; // Stores pending approval decision
 let apiCallCount = 0;
 let lastApiCallTime = 0;
 let sessionCost = 0.0;  // Track cumulative spend per session
@@ -30,6 +31,7 @@ async function loadAnalysisHistory() {
     analysisHistory = stored.analysisHistory.slice(-MAX_ANALYSIS_HISTORY);
   }
 }
+loadAnalysisHistory();
 
 async function saveAnalysisHistory() {
   await chrome.storage.local.set({ analysisHistory: analysisHistory.slice(-MAX_ANALYSIS_HISTORY) });
@@ -106,6 +108,7 @@ async function generateMissingTool(error, step, workingTabId) {
       })
     });
     var data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) return null;
     var script = data.choices[0].message.content;
     script = script.replace(/```javascript?\n?/gi, '').replace(/```\n?/g, '').trim();
     if (script.length < 5) return null;
@@ -276,7 +279,14 @@ async function callLLMSimple(prompt, opts = {}) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
     body: JSON.stringify(body)
   });
+  if (!resp.ok) {
+    const errorText = await resp.text();
+    throw new Error('API Error: ' + resp.status + ' - ' + errorText);
+  }
   const data = await resp.json();
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    throw new Error('Invalid API response structure');
+  }
   return data.choices[0].message.content;
 }
 
@@ -422,6 +432,9 @@ sendSilentUpdate('[Analysis] Generating analysis...');
   }
 
   const data = await response.json();
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    throw new Error('Invalid API response structure');
+  }
   const analysisResult = data.choices[0].message.content;
 
   // Track cost
@@ -657,6 +670,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         currentStepIndex = 0;
         agentRunning = false;
         sendResponse({status: 'Plan rejected'});
+    } else if (request.action === 'approval_response') {
+        pendingApproval = {
+          approved: request.approved,
+          skipped: request.skipped,
+          rejected: request.rejected
+        };
+        sendResponse({status: 'Approval recorded'});
     }
     return false;
 });
@@ -869,6 +889,9 @@ async function planTask(goal, workingTabId) {
     }
 
     const data = await response.json();
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid API response structure');
+    }
     const content = data.choices[0].message.content;
 
     let parsed;
@@ -1205,6 +1228,9 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
     throw new Error(`API Error: ${response.status} - ${errorData}`);
   }
   const data = await response.json();
+  if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+    throw new Error('Invalid API response structure');
+  }
 
   if (isVenice || isOpenRouter) {
     const actualInputTokens = (data.usage && data.usage.prompt_tokens) ? data.usage.prompt_tokens : estimatedInputTokens;
