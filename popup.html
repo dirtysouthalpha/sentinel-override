@@ -24,7 +24,7 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;bottom:0;background:
 #status{display:flex;align-items:center;gap:4px}
 .status-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pd 2s ease-in-out infinite}
 @keyframes pd{0%,100%{opacity:1}50%{opacity:.4}}
-#status-text{color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em}
+#statusText{color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em}
 #modeBadge{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;padding:1px 6px;border:1px solid var(--amber-dim);color:var(--amber);text-transform:uppercase}
 .tab-nav{display:flex;background:var(--bg-base);border-bottom:1px solid var(--border-subtle);flex-shrink:0;padding:0 4px}
 .tab-btn{flex:1;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 4px;cursor:pointer;font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:all var(--transition)}
@@ -55,7 +55,7 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;bottom:0;background:
 #approvalSkip{border-color:var(--amber-dim);color:var(--amber)}#approvalSkip:hover{background:rgba(255,212,123,.1)}
 #approvalReject{border-color:rgba(255,180,171,.3);color:var(--error)}#approvalReject:hover{background:rgba(255,180,171,.1)}
 #typing-indicator{display:none;padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
-#typing-indicator.visible{display:block}
+#typing-indicator.show{display:block}
 #typing-indicator::after{content:"_";animation:bc 1s step-end infinite}
 @keyframes bc{50%{opacity:0}}
 .input-area{display:flex;flex-direction:column;background:var(--bg-card);border-top:1px solid var(--border-subtle);flex-shrink:0;padding:8px 12px;gap:4px}
@@ -103,7 +103,7 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .history-btn:hover{color:var(--cyan);border-color:var(--cyan-dim)}
 .history-btn.primary{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
 .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.9);z-index:1000;align-items:center;justify-content:center}
-.modal.visible{display:flex}
+.modal.show{display:flex}
 .modal-content{background:var(--bg-card);border:1px solid var(--cyan-dim);box-shadow:0 0 30px rgba(0,240,255,.2);width:90%;max-height:80%;overflow-y:auto;padding:20px}
 .modal-content h2{font-family:var(--font-headline);font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;margin-bottom:12px}
 .modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
@@ -112,7 +112,7 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .modal-btn.save{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
 .modal-btn.save:hover{box-shadow:0 0 8px rgba(0,240,255,.25)}
 #commandPalette{position:fixed;top:0;left:0;right:0;background:var(--bg-card);border-bottom:1px solid var(--cyan-dim);box-shadow:0 0 15px rgba(0,240,255,.3);z-index:1001;padding:12px;display:none}
-#commandPalette.visible{display:block}
+#commandPalette.show{display:block}
 #commandInput{width:100%;background:var(--bg-input);border:1px solid var(--cyan-dim);color:var(--cyan);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none}
 #commandInput::placeholder{color:var(--text-muted);text-transform:uppercase}
 #commandList{max-height:200px;overflow-y:auto;margin-top:8px}
@@ -121,7 +121,7 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 #shortcuts-list{max-height:250px;overflow-y:auto}
 .shortcut-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(0,240,255,.05);font-family:var(--font-mono);font-size:11px}
 #markdownPreview{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.95);z-index:1000;overflow-y:auto;padding:20px}
-#markdownPreview.visible{display:block}
+#markdownPreview.show{display:block}
 #previewContent{background:var(--bg-card);border:1px solid var(--border-subtle);padding:16px;color:var(--text-primary);font-size:12px;line-height:1.6;max-height:100%;overflow-y:auto}
 [data-theme="matrix"]{--cyan:#00FF41;--cyan-dim:rgba(0,255,65,.3);--cyan-glow:rgba(0,255,65,.15);--cyan-ghost:rgba(0,255,65,.05);--lime:#39FF14}
 [data-theme="cyberpunk"]{--cyan:#FF2A6D;--cyan-dim:rgba(255,42,109,.3);--cyan-glow:rgba(255,42,109,.15);--cyan-ghost:rgba(255,42,109,.05);--lime:#05D9E8}
@@ -145,10 +145,11 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 </div>
 </div>
 <div class="status-bar">
-<div id="status"><div class="status-dot"></div><span id="status-text">READY</span><span id="statusText" style="display:none">READY</span></div>
+<div id="status"><div class="status-dot"></div><span id="statusText" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">READY</span></div>
 <div style="display:flex;gap:8px;align-items:center;">
 <span id="modeBadge">AUTO</span>
-<span id="approvalModeLabel" style="cursor:pointer;color:var(--amber);"><span id="approvalModeToggle"></span></span>
+<input type="checkbox" id="approvalModeToggle" style="accent-color:var(--amber);width:12px;height:12px;cursor:pointer;">
+<span id="approvalModeLabel" style="color:var(--amber);font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">OFF</span>
 </div>
 </div>
 <div class="tab-nav">
@@ -192,9 +193,9 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 <div class="settings-section">
 <div class="section-header"><span class="section-title">// API Authentication</span><span class="section-ref">REF_AUTH_001</span></div>
 <div class="field-group"><div class="field-label"><label for="provider-select">PROVIDER</label></div><select class="field-input" id="provider-select"><option value="openrouter">OpenRouter</option><option value="venice">Venice</option><option value="zai">ZAI</option></select></div>
-<div class="field-group"><div class="field-label"><label for="set-api-endpoint">ENDPOINT</label><span class="field-status secure">[SECURE]</span></div><input type="text" class="field-input" id="set-api-endpoint" placeholder="https://..."></div>
-<div class="field-group"><div class="field-label"><label for="set-api-key">API_KEY</label><span class="field-status secure">[VAULT]</span></div><input type="password" class="field-input" id="set-api-key" placeholder="sk-..."></div>
-<div class="field-group"><div class="field-label"><label for="set-api-model">MODEL</label></div><input type="text" class="field-input" id="set-api-model" placeholder="model-id"></div>
+<div class="field-group"><div class="field-label"><label for="set-api-endpoint">ENDPOINT</label><span class="field-status secure">[SECURE]</span></div><input type="text" class="field-input" id="set-api-endpoint-inline" placeholder="https://..."></div>
+<div class="field-group"><div class="field-label"><label for="set-api-key">API_KEY</label><span class="field-status secure">[VAULT]</span></div><input type="password" class="field-input" id="set-api-key-inline" placeholder="sk-..."></div>
+<div class="field-group"><div class="field-label"><label for="set-api-model">MODEL</label></div><input type="text" class="field-input" id="set-api-model-inline" placeholder="model-id"></div>
 </div>
 <div class="settings-section">
 <div class="section-header"><span class="section-title">// Theme</span><span class="section-ref">REF_THEME_042</span></div>
@@ -208,9 +209,9 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 <div class="theme-preset" data-theme="blood">Blood</div>
 </div>
 <div class="color-picker">
-<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary" value="#00F0FF"></div>
-<div class="color-field"><label>Background</label><input type="color" id="colorBg" value="#0A0C10"></div>
-<div class="color-field"><label>Text</label><input type="color" id="colorText" value="#E2E2E8"></div>
+<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary-inline" value="#00F0FF"></div>
+<div class="color-field"><label>Background</label><input type="color" id="colorBg-inline" value="#0A0C10"></div>
+<div class="color-field"><label>Text</label><input type="color" id="colorText-inline" value="#E2E2E8"></div>
 </div></div>
 <div class="settings-section">
 <div class="section-header"><span class="section-title">// Data</span><span class="section-ref">REF_DATA_882</span></div>
@@ -219,21 +220,21 @@ select.field-input{cursor:pointer;appearance:none;background-image:url("data:ima
 <button class="history-btn" id="exportBtn">EXPORT CHAT</button>
 <button class="history-btn" id="previewBtn">MARKDOWN PREVIEW</button>
 </div></div>
-<button class="modal-btn save" style="width:100%;" id="saveSettingsBtn">SAVE CONFIG</button>
+<button class="modal-btn save" style="width:100%;" id="saveSettingsBtn-inline">SAVE CONFIG</button>
 </div></div>
 <div class="tab-content" id="tab-history">
 <div class="history-content">
 <div class="history-search"><input type="text" id="searchInput" placeholder="Filter session logs..."><span id="searchCount">0/0</span></div>
-<div class="history-actions"><button class="history-btn primary" id="newChatBtn">NEW SESSION</button></div>
+<div class="history-actions"><button class="history-btn primary" id="newChatBtnHistory">NEW SESSION</button></div>
 <div style="flex:1;overflow-y:auto;padding:12px;" id="chat-container-history"></div>
 </div></div>
 </div>
 <input type="file" id="file-input" multiple style="display:none;">
 <div id="commandPalette"><input type="text" id="commandInput" placeholder="Type command..."><div id="commandList"></div></div>
 <div id="settings-modal" class="modal"><div class="modal-content"><h2>// Settings</h2>
-<div class="field-group"><div class="field-label"><label>ENDPOINT</label></div><input type="text" class="field-input" id="set-api-endpoint-modal" placeholder="https://..."></div>
-<div class="field-group"><div class="field-label"><label>API_KEY</label></div><input type="password" class="field-input" id="set-api-key-modal" placeholder="sk-..."></div>
-<div class="field-group"><div class="field-label"><label>MODEL</label></div><input type="text" class="field-input" id="set-api-model-modal" placeholder="model-id"></div>
+<div class="field-group"><div class="field-label"><label>ENDPOINT</label></div><input type="text" class="field-input" id="set-api-endpoint" placeholder="https://..."></div>
+<div class="field-group"><div class="field-label"><label>API_KEY</label></div><input type="password" class="field-input" id="set-api-key" placeholder="sk-..."></div>
+<div class="field-group"><div class="field-label"><label>MODEL</label></div><input type="text" class="field-input" id="set-api-model" placeholder="model-id"></div>
 <div class="modal-actions"><button class="modal-btn" id="closeSettingsBtn">Close</button><button class="modal-btn save" id="saveSettingsBtn">Save</button></div>
 </div></div>
 <div id="theme-modal" class="modal"><div class="modal-content"><h2>// Theme Configuration</h2>
