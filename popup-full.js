@@ -1,49 +1,4 @@
-// ========== Global State ==========
-let conversationHistory = [];
-let selectedAttachments = [];
-let currentSearchQuery = '';
-let currentSearchIndex = 0;
-let sessionCost = 0;
-let sessionCap = 5.00;
-// ========== DOM Elements ==========
-const chatContainer = document.getElementById('chat-container');
-const goalInput = document.getElementById('goalInput');
-const sendBtn = document.getElementById('sendBtn');
-const stopBtn = document.getElementById('stopBtn');
-const status = document.getElementById('status');
-const statusText = document.getElementById('status-text');
-const newChatBtn = document.getElementById('newChatBtn');
-const settingsBtn = document.getElementById('settingsBtn');
-const settingsModal = document.getElementById('settings-modal');
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const setApiEndpoint = document.getElementById('set-api-endpoint');
-const setApiKey = document.getElementById('set-api-key');
-const setApiModel = document.getElementById('set-api-model');
-const exportFormatSelect = document.getElementById('export-format');
-const fileInput = document.getElementById('file-input');
-const attachmentPreview = document.getElementById('attachmentPreview');
-const commandPalette = document.getElementById('commandPalette');
-const commandInput = document.getElementById('commandInput');
-const commandList = document.getElementById('commandList');
-const approvalModeToggle = document.getElementById('approvalModeToggle');
-const approvalModeLabel = document.getElementById('approvalModeLabel');
-const modeBadge = document.getElementById('modeBadge');
-const approvalCardContainer = document.getElementById('approvalCardContainer');
-const activeIndicator = document.getElementById('activeIndicator');
-const costBar = document.getElementById('costBar');
-const costFill = document.getElementById('costFill');
-const costVal = document.getElementById('costVal');
-const providerSelect = document.getElementById('provider-select');
-const shortcutsModal = document.getElementById('shortcuts-modal');
-const shortcutsList = document.getElementById('shortcuts-list');
-const closeShortcutsBtn = document.getElementById('closeShortcutsBtn');
-const shortcutsBtnHdr = document.getElementById('shortcutsBtnHdr');
-const headerTitle = document.getElementById('headerTitle');
-const welcomeMessage = document.getElementById('welcomeMessage');
-
-// ========== Provider Presets (must be defined before init) ==========
-// ========== Provider Presets (must be defined before init) ==========
+// ========== Provider Presets ==========
 const PROVIDER_PRESETS = {
   'openrouter': {
     endpoint: 'https://openrouter.ai/api/v1/chat/completions',
@@ -60,17 +15,53 @@ const PROVIDER_PRESETS = {
     models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
     defaultModel: 'deepseek-v4-flash'
   },
+  'poolside': {
+    endpoint: 'https://api.poolside.ai/v1/chat/completions',
+    models: ['mistral-small-3-24b-instruct', 'llama-3.3-70b-instruct', 'qwen2.5-72b-instruct', 'gemma-3-27b-instruct', 'phi-4'],
+    defaultModel: 'mistral-small-3-24b-instruct'
+  },
   'xiaomi': {
     endpoint: 'https://api.xiaomimimo.com/v1/chat/completions',
     models: ['mimo-v2.5-pro', 'mimo-v2.5', 'mimo-v2-pro', 'mimo-v2-flash'],
     defaultModel: 'mimo-v2.5-pro'
-  },
-  'poolside': {
-    endpoint: 'https://api.poolside.ai/v1/chat/completions',
-    models: ['poolside/mistral-small-3-24b-instruct', 'poolside/llama-3.3-70b-instruct', 'poolside/qwen2.5-72b-instruct', 'poolside/gemma-3-27b-instruct', 'poolside/phi-4'],
-    defaultModel: 'poolside/mistral-small-3-24b-instruct'
   }
 };
+
+// ========== Global State ==========
+let conversationHistory = [];
+let selectedAttachments = [];
+let currentSearchQuery = '';
+let currentSearchIndex = 0;
+
+// ========== DOM Elements ==========
+const chatContainer = document.getElementById('chat-container');
+const goalInput = document.getElementById('goalInput');
+const sendBtn = document.getElementById('sendBtn');
+const stopBtn = document.getElementById('stopBtn');
+const newChatBtn = document.getElementById('newChatBtn');
+const settingsBtn = document.getElementById('settingsBtn');
+const themeToggle = document.getElementById('themeToggle');
+const commandPaletteBtn = document.getElementById('commandPaletteBtn');
+const settingsModal = document.getElementById('settings-modal');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const setApiEndpoint = document.getElementById('set-api-endpoint');
+const setApiKey = document.getElementById('set-api-key');
+const setApiModel = document.getElementById('set-api-model');
+const exportFormatSelect = document.getElementById('export-format');
+const shortcutsModal = document.getElementById('shortcuts-modal');
+const shortcutsList = document.getElementById('shortcuts-list');
+const commandPalette = document.getElementById('commandPalette');
+const commandInput = document.getElementById('commandInput');
+const commandList = document.getElementById('commandList');
+const themeModal = document.getElementById('theme-modal');
+const closeThemeBtn = document.getElementById('closeThemeBtn');
+const saveThemeBtn = document.getElementById('saveThemeBtn');
+const approvalModeToggle = document.getElementById('approvalModeToggle');
+const approvalModeLabel = document.getElementById('approvalModeLabel');
+const modeBadge = document.getElementById('modeBadge');
+const approvalCardContainer = document.getElementById('approvalCardContainer');
+const activeIndicator = document.getElementById('activeIndicator');
 
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -182,58 +173,95 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// ========== Compact Step Progress Indicator (Claude-style) ==========
-let stepProgressContainer = null;
-
-function ensureStepProgress() {
-  if (stepProgressContainer && stepProgressContainer.parentNode) return;
-  stepProgressContainer = document.createElement('div');
-  stepProgressContainer.id = 'step-progress-container';
-  stepProgressContainer.style.cssText = 'display:none; padding:6px 12px; margin:4px 8px; background:var(--bg-secondary, #0d1628); border:1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius:8px; font-size:11px; color:var(--text-secondary, #7aa8c4); align-items:center; gap:8px;';
-  stepProgressContainer.innerHTML = '<span id="step-progress-label" style="flex-shrink:0;">⏳ Working...</span><div style="flex:1; height:4px; background:rgba(0,212,255,0.1); border-radius:2px; overflow:hidden;"><div id="step-progress-fill" style="width:0%; height:100%; background:var(--color-primary-cyan, #00d4ff); border-radius:2px; transition:width 0.3s ease;"></div></div>';
-  const chatContainer = document.getElementById('chat-container');
-  if (chatContainer) chatContainer.insertBefore(stepProgressContainer, chatContainer.firstChild);
-}
-
-function updateStepIndicatorProgress(stepNumber, totalSteps, description) {
-  ensureStepProgress();
-  stepProgressContainer.style.display = 'flex';
-  const pct = Math.min(100, Math.round((stepNumber / totalSteps) * 100));
-  const fill = document.getElementById('step-progress-fill');
-  const label = document.getElementById('step-progress-label');
-  if (fill) fill.style.width = pct + '%';
-  if (label) label.textContent = '⏳ Step ' + stepNumber + '/' + totalSteps + (description ? ': ' + description.substring(0, 40) : '');
-}
-
-function completeStepIndicator() {
-  if (stepProgressContainer) {
-    const fill = document.getElementById('step-progress-fill');
-    const label = document.getElementById('step-progress-label');
-    if (fill) fill.style.width = '100%';
-    if (label) label.textContent = '✅ All steps complete';
-    setTimeout(() => { if (stepProgressContainer) stepProgressContainer.style.display = 'none'; }, 2000);
-  }
-}
-
-// Replaced raw action cards with compact progress indicator
+// ========== Claude-style Action Cards ==========
 function addActionCard(payload) {
-  // Show compact progress instead of adding chat message
-  if (payload && payload.stepNumber) {
-    ensureStepProgress();
-    stepProgressContainer.style.display = 'flex';
-    const fill = document.getElementById('step-progress-fill');
-    const label = document.getElementById('step-progress-label');
-    if (fill) fill.style.width = Math.min(100, payload.stepNumber * 14) + '%';
-    if (label) label.textContent = '⏳ ' + (payload.type || 'Working') + ': ' + (payload.description || '').substring(0, 50);
-  }
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
+
+  const group = document.createElement('div');
+  group.className = 'message-group agent-action-group';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message-wrapper assistant-wrapper';
+
+  const msg = document.createElement('div');
+  msg.className = 'message assistant-msg agent-action-card';
+  msg.id = `agent-action-${payload.stepNumber}`;
+
+  const inner = document.createElement('div');
+  inner.className = 'agent-action-inner';
+
+  const header = document.createElement('div');
+  header.className = 'agent-action-header';
+
+  const typeLabel = document.createElement('span');
+  typeLabel.className = 'agent-action-type';
+  typeLabel.textContent = payload.type;
+
+  const stepLabel = document.createElement('span');
+  stepLabel.className = 'agent-action-step';
+  stepLabel.textContent = `Step ${payload.stepNumber}`;
+
+  const collapseIndicator = document.createElement('span');
+  collapseIndicator.className = 'collapse-indicator';
+
+  const resultBadge = document.createElement('span');
+  resultBadge.className = 'collapse-result-badge';
+  resultBadge.id = `agent-badge-${payload.stepNumber}`;
+
+  header.appendChild(typeLabel);
+  header.appendChild(stepLabel);
+  header.appendChild(resultBadge);
+  header.appendChild(collapseIndicator);
+
+  const desc = document.createElement('div');
+  desc.className = 'agent-action-desc';
+  desc.textContent = payload.description;
+
+  inner.appendChild(header);
+  inner.appendChild(desc);
+
+  // Click to expand/collapse
+  inner.addEventListener('click', () => {
+    inner.classList.toggle('collapsed');
+  });
+
+  msg.appendChild(inner);
+  wrapper.appendChild(msg);
+  group.appendChild(wrapper);
+
+  chatContainer.appendChild(group);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
 function updateActionCardResult(stepNumber, resultText, isError) {
-  ensureStepProgress();
-  const label = document.getElementById('step-progress-label');
-  if (label) {
-    label.textContent = (isError ? '⚠️ ' : '✅ Step ' + stepNumber + ' done: ') + (resultText ? resultText.substring(0, 50) : '');
+  const card = document.getElementById(`agent-action-${stepNumber}`);
+  if (!card) return;
+
+  const inner = card.querySelector('.agent-action-inner');
+  if (!inner) return;
+
+  const existing = inner.querySelector('.agent-action-result');
+  if (existing) existing.remove();
+
+  const result = document.createElement('div');
+  result.className = `agent-action-result ${isError ? 'error' : 'success'}`;
+  result.textContent = isError ? `Failed: ${resultText}` : resultText;
+  inner.appendChild(result);
+
+  // Update the collapsed badge
+  const badge = document.getElementById(`agent-badge-${stepNumber}`);
+  if (badge) {
+    badge.className = `collapse-result-badge ${isError ? 'error' : 'success'}`;
+    badge.innerHTML = isError
+      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+      : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>';
   }
+
+  // Auto-collapse after 2 seconds (Claude-style: show then vanish)
+  setTimeout(() => {
+    inner.classList.add('collapsed');
+  }, 2000);
 }
 
 // ========== Theme Management ==========
@@ -255,6 +283,7 @@ function updateThemeToggle() {
 }
 
 function toggleTheme() {
+  document.body.classList.toggle('dark-mode');
   updateThemeToggle();
 }
 
@@ -288,7 +317,8 @@ function saveChatHistory() {
 
 // ========== Message Handling ==========
 function addMessage(text, role = 'assistant') {
-  if (welcomeMessage) welcomeMessage.remove();
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
 
   // Ensure text is always a string
   const textStr = typeof text === 'string' ? text : JSON.stringify(text);
@@ -304,7 +334,7 @@ function addMessage(text, role = 'assistant') {
   wrapper.className = `message-wrapper ${role === 'user' ? 'user-wrapper' : 'assistant-wrapper'}`;
 
   const msg = document.createElement('div');
-  msg.className = `message ${role === 'user' ? 'msg-user' : 'assistant-msg'}`;
+  msg.className = `message ${role === 'user' ? 'user-msg' : 'assistant-msg'}`;
 
   if (role === 'user') {
     msg.textContent = textStr;
@@ -340,171 +370,6 @@ function addMessage(text, role = 'assistant') {
   messageGroup.appendChild(wrapper);
   chatContainer.appendChild(messageGroup);
   chatContainer.scrollTop = chatContainer.scrollHeight;
-
-// ========== Analysis Message Renderer (Claude-style rich markdown) ==========
-function addAnalysisMessage(text, suggestions = []) {
-  if (welcomeMessage) welcomeMessage.remove();
-
-  const textStr = typeof text === 'string' ? text : JSON.stringify(text);
-
-  conversationHistory.push({ text: textStr, role: 'assistant' });
-  saveChatHistory();
-
-  const messageGroup = document.createElement('div');
-  messageGroup.className = 'message-group';
-  messageGroup.dataset.messageIndex = conversationHistory.length - 1;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'message-wrapper assistant-wrapper';
-
-  const msg = document.createElement('div');
-  msg.className = 'message assistant-msg analysis-result';
-  msg.style.cssText = 'border-left: 3px solid #00d4ff; padding-left: 12px; background: rgba(0, 212, 255, 0.03);';
-
-  try {
-    msg.innerHTML = sanitizeHtml(marked.parse(textStr));
-    addCodeCopyButtons(msg);
-    makeSectionsCollapsible(msg);
-  } catch (err) {
-    msg.textContent = textStr;
-    console.warn('Markdown parse failed for analysis, showing raw text:', err);
-  }
-
-  // Action buttons container
-  const actionBtns = document.createElement('div');
-  actionBtns.className = 'analysis-actions';
-  actionBtns.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; padding-left: 12px;';
-
-  // Export button
-  const exportBtn = document.createElement('button');
-  exportBtn.className = 'analysis-action-btn';
-  exportBtn.style.cssText = 'background: var(--bg-secondary, #0d1628); border: 1px solid var(--border-color, rgba(0,212,255,0.3)); color: var(--text-primary, #e6f4f1); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;';
-  exportBtn.textContent = '💾 Export';
-  exportBtn.addEventListener('click', () => exportAnalysisAsMarkdown(textStr));
-
-  // Copy button
-  const copyBtn = document.createElement('button');
-  copyBtn.className = 'message-copy-btn';
-  copyBtn.title = 'Copy analysis';
-  copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-  copyBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(textStr).then(() => {
-      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-      copyBtn.classList.add('copied');
-      setTimeout(() => {
-        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
-        copyBtn.classList.remove('copied');
-      }, 2000);
-    });
-  });
-
-  actionBtns.appendChild(exportBtn);
-  actionBtns.appendChild(copyBtn);
-
-  wrapper.appendChild(msg);
-  wrapper.appendChild(copyBtn);
-  messageGroup.appendChild(wrapper);
-  messageGroup.appendChild(actionBtns);
-  chatContainer.appendChild(messageGroup);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-
-  // Add follow-up suggestions if provided
-  if (suggestions && suggestions.length > 0) {
-    const suggestionsDiv = document.createElement('div');
-    suggestionsDiv.className = 'followup-suggestions';
-    suggestionsDiv.style.cssText = 'margin: 8px 0; padding: 8px 12px; background: var(--bg-secondary, #0d1628); border-radius: 6px; font-size: 13px;';
-    suggestionsDiv.innerHTML = '<strong>Suggested follow-ups:</strong><br>';
-    suggestions.forEach(s => {
-      const chip = document.createElement('span');
-      chip.className = 'suggestion-chip';
-      chip.style.cssText = 'display: inline-block; margin: 4px 4px 4px 0; padding: 4px 8px; background: rgba(0, 212, 255, 0.15); border-radius: 12px; cursor: pointer; font-size: 12px;';
-      chip.textContent = s;
-      chip.addEventListener('click', () => {
-        goalInput.value = s;
-        goalInput.focus();
-        sendMessage();
-      });
-      suggestionsDiv.appendChild(chip);
-    });
-    messageGroup.appendChild(suggestionsDiv);
-  }
-}
-// ========== Collapsible Sections for Analysis ==========
-function makeSectionsCollapsible(messageElement) {
-  const headers = messageElement.querySelectorAll('h2, h3, h4');
-  headers.forEach(header => {
-    if (header.tagName === 'H2' || header.tagName === 'H3') {
-      const nextSibling = header.nextElementSibling;
-      if (nextSibling && (nextSibling.tagName === 'P' || nextSibling.tagName === 'UL' || nextSibling.tagName === 'OL' || nextSibling.tagName === 'PRE' || nextSibling.tagName === 'TABLE')) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'collapsible-section';
-        wrapper.style.cssText = 'border: 1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius: 6px; margin: 8px 0;';
-        
-        const headerWrapper = document.createElement('div');
-        headerWrapper.className = 'collapsible-header';
-        headerWrapper.style.cssText = 'display: flex; align-items: center; cursor: pointer; padding: 8px 12px; background: var(--bg-secondary, #0d1628); user-select: none;';
-        headerWrapper.innerHTML = '<span style="margin-right: 8px;">▶</span>' + header.outerHTML;
-        
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'collapsible-content';
-        contentWrapper.style.cssText = 'display: none; padding: 8px 12px;';
-        
-        let node = nextSibling;
-        const nodesToWrap = [];
-        while (node && (node.tagName !== 'H2' && node.tagName !== 'H3')) {
-          nodesToWrap.push(node);
-          node = node.nextElementSibling;
-        }
-        nodesToWrap.forEach(n => contentWrapper.appendChild(n));
-        
-        header.remove();
-        wrapper.appendChild(headerWrapper);
-        wrapper.appendChild(contentWrapper);
-        
-        headerWrapper.addEventListener('click', () => {
-          const isExpanded = contentWrapper.style.display === 'block';
-          contentWrapper.style.display = isExpanded ? 'none' : 'block';
-          headerWrapper.querySelector('span').textContent = isExpanded ? '▶' : '▼';
-        });
-        
-        headerWrapper.parentNode.insertBefore(wrapper, headerWrapper.nextSibling);
-      }
-    }
-  });
-}
-
-// ========== Export Analysis as Markdown ==========
-function exportAnalysisAsMarkdown(analysisText) {
-  const blob = new Blob([analysisText], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `analysis-${new Date().toISOString().slice(0, 10)}.md`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ========== Typing Animation for Analysis ==========
-function animateAnalysisText(text, element, speed = 10) {
-  element.innerHTML = '';
-  let i = 0;
-  const timer = setInterval(() => {
-    if (i < text.length) {
-      element.innerHTML += text.charAt(i);
-      i++;
-      element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }else {
-      clearInterval(timer);
-      try {
-        element.innerHTML = sanitizeHtml(marked.parse(text));
-        addCodeCopyButtons(element);
-        makeSectionsCollapsible(element);
-      } catch (err) {
-        console.warn('Markdown parse failed:', err);
-      }
-    }
-  }, speed);
 }
 
 function addCodeCopyButtons(messageElement) {
@@ -614,49 +479,21 @@ function sendMessage() {
   updateStatus('Agent is starting...');
   setAgentActive(true);
 
-  // ========== Prompt Routing: Analysis vs Automation ==========
-  // Analysis mode: incident data, diagnostic info, troubleshooting, technical analysis
-  const analysisKeywords = /\b(incident|diagnostic|troubleshoot|root cause|analysis|uptime|downtime|outage|failure|connectivity|firewall|network|server|error log|system log|status report|assessment|verdict|findings)\b/i;
-  const isAnalysis = analysisKeywords.test(goal) || goal.length > 500;  // Long prompts with data = analysis
-
-  // Automation mode: browser actions, clicking, typing, navigating
-  const complexKeywords = /\b(plan|execute|task|extract|automate|monitor|crawl|scrape)\b|https?:\/\//i;
-  const isComplex = complexKeywords.test(goal);
-
-  if (isAnalysis) {
-    // Route to analysis mode — returns rich markdown, not JSON actions
-    chrome.runtime.sendMessage({ action: 'analyze', prompt: goal }, (response) => {
-      if (chrome.runtime.lastError) {
-        removeTypingIndicator();
-        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
-        resetUI();
-      }
-    });
-  } else if (isComplex) {
-    chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
-      if (chrome.runtime.lastError) {
-        removeTypingIndicator();
-        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
-        resetUI();
-      }
-    });
-  } else {
-    chrome.runtime.sendMessage({ action: 'runPrompt', prompt: goal, openInNewTab: true }, (response) => {
-      if (chrome.runtime.lastError) {
-        removeTypingIndicator();
-        addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
-        resetUI();
-      }
-    });
-  }
-}
+  chrome.runtime.sendMessage({ action: 'plan_task', goal: goal }, (response) => {
+    if (chrome.runtime.lastError) {
+      removeTypingIndicator();
+      addMessage('Error: ' + chrome.runtime.lastError.message, 'assistant');
+      resetUI();
+    }
+  });
 }
 
 // ========== PLAN: Show decomposed plan to user ==========
 function showPlanCard(plan, goal) {
   removeTypingIndicator();
 
-  if (welcomeMessage) welcomeMessage.remove();
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
 
   // Remove any existing plan card
   const existing = document.getElementById('plan-card-container');
@@ -812,84 +649,21 @@ function updatePlanProgress(stepNumber, totalSteps) {
 }
 
 function addProviderSelector() {
+  // Find the settings modal fields
   const endpointField = document.getElementById('set-api-endpoint');
-  const modelFieldContainer = document.getElementById('set-api-model').parentNode;
-  const modelInput = document.getElementById('set-api-model');
-  if (!endpointField || !modelFieldContainer || !modelInput) return;
+  const modelField = document.getElementById('set-api-model');
+  if (!endpointField || !modelField) return;
 
-  const modalFields = document.querySelector('.modal-fields');
-  if (!modalFields) return;
+  // Get the existing provider select (static HTML dropdown)
+  const select = document.getElementById('provider-select');
+  if (!select) return;
 
-  if (document.getElementById('provider-select')) return;
-
-  // Create provider select
-  const providerDiv = document.createElement('div');
-  providerDiv.className = 'modal-field';
-  const pLabel = document.createElement('label');
-  pLabel.setAttribute('for', 'provider-select');
-  pLabel.textContent = 'Provider';
-  const pSelect = document.createElement('select');
-  pSelect.id = 'provider-select';
-  pSelect.innerHTML = '' +
-    '<option value="openrouter">OpenRouter (default)</option>' +
-    '<option value="venice">Venice.ai</option>' +
-    '<option value="zai">z.ai Coding Plan</option>' +
-    '<option value="xiaomi">Xiaomi MiMo</option>' +
-    '<option value="custom">Custom Endpoint</option>';
-
-  // Create model select element (hidden initially)
-  const modelSelect = document.createElement('select');
-  modelSelect.id = 'model-select';
-  modelSelect.style.display = 'none';
-
-  function populateModelSelect(providerValue) {
-    const preset = PROVIDER_PRESETS[providerValue];
-    if (preset && preset.models) {
-      modelSelect.innerHTML = preset.models.map(function(m) {
-        return '<option value="' + m + '">' + m + '</option>';
-      }).join('');
-      modelSelect.value = preset.defaultModel || preset.models[0];
-      modelSelect.style.display = '';
-      modelFieldContainer.querySelector('input').style.display = 'none';
-      modelFieldContainer.querySelector('label').textContent = 'Model ID';
-    } else {
-      // Custom — show text input, hide select
-      modelSelect.style.display = 'none';
-      modelFieldContainer.querySelector('input').style.display = '';
-      modelFieldContainer.querySelector('label').textContent = 'Model ID';
-    }
-  }
-
-  pSelect.addEventListener('change', function() {
-    const val = pSelect.value;
-    const preset = PROVIDER_PRESETS[val];
+  // Add change event listener to populate endpoint and model
+  select.addEventListener('change', function() {
+    const preset = PROVIDER_PRESETS[select.value];
     if (preset) {
       endpointField.value = preset.endpoint;
-      populateModelSelect(val);
-    } else {
-      // Custom — keep existing endpoint, show text input
-      modelSelect.style.display = 'none';
-      modelFieldContainer.querySelector('input').style.display = '';
-    }
-  });
-
-  // Insert model select into the model field container (before the existing input)
-  modelFieldContainer.insertBefore(modelSelect, modelInput);
-
-  providerDiv.appendChild(pLabel);
-  providerDiv.appendChild(pSelect);
-  modalFields.insertBefore(providerDiv, modalFields.firstChild);
-
-  // Auto-trigger on modal open if provider was previously saved
-  chrome.storage.local.get(['endpoint'], function(r) {
-    if (r.endpoint) {
-      for (var key in PROVIDER_PRESETS) {
-        if (PROVIDER_PRESETS[key].endpoint === r.endpoint) {
-          pSelect.value = key;
-          pSelect.dispatchEvent(new Event('change'));
-          return;
-        }
-      }
+      modelField.value = preset.defaultModel;
     }
   });
 }
@@ -916,8 +690,6 @@ stopBtn.addEventListener('click', () => {
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
   if (confirm('Start a new chat? This will clear the current conversation.')) {
-    // Clear analysis history in background
-    chrome.runtime.sendMessage({ action: 'clear_analysis_history' }).catch(() => {});
     chrome.storage.local.set({ chat_history: [] }, () => {
       conversationHistory = [];
       chatContainer.innerHTML = `
@@ -973,72 +745,27 @@ saveSettingsBtn.addEventListener('click', () => {
   });
 });
 
-// ========== Message Search ==========
-searchInput.addEventListener('input', (e) => {
-  currentSearchQuery = e.target.value.toLowerCase();
-  currentSearchIndex = 0;
+// Search and preview removed - elements not in HTML
 
-  if (currentSearchQuery) {
-    highlightSearchResults();
-  } else {
-    clearSearchHighlights();
-  }
-});
-
-function highlightSearchResults() {
-  clearSearchHighlights();
-
-  const messages = chatContainer.querySelectorAll('.message-group');
-  let matchCount = 0;
-
-  messages.forEach(group => {
-    const text = group.textContent.toLowerCase();
-    if (text.includes(currentSearchQuery)) {
-      group.classList.add('highlighted');
-      matchCount++;
-    }
-  });
-
-  const searchCount = document.getElementById('searchCount');
-  if (matchCount > 0) {
-    searchCount.textContent = `${matchCount} match${matchCount !== 1 ? 'es' : ''}`;
-    searchCount.style.display = 'inline';
-  } else {
-    searchCount.style.display = 'none';
-  }
+// ========== Typing Indicator ==========
+function showTypingIndicator() {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'assistant-wrapper';
+  wrapper.id = 'typing-indicator';
+  
+  const msg = document.createElement('div');
+  msg.className = 'msg assistant-msg';
+  msg.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+  
+  wrapper.appendChild(msg);
+  chatContainer.appendChild(wrapper);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-function clearSearchHighlights() {
-  document.querySelectorAll('.message-group.highlighted').forEach(group => {
-    group.classList.remove('highlighted');
-  });
-  document.getElementById('searchCount').style.display = 'none';
+function removeTypingIndicator() {
+  const indicator = document.getElementById('typing-indicator');
+  if (indicator) indicator.remove();
 }
-
-// ========== Markdown Preview ==========
-previewBtn.addEventListener('click', () => {
-  markdownPreview.classList.toggle('show');
-  previewBtn.classList.toggle('active');
-});
-
-function updateMarkdownPreview() {
-  const text = goalInput.value;
-  if (text) {
-    previewContent.innerHTML = sanitizeHtml(marked.parse(text));
-  } else {
-    previewContent.innerHTML = '<p style="color: var(--text-tertiary);">Preview appears here...</p>';
-  }
-}
-
-// ========== File Attachment ==========
-attachBtn.addEventListener('click', () => {
-  fileInput.click();
-});
-
-fileInput.addEventListener('change', (e) => {
-  selectedAttachments = Array.from(e.target.files);
-  updateAttachmentPreview();
-});
 
 function updateAttachmentPreview() {
   if (selectedAttachments.length > 0) {
@@ -1536,6 +1263,20 @@ function speakLastMessage() {
     })
     .catch(function(err) {
       console.error('TTS error:', err);
+      showToast('TTS error: ' + err.message, 'error');
+    });
+}
+
+// ========== TTS Event Listener ==========
+speakBtn.addEventListener('click', speakLastMessage);
+
+// ========== Markdown Configuration ==========
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+// ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
     updateStatus(message.text);
@@ -1548,21 +1289,6 @@ chrome.runtime.onMessage.addListener((message) => {
     } catch (err) {
       console.error('Error displaying completion message:', err);
     }
-    resetUI();
-  }
-if (message.action === 'prompt_result') {
-    removeTypingIndicator();
-    // Handle new response format with suggestions
-    if (typeof message.reply === 'object' && message.reply.result) {
-      addAnalysisMessage(message.reply.result, message.reply.suggestions || []);
-    } else {
-      addMessage(message.reply, 'assistant');
-    }
-    resetUI();
-  }
-  if (message.action === 'prompt_error') {
-    removeTypingIndicator();
-    addMessage('❌ Error: ' + escapeHtml(message.error), 'assistant');
     resetUI();
   }
   if (message.action === 'request_approval') {
@@ -1605,18 +1331,7 @@ if (message.action === 'prompt_result') {
     addMessage('✅ **Plan Complete!** ' + message.summary, 'assistant');
     resetUI();
   }
-  // ========== ANALYSIS MODE HANDLERS ==========
-  if (message.action === 'analysis_result') {
-    removeTypingIndicator();
-    // Render analysis result with rich markdown
-    addAnalysisMessage(message.result);
-    resetUI();
-  }
-  if (message.action === 'analysis_error') {
-    removeTypingIndicator();
-    addMessage('❌ Analysis Error: ' + escapeHtml(message.error), 'assistant');
-    resetUI();
-  }
+});
 
 // ========== Close Modals on Escape ==========
 document.addEventListener('keydown', (e) => {
@@ -1658,74 +1373,24 @@ document.getElementById('closeShortcutsBtn').addEventListener('click', function(
   document.getElementById('shortcuts-modal').classList.remove('show');
 });
 
-function getShortcutEmoji(prompt) {
-  const p = prompt.toLowerCase();
-  if (p.includes('extract') || p.includes('scrape') || p.includes('grab') || p.includes('collect')) return '📋';
-  if (p.includes('search') || p.includes('find') || p.includes('look up') || p.includes('google')) return '🔍';
-  if (p.includes('translate') || p.includes('language')) return '🌐';
-  if (p.includes('summarize') || p.includes('summary') || p.includes('tl;dr')) return '📝';
-  if (p.includes('analyze') || p.includes('analyse') || p.includes('audit')) return '📊';
-  if (p.includes('generate') || p.includes('create') || p.includes('write') || p.includes('draft')) return '✏️';
-  if (p.includes('monitor') || p.includes('watch') || p.includes('track') || p.includes('check')) return '👁️';
-  if (p.includes('compare') || p.includes('diff') || p.includes('versus')) return '⚖️';
-  if (p.includes('test') || p.includes('debug') || p.includes('validate')) return '🧪';
-  if (p.includes('deploy') || p.includes('release') || p.includes('publish')) return '🚀';
-  if (p.includes('organize') || p.includes('sort') || p.includes('categorize')) return '🗂️';
-  if (p.includes('automate') || p.includes('schedule') || p.includes('cron')) return '⚡';
-  return '⚙️';
-}
-
-function getShortcutCategory(prompt) {
-  const p = prompt.toLowerCase();
-  if (p.includes('extract') || p.includes('scrape')) return { label: 'Data', color: '#00d4ff' };
-  if (p.includes('search')) return { label: 'Search', color: '#e040fb' };
-  if (p.includes('translate')) return { label: 'Translate', color: '#00dd55' };
-  if (p.includes('summarize') || p.includes('summary')) return { label: 'Summarize', color: '#ffa000' };
-  if (p.includes('analyze') || p.includes('audit')) return { label: 'Analyze', color: '#ff2a6d' };
-  if (p.includes('generate') || p.includes('create') || p.includes('write')) return { label: 'Generate', color: '#7c4dff' };
-  if (p.includes('monitor') || p.includes('track') || p.includes('watch')) return { label: 'Monitor', color: '#00bcd4' };
-  if (p.includes('automate') || p.includes('schedule') || p.includes('cron') || p.includes('batch')) return { label: 'Auto', color: '#ff6d00' };
-  if (p.includes('compare') || p.includes('diff')) return { label: 'Compare', color: '#aa00ff' };
-  if (p.includes('test') || p.includes('debug') || p.includes('validate')) return { label: 'Test', color: '#76ff03' };
-  if (p.includes('deploy') || p.includes('release') || p.includes('publish')) return { label: 'Deploy', color: '#00e676' };
-  if (p.includes('organize') || p.includes('sort') || p.includes('categorize') || p.includes('clean')) return { label: 'Clean', color: '#8d6e63' };
-  return { label: 'Task', color: '#9e9e9e' };
-}
-
-function formatShortcutDate(iso) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-  } catch(e) { return ''; }
-}
-
 function renderShortcutsModal() {
   var list = document.getElementById('shortcuts-list');
   if (!list) return;
   if (savedShortcuts.length === 0) {
-    list.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; color:var(--text-tertiary);"><div style="font-size:48px; margin-bottom:12px;">⌨️</div><div style="font-size:14px; font-weight:500;">No shortcuts saved yet</div><div style="font-size:12px; margin-top:4px;">Type a prompt and click ⭐ or press Ctrl+Shift+S to save it!</div></div>';
+    list.innerHTML = '<p style="color: var(--text-tertiary); text-align: center; padding: 20px;">No shortcuts saved yet. Run a task and save it as a shortcut!</p>';
     return;
   }
   var html = '';
   for (var i = 0; i < savedShortcuts.length; i++) {
     var sc = savedShortcuts[i];
-    var emoji = getShortcutEmoji(sc.prompt);
-    var cat = getShortcutCategory(sc.prompt);
-    var dateStr = sc.created ? formatShortcutDate(sc.created) : '';
-    var promptPreview = sc.prompt.length > 50 ? sc.prompt.substring(0, 50) + '...' : sc.prompt;
-    html += '<div style="display:flex; align-items:center; padding:12px 14px; margin-bottom:8px; background:var(--bg-secondary, #0d1628); border:1px solid var(--border-color, rgba(0,212,255,0.15)); border-radius:10px; transition:all 0.15s ease; cursor:default; position:relative;">';
-    html += '  <div style="font-size:24px; margin-right:12px; flex-shrink:0; width:36px; text-align:center;">' + emoji + '</div>';
-    html += '  <div style="flex:1; min-width:0;">';
-    html += '    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">';
-    html += '      <span style="font-weight:600; font-size:13px; color:var(--text-primary, #e0f4ff); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(sc.name) + '</span>';
-    html += '      <span style="font-size:10px; font-weight:500; padding:2px 8px; border-radius:10px; background:' + cat.color + '22; color:' + cat.color + '; border:1px solid ' + cat.color + '44;">' + cat.label + '</span>';
-    html += '    </div>';
-    html += '    <div style="font-size:11px; color:var(--text-secondary, #7aa8c4); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(promptPreview) + '</div>';
-    html += '    ' + (dateStr ? '<div style="font-size:10px; color:var(--text-muted, #3d6080); margin-top:2px;">' + dateStr + '</div>' : '');
+    html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; margin-bottom:6px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px;">';
+    html += '  <div style="flex:1; overflow:hidden;">';
+    html += '    <div style="font-weight:500; font-size:13px; color:var(--text-primary);">' + escHtml(sc.name) + '</div>';
+    html += '    <div style="font-size:11px; color:var(--text-tertiary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(sc.prompt.substring(0, 60)) + '</div>';
     html += '  </div>';
-    html += '  <div style="display:flex; gap:4px; flex-shrink:0; margin-left:8px;">';
-    html += '    <button class="modal-btn btn-save" style="padding:6px 14px; font-size:11px; font-weight:500; border:none; border-radius:6px; background:' + cat.color + '22; color:' + cat.color + '; cursor:pointer; transition:all 0.1s;" onclick="runShortcut(' + i + ')" title="Run this shortcut">▶ Run</button>';
-    html += '    <button class="modal-btn btn-cancel" style="padding:6px 10px; font-size:11px; border:none; border-radius:6px; background:rgba(255,42,109,0.15); color:#ff2a6d; cursor:pointer; transition:all 0.1s;" onclick="deleteShortcut(' + i + ')" title="Delete this shortcut">✕</button>';
+    html += '  <div style="display:flex; gap:6px; flex-shrink:0;">';
+    html += '    <button class="modal-btn btn-save" style="padding:6px 12px; font-size:12px;" onclick="runShortcut(' + i + ')">Run</button>';
+    html += '    <button class="modal-btn btn-cancel" style="padding:6px 12px; font-size:12px;" onclick="deleteShortcut(' + i + ')">Delete</button>';
     html += '  </div>';
     html += '</div>';
   }
