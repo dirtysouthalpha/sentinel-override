@@ -32,7 +32,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. SQLite database initializes with WAL mode enabled and all required tables (services, health_checks, recovery_events, metrics, state_snapshots) created on first run
   4. APScheduler starts and accepts scheduled jobs that fire at configured intervals without overlap (max_instances=1, coalesce=True)
   5. CLI subcommands start, status, logs, recover, and config all respond with help text and appropriate behavior
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md -- Project scaffolding and Pydantic config models (CFG-01, CFG-02)
+- [ ] 01-02-PLAN.md -- Structured logging and SQLite database with WAL mode (CFG-03, CFG-04, MET-04)
+- [ ] 01-03-PLAN.md -- CLI entry point and Orchestrator with APScheduler (CFG-05)
 
 ### Phase 2: Monitoring Core
 **Goal**: MediaSentinel detects the health status of all 8 media stack services, verifies VPN connectivity with leak testing, and monitors Cloudflare tunnel health -- producing accurate status data that downstream recovery and UI phases can consume
@@ -111,7 +116,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Infrastructure | 0/? | Not started | - |
+| 1. Foundation and Infrastructure | 0/3 | Planning complete | - |
 | 2. Monitoring Core | 0/? | Not started | - |
 | 3. Recovery Engine | 0/? | Not started | - |
 | 4. VPN-Gated Downloads | 0/? | Not started | - |
