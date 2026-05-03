@@ -36,7 +36,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     } else if (request.action === 'execute_command') {
       const cmd = request.command;
-      let result = "Command failed";
+      let result = "Command not implemented: " + (cmd.type || 'unknown');
 
       try {
         if (cmd.type === 'click') {
@@ -73,11 +73,165 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         } else if (cmd.type === 'scroll') {
           window.scrollBy(0, cmd.amount);
           result = 'Scrolled ' + cmd.amount;
+        } else if (cmd.type === 'select') {
+          const el = document.querySelector(cmd.selector);
+          if (el) {
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            el.focus();
+            if (el.tagName === 'SELECT') {
+              el.value = cmd.value;
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              result = 'Selected value ' + cmd.value + ' in ' + cmd.selector;
+            } else {
+              result = 'Element is not a select element: ' + cmd.selector;
+            }
+          } else {
+            result = 'Element not found: ' + cmd.selector;
+          }
+        } else if (cmd.type === 'hover') {
+          const el = document.querySelector(cmd.selector);
+          if (el) {
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            const mouseoverEvent = new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window });
+            el.dispatchEvent(mouseoverEvent);
+            const mouseenterEvent = new MouseEvent('mouseenter', { bubbles: false, cancelable: true, view: window });
+            el.dispatchEvent(mouseenterEvent);
+            result = 'Hovered over ' + cmd.selector;
+          } else {
+            result = 'Element not found: ' + cmd.selector;
+          }
+        } else if (cmd.type === 'press_key') {
+          const el = document.querySelector(cmd.selector);
+          if (el) {
+            el.scrollIntoView({ behavior: 'instant', block: 'center' });
+            el.focus();
+            const keyCode = cmd.value;
+            const keydownEvent = new KeyboardEvent('keydown', { key: keyCode, code: keyCode, bubbles: true, cancelable: true });
+            const keypressEvent = new KeyboardEvent('keypress', { key: keyCode, code: keyCode, bubbles: true, cancelable: true });
+            const keyupEvent = new KeyboardEvent('keyup', { key: keyCode, code: keyCode, bubbles: true, cancelable: true });
+            el.dispatchEvent(keydownEvent);
+            el.dispatchEvent(keypressEvent);
+            el.dispatchEvent(keyupEvent);
+            result = 'Pressed key ' + keyCode + ' on ' + cmd.selector;
+          } else {
+            result = 'Element not found: ' + cmd.selector;
+          }
+        } else if (cmd.type === 'extract') {
+          const el = document.querySelector(cmd.selector);
+          if (el) {
+            const extractedText = el.innerText || el.textContent || el.value || '';
+            result = extractedText.trim();
+          } else {
+            result = 'Element not found: ' + cmd.selector;
+          }
+        } else if (cmd.type === 'wait_for_text') {
+          const checkForText = () => {
+            const bodyText = document.body.innerText;
+            if (bodyText.includes(cmd.text)) {
+              return true;
+            }
+            return false;
+          };
+
+          const startTime = Date.now();
+          const timeout = cmd.timeout || 10000;
+          const pollInterval = 100;
+
+          const waitPromise = new Promise((resolve) => {
+            const interval = setInterval(() => {
+              if (checkForText()) {
+                clearInterval(interval);
+                resolve(true);
+              } else if (Date.now() - startTime > timeout) {
+                clearInterval(interval);
+                resolve(false);
+              }
+            }, pollInterval);
+          });
+
+          waitPromise.then((found) => {
+            if (found) {
+              result = 'Found text: ' + cmd.text;
+            } else {
+              result = 'Text not found after ' + timeout + 'ms: ' + cmd.text;
+            }
+            sendResponse({ result: result });
+          });
+          return true;
+        } else if (cmd.type === 'wait_for_element') {
+          const checkForElement = () => {
+            return document.querySelector(cmd.selector) !== null;
+          };
+
+          const startTime = Date.now();
+          const timeout = cmd.timeout || 10000;
+          const pollInterval = 100;
+
+          const waitPromise = new Promise((resolve) => {
+            const interval = setInterval(() => {
+              if (checkForElement()) {
+                clearInterval(interval);
+                resolve(true);
+              } else if (Date.now() - startTime > timeout) {
+                clearInterval(interval);
+                resolve(false);
+              }
+            }, pollInterval);
+          });
+
+          waitPromise.then((found) => {
+            if (found) {
+              result = 'Element found: ' + cmd.selector;
+            } else {
+              result = 'Element not found after ' + timeout + 'ms: ' + cmd.selector;
+            }
+            sendResponse({ result: result });
+          });
+          return true;
+        } else if (cmd.type === 'wait_for_navigation') {
+          const startUrl = window.location.href;
+          const startTime = Date.now();
+          const timeout = cmd.timeout || 10000;
+          const pollInterval = 500;
+
+          const waitPromise = new Promise((resolve) => {
+            const interval = setInterval(() => {
+              if (window.location.href !== startUrl) {
+                clearInterval(interval);
+                resolve(true);
+              } else if (Date.now() - startTime > timeout) {
+                clearInterval(interval);
+                resolve(false);
+              }
+            }, pollInterval);
+          });
+
+          waitPromise.then((navigated) => {
+            if (navigated) {
+              result = 'Page navigated from ' + startUrl + ' to ' + window.location.href;
+            } else {
+              result = 'Navigation timeout after ' + timeout + 'ms (page did not change from ' + startUrl + ')';
+            }
+            sendResponse({ result: result });
+          });
+          return true;
+        } else if (cmd.type === 'execute_js') {
+          try {
+            const jsResult = eval(cmd.code);
+            result = 'JavaScript executed: ' + (typeof jsResult === 'string' ? jsResult : JSON.stringify(jsResult));
+          } catch (jsError) {
+            result = 'JavaScript error: ' + jsError.message;
+          }
+        } else {
+          result = 'Unknown command type: ' + cmd.type;
         }
       } catch (e) {
-        result = 'Error executing ' + cmd.type + ': ' + e.message;
+        result = 'Error executing command type "' + (cmd.type || 'unknown') + '": ' + e.message;
       }
-      sendResponse({ result: result });
+
+      if (cmd.type !== 'wait_for_text' && cmd.type !== 'wait_for_element') {
+        sendResponse({ result: result });
+      }
       return false;
     } else if (request.action === 'capture_screenshot') {
       (async () => {
