@@ -592,9 +592,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }, () => {
             chrome.tabs.sendMessage(tab, { action: 'execute_command', command: cmd }, (res) => {
                 if (chrome.runtime.lastError) {
-                    sendResponse({result: 'Error: ' + chrome.runtime.lastError.message});
+                    sendResponse({result: 'Error executing command type "' + (cmd.type || 'unknown') + '": ' + chrome.runtime.lastError.message});
                 } else {
-                    sendResponse(res || {result: 'No response from content script'});
+                    sendResponse(res || {result: 'No response from content script for command type "' + (cmd.type || 'unknown') + '"'});
                 }
             });
         });
@@ -795,6 +795,17 @@ async function runAgentLoop(goal, workingTabId) {
         break;
       }
 
+      if (command.type === 'note') {
+        // Handle internal notes/logging - don't send to content.js
+        sendSilentUpdate(`[Step ${stepCount}] Note: ${command.text}`);
+        const noteText = command.text || command.summary || 'Internal note';
+        taskContext.intermediateData['lastNote'] = noteText;
+        history.push({ step: stepCount, observation, action: command, result: 'Logged note' });
+        await chrome.storage.local.set({ agent_history: history });
+        await sleep(500);
+        continue; // Skip content.js execution
+      }
+
       sendSilentUpdate(`[Step ${stepCount}] Executing: ${command.type}...`);
 
       let result;
@@ -806,6 +817,14 @@ async function runAgentLoop(goal, workingTabId) {
           await sleep(2000);
           result = 'Navigated to ' + command.url;
         }
+      } else if (command.type === 'read_page') {
+        // Handle read_page as a direct message action, not as execute_command
+        result = await sendMessageWithRetry(tab, { action: 'read_page' });
+      } else if (command.type === 'wait_for_navigation') {
+        // Wait for page navigation to complete
+        result = await chrome.tabs.sendMessage(tab, { action: 'execute_command', command });
+        // Add extra time for page to fully load after navigation
+        await sleep(2000);
       } else {
         result = await chrome.tabs.sendMessage(tab, { action: 'execute_command', command });
       }
@@ -1284,7 +1303,7 @@ function parseLLMResponse(content) {
       return { type: 'note', text: '[Processed] ' + summary };
     }
 
-    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js'];
+    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js', 'wait_for_navigation'];
     if (!validTypes.includes(parsed.type)) {
       throw new Error('Invalid command type: ' + parsed.type);
     }
