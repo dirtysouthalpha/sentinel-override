@@ -11,6 +11,7 @@ import { generateReport } from './report-generator.js';
 import { migrateLegacySettings } from './provider-registry.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
+import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -153,6 +154,26 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'schedule_clear_badge':
       chrome.action.setBadgeText({ text: '' });
       return { cleared: true };
+
+    // Collaboration: export/import
+    case 'collab_export_template':
+      if (!request.id) throw new Error('Template ID required');
+      return await exportTemplate(request.id);
+
+    case 'collab_export_all_templates':
+      return await exportAllTemplates();
+
+    case 'collab_validate_import':
+      if (!request.data) throw new Error('Import data required');
+      return validateImport(request.data);
+
+    case 'collab_import_templates':
+      if (!request.templates || !Array.isArray(request.templates)) throw new Error('Templates array required');
+      return await importTemplates(request.templates, request.conflictMode || 'skip');
+
+    case 'collab_export_report':
+      if (!request.report) throw new Error('Report data required');
+      return exportReportAsMarkdown(request.report);
 
     default:
       throw new Error(`Unknown action: ${request.action}`);

@@ -911,6 +911,9 @@ function removeReportGeneratingIndicator() {
  * @param {object} report - Report object with summary, fullReport, goal, timestamp
  */
 function addReportCard(report) {
+  const state = getState();
+  state.currentReport = report;
+
   const welcome = chatContainer.querySelector('.welcome-message');
   if (welcome) welcome.remove();
 
@@ -949,7 +952,15 @@ function addReportCard(report) {
     openReportModal(report.fullReport);
   });
 
+  const exportBtn = document.createElement('button');
+  exportBtn.className = 'report-view-btn';
+  exportBtn.textContent = 'Export .md';
+  exportBtn.addEventListener('click', () => {
+    if (window.exportReportFile) window.exportReportFile(report);
+  });
+
   actions.appendChild(viewBtn);
+  actions.appendChild(exportBtn);
 
   group.appendChild(header);
   group.appendChild(summary);
@@ -1013,23 +1024,27 @@ copyReportMdBtn.addEventListener('click', () => {
   });
 });
 
-// Export: Download as .md
+// Export: Download as .md (with YAML frontmatter via collaboration module)
 downloadReportBtn.addEventListener('click', () => {
   const state = getState();
   if (!state.currentReportMarkdown) {
     showToast('No report to download', 'error');
     return;
   }
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-  const filename = `report-${timestamp}.md`;
-  const blob = new Blob([state.currentReportMarkdown], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('Report downloaded', 'success');
+  if (window.exportReportFile && state.currentReport) {
+    window.exportReportFile(state.currentReport);
+  } else {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+    const filename = `report-${timestamp}.md`;
+    const blob = new Blob([state.currentReportMarkdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Report downloaded', 'success');
+  }
 });
 
 // Export: Copy as Plain Text

@@ -44,7 +44,7 @@ export function extractParameters(goalText) {
  * Read the full templates object from chrome.storage.local.
  * @returns {Promise<Object<string, object>>}
  */
-async function loadTemplates() {
+export async function loadTemplates() {
   const result = await chrome.storage.local.get([STORAGE_KEY]);
   return result[STORAGE_KEY] || {};
 }
@@ -53,7 +53,7 @@ async function loadTemplates() {
  * Persist the full templates object to chrome.storage.local.
  * @param {Object<string, object>} templates
  */
-async function saveTemplates(templates) {
+export async function saveTemplates(templates) {
   await chrome.storage.local.set({ [STORAGE_KEY]: templates });
 }
 

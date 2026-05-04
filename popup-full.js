@@ -12,6 +12,7 @@ window.__popupState = {
   activeProviderId: 'anthropic',
   providerConfigs: { anthropic: {}, openai: {} },
   currentReportMarkdown: null,
+  currentReport: null,
   isAgentRunning: false,
   pendingStepLogs: {},
 };
@@ -66,6 +67,14 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('saveScheduleBtn')?.addEventListener('click', () => {
     window._handleSaveSchedule?.();
   });
+
+  // Collaboration buttons
+  document.getElementById('importTemplatesBtn')?.addEventListener('click', () => {
+    window.openImportDialog?.();
+  });
+  document.getElementById('exportAllTemplatesBtn')?.addEventListener('click', () => {
+    window.exportAllTemplatesFile?.();
+  });
 });
 
 // ========== Close Modals on Escape ==========
@@ -78,6 +87,7 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('template-run-modal').classList.remove('show');
     document.getElementById('schedule-modal')?.classList.remove('show');
     document.getElementById('schedule-history-modal')?.classList.remove('show');
+    document.getElementById('import-modal')?.classList.remove('show');
     closeCommandPalette();
   }
 });
@@ -104,5 +114,8 @@ window.addEventListener('click', (e) => {
   }
   if (e.target === document.getElementById('schedule-history-modal')) {
     document.getElementById('schedule-history-modal').classList.remove('show');
+  }
+  if (e.target === document.getElementById('import-modal')) {
+    document.getElementById('import-modal').classList.remove('show');
   }
 });

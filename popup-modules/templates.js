@@ -102,6 +102,7 @@ function renderTemplateList(templates) {
         <div class="template-card-actions">
           <button class="small-btn" data-action="run" data-id="${template.id}" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">Run</button>
           <button class="small-btn" data-action="edit" data-id="${template.id}">Edit</button>
+          <button class="small-btn" data-action="export" data-id="${template.id}" data-name="${escapeHtml(template.name)}">Export</button>
           <button class="small-btn" data-action="delete" data-id="${template.id}" data-name="${escapeHtml(template.name)}" style="color:var(--error-color);">Delete</button>
         </div>
       </div>
@@ -122,6 +123,7 @@ function renderTemplateList(templates) {
         const id = btn.dataset.id;
         if (action === 'run') openRunModal(id);
         else if (action === 'edit') openEditTemplateModal(id);
+        else if (action === 'export') window.exportTemplateFile?.(id);
         else if (action === 'delete') deleteTemplate(id, btn.dataset.name);
       });
     });
