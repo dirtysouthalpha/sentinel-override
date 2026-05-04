@@ -4,6 +4,7 @@
 
 import { sendSilentUpdate } from './message-protocol.js';
 import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
+import { resolveProvider, getActiveProvider } from './provider-registry.js';
 
 // ========== Platform Context Detection ==========
 // Detects which UI the agent is currently operating in based on the page URL
@@ -142,8 +143,8 @@ export function supportsVision(model) {
 }
 
 // Detect whether the configured endpoint is the native Anthropic Messages API.
-// OpenRouter/proxy endpoints that happen to serve Claude models use OpenAI format,
-// so only direct api.anthropic.com calls need special handling.
+// DEPRECATED: Use resolveProvider from provider-registry.js instead.
+// Kept for backward compatibility with any external references.
 export function isAnthropicEndpoint(endpoint) {
   return endpoint && endpoint.includes('api.anthropic.com');
 }
@@ -193,27 +194,9 @@ Goal: "Check the SonicWall firewall for blocked connections"
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const useAnthropic = isAnthropicEndpoint(endpoint);
-    const planBody = useAnthropic
-      ? JSON.stringify({
-          model,
-          max_tokens: 800,
-          temperature: 0.2,
-          system: 'You are a planning assistant. Return ONLY valid JSON.',
-          messages: [{ role: 'user', content: planPrompt }]
-        })
-      : JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: 'You are a planning assistant. Return ONLY valid JSON.' },
-            { role: 'user', content: planPrompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 800
-        });
-    const planHeaders = useAnthropic
-      ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
-      : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+    const provider = resolveProvider(endpoint);
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 800, temperature: 0.2 }));
+    const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: planHeaders,
@@ -223,9 +206,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
     clearTimeout(timeout);
     if (!response.ok) return null;
     const data = await response.json();
-    const content = useAnthropic
-      ? (data.content && data.content.find(b => b.type === 'text')?.text) || ''
-      : data.choices?.[0]?.message?.content || '';
+    const content = provider.parseResponse(data);
     const firstObj = extractFirstJsonObject(content);
     if (!firstObj) return null;
     const parsed = JSON.parse(firstObj);
@@ -259,10 +240,8 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
 // trimmedElements: the capped/cleaned element list built in the main loop
 // totalElementCount: the raw count before trimming (for the prompt header)
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
-  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
-  const apiKey = settings.api_key;
-  const model = settings.model || 'glm-5.1';
+  const providerConfig = await getActiveProvider();
+  const { endpoint, apiKey, model } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   agentState.apiCallCount++;
 
@@ -418,47 +397,13 @@ Return ONLY a JSON object. No markdown, no explanation.`;
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
 
-  // Build request body (OpenAI-compatible vs native Anthropic)
-  const useAnthropic = isAnthropicEndpoint(endpoint);
-  let requestBody, requestHeaders;
-
-  if (useAnthropic) {
-    const userContent = (supportsVision(model) && base64Image)
-      ? [
-          { type: 'text', text: prompt },
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } }
-        ]
-      : prompt;
-    requestBody = JSON.stringify({
-      model,
-      max_tokens: 8000,
-      temperature: 0.3,
-      system: 'You are Sentinel Override, a precise web automation agent. Return ONLY valid JSON.',
-      messages: [{ role: 'user', content: userContent }]
-    });
-    requestHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    };
-  } else {
-    requestBody = JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: 'You are Sentinel Override, a precise web automation agent. Return ONLY valid JSON.' },
-        { role: 'user', content: (supportsVision(model) && base64Image)
-            ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }]
-            : prompt
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 8000
-    });
-    requestHeaders = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    };
-  }
+  // Build request body using provider registry
+  const provider = resolveProvider(endpoint);
+  const userContent = (supportsVision(model) && base64Image)
+    ? provider.buildVisionContent(prompt, base64Image)
+    : prompt;
+  const requestBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000 }));
+  const requestHeaders = provider.buildHeaders(apiKey);
 
   let response;
   try {
@@ -483,18 +428,8 @@ Return ONLY a JSON object. No markdown, no explanation.`;
 
   const data = await response.json();
 
-  // Parse response (Anthropic vs OpenAI format)
-  let responseText;
-  if (useAnthropic) {
-    const block = data.content && data.content.find(b => b.type === 'text');
-    if (!block) throw new Error(`Anthropic API returned no text block: ${JSON.stringify(data).slice(0, 500)}`);
-    responseText = block.text;
-  } else {
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error(`API returned no valid response: ${data.error?.message || JSON.stringify(data).slice(0, 500)}`);
-    }
-    responseText = data.choices[0].message.content;
-  }
+  // Parse response using provider registry
+  const responseText = provider.parseResponse(data);
   return parseLLMResponse(responseText);
 }
 

@@ -6,6 +6,7 @@ import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, get
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
+import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 
@@ -145,6 +146,9 @@ async function runAgentLoop(goal, workingTabId) {
   agentPlan = null;
   currentPlanStep = 0;
 
+  // Migrate legacy settings before any LLM calls
+  await migrateLegacySettings();
+
   const stored = await chrome.storage.local.get(['agent_history', 'agent_context', 'agent_memory']);
   await chrome.storage.local.set({ agent_history: [] });
 
@@ -156,7 +160,12 @@ async function runAgentLoop(goal, workingTabId) {
 
   // Generate a plan before execution
   sendSilentUpdate('Planning task...');
-  const planSettings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
+  const planProviderConfig = await getActiveProvider();
+  const planSettings = {
+    api_endpoint: planProviderConfig.endpoint,
+    api_key: planProviderConfig.apiKey,
+    model: planProviderConfig.model
+  };
 
   // Gather context for plan generation
   const currentTabInfo = await getTabInfo(workingTabId);
@@ -277,7 +286,8 @@ async function runAgentLoop(goal, workingTabId) {
       const screenshotCache = tabCtx.screenshotCache;
 
       let base64Image = null;
-      const modelForScreenshot = (await chrome.storage.local.get(['model'])).model || 'glm-5.1';
+      const screenshotProviderConfig = await getActiveProvider();
+      const modelForScreenshot = screenshotProviderConfig.model || 'glm-5.1';
       if (supportsVision(modelForScreenshot)) {
         const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
         if (shotResult) {
