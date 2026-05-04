@@ -24,6 +24,16 @@ window.addEventListener('DOMContentLoaded', () => {
   loadChatHistory();
   setupVoiceInput();
   setupApprovalModeToggle();
+
+  // Templates button toggle
+  document.getElementById('templatesBtn').addEventListener('click', () => {
+    const panel = document.getElementById('templates-panel');
+    if (panel.style.display === 'none' || !panel.style.display) {
+      showTemplatesPanel();
+    } else {
+      hideTemplatesPanel();
+    }
+  });
 });
 
 // ========== Close Modals on Escape ==========
@@ -32,6 +42,8 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('settings-modal').classList.remove('show');
     document.getElementById('theme-modal').classList.remove('show');
     document.getElementById('report-modal').classList.remove('show');
+    document.getElementById('template-modal').classList.remove('show');
+    document.getElementById('template-run-modal').classList.remove('show');
     closeCommandPalette();
   }
 });
@@ -46,5 +58,11 @@ window.addEventListener('click', (e) => {
   }
   if (e.target === document.getElementById('report-modal')) {
     closeReportModal();
+  }
+  if (e.target === document.getElementById('template-modal')) {
+    document.getElementById('template-modal').classList.remove('show');
+  }
+  if (e.target === document.getElementById('template-run-modal')) {
+    document.getElementById('template-run-modal').classList.remove('show');
   }
 });
