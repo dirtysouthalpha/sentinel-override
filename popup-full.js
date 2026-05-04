@@ -11,9 +11,9 @@ const PROVIDER_PRESETS = {
     defaultModel: 'gemma-4-uncensored'
   },
   'zai': {
-    endpoint: 'https://api.z.ai/v1/chat/completions',
+    endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
     models: ['zai-org-glm-4.7-flash', 'deepseek-v4-flash'],
-    defaultModel: 'deepseek-v4-flash'
+    defaultModel: 'zai-org-glm-4.7-flash'
   },
   'poolside': {
     endpoint: 'https://api.poolside.ai/v1/chat/completions',
