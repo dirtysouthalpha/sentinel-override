@@ -827,6 +827,9 @@ function executeSelectedCommand() {
   }
 }
 
+window.openReportModal = openReportModal;
+window.closeReportModal = closeReportModal;
+
 window.executeCommand = (action) => {
   closeCommandPalette();
 

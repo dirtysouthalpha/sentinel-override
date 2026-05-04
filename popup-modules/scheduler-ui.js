@@ -603,6 +603,17 @@ async function showRunHistory(scheduleId, scheduleName) {
         `;
         container.appendChild(item);
       });
+
+      // Wire view-report buttons inside history modal
+      container.querySelectorAll('[data-action="view-report"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const report = decodeURIComponent(btn.dataset.report || '');
+          if (report && window.openReportModal) {
+            window.openReportModal(report);
+          }
+        });
+      });
     }
 
     // Show modal
