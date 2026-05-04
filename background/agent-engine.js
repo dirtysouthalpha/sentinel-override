@@ -492,6 +492,8 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate(`Opening tab: ${command.label || command.url}`, stepCount);
           const ctx = await openTab(command.url, command.label);
           await switchToTab(ctx.tabId);
+          await sleep(2000);
+          await injectContentScript(ctx.tabId);
           result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
         }
         sendActionResult(stepCount, command, result, actionFailed);
@@ -513,6 +515,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           sendActionMessage(command, stepCount, null); // Show action card in popup
           await switchToTab(targetId);
+          await injectContentScript(targetId);
           result = `Switched to tab "${getTabContext(targetId)?.label || targetId}"`;
         }
         sendActionResult(stepCount, command, result, actionFailed);
@@ -549,8 +552,16 @@ async function runAgentLoop(goal, workingTabId) {
           actionFailed = true;
         } else {
           await chrome.tabs.update(tab, { url: command.url });
-          await sleep(2000);
-          result = 'Navigated to ' + command.url;
+          await waitForPageLoad(tab);
+          await sleep(1500);
+          // Re-inject content script on the new page
+          const reinjected = await injectContentScript(tab);
+          if (!reinjected) {
+            result = 'Navigated to ' + command.url + ' (content script failed to load)';
+            actionFailed = true;
+          } else {
+            result = 'Navigated to ' + command.url;
+          }
         }
       } else if (command.type === 'read_page') {
         try {
@@ -586,7 +597,10 @@ async function runAgentLoop(goal, workingTabId) {
           const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
           result = (res && res.result) ? res.result : 'Done';
           actionFailed = result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
-        } catch (err) { result = 'Executed (page navigated)'; }
+        } catch (err) {
+          result = 'Content script error: ' + (err.message || 'command failed to reach page');
+          actionFailed = true;
+        }
       }
 
       // Post-click: handle navigation and new tab capture
