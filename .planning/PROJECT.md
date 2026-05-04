@@ -8,9 +8,21 @@ A Chrome browser extension that acts as an AI-powered browser automation agent f
 
 Give a command in any form and the agent drives the browser to completion, then generates a structured report — regardless of the web UI or task complexity.
 
+## Current Milestone: v2
+
+**Goal:** Make Sentinel Override production-ready and powerful — test infrastructure, tech debt cleanup, command templates for runbook reuse, agent scheduling, and team collaboration.
+
+**Target features:**
+- Test infrastructure (unit, integration, E2E)
+- Tech debt cleanup and security hardening
+- Command templates / saved runbooks
+- Agent scheduling
+- Report and runbook collaboration
+
 ## Current State
 
 **Shipped:** v1 milestone (2026-05-04) — 4 phases, 8 plans, 20/20 requirements satisfied.
+**In Progress:** v2 milestone — quality, testing, and power-user features.
 
 The extension has a modular background service worker (8 ES modules), modular content scripts (9 utility modules), multi-tab infrastructure, structured report generation, and multi-provider LLM support (Claude/OpenAI). See `.planning/MILESTONES.md` for full delivery details.
 
@@ -39,7 +51,12 @@ The extension has a modular background service worker (8 ES modules), modular co
 
 ### Active
 
-- [ ] Reliable enough for organization-wide deployment (ongoing — needs real-world testing)
+- [ ] Test infrastructure for confident code changes
+- [ ] Tech debt cleanup and security hardening
+- [ ] Command templates / saved runbooks for re-use
+- [ ] Agent scheduling — queue tasks to run at specific times
+- [ ] Collaboration — share reports and runbooks with team members
+- [ ] Reliable enough for organization-wide deployment
 
 ### Out of Scope
 
@@ -78,4 +95,4 @@ Remaining tech debt: old content.js alongside content/ directory, popup-full.js 
 | In-memory TabContext for v1 | Service worker stays alive during agent execution; persistence unnecessary | ✓ Delivered — Map-based with LRU eviction |
 
 ---
-*Last updated: 2026-05-04 after v1 milestone*
+*Last updated: 2026-05-04 after v2 milestone start*
