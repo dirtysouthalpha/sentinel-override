@@ -28,3 +28,5 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
     } catch (e) {}
   };
 })();
+
+export const highlight = window.__sentinelUtils.highlight;

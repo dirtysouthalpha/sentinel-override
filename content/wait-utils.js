@@ -73,3 +73,5 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
     return false;
   };
 })();
+
+export const wait = window.__sentinelUtils.wait;

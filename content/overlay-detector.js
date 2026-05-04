@@ -228,3 +228,5 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     }
   };
 })();
+
+export const overlay = window.__sentinelUtils.overlay;

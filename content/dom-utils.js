@@ -170,3 +170,5 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     interactiveElements.push(elementData);
   };
 })();
+
+export const dom = window.__sentinelUtils.dom;

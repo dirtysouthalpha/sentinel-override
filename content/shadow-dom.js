@@ -161,3 +161,5 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     return found;
   };
 })();
+
+export const shadow = window.__sentinelUtils.shadow;

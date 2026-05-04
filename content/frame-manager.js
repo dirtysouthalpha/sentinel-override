@@ -160,3 +160,5 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     return info;
   };
 })();
+
+export const frame = window.__sentinelUtils.frame;

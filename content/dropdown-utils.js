@@ -328,3 +328,5 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     return null;
   };
 })();
+
+export const dropdown = window.__sentinelUtils.dropdown;
