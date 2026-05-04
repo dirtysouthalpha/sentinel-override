@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 ## Current Position
 
 Phase: 4 of 4 (Reports & Multi-Provider LLM)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-05-04 -- Completed 04-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-05-04 -- Completed 04-02-PLAN.md
 
-Progress: [██████████████████░░] 87% (7 of 8 plans complete)
+Progress: [████████████████████] 100% (8 of 8 plans complete)
 
 ## Performance Metrics
 
@@ -30,7 +30,7 @@ Progress: [██████████████████░░] 87% (7 
 | 1     | 2     | 2     | --       |
 | 2     | 2     | 2     | --       |
 | 3     | 2     | 2     | --       |
-| 4     | 1     | 2     | --       |
+| 4     | 2     | 2     | --       |
 
 *Updated after each plan completion*
 
@@ -71,6 +71,11 @@ Progress: [██████████████████░░] 87% (7 
 - [04-01]: Report LLM call is a dedicated fetch (not callLLMWithRetry) because report prompt has different format requirements
 - [04-01]: Fallback report built from raw execution data when LLM call fails
 - [04-01]: Report modal reuses existing .modal CSS class for consistent z-index and backdrop behavior
+- [04-02]: Provider registry uses PROVIDERS object with per-provider methods (buildHeaders, buildBody, parseResponse) rather than class hierarchy
+- [04-02]: Test connection handler in popup uses inline URL-based detection (cannot import background modules)
+- [04-02]: Legacy migration removes old keys after creating new structure to prevent stale data
+- [04-02]: Mid-task provider switching works transparently via getActiveProvider() on each call -- no context bridge needed for v1
+- [04-02]: generatePlan() keeps flat settings parameter interface to minimize change surface
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 04-01-PLAN.md
+Stopped at: Completed 04-02-PLAN.md (Phase 4 complete -- all plans done)
 Resume file: None
