@@ -10,7 +10,9 @@
     "sidePanel",
     "storage",
     "debugger",
-    "webNavigation"
+    "webNavigation",
+    "alarms",
+    "notifications"
   ],
   "action": {
     "default_title": "Sentinel Override",

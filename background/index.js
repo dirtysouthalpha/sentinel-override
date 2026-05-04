@@ -10,6 +10,7 @@ import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } fr
 import { generateReport } from './report-generator.js';
 import { migrateLegacySettings } from './provider-registry.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
+import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -19,6 +20,22 @@ chrome.runtime.onInstalled.addListener(() => {
     if (result.model && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';
     if (Object.keys(updates).length > 0) chrome.storage.local.set(updates);
   });
+});
+
+// ========== Scheduler Initialization ==========
+// Re-register alarms on service worker restart (handles browser restart alarm loss)
+initScheduler();
+
+// Schedule alarm listener
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name.startsWith('schedule-')) {
+    const scheduleId = alarm.name.replace('schedule-', '');
+    try {
+      await executeScheduledTask(scheduleId);
+    } catch (err) {
+      console.error('Scheduled task execution failed:', err);
+    }
+  }
 });
 
 // ========== Tab Locking ==========
@@ -105,6 +122,37 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       const goal = await resolveTemplateGoal(request.templateId, request.params || {});
       return await startAgent(goal, sender);
     }
+
+    // Schedule CRUD
+    case 'schedule_list':
+      return await listSchedules();
+
+    case 'schedule_create':
+      if (!request.schedule) throw new Error('Schedule data required');
+      return await createSchedule(request.schedule);
+
+    case 'schedule_delete':
+      if (!request.id) throw new Error('Schedule ID required');
+      await deleteSchedule(request.id);
+      return { deleted: true };
+
+    case 'schedule_toggle':
+      if (!request.id) throw new Error('Schedule ID required');
+      if (typeof request.enabled !== 'boolean') throw new Error('Enabled flag required');
+      return await toggleSchedule(request.id, request.enabled);
+
+    case 'schedule_results':
+      if (request.id) return await getScheduleResults(request.id);
+      return await getRecentResults(request.limit || 20);
+
+    case 'schedule_clear_results':
+      if (!request.id) throw new Error('Schedule ID required');
+      await clearScheduleResults(request.id);
+      return { cleared: true };
+
+    case 'schedule_clear_badge':
+      chrome.action.setBadgeText({ text: '' });
+      return { cleared: true };
 
     default:
       throw new Error(`Unknown action: ${request.action}`);
