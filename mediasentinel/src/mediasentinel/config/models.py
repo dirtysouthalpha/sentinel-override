@@ -79,6 +79,7 @@ class AlertConfig(BaseModel):
     from_address: str = ""
     to_addresses: list[str] = []
     webhook_urls: list[str] = []
+    emergency_repeat_interval_seconds: int = Field(ge=60, le=3600, default=300)
 
 
 class RecoveryPolicy(BaseModel):
