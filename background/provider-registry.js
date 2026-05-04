@@ -43,7 +43,7 @@ export const PROVIDERS = {
     ],
 
     /** System prompt for Anthropic provider. */
-    systemPromptTweak: 'You are Sentinel Override, a precise web automation agent. Return ONLY valid JSON.'
+    systemPromptTweak: 'You are Sentinel Override, a web automation agent. You MUST respond with ONLY a single JSON object containing a "type" field. Never include any text, reasoning, explanation, or markdown outside the JSON. Your entire response must be valid JSON and nothing else.'
   },
 
   openai: {
@@ -91,7 +91,7 @@ export const PROVIDERS = {
     ],
 
     /** System prompt for OpenAI provider. */
-    systemPromptTweak: 'You are Sentinel Override, a precise web automation agent. Return ONLY valid JSON.'
+    systemPromptTweak: 'You are Sentinel Override, a web automation agent. You MUST respond with ONLY a single JSON object containing a "type" field. Never include any text, reasoning, explanation, or markdown outside the JSON. Your entire response must be valid JSON and nothing else.'
   }
 };
 

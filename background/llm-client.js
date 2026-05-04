@@ -354,48 +354,38 @@ ${last_action && last_result && String(last_result).includes('not found') ? 'CRI
 RULES:
 1. **READ BEFORE YOU ACT** -- Always "read_page" or "extract" BEFORE navigating. You CANNOT extract data from a page you already left!
 2. **EXTRACT OR FINISH** -- After reading a page, either "extract" key data to memory OR "finish" with the answer. NEVER just navigate away.
-3. **MAX 2 NAVIGATES** -- For research tasks, visit at most 2 sites. Extract everything, then finish.
+3. **USE TABS FOR MULTIPLE PAGES** -- Use open_tab/switch_tab/close_tab to visit multiple pages without losing context. Extract data from each tab before closing.
 4. **FINISH EARLY** -- If you have enough data to answer the question, FINISH immediately. Do NOT browse more sites "just in case".
 5. **NO VAGUE SUMMARIES** -- Include ACTUAL TEXT, names, numbers, URLs, prices. "Found articles" is useless. "Article 'X' by Y says Z" is useful.
 6. Use "extract" + memory to carry data between pages. Reference with ::key::.
 7. If standard actions fail, use "execute_js" to write custom code to handle it.
 8. For dropdowns: use "select". For hover menus: use "hover" then "click".
-9. One action per step. Return ONLY valid JSON.
-10. **PREFERRED WORKFLOW**: read_page -> extract/note -> read_page -> extract/note -> finish (4-6 steps total)
-11. **MULTI-TAB WORKFLOW** -- You can open multiple tabs to compare data across pages. Use open_tab with a descriptive label, switch_tab to move between them, and close_tab when done. Extract data from each tab before closing it. You can see other tabs' content in the MANAGED TABS section above.
+9. One action per step.
 
-BUILT-IN UI CAPABILITIES (automatic -- no special action needed):
-- Shadow DOM: Elements inside shadow roots are automatically scanned and interactable. Use their selectors normally.
-- Custom Dropdowns: If a dropdown doesn't respond to "select", try clicking it to open, then clicking the desired option from the now-visible list. Re-read the page after opening.
-- Overlays/Modals: If an action fails and an overlay is detected, the system will attempt to dismiss it automatically. You may need to retry your action after dismissal.
-- Rich Text Editors (Quill, TinyMCE, CKEditor): The "type" action handles these automatically. No special action needed.
-- Same-origin iframes: Content inside same-origin iframes is automatically included in page scans. Use selectors normally.
-- Cross-origin iframes: Cannot be read directly. Note this and work with the outer page.
+Actions:
+- { "type": "click", "selector": "FROM_LIST" }
+- { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
+- { "type": "navigate", "url": "URL" }
+- { "type": "scroll", "amount": INTEGER }
+- { "type": "select", "selector": "FROM_LIST", "value": "OPTION" }
+- { "type": "hover", "selector": "FROM_LIST" }
+- { "type": "press_key", "key": "Enter|Tab|Escape|ArrowDown|..." }
+- { "type": "extract", "key": "memory_key", "selector": "FROM_LIST", "attribute": "text|href|value|..." }
+- { "type": "extract_list", "key": "memory_key", "selector": "CSS_SELECTOR", "fields": { "title": "h2", "price": ".price" }, "limit": 10 }
+- { "type": "wait_for_text", "text": "TEXT", "timeout": 5000 }
+- { "type": "wait_for_element", "selector": "FROM_LIST", "timeout": 5000 }
+- { "type": "wait_for_navigation", "timeout": 5000 }
+- { "type": "execute_js", "code": "JS_CODE" }
+- { "type": "read_page" }
+- { "type": "note", "text": "FINDINGS" }
+- { "type": "finish", "summary": "FULL DETAILED REPORT with actual text, names, numbers, URLs" }
+- { "type": "open_tab", "url": "URL", "label": "name" }
+- { "type": "switch_tab", "label": "name" }
+- { "type": "close_tab", "label": "name" }
+- { "type": "dismiss_overlay" }
+- { "type": "switch_to_frame", "frame_index": INTEGER }
 
-Actions available:
-1. { "type": "click", "selector": "FROM_LIST" } -- Click element
-2. { "type": "type", "selector": "FROM_LIST", "text": "TEXT" } -- Type text (supports ::memory_key::)
-3. { "type": "navigate", "url": "URL" } -- Go to URL (supports ::memory_key::)
-4. { "type": "scroll", "amount": INTEGER } -- Scroll up/down
-5. { "type": "select", "selector": "FROM_LIST", "value": "OPTION" } -- Select dropdown option
-6. { "type": "hover", "selector": "FROM_LIST" } -- Hover over element
-7. { "type": "press_key", "key": "Enter|Tab|Escape|ArrowDown|..." } -- Press keyboard key
-8. { "type": "extract", "key": "memory_key", "selector": "FROM_LIST", "attribute": "text|href|value|..." } -- Extract one value to memory
-9. { "type": "extract_list", "key": "memory_key", "selector": "CSS_CONTAINER", "fields": { "title": "h2", "price": ".price", "reviews": ".review-count" }, "limit": 10 } -- POWERFUL: extract structured data from ALL matching containers in one step. Use for product grids, search results, listings. selector is a raw CSS selector (not from the elements list) that matches each repeated card/row.
-10. { "type": "wait_for_text", "text": "TEXT", "timeout": 5000 } -- Wait until text appears
-11. { "type": "wait_for_element", "selector": "FROM_LIST", "timeout": 5000 } -- Wait until element exists
-12. { "type": "wait_for_navigation", "timeout": 5000 } -- Wait for URL change
-13. { "type": "execute_js", "code": "JS_CODE" } -- Run custom JavaScript on the page. Use to handle ANY complex UI. Return value is captured.
-14. { "type": "read_page" } -- Re-read page content
-15. { "type": "note", "text": "FINDINGS" } -- Record findings without page interaction
-16. { "type": "finish", "summary": "FULL DETAILED REPORT with actual text, names, numbers, URLs, comparisons, and analysis" } -- Task complete. Your summary is the ONLY output the user sees. Make it COUNT: specific data, not vague descriptions. For research: write a FULL multi-paragraph answer as if explaining to a colleague.
-17. { "type": "open_tab", "url": "URL", "label": "Descriptive name" } -- Open a new background tab and switch to it. Label is your reference name (e.g., "Logs Page", "Config Tab").
-18. { "type": "switch_tab", "label": "Tab name" } -- Switch to a previously opened tab by its label. Use the labels shown in MANAGED TABS above.
-19. { "type": "close_tab", "label": "Tab name" } -- Close a tab you no longer need. Frees up a slot for new tabs.
-20. { "type": "dismiss_overlay" } -- Attempt to detect and dismiss any blocking overlay/modal/dialog. Use when you suspect an overlay is preventing interaction.
-21. { "type": "switch_to_frame", "frame_index": INTEGER } -- Switch interaction context to a specific iframe (0-indexed). Use "read_page" after switching to scan the iframe content.
-
-Return ONLY a JSON object. No markdown, no explanation.`;
+IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.`;
 
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
@@ -438,17 +428,40 @@ Return ONLY a JSON object. No markdown, no explanation.`;
 
 // ========== Response Parsing ==========
 export function extractFirstJsonObject(str) {
-  const start = str.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < str.length; i++) {
-    const ch = str[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') { depth--; if (depth === 0) return str.substring(start, i + 1); }
+  // Try every '{' position to find a valid JSON object with a "type" field.
+  // This handles models that prepend reasoning text before the actual JSON.
+  const validTypes = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
+    'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+    'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
+    'dismiss_overlay', 'switch_to_frame']);
+
+  let searchFrom = 0;
+  while (searchFrom < str.length) {
+    const start = str.indexOf('{', searchFrom);
+    if (start === -1) return null;
+
+    let depth = 0, inString = false, escape = false;
+    let end = -1;
+    for (let i = start; i < str.length; i++) {
+      const ch = str[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+
+    if (end !== -1) {
+      const candidate = str.substring(start, end + 1);
+      try {
+        const parsed = JSON.parse(candidate);
+        if (parsed.type && validTypes.has(parsed.type)) return candidate;
+      } catch (e) { /* not valid JSON, try next */ }
+      searchFrom = end + 1;
+    } else {
+      break;
+    }
   }
   return null;
 }
