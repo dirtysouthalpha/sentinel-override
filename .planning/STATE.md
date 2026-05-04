@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 ## Current Position
 
 Phase: 7 of 8 -- Agent Scheduling
-Plan: 01 of 2 (In progress)
-Status: In progress
-Last activity: 2026-05-04 -- Completed 07-01-PLAN.md
+Plan: 2 of 2 (Complete)
+Status: Phase complete
+Last activity: 2026-05-04 -- Completed 07-02-PLAN.md
 
-Progress: [███████░░░░░░░░░] 56.3% (v2, 5/8 plans -- plan 7-01 done)
+Progress: [████████░░░░░░░] 62.5% (v2, 5/8 plans -- phases 1-7 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13 (v1: 8, v2: 5)
+- Total plans completed: 14 (v1: 8, v2: 6)
 - Average duration: ~4 min/plan
-- Total execution time: ~56 minutes
+- Total execution time: ~60 minutes
 
 **By Phase:**
 
@@ -33,7 +33,7 @@ Progress: [███████░░░░░░░░░] 56.3% (v2, 5/8 plan
 | 4     | 2     | 2     | ~4.5 min |
 | 5     | 2     | 2     | ~12.5 min |
 | 6     | 2     | 2     | ~2 min   |
-| 7     | 1     | 1     | ~3 min   |
+| 7     | 2     | 2     | ~3.5 min |
 
 *Updated after each plan completion*
 
@@ -107,6 +107,11 @@ Progress: [███████░░░░░░░░░] 56.3% (v2, 5/8 plan
 - [07-01]: initScheduler() re-registers all enabled alarms on service worker restart (handles browser restart alarm loss)
 - [07-01]: Scheduler skips execution if agentRunning=true, marks lastRunStatus='skipped', re-registers alarm for recurring
 - [07-01]: Result storage capped at 50 entries per schedule with oldest evicted first
+- [07-02]: Scheduler panel uses same mutual exclusion pattern as templates panel (show one, hide others)
+- [07-02]: Form field toggling via display:none/flex rather than dynamic DOM generation for simplicity
+- [07-02]: Event delegation on schedules-panel container for data-action button routing (matches templates.js pattern)
+- [07-02]: Templates cached in module scope to avoid redundant template_list calls during form interactions
+- [07-02]: Badge cleared on every panel open via schedule_clear_badge message to background
 
 ### Pending Todos
 
@@ -124,5 +129,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 07-01-PLAN.md (scheduler backend)
+Stopped at: Completed 07-02-PLAN.md (scheduler popup UI)
 Resume file: None
