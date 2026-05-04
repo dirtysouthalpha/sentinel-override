@@ -30,6 +30,7 @@ function relativeTime(timestamp) {
 function showTemplatesPanel() {
   document.getElementById('templates-panel').style.display = 'flex';
   document.getElementById('chat-container').style.display = 'none';
+  document.getElementById('input-area').style.display = 'none';
   document.getElementById('templatesBtn').classList.add('active');
   loadTemplates();
 }
@@ -37,6 +38,7 @@ function showTemplatesPanel() {
 function hideTemplatesPanel() {
   document.getElementById('templates-panel').style.display = 'none';
   document.getElementById('chat-container').style.display = 'flex';
+  document.getElementById('input-area').style.display = 'flex';
   document.getElementById('templatesBtn').classList.remove('active');
 }
 
@@ -51,7 +53,7 @@ function loadTemplates() {
       return;
     }
 
-    const templates = response && Array.isArray(response.templates) ? response.templates : [];
+    const templates = response && response.ok && Array.isArray(response.data) ? response.data : [];
     const filtered = filterTemplates(templates, searchTerm, tagFilter);
     renderTemplateList(filtered);
   });
@@ -204,12 +206,12 @@ function openEditTemplateModal(templateId) {
       showToast(chrome.runtime.lastError.message || 'Error loading template', 'error');
       return;
     }
-    if (!response || !response.template) {
-      showToast('Template not found', 'error');
+    if (!response || !response.ok || !response.data) {
+      showToast(response?.error || 'Template not found', 'error');
       return;
     }
 
-    const template = response.template;
+    const template = response.data;
     editingTemplateId = templateId;
     document.getElementById('template-modal-title').textContent = 'Edit Template';
     document.getElementById('tmpl-name').value = template.name || '';
@@ -309,12 +311,12 @@ function openRunModal(templateId) {
       showToast(chrome.runtime.lastError.message || 'Error loading template', 'error');
       return;
     }
-    if (!response || !response.template) {
-      showToast('Template not found', 'error');
+    if (!response || !response.ok || !response.data) {
+      showToast(response?.error || 'Template not found', 'error');
       return;
     }
 
-    const template = response.template;
+    const template = response.data;
     runningTemplateId = templateId;
     document.getElementById('template-run-title').textContent = 'Run: ' + template.name;
     document.getElementById('template-run-goal-preview').textContent = template.goal;
