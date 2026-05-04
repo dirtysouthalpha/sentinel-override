@@ -79,11 +79,11 @@ Requirements for v2 milestone. Focus: test infrastructure, tech debt cleanup, co
 | TMP-04 | Phase 6 | Complete |
 | TMP-05 | Phase 6 | Complete |
 | TMP-06 | Phase 6 | Complete |
-| SCH-01 | Phase 7 | Pending |
-| SCH-02 | Phase 7 | Pending |
-| SCH-03 | Phase 7 | Pending |
-| SCH-04 | Phase 7 | Pending |
-| SCH-05 | Phase 7 | Pending |
+| SCH-01 | Phase 7 | Complete |
+| SCH-02 | Phase 7 | Complete |
+| SCH-03 | Phase 7 | Complete |
+| SCH-04 | Phase 7 | Complete |
+| SCH-05 | Phase 7 | Complete |
 | COL-01 | Phase 8 | Pending |
 | COL-02 | Phase 8 | Pending |
 | COL-03 | Phase 8 | Pending |
