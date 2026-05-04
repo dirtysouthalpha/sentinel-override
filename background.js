@@ -1353,8 +1353,6 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   }
   // ===== END COST SAFETY CHECK =====
 
-  const isZAI = endpoint.includes('z.ai');
-
   console.log('[LLM] Endpoint:', endpoint);
   console.log('[LLM] Model:', model);
   console.log('[LLM] API Key length:', apiKey.length, 'chars');
