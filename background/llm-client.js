@@ -3,6 +3,7 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { sendSilentUpdate } from './message-protocol.js';
+import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
 
 // ========== Platform Context Detection ==========
 // Detects which UI the agent is currently operating in based on the page URL
@@ -327,9 +328,32 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     planCtx = `\nEXECUTION PLAN (your roadmap -- follow in order):\n${planLines}\n\nCURRENT PLAN STEP: ${agentState.currentPlanStep + 1} -- "${agentState.agentPlan[agentState.currentPlanStep] || 'All steps complete'}"\nWhen the current plan step is fully done, include "advance_plan": true in your JSON response.\n`;
   }
 
+  // Multi-tab context: show all managed tabs with summaries
+  const allContexts = getAllTabContexts();
+  const activeId = getActiveTabId();
+
+  let tabCtxSection = '';
+  if (allContexts.length > 0) {
+    tabCtxSection = `\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`;
+    for (const ctx of allContexts) {
+      const isActive = ctx.tabId === activeId;
+      const marker = isActive ? '[ACTIVE] ' : '';
+      const snapSummary = ctx.snapshot
+        ? `Last seen: "${(ctx.snapshot.pageContent || '').substring(0, 300)}..." (${new Date(ctx.snapshot.timestamp).toLocaleTimeString()})`
+        : 'No snapshot yet.';
+      tabCtxSection += `- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`;
+    }
+    tabCtxSection += `\nTab rules:\n`;
+    tabCtxSection += `- Use "open_tab" to open a new URL in a background tab (max ${TAB_LIMIT} tabs total)\n`;
+    tabCtxSection += `- Use "switch_tab" with a label to operate on a different tab\n`;
+    tabCtxSection += `- Use "close_tab" with a label to close a tab you no longer need\n`;
+    tabCtxSection += `- Extract data from a tab BEFORE opening new tabs that might push it past the ${TAB_LIMIT}-tab limit\n`;
+    tabCtxSection += `- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`;
+  }
+
   // Build prompt
   const prompt = `You are Sentinel Override v3, an autonomous browser agent. You can create tools, extract data, and solve ANY web task.
-${runbookCtx}${platformCtx}${planCtx}${strategyCtx}${finishCtx}${patternCtx}${memoryCtx}
+${runbookCtx}${platformCtx}${planCtx}${strategyCtx}${finishCtx}${patternCtx}${memoryCtx}${tabCtxSection}
 Current step: ${stepCount}
 Goal: ${goal}
 
@@ -366,6 +390,7 @@ RULES:
 8. For dropdowns: use "select". For hover menus: use "hover" then "click".
 9. One action per step. Return ONLY valid JSON.
 10. **PREFERRED WORKFLOW**: read_page -> extract/note -> read_page -> extract/note -> finish (4-6 steps total)
+11. **MULTI-TAB WORKFLOW** -- You can open multiple tabs to compare data across pages. Use open_tab with a descriptive label, switch_tab to move between them, and close_tab when done. Extract data from each tab before closing it. You can see other tabs' content in the MANAGED TABS section above.
 
 Actions available:
 1. { "type": "click", "selector": "FROM_LIST" } -- Click element
@@ -384,6 +409,9 @@ Actions available:
 14. { "type": "read_page" } -- Re-read page content
 15. { "type": "note", "text": "FINDINGS" } -- Record findings without page interaction
 16. { "type": "finish", "summary": "FULL DETAILED REPORT with actual text, names, numbers, URLs, comparisons, and analysis" } -- Task complete. Your summary is the ONLY output the user sees. Make it COUNT: specific data, not vague descriptions. For research: write a FULL multi-paragraph answer as if explaining to a colleague.
+17. { "type": "open_tab", "url": "URL", "label": "Descriptive name" } -- Open a new background tab and switch to it. Label is your reference name (e.g., "Logs Page", "Config Tab").
+18. { "type": "switch_tab", "label": "Tab name" } -- Switch to a previously opened tab by its label. Use the labels shown in MANAGED TABS above.
+19. { "type": "close_tab", "label": "Tab name" } -- Close a tab you no longer need. Frees up a slot for new tabs.
 
 Return ONLY a JSON object. No markdown, no explanation.`;
 
@@ -503,7 +531,7 @@ export function parseLLMResponse(content) {
     if (!parsed.type) throw new Error('Missing type field');
     const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
       'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
-      'execute_js', 'read_page', 'note', 'finish'];
+      'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     return parsed;
   } catch (err) {
