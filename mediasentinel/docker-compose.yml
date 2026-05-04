@@ -1,0 +1,252 @@
+# MediaSentinel Media Stack Docker Compose
+# All services with health checks and dependency ordering
+# Target: Windows Server 2025 with Docker Desktop
+
+services:
+  # ── Prowlarr (Indexer Manager) ─────────────────────────────────
+  prowlarr:
+    image: ghcr.io/hotio/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "9696:9696"
+    volumes:
+      - ./data/prowlarr:/config
+    networks:
+      - media-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Radarr (Movie Collection Manager) ──────────────────────────
+  radarr:
+    image: ghcr.io/hotio/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./data/radarr:/config
+      - media-downloads:/downloads
+      - media-library:/movies
+    networks:
+      - media-net
+    depends_on:
+      prowlarr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/api/v3/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Sonarr (TV Series Manager) ─────────────────────────────────
+  sonarr:
+    image: ghcr.io/hotio/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "8989:8989"
+    volumes:
+      - ./data/sonarr:/config
+      - media-downloads:/downloads
+      - media-library:/tv
+    networks:
+      - media-net
+    depends_on:
+      prowlarr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/api/v3/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── qBittorrent (Torrent Client) ──────────────────────────────
+  # network_mode: bridge by default; switch to "service:vpn" if a
+  # VPN container (e.g. gluetun) is added later.
+  qbittorrent:
+    image: ghcr.io/hotio/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    volumes:
+      - ./data/qbittorrent:/config
+      - media-downloads:/downloads
+    networks:
+      - media-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/app/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  # ── Jellyfin (Media Server) ───────────────────────────────────
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - JELLYFIN_PublishedServerUrl=http://localhost:8096
+    ports:
+      - "8096:8096"
+      - "8920:8920"   # HTTPS
+      - "7359:7359/udp"  # Service discovery
+    volumes:
+      - ./data/jellyfin/config:/config
+      - ./data/jellyfin/cache:/cache
+      - media-library:/media
+    networks:
+      - media-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ── Jellyseerr (Request Manager for Jellyfin) ─────────────────
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "5055:5055"
+    volumes:
+      - ./data/jellyseerr:/app/config
+    networks:
+      - media-net
+    depends_on:
+      jellyfin:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
+  # ── Shoko (Anime Server) ──────────────────────────────────────
+  shoko:
+    image: shokoanime/server:latest
+    container_name: shoko
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+    ports:
+      - "8111:8111"
+    volumes:
+      - ./data/shoko:/home/shoko/.shoko
+      - media-library:/anime
+    networks:
+      - media-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8111/api/v3/Init/GetState"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── Cloudflare Tunnel ─────────────────────────────────────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    # No published ports -- tunnel connects outbound to Cloudflare edge
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      - ./data/cloudflared:/etc/cloudflared
+    networks:
+      - media-net
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "info"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+
+  # ── MediaSentinel Monitor ─────────────────────────────────────
+  # Note: On Windows, prefer running MediaSentinel natively (not in Docker)
+  # via the Windows service installer in scripts/install_service.py.
+  # This Docker definition supports Linux-based setups.
+  mediasentinel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mediasentinel
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - MEDIASENTINEL_CONFIG=/app/config.yaml
+      - QBITTORRENT_PASSWORD=${QBITTORRENT_PASSWORD:-adminadmin}
+    volumes:
+      # Docker socket for container management (read-only)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # MediaSentinel config
+      - ./config.yaml:/app/config.yaml:ro
+      # Persist data directory (logs, DB)
+      - ./data/mediasentinel:/data
+    healthcheck:
+      test: ["CMD", "python", "-m", "mediasentinel", "-c", "/app/config.yaml", "status"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy
+      jellyfin:
+        condition: service_healthy
+
+networks:
+  media-net:
+    driver: bridge
+    name: media-net
+
+volumes:
+  media-downloads:
+    name: media-downloads
+  media-library:
+    name: media-library
