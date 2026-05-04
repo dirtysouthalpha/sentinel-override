@@ -64,15 +64,15 @@ Requirements for v2 milestone. Focus: test infrastructure, tech debt cleanup, co
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TST-01 | Phase 5 | Pending |
-| TST-02 | Phase 5 | Pending |
-| TST-03 | Phase 5 | Pending |
-| DEB-01 | Phase 5 | Pending |
-| DEB-02 | Phase 5 | Pending |
-| DEB-03 | Phase 5 | Pending |
-| DEB-04 | Phase 5 | Pending |
-| DEB-05 | Phase 5 | Pending |
-| DEB-06 | Phase 5 | Pending |
+| TST-01 | Phase 5 | Complete |
+| TST-02 | Phase 5 | Complete |
+| TST-03 | Phase 5 | Complete |
+| DEB-01 | Phase 5 | Complete |
+| DEB-02 | Phase 5 | Complete |
+| DEB-03 | Phase 5 | Complete |
+| DEB-04 | Phase 5 | Complete |
+| DEB-05 | Phase 5 | Complete |
+| DEB-06 | Phase 5 | Complete |
 | TMP-01 | Phase 6 | Pending |
 | TMP-02 | Phase 6 | Pending |
 | TMP-03 | Phase 6 | Pending |
