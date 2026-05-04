@@ -351,15 +351,15 @@ async function runAgentLoop(goal, workingTabId) {
         delete command.advance_plan;
       }
 
-      // Template substitution: replace {{key}} with memory values
+      // Template substitution: replace ::key:: with memory values
       if (command.text && typeof command.text === 'string') {
-        command.text = command.text.replace(/\{\{(\w+)\}\}/g, (_, key) => agentMemory[key] || `{{${key}}}`);
+        command.text = command.text.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
       if (command.url && typeof command.url === 'string') {
-        command.url = command.url.replace(/\{\{(\w+)\}\}/g, (_, key) => agentMemory[key] || `{{${key}}}`);
+        command.url = command.url.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
       if (command.value && typeof command.value === 'string') {
-        command.value = command.value.replace(/\{\{(\w+)\}\}/g, (_, key) => agentMemory[key] || `{{${key}}}`);
+        command.value = command.value.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
 
       // Validate selectors against the trimmed list

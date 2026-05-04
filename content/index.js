@@ -424,6 +424,34 @@ if (window.__sentinelInitialized) {
       }
 
       case 'execute_js': {
+        // SECURITY REVIEW (DEB-05):
+        // Risk Level: HIGH -- new Function() executes arbitrary JavaScript in the page context.
+        //
+        // Why it exists: The agent needs to execute custom JavaScript to handle UIs that cannot
+        // be automated through standard DOM APIs (e.g., complex React state updates, Angular
+        // form controls, custom widget libraries). The LLM generates the code, and the content
+        // script runs it in the page's JS context (not the extension's isolated world).
+        //
+        // Attack surface:
+        // 1. LLM prompt injection: A malicious web page could craft content that tricks the LLM
+        //    into generating dangerous execute_js commands (e.g., exfiltrating cookies, modifying
+        //    page state, redirecting the user).
+        // 2. Imported runbooks: Untrusted templates could contain goals that instruct the agent
+        //    to execute arbitrary code. See COL-05 for import validation.
+        //
+        // Current mitigations:
+        // - execute_js is only available when the agent is actively running (user-initiated)
+        // - The code runs in the PAGE context, not the extension context (no access to chrome.* APIs)
+        // - "use strict" mode prevents some dangerous patterns
+        //
+        // Recommended improvements for v2+:
+        // - Add an allowlist of permitted APIs for execute_js code
+        // - Add user confirmation prompt before execute_js commands (already exists for approval mode)
+        // - For imported runbooks: reject any goal containing "execute_js" (see COL-05)
+        // - Consider a sandboxed iframe for code execution instead of new Function()
+        //
+        // Decision: KEEP new Function() for v2. The agent's core value depends on it.
+        // Document the risk and add mitigations incrementally.
         const code = cmd.code || '';
         if (!code) return 'No code provided';
         try {
