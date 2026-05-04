@@ -2,19 +2,9 @@
 // Schedule management UI: list, create, enable/disable, delete, run history.
 // Communicates with background via chrome.runtime.sendMessage (schedule_* actions).
 
-// ========== Shared State ==========
-const getState = () => window.__popupState;
-
 // ========== Module-level State ==========
 let refreshIntervalId = null;
 let templatesCache = [];
-
-// ========== HTML Escape Helper ==========
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text || '';
-  return div.innerHTML;
-}
 
 // ========== Countdown / Relative Time Helpers ==========
 function formatCountdown(timestamp) {

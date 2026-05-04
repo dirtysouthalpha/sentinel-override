@@ -4,7 +4,6 @@
 // Communicates with background via chrome.runtime.sendMessage (template_* actions).
 
 // ========== Shared State ==========
-const getState = () => window.__popupState;
 
 // ========== Module-level State ==========
 let editingTemplateId = null;
@@ -130,13 +129,6 @@ function renderTemplateList(templates) {
 
     container.appendChild(card);
   });
-}
-
-// ========== HTML Escape Helper ==========
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text || '';
-  return div.innerHTML;
 }
 
 // ========== Search and Filter ==========

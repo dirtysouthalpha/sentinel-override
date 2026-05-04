@@ -3,16 +3,6 @@
 // Depends on: ui-common.js (showToast, sanitizeHtml).
 // Communicates with background via chrome.runtime.sendMessage (collab_* actions).
 
-// ========== Shared State ==========
-const getState = () => window.__popupState;
-
-// ========== HTML Escape Helper ==========
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text || '';
-  return div.innerHTML;
-}
-
 // ========== Export Template ==========
 
 /**

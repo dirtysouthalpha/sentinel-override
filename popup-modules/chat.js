@@ -4,9 +4,6 @@
 // Depends on: ui-common.js (sanitizeHtml, isValidUrl, showToast, marked config).
 // Depends on: settings.js (toggleTheme).
 
-// Access shared state (set by bootstrap)
-const getState = () => window.__popupState;
-
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
@@ -134,12 +131,6 @@ function respondApproval(decision) {
   if (decision === 'rejected') {
     addMessage('Command rejected by user.', 'assistant');
   }
-}
-
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
 }
 
 // ========== Claude-style Action Cards ==========

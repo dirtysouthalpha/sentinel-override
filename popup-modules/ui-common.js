@@ -2,6 +2,16 @@
 // Shared popup utilities: HTML sanitization, URL validation, toasts, markdown config.
 // Loaded first (before settings.js and chat.js) so these utilities are available globally.
 
+// ========== Shared Helpers ==========
+// Defined once here — all other popup modules reference these from global scope.
+const getState = () => window.__popupState;
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}
+
 // ========== HTML Sanitization ==========
 function sanitizeHtml(dirtyHtml) {
   const doc = new DOMParser().parseFromString(dirtyHtml, 'text/html');

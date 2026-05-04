@@ -2,9 +2,6 @@
 // Settings UI: theme management, provider switching, settings modal, test connection, presets.
 // Depends on: ui-common.js (showToast, isValidUrl, sanitizeHtml).
 
-// Access shared state (set by bootstrap)
-const getState = () => window.__popupState;
-
 // ========== DOM Elements ==========
 const settingsBtn = document.getElementById('settingsBtn');
 const themeToggle = document.getElementById('themeToggle');
