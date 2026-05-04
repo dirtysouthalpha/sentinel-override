@@ -10,6 +10,12 @@
  */
 export function createEl(tag, attrs = {}, textContent = '') {
   const el = document.createElement(tag);
+  // happy-dom elements have 0x0 dimensions by default.
+  // Set explicit dimensions so isVisible() treats them as visible.
+  el.style.width = '100px';
+  el.style.height = '20px';
+  el.style.display = '';
+  el.style.visibility = '';
   Object.entries(attrs).forEach(([key, value]) => {
     if (key === 'style' && typeof value === 'object') {
       Object.assign(el.style, value);
@@ -34,6 +40,8 @@ export function createForm(inputs = []) {
     const el = document.createElement('input');
     el.type = input.type || 'text';
     el.name = input.name || '';
+    el.style.width = '100px';
+    el.style.height = '20px';
     if (input.id) el.id = input.id;
     if (input.placeholder) el.placeholder = input.placeholder;
     if (input.value) el.value = input.value;
@@ -49,10 +57,14 @@ export function createForm(inputs = []) {
  */
 export function createDropdown(items = []) {
   const select = document.createElement('select');
+  select.style.width = '100px';
+  select.style.height = '20px';
   items.forEach(item => {
     const option = document.createElement('option');
     option.value = item.value || '';
     option.textContent = item.text || '';
+    option.style.width = '100px';
+    option.style.height = '20px';
     select.appendChild(option);
   });
   return select;
@@ -100,6 +112,7 @@ export function createTestPage() {
   container.appendChild(hidden);
 
   document.body.appendChild(container);
+  patchBoundingClientRect(document);
   return { container, button, input, link, select, hidden };
 }
 
@@ -111,4 +124,24 @@ export function cleanupTestPage(container) {
   if (container && container.parentNode) {
     container.parentNode.removeChild(container);
   }
+}
+
+/**
+ * Patches getBoundingClientRect on all elements to return non-zero dimensions.
+ * Required because happy-dom does not implement layout calculations,
+ * so getBoundingClientRect() always returns { width: 0, height: 0 }.
+ * The extension's isVisible() checks for zero dimensions, which would
+ * make all elements "invisible" in tests.
+ */
+export function patchBoundingClientRect(doc) {
+  const original = doc.documentElement.getBoundingClientRect.bind(doc.documentElement);
+  doc.querySelectorAll('*').forEach(el => {
+    if (el.style.display === 'none') return; // Keep hidden elements returning 0
+    el.getBoundingClientRect = () => ({
+      x: 0, y: 0,
+      width: parseFloat(el.style.width) || 100,
+      height: parseFloat(el.style.height) || 20,
+      top: 0, right: 100, bottom: 20, left: 0,
+    });
+  });
 }
