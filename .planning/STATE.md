@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-05-04)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Planning next milestone
+**Current focus:** v2 milestone -- testing, tech debt, templates, scheduling, collaboration
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-05-04 — Milestone v2 started
+Phase: 5 -- Testing & Tech Debt Cleanup (next to plan)
+Plan: 05-01
+Status: Roadmap created, ready to plan Phase 5
+Last activity: 2026-05-04 -- v2 roadmap created
 
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2)
+Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2, 0/8 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 8 (v1)
 - Average duration: ~3.5 min/plan
 - Total execution time: ~28 minutes
 
@@ -38,8 +38,11 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2)
 
 ### Decisions
 
-- [Roadmap]: Phase 1 prioritizes agent engine refactoring and reliability -- everything else depends on a solid foundation
-- [Roadmap]: Reports and multi-provider LLM combined into Phase 4 as independent value-adds
+- [Roadmap]: Phase 5 prioritizes testing and tech debt cleanup -- every v2 feature depends on validated, clean code
+- [Roadmap]: Templates (Phase 6) before Scheduling (Phase 7) -- scheduling depends on templates as its primary execution target
+- [Roadmap]: Scheduling (Phase 7) before Collaboration (Phase 8) -- scheduled run reports need to be exportable, so export format designed with scheduled metadata
+- [Roadmap]: v2 has 4 phases (5-8), 8 plans total -- matches "quick" depth calibration
+- [Roadmap]: Each phase split into 2 plans -- backend first, then UI
 - [01-01]: Dependency graph is strictly one-way: message-protocol has no imports; llm-client and tab-manager import only from message-protocol; agent-engine imports from all three; index.js imports from all
 - [01-01]: callLLM/callLLMWithRetry pass CONFIG and agentState as parameters (not closures) for clean module boundaries
 - [01-01]: getRelevantPatterns moved to llm-client.js, saveLearnedPattern stays in agent-engine.js
@@ -83,14 +86,15 @@ None.
 
 ### Blockers/Concerns
 
-- [Codebase]: popup-full.js is ~1,450 lines (monitor for maintainability)
-- [Codebase]: `new Function()` in content.js -- security review needed
-- [Codebase]: No test infrastructure — deferred to v2 (TST-01, TST-02, TST-03)
-- [Codebase]: Old content.js still exists alongside content/ directory -- should be cleaned up
-- [Codebase]: Agent-engine.js LLM prompt does not describe iframe/dropdown/overlay capabilities
+- [Research]: `{{key}}` delimiter collision in agent-engine.js -- must fix before templates ship (DEB-06)
+- [Research]: `new Function()` in content/index.js -- security review needed (DEB-05)
+- [Research]: In-memory state loss on service worker termination -- agent state must persist for scheduling
+- [Research]: Malicious runbook import -- `execute_js` + `new Function()` makes untrusted import dangerous (COL-05)
+- [Research]: Service worker 5-minute execution timeout for long scheduled runs
+- [Research]: chrome.alarms may be cleared on browser restart -- must re-register in scheduler init()
 
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: v1 milestone complete — all phases done, archived
+Stopped at: v2 roadmap created -- 4 phases (5-8), 8 plans, 25/25 requirements mapped
 Resume file: None
