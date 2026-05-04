@@ -2,8 +2,8 @@
 // Generates structured investigation reports after agent task completion.
 // Imports from llm-client.js for LLM calls and message-protocol.js for popup messaging.
 
-import { callLLMWithRetry, isAnthropicEndpoint } from './llm-client.js';
 import { sendSilentUpdate } from './message-protocol.js';
+import { getActiveProvider, resolveProvider } from './provider-registry.js';
 
 // ========== Report Generation ==========
 /**
@@ -132,47 +132,19 @@ IMPORTANT:
  * Reuses settings from chrome.storage but with a dedicated prompt.
  */
 async function generateReportViaLLM(prompt, CONFIG) {
-  const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
-  const apiKey = settings.api_key;
-  const model = settings.model || 'glm-5.1';
+  const providerConfig = await getActiveProvider();
+  const { endpoint, apiKey, model } = providerConfig;
 
   if (!apiKey) throw new Error('API key not configured');
 
-  const useAnthropic = isAnthropicEndpoint(endpoint);
+  const provider = resolveProvider(endpoint, apiKey, model);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout || 45000);
 
-  let requestBody, requestHeaders;
+  const reportSystemPrompt = 'You are an investigation report writer. Produce clean, professional markdown reports. Return ONLY the report content with no wrapping.';
 
-  if (useAnthropic) {
-    requestBody = JSON.stringify({
-      model,
-      max_tokens: 4000,
-      temperature: 0.3,
-      system: 'You are an investigation report writer. Produce clean, professional markdown reports. Return ONLY the report content with no wrapping.',
-      messages: [{ role: 'user', content: prompt }]
-    });
-    requestHeaders = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    };
-  } else {
-    requestBody = JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: 'You are an investigation report writer. Produce clean, professional markdown reports. Return ONLY the report content with no wrapping.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 4000
-    });
-    requestHeaders = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    };
-  }
+  const requestBody = JSON.stringify(provider.buildBody(model, reportSystemPrompt, prompt, { maxTokens: 4000, temperature: 0.3 }));
+  const requestHeaders = provider.buildHeaders(apiKey);
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -188,18 +160,7 @@ async function generateReportViaLLM(prompt, CONFIG) {
   }
 
   const data = await response.json();
-  let responseText;
-
-  if (useAnthropic) {
-    const block = data.content && data.content.find(b => b.type === 'text');
-    if (!block) throw new Error('Anthropic API returned no text block for report');
-    responseText = block.text;
-  } else {
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('API returned no valid response for report');
-    }
-    responseText = data.choices[0].message.content;
-  }
+  const responseText = provider.parseResponse(data);
 
   // Strip code fences if present
   let cleaned = responseText.trim();
