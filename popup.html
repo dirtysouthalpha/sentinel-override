@@ -1794,6 +1794,85 @@
       outline: none;
       border-color: var(--accent-primary);
     }
+
+    /* Schedule Cards */
+    .schedule-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px 16px;
+      transition: border-color 0.2s;
+    }
+    .schedule-card:hover {
+      border-color: var(--accent-primary);
+    }
+    .schedule-card.disabled {
+      opacity: 0.6;
+    }
+    .schedule-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+    .schedule-card-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .schedule-card-goal {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      max-height: 40px;
+      overflow: hidden;
+    }
+    .schedule-card-meta {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .schedule-status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .schedule-status-badge.success { background: rgba(22,163,74,0.15); color: var(--success-color); }
+    .schedule-status-badge.failure { background: rgba(220,38,38,0.15); color: var(--error-color); }
+    .schedule-status-badge.skipped { background: rgba(156,163,175,0.15); color: var(--text-tertiary); }
+    .schedule-status-badge.pending { background: rgba(0,132,255,0.15); color: var(--accent-primary); }
+    .schedule-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-tertiary);
+      font-size: 14px;
+    }
+    .schedule-result-item {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .schedule-result-item:last-child {
+      border-bottom: none;
+    }
+    .schedule-result-status {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .schedule-result-time {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
   </style>
 </head>
 <body>
@@ -1838,6 +1917,12 @@
           <rect x="14" y="3" width="7" height="7"></rect>
           <rect x="14" y="14" width="7" height="7"></rect>
           <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </button>
+      <button class="icon-btn" id="schedulerBtn" title="Schedules">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
         </svg>
       </button>
       <button class="icon-btn" id="settingsBtn" title="Settings">
@@ -1887,6 +1972,15 @@
       <input type="text" id="templateTagFilter" placeholder="Filter by tag..." style="width:140px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;outline:none;">
     </div>
     <div id="template-list"></div>
+  </div>
+
+  <!-- Schedules Panel -->
+  <div id="schedules-panel" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0;">Schedules</h2>
+      <button id="createScheduleBtn" class="small-btn" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">+ New Schedule</button>
+    </div>
+    <div id="schedule-list"></div>
   </div>
 
   <!-- Input Area -->
@@ -2142,6 +2236,92 @@
     </div>
   </div>
 
+  <!-- Create/Edit Schedule Modal -->
+  <div id="schedule-modal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+      <h2 id="schedule-modal-title">New Schedule</h2>
+      <div class="modal-field">
+        <label>Name</label>
+        <input type="text" id="sch-name" placeholder="e.g., Daily VPN Health Check">
+      </div>
+      <div class="modal-field">
+        <label>Source</label>
+        <select id="sch-source-type" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="template">From Template</option>
+          <option value="goal">Freeform Goal</option>
+        </select>
+      </div>
+      <div id="sch-template-field" class="modal-field">
+        <label>Template</label>
+        <select id="sch-template-id" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="">Loading templates...</option>
+        </select>
+        <div id="sch-template-params" style="margin-top:8px;"></div>
+      </div>
+      <div id="sch-goal-field" class="modal-field" style="display:none;">
+        <label>Goal</label>
+        <textarea id="sch-goal" rows="3" placeholder="Describe what the agent should do..." style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Schedule Type</label>
+        <select id="sch-type" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="once">Run Once</option>
+          <option value="recurring">Recurring</option>
+        </select>
+      </div>
+      <div id="sch-once-fields" class="modal-field">
+        <label>Date & Time</label>
+        <input type="datetime-local" id="sch-run-at" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+      </div>
+      <div id="sch-recurring-fields" style="display:none;">
+        <div class="modal-field">
+          <label>Repeat</label>
+          <select id="sch-interval" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="custom">Custom Interval</option>
+          </select>
+        </div>
+        <div id="sch-weekly-days" class="modal-field" style="display:none;">
+          <label>Days of Week</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="1"> Mon</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="2"> Tue</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="3"> Wed</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="4"> Thu</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="5"> Fri</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="6"> Sat</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="0"> Sun</label>
+          </div>
+        </div>
+        <div id="sch-custom-interval" class="modal-field" style="display:none;">
+          <label>Every N minutes</label>
+          <input type="number" id="sch-period" min="30" step="30" value="60" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">Minimum 30 minutes (Chrome alarm API limit)</div>
+        </div>
+        <div class="modal-field">
+          <label>Time of Day</label>
+          <input type="time" id="sch-time" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeScheduleModalBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="saveScheduleBtn" class="modal-btn btn-save">Create Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run History Modal -->
+  <div id="schedule-history-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">Run History</h2>
+        <button id="closeHistoryModalBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div id="schedule-history-list"></div>
+    </div>
+  </div>
+
   <!-- Hidden Elements -->
   <input type="file" id="file-input" multiple>
 
@@ -2150,6 +2330,7 @@
   <script src="popup-modules/settings.js"></script>
   <script src="popup-modules/chat.js"></script>
   <script src="popup-modules/templates.js"></script>
+  <script src="popup-modules/scheduler-ui.js"></script>
   <script src="popup-full.js"></script>
 </body>
 </html>
