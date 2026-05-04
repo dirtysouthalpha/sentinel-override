@@ -1,6 +1,9 @@
 // Sentinel Override v3 — Message Protocol
 // Standardized message send/receive wrappers with { ok, data, error } envelope.
 // Pure utility module — imports NOTHING from other background modules (no circular dependency risk).
+// NOTE: tab-context.js imports sendTabStateUpdate from this module. This is acceptable
+// because tab-context.js does not re-export anything from message-protocol.js, and
+// message-protocol.js never imports from tab-context.js.
 
 /**
  * Promise wrapper around chrome.tabs.sendMessage.
@@ -122,6 +125,12 @@ export function sendActionMessage(command, stepNumber, observation) {
     description = `Wait for element`;
   } else if (command.type === 'wait_for_navigation') {
     description = `Wait for navigation`;
+  } else if (command.type === 'open_tab') {
+    description = `Open tab: ${command.label || command.url}`;
+  } else if (command.type === 'switch_tab') {
+    description = `Switch to: ${command.label || command.tab_id}`;
+  } else if (command.type === 'close_tab') {
+    description = `Close tab: ${command.label || command.tab_id}`;
   } else {
     description = `${command.type}`;
   }
@@ -145,5 +154,23 @@ export function sendActionResult(stepNumber, result, isError) {
     stepNumber,
     result: resultStr.substring(0, 120),
     isError: !!isError
+  }).catch(() => {});
+}
+
+/**
+ * Send tab state update to the popup (for multi-tab UI display).
+ * Each tab is sanitized to { tabId, label, url, isActive }.
+ *
+ * @param {Array} tabs - Array of TabContext objects
+ */
+export function sendTabStateUpdate(tabs) {
+  chrome.runtime.sendMessage({
+    action: 'tab_state_update',
+    tabs: tabs.map(ctx => ({
+      tabId: ctx.tabId,
+      label: ctx.label,
+      url: ctx.url,
+      isActive: ctx.isActive,
+    }))
   }).catch(() => {});
 }
