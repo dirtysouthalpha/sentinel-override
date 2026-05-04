@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Sentinel Override",
-  "version": "2.7.4",
+  "version": "2.8.0",
   "description": "Professional browser automation powered by AI",
   "permissions": [
     "activeTab",
     "scripting",
     "tabs",
     "sidePanel",
-    "storage"
+    "storage",
+    "webNavigation"
   ],
   "action": {
     "default_title": "Sentinel Override",

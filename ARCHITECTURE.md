@@ -2,7 +2,7 @@
 
 > Chrome Manifest V3 extension for LLM-powered browser automation.
 > Location: `C:\Users\Administrator\.openclaw\workspace\sentinel-override\`
-> Version: 2.4.5
+> Version: 2.8.0
 
 ---
 
@@ -135,23 +135,48 @@ sentinel-override/
 - `request_approval` — action needs user approval
 - `show_plan`, `plan_error`, `step_executing`, `step_complete`, `plan_finished` — plan execution events
 
-### content.js — Content Script (150 lines)
+### content.js — Content Script (v2.8, ~500 lines)
+
+**Element Registry (set-of-marks foundation):**
+
+`observe_page` walks the DOM (including open shadow roots) and assigns every visible
+interactive element a stable numeric `id`. The id is stored both in an in-memory
+`Map<id, Element>` and as a `data-sentinel-id` attribute on the element so it survives
+re-observation. Subsequent commands address elements by `id` instead of fragile CSS
+selectors. Resolution order: `id` → `selector` → `role+name` fallback. If an `id`
+goes stale (element re-rendered with the same role and name), background.js retries
+the action by `role` + `name` from the previous observation.
+
+**Set-of-marks visual prompting:**
+
+`draw_marks` paints a top-layer overlay of numbered, color-coded badges over each
+registered element. The agent loop draws marks → captures the screenshot → clears
+marks before the next action. This lets the vision model ground commands by the
+numbered label it sees in the image, eliminating most selector-mismatch failures.
 
 **Actions implemented:**
 
 | Message Action | Handler | Status |
 |---------------|---------|--------|
-| `observe_page` | Find interactive elements (buttons, inputs, links) | Working |
-| `read_page` | Get page text content | Working |
+| `observe_page` | Walk DOM + shadow roots; build registry; return enriched elements (role, name, bbox, viewport, disabled, value, etc.) | Working |
+| `read_page` | Title + URL + truncated body text | Working |
 | `extract_data` | Tables, metadata, forms | Working |
-| `execute_command` → `click` | Click element by selector | Working |
-| `execute_command` → `type` | Type text into input | Working |
-| `execute_command` → `scroll` | Scroll page by direction | Working |
-| `execute_command` → `navigate` | Navigate to URL | Working |
+| `draw_marks` | Render numbered overlay badges over registered elements | Working |
+| `clear_marks` | Remove overlay | Working |
+| `wait_stable` | Wait for `readyState === 'complete'` then DOM mutation quiet period | Working |
+| `execute_command` → `click` | Real pointer+mouse event sequence (pointerdown/mousedown/up/click) | Working |
+| `execute_command` → `type` | Native value setter + InputEvent + change event; supports `clear`, `submit` | Working |
+| `execute_command` → `select` | `<select>` value change | Working |
+| `execute_command` → `hover` | Pointer/mouseover/enter sequence | Working |
+| `execute_command` → `press_key` | KeyboardEvent with proper code + modifiers | Working |
+| `execute_command` → `scroll` | Scroll viewport or scroll element into view | Working |
+| `execute_command` → `extract` | Read element text/value | Working |
+| `execute_command` → `wait_for_text` / `wait_for_element` | Polling waits | Working |
+| `execute_command` → `go_back` / `go_forward` | Browser history navigation | Working |
 
-**Known gap (DEF-001):** `select`, `hover`, `press_key`, `extract`, `wait_for_text`, `wait_for_element`, `execute_js` — 7 action types are NOT handled in content.js and fail silently.
+**Element resolution:** `resolveElement({ id?, selector?, role?, name? })` — preferred path is `id` (constant time lookup). Falls back to selector (with shadow-tree walk) then to role+accessible-name match.
 
-**Helper:** `getUniqueSelector(element)` — generates unique CSS selector for any DOM element.
+**Accessible name:** computed from `aria-label` → `aria-labelledby` → `<label for>` / wrapping `<label>` → `placeholder` → `name` → inner text.
 
 ---
 
@@ -305,51 +330,58 @@ Each defines full CSS variable set (background, text, accent, borders, shadows, 
 
 ---
 
-## Agent Loop Flow
+## Agent Loop Flow (v2.8)
 
 ```
 User sends prompt
     │
     ├── Simple prompt → runPrompt → callLLMSimple → display response
     │
-    └── Complex prompt (plan/execute/task/extract/automate/monitor/crawl/scrape or URLs)
+    └── Complex prompt
         │
         ▼
-    planTask(goal)
-        │ callLLMSimple → get step list
-        ▼
-    showPlanCard → user clicks Execute
+    planTask(goal) → showPlanCard → user clicks Execute
         │
         ▼
-    executePlan(plan)
-        │ for each step:
-        ▼
-    runAgentLoop()
+    runAgentLoop(goal, tabId)
         │
-        ├── 1. observe_page → get interactive elements
-        ├── 2. Capture screenshot
-        ├── 3. callLLM (with vision) → get action JSON
-        ├── 4. parseLLMResponse → validate action
-        ├── 5. If approval mode ON → request_approval → wait
-        ├── 6. Execute action via content.js
-        ├── 7. If step complete → next step
-        ├── 8. If step fails → retry (up to 3)
-        │       If still fails → generateMissingTool → retry
-        │       If still fails → escalate tier → retry
-        └── 9. finish → plan_finished
+        ├── 1. ensureContentScript(tab)
+        ├── 2. wait_stable    (readyState=complete + DOM quiet ≥400ms)
+        ├── 3. observe_page   (build registry; collect role+name+bbox+state)
+        ├── 4. read_page      (truncated body text for context)
+        ├── 5. extract_data   (tables, metadata, forms)
+        ├── 6. draw_marks     (numbered overlay badges)
+        ├── 7. captureVisibleTab (JPEG)
+        ├── 8. clear_marks
+        ├── 9. enforceRateLimit + callLLM (text + vision)
+        ├── 10. parseLLMResponse → command { type, id?, ... }
+        ├── 11. Dispatch command:
+        │        - navigate    → tabs.update + waitForTabLoad (webNavigation.onCompleted)
+        │        - go_back/fwd → content.js + waitForTabLoad
+        │        - other       → executeWithStaleRetry
+        │                         └── if {stale:true} → re-observe + retry by role+name
+        ├── 12. Append to in-memory history (capped at 8)
+        └── 13. Loop until {type:'finish'} or stop_agent_loop
 ```
+
+**Key reliability primitives:**
+
+- `waitForTabLoad(tabId, timeoutMs)` — listens on `chrome.webNavigation.onCompleted` for the top frame, with a polling fallback on `tabs.get(...).status === 'complete'` (covers SPA same-document transitions).
+- `executeWithStaleRetry(tabId, command, observation)` — if content.js reports `{ok:false, stale:true}`, re-observes the page and retries with `role`+`name` from the prior observation.
+- Per-run agent history is in-memory only and cleared from `chrome.storage.local` at start and end.
 
 ---
 
 ## Known Defects
 
-| ID | Severity | Description |
-|----|----------|-------------|
-| DEF-001 | High | content.js missing handlers for select, hover, press_key, extract, wait_for_text, wait_for_element, execute_js — 7/15 action types fail silently |
-| DEF-002 | Medium | `wait_for_navigation` not in validTypes array in background.js |
-| DEF-003 | Medium | `read_page` routing mismatch — message action vs execute_command handler |
-| DEF-004 | Low | `note` type sent to content.js produces noise |
-| DEF-005 | Low | Default "Command failed" error message is not actionable |
+| ID | Severity | Description | Status |
+|----|----------|-------------|--------|
+| DEF-001 | High | content.js missing handlers for select, hover, press_key, extract, wait_for_text, wait_for_element, execute_js | Fixed in 2.5/2.8 |
+| DEF-002 | Medium | `wait_for_navigation` not in validTypes array in background.js | Fixed in 2.8 |
+| DEF-003 | Medium | `read_page` routing mismatch — message action vs execute_command handler | Fixed in 2.8 |
+| DEF-004 | Low | `note` type sent to content.js produces noise | Fixed (note short-circuits before content.js) |
+| DEF-005 | Low | Default "Command failed" error message is not actionable | Improved in 2.8 |
+| DEF-006 | Low | Cross-origin iframes not yet inspected (top frame + same-origin shadow DOM only) | Open |
 
 ---
 
@@ -379,6 +411,7 @@ User sends prompt
 | v2.2.0 | 2026-04-26 | Lean context retention, auto-tool generation |
 | v2.3.0 | 2026-04-27 | Shortcut UI, growth plan, documentation |
 | v2.4.0 | 2026-04-27 | Structured data extraction, persistent memory |
+| v2.8.0 | 2026-05-04 | Set-of-marks visual prompting, element registry with stable IDs, shadow-DOM walking, real pointer/mouse events, webNavigation-based load waits, stale-element retry, `go_back`/`go_forward`. Closes DEF-001/002/003. |
 
 ---
 
