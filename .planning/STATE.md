@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Phase 2 complete -- moving to Phase 3
+**Current focus:** Phase 3 -- Multi-Tab Workflows (plan 1 of 2 complete)
 
 ## Current Position
 
-Phase: 2 of 4 (Complex UI Interactions) -- PHASE COMPLETE
-Plan: 2 of 2 in current phase (both complete)
-Status: Phase complete
-Last activity: 2026-04-24 -- Completed 02-02-PLAN.md
+Phase: 3 of 4 (Multi-Tab Workflows) -- In progress
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-05-04 -- Completed 03-01-PLAN.md
 
-Progress: [████████████████████] 40% (phase 2 complete)
+Progress: [███████████████████░] 83% (5 of 6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: --
 - Total execution time: 0 hours
 
@@ -29,6 +29,7 @@ Progress: [████████████████████] 40% (ph
 |-------|-------|-------|----------|
 | 1     | 2     | 2     | --       |
 | 2     | 2     | 2     | --       |
+| 3     | 1     | 2     | --       |
 
 *Updated after each plan completion*
 
@@ -54,6 +55,12 @@ Progress: [████████████████████] 40% (ph
 - [02-02]: Frame index to Chrome frameId mapping is positional via webNavigation.getAllFrames
 - [02-02]: dismissOverlay never removes elements from DOM -- only clicks close buttons or presses Escape
 - [02-02]: Rich text editor APIs (Quill, TinyMCE, CKEditor) checked before execCommand fallback
+- [03-01]: TabContext is in-memory Map only (no chrome.storage.session backup for v1)
+- [03-01]: Agent-created tabs batch-closed at loop end; no cross-task tab persistence in v1
+- [03-01]: User tab switches do NOT change agent's active tab (CONTEXT.md decision)
+- [03-01]: Post-click new tab: registered as tracked context in multi-tab mode, captured in single-tab mode
+- [03-01]: tab-context.js imports sendTabStateUpdate from message-protocol.js (acceptable one-way dep)
+- [03-01]: handleTabRemoved exported from tab-context.js, called from index.js listener
 
 ### Pending Todos
 
@@ -66,9 +73,10 @@ None yet.
 - [Codebase]: No test infrastructure -- deferred to v2 (TST-01, TST-02, TST-03)
 - [02-01]: Old content.js still exists alongside new content/ directory -- should be cleaned up after Phase 2 verification
 - [02-02]: Agent-engine.js LLM prompt context does not yet describe iframe/dropdown/overlay capabilities -- separate enhancement needed
+- [03-01]: Tab command types (open_tab/switch_tab/close_tab) need to be added to LLM prompt vocabulary in 03-02 or later
 
 ## Session Continuity
 
-Last session: 2026-04-24
-Stopped at: Completed 02-02-PLAN.md (Phase 2 complete)
+Last session: 2026-05-04
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
