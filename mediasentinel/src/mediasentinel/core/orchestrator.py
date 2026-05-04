@@ -1,5 +1,7 @@
 import asyncio
+import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -7,6 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from loguru import logger
 
 from mediasentinel.agents.alert_dispatcher import AlertDispatcher
+from mediasentinel.agents.qbt_controller import SPEED_PROFILES
 from mediasentinel.agents.health_monitor import HealthMonitor
 from mediasentinel.agents.metrics_collector import MetricsCollector
 from mediasentinel.agents.models import VPNState
@@ -15,6 +18,7 @@ from mediasentinel.agents.recovery_engine import RecoveryEngine
 from mediasentinel.agents.tunnel_guard import TunnelGuard
 from mediasentinel.agents.vpn_guard import VPNGuard
 from mediasentinel.config.models import AppConfig
+from mediasentinel.core.snapshot import capture_snapshot, save_snapshot, load_latest_snapshot
 from mediasentinel.db.connection import get_db, init_db
 from mediasentinel.logging.setup import setup_logging
 
@@ -60,6 +64,9 @@ class Orchestrator:
         if self.config.tunnels:
             self.tunnel_guard = TunnelGuard(self.config.tunnels)
 
+        # Restore state from shutdown snapshot if one exists (DEP-03)
+        await self._restore_shutdown_snapshot()
+
         logger.bind(component="Orchestrator").info("Orchestrator initialized")
         self._initialized = True
 
@@ -72,6 +79,53 @@ class Orchestrator:
         await self._shutdown_event.wait()
 
     async def shutdown(self):
+        """Graceful shutdown sequence (DEP-03).
+
+        1. Log shutdown initiated
+        2. Pause all qBittorrent downloads
+        3. Capture full state snapshot and save as 'shutdown' type
+        4. Stop the scheduler
+        5. Flush all pending log entries
+        6. Close all agent connections
+        7. Set shutdown event
+        """
+        log = logger.bind(component="Orchestrator")
+        log.info("Graceful shutdown initiated")
+
+        # Step 2: Pause all qBittorrent downloads if controller is available
+        if self.qbt_controller:
+            try:
+                log.info("Pausing all qBittorrent downloads for shutdown...")
+                self.qbt_controller.enforce_vpn_gate(VPNState.DISCONNECTED)
+                log.info("qBittorrent downloads paused")
+            except Exception as e:
+                log.warning("Failed to pause qBittorrent during shutdown: {}", e)
+
+        # Step 3: Capture full state snapshot and save as 'shutdown'
+        if self._db_path:
+            try:
+                vpn_status = {"state": self._vpn_state.value}
+                snapshot_data = await capture_snapshot(
+                    self._db_path, self.config, vpn_status=vpn_status
+                )
+                # Add shutdown-specific metadata
+                snapshot_data["shutdown_reason"] = "graceful"
+                snapshot_data["shutdown_at"] = datetime.now().isoformat()
+                await save_snapshot(self._db_path, snapshot_data, snapshot_type="shutdown")
+                log.info("Shutdown snapshot saved")
+            except Exception as e:
+                log.warning("Failed to save shutdown snapshot: {}", e)
+
+        # Step 4: Stop the scheduler
+        if self.scheduler.running:
+            self.scheduler.shutdown(wait=False)
+            log.info("Scheduler stopped")
+
+        # Step 5: Flush pending log entries
+        # Loguru file sinks auto-flush on close; the agent close calls below
+        # ensure everything is written before we exit.
+
+        # Step 6: Close all agent connections
         if self.health_monitor:
             await self.health_monitor.close()
         if self.vpn_guard:
@@ -82,13 +136,75 @@ class Orchestrator:
             self.qbt_controller.close()
         if self.alert_dispatcher:
             await self.alert_dispatcher.close()
-        self.scheduler.shutdown(wait=False)
+        log.info("All agent connections closed")
+
+        # Step 7: Set shutdown event
         self._shutdown_event.set()
-        logger.bind(component="Orchestrator").info("Orchestrator shut down")
+        log.info("Orchestrator shut down gracefully")
 
     @property
     def vpn_state(self) -> VPNState:
         return self._vpn_state
+
+    async def _restore_shutdown_snapshot(self):
+        """On startup, check for a 'shutdown' snapshot and restore state from it (DEP-03).
+
+        If found, logs the restore and updates the DB with the last-known service
+        statuses from the snapshot. Deletes the snapshot after restoring so it is
+        not re-used on subsequent starts.
+        """
+        if not self._db_path:
+            return
+
+        log = logger.bind(component="Orchestrator")
+        try:
+            snapshot = await load_latest_snapshot(self._db_path, snapshot_type="shutdown")
+            if snapshot is None:
+                return
+
+            log.info(
+                "Resuming from shutdown snapshot captured at {}",
+                snapshot.get("captured_at", "unknown"),
+            )
+
+            # Restore service statuses from snapshot
+            services = snapshot.get("services", [])
+            if services:
+                async with get_db(self._db_path) as db:
+                    for svc in services:
+                        await db.execute(
+                            """UPDATE services SET status = ?, consecutive_failures = ?
+                            WHERE name = ?""",
+                            (
+                                svc.get("status", "unknown"),
+                                svc.get("consecutive_failures", 0),
+                                svc["name"],
+                            ),
+                        )
+                    await db.commit()
+                log.info(
+                    "Restored statuses for {} services from snapshot", len(services)
+                )
+
+            # Restore VPN state from snapshot
+            vpn_info = snapshot.get("vpn", {})
+            saved_vpn_state = vpn_info.get("state", "disconnected")
+            try:
+                self._vpn_state = VPNState(saved_vpn_state)
+            except ValueError:
+                self._vpn_state = VPNState.DISCONNECTED
+            log.info("Restored VPN state from snapshot: {}", self._vpn_state.value)
+
+            # Delete the shutdown snapshot so it is not reused
+            async with get_db(self._db_path) as db:
+                await db.execute(
+                    "DELETE FROM state_snapshots WHERE snapshot_type = 'shutdown'"
+                )
+                await db.commit()
+            log.info("Shutdown snapshot consumed and deleted")
+
+        except Exception as e:
+            log.warning("Failed to restore shutdown snapshot: {}", e)
 
     def _register_jobs(self):
         for service in self.config.services:
@@ -133,6 +249,15 @@ class Orchestrator:
                 trigger=IntervalTrigger(seconds=self.config.qbt.verify_binding_interval),
                 id="interface_binding_check",
                 name="qBittorrent interface binding verification",
+                replace_existing=True,
+            )
+
+            # Throttling detection (MET-05) runs every 60 seconds
+            self.scheduler.add_job(
+                self._detect_throttling,
+                trigger=IntervalTrigger(seconds=60),
+                id="throttle_detection",
+                name="Bandwidth throttling detection",
                 replace_existing=True,
             )
 
@@ -247,9 +372,11 @@ class Orchestrator:
                 try:
                     stats = self.qbt_controller.get_download_stats()
                     if stats:
-                        await self.metrics_collector.record("download_speed", "qbt", stats.get("download_speed", 0), "bytes/s")
-                        await self.metrics_collector.record("upload_speed", "qbt", stats.get("upload_speed", 0), "bytes/s")
-                        await self.metrics_collector.record("active_torrents", "qbt", stats.get("active_torrents", 0), "count")
+                        await self.metrics_collector.record_download_throughput(
+                            download_bytes_per_sec=stats.get("download_speed", 0),
+                            upload_bytes_per_sec=stats.get("upload_speed", 0),
+                            active_torrents=stats.get("active_torrents", 0),
+                        )
                 except Exception as e:
                     log.debug("Failed to collect qBittorrent download stats: {}", e)
 
@@ -273,6 +400,21 @@ class Orchestrator:
     async def _collect_system_metrics(self):
         if self.metrics_collector:
             await self.metrics_collector.collect_system_metrics()
+
+        # Record download throughput stats from qBittorrent (MET-03)
+        if self.qbt_controller and self.metrics_collector and self._vpn_state == VPNState.CONNECTED:
+            try:
+                stats = self.qbt_controller.get_download_stats()
+                if stats:
+                    await self.metrics_collector.record_download_throughput(
+                        download_bytes_per_sec=stats.get("download_speed", 0),
+                        upload_bytes_per_sec=stats.get("upload_speed", 0),
+                        active_torrents=stats.get("active_torrents", 0),
+                    )
+            except Exception as e:
+                logger.bind(component="Orchestrator").debug(
+                    "Failed to collect download throughput: {}", e
+                )
 
     async def _apply_initial_qbt_settings(self):
         """Apply speed profile on startup."""
@@ -317,6 +459,37 @@ class Orchestrator:
                         )
         except Exception as e:
             log.error("Interface binding check failed: {}", e)
+
+    async def _detect_throttling(self):
+        """Detect bandwidth throttling by comparing throughput against speed profile (MET-05)."""
+        if not self.metrics_collector or not self.alert_dispatcher:
+            return
+
+        # Resolve the speed profile to get expected download speed in bytes/sec
+        profile_name = self.config.qbt.speed_profile
+        profile = SPEED_PROFILES.get(profile_name)
+        if not profile:
+            return
+
+        try:
+            throttle_pct = await self.metrics_collector.detect_throttling(
+                profile.max_download_bytes
+            )
+            if throttle_pct is not None:
+                await self.alert_dispatcher.send_alert(
+                    title="Bandwidth throttling detected",
+                    message=(
+                        f"Download speed is at {throttle_pct}% of the configured profile "
+                        f"'{profile_name}' (expected ~{profile.max_download_bytes} bytes/s). "
+                        f"ISP or VPN may be throttling traffic."
+                    ),
+                    severity="warning",
+                    service_name="qBittorrent",
+                )
+        except Exception as e:
+            logger.bind(component="Orchestrator").debug(
+                "Throttling detection failed: {}", e
+            )
 
     async def _seed_services(self):
         db_path_resolved = Path(os.path.expandvars(str(self._db_path)))
