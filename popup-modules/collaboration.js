@@ -19,7 +19,7 @@ function escapeHtml(text) {
  * Export a single template as a downloadable JSON file.
  * @param {string} templateId
  */
-export async function exportTemplateFile(templateId) {
+async function exportTemplateFile(templateId) {
   try {
     const response = await sendMessage('collab_export_template', { id: templateId });
     if (!response.ok) throw new Error(response.error || 'Export failed');
@@ -36,7 +36,7 @@ export async function exportTemplateFile(templateId) {
 /**
  * Export all templates as a batch JSON file.
  */
-export async function exportAllTemplatesFile() {
+async function exportAllTemplatesFile() {
   try {
     const response = await sendMessage('collab_export_all_templates', {});
     if (!response.ok) throw new Error(response.error || 'Export failed');
@@ -55,7 +55,7 @@ export async function exportAllTemplatesFile() {
 /**
  * Open file picker and handle template import flow.
  */
-export function openImportDialog() {
+function openImportDialog() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -107,7 +107,7 @@ export function openImportDialog() {
  * Export the current report as a downloadable markdown file.
  * @param {{ summary: string, fullReport: string, goal: string, timestamp: string }} report
  */
-export async function exportReportFile(report) {
+async function exportReportFile(report) {
   if (!report || !report.fullReport) {
     showToast('No report to export', 'error');
     return;
@@ -282,3 +282,9 @@ document.getElementById('closeImportModalBtn')?.addEventListener('click', () => 
 document.getElementById('importConfirmBtn')?.addEventListener('click', () => {
   executeImport();
 });
+
+// ========== Window Exports ==========
+window.exportTemplateFile = exportTemplateFile;
+window.exportAllTemplatesFile = exportAllTemplatesFile;
+window.openImportDialog = openImportDialog;
+window.exportReportFile = exportReportFile;
