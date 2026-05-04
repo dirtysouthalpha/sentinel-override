@@ -395,7 +395,7 @@ IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thi
   const userContent = (supportsVision(model) && base64Image)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
-  const requestBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000 }));
+  const requestBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000, temperature: 0.1 }));
   const requestHeaders = provider.buildHeaders(apiKey);
 
   let response;
