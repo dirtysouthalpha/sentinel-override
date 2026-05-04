@@ -930,7 +930,12 @@ async function planTask(goal, workingTabId) {
     });
 
     if (!response.ok) {
-      throw new Error('Plan API error: ' + response.status);
+      const errorText = await response.text();
+      console.error('[Plan Error] Status:', response.status, 'Response:', errorText.substring(0, 200));
+      if (response.status === 401) {
+        throw new Error('API Authentication Failed (401) - Check your API key in settings');
+      }
+      throw new Error('Plan API error: ' + response.status + ' - ' + errorText.substring(0, 100));
     }
 
     const data = await response.json();
