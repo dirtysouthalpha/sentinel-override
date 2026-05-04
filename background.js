@@ -10,6 +10,19 @@ let currentPlan = null;   // Stores the current decomposed plan
 let currentStepIndex = 0; // Tracks which step we're executing
 
 
+// ========== Utility: Sanitize API Key and Endpoint ==========
+function sanitizeApiKey(key) {
+  if (!key) return '';
+  // Remove all whitespace (spaces, tabs, newlines, etc.) and keep only alphanumeric, hyphens, underscores, dots
+  return String(key).replace(/\s/g, '').trim();
+}
+
+function sanitizeEndpoint(url) {
+  if (!url) return 'https://openrouter.ai/api/v1/chat/completions';
+  // Remove leading/trailing whitespace and newlines
+  return String(url).replace(/[\s\n\r]/g, '').trim();
+}
+
 // ========== Task Context — Goal Retention ==========
 let taskContext = {
   goal: null,
@@ -255,8 +268,8 @@ function validateOpenRouterModel(modelName) {
 async function callLLMSimple(prompt, opts = {}) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
-  let endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
-  let apiKey = (settings.api_key || '').trim();
+  let endpoint = sanitizeEndpoint(settings.api_endpoint);
+  let apiKey = sanitizeApiKey(settings.api_key);
 
   if (!apiKey) {
     throw new Error('API key not configured. Please set it in extension settings.');
@@ -358,8 +371,8 @@ function buildAnalysisMessages(userPrompt, pageContext, template = null) {
 // Main analysis function — returns rich markdown, not JSON
 async function analyzeWithPage(userPrompt, tabId) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
-  const apiKey = (settings.api_key || '').trim();
+  const endpoint = sanitizeEndpoint(settings.api_endpoint);
+  const apiKey = sanitizeApiKey(settings.api_key);
   const model = settings.model || 'deepseek-v4-flash';
 
   if (!apiKey) {
@@ -874,8 +887,8 @@ function sendSilentUpdate(text) {
 async function planTask(goal, workingTabId) {
   try {
     const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-    const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
-    const apiKey = (settings.api_key || '').trim();
+    const endpoint = sanitizeEndpoint(settings.api_endpoint);
+    const apiKey = sanitizeApiKey(settings.api_key);
     const model = settings.model || 'deepseek-v4-flash';
 
     if (!apiKey) {
@@ -1166,8 +1179,8 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
 // ========== API Call (Automation Mode) ==========
 async function callLLM(observation, pageContent, base64Image, goal, history, stepCount) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
-  const apiKey = (settings.api_key || '').trim();
+  const endpoint = sanitizeEndpoint(settings.api_endpoint);
+  const apiKey = sanitizeApiKey(settings.api_key);
   const model = settings.model || 'deepseek-v4-flash';
 
   if (!apiKey) {
