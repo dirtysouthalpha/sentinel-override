@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-04-24)
 
 ## Current Position
 
-Phase: 3 of 4 (Multi-Tab Workflows) -- PHASE COMPLETE
-Plan: 2 of 2 in current phase (both complete)
-Status: Phase complete
-Last activity: 2026-05-04 -- Completed 03-02-PLAN.md
+Phase: 4 of 4 (Reports & Multi-Provider LLM)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-05-04 -- Completed 04-01-PLAN.md
 
-Progress: [████████████████████] 100% (6 of 6 plans complete)
+Progress: [██████████████████░░] 87% (7 of 8 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: --
 - Total execution time: 0 hours
 
@@ -30,6 +30,7 @@ Progress: [████████████████████] 100% (6
 | 1     | 2     | 2     | --       |
 | 2     | 2     | 2     | --       |
 | 3     | 2     | 2     | --       |
+| 4     | 1     | 2     | --       |
 
 *Updated after each plan completion*
 
@@ -65,6 +66,11 @@ Progress: [████████████████████] 100% (6
 - [03-02]: MANAGED TABS shows first 300 chars of page content for inactive tabs, not full element list
 - [03-02]: Labels are the primary reference mechanism for LLM tab commands
 - [03-02]: Popup tab clicks use chrome.tabs.update only, no background messaging (observation-only)
+- [04-01]: Report generation is async (non-blocking) -- uses .then() after loop exit so "Task completed" appears immediately
+- [04-01]: reportData snapshot captured BEFORE history is cleared, ensuring data survives cleanup
+- [04-01]: Report LLM call is a dedicated fetch (not callLLMWithRetry) because report prompt has different format requirements
+- [04-01]: Fallback report built from raw execution data when LLM call fails
+- [04-01]: Report modal reuses existing .modal CSS class for consistent z-index and backdrop behavior
 
 ### Pending Todos
 
@@ -81,5 +87,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 03-02-PLAN.md (Phase 3 complete)
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
