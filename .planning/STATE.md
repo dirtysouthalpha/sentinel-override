@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 5 of 8 -- Testing & Tech Debt Cleanup
-Plan: 02 of 2
-Status: Phase 5 complete, next is 06-01 (templates backend)
-Last activity: 2026-05-04 -- Completed 05-02-PLAN.md
+Phase: 6 of 8 -- Command Templates & Runbooks
+Plan: 01 of 2
+Status: In progress, next is 06-02 (template popup UI)
+Last activity: 2026-05-04 -- Completed 06-01-PLAN.md
 
-Progress: [███░░░░░░░░░░░░░] 25.0% (v2, 2/8 plans)
+Progress: [████░░░░░░░░░░░░] 37.5% (v2, 3/8 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10 (v1: 8, v2: 2)
+- Total plans completed: 11 (v1: 8, v2: 3)
 - Average duration: ~4 min/plan
-- Total execution time: ~49 minutes
+- Total execution time: ~51 minutes
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: [███░░░░░░░░░░░░░] 25.0% (v2, 2/8 plan
 | 3     | 2     | 2     | ~3 min   |
 | 4     | 2     | 2     | ~4.5 min |
 | 5     | 2     | 2     | ~12.5 min |
+| 6     | 1     | 1     | ~2 min   |
 
 *Updated after each plan completion*
 
@@ -91,6 +92,11 @@ Progress: [███░░░░░░░░░░░░░] 25.0% (v2, 2/8 plan
 - [05-02]: KEPT new Function() for v2 -- documented risk with detailed comment block, deferred sandboxing
 - [05-02]: Legacy content.js deleted -- replaced by modular content/ directory since Phase 2
 - [05-02]: isAnthropicEndpoint export removed from llm-client.js -- resolveProvider from provider-registry.js is the replacement
+- [06-01]: Template storage uses object-keyed pattern { [id]: Template } in chrome.storage.local -- avoids array reindexing, O(1) lookup
+- [06-01]: Auto-param extraction from goal text when params not provided; re-extracted on goal update unless explicitly overridden
+- [06-01]: Unresolved ::key:: placeholders left as-is when no value/default provided -- user sees what was skipped
+- [06-01]: template-manager.js is Layer 2 (zero imports from other background modules) -- pure chrome.storage.local utility
+- [06-01]: Usage tracking (lastUsedAt, runCount) updated inside resolveTemplateGoal at agent start
 
 ### Pending Todos
 
@@ -108,5 +114,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 05-02-PLAN.md (tech debt cleanup + popup split)
+Stopped at: Completed 06-01-PLAN.md (template backend)
 Resume file: None
