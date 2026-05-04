@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 ## Current Position
 
 Phase: 5 of 8 -- Testing & Tech Debt Cleanup
-Plan: 01 of 2
-Status: Plan 01 complete, next is 05-02 (tech debt cleanup)
-Last activity: 2026-05-04 -- Completed 05-01-PLAN.md
+Plan: 02 of 2
+Status: Phase 5 complete, next is 06-01 (templates backend)
+Last activity: 2026-05-04 -- Completed 05-02-PLAN.md
 
-Progress: [█░░░░░░░░░░░░░░░] 12.5% (v2, 1/8 plans)
+Progress: [███░░░░░░░░░░░░░] 25.0% (v2, 2/8 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (v1)
-- Average duration: ~3.5 min/plan
-- Total execution time: ~28 minutes
+- Total plans completed: 10 (v1: 8, v2: 2)
+- Average duration: ~4 min/plan
+- Total execution time: ~49 minutes
 
 **By Phase:**
 
@@ -31,7 +31,7 @@ Progress: [█░░░░░░░░░░░░░░░] 12.5% (v2, 1/8 plan
 | 2     | 2     | 2     | ~5 min   |
 | 3     | 2     | 2     | ~3 min   |
 | 4     | 2     | 2     | ~4.5 min |
-| 5     | 1     | 1     | ~21 min  |
+| 5     | 2     | 2     | ~12.5 min |
 
 *Updated after each plan completion*
 
@@ -84,6 +84,13 @@ Progress: [█░░░░░░░░░░░░░░░] 12.5% (v2, 1/8 plan
 - [05-01]: Patched `getBoundingClientRect` in test fixtures -- happy-dom does not implement layout calculations, so all elements have 0x0 dimensions, breaking `isVisible()` checks
 - [05-01]: Content script testability achieved via `export const X = window.__sentinelUtils.X;` at end of each IIFE -- no production behavior change
 - [05-01]: Vitest v4 removed `--include` flag -- test scripts use positional path arguments instead
+- [05-02]: Regular `<script>` tags for popup modules (NOT type=module) -- global scope sharing is simpler than ES modules
+- [05-02]: window.__popupState shared state object for cross-module communication in popup
+- [05-02]: BUILT-IN UI CAPABILITIES section in LLM prompt describes automatic capabilities (shadow DOM, dropdowns, overlays, rich text editors, iframes)
+- [05-02]: Template delimiter changed from {{key}} to ::key:: -- collision-proof for templates
+- [05-02]: KEPT new Function() for v2 -- documented risk with detailed comment block, deferred sandboxing
+- [05-02]: Legacy content.js deleted -- replaced by modular content/ directory since Phase 2
+- [05-02]: isAnthropicEndpoint export removed from llm-client.js -- resolveProvider from provider-registry.js is the replacement
 
 ### Pending Todos
 
@@ -91,8 +98,8 @@ None.
 
 ### Blockers/Concerns
 
-- [Research]: `{{key}}` delimiter collision in agent-engine.js -- must fix before templates ship (DEB-06)
-- [Research]: `new Function()` in content/index.js -- security review needed (DEB-05)
+- ~~[Research]: `{{key}}` delimiter collision in agent-engine.js~~ -- FIXED: changed to ::key::
+- ~~[Research]: `new Function()` in content/index.js -- security review needed~~ -- DONE: documented with SECURITY REVIEW comment block
 - [Research]: In-memory state loss on service worker termination -- agent state must persist for scheduling
 - [Research]: Malicious runbook import -- `execute_js` + `new Function()` makes untrusted import dangerous (COL-05)
 - [Research]: Service worker 5-minute execution timeout for long scheduled runs
@@ -101,5 +108,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 05-01-PLAN.md (test infrastructure + 216 tests)
+Stopped at: Completed 05-02-PLAN.md (tech debt cleanup + popup split)
 Resume file: None
