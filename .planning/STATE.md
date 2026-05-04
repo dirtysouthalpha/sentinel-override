@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 6 of 8 -- Command Templates & Runbooks
-Plan: 01 of 2
-Status: In progress, next is 06-02 (template popup UI)
-Last activity: 2026-05-04 -- Completed 06-01-PLAN.md
+Phase: 6 of 8 -- Command Templates & Runbooks (COMPLETE)
+Plan: 02 of 2 (COMPLETE)
+Status: Phase complete, ready for Phase 7 (Scheduling)
+Last activity: 2026-05-04 -- Completed 06-02-PLAN.md
 
-Progress: [████░░░░░░░░░░░░] 37.5% (v2, 3/8 plans)
+Progress: [██████░░░░░░░░░░] 50.0% (v2, 4/8 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11 (v1: 8, v2: 3)
+- Total plans completed: 12 (v1: 8, v2: 4)
 - Average duration: ~4 min/plan
-- Total execution time: ~51 minutes
+- Total execution time: ~53 minutes
 
 **By Phase:**
 
@@ -32,7 +32,7 @@ Progress: [████░░░░░░░░░░░░] 37.5% (v2, 3/8 plan
 | 3     | 2     | 2     | ~3 min   |
 | 4     | 2     | 2     | ~4.5 min |
 | 5     | 2     | 2     | ~12.5 min |
-| 6     | 1     | 1     | ~2 min   |
+| 6     | 2     | 2     | ~2 min   |
 
 *Updated after each plan completion*
 
@@ -97,6 +97,9 @@ Progress: [████░░░░░░░░░░░░] 37.5% (v2, 3/8 plan
 - [06-01]: Unresolved ::key:: placeholders left as-is when no value/default provided -- user sees what was skipped
 - [06-01]: template-manager.js is Layer 2 (zero imports from other background modules) -- pure chrome.storage.local utility
 - [06-01]: Usage tracking (lastUsedAt, runCount) updated inside resolveTemplateGoal at agent start
+- [06-02]: templatesBtn click handler lives only in popup-full.js bootstrap, not duplicated in templates.js
+- [06-02]: escapeHtml helper duplicated per popup module (no shared utility module for popup)
+- [06-02]: Template panel uses inline style display:none/flex toggle rather than CSS class
 
 ### Pending Todos
 
@@ -114,5 +117,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 06-01-PLAN.md (template backend)
+Stopped at: Completed 06-02-PLAN.md (template popup UI -- Phase 6 complete)
 Resume file: None
