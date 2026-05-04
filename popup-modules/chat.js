@@ -430,6 +430,13 @@ goalInput.addEventListener('input', () => {
   updateMarkdownPreview();
 });
 
+goalInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
 // ========== Send Message ==========
 sendBtn.addEventListener('click', sendMessage);
 
