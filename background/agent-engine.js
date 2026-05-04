@@ -4,7 +4,8 @@
 
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
-import { sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
+import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate } from './message-protocol.js';
+import { generateReport } from './report-generator.js';
 import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 
@@ -140,6 +141,7 @@ async function runAgentLoop(goal, workingTabId) {
   let finished = false;
   let history = [];
   let stepCount = 0;
+  let reportData = null;  // Snapshot for async report generation
   agentPlan = null;
   currentPlanStep = 0;
 
@@ -383,7 +385,19 @@ async function runAgentLoop(goal, workingTabId) {
           finalSummary += `\n\n---\n**Extracted Data (from investigation):**\n${memLines}`;
         }
 
+        // Capture report data BEFORE history gets cleared at loop exit
+        reportData = {
+          goal,
+          history: history.slice(),
+          agentMemory: { ...agentMemory },
+          agentPlan: agentPlan ? agentPlan.slice() : null,
+          stepCount,
+          apiCallCount,
+          tabContexts: getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot }))
+        };
+
         chrome.runtime.sendMessage({ action: 'agent_finished', summary: finalSummary }).catch(() => {});
+        sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
         break;
       }
@@ -685,6 +699,18 @@ async function runAgentLoop(goal, workingTabId) {
 
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
+
+  // Async report generation (non-blocking -- runs after loop exit)
+  if (reportData) {
+    generateReport(reportData, CONFIG)
+      .then(report => {
+        sendReportUpdate('ready', report);
+      })
+      .catch(err => {
+        console.error('Report generation failed:', err);
+        sendReportUpdate('error', null, err.message);
+      });
+  }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);

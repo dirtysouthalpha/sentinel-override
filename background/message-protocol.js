@@ -158,6 +158,23 @@ export function sendActionResult(stepNumber, result, isError) {
 }
 
 /**
+ * Send a report update to the popup (generating, ready, or error).
+ * Fire-and-forget messaging pattern consistent with other send functions.
+ *
+ * @param {'generating'|'ready'|'error'} status
+ * @param {object|null} report - Report object when status is 'ready'
+ * @param {string|null} error - Error message when status is 'error'
+ */
+export function sendReportUpdate(status, report = null, error = null) {
+  chrome.runtime.sendMessage({
+    action: 'report_update',
+    status,
+    report,
+    error
+  }).catch(() => {});
+}
+
+/**
  * Send tab state update to the popup (for multi-tab UI display).
  * Each tab is sanitized to { tabId, label, url, isActive }.
  *

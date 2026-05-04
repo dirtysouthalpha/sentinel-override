@@ -7,6 +7,7 @@ import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreens
 import { setSPATransitionPending } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector } from './frame-router.js';
 import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
+import { generateReport } from './report-generator.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
