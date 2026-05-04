@@ -27,3 +27,30 @@
 **Audit:** 20/20 requirements, 4/4 phases, 8/8 integration, 4/4 E2E flows
 
 ---
+
+## v2 (Shipped: 2026-05-04)
+
+**Delivered:** Production-ready codebase with test safety net, command templates for runbook reuse, automated scheduling, and team collaboration via file sharing.
+
+**Phases completed:** 5-8 (8 plans total)
+
+**Key accomplishments:**
+
+- Test infrastructure with Vitest + happy-dom: 239 tests across 15 files (unit, integration, E2E scaffold)
+- Eliminated tech debt: deleted legacy content.js, split 1,450-line popup into 5 focused modules, fixed template delimiter collision
+- Command templates with ::key:: parameter placeholders, auto-extraction, library with search/filter, and persisted storage
+- Agent scheduling via chrome.alarms with one-time and recurring intervals, background execution, completion notifications, and report capture
+- Collaboration with JSON template export/import, safety validation (7 dangerous patterns), conflict resolution (skip/rename/overwrite), and report markdown export with YAML frontmatter
+
+**Stats:**
+
+- 39 commits across 1 day (2026-05-04)
+- 239 tests passing (15 test files)
+- 4 phases, 8 plans
+- 25/25 requirements satisfied
+
+**Git range:** `af226a9` (docs: start milestone v2) to `84bc2b5` (docs(08): complete)
+
+**Audit:** 25/25 requirements, 4/4 phases, passed
+
+---
