@@ -279,30 +279,54 @@ async function callLLMSimple(prompt, opts = {}) {
   if (!apiKey) {
     throw new Error('API key not configured. Please set it in extension settings.');
   }
-  
+
   // Handle Poolside AI endpoint
   if (endpoint.includes('poolside.ai') || endpoint.includes('platform.poolside.ai')) {
     model = validatePoolsideModel(model);
     endpoint = 'https://api.poolside.ai/v1/chat/completions';
   }
-  
+
   if (endpoint.includes('openrouter.ai')) {
     model = validateOpenRouterModel(model);
   }
-  
+
   const body = {
     model: model,
     messages: [{ role: 'user', content: prompt }],
     max_tokens: opts.max_tokens || 1024,
     temperature: opts.temperature || 0.3
   };
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-    body: JSON.stringify(body)
-  });
+
+  // Debug logging
+  console.log('[API Call] Endpoint:', endpoint);
+  console.log('[API Call] Model:', model);
+  console.log('[API Call] API Key length:', apiKey.length, 'chars');
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+
+  let resp;
+  try {
+    resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify(body),
+      signal: abortController.signal
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('API request timed out after 30 seconds');
+    }
+    throw new Error('Network error: ' + err.message);
+  }
+
+  clearTimeout(timeoutId);
+
   if (!resp.ok) {
     const errorText = await resp.text();
+    console.error('[API Error] Status:', resp.status);
+    console.error('[API Error] Response:', errorText.substring(0, 500));
     throw new Error('API Error: ' + resp.status + ' - ' + errorText);
   }
   const data = await resp.json();
@@ -434,22 +458,43 @@ sendSilentUpdate('[Analysis] Generating analysis...');
   // Rate limiting
   await enforceRateLimit();
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + apiKey
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: messages,
-      temperature: 0.4,  // Slightly higher for nuanced analysis
-      max_tokens: 4096   // Much higher for detailed reports
-    })
-  });
+  console.log('[Analysis] Endpoint:', endpoint);
+  console.log('[Analysis] Model:', model);
+  console.log('[Analysis] API Key length:', apiKey.length, 'chars');
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 0.4,  // Slightly higher for nuanced analysis
+        max_tokens: 4096   // Much higher for detailed reports
+      }),
+      signal: abortController.signal
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('API request timed out after 30 seconds');
+    }
+    throw new Error('Network error: ' + err.message);
+  }
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorData = await response.text();
+    console.error('[Analysis Error] Status:', response.status);
+    console.error('[Analysis Error] Response:', errorData.substring(0, 500));
     throw new Error('API Error: ' + response.status + ' - ' + errorData);
   }
 
@@ -912,26 +957,45 @@ async function planTask(goal, workingTabId) {
 
     const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.\n\nUser instruction: "${goal}"\n\nReturn ONLY a JSON object with this exact structure:\n{\n  "plan_title": "Brief 5-word title",\n  "steps": [\n    {\n      "step_number": 1,\n      "action_type": "navigate|click|type|scroll|read_page|ask_user|wait",\n      "description": "Clear description of what to do"\n    }\n  ],\n  "estimated_steps": 3,\n  "warnings": []\n}\n\nRules:\n- Each step should be a single action\n- First step is usually 'navigate' to a URL\n- If user needs to provide information (like a password), use action_type "ask_user"\n- Keep descriptions brief but clear (10-20 words each)\n- Return ONLY valid JSON, no markdown, no explanations`;
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: 'You are a precise task decomposition assistant. Return ONLY valid JSON.' },
-          { role: 'user', content: planPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000
-      })
-    });
+    console.log('[Plan] Endpoint:', endpoint);
+    console.log('[Plan] Model:', model);
+    console.log('[Plan] API Key length:', apiKey.length, 'chars');
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 30000);
+
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: 'You are a precise task decomposition assistant. Return ONLY valid JSON.' },
+            { role: 'user', content: planPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: 2000
+        }),
+        signal: abortController.signal
+      });
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('API request timed out after 30 seconds');
+      }
+      throw new Error('Network error: ' + err.message);
+    }
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Plan Error] Status:', response.status, 'Response:', errorText.substring(0, 200));
+      console.error('[Plan Error] Status:', response.status, 'Response:', errorText.substring(0, 500));
       if (response.status === 401) {
         throw new Error('API Authentication Failed (401) - Check your API key in settings');
       }
@@ -1252,29 +1316,50 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   }
   // ===== END COST SAFETY CHECK =====
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: 'system', content: 'You are a precise web automation agent. Return ONLY valid JSON. No markdown, no explanations.' },
-        { role: 'user', content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-          ]
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 500
-    })
-  });
+  console.log('[LLM] Endpoint:', endpoint);
+  console.log('[LLM] Model:', model);
+  console.log('[LLM] API Key length:', apiKey.length, 'chars');
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'system', content: 'You are a precise web automation agent. Return ONLY valid JSON. No markdown, no explanations.' },
+          { role: 'user', content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+            ]
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      }),
+      signal: abortController.signal
+    });
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('API request timed out after 30 seconds');
+    }
+    throw new Error('Network error: ' + err.message);
+  }
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorData = await response.text();
+    console.error('[LLM Error] Status:', response.status);
+    console.error('[LLM Error] Response:', errorData.substring(0, 500));
     throw new Error(`API Error: ${response.status} - ${errorData}`);
   }
   const data = await response.json();
