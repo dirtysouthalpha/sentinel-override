@@ -280,7 +280,7 @@ async function callLLMSimple(prompt, opts = {}) {
     throw new Error('API key not configured. Please set it in extension settings.');
   }
 
-  // Handle Poolside AI endpoint
+  // Handle provider-specific configuration
   if (endpoint.includes('poolside.ai') || endpoint.includes('platform.poolside.ai')) {
     model = validatePoolsideModel(model);
     endpoint = 'https://api.poolside.ai/v1/chat/completions';
@@ -289,6 +289,8 @@ async function callLLMSimple(prompt, opts = {}) {
   if (endpoint.includes('openrouter.ai')) {
     model = validateOpenRouterModel(model);
   }
+
+  const isZAI = endpoint.includes('z.ai');
 
   const body = {
     model: model,
@@ -301,15 +303,28 @@ async function callLLMSimple(prompt, opts = {}) {
   console.log('[API Call] Endpoint:', endpoint);
   console.log('[API Call] Model:', model);
   console.log('[API Call] API Key length:', apiKey.length, 'chars');
+  if (isZAI) {
+    console.log('[API Call] Provider: z.ai (detected)');
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), 30000);
 
   let resp;
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    };
+
+    // z.ai might require additional headers
+    if (isZAI) {
+      headers['User-Agent'] = 'Mozilla/5.0 (Chrome Extension)';
+    }
+
     resp = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      headers: headers,
       body: JSON.stringify(body),
       signal: abortController.signal
     });
@@ -458,21 +473,32 @@ sendSilentUpdate('[Analysis] Generating analysis...');
   // Rate limiting
   await enforceRateLimit();
 
+  const isZAIAnalysis = endpoint.includes('z.ai');
+
   console.log('[Analysis] Endpoint:', endpoint);
   console.log('[Analysis] Model:', model);
   console.log('[Analysis] API Key length:', apiKey.length, 'chars');
+  if (isZAIAnalysis) {
+    console.log('[Analysis] Provider: z.ai (detected)');
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), 30000);
 
   let response;
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    };
+
+    if (isZAIAnalysis) {
+      headers['User-Agent'] = 'Mozilla/5.0 (Chrome Extension)';
+    }
+
     response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
+      headers: headers,
       body: JSON.stringify({
         model: model,
         messages: messages,
@@ -957,21 +983,32 @@ async function planTask(goal, workingTabId) {
 
     const planPrompt = `You are a task decomposition assistant. Break down the following user instruction into a clear, sequential plan with 2-8 steps.\n\nUser instruction: "${goal}"\n\nReturn ONLY a JSON object with this exact structure:\n{\n  "plan_title": "Brief 5-word title",\n  "steps": [\n    {\n      "step_number": 1,\n      "action_type": "navigate|click|type|scroll|read_page|ask_user|wait",\n      "description": "Clear description of what to do"\n    }\n  ],\n  "estimated_steps": 3,\n  "warnings": []\n}\n\nRules:\n- Each step should be a single action\n- First step is usually 'navigate' to a URL\n- If user needs to provide information (like a password), use action_type "ask_user"\n- Keep descriptions brief but clear (10-20 words each)\n- Return ONLY valid JSON, no markdown, no explanations`;
 
+    const isZAI = endpoint.includes('z.ai');
+
     console.log('[Plan] Endpoint:', endpoint);
     console.log('[Plan] Model:', model);
     console.log('[Plan] API Key length:', apiKey.length, 'chars');
+    if (isZAI) {
+      console.log('[Plan] Provider: z.ai (detected)');
+    }
 
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => abortController.abort(), 30000);
 
     let response;
     try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apiKey
+      };
+
+      if (isZAI) {
+        headers['User-Agent'] = 'Mozilla/5.0 (Chrome Extension)';
+      }
+
       response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + apiKey
-        },
+        headers: headers,
         body: JSON.stringify({
           model: model,
           messages: [
@@ -1316,21 +1353,32 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   }
   // ===== END COST SAFETY CHECK =====
 
+  const isZAI = endpoint.includes('z.ai');
+
   console.log('[LLM] Endpoint:', endpoint);
   console.log('[LLM] Model:', model);
   console.log('[LLM] API Key length:', apiKey.length, 'chars');
+  if (isZAI) {
+    console.log('[LLM] Provider: z.ai (detected)');
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), 30000);
 
   let response;
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    };
+
+    if (isZAI) {
+      headers['User-Agent'] = 'Mozilla/5.0 (Chrome Extension)';
+    }
+
     response = await fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
+      headers: headers,
       body: JSON.stringify({
         model: model,
         messages: [
