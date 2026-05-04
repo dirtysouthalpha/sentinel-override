@@ -253,4 +253,3 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
   };
 })();
 
-export const specialInputs = window.__sentinelUtils.specialInputs;

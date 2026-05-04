@@ -329,4 +329,3 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   };
 })();
 
-export const dropdown = window.__sentinelUtils.dropdown;

@@ -29,4 +29,3 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
   };
 })();
 
-export const highlight = window.__sentinelUtils.highlight;

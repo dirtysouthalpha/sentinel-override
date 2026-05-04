@@ -74,4 +74,3 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
   };
 })();
 
-export const wait = window.__sentinelUtils.wait;

@@ -171,4 +171,3 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   };
 })();
 
-export const dom = window.__sentinelUtils.dom;

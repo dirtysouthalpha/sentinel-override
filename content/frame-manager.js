@@ -161,4 +161,3 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
   };
 })();
 
-export const frame = window.__sentinelUtils.frame;

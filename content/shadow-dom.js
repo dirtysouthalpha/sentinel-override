@@ -162,4 +162,3 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   };
 })();
 
-export const shadow = window.__sentinelUtils.shadow;
