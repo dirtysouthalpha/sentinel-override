@@ -455,6 +455,9 @@ export function extractFirstJsonObject(str) {
 
 export function parseLLMResponse(content) {
   try {
+    if (!content || typeof content !== 'string') {
+      throw new Error('Empty or null response from API');
+    }
     let jsonStr = content.trim();
     if (jsonStr.includes('```')) {
       const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);

@@ -74,7 +74,14 @@ export const PROVIDERS = {
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
         throw new Error(`API returned no valid response: ${data.error?.message || JSON.stringify(data).slice(0, 500)}`);
       }
-      return data.choices[0].message.content;
+      const content = data.choices[0].message.content;
+      if (!content) {
+        // Some APIs (OpenRouter, Z.ai) return null content for tool calls or empty responses
+        const reasoning = data.choices[0].message.reasoning_content || data.choices[0].message.reasoning;
+        if (reasoning) return reasoning;
+        throw new Error(`API returned null content: ${JSON.stringify(data).slice(0, 500)}`);
+      }
+      return content;
     },
 
     /** Build vision content array for OpenAI Chat Completions API. */
