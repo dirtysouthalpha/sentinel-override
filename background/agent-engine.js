@@ -270,7 +270,7 @@ async function runAgentLoop(goal, workingTabId) {
       updateSnapshot(tab, {
         elements: observation?.elements || [],
         pageContent: pageContent?.content || '',
-        url: currentUrl,
+        url: tabInfo?.url || '',
         title: tabInfo?.title || ''
       });
 
