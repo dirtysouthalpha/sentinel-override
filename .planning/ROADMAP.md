@@ -25,7 +25,7 @@ Full details: [.planning/milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md)
 
 ### v2 (Phases 5-8) -- IN PROGRESS
 
-- [ ] **Phase 5: Testing & Tech Debt Cleanup** -- Establish test infrastructure, eliminate security risks, and clean up codebase debt so all future work is validated.
+- [ ] **Phase 5: Testing & Tech Debt Cleanup** (1/2 plans) -- Establish test infrastructure, eliminate security risks, and clean up codebase debt so all future work is validated.
 - [ ] **Phase 6: Command Templates & Runbooks** -- Users save, organize, and re-execute tasks as reusable templates with parameter substitution.
 - [ ] **Phase 7: Agent Scheduling** -- Users schedule templates to run at specific times or on recurring intervals with background execution and notifications.
 - [ ] **Phase 8: Collaboration & Export** -- Users export and import templates and reports as shareable files with format versioning and safety validation.
@@ -50,7 +50,7 @@ Full details: [.planning/milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md)
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Test infrastructure setup, Chrome API mocks, unit tests for content script utilities and background modules, integration tests for agent loop with mocked APIs
+- [x] 05-01: Test infrastructure setup, Chrome API mocks, unit tests for content script utilities and background modules, integration tests for agent loop with mocked APIs
 - [ ] 05-02: Tech debt cleanup -- delete legacy content.js, split popup-full.js into focused modules, update agent-engine LLM prompt, remove deprecated exports, fix template delimiter collision, document or resolve `new Function()` security risk
 
 ---
@@ -133,7 +133,7 @@ Plans:
 | 2. Complex UI Interactions | v1 | 2 | 2/2 | Complete | 2026-04-24 |
 | 3. Multi-Tab Workflows | v1 | 2 | 2/2 | Complete | 2026-05-04 |
 | 4. Reports & Multi-Provider LLM | v1 | 2 | 2/2 | Complete | 2026-05-04 |
-| 5. Testing & Tech Debt Cleanup | v2 | 2 | 0/2 | Pending | -- |
+| 5. Testing & Tech Debt Cleanup | v2 | 2 | 1/2 | In Progress | 2026-05-04 |
 | 6. Command Templates & Runbooks | v2 | 2 | 0/2 | Pending | -- |
 | 7. Agent Scheduling | v2 | 2 | 0/2 | Pending | -- |
 | 8. Collaboration & Export | v2 | 2 | 0/2 | Pending | -- |

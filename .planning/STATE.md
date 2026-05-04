@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 5 -- Testing & Tech Debt Cleanup (next to plan)
-Plan: 05-01
-Status: Roadmap created, ready to plan Phase 5
-Last activity: 2026-05-04 -- v2 roadmap created
+Phase: 5 of 8 -- Testing & Tech Debt Cleanup
+Plan: 01 of 2
+Status: Plan 01 complete, next is 05-02 (tech debt cleanup)
+Last activity: 2026-05-04 -- Completed 05-01-PLAN.md
 
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2, 0/8 plans)
+Progress: [█░░░░░░░░░░░░░░░] 12.5% (v2, 1/8 plans)
 
 ## Performance Metrics
 
@@ -31,6 +31,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2,
 | 2     | 2     | 2     | ~5 min   |
 | 3     | 2     | 2     | ~3 min   |
 | 4     | 2     | 2     | ~4.5 min |
+| 5     | 1     | 1     | ~21 min  |
 
 *Updated after each plan completion*
 
@@ -79,6 +80,10 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0% (v2,
 - [04-02]: Legacy migration removes old keys after creating new structure to prevent stale data
 - [04-02]: Mid-task provider switching works transparently via getActiveProvider() on each call -- no context bridge needed for v1
 - [04-02]: generatePlan() keeps flat settings parameter interface to minimize change surface
+- [05-01]: Used `beforeAll` instead of `beforeEach` for content script imports -- IIFEs only execute once per module load; resetting `window.__sentinelUtils` between tests breaks the namespace
+- [05-01]: Patched `getBoundingClientRect` in test fixtures -- happy-dom does not implement layout calculations, so all elements have 0x0 dimensions, breaking `isVisible()` checks
+- [05-01]: Content script testability achieved via `export const X = window.__sentinelUtils.X;` at end of each IIFE -- no production behavior change
+- [05-01]: Vitest v4 removed `--include` flag -- test scripts use positional path arguments instead
 
 ### Pending Todos
 
@@ -96,5 +101,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: v2 roadmap created -- 4 phases (5-8), 8 plans, 25/25 requirements mapped
+Stopped at: Completed 05-01-PLAN.md (test infrastructure + 216 tests)
 Resume file: None
