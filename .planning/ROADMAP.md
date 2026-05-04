@@ -26,7 +26,7 @@ Full details: [.planning/milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md)
 ### v2 (Phases 5-8) -- IN PROGRESS
 
 - [x] **Phase 5: Testing & Tech Debt Cleanup** (2/2 plans) -- completed 2026-05-04
-- [ ] **Phase 6: Command Templates & Runbooks** -- Users save, organize, and re-execute tasks as reusable templates with parameter substitution.
+- [x] **Phase 6: Command Templates & Runbooks** (2/2 plans) -- completed 2026-05-04
 - [ ] **Phase 7: Agent Scheduling** -- Users schedule templates to run at specific times or on recurring intervals with background execution and notifications.
 - [ ] **Phase 8: Collaboration & Export** -- Users export and import templates and reports as shareable files with format versioning and safety validation.
 
@@ -74,8 +74,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: Template data model and storage (template-manager.js), CRUD operations, goal resolution with parameter substitution, message routing in index.js
-- [ ] 06-02: Template popup UI (popup-modules/templates.js) -- template library view with tag filtering and search, create/edit form with parameter definitions, run button with parameter prompt form, delete confirmation
+- [x] 06-01: Template data model and storage (template-manager.js), CRUD operations, goal resolution with parameter substitution, message routing in index.js ✓ (2026-05-04)
+- [x] 06-02: Template popup UI (popup-modules/templates.js) -- template library view with tag filtering and search, create/edit form with parameter definitions, run button with parameter prompt form, delete confirmation ✓ (2026-05-04)
 
 ---
 
@@ -134,7 +134,7 @@ Plans:
 | 3. Multi-Tab Workflows | v1 | 2 | 2/2 | Complete | 2026-05-04 |
 | 4. Reports & Multi-Provider LLM | v1 | 2 | 2/2 | Complete | 2026-05-04 |
 | 5. Testing & Tech Debt Cleanup | v2 | 2 | 2/2 | Complete | 2026-05-04 |
-| 6. Command Templates & Runbooks | v2 | 2 | 0/2 | Pending | -- |
+| 6. Command Templates & Runbooks | v2 | 2 | 2/2 | Complete | 2026-05-04 |
 | 7. Agent Scheduling | v2 | 2 | 0/2 | Pending | -- |
 | 8. Collaboration & Export | v2 | 2 | 0/2 | Pending | -- |
 
