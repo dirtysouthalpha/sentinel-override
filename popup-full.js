@@ -564,6 +564,7 @@ stopBtn.addEventListener('click', () => {
     }
     setAgentActive(false);
     resetUI();
+    renderTabBar([]);
   });
 });
 
@@ -1163,6 +1164,31 @@ marked.setOptions({
   gfm: true,
 });
 
+// ========== Agent Tab Bar ==========
+function renderTabBar(tabs) {
+  const tabBar = document.getElementById('agent-tab-bar');
+  if (!tabBar) return;
+  if (!tabs || tabs.length <= 1) {
+    tabBar.style.display = 'none';
+    return;
+  }
+  tabBar.style.display = 'block';
+  tabBar.innerHTML = '';
+  tabs.forEach(ctx => {
+    const tab = document.createElement('div');
+    tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
+    tab.textContent = ctx.label || ctx.url;
+    tab.title = ctx.url;
+    tab.addEventListener('click', () => {
+      // User observation: switch their VIEW but do NOT change agent's active tab
+      if (ctx.tabId) {
+        chrome.tabs.update(ctx.tabId, { active: true });
+      }
+    });
+    tabBar.appendChild(tab);
+  });
+}
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
@@ -1177,6 +1203,7 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_finished') {
     removeTypingIndicator();
     removeApprovalCard();
+    renderTabBar([]);
     try {
       addMessage('✅ Task completed!\n\n' + (message.summary || 'Done'), 'assistant');
     } catch (err) {
@@ -1194,6 +1221,9 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'agent_action_result') {
     updateActionCardResult(message.stepNumber, message.result, message.isError);
+  }
+  if (message.action === 'tab_state_update' && message.tabs) {
+    renderTabBar(message.tabs);
   }
 });
 
