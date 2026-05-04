@@ -1,3 +1,18 @@
+// ========== Utility: Sanitize API Key and Endpoint ==========
+function sanitizeApiKey(key) {
+  if (!key) return '';
+  return String(key)
+    .replace(/\s+/g, '')
+    .replace(/[^\x20-\x7E]/g, '');
+}
+
+function sanitizeEndpoint(url) {
+  if (!url) return '';
+  return String(url)
+    .replace(/[\s\n\r\t]/g, '')
+    .replace(/[^\x20-\x7E]/g, '');
+}
+
 // ========== Provider Presets ==========
 const PROVIDER_PRESETS = {
   'openrouter': {
@@ -728,8 +743,8 @@ closeSettingsBtn.addEventListener('click', () => {
 });
 
 saveSettingsBtn.addEventListener('click', () => {
-  const endpoint = setApiEndpoint.value.trim();
-  const apiKey = setApiKey.value.trim();
+  const endpoint = sanitizeEndpoint(setApiEndpoint.value);
+  const apiKey = sanitizeApiKey(setApiKey.value);
   const model = setApiModel.value.trim();
   const format = exportFormatSelect.value;
 
@@ -751,6 +766,7 @@ saveSettingsBtn.addEventListener('click', () => {
   }, () => {
     settingsModal.classList.remove('show');
     showToast('Settings saved', 'success');
+    setApiKey.value = ''; // Clear the visible field for security
   });
 });
 
@@ -763,8 +779,8 @@ if (saveSettingsBtnInline) {
     const inlineEndpoint = document.getElementById('set-api-endpoint-inline');
     const inlineKey = document.getElementById('set-api-key-inline');
     const inlineModel = document.getElementById('set-api-model-inline');
-    const endpoint = inlineEndpoint ? inlineEndpoint.value.trim() : '';
-    const apiKey = inlineKey ? inlineKey.value.trim() : '';
+    const endpoint = sanitizeEndpoint(inlineEndpoint ? inlineEndpoint.value : '');
+    const apiKey = sanitizeApiKey(inlineKey ? inlineKey.value : '');
     const model = inlineModel ? inlineModel.value.trim() : '';
     const format = exportFormatSelect.value;
 
