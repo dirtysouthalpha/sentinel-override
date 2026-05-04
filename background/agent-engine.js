@@ -346,20 +346,24 @@ async function runAgentLoop(goal, workingTabId) {
       // Rate limiting
       await enforceRateLimit();
 
-      // Action-type loop detection: if the model keeps doing the same non-productive
-      // action (read_page, execute_js) without extracting or finishing, force a directive
+      // Action-type loop detection: count consecutive non-productive actions
+      // from the END of history (not across the whole window)
       let loopDirective = '';
-      if (history.length >= 4) {
-        const recent = history.slice(-5).map(h => h.action.type);
-        const nonProductive = ['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element'];
-        const productive = ['extract', 'extract_list', 'note', 'finish', 'navigate', 'open_tab', 'switch_tab', 'click', 'type', 'select'];
-        const nonProductiveCount = recent.filter(t => nonProductive.includes(t)).length;
-        const productiveCount = recent.filter(t => productive.includes(t)).length;
-        if (nonProductiveCount >= 4 && productiveCount === 0) {
+      if (history.length >= 3) {
+        const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
+        let consecutiveNonProductive = 0;
+        for (let i = history.length - 1; i >= 0; i--) {
+          if (nonProductive.has(history[i].action.type)) {
+            consecutiveNonProductive++;
+          } else {
+            break;
+          }
+        }
+        if (consecutiveNonProductive >= 3) {
           const memCount = Object.keys(agentMemory).length;
           loopDirective = memCount === 0
-            ? '\n⚠ LOOP DETECTED -- You have read/scrolled/executed JS multiple times without extracting ANY data. You MUST use "extract" or "extract_list" NOW to capture data from the page. Do NOT read_page again.\n'
-            : '\n⚠ LOOP DETECTED -- You have enough data extracted (' + Object.keys(agentMemory).length + ' items). You MUST use "finish" NOW with a comprehensive summary using your extracted data. Do NOT read_page or execute_js again.\n';
+            ? '\n⚠ LOOP DETECTED -- You have done nothing productive for ' + consecutiveNonProductive + ' steps. You MUST use "extract" or "extract_list" NOW to capture data from the page. Do NOT read_page or execute_js again.\n'
+            : '\n⚠ LOOP DETECTED -- You have ' + memCount + ' extracted items but keep looping. You MUST use "finish" NOW with a comprehensive summary using your extracted data. Do NOT read_page or execute_js again.\n';
         }
       }
 
