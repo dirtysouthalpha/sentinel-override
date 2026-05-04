@@ -581,12 +581,11 @@ export async function executeScheduledTask(alarmName) {
     error: completionResult.error,
   };
 
-  // Try to get the report from the last agent run
+  // Wait for the report (generated asynchronously after agent finishes)
   try {
-    const stored = await chrome.storage.local.get(['agent_history']);
-    // Report is generated asynchronously after agent finishes; we may not have it yet
-    // The result will be updated later if a report becomes available
-  } catch (e) { /* non-fatal */ }
+    const report = await waitForReport(15000); // up to 15s for report generation
+    if (report) finalResult.report = report.fullReport || report;
+  } catch (e) { /* non-fatal -- report capture failed */ }
 
   // Store result
   await storeResult(schedule, finalResult);
@@ -659,6 +658,38 @@ async function storeResult(schedule, result) {
 
   await saveResults(results);
   return fullResult;
+}
+
+// ========== Report Retrieval ==========
+
+/**
+ * Wait for the report from the last agent run to be written to storage.
+ * The agent engine stores it under 'last_agent_report' after generation.
+ * @param {number} timeoutMs - Max time to wait for report
+ * @returns {Promise<object|null>} Report object or null if unavailable
+ */
+function waitForReport(timeoutMs) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const poll = setInterval(async () => {
+      try {
+        const stored = await chrome.storage.local.get(['last_agent_report']);
+        if (stored.last_agent_report) {
+          clearInterval(poll);
+          await chrome.storage.local.remove('last_agent_report');
+          resolve(stored.last_agent_report);
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          clearInterval(poll);
+          resolve(null);
+        }
+      } catch (e) {
+        clearInterval(poll);
+        resolve(null);
+      }
+    }, 2000);
+  });
 }
 
 // ========== Result Queries ==========

@@ -715,10 +715,12 @@ async function runAgentLoop(goal, workingTabId) {
     generateReport(reportData, CONFIG)
       .then(report => {
         sendReportUpdate('ready', report);
+        chrome.storage.local.set({ last_agent_report: report }).catch(() => {});
       })
       .catch(err => {
         console.error('Report generation failed:', err);
         sendReportUpdate('error', null, err.message);
+        chrome.storage.local.set({ last_agent_report_error: err.message }).catch(() => {});
       });
   }
 
