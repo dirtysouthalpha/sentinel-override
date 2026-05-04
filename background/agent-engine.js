@@ -346,9 +346,10 @@ async function runAgentLoop(goal, workingTabId) {
       // Rate limiting
       await enforceRateLimit();
 
-      // Action-type loop detection: count consecutive non-productive actions
-      // from the END of history (not across the whole window)
+      // Anti-loop directives: force the model to make progress
       let loopDirective = '';
+
+      // 1. Consecutive non-productive actions from end of history
       if (history.length >= 3) {
         const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
         let consecutiveNonProductive = 0;
@@ -362,9 +363,35 @@ async function runAgentLoop(goal, workingTabId) {
         if (consecutiveNonProductive >= 3) {
           const memCount = Object.keys(agentMemory).length;
           loopDirective = memCount === 0
-            ? '\n⚠ LOOP DETECTED -- You have done nothing productive for ' + consecutiveNonProductive + ' steps. You MUST use "extract" or "extract_list" NOW to capture data from the page. Do NOT read_page or execute_js again.\n'
-            : '\n⚠ LOOP DETECTED -- You have ' + memCount + ' extracted items but keep looping. You MUST use "finish" NOW with a comprehensive summary using your extracted data. Do NOT read_page or execute_js again.\n';
+            ? '\n⚠ LOOP DETECTED -- ' + consecutiveNonProductive + ' non-productive steps in a row. You MUST use "extract" or "extract_list" NOW. Do NOT read_page or execute_js again.\n'
+            : '\n⚠ LOOP DETECTED -- You have ' + memCount + ' items in memory but keep looping. You MUST use "finish" NOW with a summary of your extracted data.\n';
         }
+      }
+
+      // 2. Step-based soft cap: warn model to finish after 15 steps
+      if (stepCount >= 15 && !loopDirective) {
+        const memCount = Object.keys(agentMemory).length;
+        loopDirective = memCount > 0
+          ? '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. You have ' + memCount + ' extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n'
+          : '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n';
+      }
+
+      // 3. Step-based hard cap: force finish after 25 steps
+      if (stepCount >= 25) {
+        const memCount = Object.keys(agentMemory).length;
+        const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
+          const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
+          return '- ' + k + ': ' + vStr;
+        }).join('\n');
+        const summary = memCount > 0
+          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (Object.keys(agentMemory).length > 10 ? '\n...and ' + (Object.keys(agentMemory).length - 10) + ' more items.' : '')
+          : 'Task timed out after ' + stepCount + ' steps without extracting useful data.';
+        finished = true;
+        sendSilentUpdate('Step limit reached -- finishing', stepCount);
+        sendActionResult(stepCount, { type: 'finish', summary }, false);
+        history.push({ step: stepCount, action: { type: 'finish', summary }, result: summary });
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary }).catch(() => {});
+        break;
       }
 
       // Progress indicator
