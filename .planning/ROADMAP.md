@@ -16,6 +16,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Complex UI Interactions** ✓ (2026-04-24) - Enable the agent to handle dropdowns, iframes, shadow DOM, modals, special inputs, and extract content script DOM operations into reusable utilities
 - [x] **Phase 3: Multi-Tab Workflows** ✓ (2026-05-04) - Give the agent the ability to operate across multiple browser tabs with context tracking and cross-tab data correlation
 - [ ] **Phase 4: Reports & Multi-Provider LLM** - Add structured investigation report generation and support for switching between Claude and OpenAI backends
+**Plans**: 2 plans
+
+Plans:
+- [ ] 04-01: Implement structured investigation report generation with timeline, findings, screenshots, and copy-paste-ready formatting
+- [ ] 04-02: Implement multi-provider LLM support with UI settings for switching between Claude and OpenAI, handling provider-specific API differences transparently
 
 ## Phase Details
 

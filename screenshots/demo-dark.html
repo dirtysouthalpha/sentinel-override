@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=420, initial-scale=1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0d0d0d;
+    color: #ffffff;
+    width: 420px;
+    height: 750px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid #404040;
+  }
+  .header-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .header-logo { width: 22px; height: 22px; border-radius: 4px; background: linear-gradient(135deg, #00d4ff, #0084ff); }
+  .mode-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(22,163,74,0.15); color: #16a34a; }
+  .active-dot { width: 10px; height: 10px; border-radius: 50%; background: #16a34a; box-shadow: 0 0 8px rgba(22,163,74,0.6); animation: glow 1.5s infinite; }
+  @keyframes glow { 0%,100% { box-shadow: 0 0 8px rgba(22,163,74,0.6); } 50% { box-shadow: 0 0 16px rgba(22,163,74,0.9); } }
+  .icon-btn { background: none; border: none; color: #d1d5db; padding: 8px; cursor: pointer; }
+  .toolbar { display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #404040; background: #1a1a1a; }
+  .search-box { background: #2a2a2a; border: 1px solid #404040; border-radius: 20px; padding: 6px 12px; flex: 1; }
+  .search-box span { color: #9ca3af; font-size: 13px; }
+  .small-btn { padding: 6px 10px; background: #262626; border: 1px solid #404040; border-radius: 6px; color: #d1d5db; font-size: 12px; }
+  #chat { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .user-msg { background: #0084ff; color: white; padding: 14px 18px; border-radius: 18px 4px 18px 18px; max-width: 85%; align-self: flex-end; font-size: 15px; line-height: 1.5; }
+  .action-card { border-left: 3px solid #00d4ff; padding: 8px 14px; max-width: 92%; background: transparent; }
+  .action-type { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #00d4ff; }
+  .action-step { font-size: 11px; color: #9ca3af; }
+  .action-desc { font-size: 14px; color: #fff; margin-top: 3px; }
+  .action-detail { font-size: 12px; color: #9ca3af; margin-top: 2px; font-family: monospace; }
+  .action-result { font-size: 12px; color: #16a34a; margin-top: 4px; padding-top: 4px; border-top: 1px solid #404040; }
+  .finish-msg { background: #262626; color: #fff; padding: 14px 18px; border-radius: 4px 18px 18px 18px; max-width: 92%; align-self: flex-start; font-size: 14px; line-height: 1.6; }
+  .finish-msg strong { color: #00d4ff; }
+  .input-area { padding: 18px 20px 20px; border-top: 1px solid #404040; }
+  .input-box { background: #2a2a2a; border: 1px solid #404040; border-radius: 22px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; }
+  .input-box span { color: #565869; font-size: 15px; flex: 1; }
+  .send-btn { background: #0084ff; border: none; border-radius: 50%; width: 36px; height: 36px; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .footer { font-size: 11px; color: #666; text-align: center; padding: 4px 0 8px; }
+</style>
+</head>
+<body class="theme-tron dark-mode">
+  <div class="header">
+    <div class="header-title">
+      <div class="header-logo"></div>
+      <span>Sentinel Override</span>
+      <span class="mode-badge">YOLO</span>
+      <div class="active-dot"></div>
+    </div>
+    <div style="display:flex;gap:4px;">
+      <button class="icon-btn">⚙️</button>
+    </div>
+  </div>
+  <div class="toolbar">
+    <div class="search-box"><span>🔍 Search messages...</span></div>
+    <div style="width:1px;height:20px;background:#404040;"></div>
+    <button class="small-btn">👁️ Preview</button>
+    <button class="small-btn">💾 Export</button>
+  </div>
+  <div id="chat">
+    <div class="user-msg">Find the cheapest OpenClaw-compatible API models with strong reasoning capabilities</div>
+    <div class="action-card">
+      <div><span class="action-type">Navigate</span> <span class="action-step">Step 1</span></div>
+      <div class="action-desc">Go to openrouter.ai/models</div>
+    </div>
+    <div class="action-card">
+      <div><span class="action-type">Extract List</span> <span class="action-step">Step 2</span></div>
+      <div class="action-desc">Extract model names, prices, and capabilities</div>
+      <div class="action-result">✓ Extracted 24 models with pricing data</div>
+    </div>
+    <div class="action-card">
+      <div><span class="action-type">Navigate</span> <span class="action-step">Step 3</span></div>
+      <div class="action-desc">Go to huggingface.co/open-llm-leaderboard</div>
+    </div>
+    <div class="action-card">
+      <div><span class="action-type">Extract List</span> <span class="action-step">Step 4</span></div>
+      <div class="action-desc">Extract benchmark scores for top models</div>
+      <div class="action-result">✓ Extracted 18 models with benchmark data</div>
+    </div>
+    <div class="finish-msg">
+      <strong>✅ Task Complete!</strong><br><br>
+      <strong>Top 5 cheapest high-capability models:</strong><br><br>
+      1. <strong>DeepSeek V3</strong> — $0/$0 (free!) — MMLU 88.5, HumanEval 82.6<br>
+      2. <strong>Qwen3 30B A3B</strong> — $0/$0 (free!) — MMLU 85.1, HumanEval 79.3<br>
+      3. <strong>Grok 4.1 Fast</strong> — $0.20/$0.50 per M tokens — MMLU 90.2<br>
+      4. <strong>GLM 4.7</strong> — $0.39/$1.75 per M tokens — MMLU 89.1<br>
+      5. <strong>Gemini 3 Flash</strong> — $0.50/$3.00 per M tokens — MMLU 91.7<br><br>
+      <strong>Recommendation:</strong> DeepSeek V3 for free tier, Grok 4.1 Fast for paid speed.
+    </div>
+  </div>
+  <div class="input-area">
+    <div class="input-box">
+      <span>Tell me what to do...</span>
+      <div class="send-btn">▶</div>
+    </div>
+    <div class="footer">Press Enter to send • Shift+Enter for new line • Cmd+K for commands</div>
+  </div>
+</body>
+</html>

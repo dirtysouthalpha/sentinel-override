@@ -1,0 +1,29 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield outer (dark navy) -->
+  <path d="M256 32 L96 120 L96 272 C96 368 256 464 256 464 C256 464 416 368 416 272 L416 120 Z" fill="#001F5C" stroke="none"/>
+  
+  <!-- Shield inner (teal) -->
+  <path d="M256 64 L128 144 L128 272 C128 348 256 428 256 428 C256 428 384 348 384 272 L384 144 Z" fill="#1DD1A1" stroke="none"/>
+  
+  <!-- Profile silhouette (dark navy) -->
+  <g clip-path="url(#shield-clip)">
+    <!-- Head -->
+    <circle cx="220" cy="160" r="45" fill="#001F5C"/>
+    
+    <!-- Chin -->
+    <path d="M 175 205 Q 190 230 220 235 Q 250 230 265 205" fill="#001F5C"/>
+    
+    <!-- Neck -->
+    <rect x="210" y="235" width="20" height="30" fill="#001F5C"/>
+    
+    <!-- Shoulder/back -->
+    <path d="M 210 265 Q 180 280 160 320 Q 180 340 240 350 L 240 265 Z" fill="#001F5C"/>
+    
+    <!-- Define clipping path for shield -->
+    <defs>
+      <clipPath id="shield-clip">
+        <path d="M256 64 L128 144 L128 272 C128 348 256 428 256 428 C256 428 384 348 384 272 L384 144 Z"/>
+      </clipPath>
+    </defs>
+  </g>
+</svg>
