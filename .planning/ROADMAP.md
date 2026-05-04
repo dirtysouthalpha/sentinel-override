@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Agent Engine Foundation** ✓ (2026-04-24) - Refactor background.js into modular components, standardize error handling, and fix agent reliability (stall recovery, planning accuracy, SPA transitions)
 - [x] **Phase 2: Complex UI Interactions** ✓ (2026-04-24) - Enable the agent to handle dropdowns, iframes, shadow DOM, modals, special inputs, and extract content script DOM operations into reusable utilities
-- [ ] **Phase 3: Multi-Tab Workflows** - Give the agent the ability to operate across multiple browser tabs with context tracking and cross-tab data correlation
+- [x] **Phase 3: Multi-Tab Workflows** ✓ (2026-05-04) - Give the agent the ability to operate across multiple browser tabs with context tracking and cross-tab data correlation
 - [ ] **Phase 4: Reports & Multi-Provider LLM** - Add structured investigation report generation and support for switching between Claude and OpenAI backends
 
 ## Phase Details
@@ -59,10 +59,11 @@ Plans:
   1. Agent opens new tabs, switches between existing tabs, and closes tabs as needed during task execution
   2. Agent can reference data from one tab while working in another (e.g., read a log entry on tab A, compare with config on tab B)
   3. Agent always knows which tab it is on and what that tab represents -- no confusion about current context after tab switches
-**Plans**: 1-2 plans
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: Implement multi-tab management (open, switch, close) with per-tab context tracking and cross-tab data correlation
+- [x] 03-01: Create tab-context.js module and integrate into agent-engine.js -- core multi-tab infrastructure with open/switch/close, per-tab screenshot cache, and cleanup ✓ (2026-05-04)
+- [x] 03-02: Add multi-tab LLM commands, cross-tab prompt context, and popup tab bar UI ✓ (2026-05-04)
 
 ### Phase 4: Reports & Multi-Provider LLM
 **Goal**: The agent generates structured, copy-paste-ready investigation reports after task completion, and users can switch between Claude and OpenAI as the LLM backend
@@ -88,7 +89,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 |-------|----------------|--------|-----------|
 | 1. Agent Engine Foundation | 2/2 | ✓ Complete | 2026-04-24 |
 | 2. Complex UI Interactions | 2/2 | ✓ Complete | 2026-04-24 |
-| 3. Multi-Tab Workflows | 0/1 | Not started | - |
+| 3. Multi-Tab Workflows | 2/2 | ✓ Complete | 2026-05-04 |
 | 4. Reports & Multi-Provider LLM | 0/2 | Not started | - |
 
 ---
