@@ -46,6 +46,15 @@ const modeBadge = document.getElementById('modeBadge');
 const approvalCardContainer = document.getElementById('approvalCardContainer');
 const activeIndicator = document.getElementById('activeIndicator');
 
+// ========== Report Modal Elements ==========
+const reportModal = document.getElementById('report-modal');
+const reportContent = document.getElementById('report-content');
+const closeReportBtn = document.getElementById('closeReportBtn');
+const copyReportMdBtn = document.getElementById('copyReportMdBtn');
+const downloadReportBtn = document.getElementById('downloadReportBtn');
+const copyReportTextBtn = document.getElementById('copyReportTextBtn');
+let currentReportMarkdown = null;
+
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -1189,6 +1198,186 @@ function renderTabBar(tabs) {
   });
 }
 
+// ========== Report Card & Modal ==========
+
+/**
+ * Adds a "Generating report..." indicator in the chat feed.
+ */
+function addReportGeneratingIndicator() {
+  // Remove existing indicator if any
+  removeReportGeneratingIndicator();
+
+  const group = document.createElement('div');
+  group.className = 'message-group report-group';
+  group.id = 'report-generating';
+
+  const indicator = document.createElement('div');
+  indicator.className = 'report-generating-indicator';
+  indicator.innerHTML = '<span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span><span>Generating report...</span>';
+
+  group.appendChild(indicator);
+  chatContainer.appendChild(group);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+/**
+ * Removes the generating indicator from the chat feed.
+ */
+function removeReportGeneratingIndicator() {
+  const existing = document.getElementById('report-generating');
+  if (existing) existing.remove();
+}
+
+/**
+ * Adds an inline report card to the chat feed with summary preview
+ * and a "View Full Report" button.
+ *
+ * @param {object} report - Report object with summary, fullReport, goal, timestamp
+ */
+function addReportCard(report) {
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
+
+  const group = document.createElement('div');
+  group.className = 'message-group report-group';
+
+  const header = document.createElement('div');
+  header.className = 'report-card-header';
+
+  const title = document.createElement('div');
+  title.className = 'report-card-title';
+  title.textContent = 'Investigation Report';
+
+  const time = document.createElement('div');
+  time.className = 'report-card-time';
+  try {
+    time.textContent = new Date(report.timestamp).toLocaleTimeString();
+  } catch (e) {
+    time.textContent = '';
+  }
+
+  header.appendChild(title);
+  header.appendChild(time);
+
+  const summary = document.createElement('div');
+  summary.className = 'report-card-summary';
+  summary.textContent = report.summary || 'Report generated.';
+
+  const actions = document.createElement('div');
+  actions.className = 'report-card-actions';
+
+  const viewBtn = document.createElement('button');
+  viewBtn.className = 'report-view-btn';
+  viewBtn.textContent = 'View Full Report';
+  viewBtn.addEventListener('click', () => {
+    openReportModal(report.fullReport);
+  });
+
+  actions.appendChild(viewBtn);
+
+  group.appendChild(header);
+  group.appendChild(summary);
+  group.appendChild(actions);
+  chatContainer.appendChild(group);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+/**
+ * Opens the report modal with the full report rendered as markdown.
+ *
+ * @param {string} markdown - The full report markdown
+ */
+function openReportModal(markdown) {
+  currentReportMarkdown = markdown;
+
+  // Close other modals
+  settingsModal.classList.remove('show');
+  themeModal.classList.remove('show');
+
+  // Render markdown with sanitization
+  try {
+    reportContent.innerHTML = sanitizeHtml(marked.parse(markdown));
+    addCodeCopyButtons(reportContent);
+  } catch (err) {
+    reportContent.textContent = markdown;
+  }
+
+  reportModal.classList.add('show');
+}
+
+/**
+ * Closes the report modal.
+ */
+function closeReportModal() {
+  reportModal.classList.remove('show');
+}
+
+// Report modal close button
+closeReportBtn.addEventListener('click', closeReportModal);
+
+// Close report modal on backdrop click
+reportModal.addEventListener('click', (e) => {
+  if (e.target === reportModal) {
+    closeReportModal();
+  }
+});
+
+// Export: Copy as Markdown
+copyReportMdBtn.addEventListener('click', () => {
+  if (!currentReportMarkdown) {
+    showToast('No report to copy', 'error');
+    return;
+  }
+  navigator.clipboard.writeText(currentReportMarkdown).then(() => {
+    showToast('Markdown copied to clipboard', 'success');
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
+});
+
+// Export: Download as .md
+downloadReportBtn.addEventListener('click', () => {
+  if (!currentReportMarkdown) {
+    showToast('No report to download', 'error');
+    return;
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+  const filename = `report-${timestamp}.md`;
+  const blob = new Blob([currentReportMarkdown], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Report downloaded', 'success');
+});
+
+// Export: Copy as Plain Text
+copyReportTextBtn.addEventListener('click', () => {
+  if (!currentReportMarkdown) {
+    showToast('No report to copy', 'error');
+    return;
+  }
+  // Strip markdown formatting for plain text
+  const plainText = currentReportMarkdown
+    .replace(/^#{1,6}\s+/gm, '')      // Remove headers
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // Remove bold
+    .replace(/\*(.+?)\*/g, '$1')       // Remove italic
+    .replace(/`(.+?)`/g, '$1')         // Remove inline code
+    .replace(/^- /gm, '')              // Remove unordered list markers
+    .replace(/^\d+\.\s/gm, '')         // Remove ordered list markers
+    .replace(/^---+$/gm, '')           // Remove horizontal rules
+    .replace(/>\s+/gm, '')             // Remove blockquote markers
+    .replace(/\n{3,}/g, '\n\n')        // Collapse multiple newlines
+    .trim();
+  navigator.clipboard.writeText(plainText).then(() => {
+    showToast('Plain text copied to clipboard', 'success');
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
+});
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
@@ -1224,6 +1413,17 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'tab_state_update' && message.tabs) {
     renderTabBar(message.tabs);
+  }
+  if (message.action === 'report_update') {
+    if (message.status === 'generating') {
+      addReportGeneratingIndicator();
+    } else if (message.status === 'ready' && message.report) {
+      removeReportGeneratingIndicator();
+      addReportCard(message.report);
+    } else if (message.status === 'error') {
+      removeReportGeneratingIndicator();
+      showToast('Report generation failed: ' + (message.error || 'Unknown error'), 'error');
+    }
   }
 });
 
@@ -1282,6 +1482,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     settingsModal.classList.remove('show');
     themeModal.classList.remove('show');
+    reportModal.classList.remove('show');
     closeCommandPalette();
   }
 });
@@ -1293,5 +1494,8 @@ window.addEventListener('click', (e) => {
   }
   if (e.target === themeModal) {
     themeModal.classList.remove('show');
+  }
+  if (e.target === reportModal) {
+    closeReportModal();
   }
 });

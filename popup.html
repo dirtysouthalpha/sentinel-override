@@ -1589,6 +1589,71 @@
     }
 
     /* Agent Tab Bar */
+
+    /* Report Card in Chat */
+    .report-group {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: var(--bg-secondary);
+      animation: messageSlideIn 0.3s ease-out;
+    }
+    .report-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .report-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .report-card-time {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+    .report-card-summary {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .report-card-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .report-view-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--accent-primary);
+      background: transparent;
+      color: var(--accent-primary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .report-view-btn:hover {
+      background: var(--accent-primary);
+      color: white;
+    }
+    .report-generating-indicator {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 0;
+    }
+    .report-generating-indicator .loading-dot {
+      width: 3px;
+      height: 3px;
+    }
+
     #agent-tab-bar {
       display: none;
       border-bottom: 1px solid var(--border-color);
@@ -1872,6 +1937,22 @@
       <div class="modal-actions">
         <button id="closeThemeBtn" class="modal-btn btn-cancel">Cancel</button>
         <button id="saveThemeBtn" class="modal-btn btn-save">Apply Theme</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div id="report-modal" class="modal">
+    <div class="modal-content" style="max-width:560px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">Investigation Report</h2>
+        <button id="closeReportBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div id="report-content" style="line-height:1.6;max-height:60vh;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);">
+        <button id="copyReportMdBtn" class="modal-btn btn-save" style="flex:1;">Copy Markdown</button>
+        <button id="downloadReportBtn" class="modal-btn btn-save" style="flex:1;">Download .md</button>
+        <button id="copyReportTextBtn" class="modal-btn btn-cancel" style="flex:1;">Copy Plain Text</button>
       </div>
     </div>
   </div>
