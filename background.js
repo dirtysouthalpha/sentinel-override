@@ -255,8 +255,12 @@ function validateOpenRouterModel(modelName) {
 async function callLLMSimple(prompt, opts = {}) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
   let model = opts.model || settings.model || 'mistralai/mistral-7b-instruct-v0.2';
-  let endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-  let apiKey = settings.api_key;
+  let endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
+  let apiKey = (settings.api_key || '').trim();
+
+  if (!apiKey) {
+    throw new Error('API key not configured. Please set it in extension settings.');
+  }
   
   // Handle Poolside AI endpoint
   if (endpoint.includes('poolside.ai') || endpoint.includes('platform.poolside.ai')) {
@@ -354,8 +358,8 @@ function buildAnalysisMessages(userPrompt, pageContext, template = null) {
 // Main analysis function — returns rich markdown, not JSON
 async function analyzeWithPage(userPrompt, tabId) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-  const apiKey = settings.api_key;
+  const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
+  const apiKey = (settings.api_key || '').trim();
   const model = settings.model || 'deepseek-v4-flash';
 
   if (!apiKey) {
@@ -870,9 +874,13 @@ function sendSilentUpdate(text) {
 async function planTask(goal, workingTabId) {
   try {
     const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-    const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-    const apiKey = settings.api_key;
+    const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
+    const apiKey = (settings.api_key || '').trim();
     const model = settings.model || 'deepseek-v4-flash';
+
+    if (!apiKey) {
+      throw new Error('API key not configured. Please set it in extension settings.');
+    }
 
     sendSilentUpdate('[Plan] Analyzing your instruction...');
 
@@ -1158,8 +1166,8 @@ async function callLLMWithRetry(observation, pageContent, base64Image, goal, his
 // ========== API Call (Automation Mode) ==========
 async function callLLM(observation, pageContent, base64Image, goal, history, stepCount) {
   const settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  const endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-  const apiKey = settings.api_key;
+  const endpoint = (settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions').trim();
+  const apiKey = (settings.api_key || '').trim();
   const model = settings.model || 'deepseek-v4-flash';
 
   if (!apiKey) {
