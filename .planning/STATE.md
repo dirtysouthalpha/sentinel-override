@@ -2,35 +2,35 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-24)
+See: .planning/PROJECT.md (updated 2026-05-04)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Phase 3 complete -- ready for Phase 4
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 4 of 4 (Reports & Multi-Provider LLM)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-05-04 -- Completed 04-02-PLAN.md
+Phase: v1 milestone complete
+Plan: N/A
+Status: Ready for next milestone
+Last activity: 2026-05-04 — v1 milestone archived
 
-Progress: [████████████████████] 100% (8 of 8 plans complete)
+Progress: [████████████████████] 100% (v1 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: --
-- Total execution time: 0 hours
+- Total plans completed: 8
+- Average duration: ~3.5 min/plan
+- Total execution time: ~28 minutes
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1     | 2     | 2     | --       |
-| 2     | 2     | 2     | --       |
-| 3     | 2     | 2     | --       |
-| 4     | 2     | 2     | --       |
+| 1     | 2     | 2     | ~4 min   |
+| 2     | 2     | 2     | ~5 min   |
+| 3     | 2     | 2     | ~3 min   |
+| 4     | 2     | 2     | ~4.5 min |
 
 *Updated after each plan completion*
 
@@ -79,18 +79,18 @@ Progress: [████████████████████] 100% (8
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- [Codebase]: popup-full.js is ~1,267 lines (noted in concerns but not a v1 requirement -- monitor)
-- [Codebase]: `new Function()` in content.js -- security review needed but not blocking v1
-- [Codebase]: No test infrastructure -- deferred to v2 (TST-01, TST-02, TST-03)
-- [02-01]: Old content.js still exists alongside new content/ directory -- should be cleaned up after Phase 2 verification
-- [02-02]: Agent-engine.js LLM prompt context does not yet describe iframe/dropdown/overlay capabilities -- separate enhancement needed
+- [Codebase]: popup-full.js is ~1,450 lines (monitor for maintainability)
+- [Codebase]: `new Function()` in content.js -- security review needed
+- [Codebase]: No test infrastructure — deferred to v2 (TST-01, TST-02, TST-03)
+- [Codebase]: Old content.js still exists alongside content/ directory -- should be cleaned up
+- [Codebase]: Agent-engine.js LLM prompt does not describe iframe/dropdown/overlay capabilities
 
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 04-02-PLAN.md (Phase 4 complete -- all plans done)
+Stopped at: v1 milestone complete — all phases done, archived
 Resume file: None

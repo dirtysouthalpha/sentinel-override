@@ -8,30 +8,38 @@ A Chrome browser extension that acts as an AI-powered browser automation agent f
 
 Give a command in any form and the agent drives the browser to completion, then generates a structured report — regardless of the web UI or task complexity.
 
+## Current State
+
+**Shipped:** v1 milestone (2026-05-04) — 4 phases, 8 plans, 20/20 requirements satisfied.
+
+The extension has a modular background service worker (8 ES modules), modular content scripts (9 utility modules), multi-tab infrastructure, structured report generation, and multi-provider LLM support (Claude/OpenAI). See `.planning/MILESTONES.md` for full delivery details.
+
 ## Requirements
 
 ### Validated
 
-- ✓ Agent loop with plan-observe-act cycle — existing (`background.js`)
-- ✓ Content script DOM interaction (click, type, navigate, observe) — existing (`content.js`)
-- ✓ Side panel chat UI with command input — existing (`popup.html`, `popup-full.js`)
-- ✓ Platform detection for SonicWall, Fortinet, Cisco, Palo Alto — existing (`background.js` getPlatformContext)
-- ✓ LLM integration for decision-making — existing
-- ✓ Self-healing retry logic — existing
-- ✓ Memory system with template substitution — existing
-- ✓ Chrome Manifest V3 architecture — existing
+- ✓ Agent loop with plan-observe-act cycle — existing (v1)
+- ✓ Content script DOM interaction (click, type, navigate, observe) — existing (v1)
+- ✓ Side panel chat UI with command input — existing (v1)
+- ✓ Platform detection for SonicWall, Fortinet, Cisco, Palo Alto — existing (v1)
+- ✓ LLM integration for decision-making — existing (v1)
+- ✓ Self-healing retry logic — existing (v1)
+- ✓ Memory system with template substitution — existing (v1)
+- ✓ Chrome Manifest V3 architecture — existing (v1)
+- ✓ Agent recovers from stalls instead of getting stuck indefinitely — v1 (REL-01)
+- ✓ Agent planning produces accurate step sequences that match user intent — v1 (REL-02)
+- ✓ Complex UI interactions: dropdowns, nested menus, date pickers, file uploads, rich text editors — v1 (UIX-01 through UIX-05)
+- ✓ Iframe and shadow DOM element interaction — v1 (UIX-03, UIX-04)
+- ✓ SPA page transition handling (content changes without full navigation) — v1 (REL-03)
+- ✓ Multi-tab workflows — agent operates across multiple browser tabs — v1 (TAB-01, TAB-02, TAB-03)
+- ✓ Structured investigation report generation after task completion — v1 (RPT-01, RPT-02, RPT-03)
+- ✓ Multi-provider LLM support (Claude, OpenAI) with per-provider settings — v1 (LLM-01, LLM-02, LLM-03)
+- ✓ Modular background architecture with standardized error handling — v1 (HEA-01, HEA-02)
+- ✓ Content script DOM operations extracted into reusable utilities — v1 (HEA-03)
 
 ### Active
 
-- [ ] Agent recovers from stalls instead of getting stuck indefinitely
-- [ ] Agent planning produces accurate step sequences that match user intent
-- [ ] Multi-tab workflows — agent operates across multiple browser tabs
-- [ ] Complex UI interactions: dropdowns, nested menus, date pickers, file uploads, rich text editors
-- [ ] Iframe and shadow DOM element interaction
-- [ ] SPA page transition handling (content changes without full navigation)
-- [ ] Structured investigation report generation after task completion
-- [ ] Multi-provider LLM support (Claude, OpenAI, others)
-- [ ] Reliable enough for organization-wide deployment
+- [ ] Reliable enough for organization-wide deployment (ongoing — needs real-world testing)
 
 ### Out of Scope
 
@@ -39,21 +47,20 @@ Give a command in any form and the agent drives the browser to completion, then 
 - Server-side orchestration — runs entirely in-browser
 - Non-browser automation (CLI, SSH, API calls outside the browser)
 - Custom LLM model training or fine-tuning
+- Firefox/Safari support — Chrome-only deployment
 
 ## Context
 
-The extension (v3.1.3) already has functional bones: an agent loop in `background.js`, content scripts in `content.js`, a chat UI in `popup.html`/`popup-full.js`, and platform-specific detection. The codebase map in `.planning/codebase/` documents the full existing state.
+The extension has been transformed from a v3.1.3 prototype into a modular, reliable agent. The codebase consists of 8 background ES modules (agent-engine, llm-client, tab-manager, message-protocol, tab-context, report-generator, provider-registry, shared-state, frame-router, index), 9 content script modules, a popup UI, and a Manifest V3 configuration.
 
-Key technical debt: monolithic files (popup-full.js is ~1,257 lines), global state management, inconsistent error handling, no test infrastructure, and fragile iframe/message passing. These structural issues contribute to the reliability problems.
-
-The user is an MSP tech who uses this for firewall investigations (SonicWall, Fortinet), Office 365 admin tasks, and other browser-based IT operations. The extension needs to handle enterprise web UIs that are often complex — nested menus, iframes, SPAs with dynamic content.
+Remaining tech debt: old content.js alongside content/ directory, popup-full.js at ~1,450 lines, no test infrastructure. v2 requirements include testing (TST-01, TST-02, TST-03) and advanced capabilities (command templates, scheduling, collaboration).
 
 ## Constraints
 
 - **Platform**: Chrome Manifest V3 — must work within MV3 constraints (service worker lifecycle, no background pages)
 - **Storage**: Chrome storage API only — no IndexedDB initially, no server-side storage
-- **LLM**: Must support multiple providers (Claude, OpenAI) — user already has multi-provider setup
-- **Security**: No dynamic code execution beyond what's needed — `new Function()` in content.js needs review
+- **LLM**: Supports multiple providers (Claude, OpenAI) via provider registry pattern
+- **Security**: `new Function()` in content.js needs review
 - **Deployment**: Organization-wide — needs to be stable enough for non-technical users
 - **Offline**: No — requires LLM API access to function
 
@@ -61,10 +68,14 @@ The user is an MSP tech who uses this for firewall investigations (SonicWall, Fo
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Enhance existing code vs rewrite | Working agent loop exists; rewriting loses platform detection, memory system, UI work | — Pending |
-| Multi-tab as core capability | MSP investigations often require cross-tab workflows (compare logs, check multiple systems) | — Pending |
-| Structured reports over audit logs | Users need copy-paste ticket documentation, not raw action logs | — Pending |
-| Keep MV3 architecture | Chrome extension constraints are acceptable; no migration to Firefox/Safari needed | — Pending |
+| Enhance existing code vs rewrite | Working agent loop exists; rewriting loses platform detection, memory system, UI work | ✓ Enhanced — modular refactoring preserved all existing functionality |
+| Multi-tab as core capability | MSP investigations often require cross-tab workflows (compare logs, check multiple systems) | ✓ Delivered — tab-context.js with open/switch/close, LLM vocabulary, popup tab bar |
+| Structured reports over audit logs | Users need copy-paste ticket documentation, not raw action logs | ✓ Delivered — async LLM report with Goal/Steps/Findings/Evidence/Conclusions |
+| Keep MV3 architecture | Chrome extension constraints are acceptable; no migration to Firefox/Safari needed | ✓ Maintained |
+| Provider registry pattern | Consolidates Anthropic/OpenAI API format differences into single module | ✓ Delivered — PROVIDERS object with buildHeaders/buildBody/parseResponse |
+| IIFE namespace for content scripts | Content scripts cannot use ES module imports in Chrome extensions | ✓ Delivered — window.__sentinelUtils namespace |
+| Reactive overlay detection | Proactive detection causes false positives on legitimate full-screen UIs | ✓ Delivered — check only on action failure |
+| In-memory TabContext for v1 | Service worker stays alive during agent execution; persistence unnecessary | ✓ Delivered — Map-based with LRU eviction |
 
 ---
-*Last updated: 2026-04-24 after initialization*
+*Last updated: 2026-05-04 after v1 milestone*
