@@ -249,6 +249,28 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
+      // Auto-navigate to URL found in goal (first iteration only)
+      if (stepCount === 0 && goal) {
+        const urlMatch = goal.match(/https?:\/\/[^\s"'<>,]+/i) || goal.match(/(?:go to|visit|navigate to|open)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i);
+        if (urlMatch) {
+          const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
+          const currentUrl = (tabInfo.url || '').toLowerCase();
+          if (!currentUrl.includes(new URL(goalUrl).hostname)) {
+            sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
+            sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
+            await chrome.tabs.update(tab, { url: goalUrl });
+            await waitForPageLoad(tab);
+            await sleep(1500);
+            const reinjected = await injectContentScript(tab);
+            if (reinjected) {
+              history.push({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
+              await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+            }
+            continue;
+          }
+        }
+      }
+
       sendSilentUpdate('Observing page...', stepCount);
 
       // Inject content script
