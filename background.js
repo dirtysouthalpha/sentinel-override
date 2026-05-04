@@ -13,14 +13,19 @@ let currentStepIndex = 0; // Tracks which step we're executing
 // ========== Utility: Sanitize API Key and Endpoint ==========
 function sanitizeApiKey(key) {
   if (!key) return '';
-  // Remove all whitespace (spaces, tabs, newlines, etc.) and keep only alphanumeric, hyphens, underscores, dots
-  return String(key).replace(/\s/g, '').trim();
+  // Remove all whitespace and non-ASCII characters
+  // Keep only: alphanumeric, hyphen, underscore, dot, forward slash
+  return String(key)
+    .replace(/\s+/g, '') // Remove all whitespace
+    .replace(/[^\x20-\x7E]/g, ''); // Remove non-ASCII characters (keep only ASCII printable)
 }
 
 function sanitizeEndpoint(url) {
   if (!url) return 'https://openrouter.ai/api/v1/chat/completions';
-  // Remove leading/trailing whitespace and newlines
-  return String(url).replace(/[\s\n\r]/g, '').trim();
+  // Remove whitespace and ensure it's a valid URL
+  return String(url)
+    .replace(/[\s\n\r\t]/g, '') // Remove all whitespace
+    .replace(/[^\x20-\x7E]/g, ''); // Remove non-ASCII characters
 }
 
 // ========== Task Context — Goal Retention ==========
@@ -105,8 +110,8 @@ function getSitePattern(url) {
 async function generateMissingTool(error, step, workingTabId) {
   sendSilentUpdate('[Auto-Tool] Generating workaround for: ' + (error.message || String(error)).substring(0, 60));
   var settings = await chrome.storage.local.get(['api_endpoint', 'api_key', 'model']);
-  var endpoint = settings.api_endpoint || 'https://openrouter.ai/api/v1/chat/completions';
-  var apiKey = settings.api_key;
+  var endpoint = sanitizeEndpoint(settings.api_endpoint);
+  var apiKey = sanitizeApiKey(settings.api_key);
   var model = settings.model || 'deepseek-v4-flash';
   var genPrompt = 'A browser step failed. ERROR: ' + (error.message || String(error)) + '. STEP: ' + step.description + '. Generate a short JavaScript snippet (max 15 lines) to work around this. Use creative selectors (text content, aria-label, title). Return ONLY the code, no markdown.';
   try {
