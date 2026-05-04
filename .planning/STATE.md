@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 6 of 8 -- Command Templates & Runbooks (COMPLETE)
-Plan: 02 of 2 (COMPLETE)
-Status: Phase complete, ready for Phase 7 (Scheduling)
-Last activity: 2026-05-04 -- Completed 06-02-PLAN.md
+Phase: 7 of 8 -- Agent Scheduling
+Plan: 01 of 2 (In progress)
+Status: In progress
+Last activity: 2026-05-04 -- Completed 07-01-PLAN.md
 
-Progress: [██████░░░░░░░░░░] 50.0% (v2, 4/8 plans)
+Progress: [███████░░░░░░░░░] 56.3% (v2, 5/8 plans -- plan 7-01 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12 (v1: 8, v2: 4)
+- Total plans completed: 13 (v1: 8, v2: 5)
 - Average duration: ~4 min/plan
-- Total execution time: ~53 minutes
+- Total execution time: ~56 minutes
 
 **By Phase:**
 
@@ -33,6 +33,7 @@ Progress: [██████░░░░░░░░░░] 50.0% (v2, 4/8 plan
 | 4     | 2     | 2     | ~4.5 min |
 | 5     | 2     | 2     | ~12.5 min |
 | 6     | 2     | 2     | ~2 min   |
+| 7     | 1     | 1     | ~3 min   |
 
 *Updated after each plan completion*
 
@@ -100,6 +101,12 @@ Progress: [██████░░░░░░░░░░] 50.0% (v2, 4/8 plan
 - [06-02]: templatesBtn click handler lives only in popup-full.js bootstrap, not duplicated in templates.js
 - [06-02]: escapeHtml helper duplicated per popup module (no shared utility module for popup)
 - [06-02]: Template panel uses inline style display:none/flex toggle rather than CSS class
+- [07-01]: Polling approach for agent completion (setInterval every 2s checking agentRunning) -- service worker stays alive during API calls
+- [07-01]: One-time schedules auto-disable after execution to prevent stale alarm re-registration
+- [07-01]: Schedule storage follows same object-keyed pattern as templates: { [id]: Schedule } in chrome.storage.local
+- [07-01]: initScheduler() re-registers all enabled alarms on service worker restart (handles browser restart alarm loss)
+- [07-01]: Scheduler skips execution if agentRunning=true, marks lastRunStatus='skipped', re-registers alarm for recurring
+- [07-01]: Result storage capped at 50 entries per schedule with oldest evicted first
 
 ### Pending Todos
 
@@ -112,10 +119,10 @@ None.
 - [Research]: In-memory state loss on service worker termination -- agent state must persist for scheduling
 - [Research]: Malicious runbook import -- `execute_js` + `new Function()` makes untrusted import dangerous (COL-05)
 - [Research]: Service worker 5-minute execution timeout for long scheduled runs
-- [Research]: chrome.alarms may be cleared on browser restart -- must re-register in scheduler init()
+- ~~[Research]: chrome.alarms may be cleared on browser restart -- must re-register in scheduler init()~~ -- DONE: initScheduler() re-registers all enabled alarms
 
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 06-02-PLAN.md (template popup UI -- Phase 6 complete)
+Stopped at: Completed 07-01-PLAN.md (scheduler backend)
 Resume file: None
