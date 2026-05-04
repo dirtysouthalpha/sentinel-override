@@ -765,8 +765,10 @@ saveSettingsBtn.addEventListener('click', () => {
     export_format: format
   }, () => {
     settingsModal.classList.remove('show');
-    showToast('Settings saved', 'success');
+    setApiEndpoint.value = endpoint;
     setApiKey.value = ''; // Clear the visible field for security
+    setApiModel.value = model;
+    showToast('Settings saved', 'success');
   });
 });
 
@@ -802,8 +804,10 @@ if (saveSettingsBtnInline) {
     }, () => {
       // Sync to modal fields
       if (setApiEndpoint) setApiEndpoint.value = endpoint;
-      if (setApiKey) setApiKey.value = apiKey;
+      if (setApiKey) setApiKey.value = ''; // Clear for security
       if (setApiModel) setApiModel.value = model;
+      // Clear inline fields too
+      if (inlineKey) inlineKey.value = '';
       showToast('Settings saved', 'success');
     });
   });
