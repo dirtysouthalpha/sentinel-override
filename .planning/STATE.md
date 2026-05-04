@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-24)
 
 **Core value:** Give a command in any form and the agent drives the browser to completion, then generates a structured report.
-**Current focus:** Phase 3 -- Multi-Tab Workflows (plan 1 of 2 complete)
+**Current focus:** Phase 3 complete -- ready for Phase 4
 
 ## Current Position
 
-Phase: 3 of 4 (Multi-Tab Workflows) -- In progress
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-05-04 -- Completed 03-01-PLAN.md
+Phase: 3 of 4 (Multi-Tab Workflows) -- PHASE COMPLETE
+Plan: 2 of 2 in current phase (both complete)
+Status: Phase complete
+Last activity: 2026-05-04 -- Completed 03-02-PLAN.md
 
-Progress: [███████████████████░] 83% (5 of 6 plans complete)
+Progress: [████████████████████] 100% (6 of 6 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: --
 - Total execution time: 0 hours
 
@@ -29,7 +29,7 @@ Progress: [███████████████████░] 83% (5 
 |-------|-------|-------|----------|
 | 1     | 2     | 2     | --       |
 | 2     | 2     | 2     | --       |
-| 3     | 1     | 2     | --       |
+| 3     | 2     | 2     | --       |
 
 *Updated after each plan completion*
 
@@ -61,6 +61,10 @@ Progress: [███████████████████░] 83% (5 
 - [03-01]: Post-click new tab: registered as tracked context in multi-tab mode, captured in single-tab mode
 - [03-01]: tab-context.js imports sendTabStateUpdate from message-protocol.js (acceptable one-way dep)
 - [03-01]: handleTabRemoved exported from tab-context.js, called from index.js listener
+- [03-02]: Tab context built inside callLLM, not passed as parameter, to keep function signature unchanged
+- [03-02]: MANAGED TABS shows first 300 chars of page content for inactive tabs, not full element list
+- [03-02]: Labels are the primary reference mechanism for LLM tab commands
+- [03-02]: Popup tab clicks use chrome.tabs.update only, no background messaging (observation-only)
 
 ### Pending Todos
 
@@ -68,15 +72,14 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Codebase]: popup-full.js is ~12,571 lines (noted in concerns but not a v1 requirement -- monitor)
+- [Codebase]: popup-full.js is ~1,267 lines (noted in concerns but not a v1 requirement -- monitor)
 - [Codebase]: `new Function()` in content.js -- security review needed but not blocking v1
 - [Codebase]: No test infrastructure -- deferred to v2 (TST-01, TST-02, TST-03)
 - [02-01]: Old content.js still exists alongside new content/ directory -- should be cleaned up after Phase 2 verification
 - [02-02]: Agent-engine.js LLM prompt context does not yet describe iframe/dropdown/overlay capabilities -- separate enhancement needed
-- [03-01]: Tab command types (open_tab/switch_tab/close_tab) need to be added to LLM prompt vocabulary in 03-02 or later
 
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 03-01-PLAN.md
+Stopped at: Completed 03-02-PLAN.md (Phase 3 complete)
 Resume file: None
