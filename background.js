@@ -308,7 +308,7 @@ async function callLLMSimple(prompt, opts = {}) {
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
 
   let resp;
   try {
@@ -483,7 +483,7 @@ sendSilentUpdate('[Analysis] Generating analysis...');
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
 
   let response;
   try {
@@ -993,9 +993,13 @@ async function planTask(goal, workingTabId) {
     }
 
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 30000);
+    const timeoutId = setTimeout(() => {
+      console.warn('[Plan] Timeout reached - aborting fetch');
+      abortController.abort();
+    }, 60000);
 
     let response;
+    let startTime = Date.now();
     try {
       const headers = {
         'Content-Type': 'application/json',
@@ -1006,6 +1010,7 @@ async function planTask(goal, workingTabId) {
         headers['User-Agent'] = 'Mozilla/5.0 (Chrome Extension)';
       }
 
+      console.log('[Plan] Sending request to', endpoint);
       response = await fetch(endpoint, {
         method: 'POST',
         headers: headers,
@@ -1020,10 +1025,12 @@ async function planTask(goal, workingTabId) {
         }),
         signal: abortController.signal
       });
+      console.log('[Plan] Response received in', Date.now() - startTime, 'ms. Status:', response.status);
     } catch (err) {
       clearTimeout(timeoutId);
+      console.error('[Plan] Fetch failed after', Date.now() - startTime, 'ms:', err.message);
       if (err.name === 'AbortError') {
-        throw new Error('API request timed out after 30 seconds');
+        throw new Error('API request timed out after 60 seconds');
       }
       throw new Error('Network error: ' + err.message);
     }
@@ -1361,7 +1368,7 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   }
 
   const abortController = new AbortController();
-  const timeoutId = setTimeout(() => abortController.abort(), 30000);
+  const timeoutId = setTimeout(() => abortController.abort(), 60000);  // 60 second timeout
 
   let response;
   try {
