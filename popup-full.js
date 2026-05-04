@@ -6,6 +6,10 @@ let currentSearchIndex = 0;
 // Step timeline: buffer log lines that arrive before their card is created
 const pendingStepLogs = {};
 
+// ========== Provider State ==========
+let activeProviderId = 'anthropic';
+let providerConfigs = { anthropic: {}, openai: {} };
+
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
@@ -21,9 +25,9 @@ const commandPaletteBtn = document.getElementById('commandPaletteBtn');
 const settingsModal = document.getElementById('settings-modal');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const setApiEndpoint = document.getElementById('set-api-endpoint');
-const setApiKey = document.getElementById('set-api-key');
-const setApiModel = document.getElementById('set-api-model');
+const setProviderEndpoint = document.getElementById('set-provider-endpoint');
+const setProviderKey = document.getElementById('set-provider-key');
+const setProviderModel = document.getElementById('set-provider-model');
 const exportFormatSelect = document.getElementById('export-format');
 const searchInput = document.getElementById('searchInput');
 const previewBtn = document.getElementById('previewBtn');
@@ -327,12 +331,51 @@ function toggleTheme() {
   updateThemeToggle();
 }
 
+// ========== Provider Card Switching ==========
+function switchProviderCard(providerId) {
+  activeProviderId = providerId;
+
+  // Update active provider button styling
+  document.querySelectorAll('.provider-btn').forEach(btn => {
+    btn.classList.toggle('active-provider', btn.dataset.provider === providerId);
+  });
+
+  // Populate fields from provider config
+  const config = providerConfigs[providerId] || {};
+  setProviderEndpoint.value = config.endpoint || '';
+  setProviderKey.value = config.api_key || '';
+  setProviderModel.value = config.model || '';
+
+  // Auto-fill defaults if fields are empty
+  const defaults = providerId === 'anthropic'
+    ? { endpoint: 'https://api.anthropic.com/v1/messages', model: 'claude-haiku-4-5-20251001' }
+    : { endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' };
+
+  if (!setProviderEndpoint.value) setProviderEndpoint.placeholder = defaults.endpoint;
+  if (!setProviderModel.value) setProviderModel.placeholder = defaults.model;
+}
+
+// Wire up provider selector buttons
+document.querySelectorAll('.provider-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchProviderCard(btn.dataset.provider));
+});
+
 // ========== Settings Management ==========
 function loadSettings() {
-  chrome.storage.local.get(['api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
-    if (result.api_endpoint) setApiEndpoint.value = result.api_endpoint;
-    if (result.api_key) setApiKey.value = result.api_key;
-    if (result.model) setApiModel.value = result.model;
+  chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
+    // Handle both new provider structure and legacy keys
+    if (result.providers) {
+      providerConfigs = result.providers;
+      activeProviderId = result.active_provider || 'openai';
+    } else {
+      // Legacy fallback -- migrate on the fly for display
+      const providerId = (result.api_endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai';
+      providerConfigs = {
+        anthropic: { api_key: '', model: 'claude-haiku-4-5-20251001', endpoint: 'https://api.anthropic.com/v1/messages', max_tokens: 8000, temperature: 0.3 },
+        openai: { api_key: result.api_key || '', model: result.model || 'gpt-4o', endpoint: result.api_endpoint || 'https://api.openai.com/v1/chat/completions', max_tokens: 8000, temperature: 0.3 }
+      };
+      activeProviderId = providerId;
+    }
     if (result.export_format) exportFormatSelect.value = result.export_format;
     if (result.agent_context) document.getElementById('set-agent-context').value = result.agent_context;
   });
@@ -600,7 +643,24 @@ newChatBtn.addEventListener('click', () => {
 themeToggle.addEventListener('click', toggleTheme);
 
 // ========== Settings Modal ==========
-settingsBtn.addEventListener('click', () => {
+settingsBtn.addEventListener('click', async () => {
+  // Load provider settings from storage
+  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+
+  if (stored.providers) {
+    providerConfigs = stored.providers;
+    activeProviderId = stored.active_provider || 'openai';
+  } else {
+    // Legacy fallback -- migrate on the fly for display
+    const providerId = (stored.api_endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai';
+    providerConfigs = {
+      anthropic: { api_key: '', model: 'claude-haiku-4-5-20251001', endpoint: 'https://api.anthropic.com/v1/messages', max_tokens: 8000, temperature: 0.3 },
+      openai: { api_key: stored.api_key || '', model: stored.model || 'gpt-4o', endpoint: stored.api_endpoint || 'https://api.openai.com/v1/chat/completions', max_tokens: 8000, temperature: 0.3 }
+    };
+    activeProviderId = providerId;
+  }
+
+  switchProviderCard(activeProviderId);
   settingsModal.classList.add('show');
 });
 
@@ -609,9 +669,9 @@ closeSettingsBtn.addEventListener('click', () => {
 });
 
 saveSettingsBtn.addEventListener('click', () => {
-  const endpoint = setApiEndpoint.value.trim();
-  const apiKey = setApiKey.value.trim();
-  const model = setApiModel.value.trim();
+  const endpoint = setProviderEndpoint.value.trim();
+  const apiKey = setProviderKey.value.trim();
+  const model = setProviderModel.value.trim();
   const format = exportFormatSelect.value;
   const agentContext = document.getElementById('set-agent-context').value.trim();
 
@@ -625,15 +685,23 @@ saveSettingsBtn.addEventListener('click', () => {
     return;
   }
 
-  chrome.storage.local.set({
-    api_endpoint: endpoint,
+  // Save to per-provider structure
+  providerConfigs[activeProviderId] = {
     api_key: apiKey,
     model: model,
+    endpoint: endpoint,
+    max_tokens: 8000,
+    temperature: 0.3
+  };
+
+  chrome.storage.local.set({
+    active_provider: activeProviderId,
+    providers: providerConfigs,
     export_format: format,
     agent_context: agentContext
   }, () => {
     settingsModal.classList.remove('show');
-    showToast('Settings saved', 'success');
+    showToast(`Settings saved (${activeProviderId})`, 'success');
   });
 });
 
@@ -1430,17 +1498,19 @@ chrome.runtime.onMessage.addListener((message) => {
 // ========== Preset Buttons ==========
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    setApiEndpoint.value = btn.dataset.endpoint;
-    setApiModel.value = btn.dataset.model;
+    const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
+    switchProviderCard(provider);
+    setProviderEndpoint.value = btn.dataset.endpoint;
+    setProviderModel.value = btn.dataset.model;
     showToast(`Preset loaded: ${btn.textContent}`, 'success');
   });
 });
 
 // ========== Test Connection Button ==========
 document.getElementById('testConnectionBtn').addEventListener('click', async () => {
-  const endpoint = setApiEndpoint.value.trim();
-  const apiKey = setApiKey.value.trim();
-  const model = setApiModel.value.trim();
+  const endpoint = setProviderEndpoint.value.trim();
+  const apiKey = setProviderKey.value.trim();
+  const model = setProviderModel.value.trim();
 
   if (!endpoint || !apiKey || !model) {
     showToast('Fill in endpoint, API key, and model first', 'error');
@@ -1448,11 +1518,11 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
   }
 
   const btn = document.getElementById('testConnectionBtn');
-  btn.textContent = '⏳ Testing...';
+  btn.textContent = 'Testing...';
   btn.disabled = true;
 
   try {
-    // Use Anthropic API format when endpoint is api.anthropic.com, otherwise OpenAI-compatible
+    // Determine provider format from endpoint (popup context cannot import background modules)
     const isAnthropic = endpoint.includes('api.anthropic.com');
     const headers = isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
@@ -1464,15 +1534,15 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     const response = await fetch(endpoint, { method: 'POST', headers, body });
 
     if (response.ok) {
-      showToast('✅ Connection successful', 'success');
+      showToast('Connection successful', 'success');
     } else {
       const errText = await response.text().catch(() => 'Unknown error');
-      showToast(`❌ Connection failed: ${response.status} - ${errText.substring(0, 100)}`, 'error');
+      showToast(`Connection failed: ${response.status} - ${errText.substring(0, 100)}`, 'error');
     }
   } catch (err) {
-    showToast(`❌ Connection failed: ${err.message}`, 'error');
+    showToast(`Connection failed: ${err.message}`, 'error');
   } finally {
-    btn.textContent = '🔌 Test Connection';
+    btn.textContent = 'Test Connection';
     btn.disabled = false;
   }
 });

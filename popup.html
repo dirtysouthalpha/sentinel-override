@@ -1692,6 +1692,19 @@
       margin-bottom: -1px;
       font-weight: 600;
     }
+
+    /* Provider Selector Buttons */
+    .provider-btn.active-provider {
+      border-color: var(--accent-primary) !important;
+      background: rgba(0, 132, 255, 0.1) !important;
+      color: var(--accent-primary) !important;
+      font-weight: 600;
+    }
+
+    .provider-btn:hover:not(.active-provider) {
+      border-color: var(--text-tertiary);
+      background: var(--bg-input);
+    }
   </style>
 </head>
 <body>
@@ -1825,17 +1838,38 @@
   <div id="settings-modal" class="modal">
     <div class="modal-content">
       <h2>Settings</h2>
+      <!-- Active Provider Selector -->
       <div class="modal-field">
-        <label>API Endpoint</label>
-        <input type="text" id="set-api-endpoint" placeholder="https://api.example.com/v1/chat/completions">
+        <label>Active Provider</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="provider-anthropic" class="provider-btn active-provider" data-provider="anthropic"
+            style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;text-align:center;font-size:13px;">
+            Anthropic Claude
+          </button>
+          <button type="button" id="provider-openai" class="provider-btn" data-provider="openai"
+            style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;text-align:center;font-size:13px;">
+            OpenAI
+          </button>
+        </div>
       </div>
-      <div class="modal-field">
-        <label>API Key</label>
-        <input type="password" id="set-api-key" placeholder="Your API key">
-      </div>
-      <div class="modal-field">
-        <label>Model ID</label>
-        <input type="text" id="set-api-model" placeholder="gpt-4 or your model name">
+
+      <!-- Provider Config Card -->
+      <div class="modal-field" id="provider-config-card" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:12px;">
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>API Endpoint</label>
+          <input type="text" id="set-provider-endpoint" placeholder="https://api.example.com/v1/...">
+        </div>
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>API Key</label>
+          <input type="password" id="set-provider-key" placeholder="Your API key">
+        </div>
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>Model</label>
+          <input type="text" id="set-provider-model" placeholder="Model ID">
+        </div>
+        <div style="font-size:11px;color:var(--text-tertiary);">
+          Default endpoint and model auto-fill when switching providers.
+        </div>
       </div>
       <div class="modal-field">
         <label>Provider Presets <span style="font-weight:400;color:var(--text-tertiary);">(click to fill endpoint + model)</span></label>
@@ -1843,23 +1877,23 @@
 
         <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Free / Low Cost</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <button type="button" class="preset-btn" data-endpoint="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.3-70b-versatile" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">⚡ Groq (Llama 3.3 70B)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" data-model="gemini-2.0-flash" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 Google AI Studio (Gemini 2.0 Flash)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.0-flash-exp:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Gemini Free)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="meta-llama/llama-3.3-70b-instruct:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Llama Free)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://api.z.ai/api/paas/v4/chat/completions" data-model="glm-5.1" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Z.ai (GLM-5.1)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.3-70b-versatile" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">⚡ Groq (Llama 3.3 70B)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" data-model="gemini-2.0-flash" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 Google AI Studio (Gemini 2.0 Flash)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.0-flash-exp:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Gemini Free)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="meta-llama/llama-3.3-70b-instruct:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Llama Free)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.z.ai/api/paas/v4/chat/completions" data-model="glm-5.1" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Z.ai (GLM-5.1)</button>
         </div>
 
         <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Best for Complex Runbooks</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-          <button type="button" class="preset-btn" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-haiku-4-5-20251001" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;font-weight:500;">🧠 Anthropic Claude Haiku (fast+cheap)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🧠 Anthropic Claude Sonnet</button>
-          <button type="button" class="preset-btn" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-haiku-4-5" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Haiku)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Sonnet)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.5-pro-preview-03-25" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">OpenRouter (Gemini 2.5 Pro)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://api.mistral.ai/v1/chat/completions" data-model="mistral-large-latest" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Mistral Large</button>
-          <button type="button" class="preset-btn" data-endpoint="https://api.together.xyz/v1/chat/completions" data-model="meta-llama/Llama-3-70b-chat-hf" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Together AI (Llama 3 70B)</button>
-          <button type="button" class="preset-btn" data-endpoint="https://api.venice.ai/api/v1/chat/completions" data-model="llama-3.3-70b" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Venice</button>
+          <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-haiku-4-5-20251001" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;font-weight:500;">🧠 Anthropic Claude Haiku (fast+cheap)</button>
+          <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🧠 Anthropic Claude Sonnet</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-haiku-4-5" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Haiku)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid #d97706;background:rgba(217,119,6,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Sonnet)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.5-pro-preview-03-25" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">OpenRouter (Gemini 2.5 Pro)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.mistral.ai/v1/chat/completions" data-model="mistral-large-latest" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Mistral Large</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.together.xyz/v1/chat/completions" data-model="meta-llama/Llama-3-70b-chat-hf" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Together AI (Llama 3 70B)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.venice.ai/api/v1/chat/completions" data-model="llama-3.3-70b" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Venice</button>
         </div>
 
         <div style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:8px 10px;border-radius:6px;border:1px solid var(--border-color);">
