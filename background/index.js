@@ -1,11 +1,12 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentTabId, agentRunning } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector } from './frame-router.js';
+import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -27,8 +28,9 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
   switch (request.action) {
     case 'execute_command': {
-      if (!agentTabId) throw new Error('No agent tab specified');
-      const tab = agentTabId;
+      const activeTab = getActiveTabId();
+      if (!activeTab) throw new Error('No agent tab specified');
+      const tab = activeTab;
       const cmd = request.command;
 
       // Handle navigate inline (no content script needed)
@@ -63,16 +65,31 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // Cross-origin iframe commands from content script
     case 'execute_in_frame': {
       const { frameIndex, command } = request;
-      const frameId = await resolveFrameForSelector(agentTabId, frameIndex);
+      const frameId = await resolveFrameForSelector(getActiveTabId(), frameIndex);
       if (!frameId) throw new Error('Frame ' + frameIndex + ' not found');
-      return await executeInFrame(agentTabId, frameId, command);
+      return await executeInFrame(getActiveTabId(), frameId, command);
     }
 
     case 'enumerate_frames': {
-      return await enumerateFrames(agentTabId);
+      return await enumerateFrames(getActiveTabId());
     }
 
     default:
       throw new Error(`Unknown action: ${request.action}`);
   }
 }));
+
+// ========== Tab Event Listeners ==========
+
+// Detect externally-closed tabs and clean up context
+chrome.tabs.onRemoved.addListener((tabId) => {
+  handleTabRemoved(tabId);
+});
+
+// Track user tab switches for popup UI awareness only.
+// Do NOT change the agent's active tab when the user switches.
+// Per CONTEXT.md decision: agent ignores user's manual tab switches.
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  // This listener exists for future popup UI features.
+  // No action needed -- agent ignores user tab switches per CONTEXT.md decision.
+});

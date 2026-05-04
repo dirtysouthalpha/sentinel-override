@@ -6,22 +6,23 @@ import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, get
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
+import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
-let agentTabId = null;
 let apiCallCount = 0;
 let lastApiCallTime = 0;
-let lastScreenshotUrl = null;
-let cachedBase64Image = null;
 let agentMemory = {};           // Extract-and-remember: carries data between pages
 let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy shift
 let currentStrategies = [];     // Self-healing: remembers tried approaches
 let agentPlan = null;           // Planning phase: numbered list of steps
 let currentPlanStep = 0;        // Planning phase: which step we're currently on
 
-// Expose agentRunning and agentTabId as mutable exports for index.js
-export { agentRunning, agentTabId };
+// Expose agentRunning for index.js
+export { agentRunning };
+
+/** Compatibility accessor -- returns the current active tab ID from tab-context. */
+export function getAgentTabId() { return getActiveTabId(); }
 
 // ========== Configuration ==========
 const CONFIG = {
@@ -54,13 +55,12 @@ const CONFIG = {
 export function resetAgentState() {
   apiCallCount = 0;
   lastApiCallTime = 0;
-  lastScreenshotUrl = null;
-  cachedBase64Image = null;
   agentMemory = {};
   consecutiveFailures = 0;
   currentStrategies = [];
   agentPlan = null;
   currentPlanStep = 0;
+  resetAllContexts();
 }
 
 // ========== Agent Lifecycle ==========
@@ -68,26 +68,32 @@ export async function startAgent(goal, sender) {
   if (agentRunning) throw new Error('Agent already running');
 
   // Determine which tab to operate on
+  let startTabId;
   if (!sender.tab || !sender.tab.id) {
     const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t)); });
     if (tabs && tabs.length > 0) {
-      agentTabId = tabs[0].id;
+      startTabId = tabs[0].id;
     } else {
       throw new Error('No active tab found');
     }
   } else {
-    agentTabId = sender.tab.id;
+    startTabId = sender.tab.id;
   }
 
   agentRunning = true;
   resetAgentState();
-  runAgentLoop(goal, agentTabId);
+
+  // Register the starting tab in the tab context map
+  const tabInfo = await getTabInfo(startTabId);
+  registerInitialTab(startTabId, tabInfo?.url || '');
+
+  runAgentLoop(goal, startTabId);
   return 'Agent started in background';
 }
 
-export function stopAgent() {
+export async function stopAgent() {
   agentRunning = false;
-  agentTabId = null;
+  await closeAllAgentTabs();
   return 'Agent stopped';
 }
 
@@ -170,9 +176,6 @@ async function runAgentLoop(goal, workingTabId) {
     sendSilentUpdate('No plan generated -- running in direct mode');
   }
 
-  // Screenshot cache ref (mutable, passed to takeScreenshot)
-  const screenshotCache = { cachedBase64Image: null, lastScreenshotUrl: null };
-
   while (!finished && agentRunning) {
     try {
       stepCount++;
@@ -187,15 +190,23 @@ async function runAgentLoop(goal, workingTabId) {
       if (isSPATransitionPending()) {
         sendSilentUpdate('SPA page transition detected -- re-scanning...', stepCount);
         clearSPATransition();
-        // Invalidate screenshot cache
-        cachedBase64Image = null;
-        lastScreenshotUrl = null;
+        // Invalidate screenshot cache for current active tab
+        const spaCtx = getTabContext(getActiveTabId());
+        if (spaCtx) {
+          spaCtx.screenshotCache.cachedBase64Image = null;
+          spaCtx.screenshotCache.lastScreenshotUrl = null;
+        }
         // Don't skip the iteration -- just let the normal observe/scan flow run
         // with fresh data. The continue is NOT used here because we want the
         // normal flow to pick up the new page state.
       }
 
-      let tab = workingTabId;
+      let tab = getActiveTabId();
+      if (!tab) {
+        sendSilentUpdate('No active tab -- stopping', stepCount);
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'No active tab. Task interrupted.' }).catch(() => {});
+        break;
+      }
 
       // Get tab info
       let tabInfo = await getTabInfo(tab);
@@ -203,7 +214,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
         const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
-        const lostTab = allTabs.find(t => t.id === workingTabId);
+        const lostTab = allTabs.find(t => t.id === tab);
         if (lostTab) { tabInfo = lostTab; }
         else {
           sendSilentUpdate('Agent tab was closed. Task stopped.', stepCount);
@@ -244,24 +255,31 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
-      // Screenshot (CDP with cache)
+      // Update snapshot for the current tab
+      updateSnapshot(tab, {
+        elements: observation?.elements || [],
+        pageContent: pageContent?.content || '',
+        url: currentUrl,
+        title: tabInfo?.title || ''
+      });
+
+      // Screenshot (CDP with per-tab cache)
       const freshTabInfo = await getTabInfo(tab);
       if (!freshTabInfo) { await sleep(1000); continue; }
 
       const currentUrl = (freshTabInfo && freshTabInfo.url) || tabInfo.url;
 
+      // Get per-tab screenshot cache
+      const tabCtx = getTabContext(tab);
+      if (!tabCtx) { await sleep(1000); continue; }
+      const screenshotCache = tabCtx.screenshotCache;
+
       let base64Image = null;
       const modelForScreenshot = (await chrome.storage.local.get(['model'])).model || 'glm-5.1';
       if (supportsVision(modelForScreenshot)) {
-        // Sync local cache vars with screenshotCache ref
-        if (screenshotCache.cachedBase64Image) cachedBase64Image = screenshotCache.cachedBase64Image;
-        if (screenshotCache.lastScreenshotUrl) lastScreenshotUrl = screenshotCache.lastScreenshotUrl;
-
         const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
         if (shotResult) {
           base64Image = shotResult.base64Image;
-          cachedBase64Image = base64Image;
-          lastScreenshotUrl = currentUrl;
         }
       }
 
@@ -428,16 +446,78 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Invalidate screenshot cache for actions that can change the page
       if (['navigate', 'click', 'type', 'press_key', 'select'].includes(command.type)) {
-        lastScreenshotUrl = null;
-        cachedBase64Image = null;
-        screenshotCache.cachedBase64Image = null;
-        screenshotCache.lastScreenshotUrl = null;
+        const invalidationCtx = getTabContext(tab);
+        if (invalidationCtx) {
+          invalidationCtx.screenshotCache.cachedBase64Image = null;
+          invalidationCtx.screenshotCache.lastScreenshotUrl = null;
+        }
       }
 
       // Execute command
       const urlBeforeCommand = tabInfo.url;
       let result;
       let actionFailed = false;
+
+      // Handle open_tab
+      if (command.type === 'open_tab') {
+        if (!isValidUrl(command.url)) {
+          result = 'Invalid URL: ' + command.url;
+          actionFailed = true;
+        } else {
+          sendActionMessage(command, stepCount, null); // Show action card in popup
+          sendSilentUpdate(`Opening tab: ${command.label || command.url}`, stepCount);
+          const ctx = await openTab(command.url, command.label);
+          await switchToTab(ctx.tabId);
+          result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
+        }
+        sendActionResult(stepCount, command, result, actionFailed);
+        history.push({ step: stepCount, action: command, result });
+        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        continue;
+      }
+
+      // Handle switch_tab
+      if (command.type === 'switch_tab') {
+        let targetId = command.tab_id;
+        if (!targetId && command.label) {
+          targetId = findTabByLabel(command.label);
+        }
+        if (!targetId) {
+          result = `Tab not found: ${command.label || command.tab_id}`;
+          actionFailed = true;
+        } else {
+          sendActionMessage(command, stepCount, null); // Show action card in popup
+          await switchToTab(targetId);
+          result = `Switched to tab "${getTabContext(targetId)?.label || targetId}"`;
+        }
+        sendActionResult(stepCount, command, result, actionFailed);
+        history.push({ step: stepCount, action: command, result });
+        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        continue;
+      }
+
+      // Handle close_tab
+      if (command.type === 'close_tab') {
+        let targetId = command.tab_id;
+        if (!targetId && command.label) {
+          targetId = findTabByLabel(command.label);
+        }
+        if (!targetId) {
+          result = `Tab not found: ${command.label || command.tab_id}`;
+          actionFailed = true;
+        } else {
+          sendActionMessage(command, stepCount, null); // Show action card in popup
+          await closeTab(targetId);
+          result = `Closed tab "${command.label || targetId}"`;
+        }
+        sendActionResult(stepCount, command, result, actionFailed);
+        history.push({ step: stepCount, action: command, result });
+        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        continue;
+      }
 
       if (command.type === 'navigate') {
         if (!isValidUrl(command.url)) {
@@ -494,11 +574,21 @@ async function runAgentLoop(goal, workingTabId) {
           if (newTabs.length > 0) {
             const newTab = newTabs[0];
             const newUrl = newTab.url;
-            chrome.tabs.remove(newTabs.map(t => t.id));
-            await chrome.tabs.update(tab, { url: newUrl });
-            await waitForPageLoad(tab);
-            await sleep(500);
-            result = 'Clicked -> navigated to ' + (newUrl ? new URL(newUrl).hostname : 'new page');
+            if (getTabCount() > 1) {
+              // Multi-tab mode: register the new tab as a tracked context
+              registerInitialTab(newTab.id, newUrl);
+              // Mark it as agent-created since it was opened by page interaction
+              const newCtx = getTabContext(newTab.id);
+              if (newCtx) newCtx.isAgentCreated = true;
+              result = 'Clicked -> new tab opened: ' + (newUrl ? new URL(newUrl).hostname : 'new page');
+            } else {
+              // Single tab mode: capture URL, close new tab, navigate original (backward compat)
+              chrome.tabs.remove(newTabs.map(t => t.id));
+              await chrome.tabs.update(tab, { url: newUrl });
+              await waitForPageLoad(tab);
+              await sleep(500);
+              result = 'Clicked -> navigated to ' + (newUrl ? new URL(newUrl).hostname : 'new page');
+            }
           } else {
             const updatedTab = await getTabInfo(tab);
             if (updatedTab && updatedTab.url !== urlBeforeCommand) {
@@ -592,8 +682,11 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   if (finished) await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
+
+  // Batch-close all agent-created tabs
+  await closeAllAgentTabs();
+
   agentRunning = false;
-  agentTabId = null;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
 }
 
