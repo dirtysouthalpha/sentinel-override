@@ -811,10 +811,8 @@ async function runAgentLoop(goal, workingTabId) {
   let history = [];
   let stepCount = 0;
 
-  const stored = await chrome.storage.local.get(['agent_history']);
-  if (stored.agent_history) {
-    history = stored.agent_history;
-  }
+  // Per-run history is in-memory only — don't carry over old runs
+  await chrome.storage.local.remove(['agent_history']).catch(() => {});
 
   while (!finished && agentRunning) {
     try {
@@ -839,15 +837,13 @@ async function runAgentLoop(goal, workingTabId) {
       if (tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')) {
         sendSilentUpdate(`[Step ${stepCount}] Internal page detected. Navigating...`);
         await chrome.tabs.update(tab, { url: 'https://www.google.com' });
-        await sleep(3000);
+        await waitForTabLoad(tab, 15000);
         continue;
       }
 
       sendSilentUpdate(`[Step ${stepCount}] Observing page...`);
-      await chrome.scripting.executeScript({
-        target: { tabId: tab },
-        files: ['content.js']
-      });
+      await ensureContentScript(tab);
+      await sendMessageWithRetry(tab, { action: 'wait_stable', timeout: 6000, quietMs: 400 }).catch(() => {});
 
       let observation, pageContent;
       try {
@@ -862,7 +858,11 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
-      sendSilentUpdate(`[Step ${stepCount}] Capturing screen...`);
+      sendSilentUpdate(`[Step ${stepCount}] Capturing screen with element labels...`);
+      // Set-of-marks: draw numbered overlay so the model can ground actions visually
+      await sendMessageWithRetry(tab, { action: 'draw_marks' }).catch(() => {});
+      // Allow the overlay to render before capture
+      await sleep(80);
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(tabInfo.windowId, {
           format: 'jpeg',
@@ -875,6 +875,8 @@ async function runAgentLoop(goal, workingTabId) {
           }
         });
       });
+      // Remove overlay so it doesn't interfere with subsequent clicks
+      await sendMessageWithRetry(tab, { action: 'clear_marks' }).catch(() => {});
       const base64Image = screenshot_data_url.split(',')[1];
 
       await enforceRateLimit();
@@ -884,22 +886,20 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (command.type === 'finish') {
         finished = true;
-        sendSilentUpdate(`✅ Task completed: ${command.summary}`);
+        sendSilentUpdate(`✅ Task completed: ${command.summary || 'Goal achieved.'}`);
         break;
       }
 
       if (command.type === 'note') {
-        // Handle internal notes/logging - don't send to content.js
         sendSilentUpdate(`[Step ${stepCount}] Note: ${command.text}`);
         const noteText = command.text || command.summary || 'Internal note';
         taskContext.intermediateData['lastNote'] = noteText;
-        history.push({ step: stepCount, observation, action: command, result: 'Logged note' });
-        await chrome.storage.local.set({ agent_history: history });
-        await sleep(500);
-        continue; // Skip content.js execution
+        history.push({ step: stepCount, action: command, result: 'Logged note' });
+        await sleep(300);
+        continue;
       }
 
-      sendSilentUpdate(`[Step ${stepCount}] Executing: ${command.type}...`);
+      sendSilentUpdate(`[Step ${stepCount}] Executing: ${describeCommand(command)}`);
 
       let result;
       if (command.type === 'navigate') {
@@ -907,25 +907,23 @@ async function runAgentLoop(goal, workingTabId) {
           result = 'Invalid URL: ' + command.url;
         } else {
           await chrome.tabs.update(tab, { url: command.url });
-          await sleep(2000);
-          result = 'Navigated to ' + command.url;
+          const loaded = await waitForTabLoad(tab, 15000);
+          result = loaded ? ('Navigated to ' + command.url) : ('Navigation timeout to ' + command.url);
         }
+      } else if (command.type === 'go_back' || command.type === 'go_forward') {
+        await sendMessageWithRetry(tab, { action: 'execute_command', command });
+        await waitForTabLoad(tab, 8000);
+        result = 'Navigated history (' + command.type + ')';
       } else if (command.type === 'read_page') {
-        // Handle read_page as a direct message action, not as execute_command
         result = await sendMessageWithRetry(tab, { action: 'read_page' });
-      } else if (command.type === 'wait_for_navigation') {
-        // Wait for page navigation to complete
-        result = await chrome.tabs.sendMessage(tab, { action: 'execute_command', command });
-        // Add extra time for page to fully load after navigation
-        await sleep(2000);
       } else {
-        result = await chrome.tabs.sendMessage(tab, { action: 'execute_command', command });
+        result = await executeWithStaleRetry(tab, command, observation);
       }
 
-      history.push({ step: stepCount, observation, action: command, result });
-      await chrome.storage.local.set({ agent_history: history });
-
-      await sleep(1500);
+      history.push({ step: stepCount, action: command, result: shortenForHistory(result) });
+      // Trim history to last 8 entries to keep prompt small
+      if (history.length > 8) history = history.slice(-8);
+      await sleep(800);
 
     } catch (err) {
       console.error('Agent loop error:', err);
@@ -940,12 +938,103 @@ async function runAgentLoop(goal, workingTabId) {
     }
   }
 
-  if (finished) {
-    await chrome.storage.local.set({ agent_history: [] });
-  }
+  await chrome.storage.local.remove(['agent_history']).catch(() => {});
   agentRunning = false;
   agentTabId = null;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
+}
+
+// ========== Navigation + injection helpers ==========
+async function ensureContentScript(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    });
+  } catch (e) {
+    // Some pages (chrome://, view-source:) reject injection — surface clearer error
+    throw new Error('Cannot inject into this page: ' + e.message);
+  }
+}
+
+function waitForTabLoad(tabId, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => { if (!settled) { settled = true; cleanup(); resolve(ok); } };
+    const onCompleted = (details) => {
+      if (details.tabId === tabId && details.frameId === 0) finish(true);
+    };
+    const onError = (details) => {
+      if (details.tabId === tabId && details.frameId === 0) finish(false);
+    };
+    const cleanup = () => {
+      try { chrome.webNavigation.onCompleted.removeListener(onCompleted); } catch (e) {}
+      try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch (e) {}
+      clearTimeout(timer);
+    };
+    try {
+      chrome.webNavigation.onCompleted.addListener(onCompleted);
+      chrome.webNavigation.onErrorOccurred.addListener(onError);
+    } catch (e) {
+      // webNavigation permission not granted; fall back to timeout
+    }
+    // Also poll tab status — covers SPA same-document transitions
+    const pollStart = Date.now();
+    const poll = setInterval(async () => {
+      try {
+        const t = await chrome.tabs.get(tabId);
+        if (t && t.status === 'complete') {
+          clearInterval(poll);
+          finish(true);
+        } else if (Date.now() - pollStart > timeoutMs) {
+          clearInterval(poll);
+          finish(false);
+        }
+      } catch (e) {
+        clearInterval(poll);
+        finish(false);
+      }
+    }, 250);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
+async function executeWithStaleRetry(tabId, command, observation) {
+  let res = await sendMessageWithRetry(tabId, { action: 'execute_command', command });
+  if (res && res.ok === false && res.stale && command.id != null) {
+    // Element id no longer valid — re-observe and retry by name+role from prior observation
+    sendSilentUpdate('[Recover] Element became stale — re-observing and retrying.');
+    const stale = (observation.elements || []).find(e => e.id === command.id);
+    await sendMessageWithRetry(tabId, { action: 'wait_stable', timeout: 4000, quietMs: 300 }).catch(() => {});
+    await sendMessageWithRetry(tabId, { action: 'observe_page' }).catch(() => {});
+    if (stale) {
+      const retryCmd = Object.assign({}, command);
+      delete retryCmd.id;
+      retryCmd.role = stale.role;
+      retryCmd.name = stale.name;
+      res = await sendMessageWithRetry(tabId, { action: 'execute_command', command: retryCmd });
+    }
+  }
+  return res;
+}
+
+function describeCommand(cmd) {
+  if (!cmd || !cmd.type) return 'unknown';
+  if (cmd.type === 'click') return 'click ' + (cmd.id != null ? '#' + cmd.id : (cmd.name || cmd.selector || ''));
+  if (cmd.type === 'type') return 'type into ' + (cmd.id != null ? '#' + cmd.id : (cmd.name || cmd.selector || '')) + ': "' + String(cmd.text || '').slice(0, 40) + '"';
+  if (cmd.type === 'navigate') return 'navigate to ' + cmd.url;
+  if (cmd.type === 'scroll') return 'scroll ' + (cmd.amount || '');
+  return cmd.type;
+}
+
+function shortenForHistory(result) {
+  if (result == null) return '';
+  if (typeof result === 'string') return result.slice(0, 200);
+  if (typeof result === 'object') {
+    const r = result.result || result.error || JSON.stringify(result);
+    return String(r).slice(0, 200);
+  }
+  return String(result).slice(0, 200);
 }
 
 // ========== Silent Updates (send to UI, not interrupting user) ==========
@@ -1115,7 +1204,7 @@ async function executePlan(plan, workingTabId) {
 
       if (step.action_type === 'navigate') {
         await chrome.tabs.update(workingTabId, { url: step.url || 'https://www.google.com' });
-        await sleep(2500);
+        await waitForTabLoad(workingTabId, 15000);
         taskContext.completedSteps.push({ step: step.step_number, description: step.description, result: 'navigated to ' + (step.url || 'google'), timestamp: new Date().toISOString() });
         taskContext.intermediateData['lastPage'] = step.url || 'google';
       } else if (step.action_type === 'wait') {
@@ -1312,7 +1401,61 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   const resultStr = typeof last_result === 'string' ? last_result : JSON.stringify(last_result);
 
   var ctx = getContextSummary();
-  const prompt = `You are a skilled browser automation agent performing a multi-step task.\nCurrent step: ${stepCount}\nGoal: ${goal}\n\nCONTEXT SO FAR: ${ctx}\n\nCURRENT PAGE CONTENT:\n${pageContent}\n\nINTERACTIVE ELEMENTS:\n${JSON.stringify(observation.elements, null, 2)}\n\nCONVERSATION HISTORY (last 3 actions):\n${JSON.stringify(history.slice(-3), null, 2)}\n\n${last_action && resultStr && resultStr.includes('failed') ? 'Your last action failed. Please try a different selector or approach.' : ''}\n\nIMPORTANT: You are making step-by-step progress toward the goal.\n- Focus on ONE clear action per response\n- Reuse previous successful selectors when possible\n- If something failed, learn from it and try a different approach\n- Only return { "type": "finish" } when the goal is fully achieved\n\nBased on the current page, what is the NEXT single action to reach the goal?\n\nIf the goal is achieved, return: { "type": "finish", "summary": "Brief description of what was accomplished" }\nOtherwise, choose ONE of these actions:\n1. { "type": "click", "selector": "CSS_SELECTOR" } - Click a button or link\n2. { "type": "type", "selector": "CSS_SELECTOR", "text": "TEXT" } - Type text into a field\n3. { "type": "navigate", "url": "URL" } - Go to a different URL\n4. { "type": "scroll", "amount": INTEGER } - Scroll up (negative) or down (positive)\n5. { "type": "read_page" } - Re-read the page content to confirm state\n\nReturn ONLY a JSON object.`;
+  // Compact element list — model gets numbered IDs that match overlay badges in screenshot
+  const elementList = (observation.elements || []).map(e => {
+    const parts = ['[' + e.id + ']', e.role || (e.tag || '').toLowerCase()];
+    if (e.name) parts.push('"' + String(e.name).replace(/\s+/g, ' ').slice(0, 80) + '"');
+    if (e.type) parts.push('type=' + e.type);
+    if (e.value) parts.push('value="' + String(e.value).slice(0, 30) + '"');
+    if (e.placeholder) parts.push('placeholder="' + String(e.placeholder).slice(0, 30) + '"');
+    if (e.disabled) parts.push('(disabled)');
+    if (!e.inViewport) parts.push('(off-screen)');
+    if (e.href) parts.push('-> ' + String(e.href).slice(0, 60));
+    return parts.join(' ');
+  }).join('\n');
+
+  const viewport = observation.viewport || {};
+  const lastFailed = last_action && resultStr && /fail|not found|error|timeout/i.test(resultStr);
+
+  const prompt = `You are a precise browser automation agent. The screenshot shows the current page with NUMBERED COLORED BADGES on every interactive element. Use those numbers as element IDs.
+Goal: ${goal}
+Current step: ${stepCount}
+Page: ${observation.title || ''} — ${observation.url || ''}
+Viewport: ${viewport.w || 0}x${viewport.h || 0}, scrollY=${viewport.scrollY || 0}/${viewport.scrollHeight || 0}${viewport.atBottom ? ' (at bottom)' : ''}
+
+CONTEXT: ${ctx}
+
+PAGE TEXT (truncated):
+${(pageContent || '').slice(0, 3500)}
+
+INTERACTIVE ELEMENTS (id, role, name):
+${elementList || '(none visible)'}
+
+RECENT ACTIONS:
+${JSON.stringify(history.slice(-3), null, 2)}
+${lastFailed ? '\n⚠️ Last action FAILED. Pick a DIFFERENT element id, scroll, or change strategy.' : ''}
+
+Rules:
+- Output ONE action as a JSON object — nothing else.
+- Always reference elements by their numeric "id" (from the badges). Never invent CSS selectors.
+- If the target element isn't listed, scroll or navigate first.
+- Only return {"type":"finish","summary":"..."} when the goal is fully achieved.
+
+Available actions:
+{"type":"click","id":N}
+{"type":"type","id":N,"text":"...","clear":true,"submit":false}
+{"type":"select","id":N,"value":"..."}
+{"type":"hover","id":N}
+{"type":"press_key","key":"Enter","id":N}
+{"type":"scroll","amount":600}            // positive=down, negative=up; or use {"type":"scroll","id":N} to scroll an element into view
+{"type":"navigate","url":"https://..."}
+{"type":"go_back"}  |  {"type":"go_forward"}
+{"type":"wait_for_text","text":"...","timeout":8000}
+{"type":"wait_for_element","id":N,"timeout":8000}
+{"type":"extract","id":N}
+{"type":"finish","summary":"..."}
+
+Return ONLY the JSON object.`;
 
   // ===== COST SAFETY CHECK =====
   for (const prefix of COST_SAFETY.BLOCKED_MODEL_PREFIXES) {
@@ -1472,10 +1615,20 @@ function parseLLMResponse(content) {
       return { type: 'note', text: '[Processed] ' + summary };
     }
 
-    const validTypes = ['click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select', 'hover', 'extract', 'extract_list', 'note', 'press_key', 'wait_for_text', 'wait_for_element', 'execute_js', 'wait_for_navigation'];
+    const validTypes = [
+      'click', 'type', 'navigate', 'scroll', 'finish', 'read_page', 'select',
+      'hover', 'extract', 'extract_list', 'note', 'press_key',
+      'wait_for_text', 'wait_for_element', 'wait_for_navigation', 'wait_stable',
+      'execute_js', 'go_back', 'go_forward'
+    ];
     if (!validTypes.includes(parsed.type)) {
       throw new Error('Invalid command type: ' + parsed.type);
     }
+
+    // Coerce id to number; allow elementId / element_id aliases
+    if (parsed.id == null && parsed.elementId != null) parsed.id = parsed.elementId;
+    if (parsed.id == null && parsed.element_id != null) parsed.id = parsed.element_id;
+    if (parsed.id != null) parsed.id = Number(parsed.id);
 
     return parsed;
   } catch (err) {
