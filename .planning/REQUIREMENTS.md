@@ -84,11 +84,11 @@ Requirements for v2 milestone. Focus: test infrastructure, tech debt cleanup, co
 | SCH-03 | Phase 7 | Complete |
 | SCH-04 | Phase 7 | Complete |
 | SCH-05 | Phase 7 | Complete |
-| COL-01 | Phase 8 | Pending |
-| COL-02 | Phase 8 | Pending |
-| COL-03 | Phase 8 | Pending |
-| COL-04 | Phase 8 | Pending |
-| COL-05 | Phase 8 | Pending |
+| COL-01 | Phase 8 | Complete |
+| COL-02 | Phase 8 | Complete |
+| COL-03 | Phase 8 | Complete |
+| COL-04 | Phase 8 | Complete |
+| COL-05 | Phase 8 | Complete |
 
 **Coverage:**
 - v2 requirements: 25 total

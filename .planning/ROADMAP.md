@@ -28,7 +28,7 @@ Full details: [.planning/milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md)
 - [x] **Phase 5: Testing & Tech Debt Cleanup** (2/2 plans) -- completed 2026-05-04
 - [x] **Phase 6: Command Templates & Runbooks** (2/2 plans) -- completed 2026-05-04
 - [x] **Phase 7: Agent Scheduling** (2/2 plans) -- completed 2026-05-04
-- [ ] **Phase 8: Collaboration & Export** -- Users export and import templates and reports as shareable files with format versioning and safety validation.
+- [x] **Phase 8: Collaboration & Export** (2/2 plans) -- completed 2026-05-04
 
 ## Phase Details
 
@@ -136,7 +136,7 @@ Plans:
 | 5. Testing & Tech Debt Cleanup | v2 | 2 | 2/2 | Complete | 2026-05-04 |
 | 6. Command Templates & Runbooks | v2 | 2 | 2/2 | Complete | 2026-05-04 |
 | 7. Agent Scheduling | v2 | 2 | 2/2 | Complete | 2026-05-04 |
-| 8. Collaboration & Export | v2 | 2 | 0/2 | Pending | -- |
+| 8. Collaboration & Export | v2 | 2 | 2/2 | Complete | 2026-05-04 |
 
 ---
 *Roadmap created: 2026-04-24*

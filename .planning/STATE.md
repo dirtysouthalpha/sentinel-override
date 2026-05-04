@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-05-04)
 ## Current Position
 
 Phase: 8 of 8 -- Collaboration & Export
-Plan: 0 of 2
-Status: Not started (defining requirements)
-Last activity: 2026-05-04 -- Phase 7 complete (scheduler backend + UI, report capture fix)
+Plan: 2 of 2 (Complete)
+Status: Phase complete
+Last activity: 2026-05-04 -- Phase 8 complete (collaboration backend + UI)
 
-Progress: [█████████░░░░░] 75% (v2, 6/8 plans -- phases 1-7 done)
+Progress: [██████████████] 100% (v2, 8/8 plans -- all phases done)
 
 ## Performance Metrics
 
@@ -112,6 +112,12 @@ Progress: [█████████░░░░░] 75% (v2, 6/8 plans -- pha
 - [07-02]: Event delegation on schedules-panel container for data-action button routing (matches templates.js pattern)
 - [07-02]: Templates cached in module scope to avoid redundant template_list calls during form interactions
 - [07-02]: Badge cleared on every panel open via schedule_clear_badge message to background
+- [08-01]: Template export strips internal metadata (id, timestamps, runCount) for clean sharing
+- [08-01]: Import safety scans for 7 dangerous patterns: execute_js, eval, new Function, document.cookie, password exfiltration via fetch/XHR
+- [08-01]: Conflict resolution offers 3 modes: skip (default), rename (auto-append counter), overwrite
+- [08-01]: Format version 1.0.0 with semver-like compatibility check (reject too-old, warn on newer)
+- [08-01]: Report export includes YAML frontmatter with generator, version, goal, timestamp, summary
+- [08-02]: Regular script tags (not type=module) for popup modules -- window.* assignments for cross-module access
 
 ### Pending Todos
 
@@ -129,5 +135,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-04
-Stopped at: Completed 07-02-PLAN.md (scheduler popup UI)
+Stopped at: Phase 8 complete -- v2 milestone done
 Resume file: None
