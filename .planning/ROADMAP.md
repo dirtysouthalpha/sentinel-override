@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Agent Engine Foundation** ✓ (2026-04-24) - Refactor background.js into modular components, standardize error handling, and fix agent reliability (stall recovery, planning accuracy, SPA transitions)
 - [x] **Phase 2: Complex UI Interactions** ✓ (2026-04-24) - Enable the agent to handle dropdowns, iframes, shadow DOM, modals, special inputs, and extract content script DOM operations into reusable utilities
 - [x] **Phase 3: Multi-Tab Workflows** ✓ (2026-05-04) - Give the agent the ability to operate across multiple browser tabs with context tracking and cross-tab data correlation
-- [ ] **Phase 4: Reports & Multi-Provider LLM** - Add structured investigation report generation and support for switching between Claude and OpenAI backends
+- [x] **Phase 4: Reports & Multi-Provider LLM** ✓ (2026-05-04) - Add structured investigation report generation and support for switching between Claude and OpenAI backends
 **Plans**: 2 plans
 
 Plans:
@@ -82,8 +82,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: Implement structured investigation report generation with timeline, findings, screenshots, and copy-paste-ready formatting
-- [ ] 04-02: Implement multi-provider LLM support with UI settings for switching between Claude and OpenAI, handling provider-specific API differences transparently
+- [x] 04-01: Implement structured investigation report generation with timeline, findings, screenshots, and copy-paste-ready formatting ✓ (2026-05-04)
+- [x] 04-02: Implement multi-provider LLM support with UI settings for switching between Claude and OpenAI, handling provider-specific API differences transparently ✓ (2026-05-04)
 
 ## Progress
 
@@ -95,7 +95,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Agent Engine Foundation | 2/2 | ✓ Complete | 2026-04-24 |
 | 2. Complex UI Interactions | 2/2 | ✓ Complete | 2026-04-24 |
 | 3. Multi-Tab Workflows | 2/2 | ✓ Complete | 2026-05-04 |
-| 4. Reports & Multi-Provider LLM | 0/2 | Not started | - |
+| 4. Reports & Multi-Provider LLM | 2/2 | ✓ Complete | 2026-05-04 |
 
 ---
 *Roadmap created: 2026-04-24*

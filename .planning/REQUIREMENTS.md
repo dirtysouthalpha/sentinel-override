@@ -27,15 +27,15 @@
 
 ### Report Generation
 
-- [ ] **RPT-01**: Agent generates a structured investigation report after task completion with timeline, findings, and screenshots
-- [ ] **RPT-02**: Report format is copy-paste ready for ticket documentation
-- [ ] **RPT-03**: Report includes: user goal, steps taken, key findings, evidence (screenshots/data), and conclusions
+- [x] **RPT-01**: Agent generates a structured investigation report after task completion with timeline, findings, and screenshots ✓ (2026-05-04)
+- [x] **RPT-02**: Report format is copy-paste ready for ticket documentation ✓ (2026-05-04)
+- [x] **RPT-03**: Report includes: user goal, steps taken, key findings, evidence (screenshots/data), and conclusions ✓ (2026-05-04)
 
 ### Multi-Provider LLM
 
-- [ ] **LLM-01**: Extension supports switching between Claude and OpenAI as the LLM backend
-- [ ] **LLM-02**: LLM provider configuration is accessible in the UI settings
-- [ ] **LLM-03**: Agent handles provider-specific API differences transparently
+- [x] **LLM-01**: Extension supports switching between Claude and OpenAI as the LLM backend ✓ (2026-05-04)
+- [x] **LLM-02**: LLM provider configuration is accessible in the UI settings ✓ (2026-05-04)
+- [x] **LLM-03**: Agent handles provider-specific API differences transparently ✓ (2026-05-04)
 
 ### Codebase Health
 
@@ -85,18 +85,18 @@
 | TAB-01 | Phase 3 | Complete |
 | TAB-02 | Phase 3 | Complete |
 | TAB-03 | Phase 3 | Complete |
-| RPT-01 | Phase 4 | Pending |
-| RPT-02 | Phase 4 | Pending |
-| RPT-03 | Phase 4 | Pending |
-| LLM-01 | Phase 4 | Pending |
-| LLM-02 | Phase 4 | Pending |
-| LLM-03 | Phase 4 | Pending |
+| RPT-01 | Phase 4 | Complete |
+| RPT-02 | Phase 4 | Complete |
+| RPT-03 | Phase 4 | Complete |
+| LLM-01 | Phase 4 | Complete |
+| LLM-02 | Phase 4 | Complete |
+| LLM-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 20
-- Unmapped: 0
+- Complete: 20
+- Pending: 0
 
 ---
 *Requirements defined: 2026-04-24*
-*Last updated: 2026-05-04 after Phase 3 completion*
+*Last updated: 2026-05-04 after Phase 4 completion*
