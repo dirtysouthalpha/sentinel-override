@@ -546,6 +546,28 @@ if (window.__sentinelInitialized) {
         return 'Dropdown utilities not available';
       }
 
+      case 'dismiss_overlay': {
+        if (ov) {
+          const dismissed = await ov.dismissOverlay(document);
+          return dismissed ? 'Overlay dismissed successfully' : 'No overlay detected';
+        }
+        return 'Overlay utilities not available';
+      }
+
+      case 'switch_to_frame': {
+        const frameIndex = cmd.frame_index || 0;
+        const iframes = document.querySelectorAll('iframe');
+        if (!iframes[frameIndex]) return 'Iframe not found at index ' + frameIndex;
+        try {
+          const iframeDoc = iframes[frameIndex].contentWindow.document;
+          const title = iframeDoc.title || '';
+          const url = iframes[frameIndex].src || '';
+          return 'Switched to iframe ' + frameIndex + ': ' + title + ' (' + url + '). Use read_page to scan content.';
+        } catch (e) {
+          return 'Cannot access iframe ' + frameIndex + ' (cross-origin)';
+        }
+      }
+
       default:
         return 'Unknown command type: ' + cmd.type;
     }
