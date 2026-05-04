@@ -168,11 +168,13 @@ ${urlContext}${platformContext}${patternContext}
 Goal: ${goal}
 
 Rules:
+- If already on the target page (current page matches the goal URL), start with reading/extracting data
+- If NOT on the target page, the first step MUST be "Navigate to [URL from the goal]"
 - Each step should be one specific browser action or data collection task
-- Be concrete: "Navigate to sonicwall.example.com and click Firewall > Rules" not "Go to the website"
-- Reference exact URLs, selectors, and UI elements when provided
-- Multi-site tasks need explicit steps for EACH site
-- Maximum 15 steps
+- Be concrete: "Extract article titles using extract_list with selector 'a.article-link'" not "Get the articles"
+- After reading a page, the next step should be to EXTRACT data, not read again
+- For multi-page research: navigate -> extract -> navigate -> extract -> finish with summary
+- Maximum 10 steps
 - For runbooks/investigations, create one step per phase
 - Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
 
@@ -323,9 +325,13 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     tabCtxSection += `- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`;
   }
 
+  // Loop directive from stall detection
+  const loopCtx = agentState.loopDirective || '';
+
   // Build prompt
   const prompt = `You are Sentinel Override v3, an autonomous browser agent. You can create tools, extract data, and solve ANY web task.
-${runbookCtx}${platformCtx}${planCtx}${strategyCtx}${finishCtx}${patternCtx}${memoryCtx}${tabCtxSection}
+${runbookCtx}${platformCtx}${planCtx}${strategyCtx}${finishCtx}${patternCtx}${memoryCtx}${tabCtxSection}${loopCtx}
+Current URL: ${currentUrl}
 Current step: ${stepCount}
 Goal: ${goal}
 

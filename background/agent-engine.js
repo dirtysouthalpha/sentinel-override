@@ -250,24 +250,29 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Auto-navigate to URL found in goal (first iteration only)
+      // Smart: checks current page hostname before navigating
       if (stepCount === 0 && goal) {
         const urlMatch = goal.match(/https?:\/\/[^\s"'<>,]+/i) || goal.match(/(?:go to|visit|navigate to|open)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
-          const currentUrl = (tabInfo.url || '').toLowerCase();
-          if (!currentUrl.includes(new URL(goalUrl).hostname)) {
-            sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
-            sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
-            await chrome.tabs.update(tab, { url: goalUrl });
-            await waitForPageLoad(tab);
-            await sleep(1500);
-            const reinjected = await injectContentScript(tab);
-            if (reinjected) {
-              history.push({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
-              await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          try {
+            const goalHostname = new URL(goalUrl).hostname.toLowerCase();
+            const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
+            if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
+              sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
+              sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
+              await chrome.tabs.update(tab, { url: goalUrl });
+              await waitForPageLoad(tab);
+              await sleep(1500);
+              const reinjected = await injectContentScript(tab);
+              if (reinjected) {
+                history.push({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
+                await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+              }
+              continue;
             }
-            continue;
-          }
+            // Already on the right page - skip navigation
+          } catch (e) { /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -341,6 +346,23 @@ async function runAgentLoop(goal, workingTabId) {
       // Rate limiting
       await enforceRateLimit();
 
+      // Action-type loop detection: if the model keeps doing the same non-productive
+      // action (read_page, execute_js) without extracting or finishing, force a directive
+      let loopDirective = '';
+      if (history.length >= 4) {
+        const recent = history.slice(-5).map(h => h.action.type);
+        const nonProductive = ['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element'];
+        const productive = ['extract', 'extract_list', 'note', 'finish', 'navigate', 'open_tab', 'switch_tab', 'click', 'type', 'select'];
+        const nonProductiveCount = recent.filter(t => nonProductive.includes(t)).length;
+        const productiveCount = recent.filter(t => productive.includes(t)).length;
+        if (nonProductiveCount >= 4 && productiveCount === 0) {
+          const memCount = Object.keys(agentMemory).length;
+          loopDirective = memCount === 0
+            ? '\n⚠ LOOP DETECTED -- You have read/scrolled/executed JS multiple times without extracting ANY data. You MUST use "extract" or "extract_list" NOW to capture data from the page. Do NOT read_page again.\n'
+            : '\n⚠ LOOP DETECTED -- You have enough data extracted (' + Object.keys(agentMemory).length + ' items). You MUST use "finish" NOW with a comprehensive summary using your extracted data. Do NOT read_page or execute_js again.\n';
+        }
+      }
+
       // Progress indicator
       let apiWaitSeconds = 0;
       const progressTimer = setInterval(() => {
@@ -356,7 +378,7 @@ async function runAgentLoop(goal, workingTabId) {
           goal, history, stepCount, currentUrl,
           0, // retryCount
           CONFIG,
-          { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep }
+          { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective }
         );
       } finally {
         clearInterval(progressTimer);
@@ -582,7 +604,21 @@ async function runAgentLoop(goal, workingTabId) {
             result = 'Navigated to ' + command.url + ' (content script failed to load)';
             actionFailed = true;
           } else {
-            result = 'Navigated to ' + command.url;
+            // Verify we actually arrived at the intended page
+            const newTabInfo = await getTabInfo(tab);
+            const arrivedUrl = newTabInfo ? newTabInfo.url : command.url;
+            try {
+              const intendedHost = new URL(command.url).hostname.toLowerCase();
+              const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
+              if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
+                result = 'Navigated to ' + arrivedUrl;
+              } else {
+                result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
+                actionFailed = true;
+              }
+            } catch (e) {
+              result = 'Navigated to ' + arrivedUrl;
+            }
           }
         }
       } else if (command.type === 'read_page') {
