@@ -9,6 +9,7 @@ import { enumerateFrames, executeInFrame, resolveFrameForSelector } from './fram
 import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
 import { generateReport } from './report-generator.js';
 import { migrateLegacySettings } from './provider-registry.js';
+import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -74,6 +75,35 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'enumerate_frames': {
       return await enumerateFrames(getActiveTabId());
+    }
+
+    // Template CRUD
+    case 'template_list':
+      return await listTemplates();
+
+    case 'template_get':
+      if (!request.id) throw new Error('Template ID required');
+      return await getTemplate(request.id);
+
+    case 'template_save':
+      if (!request.template) throw new Error('Template data required');
+      return await saveTemplate(request.template);
+
+    case 'template_update':
+      if (!request.id) throw new Error('Template ID required');
+      if (!request.updates) throw new Error('Update data required');
+      return await updateTemplate(request.id, request.updates);
+
+    case 'template_delete':
+      if (!request.id) throw new Error('Template ID required');
+      await deleteTemplate(request.id);
+      return { deleted: true };
+
+    case 'template_run': {
+      if (!request.templateId) throw new Error('Template ID required');
+      if (agentRunning) throw new Error('Agent already running');
+      const goal = await resolveTemplateGoal(request.templateId, request.params || {});
+      return await startAgent(goal, sender);
     }
 
     default:
