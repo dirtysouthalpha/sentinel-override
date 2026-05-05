@@ -258,4 +258,234 @@ describe('agent-engine (integration)', () => {
     const result = await stopAgent();
     expect(result).toBe('Agent stopped');
   });
+
+  it('agent processes click command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'click',
+      selector: '#submit-btn',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Clicked submit.',
+    });
+
+    await startAgent('Click the button', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes type command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'type',
+      selector: '#search',
+      text: 'hello world',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Typed text.',
+    });
+
+    await startAgent('Type in search', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes scroll command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'scroll',
+      amount: 500,
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Scrolled down.',
+    });
+
+    await startAgent('Scroll the page', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes select command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'select',
+      selector: '#dropdown',
+      value: 'option1',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Selected option.',
+    });
+
+    await startAgent('Select from dropdown', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes hover command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'hover',
+      selector: '#menu-item',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Hovered.',
+    });
+
+    await startAgent('Hover over menu', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes press_key command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'press_key',
+      key: 'Enter',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Pressed Enter.',
+    });
+
+    await startAgent('Press enter key', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes execute_js command', async () => {
+    sendMessageWithRetry.mockResolvedValue({ ok: true, data: '42' });
+
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'execute_js',
+      code: 'return document.title',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Executed JS.',
+    });
+
+    await startAgent('Run some JS', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent processes extract command', async () => {
+    sendMessageWithRetry.mockResolvedValue({ ok: true, data: { elements: [{ tag: 'div', text: 'Extracted data' }] } });
+
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'extract',
+      selector: '.data-item',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Extracted data.',
+    });
+
+    await startAgent('Extract data', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent handles open_tab command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'open_tab',
+      url: 'https://example.com/new-page',
+      label: 'New Page',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Opened new tab.',
+    });
+
+    await startAgent('Open a new tab', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent handles switch_tab command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'switch_tab',
+      label: 'Main Task Tab',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Switched back.',
+    });
+
+    await startAgent('Switch tabs', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent handles close_tab command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'close_tab',
+      label: 'New Tab',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Closed tab.',
+    });
+
+    await startAgent('Close a tab', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent uses active tab from chrome.tabs.query when sender.tab is null', async () => {
+    // Create an active tab so chrome.tabs.query returns it
+    await chrome.tabs.create({ url: 'https://example.com', active: true });
+    await startAgent('No sender tab', { tab: undefined });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry).toHaveBeenCalled();
+    }, { timeout: 10000 });
+  });
+
+  it('resetAgentState clears state', () => {
+    // Reset shouldn't throw even if agent was never started
+    expect(() => resetAgentState()).not.toThrow();
+  });
+
+  it('agent handles wait_for_element command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'wait_for_element',
+      selector: '#dynamic-content',
+      timeout: 5000,
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Element appeared.',
+    });
+
+    await startAgent('Wait for element', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
+
+  it('agent handles dismiss_overlay command', async () => {
+    callLLMWithRetry.mockResolvedValueOnce({
+      type: 'dismiss_overlay',
+    }).mockResolvedValueOnce({
+      type: 'finish',
+      summary: 'Overlay dismissed.',
+    });
+
+    await startAgent('Dismiss overlay', { tab: { id: 1 } });
+
+    await vi.waitFor(() => {
+      expect(callLLMWithRetry.mock.calls.length).toBeGreaterThanOrEqual(2);
+    }, { timeout: 10000 });
+  });
 });

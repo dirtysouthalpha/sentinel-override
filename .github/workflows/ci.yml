@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run tests with coverage
+        if: matrix.node-version == 20
+        run: npx vitest run --coverage
+
+      - name: Upload coverage
+        if: matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  manifest-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manifest.json
+        run: |
+          node -e "
+            const m = require('./manifest.json');
+            const required = ['manifest_version', 'name', 'version', 'permissions', 'background'];
+            const missing = required.filter(k => !(k in m));
+            if (missing.length) { console.error('Missing:', missing); process.exit(1); }
+            if (m.manifest_version !== 3) { console.error('Not MV3'); process.exit(1); }
+            console.log('Manifest valid:', m.name, 'v' + m.version);
+          "
+
+      - name: Check referenced files exist
+        run: |
+          node -e "
+            const m = require('./manifest.json');
+            const fs = require('fs');
+            const files = [];
+            // Background service worker
+            if (m.background?.service_worker) files.push(m.background.service_worker);
+            // Icons
+            Object.values(m.icons || {}).forEach(f => files.push(f));
+            Object.values(m.action?.default_icon || {}).forEach(f => files.push(f));
+            // Side panel
+            if (m.side_panel?.default_path) files.push(m.side_panel.default_path);
+            // Content scripts
+            (m.content_scripts || []).forEach(cs => (cs.js || []).forEach(f => files.push(f)));
+            const missing = files.filter(f => !fs.existsSync(f));
+            if (missing.length) { console.error('Missing files:', missing); process.exit(1); }
+            console.log('All', files.length, 'referenced files exist');
+          "

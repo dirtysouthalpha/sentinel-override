@@ -7,8 +7,8 @@ describe('frame-manager', () => {
   beforeAll(async () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
     await import('../../content/dom-utils.js');
-    const mod = await import('../../content/frame-manager.js');
-    frame = mod.frame;
+    await import('../../content/frame-manager.js');
+    frame = window.__sentinelUtils.frame;
   });
 
   beforeEach(() => {

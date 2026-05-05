@@ -8,8 +8,8 @@ describe('dom-utils', () => {
   // Import once -- IIFE runs on first import, module is cached after that
   beforeAll(async () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
-    const mod = await import('../../content/dom-utils.js');
-    dom = mod.dom;
+    await import('../../content/dom-utils.js');
+    dom = window.__sentinelUtils.dom;
   });
 
   it('exports dom from window.__sentinelUtils.dom', () => {

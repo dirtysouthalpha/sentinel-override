@@ -7,8 +7,8 @@ describe('shadow-dom', () => {
 
   beforeAll(async () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
-    const mod = await import('../../content/shadow-dom.js');
-    shadow = mod.shadow;
+    await import('../../content/shadow-dom.js');
+    shadow = window.__sentinelUtils.shadow;
   });
 
   beforeEach(() => {

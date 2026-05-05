@@ -11,7 +11,11 @@
     "test:e2e": "vitest run tests/e2e/"
   },
   "devDependencies": {
-    "vitest": "^4.1.5",
-    "happy-dom": "^17.4.4"
+    "@vitest/coverage-v8": "^4.1.5",
+    "happy-dom": "^17.4.4",
+    "vitest": "^4.1.5"
+  },
+  "dependencies": {
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.18"
   }
 }

@@ -7,8 +7,8 @@ describe('special-inputs', () => {
 
   beforeAll(async () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
-    const mod = await import('../../content/special-inputs.js');
-    si = mod.specialInputs;
+    await import('../../content/special-inputs.js');
+    si = window.__sentinelUtils.specialInputs;
   });
 
   beforeEach(() => {

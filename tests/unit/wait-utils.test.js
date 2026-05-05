@@ -6,8 +6,8 @@ describe('wait-utils', () => {
 
   beforeAll(async () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
-    const mod = await import('../../content/wait-utils.js');
-    wait = mod.wait;
+    await import('../../content/wait-utils.js');
+    wait = window.__sentinelUtils.wait;
   });
 
   it('exports wait from window.__sentinelUtils.wait', () => {

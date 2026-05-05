@@ -9,8 +9,8 @@ describe('overlay-detector', () => {
     window.__sentinelUtils = window.__sentinelUtils || {};
     await import('../../content/dom-utils.js');
     await import('../../content/shadow-dom.js');
-    const mod = await import('../../content/overlay-detector.js');
-    overlay = mod.overlay;
+    await import('../../content/overlay-detector.js');
+    overlay = window.__sentinelUtils.overlay;
   });
 
   beforeEach(() => {

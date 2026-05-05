@@ -10,8 +10,8 @@ describe('dropdown-utils', () => {
     await import('../../content/dom-utils.js');
     await import('../../content/shadow-dom.js');
     await import('../../content/wait-utils.js');
-    const mod = await import('../../content/dropdown-utils.js');
-    dropdown = mod.dropdown;
+    await import('../../content/dropdown-utils.js');
+    dropdown = window.__sentinelUtils.dropdown;
   });
 
   beforeEach(() => {
