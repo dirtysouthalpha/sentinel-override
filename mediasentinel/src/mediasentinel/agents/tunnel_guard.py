@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from datetime import datetime
@@ -42,7 +43,7 @@ class TunnelGuard:
             log.error("url_check failed: {}", e)
 
         # DNS validation
-        dns_valid = self._validate_dns(tunnel.health_check_url)
+        dns_valid = await self._validate_dns(tunnel.health_check_url)
         if not dns_valid:
             log.warning("DNS validation failed for {}", tunnel.health_check_url)
 
@@ -172,35 +173,39 @@ class TunnelGuard:
             results.append(result)
         return results
 
-    def _validate_dns(self, url: str) -> bool:
+    async def _validate_dns(self, url: str) -> bool:
         try:
             import dns.resolver
-            from urllib.parse import urlparse
 
             hostname = urlparse(url).hostname
             if not hostname:
                 return False
 
-            resolver = dns.resolver.Resolver()
-            resolver.lifetime = 5.0
-            answers = resolver.resolve(hostname, "CNAME")
+            def _check_cname():
+                res = dns.resolver.Resolver()
+                res.lifetime = 5.0
+                return res.resolve(hostname, "CNAME")
+
+            answers = await asyncio.to_thread(_check_cname)
             for rdata in answers:
                 target = str(rdata.target).rstrip(".")
                 if "cloudflare" in target.lower() or "cfargotunnel" in target.lower():
                     return True
             return False
         except Exception:
-            # No CNAME record or resolution failed - try A record
             try:
                 import dns.resolver
-                from urllib.parse import urlparse
 
                 hostname = urlparse(url).hostname
                 if not hostname:
                     return False
-                resolver = dns.resolver.Resolver()
-                resolver.lifetime = 5.0
-                answers = resolver.resolve(hostname, "A")
+
+                def _check_a():
+                    res = dns.resolver.Resolver()
+                    res.lifetime = 5.0
+                    return res.resolve(hostname, "A")
+
+                answers = await asyncio.to_thread(_check_a)
                 return len(answers) > 0
             except Exception:
                 return False

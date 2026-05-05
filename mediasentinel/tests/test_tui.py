@@ -151,12 +151,15 @@ async def test_vpn_indicator_mounts():
 async def test_vpn_indicator_reactive():
     from mediasentinel.tui.app import MediaSentinelApp, VPNIndicator
 
-    app = MediaSentinelApp()
-    async with app.run_test() as pilot:
-        indicator = app.query_one(VPNIndicator)
-        indicator.vpn_state = "connected"
-        await pilot.pause()
-        assert indicator.vpn_state == "connected"
+    # Patch _refresh_loop at class level so the poll worker never starts
+    with patch.object(MediaSentinelApp, "_refresh_loop", lambda self: None):
+        app = MediaSentinelApp()
+        async with app.run_test() as pilot:
+            indicator = app.query_one(VPNIndicator)
+            await pilot.pause()
+            indicator.vpn_state = "connected"
+            await pilot.pause()
+            assert indicator.vpn_state == "connected"
 
 
 async def test_tunnel_status_update():

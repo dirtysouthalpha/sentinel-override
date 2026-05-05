@@ -114,10 +114,6 @@ class VPNGuard:
             pass
         return None
 
-    async def _get_vpn_ip(self) -> Optional[str]:
-        """Return the external IP when VPN is connected, for leak test comparison."""
-        return await self._get_external_ip()
-
     async def _dns_leak_test(self) -> bool:
         """Returns True if DNS leak detected (queries NOT going through VPN).
 
@@ -132,11 +128,13 @@ class VPNGuard:
             if not external_ip:
                 return True  # Can't verify — assume leak
 
-            resolver = dns.resolver.Resolver()
-            resolver.nameservers = ["1.1.1.1", "8.8.8.8"]
-            resolver.lifetime = 5.0
+            def _resolve():
+                res = dns.resolver.Resolver()
+                res.nameservers = ["1.1.1.1", "8.8.8.8"]
+                res.lifetime = 5.0
+                return res.resolve("whoami.ds.akahelp.net", "TXT")
 
-            answers = resolver.resolve("whoami.ds.akahelp.net", "TXT")
+            answers = await asyncio.to_thread(_resolve)
             for rdata in answers:
                 txt = rdata.to_text()
                 # TXT record contains the IP that the DNS resolver saw

@@ -51,7 +51,7 @@ async def cf_guard(tunnel_with_cf):
 async def test_tunnel_url_reachable(guard, tunnels):
     fake_resp = httpx.Response(200, request=httpx.Request("GET", "https://media.example.com"))
     with patch.object(guard._client, "get", new_callable=AsyncMock, return_value=fake_resp):
-        with patch.object(guard, "_validate_dns", return_value=True):
+        with patch.object(guard, "_validate_dns", new_callable=AsyncMock, return_value=True):
             result = await guard.check_tunnel(tunnels[0])
     assert result.url_reachable is True
     assert result.latency_ms >= 0
@@ -59,7 +59,7 @@ async def test_tunnel_url_reachable(guard, tunnels):
 
 async def test_tunnel_url_unreachable(guard, tunnels):
     with patch.object(guard._client, "get", new_callable=AsyncMock, side_effect=httpx.ConnectError("refused")):
-        with patch.object(guard, "_validate_dns", return_value=False):
+        with patch.object(guard, "_validate_dns", new_callable=AsyncMock, return_value=False):
             result = await guard.check_tunnel(tunnels[0])
     assert result.url_reachable is False
     assert result.dns_valid is False
@@ -68,7 +68,7 @@ async def test_tunnel_url_unreachable(guard, tunnels):
 async def test_tunnel_degraded_response(guard, tunnels):
     fake_resp = httpx.Response(503, request=httpx.Request("GET", "https://media.example.com"))
     with patch.object(guard._client, "get", new_callable=AsyncMock, return_value=fake_resp):
-        with patch.object(guard, "_validate_dns", return_value=True):
+        with patch.object(guard, "_validate_dns", new_callable=AsyncMock, return_value=True):
             result = await guard.check_tunnel(tunnels[0])
     assert result.url_reachable is False  # 503 not in 200-399
 
@@ -76,7 +76,7 @@ async def test_tunnel_degraded_response(guard, tunnels):
 async def test_check_all(guard, tunnels):
     fake_resp = httpx.Response(200, request=httpx.Request("GET", "https://media.example.com"))
     with patch.object(guard._client, "get", new_callable=AsyncMock, return_value=fake_resp):
-        with patch.object(guard, "_validate_dns", return_value=True):
+        with patch.object(guard, "_validate_dns", new_callable=AsyncMock, return_value=True):
             results = await guard.check_all()
     assert len(results) == 1
     assert results[0].tunnel_name == "media-tunnel"
@@ -87,14 +87,14 @@ async def test_dns_validation_cname(guard):
 
     mock_rdata = type("Rdata", (), {"target": "media-tunnel.cfargotunnel.com."})()
     with patch.object(dns.resolver.Resolver, "resolve", return_value=[mock_rdata]):
-        assert guard._validate_dns("https://media.example.com") is True
+        assert await guard._validate_dns("https://media.example.com") is True
 
 
 async def test_dns_validation_failure(guard):
     import dns.resolver
 
     with patch.object(dns.resolver.Resolver, "resolve", side_effect=Exception("no DNS")):
-        assert guard._validate_dns("https://nonexistent.invalid") is False
+        assert await guard._validate_dns("https://nonexistent.invalid") is False
 
 
 # --- New tests: CF API status (TUN-02) ---
@@ -304,7 +304,7 @@ async def test_dns_validation_cloudflare_cname(guard):
 
     mock_rdata = type("Rdata", (), {"target": "media.example.com.cdn.cloudflare.com."})()
     with patch.object(dns.resolver.Resolver, "resolve", return_value=[mock_rdata]):
-        assert guard._validate_dns("https://media.example.com") is True
+        assert await guard._validate_dns("https://media.example.com") is True
 
 
 async def test_dns_validation_cfargotunnel_cname(guard):
@@ -313,7 +313,7 @@ async def test_dns_validation_cfargotunnel_cname(guard):
 
     mock_rdata = type("Rdata", (), {"target": "abc-def.cfargotunnel.com."})()
     with patch.object(dns.resolver.Resolver, "resolve", return_value=[mock_rdata]):
-        assert guard._validate_dns("https://media.example.com") is True
+        assert await guard._validate_dns("https://media.example.com") is True
 
 
 async def test_dns_validation_non_cloudflare_cname(guard):
@@ -335,7 +335,7 @@ async def test_dns_validation_non_cloudflare_cname(guard):
         return [mock_a_record]
 
     with patch.object(dns.resolver.Resolver, "resolve", side_effect=resolve_side_effect):
-        result = guard._validate_dns("https://media.example.com")
+        result = await guard._validate_dns("https://media.example.com")
     # CNAME doesn't match cloudflare/cfargotunnel, so it falls through to False
     # (the function returns False after checking CNAME records that don't match)
     assert result is False
@@ -353,7 +353,7 @@ async def test_dns_validation_a_record_fallback(guard):
         return [mock_a_record]
 
     with patch.object(dns.resolver.Resolver, "resolve", side_effect=resolve_side_effect):
-        assert guard._validate_dns("https://media.example.com") is True
+        assert await guard._validate_dns("https://media.example.com") is True
 
 
 async def test_check_tunnel_integrates_cf_status(cf_guard, tunnel_with_cf):
@@ -388,7 +388,7 @@ async def test_check_tunnel_integrates_cf_status(cf_guard, tunnel_with_cf):
 
     with patch.dict(os.environ, {"TEST_CF_TOKEN": "fake-api-token"}):
         with patch.object(cf_guard._client, "get", new_callable=AsyncMock, side_effect=mock_get):
-            with patch.object(cf_guard, "_validate_dns", return_value=True):
+            with patch.object(cf_guard, "_validate_dns", new_callable=AsyncMock, return_value=True):
                 result = await cf_guard.check_tunnel(tunnel_with_cf)
 
     assert result.cf_api_status == "active"

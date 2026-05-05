@@ -23,12 +23,17 @@ class MetricsCollector:
         value: float,
         unit: str = "",
     ) -> None:
-        async with get_db(self._db_path) as db:
-            await db.execute(
-                "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
-                (metric_type, metric_name, value, unit, datetime.now().isoformat()),
+        try:
+            async with get_db(self._db_path) as db:
+                await db.execute(
+                    "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
+                    (metric_type, metric_name, value, unit, datetime.now().isoformat()),
+                )
+                await db.commit()
+        except Exception as e:
+            logger.bind(component="MetricsCollector").error(
+                "Failed to record metric {}/{}: {}", metric_type, metric_name, e
             )
-            await db.commit()
 
     async def record_service_response(self, service_name: str, response_ms: float) -> None:
         await self.record("response_time", service_name, response_ms, "ms")

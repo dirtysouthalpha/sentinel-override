@@ -308,11 +308,13 @@ class AlertDispatcher:
             msg["From"] = self.config.from_address
             msg["To"] = ", ".join(self.config.to_addresses)
 
-            with smtplib.SMTP(self.config.smtp_host, self.config.smtp_port) as server:
-                server.starttls()
-                server.login(self.config.smtp_user, password)
-                server.send_message(msg)
+            def _send_smtp():
+                with smtplib.SMTP(self.config.smtp_host, self.config.smtp_port) as server:
+                    server.starttls()
+                    server.login(self.config.smtp_user, password)
+                    server.send_message(msg)
 
+            await asyncio.to_thread(_send_smtp)
             return True
         except Exception as e:
             logger.bind(component="AlertDispatcher").error("Email alert failed: {}", e)

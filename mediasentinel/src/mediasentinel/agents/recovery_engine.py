@@ -767,11 +767,17 @@ class RecoveryEngine:
                     "Restarted container {}", container_name
                 )
                 return True
-            except Exception:
+            except Exception as e:
+                logger.bind(component="RecoveryEngine").warning(
+                    "Container restart failed for {}: {}", container_name, e
+                )
                 return False
             finally:
                 client.close()
-        except Exception:
+        except Exception as e:
+            logger.bind(component="RecoveryEngine").warning(
+                "Docker unavailable for container restart of {}: {}", service_name, e
+            )
             return False
 
     def _can_attempt(self, service_name: str) -> bool:
