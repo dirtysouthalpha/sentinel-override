@@ -276,8 +276,11 @@ class MediaSentinelApp(App):
             self._config = load_config(Path(self._config_path))
             import os
             self._db_path = Path(os.path.expandvars(self._config.database.db_path))
-        except Exception:
+        except Exception as e:
             self._config = None
+            logger.bind(component="MediaSentinelApp").warning(
+                "Config load failed: {}. Dashboard will show empty data.", e
+            )
         self._refresh_loop()
 
     def _refresh_loop(self) -> None:

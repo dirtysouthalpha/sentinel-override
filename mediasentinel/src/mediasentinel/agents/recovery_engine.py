@@ -67,8 +67,22 @@ class RecoveryEngine:
         self._db_path = db_path
         self._last_recovery: dict[str, datetime] = {}
         self._attempt_count: dict[str, int] = {}
-        # Circuit breaker: service_name -> deque of timestamps
         self._circuit_breaker: dict[str, deque] = {}
+
+    async def _get_docker_container(self, container_name: str):
+        """Get a Docker container by name, offloading blocking SDK calls to a thread.
+
+        Returns (client, container) on success, raises on failure.
+        Caller is responsible for calling client.close() in a finally block.
+        """
+        import docker
+
+        def _lookup():
+            client = docker.from_env()
+            container = client.containers.get(container_name)
+            return client, container
+
+        return await asyncio.to_thread(_lookup)
 
     # ------------------------------------------------------------------
     # Public API
@@ -302,27 +316,40 @@ class RecoveryEngine:
         try:
             import docker
 
-            client = docker.from_env()
             container_name = service_name.lower().replace(" ", "-")
 
             try:
-                container = client.containers.get(container_name)
-                log.info("Restarting container {}", container_name)
-                await asyncio.to_thread(container.restart, timeout=self.policy.docker_restart_timeout)
-                completed = datetime.now()
-                log.info("Container {} restarted successfully", container_name)
-                return RecoveryResult(
-                    service_name=service_name,
-                    action=RecoveryAction.DOCKER_RESTART,
-                    success=True,
-                    escalation_level=level,
-                    details=f"Container {container_name} restarted",
-                    started_at=started,
-                    completed_at=completed,
-                )
+                client, container = await self._get_docker_container(container_name)
+                try:
+                    log.info("Restarting container {}", container_name)
+                    await asyncio.to_thread(container.restart, timeout=self.policy.docker_restart_timeout)
+                    completed = datetime.now()
+                    log.info("Container {} restarted successfully", container_name)
+                    return RecoveryResult(
+                        service_name=service_name,
+                        action=RecoveryAction.DOCKER_RESTART,
+                        success=True,
+                        escalation_level=level,
+                        details=f"Container {container_name} restarted",
+                        started_at=started,
+                        completed_at=completed,
+                    )
+                except docker.errors.NotFound:
+                    completed = datetime.now()
+                    log.warning("No Docker container found for {}", container_name)
+                    return RecoveryResult(
+                        service_name=service_name,
+                        action=RecoveryAction.DOCKER_RESTART,
+                        success=False,
+                        escalation_level=level,
+                        details=f"Container {container_name} not found",
+                        started_at=started,
+                        completed_at=completed,
+                    )
+                finally:
+                    await asyncio.to_thread(client.close)
             except docker.errors.NotFound:
                 completed = datetime.now()
-                log.warning("No Docker container found for {}", container_name)
                 return RecoveryResult(
                     service_name=service_name,
                     action=RecoveryAction.DOCKER_RESTART,
@@ -332,8 +359,6 @@ class RecoveryEngine:
                     started_at=started,
                     completed_at=completed,
                 )
-            finally:
-                client.close()
         except Exception as e:
             completed = datetime.now()
             log.error("Docker restart failed for {}: {}", service_name, e)
@@ -504,14 +529,13 @@ class RecoveryEngine:
 
         # Step 4: Restart tunnels
         try:
-            import docker
-            client = docker.from_env()
+            client, container = await self._get_docker_container("cloudflared")
             try:
-                container = client.containers.get("cloudflared")
                 await asyncio.to_thread(container.restart, timeout=30)
             finally:
-                client.close()
-        except Exception:
+                await asyncio.to_thread(client.close)
+        except Exception as e:
+            log.warning("Docker cloudflared restart failed, trying service restart: {}", e)
             try:
                 await asyncio.to_thread(
                     subprocess.run,
@@ -529,20 +553,25 @@ class RecoveryEngine:
                         text=True,
                         timeout=30,
                     )
-            except Exception:
-                pass
+            except Exception as e2:
+                log.error("Service cloudflared restart also failed: {}", e2)
 
         # Verify Docker daemon came back
         docker_ok = False
         try:
             import docker
-            client = docker.from_env()
-            try:
-                await asyncio.to_thread(client.ping)
-                docker_ok = True
-            finally:
-                client.close()
-        except Exception:
+
+            def _verify_docker():
+                c = docker.from_env()
+                try:
+                    c.ping()
+                finally:
+                    c.close()
+                return True
+
+            docker_ok = await asyncio.to_thread(_verify_docker)
+        except Exception as e:
+            log.warning("Docker daemon verification failed: {}", e)
             pass
 
         completed = datetime.now()
@@ -673,11 +702,8 @@ class RecoveryEngine:
         try:
             # Try Docker container restart first (most common deployment)
             try:
-                import docker
-                client = docker.from_env()
-                container_name = "cloudflared"
+                client, container = await self._get_docker_container("cloudflared")
                 try:
-                    container = client.containers.get(container_name)
                     await asyncio.to_thread(container.restart, timeout=30)
                     completed = datetime.now()
                     log.info("cloudflared container restarted for tunnel {}", tunnel_name)
@@ -690,10 +716,12 @@ class RecoveryEngine:
                         started_at=started,
                         completed_at=completed,
                     )
-                except docker.errors.NotFound:
+                except Exception:
                     pass
-            except Exception:
-                pass
+                finally:
+                    await asyncio.to_thread(client.close)
+            except Exception as e:
+                log.debug("Docker cloudflared not available, trying service restart: {}", e)
 
             # Fallback: Windows service restart
             result = await asyncio.to_thread(
@@ -756,12 +784,9 @@ class RecoveryEngine:
     async def _restart_service_container(self, service_name: str) -> bool:
         """Attempt to restart a single Docker container. Returns True on success."""
         try:
-            import docker
-
-            client = docker.from_env()
             container_name = service_name.lower().replace(" ", "-")
+            client, container = await self._get_docker_container(container_name)
             try:
-                container = client.containers.get(container_name)
                 await asyncio.to_thread(container.restart, timeout=self.policy.docker_restart_timeout)
                 logger.bind(component="RecoveryEngine").debug(
                     "Restarted container {}", container_name
@@ -773,7 +798,7 @@ class RecoveryEngine:
                 )
                 return False
             finally:
-                client.close()
+                await asyncio.to_thread(client.close)
         except Exception as e:
             logger.bind(component="RecoveryEngine").warning(
                 "Docker unavailable for container restart of {}: {}", service_name, e

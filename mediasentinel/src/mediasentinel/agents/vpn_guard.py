@@ -110,8 +110,9 @@ class VPNGuard:
             resp = await self._client.get("https://api.ipify.org")
             if resp.status_code == 200:
                 return resp.text.strip()
-        except Exception:
-            pass
+        except Exception as e:
+            log = logger.bind(component="VPNGuard")
+            log.warning("Failed to fetch external IP: {}", e)
         return None
 
     async def _dns_leak_test(self) -> bool:
@@ -142,5 +143,7 @@ class VPNGuard:
                     return False  # DNS request routed through VPN
             # None of the DNS responses matched our VPN IP — leak
             return True
-        except Exception:
-            return True  # DNS resolution failed = potential leak
+        except Exception as e:
+            log = logger.bind(component="VPNGuard")
+            log.warning("DNS leak test failed, assuming leak: {}", e)
+            return True
