@@ -664,8 +664,8 @@ async function runAgentLoop(goal, workingTabId) {
           action: 'wait_for',
           condition: { ...command, currentUrl: tabInfo.url }
         });
-        const result = (waitResult && waitResult.result) || 'Wait completed';
-        sendActionResult(stepCount, result, false);
+        const result = waitResult || 'Wait completed';
+        sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
         if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
         await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
@@ -724,7 +724,7 @@ async function runAgentLoop(goal, workingTabId) {
           await injectContentScript(ctx.tabId);
           result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
         }
-        sendActionResult(stepCount, command, result, actionFailed);
+        sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
         if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
         await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
@@ -746,7 +746,7 @@ async function runAgentLoop(goal, workingTabId) {
           await injectContentScript(targetId);
           result = `Switched to tab "${getTabContext(targetId)?.label || targetId}"`;
         }
-        sendActionResult(stepCount, command, result, actionFailed);
+        sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
         if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
         await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
@@ -767,7 +767,7 @@ async function runAgentLoop(goal, workingTabId) {
           await closeTab(targetId);
           result = `Closed tab "${command.label || targetId}"`;
         }
-        sendActionResult(stepCount, command, result, actionFailed);
+        sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
         if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
         await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
@@ -813,7 +813,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (command.type === 'extract' || command.type === 'extract_list') {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        result = (res && (res.data || res.result)) || 'Done';
+        result = res || 'Done';
         let extractSucceeded = false;
         try {
           const parsed = JSON.parse(result.replace('JS Result: ', ''));
@@ -837,7 +837,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else if (command.type === 'execute_js' && command.key) {
         // execute_js with key: run JS and save result to agent memory
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        result = (res && (res.data || res.result)) || 'Done';
+        result = res || 'Done';
         // Extract the JS result value
         let jsValue = result;
         if (result.startsWith('JS Result: ')) {
@@ -867,7 +867,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else {
         try {
           const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-          result = (res && (res.data || res.result)) ? (res.data || res.result) : 'Done';
+          result = res || 'Done';
           actionFailed = result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
         } catch (err) {
           result = 'Content script error: ' + (err.message || 'command failed to reach page');

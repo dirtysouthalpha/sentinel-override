@@ -157,7 +157,7 @@ if (window.__sentinelInitialized) {
           }
           return { content: 'Iframe Title: ' + title + '\nURL: ' + url + '\n\n' + content };
         } catch (e) {
-          return { ok: false, error: 'Cross-origin iframe -- use background routing' };
+          throw new Error('Cross-origin iframe -- use background routing');
         }
       }
 

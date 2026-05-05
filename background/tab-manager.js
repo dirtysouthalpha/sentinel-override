@@ -73,7 +73,13 @@ export async function injectContentScript(tabId, maxAttempts = 3) {
 export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      return await chrome.tabs.sendMessage(tabId, message);
+      const response = await chrome.tabs.sendMessage(tabId, message);
+      // Unwrap the content-script envelope: { ok: true, data: <actual> }
+      if (response && response.ok === false) {
+        throw new Error(response.error || 'Content script error');
+      }
+      // Return the inner data, not the envelope wrapper
+      return response && response.data !== undefined ? response.data : response;
     } catch (err) {
       if (i < maxRetries - 1) {
         const csListener = createContentScriptListener(tabId, 2000);

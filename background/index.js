@@ -175,6 +175,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (!request.report) throw new Error('Report data required');
       return exportReportAsMarkdown(request.report);
 
+    // Fire-and-forget messages from content script — acknowledge silently
+    case 'content_script_ready':
+    case 'spa_navigation':
+    case 'spa_content_changed':
+      return null;
+
     default:
       throw new Error(`Unknown action: ${request.action}`);
   }
