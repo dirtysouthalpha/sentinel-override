@@ -11,7 +11,10 @@ if (window.__sentinelInitialized) {
   window.__sentinelInitialized = true;
 
   // ====== execute_js Sandbox Configuration ======
-  const EXECUTE_JS_SANDBOX_ENABLED = true; // Set false to disable sandboxing
+  // Sandbox is disabled by default — the Proxy-based sandbox was blocking
+  // legitimate agent operations (document.documentElement.outerHTML, etc.)
+  // Re-enable after tuning the allowlist/blocklist for real-world usage.
+  const EXECUTE_JS_SANDBOX_ENABLED = false;
 
   // Shorthand references to utility modules
   const dom = window.__sentinelUtils.dom;
