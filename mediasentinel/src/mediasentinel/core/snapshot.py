@@ -84,8 +84,8 @@ async def capture_snapshot(
                 ts = cl.torrents_info()
                 try:
                     cl.auth_log_out()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.bind(component="Snapshot").debug("QBT logout failed: {}", e)
                 return ts
 
             torrents = await asyncio.to_thread(_fetch_torrents)

@@ -518,7 +518,18 @@ class RecoveryEngine:
         await asyncio.sleep(10)
 
         # Step 2: Reconnect VPN
-        await self._do_vpn_reconnect(level)
+        vpn_result = await self._do_vpn_reconnect(level)
+        if not vpn_result or not vpn_result.success:
+            log.error("VPN reconnect failed during network recovery, aborting service restart")
+            return RecoveryResult(
+                service_name="network",
+                action=RecoveryAction.NETWORK_RECOVERY,
+                success=False,
+                escalation_level=level,
+                details="VPN reconnect failed",
+                started_at=started,
+                completed_at=datetime.now(),
+            )
         await asyncio.sleep(5)
 
         # Step 3: Restart all services in dependency order
@@ -716,8 +727,8 @@ class RecoveryEngine:
                         started_at=started,
                         completed_at=completed,
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.warning("Docker cloudflared container restart failed: {}", e)
                 finally:
                     await asyncio.to_thread(client.close)
             except Exception as e:

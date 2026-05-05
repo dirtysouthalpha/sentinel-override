@@ -115,6 +115,6 @@ class HealthMonitor:
                 for key in ("version", "Version", "app_version"):
                     if key in data:
                         return str(data[key])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.bind(component="HealthMonitor").debug("Version extraction failed: {}", e)
         return None

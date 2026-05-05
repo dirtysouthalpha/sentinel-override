@@ -313,5 +313,5 @@ class QBittorrentController:
         if self._client:
             try:
                 self._client.auth_log_out()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.bind(component="QBTController").debug("QBT logout failed: {}", e)

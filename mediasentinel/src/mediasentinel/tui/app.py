@@ -1,6 +1,5 @@
 import asyncio
 import json
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -9,7 +8,6 @@ from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Label, Static, DataTable
-from textual.worker import Worker, get_current_worker
 
 from mediasentinel.config.loader import load_config
 from mediasentinel.config.models import AppConfig

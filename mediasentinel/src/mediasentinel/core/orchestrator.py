@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -96,7 +95,7 @@ class Orchestrator:
         if self.qbt_controller:
             try:
                 log.info("Pausing all qBittorrent downloads for shutdown...")
-                self.qbt_controller.enforce_vpn_gate(VPNState.DISCONNECTED)
+                await asyncio.to_thread(self.qbt_controller.enforce_vpn_gate, VPNState.DISCONNECTED)
                 log.info("qBittorrent downloads paused")
             except Exception as e:
                 log.warning("Failed to pause qBittorrent during shutdown: {}", e)
@@ -385,7 +384,14 @@ class Orchestrator:
 
         # Attempt VPN recovery if disconnected
         if status.state == VPNState.DISCONNECTED and self.recovery_engine:
-            await self.recovery_engine.attempt_vpn_recovery()
+            vpn_recovery = await self.recovery_engine.attempt_vpn_recovery()
+            if vpn_recovery and not vpn_recovery.success and self.alert_dispatcher:
+                await self.alert_dispatcher.send_alert(
+                    title="VPN auto-recovery failed",
+                    message=f"Action: {vpn_recovery.action.value}, Details: {vpn_recovery.details}",
+                    severity="error",
+                    service_name="VPN",
+                )
 
     async def _run_tunnel_check(self, tunnel_name: str):
         if not self.tunnel_guard:

@@ -53,7 +53,7 @@ async def _check_docker() -> StartupCheckResult:
         import docker
         client = docker.from_env()
         await asyncio.to_thread(client.ping)
-        client.close()
+        await asyncio.to_thread(client.close)
         return StartupCheckResult("docker", True)
     except ImportError:
         return StartupCheckResult("docker", False, "docker package not installed")
