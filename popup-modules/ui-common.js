@@ -3,8 +3,7 @@
 // Loaded first (before settings.js and chat.js) so these utilities are available globally.
 
 // ========== Shared Helpers ==========
-// Defined once here — all other popup modules reference these from global scope.
-const getState = () => window.__popupState;
+// getState is defined in popup-state.js (loaded before this file).
 
 function escapeHtml(text) {
   const div = document.createElement('div');
