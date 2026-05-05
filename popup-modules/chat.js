@@ -854,7 +854,7 @@ window.executeCommand = (action) => {
 function renderTabBar(tabs) {
   const tabBar = document.getElementById('agent-tab-bar');
   if (!tabBar) return;
-  if (!tabs || tabs.length <= 1) {
+  if (!tabs || tabs.length === 0) {
     tabBar.style.display = 'none';
     return;
   }
@@ -863,7 +863,11 @@ function renderTabBar(tabs) {
   tabs.forEach(ctx => {
     const tab = document.createElement('div');
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
-    tab.textContent = ctx.label || ctx.url;
+    // Show hostname and label
+    let hostname = '';
+    try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    const displayText = ctx.label ? `${ctx.label} (${hostname})` : hostname || ctx.url;
+    tab.textContent = displayText;
     tab.title = ctx.url;
     tab.addEventListener('click', () => {
       // User observation: switch their VIEW but do NOT change agent's active tab
@@ -1083,6 +1087,17 @@ chrome.runtime.onMessage.addListener((message) => {
     } else {
       // Pre-loop status (planning phase etc) -- show in the status bar
       updateStatus(message.text);
+    }
+  }
+  if (message.action === 'page_context') {
+    // Show current page URL in the status bar so user can track where the agent is
+    if (message.url) {
+      try {
+        const hostname = new URL(message.url).hostname;
+        updateStatus(`On: ${hostname}${message.title ? ' — ' + message.title.substring(0, 50) : ''}`);
+      } catch (e) {
+        updateStatus('On: ' + message.url.substring(0, 60));
+      }
     }
   }
   if (message.action === 'agent_finished') {

@@ -138,8 +138,9 @@ UI-SPECIFIC RULES:
 // ========== Vision Support ==========
 export function supportsVision(model) {
   if (!model) return false;
-  const vm = ['glm-4.5v', 'glm-4.6v', 'glm-5v', 'gpt-4o', 'gpt-4-vision', 'claude-3', 'claude-4', 'gemini', 'qwen-vl', 'llava'];
-  return vm.some(v => model.toLowerCase().includes(v));
+  const m = model.toLowerCase();
+  const vm = ['glm-4.5v', 'glm-4.6v', 'glm-5v', 'gpt-4o', 'gpt-4-vision', 'claude-3', 'claude-4', 'gemini', 'qwen-vl', 'llava', 'vision', 'vl-', '-vl'];
+  return vm.some(v => m.includes(v));
 }
 
 // ========== Pre-flight Planning ==========
@@ -182,6 +183,10 @@ Example of a GOOD plan:
 Goal: "Check the SonicWall firewall at 192.168.1.1 for blocked connections from 10.0.0.5"
 { "plan": ["Navigate to 192.168.1.1 and log in", "Click Log > View in the navigation", "Set filter to source IP 10.0.0.5 and apply", "Read the filtered log entries and extract blocked connection details", "Note the rule IDs and zones involved", "Finish with a summary of blocked connections"] }
 
+Example of a GOOD multi-page research plan:
+Goal: "Find top 10 articles about AI agents and summarize each"
+{ "plan": ["Search Google for 'top AI agent articles 2026'", "Use execute_js to extract the first 10 article links and titles from search results", "Open each article in a separate tab using open_tab with label", "Switch to each tab, read the page, and note a summary for each article", "Close all article tabs", "Finish with a combined summary of all 10 articles"] }
+
 Example of a BAD plan:
 Goal: "Check the SonicWall firewall for blocked connections"
 { "plan": ["Go to the website", "Find the information", "Get the data"] }`;
@@ -199,13 +204,36 @@ Goal: "Check the SonicWall firewall for blocked connections"
       signal: controller.signal
     });
     clearTimeout(timeout);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn('Plan generation API returned', response.status);
+      return null;
+    }
     const data = await response.json();
     const content = provider.parseResponse(data);
-    const firstObj = extractFirstJsonObject(content);
-    if (!firstObj) return null;
-    const parsed = JSON.parse(firstObj);
-    if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+    if (!content) {
+      console.warn('Plan generation: empty response content');
+      return null;
+    }
+    // Try direct parse first (plan responses have { "plan": [...] } not { "type": "..." })
+    let jsonStr = content.trim();
+    if (jsonStr.includes('```')) {
+      const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      if (match && match[1]) jsonStr = match[1].trim();
+    }
+    // Strip control characters that break JSON.parse
+    jsonStr = jsonStr.replace(/[\x00-\x1f]/g, '');
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+    } catch (e) {
+      // Fallback: try extractFirstJsonObject for models that wrap the plan
+      const firstObj = extractFirstJsonObject(content);
+      if (firstObj) {
+        const parsed = JSON.parse(firstObj);
+        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+      }
+      console.warn('Plan generation: could not parse response as plan JSON:', e.message, 'Content:', content.slice(0, 200));
+    }
   } catch (e) {
     console.warn('Plan generation failed (non-fatal):', e.message);
   }
@@ -360,11 +388,19 @@ ${last_action && last_result && String(last_result).includes('not found') ? 'CRI
 RULES:
 1. **READ BEFORE YOU ACT** -- Always "read_page" or "extract" BEFORE navigating. You CANNOT extract data from a page you already left!
 2. **EXTRACT OR FINISH** -- After reading a page, either "extract" key data to memory OR "finish" with the answer. NEVER just navigate away.
-3. **USE TABS FOR MULTIPLE PAGES** -- Use open_tab/switch_tab/close_tab to visit multiple pages without losing context. Extract data from each tab before closing.
-4. **FINISH EARLY** -- If you have enough data to answer the question, FINISH immediately. Do NOT browse more sites "just in case".
-5. **NO VAGUE SUMMARIES** -- Include ACTUAL TEXT, names, numbers, URLs, prices. "Found articles" is useless. "Article 'X' by Y says Z" is useful.
-6. Use "extract" + memory to carry data between pages. Reference with ::key::.
-7. If standard actions fail, use "execute_js" to write custom code to handle it.
+3. **MULTI-PAGE RESEARCH PATTERN** -- When the goal requires visiting multiple pages (e.g., "open each article and summarize"):
+   a) First extract the list of URLs from the current page using "execute_js" with: document.querySelectorAll('a[href]').length to verify links exist, then extract URLs
+   b) Use "open_tab" with url and label for each page (e.g., label: "article-1")
+   c) Use "switch_tab" to go to each tab, "read_page" to read it, then "note" to record the summary
+   d) Use "close_tab" when done with a tab
+   e) After visiting all pages, "finish" with ALL summaries combined
+4. **EXTRACT FAILED? USE JS** -- If "extract" or "extract_list" returns "Element not found", use "execute_js" with a "key" to save results to memory:
+   - Extract links: { "type": "execute_js", "code": "return Array.from(document.querySelectorAll('a[href]')).slice(0,10).map(a => ({title: a.innerText.trim(), href: a.href}))", "key": "links" }
+   - Extract text: { "type": "execute_js", "code": "return Array.from(document.querySelectorAll('h2, h3')).map(e => e.innerText.trim()).filter(Boolean)", "key": "headings" }
+   - ALWAYS use "key" with execute_js so data persists in memory for your finish summary
+5. **NEVER HALLUCINATE** -- Your "finish" summary MUST only contain information you actually extracted from web pages using "extract", "execute_js" with key, or "note". If you did not extract real data from real pages, you MUST say "I was unable to extract data from the page" — NEVER fabricate article titles, product names, statistics, or summaries from your training data. This is a strict requirement.
+6. **NO VAGUE SUMMARIES** -- Include ACTUAL TEXT, names, numbers, URLs, prices extracted from pages. "Found articles" is useless. "Article 'X' by Y says Z" is useful.
+7. Use "extract" + memory to carry data between pages. Reference with ::key::.
 8. For dropdowns: use "select". For hover menus: use "hover" then "click".
 9. One action per step.
 
@@ -381,7 +417,7 @@ Actions:
 - { "type": "wait_for_text", "text": "TEXT", "timeout": 5000 }
 - { "type": "wait_for_element", "selector": "FROM_LIST", "timeout": 5000 }
 - { "type": "wait_for_navigation", "timeout": 5000 }
-- { "type": "execute_js", "code": "JS_CODE" }
+- { "type": "execute_js", "code": "JS_CODE", "key": "memory_key" }  -- key is OPTIONAL; if provided, result is saved to memory
 - { "type": "read_page" }
 - { "type": "note", "text": "FINDINGS" }
 - { "type": "finish", "summary": "FULL DETAILED REPORT with actual text, names, numbers, URLs" }
@@ -390,6 +426,9 @@ Actions:
 - { "type": "close_tab", "label": "name" }
 - { "type": "dismiss_overlay" }
 - { "type": "switch_to_frame", "frame_index": INTEGER }
+- { "type": "click_at", "x": PIXEL_X, "y": PIXEL_Y }
+
+${base64Image ? 'VISUAL MODE: You can see a screenshot of the current page. You may use "click_at" with x,y pixel coordinates to click elements you can see but that are not in the element list. Estimate coordinates from the screenshot — the image is full-width so x maps directly. Use click_at when the element list is empty or the selectors don\'t match what you see.\n' : ''}
 
 IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.`;
 
@@ -439,7 +478,7 @@ export function extractFirstJsonObject(str) {
   const validTypes = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
     'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
     'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-    'dismiss_overlay', 'switch_to_frame']);
+    'dismiss_overlay', 'switch_to_frame', 'click_at']);
 
   let searchFrom = 0;
   while (searchFrom < str.length) {
@@ -484,6 +523,10 @@ export function parseLLMResponse(content) {
     }
     const firstObj = extractFirstJsonObject(jsonStr);
     if (firstObj) jsonStr = firstObj;
+    // Fix common JSON issues from LLMs:
+    // 1. Literal newlines inside string values (e.g., "summary": "line1\nline2")
+    // 2. Control characters
+    jsonStr = jsonStr.replace(/[\x00-\x1f]/g, '');
     let parsed = JSON.parse(jsonStr);
     if (!parsed.type && parsed.action && typeof parsed.action === 'object') parsed = parsed.action;
     if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
@@ -492,11 +535,26 @@ export function parseLLMResponse(content) {
     const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
       'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
       'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-      'dismiss_overlay', 'switch_to_frame'];
+      'dismiss_overlay', 'switch_to_frame', 'click_at'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     return parsed;
   } catch (err) {
     console.error('Failed to parse LLM response:', err, 'Content:', content);
+    // If the content looks like a finish response (has a long summary),
+    // salvage it instead of treating it as a parse error
+    if (typeof content === 'string' && content.length > 200 && (content.includes('"type"') || content.includes('"finish"'))) {
+      try {
+        // Try to fix common issues: unescaped newlines in strings
+        const fixed = content
+          .replace(/[\x00-\x1f]/g, '')
+          .replace(/\\n/g, '\\n')
+          .replace(/\n/g, '\\n');
+        const parsed = JSON.parse(fixed);
+        if (parsed.type === 'finish' && parsed.summary) {
+          return parsed;
+        }
+      } catch (e) { /* fall through to note */ }
+    }
     return { type: 'note', text: `Parse error (will retry): ${err.message}` };
   }
 }

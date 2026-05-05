@@ -6,7 +6,7 @@
 // This prevents duplicate message listeners and duplicate MutationObservers
 // when content/index.js is injected multiple times (e.g., on page navigation).
 if (window.__sentinelInitialized) {
-  chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {});
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
 } else {
   window.__sentinelInitialized = true;
 
@@ -23,17 +23,33 @@ if (window.__sentinelInitialized) {
   async function handleMessage(request) {
     switch (request.action) {
       case 'observe_page': {
-        const interactiveElements = [];
-        const selectorMap = new Map();
-        dom.scanDocument(document, interactiveElements, selectorMap, '');
-        // Scan iframes using frame-manager (handles same-origin and cross-origin placeholders)
-        if (fm && fm.scanIframes) {
+        // Scan for interactive elements. Retry up to 3 times for SPAs (React, Vue, Angular)
+        // that render content asynchronously after the initial page load.
+        let interactiveElements = [];
+        const maxRetries = 3;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
-            const iframeResult = fm.scanIframes(document);
-            if (iframeResult.elements) {
-              iframeResult.elements.forEach(el => interactiveElements.push(el));
+            interactiveElements = [];
+            const selectorMap = new Map();
+            dom.scanDocument(document, interactiveElements, selectorMap, '');
+            // Scan iframes using frame-manager
+            if (fm && fm.scanIframes) {
+              try {
+                const iframeResult = fm.scanIframes(document);
+                if (iframeResult.elements) {
+                  iframeResult.elements.forEach(el => interactiveElements.push(el));
+                }
+              } catch (e) { /* fallback: no iframe scanning */ }
             }
-          } catch (e) { /* fallback: no iframe scanning */ }
+            // If we found elements, stop retrying
+            if (interactiveElements.length >= 5) break;
+          } catch (e) {
+            if (e.message && e.message.includes('Extension context invalidated')) throw e;
+          }
+          // Wait for SPA to render
+          if (attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 1500));
+          }
         }
         return { elements: interactiveElements };
       }
@@ -43,34 +59,57 @@ if (window.__sentinelInitialized) {
         const url = window.location.href;
 
         // Smart content extraction: prefer semantic content areas over raw body.innerText.
-        // Raw body on Etsy/eBay/Amazon is 50,000+ chars of mixed nav/cookie/footer garbage.
-        // Extract the primary content area and skip boilerplate, cutting the payload by ~80%.
+        // Includes retry loop for SPAs that render content asynchronously (CNN, React apps, etc.)
+        const maxRetries = 3;
+        const retryDelay = 1500;
         let content = '';
-        const mainSelectors = ['main', '[role="main"]', 'article', '#main-content', '#content', '.main-content', '.content'];
-        let mainEl = null;
-        for (const sel of mainSelectors) {
-          mainEl = document.querySelector(sel);
-          if (mainEl) break;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            content = '';
+            const mainSelectors = ['main', '[role="main"]', 'article', '#main-content', '#content', '.main-content', '.content'];
+            let mainEl = null;
+            for (const sel of mainSelectors) {
+              mainEl = document.querySelector(sel);
+              if (mainEl) break;
+            }
+
+            if (mainEl) {
+              const clone = mainEl.cloneNode(true);
+              const skip = ['nav', 'header', 'footer', 'aside', '[role="navigation"]', '[role="banner"]',
+                '.cookie-notice', '.cookie-banner', '#cookie', '.ad', '.advertisement', '[aria-hidden="true"]',
+                'script', 'style', 'noscript', 'svg'];
+              skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) {} });
+              content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+            }
+
+            if (!content || content.length < 200) {
+              const bodyClone = document.body.cloneNode(true);
+              ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
+                bodyClone.querySelectorAll(tag).forEach(el => el.remove());
+              });
+              content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+            }
+
+            // If we got meaningful content, stop retrying
+            if (content.length >= 200) break;
+          } catch (e) {
+            if (e.message && e.message.includes('Extension context invalidated')) throw e;
+          }
+          // Wait for SPA to render before retrying
+          if (attempt < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, retryDelay));
+          }
         }
 
-        if (mainEl) {
-          // Clone to avoid mutating the live DOM
-          const clone = mainEl.cloneNode(true);
-          // Remove common boilerplate from within main
-          const skip = ['nav', 'header', 'footer', 'aside', '[role="navigation"]', '[role="banner"]',
-            '.cookie-notice', '.cookie-banner', '#cookie', '.ad', '.advertisement', '[aria-hidden="true"]',
-            'script', 'style', 'noscript', 'svg'];
-          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) {} });
-          content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
-        }
-
-        // Fall back to full body if main content area is tiny or missing
-        if (!content || content.length < 200) {
-          const bodyClone = document.body.cloneNode(true);
-          ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
-            bodyClone.querySelectorAll(tag).forEach(el => el.remove());
-          });
-          content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+        // If still empty after retries, try scrolling down to trigger lazy load
+        if (content.length < 200) {
+          try {
+            window.scrollTo(0, document.body.scrollHeight / 3);
+            await new Promise(r => setTimeout(r, 1000));
+            const bodyText = (document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+            if (bodyText.length > content.length) content = bodyText;
+          } catch (e) { /* page may have navigated away */ }
         }
 
         return { content: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
@@ -121,6 +160,85 @@ if (window.__sentinelInitialized) {
     }
   }
 
+  // ========== Visual Overlay System ==========
+  // Shows the user what the agent is doing on the page: action banner + click indicators.
+
+  const SENTINEL_OVERLAY_ID = '__sentinel_overlay__';
+
+  function getOrCreateOverlay() {
+    try {
+      let overlay = document.getElementById(SENTINEL_OVERLAY_ID);
+      if (overlay) return overlay;
+
+      const style = document.createElement('style');
+      style.id = SENTINEL_OVERLAY_ID + '_style';
+      style.textContent = `
+        #__sentinel_overlay__ {
+          position: fixed; top: 12px; right: 12px; z-index: 2147483647;
+          background: #1a1a2e; color: #e0e0e0; border: 1px solid #4a4a8a;
+          border-radius: 8px; padding: 8px 14px; font-family: monospace;
+          font-size: 12px; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+          pointer-events: none; transition: opacity 0.3s;
+        }
+        #__sentinel_overlay__ .sentinel-action { color: #7eb8ff; font-weight: bold; }
+        #__sentinel_overlay__ .sentinel-target { color: #ffa07a; margin-top: 2px; }
+        #__sentinel_click_indicator__ {
+          position: fixed; z-index: 2147483646; pointer-events: none;
+          width: 24px; height: 24px; border-radius: 50%;
+          border: 2px solid #ff4444; background: rgba(255,68,68,0.15);
+          transform: translate(-50%, -50%);
+          animation: sentinelClickPulse 0.6s ease-out forwards;
+        }
+        @keyframes sentinelClickPulse {
+          0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+        }
+      `;
+      document.head.appendChild(style);
+
+      overlay = document.createElement('div');
+      overlay.id = SENTINEL_OVERLAY_ID;
+      overlay.textContent = 'Sentinel Override';
+      document.body.appendChild(overlay);
+      return overlay;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function showActionBanner(actionType, description) {
+    try {
+      const overlay = getOrCreateOverlay();
+      if (!overlay) return;
+      const label = description || actionType;
+      overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
+      overlay.style.opacity = '1';
+    } catch (e) { /* extension context may be invalidated */ }
+  }
+
+  function hideActionBanner() {
+    try {
+      const overlay = document.getElementById(SENTINEL_OVERLAY_ID);
+      if (overlay) overlay.style.opacity = '0';
+    } catch (e) {}
+  }
+
+  function showClickIndicator(x, y) {
+    try {
+      const existing = document.getElementById('__sentinel_click_indicator__');
+      if (existing) existing.remove();
+      const indicator = document.createElement('div');
+      indicator.id = '__sentinel_click_indicator__';
+      indicator.style.left = x + 'px';
+      indicator.style.top = y + 'px';
+      document.body.appendChild(indicator);
+      setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) {} }, 700);
+    } catch (e) { /* extension context may be invalidated */ }
+  }
+
+  // Make overlay functions available for the execute_command handler
+  window.__sentinelOverlay = { showActionBanner, hideActionBanner, showClickIndicator };
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleMessage(request)
       .then(data => sendResponse({ ok: true, data }))
@@ -142,19 +260,23 @@ if (window.__sentinelInitialized) {
         if (iframeResult.crossOrigin) {
           // Cross-origin: delegate to background script via chrome.runtime.sendMessage
           return new Promise((resolve) => {
-            chrome.runtime.sendMessage({
-              action: 'execute_in_frame',
-              frameIndex: iframeResult.frameIndex,
-              command: cmd
-            }, (response) => {
-              if (chrome.runtime.lastError) {
-                resolve('Cross-origin iframe error: ' + chrome.runtime.lastError.message);
-              } else if (response && response.ok) {
-                resolve(JSON.stringify(response.data || response));
-              } else {
-                resolve('Cross-origin iframe error: ' + (response ? response.error : 'Unknown error'));
-              }
-            });
+            try {
+              chrome.runtime.sendMessage({
+                action: 'execute_in_frame',
+                frameIndex: iframeResult.frameIndex,
+                command: cmd
+              }, (response) => {
+                if (chrome.runtime.lastError) {
+                  resolve('Cross-origin iframe error: ' + chrome.runtime.lastError.message);
+                } else if (response && response.ok) {
+                  resolve(JSON.stringify(response.data || response));
+                } else {
+                  resolve('Cross-origin iframe error: ' + (response ? response.error : 'Unknown error'));
+                }
+              });
+            } catch (e) {
+              resolve('Extension context error during iframe operation');
+            }
           });
         }
 
@@ -185,6 +307,10 @@ if (window.__sentinelInitialized) {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
 
+        // Visual feedback: show banner and highlight
+        const ov = window.__sentinelOverlay;
+        if (ov) ov.showActionBanner('click', `Clicking: ${(el.innerText || el.tagName || '').substring(0, 60)}`);
+
         // Reactive overlay check: is the target element blocked?
         if (ov && ov.isOverlayBlocking) {
           const blocking = ov.isOverlayBlocking(targetDoc, el);
@@ -199,21 +325,48 @@ if (window.__sentinelInitialized) {
 
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
-        // Dispatch full mouse sequence -- many enterprise UIs (SonicWall, Cisco, etc.)
-        // bind to mousedown/mouseup rather than click and won't respond to el.click() alone.
+        // Get element center for click indicator
+        try {
+          const rect = el.getBoundingClientRect();
+          if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        } catch (e) {}
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
         el.click();
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
-        hl.removeHighlight(el);
+        // Keep highlight visible for 2 seconds so user can see what was clicked
+        setTimeout(() => hl.removeHighlight(el), 2000);
 
         return 'Clicked ' + cmd.selector;
+      }
+
+      case 'click_at': {
+        const x = cmd.x;
+        const y = cmd.y;
+        if (typeof x !== 'number' || typeof y !== 'number') return 'click_at requires numeric x and y coordinates';
+
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('click_at', `Clicking at (${x}, ${y})`);
+
+        const el = targetDoc.elementFromPoint(x, y);
+        if (!el) return 'No element found at coordinates (' + x + ', ' + y + ')';
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(x, y);
+        hl.highlightElement(el);
+        el.scrollIntoView({ behavior: 'instant', block: 'center' });
+        const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView, clientX: x, clientY: y };
+        el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+        el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+        el.click();
+        el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+        setTimeout(() => hl.removeHighlight(el), 2000);
+        return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + String(el.className).split(' ')[0] : '');
       }
 
       case 'type': {
         const el = dom.findElementBySelector(targetDoc, selector);
         if (!el) return 'Element not found: ' + cmd.selector;
+
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('type', `Typing "${(cmd.text || '').substring(0, 50)}" into ${(el.innerText || el.tagName || '').substring(0, 40)}`);
 
         // Reactive overlay check: is the target element blocked?
         if (ov && ov.isOverlayBlocking) {
@@ -454,6 +607,8 @@ if (window.__sentinelInitialized) {
         // Document the risk and add mitigations incrementally.
         const code = cmd.code || '';
         if (!code) return 'No code provided';
+
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('execute_js', `Running JS${cmd.key ? ' → "' + cmd.key + '"' : ''}: ${code.substring(0, 60)}...`);
         try {
           // Execute with a timeout
           const result = await Promise.race([
@@ -468,7 +623,7 @@ if (window.__sentinelInitialized) {
             }),
             new Promise(resolve => setTimeout(() => resolve('Code execution timed out (5s)'), 5000))
           ]);
-          const resultStr = typeof result === 'object' ? JSON.stringify(result).substring(0, 500) : String(result || '').substring(0, 500);
+          const resultStr = typeof result === 'object' ? JSON.stringify(result).substring(0, 3000) : String(result || '').substring(0, 3000);
           return 'JS Result: ' + resultStr;
         } catch (err) {
           return 'JS Error: ' + err.message;
@@ -573,6 +728,12 @@ if (window.__sentinelInitialized) {
     }
   }
 
+  // Safe chrome.runtime.sendMessage — catches both sync throws and async rejections
+  // when extension context is invalidated during page navigation.
+  function safeSendMessage(msg) {
+    try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch (e) {}
+  }
+
   // ========== SPA Page Transition Detection ==========
   function setupSPAObservers() {
     let spaDebounce = null;
@@ -585,10 +746,10 @@ if (window.__sentinelInitialized) {
       if (significantChange) {
         clearTimeout(spaDebounce);
         spaDebounce = setTimeout(() => {
-          chrome.runtime.sendMessage({
+          safeSendMessage({
             action: 'spa_content_changed',
             url: window.location.href
-          }).catch(() => {}); // non-critical, best-effort
+          });
         }, 500); // 500ms debounce: wait for SPA render to settle
       }
     });
@@ -604,10 +765,10 @@ if (window.__sentinelInitialized) {
     const dispatchSPATransition = (url) => {
       clearTimeout(spaDebounce);
       spaDebounce = setTimeout(() => {
-        chrome.runtime.sendMessage({
+        safeSendMessage({
           action: 'spa_navigation',
           url: url
-        }).catch(() => {});
+        });
       }, 300);
     };
 
@@ -642,5 +803,5 @@ if (window.__sentinelInitialized) {
   setupSPAObservers();
 
   // Signal ready
-  chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {});
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
 }

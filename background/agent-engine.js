@@ -4,7 +4,7 @@
 
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo } from './tab-manager.js';
-import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate } from './message-protocol.js';
+import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
@@ -35,7 +35,7 @@ const CONFIG = {
   screenshotQuality: 30,
   fetchTimeout: 45000,
   pageLoadTimeout: 25000,
-  maxSteps: 120,
+  maxSteps: 50,
   maxPageContentLength: 16000,
   maxElements: 80,
   maxSelectorLength: 200,
@@ -136,6 +136,81 @@ function detectStall(history, consecutiveFailures, currentStrategies) {
   return { stalled: false };
 }
 
+// ========== Heuristic Plan Generator ==========
+// Fallback when LLM-based plan generation fails. Analyzes the goal text
+// to produce a basic step-by-step plan without any API calls.
+
+function generateHeuristicPlan(goal, currentUrl) {
+  if (!goal) return null;
+  const g = goal.toLowerCase();
+  const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch { return ''; } })();
+
+  // Detect multi-page research patterns
+  const isMultiPage = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(article|page|site|link|url|result|source)\b/i.test(g)
+    || /\b(open|visit|browse|check)\b.*\b(each|and|then)\b/i.test(g)
+    || /\b(summar|brief|report)\b.*\b(all|each|every)\b/i.test(g);
+
+  // Extract target URL from goal
+  const urlMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i)
+    || goal.match(/(https?:\/\/[^\s]+)/);
+  const targetUrl = urlMatch ? urlMatch[1] : null;
+  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
+  const alreadyThere = targetHost && currentHost.includes(targetHost);
+
+  // Extract search query from goal
+  const searchMatch = goal.match(/(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i)
+    || goal.match(/(?:about|on|regarding)\s+([^,.\n]{10,60})/i);
+  const searchQuery = searchMatch ? searchMatch[1].trim() : null;
+
+  // Extract count
+  const countMatch = goal.match(/(?:top\s+)?(\d+)/);
+  const count = countMatch ? parseInt(countMatch[1]) : 10;
+
+  if (isMultiPage) {
+    const steps = [];
+    if (targetUrl && !alreadyThere) {
+      steps.push(`Navigate to ${targetUrl}`);
+    } else if (searchQuery) {
+      steps.push(`Search Google for "${searchQuery}"`);
+    }
+    steps.push(`Use execute_js with key "links" to extract article/result links from the page`);
+    steps.push(`Review extracted links and identify the ${count} most relevant ones`);
+    for (let i = 1; i <= Math.min(count, 10); i++) {
+      steps.push(`Open article ${i} in a new tab, read it, and note a brief summary`);
+    }
+    steps.push(`Close all article tabs`);
+    steps.push(`Finish with a combined summary of all ${count} items`);
+    return steps;
+  }
+
+  if (targetUrl && !alreadyThere) {
+    return [
+      `Navigate to ${targetUrl}`,
+      'Read the page content',
+      'Extract key information using execute_js with key "data"',
+      'Finish with a summary of findings'
+    ];
+  }
+
+  if (searchQuery) {
+    return [
+      `Search Google for "${searchQuery}"`,
+      'Read search results and extract top links',
+      'Visit the most relevant result',
+      'Read and extract key information',
+      'Finish with a summary'
+    ];
+  }
+
+  // Generic fallback
+  return [
+    'Read the current page',
+    'Extract key information',
+    'If needed, navigate to find more data',
+    'Finish with a summary'
+  ];
+}
+
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
   console.log('Agent starting loop for goal:', goal);
@@ -184,7 +259,13 @@ async function runAgentLoop(goal, workingTabId) {
   if (agentPlan) {
     sendSilentUpdate(`Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
   } else {
-    sendSilentUpdate('No plan generated -- running in direct mode');
+    // Fallback: generate a basic heuristic plan from goal analysis
+    agentPlan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
+    if (agentPlan) {
+      sendSilentUpdate(`Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
+    } else {
+      sendSilentUpdate('Running in direct mode');
+    }
   }
 
   while (!finished && agentRunning) {
@@ -251,7 +332,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Auto-navigate to URL found in goal (first iteration only)
       // Smart: checks current page hostname before navigating
-      if (stepCount === 0 && goal) {
+      if (stepCount === 1 && goal) {
         const urlMatch = goal.match(/https?:\/\/[^\s"'<>,]+/i) || goal.match(/(?:go to|visit|navigate to|open)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
@@ -277,6 +358,15 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       sendSilentUpdate('Observing page...', stepCount);
+
+      // Send page context to popup so user can see where the agent is
+      sendPageContext(tabInfo?.url || '', tabInfo?.title || '', stepCount);
+
+      // Send tab state to popup so user can see all managed tabs
+      const allTabContexts = getAllTabContexts();
+      if (allTabContexts.length > 0) {
+        sendTabStateUpdate(allTabContexts);
+      }
 
       // Inject content script
       const scriptReady = await injectContentScript(tab);
@@ -331,8 +421,15 @@ async function runAgentLoop(goal, workingTabId) {
         pageText = pageText.substring(0, effectiveMaxLength) + '\n\n[... content truncated]';
       }
 
-      // Build capped element list
+      // Build capped element list (needed before empty page check)
       const allElements = (observation && observation.elements) ? observation.elements : [];
+
+      // Detect empty page (SPA not rendered, anti-bot, or loading failure)
+      const pageIsEmpty = pageText.length < 150 || (pageText.includes('Page Title:') && pageText.length < 300);
+      const elementsEmpty = allElements.length < 3;
+      if (pageIsEmpty) {
+        pageText = '[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n' + pageText;
+      }
       const priorityTypes = ['button', 'input', 'select', 'textarea'];
       const priorityEls = allElements.filter(e => priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
       const otherEls    = allElements.filter(e => !priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
@@ -350,6 +447,7 @@ async function runAgentLoop(goal, workingTabId) {
       let loopDirective = '';
 
       // 1. Consecutive non-productive actions from end of history
+      //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (history.length >= 3) {
         const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
         let consecutiveNonProductive = 0;
@@ -360,24 +458,49 @@ async function runAgentLoop(goal, workingTabId) {
             break;
           }
         }
-        if (consecutiveNonProductive >= 3) {
+        // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
+        const recentWindow = history.slice(-8);
+        const recentJsCount = recentWindow.filter(h => h.action.type === 'execute_js').length;
+        const recentExtractCount = recentWindow.filter(h => ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
+        const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
+
+        if (consecutiveNonProductive >= 3 || jsLoop) {
           const memCount = Object.keys(agentMemory).length;
+          const reason = jsLoop
+            ? recentJsCount + ' execute_js calls in last 8 steps with no data saved'
+            : consecutiveNonProductive + ' non-productive steps in a row';
           loopDirective = memCount === 0
-            ? '\n⚠ LOOP DETECTED -- ' + consecutiveNonProductive + ' non-productive steps in a row. You MUST use "extract" or "extract_list" NOW. Do NOT read_page or execute_js again.\n'
-            : '\n⚠ LOOP DETECTED -- You have ' + memCount + ' items in memory but keep looping. You MUST use "finish" NOW with a summary of your extracted data.\n';
+            ? '\n⚠ LOOP DETECTED -- ' + reason + '. You MUST use "execute_js" with a "key" to save results, or use "note" to record findings. Do NOT run more JS without saving.\n'
+            : '\n⚠ LOOP DETECTED -- ' + reason + '. You have ' + memCount + ' items in memory. You MUST use "finish" NOW with a summary of your extracted data.\n';
+        }
+      }
+
+      // 1b. Empty page detection — page didn't render (SPA, anti-bot, loading failure)
+      if ((pageIsEmpty || elementsEmpty) && !loopDirective) {
+        const emptyCount = history.slice(-4).filter(h => {
+          const r = h.result || '';
+          return r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300);
+        }).length;
+        if (emptyCount >= 2) {
+          loopDirective = '\n⚠ EMPTY PAGE -- The page content has been empty for multiple attempts. This site may block automation or use heavy JavaScript rendering. You MUST try a different approach:\n1. Use "execute_js" with key to extract data directly: return document.body.innerText\n2. Navigate to a simpler URL (e.g., the homepage instead of search results)\n3. Try a different site for the same information\nDo NOT read_page again on this empty page.\n';
         }
       }
 
       // 2. Step-based soft cap: warn model to finish after 15 steps
-      if (stepCount >= 15 && !loopDirective) {
+      //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
+      const recentTabActions = history.slice(-5).filter(h => ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
+      const isMakingProgress = recentTabActions > 0 || Object.keys(agentMemory).length > 0;
+      if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
+        loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
+      } else if (stepCount >= 20 && !loopDirective) {
         const memCount = Object.keys(agentMemory).length;
         loopDirective = memCount > 0
           ? '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. You have ' + memCount + ' extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n'
           : '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n';
       }
 
-      // 3. Step-based hard cap: force finish after 25 steps
-      if (stepCount >= 25) {
+      // 3. Step-based hard cap: force finish after 40 steps
+      if (stepCount >= 40) {
         const memCount = Object.keys(agentMemory).length;
         const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
           const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
@@ -403,21 +526,23 @@ async function runAgentLoop(goal, workingTabId) {
 
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
       let command;
+      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective };
       try {
         command = await callLLMWithRetry(
           trimmedElements, allElements.length, pageText, base64Image,
           goal, history, stepCount, currentUrl,
           0, // retryCount
           CONFIG,
-          { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective }
+          agentState
         );
       } finally {
         clearInterval(progressTimer);
         base64Image = null; // release screenshot memory after LLM call
       }
 
-      // Sync back any state changes from the LLM call (apiCallCount is incremented inside)
-      apiCallCount = apiCallCount; // already mutated by reference
+      // Sync apiCallCount — callLLM mutates agentState.apiCallCount by reference, but the
+      // module-level var is a primitive and doesn't auto-update. Pull it back from the object.
+      apiCallCount = agentState.apiCallCount;
 
       // Advance plan step if the LLM signalled it's done with the current step
       if (command.advance_plan && agentPlan && currentPlanStep < agentPlan.length - 1) {
@@ -451,8 +576,36 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-      // Handle finish
+      // Handle finish — but block premature finishes (model giving up without trying)
       if (command.type === 'finish') {
+        const memCount = Object.keys(agentMemory).length;
+        const noteCount = history.filter(h => h.action.type === 'note').length;
+        const hasData = memCount > 0 || noteCount > 0;
+
+        // Block finish if no real data was extracted and we haven't tried enough
+        if (!hasData && stepCount < 8) {
+          history.push({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
+          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
+          await sleep(1000);
+          continue;
+        }
+
+        // Block finish if memory only contains failed results ("Done", empty strings)
+        const hasRealData = memCount > 0 && Object.values(agentMemory).some(v => {
+          const s = typeof v === 'string' ? v : JSON.stringify(v);
+          return s.length > 10 && s !== 'Done';
+        });
+        if (!hasRealData && !hasData && stepCount < 15) {
+          history.push({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
+          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
+          await sleep(1000);
+          continue;
+        }
+
         finished = true;
         consecutiveFailures = 0;
         sendSilentUpdate('Task complete', stepCount);
@@ -544,7 +697,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendActionMessage(command, stepCount, observation);
 
       // Invalidate screenshot cache for actions that can change the page
-      if (['navigate', 'click', 'type', 'press_key', 'select'].includes(command.type)) {
+      if (['navigate', 'click', 'click_at', 'type', 'press_key', 'select'].includes(command.type)) {
         const invalidationCtx = getTabContext(tab);
         if (invalidationCtx) {
           invalidationCtx.screenshotCache.cachedBase64Image = null;
@@ -681,6 +834,36 @@ async function runAgentLoop(goal, workingTabId) {
           // extract result wasn't JSON -- treat as failure
         }
         if (!extractSucceeded) actionFailed = true;
+      } else if (command.type === 'execute_js' && command.key) {
+        // execute_js with key: run JS and save result to agent memory
+        const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
+        result = (res && res.result) || 'Done';
+        // Extract the JS result value
+        let jsValue = result;
+        if (result.startsWith('JS Result: ')) {
+          jsValue = result.substring(10);
+        }
+        if (result === 'Done' || result.startsWith('JS Error: ')) {
+          // JS execution failed or returned nothing — do NOT save to memory
+          actionFailed = true;
+          result = result === 'Done' ? 'JS execution failed — no response from page' : result;
+        } else if (jsValue.length < 5) {
+          // Result too short to be useful data
+          actionFailed = true;
+          result = 'JS returned empty result';
+        } else {
+          try {
+            const parsed = JSON.parse(jsValue);
+            agentMemory[command.key] = parsed;
+          } catch (e) {
+            agentMemory[command.key] = jsValue;
+          }
+          const memKeys = Object.keys(agentMemory);
+          if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
+          await chrome.storage.local.set({ agent_memory: agentMemory });
+          const preview = String(jsValue).substring(0, 100);
+          result = `JS result saved to "${command.key}": ${preview}`;
+        }
       } else {
         try {
           const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
@@ -693,7 +876,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Post-click: handle navigation and new tab capture
-      if (command.type === 'click') {
+      if (command.type === 'click' || command.type === 'click_at') {
         await sleep(1000);
         try {
           const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
@@ -783,11 +966,10 @@ async function runAgentLoop(goal, workingTabId) {
       if (consecutiveNavigates >= 3) {
         sendSilentUpdate(`Auto-reading page after ${consecutiveNavigates} navigates`, stepCount);
         try {
-          const forcedRead = await sendMessageWithRetry(tab, { action: 'get_page_info' });
+          const forcedRead = await sendMessageWithRetry(tab, { action: 'read_page' });
           if (forcedRead) {
-            const forcedText = (forcedRead.text || '').substring(0, 8000);
+            const forcedText = (forcedRead.content || '').substring(0, 8000);
             history.push({ step: stepCount, action: { type: 'read_page' }, result: `Auto-read: ${forcedText.substring(0, 500)}` });
-            observation = forcedText;
           }
         } catch (e) { /* non-fatal */ }
         consecutiveNavigates = 0;

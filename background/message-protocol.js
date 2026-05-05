@@ -94,6 +94,15 @@ export function sendSilentUpdate(text, stepNumber) {
   }).catch(() => { console.log(text); });
 }
 
+export function sendPageContext(url, pageTitle, stepNumber) {
+  chrome.runtime.sendMessage({
+    action: 'page_context',
+    url: url || '',
+    title: pageTitle || '',
+    stepNumber: stepNumber || 0
+  }).catch(() => {});
+}
+
 /**
  * Send an action message to the popup (shows an action card).
  *
@@ -116,7 +125,8 @@ export function sendActionMessage(command, stepNumber, observation) {
   } else if (command.type === 'scroll') {
     description = `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
   } else if (command.type === 'execute_js') {
-    description = `Run custom JS`;
+    const codePreview = (command.code || '').substring(0, 60).replace(/\n/g, ' ');
+    description = command.key ? `Run JS → save as "${command.key}": ${codePreview}...` : `Run JS: ${codePreview}...`;
   } else if (command.type === 'press_key') {
     description = `Press ${command.key || 'Enter'}`;
   } else if (command.type === 'wait_for_text') {
@@ -125,6 +135,8 @@ export function sendActionMessage(command, stepNumber, observation) {
     description = `Wait for element`;
   } else if (command.type === 'wait_for_navigation') {
     description = `Wait for navigation`;
+  } else if (command.type === 'click_at') {
+    description = `Click at (${command.x}, ${command.y})`;
   } else if (command.type === 'open_tab') {
     description = `Open tab: ${command.label || command.url}`;
   } else if (command.type === 'switch_tab') {
@@ -152,7 +164,7 @@ export function sendActionResult(stepNumber, result, isError) {
   chrome.runtime.sendMessage({
     action: 'agent_action_result',
     stepNumber,
-    result: resultStr.substring(0, 120),
+    result: resultStr.substring(0, 300),
     isError: !!isError
   }).catch(() => {});
 }

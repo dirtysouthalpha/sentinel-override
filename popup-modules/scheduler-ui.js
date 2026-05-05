@@ -7,52 +7,7 @@ let refreshIntervalId = null;
 let templatesCache = [];
 
 // ========== Countdown / Relative Time Helpers ==========
-function formatCountdown(timestamp) {
-  if (!timestamp) return 'Not scheduled';
-  const now = Date.now();
-  const diff = timestamp - now;
-
-  if (diff <= 0) return 'Overdue';
-
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 60) return `${minutes}m away`;
-  if (hours < 24) return `${hours}h ${minutes % 60}m away`;
-  if (days < 7) return `${days}d ${hours % 24}h away`;
-
-  return new Date(timestamp).toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit',
-  });
-}
-
-function relativeTime(timestamp) {
-  if (!timestamp) return 'Never';
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 30) return `${days}d ago`;
-  return new Date(timestamp).toLocaleDateString();
-}
-
-function formatDuration(startedAt, completedAt) {
-  if (!startedAt || !completedAt) return '';
-  const diff = completedAt - startedAt;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 1) return `${seconds}s`;
-  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
-}
+// formatCountdown, relativeTime, formatDuration are in window.Helpers (popup-modules/helpers.js)
 
 // ========== Panel Toggle ==========
 function showSchedulesPanel() {

@@ -98,7 +98,8 @@ Summary of outcomes and any recommended next steps. Include what was accomplishe
 
 IMPORTANT:
 - Write in a professional, factual tone suitable for ticket documentation
-- Include actual values, names, and data -- not vague descriptions
+- Include ACTUAL values, names, and data extracted from pages -- NEVER fabricate information
+- If no real data was extracted, say so explicitly in the Evidence and Conclusions sections
 - The report will be rendered as markdown -- use proper markdown formatting
 - Do NOT wrap the report in code fences or JSON
 - Return ONLY the report content, nothing else`;

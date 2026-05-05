@@ -2,7 +2,7 @@
 
 > Professional browser automation agent. Self-healing, self-learning AI that investigates, configures, and troubleshoots the web.
 
-![Version](https://img.shields.io/badge/version-3.1.2-orange)
+![Version](https://img.shields.io/badge/version-3.2.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 
