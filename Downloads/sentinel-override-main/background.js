@@ -109,8 +109,8 @@ const SITE_PATTERNS = {
 
 function getSitePattern(url) {
   try {
-    var parsed = new URL(url);
-    for (var domain in SITE_PATTERNS) {
+    const parsed = new URL(url);
+    for (const domain in SITE_PATTERNS) {
       if (parsed.hostname.includes(domain)) return SITE_PATTERNS[domain];
     }
   } catch (e) {}
@@ -131,7 +131,7 @@ async function generateMissingTool(error, step, workingTabId) {
     script = script.replace(/```javascript?\n?/gi, '').replace(/```\n?/g, '').trim();
     if (script.length < 5) return null;
     sendSilentUpdate('[Auto-Tool] Script generated (' + script.length + ' chars), injecting...');
-    var results = await chrome.scripting.executeScript({
+    const results = await chrome.scripting.executeScript({
       target: { tabId: workingTabId },
       func: new Function('return (' + script + ')'),
       world: 'MAIN'
@@ -150,14 +150,14 @@ function saveShortcut(name, prompt) {
 }
 
 function executeShortcut(name) {
-  var prompt = savedShortcuts[name];
+  const prompt = savedShortcuts[name];
   if (prompt) chrome.runtime.sendMessage({ action: 'plan_task', goal: prompt }).catch(function() {});
 }
 
 function getContextSummary() {
-  var completed = taskContext.completedSteps.length;
-  var data = Object.entries(taskContext.intermediateData).slice(-5);
-  var fails = taskContext.failedAttempts.slice(-3);
+  const completed = taskContext.completedSteps.length;
+  const data = Object.entries(taskContext.intermediateData).slice(-5);
+  const fails = taskContext.failedAttempts.slice(-3);
   return 'Goal: ' + taskContext.goal + '\nSteps done: ' + completed + '\nData: ' + data.map(function(d) { return d[0] + '=' + String(d[1]).substring(0, 40); }).join(', ') + '\nFailures: ' + fails.map(function(f) { return f.error.substring(0, 60); }).join(' | ');
 }
 
@@ -170,11 +170,13 @@ chrome.action.onClicked.addListener((tab) => {
 
 // Configuration for rate limiting
 const CONFIG = {
-  minDelayBetweenCalls: 2000,  // 2 seconds between API calls
-  maxRetries: 3,               // Retry failed requests 3 times
-  retryDelay: 5000,            // 5 second initial delay
-  screenshotQuality: 30,       // Lower quality = smaller file = faster
-  batchActions: true,          // Group similar actions together
+  minDelayBetweenCalls: 2000,
+  maxRetries: 3,
+  retryDelay: 5000,
+  screenshotQuality: 30,
+  batchActions: true,
+  maxSteps: 50,
+  stepTimeoutMs: 60000
 };
 
 // ========== COST SAFETY — Provider-aware ==========
@@ -568,13 +570,18 @@ async function runAgentLoop(goal, workingTabId) {
   let finished = false;
   let history = [];
   let stepCount = 0;
+  let consecutiveErrors = 0;
 
-  // Per-run history is in-memory only — don't carry over old runs
   await chrome.storage.local.remove(['agent_history']).catch(() => {});
 
   while (!finished && agentRunning) {
     try {
       stepCount++;
+
+      if (stepCount > CONFIG.maxSteps) {
+        sendSilentUpdate('Max steps reached (' + CONFIG.maxSteps + '). Stopping.');
+        break;
+      }
 
       const tab = workingTabId;
 
@@ -661,12 +668,14 @@ async function runAgentLoop(goal, workingTabId) {
 
       let result;
       if (command.type === 'navigate') {
-        if (!isValidUrl(command.url)) {
-          result = 'Invalid URL: ' + command.url;
+        let url = command.url || '';
+        if (!url.match(/^https?:\/\//i)) url = 'https://' + url;
+        if (!isValidUrl(url)) {
+          result = 'Invalid URL: ' + url;
         } else {
-          await chrome.tabs.update(tab, { url: command.url });
+          await chrome.tabs.update(tab, { url });
           const loaded = await waitForTabLoad(tab, 15000);
-          result = loaded ? ('Navigated to ' + command.url) : ('Navigation timeout to ' + command.url);
+          result = loaded ? ('Navigated to ' + url) : ('Navigation timeout to ' + url);
         }
       } else if (command.type === 'go_back' || command.type === 'go_forward') {
         await sendMessageWithRetry(tab, { action: 'execute_command', command });
@@ -679,16 +688,22 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       history.push({ step: stepCount, action: command, result: shortenForHistory(result) });
-      // Trim history to last 8 entries to keep prompt small
       if (history.length > 8) history = history.slice(-8);
+      consecutiveErrors = 0;
       await sleep(800);
 
     } catch (err) {
       console.error('Agent loop error:', err);
-      sendSilentUpdate(`[Step ${stepCount}] ❌ Error: ${err.message}`);
+      consecutiveErrors++;
+      sendSilentUpdate(`[Step ${stepCount}] Error: ${err.message}`);
 
       if (err.message.includes('was closed')) {
         agentRunning = false;
+        break;
+      }
+
+      if (consecutiveErrors >= 5) {
+        sendSilentUpdate('Too many consecutive errors (' + consecutiveErrors + '). Stopping.');
         break;
       }
 
@@ -718,38 +733,39 @@ async function ensureContentScript(tabId) {
 function waitForTabLoad(tabId, timeoutMs = 15000) {
   return new Promise((resolve) => {
     let settled = false;
-    const finish = (ok) => { if (!settled) { settled = true; cleanup(); resolve(ok); } };
+    let poll;
+    const finish = (ok) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(ok);
+    };
+    const cleanup = () => {
+      try { chrome.webNavigation.onCompleted.removeListener(onCompleted); } catch (e) {}
+      try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch (e) {}
+      clearTimeout(timer);
+      if (poll) clearInterval(poll);
+    };
     const onCompleted = (details) => {
       if (details.tabId === tabId && details.frameId === 0) finish(true);
     };
     const onError = (details) => {
       if (details.tabId === tabId && details.frameId === 0) finish(false);
     };
-    const cleanup = () => {
-      try { chrome.webNavigation.onCompleted.removeListener(onCompleted); } catch (e) {}
-      try { chrome.webNavigation.onErrorOccurred.removeListener(onError); } catch (e) {}
-      clearTimeout(timer);
-    };
     try {
       chrome.webNavigation.onCompleted.addListener(onCompleted);
       chrome.webNavigation.onErrorOccurred.addListener(onError);
-    } catch (e) {
-      // webNavigation permission not granted; fall back to timeout
-    }
-    // Also poll tab status — covers SPA same-document transitions
+    } catch (e) {}
     const pollStart = Date.now();
-    const poll = setInterval(async () => {
+    poll = setInterval(async () => {
       try {
         const t = await chrome.tabs.get(tabId);
         if (t && t.status === 'complete') {
-          clearInterval(poll);
           finish(true);
         } else if (Date.now() - pollStart > timeoutMs) {
-          clearInterval(poll);
           finish(false);
         }
       } catch (e) {
-        clearInterval(poll);
         finish(false);
       }
     }, 250);
@@ -816,8 +832,8 @@ async function planTask(goal, workingTabId) {
     sendSilentUpdate('[Plan] Analyzing your instruction...');
 
     try {
-      var tab = await chrome.tabs.get(workingTabId);
-      var pattern = getSitePattern(tab.url || '');
+      const tab = await chrome.tabs.get(workingTabId);
+      const pattern = getSitePattern(tab.url || '');
       if (pattern) {
         sendSilentUpdate('[Plan] Detected platform: ' + pattern.platform);
       }
@@ -939,11 +955,11 @@ async function executePlan(plan, workingTabId) {
       
       taskContext.failedAttempts.push({ step: step.step_number, error: err.message || String(err), timestamp: new Date().toISOString() });
       
-      var failCount = taskContext.failedAttempts.filter(function(f) { return f.step === step.step_number; }).length;
+      const failCount = taskContext.failedAttempts.filter(function(f) { return f.step === step.step_number; }).length;
       if (failCount <= 1 && typeof generateMissingTool === 'function') {
         sendSilentUpdate('[Auto-Recovery] Generating workaround for step ' + step.step_number + '...');
         try {
-          var recovery = await generateMissingTool(err, step, workingTabId);
+          const recovery = await generateMissingTool(err, step, workingTabId);
           if (recovery && recovery.success) {
             taskContext.completedSteps.push({ step: step.step_number, description: step.description, result: 'auto-recovered', timestamp: new Date().toISOString() });
             currentStepIndex++;
@@ -1064,7 +1080,7 @@ async function callLLM(observation, pageContent, base64Image, goal, history, ste
   const last_result = history.length > 0 ? history[history.length - 1].result : null;
   const resultStr = typeof last_result === 'string' ? last_result : JSON.stringify(last_result);
 
-  var ctx = getContextSummary();
+  const ctx = getContextSummary();
   const elementList = (observation.elements || []).map(e => {
     const parts = ['[' + e.id + ']', e.role || (e.tag || '').toLowerCase()];
     if (e.name) parts.push('"' + String(e.name).replace(/\s+/g, ' ').slice(0, 80) + '"');
