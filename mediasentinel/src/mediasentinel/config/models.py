@@ -36,6 +36,14 @@ class QBittorrentConfig(BaseModel):
     speed_profile: str = "100+mbps"
     verify_binding_interval: int = Field(ge=30, le=3600, default=300)
 
+    @field_validator("speed_profile")
+    @classmethod
+    def validate_speed_profile(cls, v: str) -> str:
+        valid = ("10mbps", "50mbps", "100mbps", "100+mbps")
+        if v not in valid:
+            raise ValueError(f"speed_profile must be one of {valid}, got '{v}'")
+        return v
+
 
 class TunnelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")

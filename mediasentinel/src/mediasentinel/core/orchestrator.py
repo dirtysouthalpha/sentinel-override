@@ -334,10 +334,11 @@ class Orchestrator:
                         await asyncio.sleep(5)
                         await self.health_monitor.check_service(service)
                     elif self.alert_dispatcher:
+                        severity = "emergency" if recovery_result.action.value == "escalate" else "error"
                         await self.alert_dispatcher.send_alert(
                             title=f"Recovery failed for {service_name}",
                             message=f"Action: {recovery_result.action.value}, Details: {recovery_result.details}",
-                            severity="error",
+                            severity=severity,
                             service_name=service_name,
                         )
 
