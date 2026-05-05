@@ -4,6 +4,7 @@ Captures a point-in-time view of the system state before any Level 2+
 recovery action, stored as JSON in the state_snapshots table.
 """
 
+import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
@@ -64,7 +65,7 @@ async def capture_snapshot(
     try:
         if qbt_controller is not None:
             # Reuse existing controller connection
-            stats = qbt_controller.get_download_stats()
+            stats = await asyncio.to_thread(qbt_controller.get_download_stats)
             snapshot["active_download_stats"] = stats
             snapshot["active_download_count"] = stats.get("active_torrents", 0)
         else:
@@ -73,13 +74,21 @@ async def capture_snapshot(
             import qbittorrentapi
 
             password = os.environ.get(config.qbt.password_env, "")
-            client = qbittorrentapi.Client(
-                host=config.qbt.host,
-                username=config.qbt.username,
-                password=password,
-            )
-            client.auth_log_in()
-            torrents = client.torrents_info()
+            def _fetch_torrents():
+                cl = qbittorrentapi.Client(
+                    host=config.qbt.host,
+                    username=config.qbt.username,
+                    password=password,
+                )
+                cl.auth_log_in()
+                ts = cl.torrents_info()
+                try:
+                    cl.auth_log_out()
+                except Exception:
+                    pass
+                return ts
+
+            torrents = await asyncio.to_thread(_fetch_torrents)
             active = [
                 {
                     "name": t.name,
@@ -92,10 +101,6 @@ async def capture_snapshot(
             ]
             snapshot["active_downloads"] = active
             snapshot["active_download_count"] = len(active)
-            try:
-                client.auth_log_out()
-            except Exception:
-                pass
     except Exception:
         # qBittorrent may be unreachable — that is fine for a snapshot
         snapshot["active_downloads"] = []

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import datetime
 from pathlib import Path
@@ -76,11 +77,7 @@ class HealthMonitor:
         return result
 
     async def check_all(self) -> list[HealthResult]:
-        results = []
-        for service in self.config.services:
-            result = await self.check_service(service)
-            results.append(result)
-        return results
+        return await asyncio.gather(*(self.check_service(s) for s in self.config.services))
 
     def exceeds_threshold(self, service: ServiceConfig) -> bool:
         return self._failure_counts.get(service.name, 0) >= service.failure_threshold

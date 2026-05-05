@@ -1,3 +1,4 @@
+import asyncio
 import time
 from datetime import datetime
 from pathlib import Path
@@ -214,9 +215,11 @@ class MetricsCollector:
     async def collect_system_metrics(self) -> dict:
         import psutil
 
-        cpu = psutil.cpu_percent(interval=0.1)
-        mem = psutil.virtual_memory()
-        disk = psutil.disk_usage("/")
+        cpu, mem, disk = await asyncio.to_thread(lambda: (
+            psutil.cpu_percent(interval=0.1),
+            psutil.virtual_memory(),
+            psutil.disk_usage("/"),
+        ))
 
         metrics = {
             "cpu_percent": cpu,

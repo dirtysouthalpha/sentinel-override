@@ -23,7 +23,7 @@ class VPNGuard:
     async def check_status(self) -> VPNStatus:
         log = logger.bind(component="VPNGuard", action="check")
 
-        adapter_info = self._detect_adapter()
+        adapter_info = await asyncio.to_thread(self._detect_adapter)
         if adapter_info is None:
             self.state = VPNState.DISCONNECTED
             status = VPNStatus(state=VPNState.DISCONNECTED)
