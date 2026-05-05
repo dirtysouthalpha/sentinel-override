@@ -399,8 +399,9 @@ class MediaSentinelApp(App):
                 latency = tunnel_data.get("latency_ms", 0.0)
                 tunnel_status.update_tunnel(tunnel_name, reachable, latency)
 
-        except Exception:
-            pass
+        except Exception as e:
+            from loguru import logger as _logger
+            _logger.bind(component="TUI", action="load_data").error("Failed to refresh dashboard: {}", e)
 
     def action_refresh(self) -> None:
         self.run_worker(self._load_data, exclusive=True)

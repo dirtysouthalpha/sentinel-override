@@ -13,6 +13,7 @@ Circuit breaker (REC-05): max 3 recovery attempts per service in 10 minutes.
 """
 
 import asyncio
+import os
 import subprocess
 from collections import deque
 from datetime import datetime, timedelta
@@ -402,17 +403,26 @@ class RecoveryEngine:
 
         log.info("Stack reset for {}: chain={}", service_name, chain)
 
+        failures = []
         for svc in chain:
-            await self._restart_service_container(svc)
+            try:
+                await self._restart_service_container(svc)
+            except Exception as e:
+                log.error("Stack reset failed to restart {}: {}", svc, e)
+                failures.append(svc)
             await asyncio.sleep(3)
 
         completed = datetime.now()
+        success = len(failures) == 0
+        details = f"Stack reset completed: chain={chain}"
+        if failures:
+            details += f" | FAILED: {failures}"
         return RecoveryResult(
             service_name=service_name,
             action=RecoveryAction.STACK_RESET,
-            success=True,
+            success=success,
             escalation_level=level,
-            details=f"Stack reset completed: chain={chain}",
+            details=details,
             started_at=started,
             completed_at=completed,
         )
@@ -493,12 +503,36 @@ class RecoveryEngine:
 
         # Step 4: Restart tunnels
         try:
-            subprocess.run(
-                ["cloudflared", "service", "restart"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
+            import docker
+            client = docker.from_env()
+            container = client.containers.get("cloudflared")
+            container.restart(timeout=30)
+        except Exception:
+            try:
+                subprocess.run(
+                    ["net", "stop", "cloudflared"] if os.name == "nt"
+                    else ["systemctl", "restart", "cloudflared"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if os.name == "nt":
+                    subprocess.run(
+                        ["net", "start", "cloudflared"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+            except Exception:
+                pass
+
+        # Verify Docker daemon came back
+        docker_ok = False
+        try:
+            import docker
+            client = docker.from_env()
+            client.ping()
+            docker_ok = True
         except Exception:
             pass
 
@@ -506,9 +540,9 @@ class RecoveryEngine:
         return RecoveryResult(
             service_name=service_name,
             action=RecoveryAction.NETWORK_RECOVERY,
-            success=True,
+            success=docker_ok,
             escalation_level=level,
-            details="Network recovery: Docker daemon restarted, VPN reconnected, all services restarted",
+            details=f"Network recovery: Docker daemon {'restarted successfully' if docker_ok else 'failed to respond'}",
             started_at=started,
             completed_at=completed,
         )
@@ -558,13 +592,14 @@ class RecoveryEngine:
             )
             await asyncio.sleep(2)
 
-            # Reconnect using stored credentials
+            # Reconnect using stored credentials (piped via stdin to avoid argv exposure)
             import os
             vpn_user = os.environ.get("MEDIASENTINEL_VPN_USER", "")
             vpn_pass = os.environ.get("MEDIASENTINEL_VPN_PASS", "")
             if vpn_user and vpn_pass:
                 result = subprocess.run(
-                    ["rasdial", self.config.vpn.adapter_description, vpn_user, vpn_pass],
+                    ["rasdial", self.config.vpn.adapter_description],
+                    input=f"{vpn_user}\n{vpn_pass}\n",
                     capture_output=True,
                     text=True,
                     timeout=30,
@@ -594,13 +629,13 @@ class RecoveryEngine:
                     )
             else:
                 completed = datetime.now()
-                log.warning("VPN credentials not configured, disconnect only")
+                log.error("VPN credentials not configured — cannot reconnect, reporting failure")
                 return RecoveryResult(
                     service_name=f"vpn:{self.config.vpn.adapter_description}",
                     action=RecoveryAction.VPN_RECONNECT,
-                    success=True,
+                    success=False,
                     escalation_level=level,
-                    details="VPN disconnect initiated (reconnect requires credentials)",
+                    details="VPN reconnect failed: credentials not configured",
                     started_at=started,
                     completed_at=completed,
                 )
@@ -620,20 +655,54 @@ class RecoveryEngine:
     async def _do_tunnel_restart(
         self, tunnel_name: str, level: int
     ) -> RecoveryResult:
-        """Restart a Cloudflare tunnel via cloudflared service restart."""
+        """Restart a Cloudflare tunnel via Docker container or Windows service."""
         started = datetime.now()
         log = logger.bind(component="RecoveryEngine", action="tunnel_restart", tunnel=tunnel_name)
 
         try:
+            # Try Docker container restart first (most common deployment)
+            try:
+                import docker
+                client = docker.from_env()
+                container_name = "cloudflared"
+                try:
+                    container = client.containers.get(container_name)
+                    container.restart(timeout=30)
+                    completed = datetime.now()
+                    log.info("cloudflared container restarted for tunnel {}", tunnel_name)
+                    return RecoveryResult(
+                        service_name=tunnel_name,
+                        action=RecoveryAction.TUNNEL_RESTART,
+                        success=True,
+                        escalation_level=level,
+                        details="cloudflared container restarted",
+                        started_at=started,
+                        completed_at=completed,
+                    )
+                except docker.errors.NotFound:
+                    pass
+            except Exception:
+                pass
+
+            # Fallback: Windows service restart
             result = subprocess.run(
-                ["cloudflared", "service", "restart"],
+                ["net", "stop", "cloudflared"] if os.name == "nt"
+                else ["systemctl", "restart", "cloudflared"],
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
+            if result.returncode == 0:
+                subprocess.run(
+                    ["net", "start", "cloudflared"] if os.name == "nt"
+                    else ["true"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
             completed = datetime.now()
             if result.returncode == 0:
-                log.info("cloudflared restarted for tunnel {}", tunnel_name)
+                log.info("cloudflared service restarted for tunnel {}", tunnel_name)
                 return RecoveryResult(
                     service_name=tunnel_name,
                     action=RecoveryAction.TUNNEL_RESTART,
