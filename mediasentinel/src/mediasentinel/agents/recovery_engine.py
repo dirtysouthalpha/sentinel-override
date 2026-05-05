@@ -308,7 +308,7 @@ class RecoveryEngine:
             try:
                 container = client.containers.get(container_name)
                 log.info("Restarting container {}", container_name)
-                container.restart(timeout=self.policy.docker_restart_timeout)
+                await asyncio.to_thread(container.restart, timeout=self.policy.docker_restart_timeout)
                 completed = datetime.now()
                 log.info("Container {} restarted successfully", container_name)
                 return RecoveryResult(
@@ -478,7 +478,8 @@ class RecoveryEngine:
 
         # Step 1: Restart Docker daemon
         try:
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 ["powershell", "-Command", "Restart-Service docker -Force"],
                 capture_output=True,
                 text=True,
@@ -507,12 +508,13 @@ class RecoveryEngine:
             client = docker.from_env()
             try:
                 container = client.containers.get("cloudflared")
-                container.restart(timeout=30)
+                await asyncio.to_thread(container.restart, timeout=30)
             finally:
                 client.close()
         except Exception:
             try:
-                subprocess.run(
+                await asyncio.to_thread(
+                    subprocess.run,
                     ["net", "stop", "cloudflared"] if os.name == "nt"
                     else ["systemctl", "restart", "cloudflared"],
                     capture_output=True,
@@ -520,7 +522,8 @@ class RecoveryEngine:
                     timeout=30,
                 )
                 if os.name == "nt":
-                    subprocess.run(
+                    await asyncio.to_thread(
+                        subprocess.run,
                         ["net", "start", "cloudflared"],
                         capture_output=True,
                         text=True,
@@ -535,7 +538,7 @@ class RecoveryEngine:
             import docker
             client = docker.from_env()
             try:
-                client.ping()
+                await asyncio.to_thread(client.ping)
                 docker_ok = True
             finally:
                 client.close()
@@ -590,7 +593,8 @@ class RecoveryEngine:
 
         try:
             # Disconnect first
-            subprocess.run(
+            await asyncio.to_thread(
+                subprocess.run,
                 ["rasdial", self.config.vpn.adapter_description, "/disconnect"],
                 capture_output=True,
                 text=True,
@@ -603,7 +607,8 @@ class RecoveryEngine:
             vpn_user = os.environ.get("MEDIASENTINEL_VPN_USER", "")
             vpn_pass = os.environ.get("MEDIASENTINEL_VPN_PASS", "")
             if vpn_user and vpn_pass:
-                result = subprocess.run(
+                result = await asyncio.to_thread(
+                    subprocess.run,
                     ["rasdial", self.config.vpn.adapter_description],
                     input=f"{vpn_user}\n{vpn_pass}\n",
                     capture_output=True,
@@ -673,7 +678,7 @@ class RecoveryEngine:
                 container_name = "cloudflared"
                 try:
                     container = client.containers.get(container_name)
-                    container.restart(timeout=30)
+                    await asyncio.to_thread(container.restart, timeout=30)
                     completed = datetime.now()
                     log.info("cloudflared container restarted for tunnel {}", tunnel_name)
                     return RecoveryResult(
@@ -691,7 +696,8 @@ class RecoveryEngine:
                 pass
 
             # Fallback: Windows service restart
-            result = subprocess.run(
+            result = await asyncio.to_thread(
+                subprocess.run,
                 ["net", "stop", "cloudflared"] if os.name == "nt"
                 else ["systemctl", "restart", "cloudflared"],
                 capture_output=True,
@@ -699,7 +705,8 @@ class RecoveryEngine:
                 timeout=30,
             )
             if result.returncode == 0:
-                subprocess.run(
+                await asyncio.to_thread(
+                    subprocess.run,
                     ["net", "start", "cloudflared"] if os.name == "nt"
                     else ["true"],
                     capture_output=True,
@@ -755,7 +762,7 @@ class RecoveryEngine:
             container_name = service_name.lower().replace(" ", "-")
             try:
                 container = client.containers.get(container_name)
-                container.restart(timeout=self.policy.docker_restart_timeout)
+                await asyncio.to_thread(container.restart, timeout=self.policy.docker_restart_timeout)
                 logger.bind(component="RecoveryEngine").debug(
                     "Restarted container {}", container_name
                 )
