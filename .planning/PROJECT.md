@@ -8,29 +8,39 @@ MediaSentinel is an intelligent monitoring and auto-recovery system for a home m
 
 24/7 autonomous uptime for the entire media stack with zero-tolerance VPN enforcement for torrent downloads. If a service goes down, it recovers itself. If VPN drops, downloads pause instantly.
 
+## Current State
+
+**Shipped:** v1.0 MVP — 2026-05-04
+- 7 phases, 267 tests passing
+- 4,291 LOC Python (src), 3,921 LOC (tests)
+- Full monitoring, recovery, VPN enforcement, TUI, alerting, and deployment pipeline
+- Running as Windows service via NSSM or Docker Compose
+
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- Monitor 8 media stack services via HTTP health checks with dependency-aware polling intervals — v1.0
+- 7-level auto-recovery hierarchy (self-heal through operator escalation) — v1.0
+- IPVanish VPN monitoring with DNS leak test, IP leak test, latency checks every 10 seconds — v1.0
+- qBittorrent WebAPI integration — VPN-dependent download state machine — v1.0
+- qBittorrent speed optimization — 4 profiles with 85% bandwidth utilization — v1.0
+- Cloudflare tunnel monitoring and recovery (TunnelGuard agent) — v1.0
+- Dependency tree startup/recovery ordering — v1.0
+- Real-time TUI dashboard — v1.0
+- Alerting with 4 severity levels across multiple channels — v1.0
+- State snapshots before every recovery attempt — v1.0
+- Metrics collection (uptime %, MTTR, failure patterns, download speeds, VPN stability) — v1.0
+- Structured JSON logging with audit trail — v1.0
+- Docker Compose configuration with health checks, restart policies — v1.0
+- Health check wrapper scripts for each service — v1.0
+- Bandwidth monitoring with throttling detection and auto-scaling — v1.0
+- Windows service wrapper (NSSM + Task Scheduler fallback) — v1.0
+- Graceful shutdown with state snapshot persistence — v1.0
 
 ### Active
 
-- [ ] Monitor 8 media stack services via HTTP health checks with dependency-aware polling intervals
-- [ ] 7-level auto-recovery hierarchy (self-heal → soft restart → dependency recovery → stack reset → VPN recovery → network recovery → operator escalation)
-- [ ] IPVanish VPN monitoring with DNS leak test, IP leak test, latency checks every 10 seconds
-- [ ] qBittorrent WebAPI integration — VPN-dependent download state machine (pause on VPN down, resume on VPN verified)
-- [ ] qBittorrent speed optimization — auto-profile based on ISP speed (4 profiles: 10/50/100/100+ Mbps)
-- [ ] Cloudflare tunnel monitoring and recovery (TunnelGuard agent)
-- [ ] Dependency tree startup/recovery ordering (VPN → Tunnels → qBittorrent paused → Jellyfin → Prowlarr → Radarr/Sonarr → Jellyseerr → Shoko)
-- [ ] Real-time TUI dashboard showing all services, VPN status, download speeds, uptime stats
-- [ ] Alerting with 4 severity levels (INFO/WARNING/CRITICAL/EMERGENCY) — log, email, SMS, webhook
-- [ ] State snapshots before every recovery attempt
-- [ ] Metrics collection (uptime %, MTTR, failure patterns, download speeds, VPN stability)
-- [ ] Structured JSON logging with audit trail
-- [ ] Docker Compose configuration with health checks, restart policies, VPN network binding
-- [ ] Health check wrapper scripts for each service returning standardized JSON
-- [ ] Bandwidth monitoring with throttling detection and auto-scaling
+(None — awaiting v1.1+ planning)
 
 ### Out of Scope
 
@@ -40,35 +50,30 @@ MediaSentinel is an intelligent monitoring and auto-recovery system for a home m
 - Kill switch at firewall level — qBittorrent interface binding sufficient for v1
 - Automatic ISP speed testing — manual configuration with speed profiles
 - Multi-VPN provider support — IPVanish only for v1
+- Auto-update services — Watchtower handles this
+- Web GUI / full dashboard — TUI sufficient for v1
+- Log aggregation / SIEM — structured logs consumable by external tools
 
 ## Context
 
-- Runs on SENTINEL-CORE (Windows homeserver, Administrator) and can coordinate with SENTINEL-EDGE (Hackbox) via SSH/Tailscale
-- All services are Docker containers except cloudflared and VPN daemon (systemd/host)
+- Shipped v1.0 with 4,291 LOC Python across 59 files
+- Tech stack: Python 3.10+, Pydantic 2.x, Textual 8.2.5, APScheduler 3.11.2, SQLite WAL, loguru, click, qbittorrent-api, dnspython, Docker SDK
+- Runs on Windows Server 2025 (SENTINEL-CORE) alongside Docker media stack
 - Hybrid deployment: Docker for media services, host for VPN daemon and cloudflared
-- Python 3.10+ as primary language — requests, APScheduler, click, dnspython, rich (TUI)
-- SQLite for metrics storage, JSON for configuration and snapshots
-- REST API for inter-agent communication and qBittorrent WebAPI
-- VPN interface: tun0 (OpenVPN) or wg0 (WireGuard) depending on IPVanish protocol
-
-## Constraints
-
-- **Platform**: Windows Server 2025 host — PowerShell and bash available, Docker Desktop for containers
-- **VPN**: IPVanish subscription required — supports OpenVPN and WireGuard protocols
-- **Network**: qBittorrent MUST bind to VPN interface only — zero tolerance for IP leaks
-- **Resource**: Must run 24/7 alongside media services — minimize CPU/memory footprint
-- **Recovery Speed**: Critical services (Jellyfin, VPN) must recover within 60 seconds
-- **State Preservation**: Recovery must preserve download queues, configurations, and databases
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Python 3.10+ over Node.js | Rich ecosystem for monitoring (requests, dnspython), better cross-platform support, APScheduler for cron-like scheduling | — Pending |
-| Hybrid deployment (Docker + host) | VPN daemon and cloudflared need host network access; media services isolated in Docker | — Pending |
-| SQLite for metrics | Lightweight, no external DB dependency, sufficient for single-node monitoring | — Pending |
-| Rich library for TUI | Modern terminal UI, supports tables/live display, pure Python | — Pending |
-| 4-agent architecture | Separation of concerns — MediaSentinel (orchestrator), TunnelGuard (Cloudflare), VPNGuard (IPVanish), MetricsCollector (reporting) | — Pending |
+| Python 3.10+ over Node.js | Rich monitoring ecosystem, async support, APScheduler | Good |
+| SQLite with WAL mode | Lightweight, concurrent, no external DB | Good |
+| APScheduler 3.11.2 (not 4.x) | 4.x is pre-release, 3.x is stable | Good |
+| Pydantic 2.x with extra='forbid' | Strict config validation | Good |
+| Textual for TUI | Modern terminal UI, reactive updates | Good |
+| NSSM for Windows service | Simpler than pywin32, auto-download | Good |
+| Hybrid deployment (Docker + host) | VPN/cloudflared need host network access | Good |
+| 4-agent architecture | MediaSentinel, TunnelGuard, VPNGuard, MetricsCollector | Good |
+| Single-use shutdown snapshots | Prevent stale state on restore | Good |
 
 ---
-*Last updated: 2026-05-02 after initialization*
+*Last updated: 2026-05-04 after v1.0 milestone*
