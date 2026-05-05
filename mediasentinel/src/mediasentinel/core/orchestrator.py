@@ -263,6 +263,16 @@ class Orchestrator:
                 replace_existing=True,
             )
 
+        # Metrics retention purge — daily at a random offset to avoid startup spike
+        self.scheduler.add_job(
+            self._purge_metrics,
+            trigger=IntervalTrigger(hours=24),
+            id="metrics_purge",
+            name="Metrics retention purge",
+            next_run_time=datetime.now() + timedelta(minutes=random.uniform(1, 10)),
+            replace_existing=True,
+        )
+
     async def _run_health_check(self, service_name: str):
         service = next((s for s in self.config.services if s.name == service_name), None)
         if not service or not self.health_monitor:
@@ -487,6 +497,16 @@ class Orchestrator:
             logger.bind(component="Orchestrator").debug(
                 "Throttling detection failed: {}", e
             )
+
+    async def _purge_metrics(self):
+        """Purge metrics older than the configured retention period."""
+        if not self.metrics_collector:
+            return
+        try:
+            retention_days = getattr(self.config.database, "metrics_retention_days", 30)
+            await self.metrics_collector.purge_old_metrics(retention_days)
+        except Exception as e:
+            logger.bind(component="Orchestrator").debug("Metrics purge failed: {}", e)
 
     async def _seed_services(self):
         db_path_resolved = Path(os.path.expandvars(str(self._db_path)))

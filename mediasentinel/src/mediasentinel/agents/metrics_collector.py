@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -191,11 +192,15 @@ class MetricsCollector:
     async def collect_system_metrics(self) -> dict:
         import psutil
 
-        cpu, mem, disk = await asyncio.to_thread(lambda: (
-            psutil.cpu_percent(interval=0.1),
-            psutil.virtual_memory(),
-            psutil.disk_usage("/"),
-        ))
+        def _collect():
+            cpu = psutil.cpu_percent(interval=0.1)
+            mem = psutil.virtual_memory()
+            # On Windows, use the system drive (usually C:) instead of "/"
+            disk_path = os.environ.get("SystemDrive", "C:\\")
+            disk = psutil.disk_usage(disk_path)
+            return cpu, mem, disk
+
+        cpu, mem, disk = await asyncio.to_thread(_collect)
 
         metrics = {
             "cpu_percent": cpu,
@@ -212,3 +217,20 @@ class MetricsCollector:
         await self.record_batch(records)
 
         return metrics
+
+    async def purge_old_metrics(self, retention_days: int = 30) -> int:
+        """Delete metrics older than retention_days. Returns count of deleted rows."""
+        cutoff = (datetime.now() - timedelta(days=retention_days)).isoformat()
+        async with get_db(self._db_path) as db:
+            cursor = await db.execute(
+                "SELECT COUNT(*) AS cnt FROM metrics WHERE recorded_at < ?", (cutoff,)
+            )
+            row = await cursor.fetchone()
+            count = row["cnt"] if row else 0
+            if count > 0:
+                await db.execute("DELETE FROM metrics WHERE recorded_at < ?", (cutoff,))
+                await db.commit()
+                logger.bind(component="MetricsCollector").info(
+                    "Purged {} metrics older than {} days", count, retention_days
+                )
+            return count

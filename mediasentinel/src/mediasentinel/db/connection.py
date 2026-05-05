@@ -60,23 +60,12 @@ async def get_fresh_db(db_path: Path) -> AsyncGenerator[aiosqlite.Connection, No
         await db.close()
 
 
-async def _apply_pragmas(db_path: Path):
-    db_path = Path(db_path)
-    db = await aiosqlite.connect(str(db_path))
-    try:
-        await db.execute("PRAGMA journal_mode=WAL;")
-        await db.execute("PRAGMA synchronous=NORMAL;")
-        await db.execute("PRAGMA foreign_keys=ON;")
-    finally:
-        await db.close()
-
-
 async def init_db(db_path: Path):
-    await _apply_pragmas(db_path)
     schema_path = Path(__file__).parent / "schema.sql"
     schema_sql = schema_path.read_text(encoding="utf-8")
 
     async with get_fresh_db(db_path) as db:
+        await db.execute("PRAGMA journal_mode=WAL;")
         await db.executescript(schema_sql)
         await db.commit()
 

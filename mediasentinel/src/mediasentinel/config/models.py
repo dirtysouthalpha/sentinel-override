@@ -75,6 +75,7 @@ class DatabaseConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     db_path: str = r"%PROGRAMDATA%\MediaSentinel\metrics.sqlite"
+    metrics_retention_days: int = 30
 
 
 class AlertConfig(BaseModel):
