@@ -23,13 +23,17 @@ Sentinel Override is a Chrome extension that turns your browser into an AI-power
 
 ## Features
 
-- 🤖 **15 Action Types** — Click, type, navigate, scroll, select dropdowns, hover, press keys, extract data, wait for conditions, run custom JS, and more
+- 🤖 **20+ Action Types** — Click, type, navigate, scroll, select dropdowns, hover, press keys, extract data, wait for conditions, run custom JS, handle iframes, dismiss overlays, and more
 - 🧠 **Self-Learning** — Remembers successful task patterns and applies them to similar future tasks
 - 🔄 **Self-Healing** — When an approach fails 3 times, automatically switches to a completely different strategy
 - 🔍 **Extract & Remember** — Pulls data from pages and carries it between tabs (e.g., copy a user ID from page 1, use it on page 2)
 - 📸 **Background Operation** — Uses Chrome DevTools Protocol to capture screenshots even when the tab is backgrounded
 - 🔒 **Tab Locking** — Agent stays locked to its tab while you work in other tabs
 - 📋 **Runbook Mode** — Execute structured investigation procedures step by step
+- 📝 **Command Templates** — Save tasks as reusable templates with parameter placeholders
+- ⏰ **Agent Scheduling** — Schedule templates to run automatically at specific times or recurring intervals
+- 🤝 **Team Collaboration** — Export/import templates and reports as shareable files with safety validation
+- 🔐 **Sandboxed Execution** — execute_js runs in a sandbox with blocked network/storage/chrome access
 - 🎨 **Multiple Themes** — Dark mode, Matrix, Tron, Cyberpunk, Neon, Terminal, Blood
 - ⚡ **Works with Any LLM** — GLM, GPT, Claude, Gemini, Ollama — anything with an OpenAI-compatible API
 
@@ -97,12 +101,45 @@ The agent can write and execute its own JavaScript when standard actions aren't 
 ## Architecture
 
 ```
-browser_agent/
-├── background.js    # Agent loop, API calls, tab management, self-learning
-├── content.js       # DOM interaction, element scanning, dynamic JS execution
-├── popup.html       # Sidebar UI
-├── popup-full.js    # UI logic, themes, chat interface
-└── manifest.json    # Chrome extension manifest v3
+sentinel-override/
+├── background/
+│   ├── index.js             # Service worker entry, message routing
+│   ├── agent-engine.js      # Agent loop, self-healing, self-learning
+│   ├── llm-client.js        # Multi-provider LLM abstraction
+│   ├── scheduler.js         # chrome.alarms scheduling, port-based signaling
+│   ├── template-manager.js  # Template CRUD, parameter resolution
+│   ├── collaboration.js     # Import/export with safety validation
+│   ├── report-generator.js  # Structured investigation reports
+│   ├── tab-manager.js       # Multi-tab orchestration
+│   ├── tab-context.js       # Per-tab state management
+│   ├── frame-router.js      # iframe message routing
+│   ├── message-protocol.js  # Typed message helpers
+│   ├── provider-registry.js # LLM provider presets
+│   └── shared-state.js      # Cross-module state
+├── content/
+│   ├── index.js             # Content script entry, action executor
+│   ├── dom-utils.js         # DOM querying and manipulation
+│   ├── shadow-dom.js        # Shadow DOM piercing
+│   ├── dropdown-utils.js    # Complex dropdown interactions
+│   ├── overlay-detector.js  # Modal/overlay detection and dismissal
+│   ├── special-inputs.js    # Rich text editors, date pickers
+│   ├── frame-manager.js     # iframe management
+│   ├── highlight.js         # Visual element highlighting
+│   ├── wait-utils.js        # Condition waiting utilities
+│   └── shadow-intercept.js  # Early shadow DOM event capture
+├── popup-modules/
+│   ├── chat.js              # Chat interface
+│   ├── settings.js          # API configuration
+│   ├── templates.js         # Template library UI
+│   ├── scheduler-ui.js      # Schedule management UI
+│   ├── collaboration.js     # Import/export UI
+│   ├── ui-common.js         # Shared UI components
+│   ├── helpers.js           # Shared utility functions
+│   └── popup-state.js       # Reactive state management
+├── popup.html               # Sidebar UI entry
+├── popup.css                # All styles (extracted)
+├── popup-full.js            # UI bootstrap and orchestration
+└── manifest.json            # Chrome extension manifest v3
 ```
 
 ## Action Reference
