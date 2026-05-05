@@ -137,12 +137,12 @@ describe('tab-manager (integration)', () => {
   });
 
   describe('sendMessageWithRetry', () => {
-    it('sends message and returns unwrapped data', async () => {
+    it('sends message and returns fully unwrapped data', async () => {
       chromeMock.tabs.sendMessage.mockResolvedValue({ ok: true, data: { result: 'success' } });
 
       const result = await sendMessageWithRetry(1, { action: 'test' });
-      // sendMessageWithRetry unwraps the { ok, data } envelope
-      expect(result).toEqual({ result: 'success' });
+      // sendMessageWithRetry unwraps both the { ok, data } envelope AND the { result } wrapper
+      expect(result).toEqual('success');
     });
 
     it('throws after max retries exhausted', async () => {

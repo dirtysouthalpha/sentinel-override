@@ -78,8 +78,14 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       if (response && response.ok === false) {
         throw new Error(response.error || 'Content script error');
       }
-      // Return the inner data, not the envelope wrapper
-      return response && response.data !== undefined ? response.data : response;
+      // Unwrap outer envelope
+      let data = response && response.data !== undefined ? response.data : response;
+      // Unwrap inner execute_command wrapper: { result: <string> }
+      // Content script returns { result } for execute_command actions
+      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 1 && 'result' in data) {
+        data = data.result;
+      }
+      return data;
     } catch (err) {
       if (i < maxRetries - 1) {
         const csListener = createContentScriptListener(tabId, 2000);
