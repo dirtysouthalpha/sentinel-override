@@ -10,6 +10,9 @@ if (window.__sentinelInitialized) {
 } else {
   window.__sentinelInitialized = true;
 
+  // ====== execute_js Sandbox Configuration ======
+  const EXECUTE_JS_SANDBOX_ENABLED = true; // Set false to disable sandboxing
+
   // Shorthand references to utility modules
   const dom = window.__sentinelUtils.dom;
   const hl = window.__sentinelUtils.highlight;
@@ -245,6 +248,114 @@ if (window.__sentinelInitialized) {
       .catch(err => sendResponse({ ok: false, error: err.message }));
     return true; // keep message channel open for async responses
   });
+
+  // ========== execute_js Sandbox Helpers ==========
+  // API allowlist for execute_js sandboxing
+  const EXECUTE_JS_ALLOWED_GLOBALS = new Set([
+    'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
+    'getElementsByTagName', 'getElementsByName', 'createElement', 'createTextNode',
+    'getAttribute', 'setAttribute', 'removeAttribute', 'hasAttribute',
+    'addEventListener', 'removeEventListener', 'dispatchEvent',
+    'classList', 'style', 'dataset', 'textContent', 'innerHTML',
+    'value', 'checked', 'selected', 'disabled', 'hidden',
+    'focus', 'blur', 'click', 'scrollIntoView', 'scrollTo',
+    'appendChild', 'removeChild', 'insertBefore', 'replaceChild',
+    'parentElement', 'children', 'firstChild', 'lastChild', 'nextSibling', 'previousSibling',
+    'offsetHeight', 'offsetWidth', 'offsetTop', 'offsetLeft',
+    'getBoundingClientRect', 'getComputedStyle',
+    'innerText', 'outerHTML', 'tagName', 'nodeType',
+    'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+    'Promise', 'JSON', 'console', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean',
+    'Map', 'Set', 'RegExp', 'Error', 'TypeError', 'RangeError',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
+    'alert', 'confirm', 'prompt'
+  ]);
+
+  const EXECUTE_JS_BLOCKED_APIS = new Set([
+    'fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource',
+    'localStorage', 'sessionStorage', 'indexedDB',
+    'open', 'close', 'stop', 'print',
+    'eval', 'Function',
+    'importScripts', 'Worker', 'SharedWorker', 'ServiceWorker',
+    'postMessage',
+    'navigator', 'location',
+    'chrome',
+    'crypto'
+  ]);
+
+  // Document-level properties to block (beyond what EXECUTE_JS_BLOCKED_APIS covers for window)
+  const EXECUTE_JS_BLOCKED_DOC_PROPS = new Set([
+    'cookie', 'domain', 'referrer', 'location', 'write', 'writeln'
+  ]);
+
+  // Creates a Proxy wrapping the document that blocks sensitive properties
+  // but allows all normal DOM read/write operations.
+  // sandboxedWin is the already-proxied window, returned when code accesses document.defaultView.
+  function createSandboxedDocument(doc, sandboxedWin) {
+    return new Proxy(doc, {
+      get(target, prop, receiver) {
+        // Block sensitive document properties (cookie, domain, referrer, location, write, writeln)
+        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) {
+          console.warn(`[Sentinel Sandbox] Blocked access to document.${String(prop)} in execute_js`);
+          return undefined;
+        }
+        // When code asks for document.defaultView, return the sandboxed window proxy
+        if (prop === 'defaultView') {
+          return sandboxedWin;
+        }
+        // Pass through everything else, binding methods to the real document
+        const value = target[prop];
+        if (typeof value === 'function') {
+          return value.bind(target);
+        }
+        return value;
+      },
+      set(target, prop, value) {
+        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) {
+          console.warn(`[Sentinel Sandbox] Blocked write to document.${String(prop)} in execute_js`);
+          return true; // silently swallow the write
+        }
+        target[prop] = value;
+        return true;
+      },
+      has(target, prop) {
+        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) return false;
+        return prop in target;
+      }
+    });
+  }
+
+  // Creates a Proxy wrapping the window that blocks dangerous APIs
+  // while allowing safe properties (console, Math, setTimeout, etc.) through.
+  function createSandboxedWindow(win) {
+    return new Proxy(win, {
+      get(target, prop, receiver) {
+        // Block all dangerous window APIs
+        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) {
+          console.warn(`[Sentinel Sandbox] Blocked access to window.${String(prop)} in execute_js`);
+          return undefined;
+        }
+        // Pass through safe properties, binding methods to the real window
+        const value = target[prop];
+        if (typeof value === 'function') {
+          return value.bind(target);
+        }
+        return value;
+      },
+      set(target, prop, value) {
+        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) {
+          console.warn(`[Sentinel Sandbox] Blocked write to window.${String(prop)} in execute_js`);
+          return true; // silently swallow the write
+        }
+        target[prop] = value;
+        return true;
+      },
+      has(target, prop) {
+        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) return false;
+        return prop in target;
+      }
+    });
+  }
 
   // ========== Command Execution ==========
   async function executeCommand(cmd) {
@@ -610,12 +721,20 @@ if (window.__sentinelInitialized) {
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('execute_js', `Running JS${cmd.key ? ' → "' + cmd.key + '"' : ''}: ${code.substring(0, 60)}...`);
         try {
+          // Build sandboxed document/window if sandboxing is enabled
+          let sandboxedDoc = targetDoc;
+          let sandboxedWin = targetDoc.defaultView;
+          if (EXECUTE_JS_SANDBOX_ENABLED) {
+            sandboxedWin = createSandboxedWindow(targetDoc.defaultView);
+            sandboxedDoc = createSandboxedDocument(targetDoc, sandboxedWin);
+          }
+
           // Execute with a timeout
           const result = await Promise.race([
             new Promise((resolve) => {
               try {
                 const fn = new Function('document', 'window', `"use strict"; return (async () => { ${code} })()`);
-                const result = fn(targetDoc, targetDoc.defaultView);
+                const result = fn(sandboxedDoc, sandboxedWin);
                 resolve(result);
               } catch (syncErr) {
                 resolve('Execution error: ' + syncErr.message);

@@ -995,22 +995,26 @@ async function runAgentLoop(goal, workingTabId) {
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
 
-  // Async report generation (non-blocking -- runs after loop exit)
+  // Generate report (await so we can include it in the completion message)
+  let agentReport = null;
   if (reportData) {
-    generateReport(reportData, CONFIG)
-      .then(report => {
-        sendReportUpdate('ready', report);
-        chrome.storage.local.set({ last_agent_report: report }).catch(() => {});
-      })
-      .catch(err => {
-        console.error('Report generation failed:', err);
-        sendReportUpdate('error', null, err.message);
-        chrome.storage.local.set({ last_agent_report_error: err.message }).catch(() => {});
-      });
+    try {
+      agentReport = await generateReport(reportData, CONFIG);
+      sendReportUpdate('ready', agentReport);
+      // Backward compat: still write to storage for any code that polls
+      await chrome.storage.local.set({ last_agent_report: agentReport });
+    } catch (err) {
+      console.error('Report generation failed:', err);
+      sendReportUpdate('error', null, err.message);
+      await chrome.storage.local.set({ last_agent_report_error: err.message });
+    }
   }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
+
+  // Signal completion via messaging (replaces polling for scheduler)
+  chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch(() => {});
 }
 
 // ========== Self-Learning ==========

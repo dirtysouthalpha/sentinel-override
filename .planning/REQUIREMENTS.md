@@ -9,43 +9,43 @@ Requirements for v2 milestone. Focus: test infrastructure, tech debt cleanup, co
 
 ### Testing & Quality
 
-- [ ] **TST-01**: Unit tests for DOM interaction utilities (dom-utils, shadow-dom, dropdown-utils, overlay-detector, special-inputs, frame-manager)
-- [ ] **TST-02**: Integration tests for agent loop with mocked Chrome APIs (message passing, tab management, LLM calls)
-- [ ] **TST-03**: E2E smoke tests for common workflows (goal entry, agent execution, report generation)
+- [x] **TST-01**: Unit tests for DOM interaction utilities (dom-utils, shadow-dom, dropdown-utils, overlay-detector, special-inputs, frame-manager)
+- [x] **TST-02**: Integration tests for agent loop with mocked Chrome APIs (message passing, tab management, LLM calls)
+- [x] **TST-03**: E2E smoke tests for common workflows (goal entry, agent execution, report generation)
 
 ### Tech Debt & Security
 
-- [ ] **DEB-01**: Delete legacy content.js (replaced by content/ modules in v1)
-- [ ] **DEB-02**: Split popup-full.js into focused modules (currently ~1,450 lines, adding more features will make it unmaintainable)
-- [ ] **DEB-03**: Update agent-engine.js LLM prompt to describe iframe/dropdown/overlay/shadow DOM capabilities
-- [ ] **DEB-04**: Remove deprecated isAnthropicEndpoint export from llm-client.js
-- [ ] **DEB-05**: Security review of new Function() in content/index.js — document risk or replace with safer alternative
-- [ ] **DEB-06**: Fix template delimiter collision — change {{key}} to collision-proof syntax in agent-engine.js
+- [x] **DEB-01**: Delete legacy content.js (replaced by content/ modules in v1)
+- [x] **DEB-02**: Split popup-full.js into focused modules (currently ~1,450 lines, adding more features will make it unmaintainable)
+- [x] **DEB-03**: Update agent-engine.js LLM prompt to describe iframe/dropdown/overlay/shadow DOM capabilities
+- [x] **DEB-04**: Remove deprecated isAnthropicEndpoint export from llm-client.js
+- [x] **DEB-05**: Security review of new Function() in content/index.js — document risk or replace with safer alternative
+- [x] **DEB-06**: Fix template delimiter collision — change {{key}} to collision-proof syntax in agent-engine.js
 
 ### Command Templates & Runbooks
 
-- [ ] **TMP-01**: User can save current task as a reusable template with extracted parameter placeholders
-- [ ] **TMP-02**: User can browse template library with tag-based filtering and search
-- [ ] **TMP-03**: User can execute a template — prompted for parameter values, then agent runs with substituted goal
-- [ ] **TMP-04**: User can edit template name, goal, parameters, and tags
-- [ ] **TMP-05**: User can delete a template
-- [ ] **TMP-06**: Templates persist in chrome.storage.local and survive extension restarts
+- [x] **TMP-01**: User can save current task as a reusable template with extracted parameter placeholders
+- [x] **TMP-02**: User can browse template library with tag-based filtering and search
+- [x] **TMP-03**: User can execute a template — prompted for parameter values, then agent runs with substituted goal
+- [x] **TMP-04**: User can edit template name, goal, parameters, and tags
+- [x] **TMP-05**: User can delete a template
+- [x] **TMP-06**: Templates persist in chrome.storage.local and survive extension restarts
 
 ### Agent Scheduling
 
-- [ ] **SCH-01**: User can schedule a template to run at a specific date/time
-- [ ] **SCH-02**: User can set up recurring schedules (daily, weekly, custom interval)
-- [ ] **SCH-03**: Scheduled tasks execute in the background (popup closed) and notify user on completion
-- [ ] **SCH-04**: User can view, enable, disable, and cancel scheduled tasks
-- [ ] **SCH-05**: Scheduled task results (success/failure/report) are stored and viewable
+- [x] **SCH-01**: User can schedule a template to run at a specific date/time
+- [x] **SCH-02**: User can set up recurring schedules (daily, weekly, custom interval)
+- [x] **SCH-03**: Scheduled tasks execute in the background (popup closed) and notify user on completion
+- [x] **SCH-04**: User can view, enable, disable, and cancel scheduled tasks
+- [x] **SCH-05**: Scheduled task results (success/failure/report) are stored and viewable
 
 ### Collaboration
 
-- [ ] **COL-01**: User can export a template as a JSON file for sharing
-- [ ] **COL-02**: User can import a template from a JSON file (with duplicate ID handling)
-- [ ] **COL-03**: User can export an investigation report as a markdown file
-- [ ] **COL-04**: Template and report exports include format versioning for forward compatibility
-- [ ] **COL-05**: Imported templates are validated for safety (no execute_js injection from untrusted sources)
+- [x] **COL-01**: User can export a template as a JSON file for sharing
+- [x] **COL-02**: User can import a template from a JSON file (with duplicate ID handling)
+- [x] **COL-03**: User can export an investigation report as a markdown file
+- [x] **COL-04**: Template and report exports include format versioning for forward compatibility
+- [x] **COL-05**: Imported templates are validated for safety (no execute_js injection from untrusted sources)
 
 ## Out of Scope
 

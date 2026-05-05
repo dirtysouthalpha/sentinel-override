@@ -3,7 +3,7 @@
 ## Milestones
 
 - **v1** -- Phases 1-4 (shipped 2026-05-04)
-- **v2** -- Phases 5-8 (in progress)
+- **v2** -- Phases 5-8 (shipped 2026-05-04)
 
 ## Overview
 
@@ -23,7 +23,7 @@ Full details: [.planning/milestones/v1-ROADMAP.md](milestones/v1-ROADMAP.md)
 
 </details>
 
-### v2 (Phases 5-8) -- IN PROGRESS
+### v2 (Phases 5-8) -- COMPLETE
 
 - [x] **Phase 5: Testing & Tech Debt Cleanup** (2/2 plans) -- completed 2026-05-04
 - [x] **Phase 6: Command Templates & Runbooks** (2/2 plans) -- completed 2026-05-04
@@ -97,8 +97,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: Scheduler backend (scheduler.js) -- chrome.alarms integration, schedule CRUD with storage persistence, execution bridge (alarm fires -> check agent state -> resolve template goal -> start agent), service worker restart recovery, run result storage
-- [ ] 07-02: Scheduler popup UI (popup-modules/scheduler-ui.js) -- schedule list with status and next run, create form with time picker and recurrence options, enable/disable toggles, run history view, notification setup
+- [x] 07-01: Scheduler backend (scheduler.js) -- chrome.alarms integration, schedule CRUD with storage persistence, execution bridge (alarm fires -> check agent state -> resolve template goal -> start agent), service worker restart recovery, run result storage
+- [x] 07-02: Scheduler popup UI (popup-modules/scheduler-ui.js) -- schedule list with status and next run, create form with time picker and recurrence options, enable/disable toggles, run history view, notification setup
 
 ---
 
@@ -120,8 +120,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: Export/import backend -- shareable JSON format specification with versioning, template export/import with duplicate ID handling, report markdown export, import safety validation (execute_js injection detection), message routing
-- [ ] 08-02: Collaboration popup UI (popup-modules/collaboration.js) -- export/import buttons with file picker, import preview showing what will be added, conflict resolution UI, format version compatibility warnings
+- [x] 08-01: Export/import backend -- shareable JSON format specification with versioning, template export/import with duplicate ID handling, report markdown export, import safety validation (execute_js injection detection), message routing
+- [x] 08-02: Collaboration popup UI (popup-modules/collaboration.js) -- export/import buttons with file picker, import preview showing what will be added, conflict resolution UI, format version compatibility warnings
 
 ---
 

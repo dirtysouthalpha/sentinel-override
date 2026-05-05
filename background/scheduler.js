@@ -548,23 +548,21 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
 
-  // Poll for agent completion (max 5 minutes)
-  const maxPollTime = 5 * 60 * 1000; // 5 minutes
-  const pollInterval = 2000; // 2 seconds
-  const pollStart = Date.now();
-
+  // Wait for agent completion via messaging (replaces polling)
   const completionResult = await new Promise((resolve) => {
-    const poll = setInterval(() => {
-      if (!agentRunning) {
-        clearInterval(poll);
-        resolve({ status: 'success', error: null });
-        return;
+    const timeout = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(listener);
+      resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
+    }, 5 * 60 * 1000);
+
+    const listener = (msg) => {
+      if (msg.action === 'agent_loop_complete') {
+        clearTimeout(timeout);
+        chrome.runtime.onMessage.removeListener(listener);
+        resolve({ status: 'success', error: null, report: msg.report || null });
       }
-      if (Date.now() - pollStart > maxPollTime) {
-        clearInterval(poll);
-        resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes' });
-      }
-    }, pollInterval);
+    };
+    chrome.runtime.onMessage.addListener(listener);
   });
 
   const completedAt = Date.now();
@@ -577,39 +575,30 @@ export async function executeScheduledTask(alarmName) {
     status: completionResult.status,
     startedAt,
     completedAt,
-    report: null,
+    report: completionResult.report,
     error: completionResult.error,
   };
-
-  // Wait for the report (generated asynchronously after agent finishes)
-  try {
-    const report = await waitForReport(15000); // up to 15s for report generation
-    if (report) finalResult.report = report.fullReport || report;
-  } catch (e) { /* non-fatal -- report capture failed */ }
 
   // Store result
   await storeResult(schedule, finalResult);
 
-  // Update schedule
+  // Update schedule -- consolidate all mutations into a single save
   schedule.lastRunAt = completedAt;
   schedule.lastRunStatus = completionResult.status;
-  schedules[scheduleId] = schedule;
-  await saveSchedules(schedules);
 
   // Re-register alarm for recurring schedules
   if (schedule.type === 'recurring' && schedule.recurrence) {
     schedule.nextRunAt = computeNextRun(schedule.recurrence);
     registerAlarm(schedule);
-    schedules[scheduleId] = schedule;
-    await saveSchedules(schedules);
   }
 
   // Disable one-time schedules after execution
   if (schedule.type === 'once') {
     schedule.enabled = false;
-    schedules[scheduleId] = schedule;
-    await saveSchedules(schedules);
   }
+
+  schedules[scheduleId] = schedule;
+  await saveSchedules(schedules);
 
   // Send notification
   sendNotification(schedule, finalResult);

@@ -32,6 +32,7 @@ vi.mock('../../background/message-protocol.js', () => ({
   sendActionResult: vi.fn(),
   sendReportUpdate: vi.fn(),
   sendTabStateUpdate: vi.fn(),
+  sendPageContext: vi.fn(),
 }));
 
 vi.mock('../../background/report-generator.js', () => ({

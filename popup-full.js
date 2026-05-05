@@ -3,19 +3,8 @@
 // Loaded last (after ui-common.js, settings.js, chat.js) so all module functions
 // are available in global scope.
 
-// ========== Global State ==========
-window.__popupState = {
-  conversationHistory: [],
-  selectedAttachments: [],
-  currentSearchQuery: '',
-  currentSearchIndex: 0,
-  activeProviderId: 'anthropic',
-  providerConfigs: { anthropic: {}, openai: {} },
-  currentReportMarkdown: null,
-  currentReport: null,
-  isAgentRunning: false,
-  pendingStepLogs: {},
-};
+// ========== Global State (initialized by popup-state.js) ==========
+initPopupState();
 
 // ========== Initialization ==========
 window.addEventListener('DOMContentLoaded', () => {

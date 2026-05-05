@@ -226,15 +226,15 @@ describe('message-protocol', () => {
       });
     });
 
-    it('truncates long results to 120 chars', () => {
+    it('truncates long results to 300 chars', () => {
       chromeMock.runtime.sendMessage = vi.fn(() => Promise.resolve());
 
-      const longResult = 'A'.repeat(200);
+      const longResult = 'A'.repeat(500);
       sendActionResult(1, longResult, true);
 
       expect(chromeMock.runtime.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
-          result: 'A'.repeat(120),
+          result: 'A'.repeat(300),
           isError: true,
         })
       );
