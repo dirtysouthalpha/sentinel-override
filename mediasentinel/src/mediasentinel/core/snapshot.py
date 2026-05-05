@@ -20,10 +20,13 @@ async def capture_snapshot(
     db_path: Path,
     config: AppConfig,
     vpn_status: Optional[dict] = None,
+    qbt_controller=None,
 ) -> dict[str, Any]:
     """Capture current system state as a snapshot dict.
 
     Collects: service statuses, VPN state, active downloads, config summary.
+    Accepts an optional qbt_controller to reuse its existing connection instead
+    of creating a new one (IN-02).
     """
     snapshot: dict[str, Any] = {
         "captured_at": datetime.now().isoformat(),
@@ -59,33 +62,40 @@ async def capture_snapshot(
 
     # Attempt to capture active downloads from qBittorrent
     try:
-        import os
-        import qbittorrentapi
+        if qbt_controller is not None:
+            # Reuse existing controller connection
+            stats = qbt_controller.get_download_stats()
+            snapshot["active_download_stats"] = stats
+            snapshot["active_download_count"] = stats.get("active_torrents", 0)
+        else:
+            # Fallback: create a temporary connection
+            import os
+            import qbittorrentapi
 
-        password = os.environ.get(config.qbt.password_env, "")
-        client = qbittorrentapi.Client(
-            host=config.qbt.host,
-            username=config.qbt.username,
-            password=password,
-        )
-        client.auth_log_in()
-        torrents = client.torrents_info()
-        active = [
-            {
-                "name": t.name,
-                "hash": t.hash,
-                "state": t.state,
-                "progress": round(t.progress, 4),
-            }
-            for t in torrents
-            if t.state.lower() not in ("paused", "stopped", "queued")
-        ]
-        snapshot["active_downloads"] = active
-        snapshot["active_download_count"] = len(active)
-        try:
-            client.auth_log_out()
-        except Exception:
-            pass
+            password = os.environ.get(config.qbt.password_env, "")
+            client = qbittorrentapi.Client(
+                host=config.qbt.host,
+                username=config.qbt.username,
+                password=password,
+            )
+            client.auth_log_in()
+            torrents = client.torrents_info()
+            active = [
+                {
+                    "name": t.name,
+                    "hash": t.hash,
+                    "state": t.state,
+                    "progress": round(t.progress, 4),
+                }
+                for t in torrents
+                if t.state.lower() not in ("paused", "stopped", "queued")
+            ]
+            snapshot["active_downloads"] = active
+            snapshot["active_download_count"] = len(active)
+            try:
+                client.auth_log_out()
+            except Exception:
+                pass
     except Exception:
         # qBittorrent may be unreachable — that is fine for a snapshot
         snapshot["active_downloads"] = []

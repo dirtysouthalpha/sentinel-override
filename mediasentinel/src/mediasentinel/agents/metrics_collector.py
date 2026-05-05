@@ -195,12 +195,13 @@ class MetricsCollector:
         ]
 
     async def get_service_uptime(self, service_name: str, hours: int = 24) -> float:
-        cutoff = datetime.now().timestamp() - (hours * 3600)
+        from datetime import timedelta
+        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
         async with get_db(self._db_path) as db:
             cursor = await db.execute(
                 "SELECT value FROM metrics "
                 "WHERE metric_type = 'service_status' AND metric_name = ? "
-                "AND recorded_at > datetime(?, 'unixepoch') "
+                "AND recorded_at > ? "
                 "ORDER BY recorded_at DESC",
                 (service_name, cutoff),
             )

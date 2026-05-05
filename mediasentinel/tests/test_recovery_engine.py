@@ -10,7 +10,7 @@ from mediasentinel.agents.models import (
     RecoveryAction,
     RecoveryLevel,
     DownloadState,
-    SpeedProfile,
+    SpeedProfileConfig,
     RecoveryResult,
 )
 from mediasentinel.agents.recovery_engine import (
@@ -89,15 +89,15 @@ class TestDownloadStateEnum:
         assert DownloadState.VPN_RECOVERING.value == "vpn_recovering"
 
 
-class TestSpeedProfile:
+class TestSpeedProfileConfig:
     def test_defaults(self):
-        p = SpeedProfile(name="test")
+        p = SpeedProfileConfig(name="test")
         assert p.max_download_kb == 0
         assert p.max_upload_kb == 0
         assert p.max_connections == 0
 
     def test_custom_values(self):
-        p = SpeedProfile(name="fast", max_download_kb=1000, max_upload_kb=500, max_connections=100)
+        p = SpeedProfileConfig(name="fast", max_download_kb=1000, max_upload_kb=500, max_connections=100)
         assert p.max_download_kb == 1000
         assert p.name == "fast"
 

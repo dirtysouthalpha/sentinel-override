@@ -505,8 +505,11 @@ class RecoveryEngine:
         try:
             import docker
             client = docker.from_env()
-            container = client.containers.get("cloudflared")
-            container.restart(timeout=30)
+            try:
+                container = client.containers.get("cloudflared")
+                container.restart(timeout=30)
+            finally:
+                client.close()
         except Exception:
             try:
                 subprocess.run(
@@ -531,8 +534,11 @@ class RecoveryEngine:
         try:
             import docker
             client = docker.from_env()
-            client.ping()
-            docker_ok = True
+            try:
+                client.ping()
+                docker_ok = True
+            finally:
+                client.close()
         except Exception:
             pass
 

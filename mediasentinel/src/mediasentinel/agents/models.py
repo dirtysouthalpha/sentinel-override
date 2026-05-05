@@ -88,8 +88,8 @@ class DownloadState(str, Enum):
     VPN_RECOVERING = "vpn_recovering"
 
 
-class SpeedProfile(BaseModel):
-    """Bandwidth profile for speed-limited operations."""
+class SpeedProfileConfig(BaseModel):
+    """Bandwidth profile configuration model (Pydantic)."""
     name: str
     max_download_kb: int = Field(ge=0, default=0)
     max_upload_kb: int = Field(ge=0, default=0)

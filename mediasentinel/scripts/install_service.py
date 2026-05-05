@@ -107,7 +107,7 @@ def _install_nssm(nssm_path: str, config_path: str) -> None:
 
     # Create the service
     subprocess.run(
-        [nssm_path, "install", SERVICE_NAME, python, "-m", "mediasentinel", "start", "--config", config_path],
+        [nssm_path, "install", SERVICE_NAME, python, "-m", "mediasentinel", "--config", config_path, "start"],
         check=True,
     )
 
@@ -180,7 +180,7 @@ def _install_task_scheduler(config_path: str) -> None:
     python = _python_executable()
     project_root = _project_root()
 
-    task_cmd = f'"{python}" -m mediasentinel start --config "{config_path}"'
+    task_cmd = f'"{python}" -m mediasentinel --config "{config_path}" start'
 
     print(f"NSSM not available. Registering via Task Scheduler...")
     print(f"  Command: {task_cmd}")
@@ -244,14 +244,14 @@ def _install_task_scheduler(config_path: str) -> None:
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
     <Priority>7</Priority>
     <RestartOnFailure>
-      <Interval>PT30S</Interval>
+      <Interval>PT1M</Interval>
       <Count>999</Count>
     </RestartOnFailure>
   </Settings>
   <Actions Context="Author">
     <Exec>
       <Command>{python}</Command>
-      <Arguments>-m mediasentinel start --config "{config_path}"</Arguments>
+      <Arguments>-m mediasentinel --config "{config_path}" start</Arguments>
       <WorkingDirectory>{project_root}</WorkingDirectory>
     </Exec>
   </Actions>
@@ -278,12 +278,16 @@ def _install_task_scheduler(config_path: str) -> None:
 
 
 def main():
-    config_path = str(_project_root() / "config.yaml")
+    import argparse
 
-    # Override config path from CLI arg
-    for i, arg in enumerate(sys.argv[1:], 1):
-        if arg == "--config" and i < len(sys.argv) - 1:
-            config_path = sys.argv[i + 1]
+    parser = argparse.ArgumentParser(description="MediaSentinel Service Installer")
+    parser.add_argument(
+        "--config",
+        default=str(_project_root() / "config.yaml"),
+        help="Path to config file",
+    )
+    args = parser.parse_args()
+    config_path = args.config
 
     if not Path(config_path).exists():
         print(f"WARNING: Config file not found at {config_path}")

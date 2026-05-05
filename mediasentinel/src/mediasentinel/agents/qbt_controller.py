@@ -65,6 +65,11 @@ class QBittorrentController:
             import qbittorrentapi
 
             password = os.environ.get(self.config.password_env, "")
+            if not password:
+                logger.bind(component="QBTController").warning(
+                    "Password env var '{}' is not set or empty — attempting connection with empty password",
+                    self.config.password_env,
+                )
             self._client = qbittorrentapi.Client(
                 host=self.config.host,
                 username=self.config.username,
@@ -95,11 +100,9 @@ class QBittorrentController:
         try:
             client.auth_log_in()
             if self._is_v5:
-                # v5: stop
-                client.torrents_stop.all()
+                client.torrents_stop(torrent_hashes="")
             else:
-                # v4: pause
-                client.torrents_pause.all()
+                client.torrents_pause(torrent_hashes="")
             return True
         except Exception as e:
             logger.bind(component="QBTController").error("Failed to pause torrents: {}", e)
@@ -110,9 +113,9 @@ class QBittorrentController:
         try:
             client.auth_log_in()
             if self._is_v5:
-                client.torrents_start.all()
+                client.torrents_start(torrent_hashes="")
             else:
-                client.torrents_resume.all()
+                client.torrents_resume(torrent_hashes="")
             return True
         except Exception as e:
             logger.bind(component="QBTController").error("Failed to resume torrents: {}", e)

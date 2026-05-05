@@ -206,25 +206,27 @@ class TunnelGuard:
                 return False
 
     async def restart_cloudflared(self) -> bool:
-        import subprocess
+        import asyncio
 
         log = logger.bind(component="TunnelGuard", action="restart_cloudflared")
         try:
-            result = subprocess.run(
-                ["cloudflared", "service", "restart"],
-                capture_output=True,
-                text=True,
-                timeout=30,
+            proc = await asyncio.create_subprocess_exec(
+                "cloudflared", "service", "restart",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            if result.returncode == 0:
-                log.info("cloudflared restarted successfully")
-                return True
-            else:
-                log.error("cloudflared restart failed: {}", result.stderr)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+                if proc.returncode == 0:
+                    log.info("cloudflared restarted successfully")
+                    return True
+                else:
+                    log.error("cloudflared restart failed: {}", stderr.decode().strip())
+                    return False
+            except asyncio.TimeoutError:
+                proc.kill()
+                log.error("cloudflared restart timed out")
                 return False
         except FileNotFoundError:
             log.error("cloudflared not found on PATH")
-            return False
-        except subprocess.TimeoutExpired:
-            log.error("cloudflared restart timed out")
             return False

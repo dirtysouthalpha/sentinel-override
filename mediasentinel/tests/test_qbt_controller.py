@@ -35,13 +35,9 @@ def _make_mock_client():
     client.transfer_set_upload_limit.return_value = None
     client.app_set_preferences.return_value = None
     client.torrents_pause = MagicMock()
-    client.torrents_pause.all = MagicMock()
     client.torrents_resume = MagicMock()
-    client.torrents_resume.all = MagicMock()
     client.torrents_stop = MagicMock()
-    client.torrents_stop.all = MagicMock()
     client.torrents_start = MagicMock()
-    client.torrents_start.all = MagicMock()
     return client
 
 
@@ -116,7 +112,7 @@ def test_pause_v4_uses_pause(controller):
     controller._is_v5 = False
 
     result = controller._pause_all()
-    mock_client.torrents_pause.all.assert_called_once()
+    mock_client.torrents_pause.assert_called_once_with(torrent_hashes="")
     assert result is True
 
 
@@ -126,7 +122,7 @@ def test_pause_v5_uses_stop(controller):
     controller._is_v5 = True
 
     result = controller._pause_all()
-    mock_client.torrents_stop.all.assert_called_once()
+    mock_client.torrents_stop.assert_called_once_with(torrent_hashes="")
     assert result is True
 
 
@@ -136,7 +132,7 @@ def test_resume_v4_uses_resume(controller):
     controller._is_v5 = False
 
     result = controller._resume_all()
-    mock_client.torrents_resume.all.assert_called_once()
+    mock_client.torrents_resume.assert_called_once_with(torrent_hashes="")
     assert result is True
 
 
@@ -146,7 +142,7 @@ def test_resume_v5_uses_start(controller):
     controller._is_v5 = True
 
     result = controller._resume_all()
-    mock_client.torrents_start.all.assert_called_once()
+    mock_client.torrents_start.assert_called_once_with(torrent_hashes="")
     assert result is True
 
 
@@ -402,7 +398,7 @@ def test_verify_interface_binding_wrong_adapter_pauses(controller):
     result = controller.verify_interface_binding("Tailscale")
     assert result is False
     # Should have paused torrents because bound to wrong interface
-    mock_client.torrents_pause.all.assert_called_once()
+    mock_client.torrents_pause.assert_called_once_with(torrent_hashes="")
 
 
 def test_verify_interface_binding_error_fail_closed(controller):

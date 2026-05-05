@@ -73,7 +73,7 @@ class Orchestrator:
     async def start(self):
         await self.initialize()
         self._register_jobs()
-        self._apply_initial_qbt_settings()
+        await self._apply_initial_qbt_settings()
         self.scheduler.start()
         logger.bind(component="Orchestrator").info("Scheduler started")
         await self._shutdown_event.wait()
@@ -106,7 +106,9 @@ class Orchestrator:
             try:
                 vpn_status = {"state": self._vpn_state.value}
                 snapshot_data = await capture_snapshot(
-                    self._db_path, self.config, vpn_status=vpn_status
+                    self._db_path, self.config,
+                    vpn_status=vpn_status,
+                    qbt_controller=self.qbt_controller,
                 )
                 # Add shutdown-specific metadata
                 snapshot_data["shutdown_reason"] = "graceful"
@@ -363,14 +365,14 @@ class Orchestrator:
 
         # Enforce VPN gate on qBittorrent
         if self.qbt_controller:
-            action = self.qbt_controller.enforce_vpn_gate(status.state)
+            action = await asyncio.to_thread(self.qbt_controller.enforce_vpn_gate, status.state)
             if action.value != "none":
                 log.info("QBT gate action: {} (vpn_state={})", action.value, status.state.value)
 
             # Collect download stats for MetricsCollector when connected
             if status.state == VPNState.CONNECTED and self.metrics_collector:
                 try:
-                    stats = self.qbt_controller.get_download_stats()
+                    stats = await asyncio.to_thread(self.qbt_controller.get_download_stats)
                     if stats:
                         await self.metrics_collector.record_download_throughput(
                             download_bytes_per_sec=stats.get("download_speed", 0),
@@ -404,7 +406,7 @@ class Orchestrator:
         # Record download throughput stats from qBittorrent (MET-03)
         if self.qbt_controller and self.metrics_collector and self._vpn_state == VPNState.CONNECTED:
             try:
-                stats = self.qbt_controller.get_download_stats()
+                stats = await asyncio.to_thread(self.qbt_controller.get_download_stats)
                 if stats:
                     await self.metrics_collector.record_download_throughput(
                         download_bytes_per_sec=stats.get("download_speed", 0),
@@ -423,7 +425,7 @@ class Orchestrator:
         profile_name = self.config.qbt.speed_profile
         log = logger.bind(component="Orchestrator")
         try:
-            success = self.qbt_controller.apply_speed_profile(profile_name)
+            success = await asyncio.to_thread(self.qbt_controller.apply_speed_profile, profile_name)
             if success:
                 log.info("Applied speed profile '{}' on startup", profile_name)
             else:
@@ -440,13 +442,13 @@ class Orchestrator:
         log = logger.bind(component="Orchestrator")
 
         try:
-            is_bound = self.qbt_controller.verify_interface_binding(vpn_adapter)
+            is_bound = await asyncio.to_thread(self.qbt_controller.verify_interface_binding, vpn_adapter)
             if not is_bound:
                 log.warning(
                     "qBittorrent not bound to VPN adapter '{}'. Attempting to set binding.",
                     vpn_adapter,
                 )
-                set_ok = self.qbt_controller.set_interface_binding(vpn_adapter)
+                set_ok = await asyncio.to_thread(self.qbt_controller.set_interface_binding, vpn_adapter)
                 if set_ok:
                     log.info("Successfully rebound qBittorrent to VPN adapter '{}'", vpn_adapter)
                 else:
@@ -496,9 +498,14 @@ class Orchestrator:
         async with get_db(db_path_resolved) as db:
             for svc in self.config.services:
                 await db.execute(
-                    """INSERT OR REPLACE INTO services
+                    """INSERT INTO services
                     (name, url, status, critical, poll_interval_seconds, failure_threshold, consecutive_failures)
-                    VALUES (?, ?, 'unknown', ?, ?, ?, 0)""",
+                    VALUES (?, ?, 'unknown', ?, ?, ?, 0)
+                    ON CONFLICT(name) DO UPDATE SET
+                        url = excluded.url,
+                        critical = excluded.critical,
+                        poll_interval_seconds = excluded.poll_interval_seconds,
+                        failure_threshold = excluded.failure_threshold""",
                     (svc.name, svc.url, int(svc.critical), svc.poll_interval_seconds, svc.failure_threshold),
                 )
             await db.commit()
