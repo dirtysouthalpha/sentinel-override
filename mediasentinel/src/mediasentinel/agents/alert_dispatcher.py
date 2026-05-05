@@ -83,11 +83,11 @@ class AlertDispatcher:
 
         results = []
         if self.config.webhook_urls:
-            for url in self.config.webhook_urls:
-                ok = await self._send_webhook(
-                    url, title, message, sev.value, service_name, payload_extras
-                )
-                results.append(ok)
+            tasks = [
+                self._send_webhook(url, title, message, sev.value, service_name, payload_extras)
+                for url in self.config.webhook_urls
+            ]
+            results.extend(await asyncio.gather(*tasks))
 
         if self.config.smtp_host and self.config.to_addresses:
             ok = await self._send_email(
@@ -369,15 +369,17 @@ async def build_diagnostic_context(
             state_map = {1.0: "connected", 0.5: "connecting", 0.0: "disconnected", 0.3: "degraded"}
             context["vpn_status"] = state_map.get(vpn_val, "unknown")
 
-        # Latest system resource metrics
-        for metric_name in ("cpu_percent", "memory_percent", "disk_percent"):
-            cursor = await db.execute(
-                "SELECT value FROM metrics WHERE metric_type = 'system' AND metric_name = ? "
-                "ORDER BY recorded_at DESC LIMIT 1",
-                (metric_name,),
-            )
-            row = await cursor.fetchone()
-            if row is not None:
-                context["system_resources"][metric_name] = row["value"]
+        # Latest system resource metrics (single query instead of 3)
+        cursor = await db.execute(
+            "SELECT metric_name, value FROM metrics WHERE metric_type = 'system' "
+            "AND metric_name IN ('cpu_percent', 'memory_percent', 'disk_percent') "
+            "AND recorded_at = ("
+            "  SELECT MAX(m2.recorded_at) FROM metrics m2"
+            "  WHERE m2.metric_type = 'system' AND m2.metric_name = metrics.metric_name"
+            ") GROUP BY metric_name"
+        )
+        metric_rows = await cursor.fetchall()
+        for row in metric_rows:
+            context["system_resources"][row["metric_name"]] = row["value"]
 
     return context

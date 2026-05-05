@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -34,6 +34,24 @@ class MetricsCollector:
                 "Failed to record metric {}/{}: {}", metric_type, metric_name, e
             )
 
+    async def record_batch(self, records: list[tuple[str, str, float, str]]) -> None:
+        """Insert multiple metrics in a single connection/transaction."""
+        if not records:
+            return
+        ts = datetime.now().isoformat()
+        rows = [(mt, mn, v, u, ts) for mt, mn, v, u in records]
+        try:
+            async with get_db(self._db_path) as db:
+                await db.executemany(
+                    "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
+                    rows,
+                )
+                await db.commit()
+        except Exception as e:
+            logger.bind(component="MetricsCollector").error(
+                "Failed to record batch of {} metrics: {}", len(records), e
+            )
+
     async def record_service_response(self, service_name: str, response_ms: float) -> None:
         await self.record("response_time", service_name, response_ms, "ms")
 
@@ -56,114 +74,69 @@ class MetricsCollector:
         upload_bytes_per_sec: float,
         active_torrents: int,
     ) -> None:
-        """Record download throughput metrics (MET-03).
-
-        Stores three metrics: download speed, upload speed, and active torrent count.
-        All three share the same timestamp for correlation.
-        """
         ts = datetime.now().isoformat()
         async with get_db(self._db_path) as db:
-            await db.execute(
+            await db.executemany(
                 "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
-                ("download_throughput", "download_speed", download_bytes_per_sec, "bytes/s", ts),
-            )
-            await db.execute(
-                "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
-                ("download_throughput", "upload_speed", upload_bytes_per_sec, "bytes/s", ts),
-            )
-            await db.execute(
-                "INSERT INTO metrics (metric_type, metric_name, value, unit, recorded_at) VALUES (?, ?, ?, ?, ?)",
-                ("download_throughput", "active_torrents", float(active_torrents), "count", ts),
+                [
+                    ("download_throughput", "download_speed", download_bytes_per_sec, "bytes/s", ts),
+                    ("download_throughput", "upload_speed", upload_bytes_per_sec, "bytes/s", ts),
+                    ("download_throughput", "active_torrents", float(active_torrents), "count", ts),
+                ],
             )
             await db.commit()
 
     async def get_throughput_history(self, hours: int = 24) -> list[dict]:
-        """Return historical download speeds for the last N hours (MET-03).
+        """Return historical download speeds for the last N hours.
 
-        Returns list of dicts with keys: download_speed, upload_speed, active_torrents,
-        recorded_at. Only returns entries where all three metrics share the same timestamp.
+        Uses a single pivot query instead of N+1 per-row lookups.
         """
-        from datetime import timedelta
-
         cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
 
         async with get_db(self._db_path) as db:
             cursor = await db.execute(
-                "SELECT value, recorded_at FROM metrics "
-                "WHERE metric_type = 'download_throughput' AND metric_name = 'download_speed' "
-                "AND recorded_at > ? "
+                "SELECT recorded_at, "
+                "MAX(CASE WHEN metric_name='download_speed' THEN value END) AS dl, "
+                "MAX(CASE WHEN metric_name='upload_speed' THEN value END) AS ul, "
+                "MAX(CASE WHEN metric_name='active_torrents' THEN value END) AS at "
+                "FROM metrics "
+                "WHERE metric_type = 'download_throughput' AND recorded_at > ? "
+                "GROUP BY recorded_at "
                 "ORDER BY recorded_at DESC",
                 (cutoff,),
             )
-            dl_rows = await cursor.fetchall()
+            rows = await cursor.fetchall()
 
-            results = []
-            for row in dl_rows:
-                ts = row["recorded_at"]
-                entry = {
-                    "download_speed": row["value"],
-                    "recorded_at": ts,
-                }
-
-                # Get matching upload speed
-                cursor2 = await db.execute(
-                    "SELECT value FROM metrics "
-                    "WHERE metric_type = 'download_throughput' AND metric_name = 'upload_speed' "
-                    "AND recorded_at = ? LIMIT 1",
-                    (ts,),
-                )
-                up_row = await cursor2.fetchone()
-                entry["upload_speed"] = up_row["value"] if up_row else 0.0
-
-                # Get matching active torrents
-                cursor3 = await db.execute(
-                    "SELECT value FROM metrics "
-                    "WHERE metric_type = 'download_throughput' AND metric_name = 'active_torrents' "
-                    "AND recorded_at = ? LIMIT 1",
-                    (ts,),
-                )
-                at_row = await cursor3.fetchone()
-                entry["active_torrents"] = int(at_row["value"]) if at_row else 0
-
-                results.append(entry)
-
-        return results
+        return [
+            {
+                "download_speed": r["dl"] or 0.0,
+                "upload_speed": r["ul"] or 0.0,
+                "active_torrents": int(r["at"] or 0),
+                "recorded_at": r["recorded_at"],
+            }
+            for r in rows
+        ]
 
     async def detect_throttling(self, speed_profile_bytes: int) -> Optional[float]:
-        """Detect ISP/VPN bandwidth throttling (MET-05).
-
-        Compares the average download throughput of the last N readings against
-        the configured speed profile. If average is below 50% of the profile,
-        returns the throttle percentage. Otherwise returns None.
-
-        Args:
-            speed_profile_bytes: The expected download speed in bytes/sec from the speed profile.
-
-        Returns:
-            Throttle percentage (e.g. 0.35 means 35% of expected) if throttling detected,
-            None if not throttled or insufficient data.
-        """
+        """Detect ISP/VPN bandwidth throttling using SQL-side aggregation."""
         window = self.config.alerts.throttle_detection_window
         threshold_fraction = 0.50
 
         async with get_db(self._db_path) as db:
             cursor = await db.execute(
-                "SELECT value FROM metrics "
-                "WHERE metric_type = 'download_throughput' AND metric_name = 'download_speed' "
-                "ORDER BY recorded_at DESC LIMIT ?",
+                "SELECT AVG(value) AS avg_val, COUNT(*) AS cnt FROM ("
+                "  SELECT value FROM metrics "
+                "  WHERE metric_type = 'download_throughput' AND metric_name = 'download_speed' "
+                "  ORDER BY recorded_at DESC LIMIT ?"
+                ")",
                 (window,),
             )
-            rows = await cursor.fetchall()
+            row = await cursor.fetchone()
 
-        if len(rows) < window:
-            logger.bind(component="MetricsCollector").debug(
-                "Throttling detection: insufficient data ({}/{})",
-                len(rows), window,
-            )
+        if not row or row["cnt"] < window:
             return None
 
-        values = [row["value"] for row in rows]
-        avg_throughput = sum(values) / len(values)
+        avg_throughput = row["avg_val"]
 
         if speed_profile_bytes <= 0:
             return None
@@ -200,21 +173,20 @@ class MetricsCollector:
         ]
 
     async def get_service_uptime(self, service_name: str, hours: int = 24) -> float:
-        from datetime import timedelta
         cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
         async with get_db(self._db_path) as db:
             cursor = await db.execute(
-                "SELECT value FROM metrics "
+                "SELECT "
+                "SUM(CASE WHEN value = 1.0 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS uptime_pct "
+                "FROM metrics "
                 "WHERE metric_type = 'service_status' AND metric_name = ? "
-                "AND recorded_at > ? "
-                "ORDER BY recorded_at DESC",
+                "AND recorded_at > ?",
                 (service_name, cutoff),
             )
-            rows = await cursor.fetchall()
-        if not rows:
+            row = await cursor.fetchone()
+        if not row or row["uptime_pct"] is None:
             return 0.0
-        healthy_count = sum(1 for r in rows if r["value"] == 1.0)
-        return healthy_count / len(rows) * 100.0
+        return row["uptime_pct"]
 
     async def collect_system_metrics(self) -> dict:
         import psutil
@@ -233,8 +205,10 @@ class MetricsCollector:
             "disk_free_gb": round(disk.free / (1024**3), 2),
         }
 
-        for name, value in metrics.items():
-            unit = "%" if "percent" in name else "GB" if "gb" in name else ""
-            await self.record("system", name, value, unit)
+        records = [
+            ("system", name, value, "%" if "percent" in name else "GB" if "gb" in name else "")
+            for name, value in metrics.items()
+        ]
+        await self.record_batch(records)
 
         return metrics

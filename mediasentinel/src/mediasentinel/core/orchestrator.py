@@ -1,6 +1,7 @@
 import asyncio
 import os
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -171,17 +172,15 @@ class Orchestrator:
             # Restore service statuses from snapshot
             services = snapshot.get("services", [])
             if services:
+                rows = [
+                    (svc.get("status", "unknown"), svc.get("consecutive_failures", 0), svc["name"])
+                    for svc in services
+                ]
                 async with get_db(self._db_path) as db:
-                    for svc in services:
-                        await db.execute(
-                            """UPDATE services SET status = ?, consecutive_failures = ?
-                            WHERE name = ?""",
-                            (
-                                svc.get("status", "unknown"),
-                                svc.get("consecutive_failures", 0),
-                                svc["name"],
-                            ),
-                        )
+                    await db.executemany(
+                        "UPDATE services SET status = ?, consecutive_failures = ? WHERE name = ?",
+                        rows,
+                    )
                     await db.commit()
                 log.info(
                     "Restored statuses for {} services from snapshot", len(services)
@@ -209,12 +208,14 @@ class Orchestrator:
 
     def _register_jobs(self):
         for service in self.config.services:
+            jitter = random.uniform(0, service.poll_interval_seconds)
             self.scheduler.add_job(
                 self._run_health_check,
                 trigger=IntervalTrigger(seconds=service.poll_interval_seconds),
                 id=f"health_{service.name}",
                 name=f"Health check: {service.name}",
                 args=[service.name],
+                next_run_time=datetime.now() + timedelta(seconds=jitter),
                 replace_existing=True,
             )
 
@@ -369,19 +370,6 @@ class Orchestrator:
             if action.value != "none":
                 log.info("QBT gate action: {} (vpn_state={})", action.value, status.state.value)
 
-            # Collect download stats for MetricsCollector when connected
-            if status.state == VPNState.CONNECTED and self.metrics_collector:
-                try:
-                    stats = await asyncio.to_thread(self.qbt_controller.get_download_stats)
-                    if stats:
-                        await self.metrics_collector.record_download_throughput(
-                            download_bytes_per_sec=stats.get("download_speed", 0),
-                            upload_bytes_per_sec=stats.get("upload_speed", 0),
-                            active_torrents=stats.get("active_torrents", 0),
-                        )
-                except Exception as e:
-                    log.debug("Failed to collect qBittorrent download stats: {}", e)
-
         # Attempt VPN recovery if disconnected
         if status.state == VPNState.DISCONNECTED and self.recovery_engine:
             vpn_recovery = await self.recovery_engine.attempt_vpn_recovery()
@@ -502,17 +490,20 @@ class Orchestrator:
 
     async def _seed_services(self):
         db_path_resolved = Path(os.path.expandvars(str(self._db_path)))
+        rows = [
+            (svc.name, svc.url, int(svc.critical), svc.poll_interval_seconds, svc.failure_threshold)
+            for svc in self.config.services
+        ]
         async with get_db(db_path_resolved) as db:
-            for svc in self.config.services:
-                await db.execute(
-                    """INSERT INTO services
-                    (name, url, status, critical, poll_interval_seconds, failure_threshold, consecutive_failures)
-                    VALUES (?, ?, 'unknown', ?, ?, ?, 0)
-                    ON CONFLICT(name) DO UPDATE SET
-                        url = excluded.url,
-                        critical = excluded.critical,
-                        poll_interval_seconds = excluded.poll_interval_seconds,
-                        failure_threshold = excluded.failure_threshold""",
-                    (svc.name, svc.url, int(svc.critical), svc.poll_interval_seconds, svc.failure_threshold),
-                )
+            await db.executemany(
+                """INSERT INTO services
+                (name, url, status, critical, poll_interval_seconds, failure_threshold, consecutive_failures)
+                VALUES (?, ?, 'unknown', ?, ?, ?, 0)
+                ON CONFLICT(name) DO UPDATE SET
+                    url = excluded.url,
+                    critical = excluded.critical,
+                    poll_interval_seconds = excluded.poll_interval_seconds,
+                    failure_threshold = excluded.failure_threshold""",
+                rows,
+            )
             await db.commit()

@@ -167,11 +167,9 @@ class TunnelGuard:
             return None
 
     async def check_all(self) -> list[TunnelResult]:
-        results = []
-        for tunnel in self.tunnels:
-            result = await self.check_tunnel(tunnel)
-            results.append(result)
-        return results
+        if not self.tunnels:
+            return []
+        return list(await asyncio.gather(*(self.check_tunnel(t) for t in self.tunnels)))
 
     async def _validate_dns(self, url: str) -> bool:
         try:

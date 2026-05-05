@@ -246,6 +246,11 @@ class MediaSentinelApp(App):
         self._config_path = config_path
         self._config: Optional[AppConfig] = None
         self._db_path: Optional[Path] = None
+        self._prev_services: Optional[list] = None
+        self._prev_vpn: Optional[dict] = None
+        self._prev_recovery: Optional[list] = None
+        self._prev_download: Optional[dict] = None
+        self._prev_tunnel: Optional[dict] = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -309,96 +314,105 @@ class MediaSentinelApp(App):
                 )
                 recovery_rows = await cursor.fetchall()
 
-                # --- VPN state snapshot ---
+                # --- VPN + Tunnel snapshots in one query ---
                 cursor = await db.execute(
-                    "SELECT snapshot_data FROM state_snapshots "
-                    "WHERE snapshot_type = 'vpn' ORDER BY created_at DESC LIMIT 1"
+                    "SELECT snapshot_type, snapshot_data FROM state_snapshots "
+                    "WHERE snapshot_type IN ('vpn', 'tunnel') AND id IN ("
+                    "  SELECT MAX(id) FROM state_snapshots GROUP BY snapshot_type"
+                    ")"
                 )
-                vpn_row = await cursor.fetchone()
+                snapshot_rows = await cursor.fetchall()
+                vpn_data = None
+                tunnel_data_dict = None
+                for sr in snapshot_rows:
+                    if sr["snapshot_type"] == "vpn":
+                        vpn_data = json.loads(sr["snapshot_data"])
+                    elif sr["snapshot_type"] == "tunnel":
+                        tunnel_data_dict = json.loads(sr["snapshot_data"])
 
-                # --- Download throughput metrics ---
+                # --- Download throughput + active torrents in one query ---
                 cursor = await db.execute(
                     "SELECT metric_name, value FROM metrics "
                     "WHERE metric_type = 'download_throughput' "
-                    "ORDER BY recorded_at DESC LIMIT 10"
+                    "AND metric_name IN ('download_speed', 'upload_speed', 'active_torrents') "
+                    "AND id IN ("
+                    "  SELECT MAX(id) FROM metrics "
+                    "  WHERE metric_type = 'download_throughput' GROUP BY metric_name"
+                    ")"
                 )
-                metric_rows = await cursor.fetchall()
+                dl_rows = await cursor.fetchall()
 
-                # --- Active torrents count ---
-                cursor = await db.execute(
-                    "SELECT value FROM metrics "
-                    "WHERE metric_name = 'active_torrents' "
-                    "ORDER BY recorded_at DESC LIMIT 1"
-                )
-                torrent_row = await cursor.fetchone()
+            # --- Build current state hashes for change detection ---
+            services_list = [(r["name"], r["status"], r["response_time_ms"], r["last_check_at"]) for r in service_rows]
+            recovery_list = [dict(r) for r in recovery_rows]
 
-                # --- Tunnel state snapshot ---
-                cursor = await db.execute(
-                    "SELECT snapshot_data FROM state_snapshots "
-                    "WHERE snapshot_type = 'tunnel' ORDER BY created_at DESC LIMIT 1"
-                )
-                tunnel_row = await cursor.fetchone()
-
-            # Update service table with color-coded rows
-            table = self.query_one(ServiceTable)
-            table.update_services(
-                [(r["name"], r["status"], r["response_time_ms"], r["last_check_at"]) for r in service_rows]
-            )
-
-            # Update VPN indicator badge and detail panel
-            vpn_indicator = self.query_one(VPNIndicator)
-            vpn_panel = self.query_one(VPNPanel)
-            if vpn_row:
-                data = json.loads(vpn_row["snapshot_data"])
-                vpn_indicator.vpn_state = data.get("state", "disconnected")
-                vpn_panel.update_vpn(
-                    state=data.get("state", "disconnected"),
-                    adapter_name=data.get("adapter_name"),
-                    external_ip=data.get("external_ip"),
-                    latency_ms=data.get("latency_ms"),
-                    dns_leak=data.get("dns_leak"),
-                    ip_leak=data.get("ip_leak"),
-                )
-            else:
-                vpn_indicator.vpn_state = "disconnected"
-                vpn_panel.update_vpn(state="disconnected")
-
-            # Update recovery log
-            recovery_log = self.query_one(RecoveryLog)
-            recovery_entries = [dict(r) for r in recovery_rows]
-            recovery_log.update_entries(recovery_entries)
-
-            # Update download panel
             download_speed = None
             upload_speed = None
-            for m in metric_rows:
-                if m["metric_name"] == "download_speed" and download_speed is None:
+            active_torrents = 0
+            for m in dl_rows:
+                if m["metric_name"] == "download_speed":
                     download_speed = m["value"]
-                elif m["metric_name"] == "upload_speed" and upload_speed is None:
+                elif m["metric_name"] == "upload_speed":
                     upload_speed = m["value"]
+                elif m["metric_name"] == "active_torrents":
+                    active_torrents = int(m["value"])
 
+            download_state = {
+                "download_speed": download_speed,
+                "upload_speed": upload_speed,
+                "active_torrents": active_torrents,
+            }
             speed_profile = "-"
             if self._config and self._config.qbt:
                 speed_profile = self._config.qbt.speed_profile
 
-            active_torrents = int(torrent_row["value"]) if torrent_row else 0
+            vpn_state_str = vpn_data.get("state", "disconnected") if vpn_data else "disconnected"
+            vpn_state_dict = vpn_data or {}
+            tunnel_dict = tunnel_data_dict or {}
 
-            download_panel = self.query_one(DownloadPanel)
-            download_panel.update_download(
-                download_speed=download_speed,
-                upload_speed=upload_speed,
-                speed_profile=speed_profile,
-                active_torrents=active_torrents,
-            )
+            # --- Update widgets only if data changed ---
+            if services_list != self._prev_services:
+                table = self.query_one(ServiceTable)
+                table.update_services(services_list)
+                self._prev_services = services_list
 
-            # Update tunnel status
-            tunnel_status = self.query_one(TunnelStatus)
-            if tunnel_row:
-                tunnel_data = json.loads(tunnel_row["snapshot_data"])
-                tunnel_name = tunnel_data.get("tunnel_name", "tunnel")
-                reachable = tunnel_data.get("url_reachable", False)
-                latency = tunnel_data.get("latency_ms", 0.0)
-                tunnel_status.update_tunnel(tunnel_name, reachable, latency)
+            if vpn_state_dict != self._prev_vpn:
+                vpn_indicator = self.query_one(VPNIndicator)
+                vpn_panel = self.query_one(VPNPanel)
+                vpn_indicator.vpn_state = vpn_state_str
+                vpn_panel.update_vpn(
+                    state=vpn_state_str,
+                    adapter_name=vpn_data.get("adapter_name") if vpn_data else None,
+                    external_ip=vpn_data.get("external_ip") if vpn_data else None,
+                    latency_ms=vpn_data.get("latency_ms") if vpn_data else None,
+                    dns_leak=vpn_data.get("dns_leak") if vpn_data else None,
+                    ip_leak=vpn_data.get("ip_leak") if vpn_data else None,
+                )
+                self._prev_vpn = vpn_state_dict
+
+            if recovery_list != self._prev_recovery:
+                recovery_log = self.query_one(RecoveryLog)
+                recovery_log.update_entries(recovery_list)
+                self._prev_recovery = recovery_list
+
+            if download_state != self._prev_download:
+                download_panel = self.query_one(DownloadPanel)
+                download_panel.update_download(
+                    download_speed=download_speed,
+                    upload_speed=upload_speed,
+                    speed_profile=speed_profile,
+                    active_torrents=active_torrents,
+                )
+                self._prev_download = download_state
+
+            if tunnel_dict != self._prev_tunnel:
+                tunnel_status = self.query_one(TunnelStatus)
+                if tunnel_data_dict:
+                    tunnel_name = tunnel_data_dict.get("tunnel_name", "tunnel")
+                    reachable = tunnel_data_dict.get("url_reachable", False)
+                    latency = tunnel_data_dict.get("latency_ms", 0.0)
+                    tunnel_status.update_tunnel(tunnel_name, reachable, latency)
+                self._prev_tunnel = tunnel_dict
 
         except Exception as e:
             from loguru import logger as _logger

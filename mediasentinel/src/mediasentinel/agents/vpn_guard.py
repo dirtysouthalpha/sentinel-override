@@ -47,7 +47,7 @@ class VPNGuard:
         external_ip = await self._get_external_ip()
         latency_ms = round((time.monotonic() - start) * 1000, 1)
 
-        dns_leak = await self._dns_leak_test()
+        dns_leak = await self._dns_leak_test(external_ip)
         ip_leak = False
         if external_ip and self.config.expected_endpoint:
             ip_leak = external_ip != self.config.expected_endpoint
@@ -115,19 +115,15 @@ class VPNGuard:
             log.warning("Failed to fetch external IP: {}", e)
         return None
 
-    async def _dns_leak_test(self) -> bool:
-        """Returns True if DNS leak detected (queries NOT going through VPN).
-
-        Queries a leak-test service that echoes back the requesting IP in a TXT
-        record. If the echoed IP matches our VPN external IP, DNS is routing
-        through the tunnel. Otherwise, queries are leaking outside VPN.
-        """
+    async def _dns_leak_test(self, external_ip: Optional[str] = None) -> bool:
+        """Returns True if DNS leak detected (queries NOT going through VPN)."""
         try:
             import dns.resolver
 
-            external_ip = await self._get_external_ip()
+            if external_ip is None:
+                external_ip = await self._get_external_ip()
             if not external_ip:
-                return True  # Can't verify — assume leak
+                return True
 
             def _resolve():
                 res = dns.resolver.Resolver()
