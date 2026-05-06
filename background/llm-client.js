@@ -163,31 +163,39 @@ export async function generatePlan(goal, settings, context = {}) {
     ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => `- "${p.goal}" -> ${p.steps.map(s => s.type).join(', ')}`).join('\n')}\n`
     : '';
 
-  const planPrompt = `You are a browser automation planner. Given a user goal and current context, produce a concise numbered execution plan.
+  const planPrompt = `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
+
+DECOMPOSITION RULES — follow these exactly:
+1. Break every task into EXPLICIT, atomic browser actions. NEVER combine multiple actions into one step.
+2. Login flows: navigate to login page → type username → type password → click submit → wait for dashboard
+3. Form interactions: locate field → clear/focus → type value → move to next field
+4. Navigation: click menu item → wait for content → scan elements → proceed
+5. Table/filter tasks: navigate to table → locate filter → set filter → wait for results → read → extract data
+6. Configuration changes: navigate to config section → find item → open edit → set values → save → verify success
+7. Multi-page research: navigate to source → extract links → open each in tab → read → note findings → close tabs → summarize
+8. ALWAYS include data extraction steps (extract, execute_js with key, or note) — never just navigate and read without saving
+9. ALWAYS include verification after saves/commits (wait for success message, re-read to confirm)
+10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change
+11. Maximum 15 steps — be thorough but not redundant
 
 ${urlContext}${platformContext}${patternContext}
 Goal: ${goal}
 
-Rules:
-- If already on the target page (current page matches the goal URL), start with reading/extracting data
-- If NOT on the target page, the first step MUST be "Navigate to [URL from the goal]"
-- Each step should be one specific browser action or data collection task
-- Be concrete: "Extract article titles using extract_list with selector 'a.article-link'" not "Get the articles"
-- After reading a page, the next step should be to EXTRACT data, not read again
-- For multi-page research: navigate -> extract -> navigate -> extract -> finish with summary
-- Maximum 10 steps
-- For runbooks/investigations, create one step per phase
-- Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
+Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
 
-Example of a GOOD plan:
-Goal: "Check the SonicWall firewall at 192.168.1.1 for blocked connections from 10.0.0.5"
-{ "plan": ["Navigate to 192.168.1.1 and log in", "Click Log > View in the navigation", "Set filter to source IP 10.0.0.5 and apply", "Read the filtered log entries and extract blocked connection details", "Note the rule IDs and zones involved", "Finish with a summary of blocked connections"] }
+Example GOOD plan for a complex MSP task:
+Goal: "Block port 3389 from WAN to LAN on the SonicWall at 192.168.1.1"
+{ "plan": ["Navigate to https://192.168.1.1", "Type the username into the login field", "Type the password into the password field", "Click the Login button and wait for dashboard", "Click Policy or Firewall in the left navigation menu", "Click Access Rules or IPv4 Rules", "Wait for the rules table to load", "Click Add Rule or the + button to create a new rule", "Set the Source Zone dropdown to WAN", "Set the Destination Zone dropdown to LAN", "Set the Service dropdown to RDP (port 3389) or type 3389", "Set the Action to Deny or Drop", "Type a descriptive name in the Comment/Name field", "Click Save or Apply", "Wait for the success confirmation banner", "Finish with confirmation that the RDP block rule was created"] }
 
-Example of a GOOD multi-page research plan:
-Goal: "Find top 10 articles about AI agents and summarize each"
-{ "plan": ["Search Google for 'top AI agent articles 2026'", "Use execute_js to extract the first 10 article links and titles from search results", "Open each article in a separate tab using open_tab with label", "Switch to each tab, read the page, and note a summary for each article", "Close all article tabs", "Finish with a combined summary of all 10 articles"] }
+Example GOOD plan for a multi-page research task:
+Goal: "Go to cnn.com and give me a briefing on the top 10 articles"
+{ "plan": ["Navigate to cnn.com", "Read the homepage content to identify top stories", "Use execute_js with key 'headlines' to extract the top 10 headline titles, links, and descriptions", "For each article that needs more detail, open it in a new tab using open_tab with label", "Switch to each article tab, read the page, and note a brief summary", "Close article tabs when done", "Finish with a numbered briefing of all 10 articles with headlines and key takeaways"] }
 
-Example of a BAD plan:
+Example GOOD plan for a firewall investigation:
+Goal: "Check the SonicWall at 10.0.0.1 for why traffic from 192.168.5.20 is being blocked"
+{ "plan": ["Navigate to the SonicWall management URL", "Login with the provided credentials", "Click Log in the left navigation menu", "Click View under Log to open the log viewer", "Wait for log entries to load", "Set the Category filter to Firewall if available", "Set the Source IP filter to 192.168.5.20", "Click Apply or Filter to apply the filters", "Wait for filtered results to appear", "Read and extract the blocked connection log entries", "Note the rule IDs, zones, and action (deny/drop) for each blocked connection", "Navigate to the matching firewall rules to understand why traffic is blocked", "Finish with a summary of which rules are blocking the traffic and why"] }
+
+Example BAD plan (too vague):
 Goal: "Check the SonicWall firewall for blocked connections"
 { "plan": ["Go to the website", "Find the information", "Get the data"] }`;
 
@@ -195,7 +203,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 800, temperature: 0.2 }));
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2 }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',

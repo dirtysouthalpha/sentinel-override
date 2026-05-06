@@ -322,6 +322,36 @@ if (window.__sentinelInitialized) {
   // Make overlay functions available for the execute_command handler
   window.__sentinelOverlay = { showActionBanner, hideActionBanner, showClickIndicator };
 
+  // ========== Human-like Interaction Helpers ==========
+  // Makes agent actions visible and feel natural — watching the agent work
+  // should feel like watching a skilled human operator.
+
+  function humanDelay(minMs = 30, maxMs = 80) {
+    const delay = minMs + Math.random() * (maxMs - minMs);
+    return new Promise(r => setTimeout(r, delay));
+  }
+
+  function typingDelay(charIndex, totalChars) {
+    // Adaptive speed: fast for long strings, natural variation for short ones
+    if (totalChars > 150) return humanDelay(8, 20);   // Very fast for long strings (URLs, etc.)
+    if (totalChars > 80) return humanDelay(15, 35);    // Fast for medium strings
+    // Natural human-like typing with occasional brief pauses
+    if (charIndex > 0 && charIndex % 7 === 0) return humanDelay(80, 200); // Thinking pause every ~7 chars
+    return humanDelay(35, 110); // Normal typing speed (9-28 chars/sec)
+  }
+
+  // Enhanced action banner with typing preview — shows the user what's being typed
+  function showTypingBanner(text, position, total) {
+    try {
+      const overlay = getOrCreateOverlay();
+      if (!overlay) return;
+      const preview = text.substring(0, 40) + (text.length > 40 ? '...' : '');
+      const progress = position !== undefined ? ` (${position}/${total})` : '';
+      overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${preview}"</span>${progress}`;
+      overlay.style.opacity = '1';
+    } catch (e) {}
+  }
+
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleMessage(request)
       .then(data => sendResponse({ ok: true, data }))
@@ -515,12 +545,15 @@ if (window.__sentinelInitialized) {
         }
 
         hl.highlightElement(el);
-        el.scrollIntoView({ behavior: 'instant', block: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(r => setTimeout(r, 500)); // Wait for smooth scroll animation
         // Get element center for click indicator
         try {
           const rect = el.getBoundingClientRect();
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
         } catch (e) {}
+        // Human-like pause: operator sees the element, then decides to click
+        await humanDelay(200, 450);
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
@@ -543,7 +576,10 @@ if (window.__sentinelInitialized) {
         if (!el) return 'No element found at coordinates (' + x + ', ' + y + ')';
         if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(x, y);
         hl.highlightElement(el);
-        el.scrollIntoView({ behavior: 'instant', block: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll
+        // Human-like pause before clicking
+        await humanDelay(150, 350);
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView, clientX: x, clientY: y };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
@@ -572,7 +608,8 @@ if (window.__sentinelInitialized) {
         }
 
         hl.highlightElement(el);
-        el.scrollIntoView({ behavior: 'instant', block: 'center' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll before typing
         el.focus();
         const text = cmd.text || '';
 
@@ -598,9 +635,10 @@ if (window.__sentinelInitialized) {
           // Use execCommand for broadest compatibility with SPA frameworks
           targetDoc.execCommand('selectAll', false, null);
           targetDoc.execCommand('delete', false, null);
-          for (const char of text) {
-            targetDoc.execCommand('insertText', false, char);
-            el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
+          for (let i = 0; i < text.length; i++) {
+            targetDoc.execCommand('insertText', false, text[i]);
+            el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: text[i] }));
+            await typingDelay(i, text.length);
           }
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
@@ -609,6 +647,7 @@ if (window.__sentinelInitialized) {
         }
 
         // Standard INPUT / TEXTAREA -- clear then type char-by-char for React/Vue compatibility
+        // Characters appear one at a time with human-like pacing so the user can see the typing
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
           const nativeSetter = Object.getOwnPropertyDescriptor(
             el.tagName === 'TEXTAREA'
@@ -618,10 +657,14 @@ if (window.__sentinelInitialized) {
           ).set;
           nativeSetter.call(el, '');
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-          for (const char of text) {
+          for (let i = 0; i < text.length; i++) {
+            const char = text[i];
             const currentVal = el.value;
             nativeSetter.call(el, currentVal + char);
             el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
+            // Update typing banner every 10 chars for visual feedback
+            if (i % 10 === 0 || i === text.length - 1) showTypingBanner(text, i + 1, text.length);
+            await typingDelay(i, text.length);
           }
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
@@ -648,7 +691,8 @@ if (window.__sentinelInitialized) {
       }
 
       case 'scroll': {
-        targetDoc.defaultView.scrollBy(0, cmd.amount || 0);
+        targetDoc.defaultView.scrollBy({ top: cmd.amount || 0, behavior: 'smooth' });
+        await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll animation
         return 'Scrolled ' + (cmd.amount || 0);
       }
 

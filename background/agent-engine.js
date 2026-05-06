@@ -257,12 +257,12 @@ async function runAgentLoop(goal, workingTabId) {
     relevantPatterns: patterns
   });
   if (agentPlan) {
-    sendSilentUpdate(`Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
+    sendSilentUpdate(`📋 Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
   } else {
     // Fallback: generate a basic heuristic plan from goal analysis
     agentPlan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
     if (agentPlan) {
-      sendSilentUpdate(`Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
+      sendSilentUpdate(`📋 Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
     } else {
       sendSilentUpdate('Running in direct mode');
     }
@@ -556,7 +556,9 @@ async function runAgentLoop(goal, workingTabId) {
       // Advance plan step if the LLM signalled it's done with the current step
       if (command.advance_plan && agentPlan && currentPlanStep < agentPlan.length - 1) {
         currentPlanStep++;
-        sendSilentUpdate(`Plan advanced to step ${currentPlanStep + 1}: ${agentPlan[currentPlanStep]}`);
+        const nextStep = agentPlan[currentPlanStep];
+        const progress = `[${currentPlanStep + 1}/${agentPlan.length}]`;
+        sendSilentUpdate(`📋 Step ${progress}: ${nextStep}`);
         delete command.advance_plan;
       }
 
@@ -692,7 +694,7 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
-      sendSilentUpdate(`Executing: ${command.type}`, stepCount);
+      sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
 
       // Approval gate
       const settings = await chrome.storage.local.get(['approvalMode']);
@@ -998,7 +1000,20 @@ async function runAgentLoop(goal, workingTabId) {
         history.splice(0, history.length - CONFIG.maxHistoryEntries);
       }
       await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
-      await sleep(1500);
+      // Human-like pacing between steps — variable delays so it feels like an operator working
+      // Faster for reads/extractions, slower for complex actions (clicks, types, navigates)
+      const actionType = command.type;
+      let pacingDelay;
+      if (['read_page', 'extract', 'extract_list', 'note'].includes(actionType)) {
+        pacingDelay = 800 + Math.random() * 600;    // 800-1400ms: quick data gathering
+      } else if (['click', 'type', 'select', 'navigate'].includes(actionType)) {
+        pacingDelay = 1200 + Math.random() * 800;   // 1200-2000ms: deliberate actions
+      } else if (['execute_js', 'scroll', 'dismiss_overlay'].includes(actionType)) {
+        pacingDelay = 600 + Math.random() * 400;    // 600-1000ms: quick utility actions
+      } else {
+        pacingDelay = 1000 + Math.random() * 1000;  // 1000-2000ms: default
+      }
+      await sleep(pacingDelay);
 
     } catch (err) {
       console.error('Agent loop error:', err);
