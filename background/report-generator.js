@@ -35,17 +35,25 @@ export async function generateReport(executionData, CONFIG) {
     result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
   }));
 
-  // Build memory summary for evidence section
+  // Build memory summary for evidence section — skip failed/empty entries
   const memoryKeys = Object.keys(agentMemory);
   const memorySummary = memoryKeys.length > 0
-    ? memoryKeys.map(k => {
-        const val = agentMemory[k];
-        const valStr = Array.isArray(val)
-          ? `${val.length} items: ${val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ')}`
-          : String(val).substring(0, 500);
-        return `- **${k}**: ${valStr}`;
-      }).join('\n')
-    : 'No extracted data stored.';
+    ? memoryKeys
+        .filter(k => {
+          const v = agentMemory[k];
+          const s = typeof v === 'string' ? v : JSON.stringify(v);
+          return s && s.length > 3 && s !== 'Done'
+            && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
+            && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
+        })
+        .map(k => {
+          const val = agentMemory[k];
+          const valStr = Array.isArray(val)
+            ? val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n')
+            : String(val).substring(0, 800);
+          return `- ${k}: ${valStr}`;
+        }).join('\n')
+    : 'No usable data was extracted (all extractions failed or timed out).';
 
   // Build plan context if a plan was generated
   const planContext = agentPlan && agentPlan.length > 0
@@ -57,58 +65,77 @@ export async function generateReport(executionData, CONFIG) {
     ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
     : '';
 
-  const reportPrompt = `You are an investigation report writer. Generate a structured markdown report based on the agent's execution data below.
+  const reportPrompt = `You are a brilliant research analyst and writer — think Claude-quality output. Your job is to take raw data collected by a browser agent and produce a polished, insightful report that the user actually WANTS to read.
 
 ## Original Goal
 ${goal}
 
 ${planContext}
 
-## Execution Summary
+## How the Agent Collected Data
 - Total steps: ${stepCount}
-- API calls made: ${apiCallCount}
+- API calls: ${apiCallCount}
 - Timestamp: ${timestamp}
 
-## Action History (condensed)
-${condensedHistory.map(h => `**Step ${h.step}** [${h.action}]: ${h.result}`).join('\n')}
+## Raw Action History
+${condensedHistory.map(h => `[${h.action}] ${h.result}`).join('\n')}
 
-## Extracted Data (Evidence)
+## Raw Extracted Data
 ${memorySummary}
 
 ${tabReferences}
 
 ---
 
-Produce a structured markdown report with these EXACT sections:
+## YOUR TASK
 
-### Goal
-State the original goal in a clear, concise sentence.
+Synthesize the raw extracted data into a clean, compelling report. Follow these principles:
 
-### Steps Taken
-A numbered list of the key actions taken. Do NOT list every single step -- condense routine actions (e.g., navigating, scrolling, waiting) and highlight important ones (extracting data, finding results, making changes). Aim for 5-15 items depending on task complexity.
+### Writing Style
+- **Conversational but authoritative** — like a knowledgeable colleague briefing you over coffee, not a robot reading a list
+- **Lead with insight** — open with a 1-2 sentence executive summary that answers the user's core question
+- **Specific > vague** — use actual names, numbers, dates, quotes, URLs. "3.2 million users" not "a large number of users"
+- **Contextualize** — don't just list facts; explain WHY they matter. Connect dots between data points
+- **Structured for scanning** — use headers, numbered lists, bold key terms. The user should find any detail in <5 seconds
 
-### Key Findings
-Goal-relevant observations and discoveries. The LLM decides what counts as a finding vs routine. List each finding with enough context to understand why it matters. If no significant findings, say "No significant findings beyond routine navigation."
+### Output Format
+Adapt to the task type:
 
-### Evidence
-Reference specific extracted data from the investigation. Use format like "IP 10.0.0.5 found in blocked connections log" or "Configuration value X set to Y". If no data was extracted, say "No structured data was extracted during this investigation."
+**For news briefings (top N articles):**
+→ Lead with "Here's your briefing on [topic]..."
+→ Each item: **numbered headline** → 2-3 sentence summary of what happened and why it matters → source link
+→ End with "Bottom line:" — one sentence takeaway
 
-### Conclusions
-Summary of outcomes and any recommended next steps. Include what was accomplished and what might need follow-up.
+**For research/analysis tasks:**
+→ Lead with the answer/conclusion upfront
+→ Then support with evidence in structured sections
+→ End with recommendations or next steps
 
-IMPORTANT:
-- Write in a professional, factual tone suitable for ticket documentation
-- Include ACTUAL values, names, and data extracted from pages -- NEVER fabricate information
-- If no real data was extracted, say so explicitly in the Evidence and Conclusions sections
-- The report will be rendered as markdown -- use proper markdown formatting
-- Do NOT wrap the report in code fences or JSON
-- Return ONLY the report content, nothing else`;
+**For comparisons:**
+→ Side-by-side format with specific data points
+→ Clear verdict with reasoning
+
+**For data extraction (configs, logs, etc.):**
+→ Clean structured format (tables, key-value pairs)
+→ Anomalies or notable findings highlighted
+→ Summary of what was found
+
+### Rules
+- ONLY use data that was actually extracted — NEVER fabricate, infer, or use training data
+- If data is incomplete or missing, say so explicitly rather than guessing
+- If extracted data contains errors/failed extractions, skip those and work with what succeeded
+- Keep the report tight — every sentence should earn its place
+- Use proper markdown formatting (headers, bold, lists, links)
+- Do NOT wrap in code fences or JSON
+- Return ONLY the report, nothing else`;
+
+  const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
 
   try {
     // Make the LLM call for report generation
     // We reuse callLLMWithRetry but need a minimal call setup
     // Build a minimal call that uses the retry infrastructure
-    const reportResult = await generateReportViaLLM(reportPrompt, CONFIG);
+    const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
 
     const fullReport = typeof reportResult === 'string' ? reportResult.trim() : String(reportResult).trim();
 
@@ -132,7 +159,7 @@ IMPORTANT:
  * Makes an LLM call specifically for report generation.
  * Reuses settings from chrome.storage but with a dedicated prompt.
  */
-async function generateReportViaLLM(prompt, CONFIG) {
+async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const providerConfig = await getActiveProvider();
   const { endpoint, apiKey, model } = providerConfig;
 
@@ -142,9 +169,9 @@ async function generateReportViaLLM(prompt, CONFIG) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout || 45000);
 
-  const reportSystemPrompt = 'You are an investigation report writer. Produce clean, professional markdown reports. Return ONLY the report content with no wrapping.';
+  const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
 
-  const requestBody = JSON.stringify(provider.buildBody(model, reportSystemPrompt, prompt, { maxTokens: 4000, temperature: 0.3 }));
+  const requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
   const requestHeaders = provider.buildHeaders(apiKey);
 
   const response = await fetch(endpoint, {

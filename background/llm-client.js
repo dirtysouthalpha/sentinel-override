@@ -403,6 +403,13 @@ RULES:
 7. Use "extract" + memory to carry data between pages. Reference with ::key::.
 8. For dropdowns: use "select". For hover menus: use "hover" then "click".
 9. One action per step.
+10. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
+   - For briefings/lists: Use clear numbered sections with headlines, key takeaways, and source links
+   - For research tasks: Lead with the answer, then support with evidence
+   - For comparisons: Use structured "vs" format with specific data points
+   - Write in a conversational but authoritative tone — like a knowledgeable colleague briefing you
+   - Include SPECIFIC details: actual names, numbers, dates, quotes — not generic descriptions
+   - Skip the "Raw extracted data" section — synthesize everything into readable prose
 
 Actions:
 - { "type": "click", "selector": "FROM_LIST" }

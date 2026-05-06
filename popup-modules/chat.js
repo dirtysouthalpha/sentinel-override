@@ -1105,7 +1105,10 @@ chrome.runtime.onMessage.addListener((message) => {
     removeApprovalCard();
     renderTabBar([]);
     try {
-      addMessage('Task completed!\n\n' + (message.summary || 'Done'), 'assistant');
+      const summary = message.summary || 'Done';
+      // If summary already has substantial content, don't prefix with "Task completed"
+      const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
+      addMessage(prefix + summary, 'assistant');
     } catch (err) {
       console.error('Error displaying completion message:', err);
     }

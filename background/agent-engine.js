@@ -621,15 +621,25 @@ async function runAgentLoop(goal, workingTabId) {
 
         let finalSummary = command.summary || '';
         const memKeys = Object.keys(agentMemory);
-        if (memKeys.length > 0) {
-          const memLines = memKeys.map(k => {
-            const val = agentMemory[k];
-            const valStr = Array.isArray(val)
-              ? val.slice(0, 10).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ')
-              : String(val).substring(0, 300);
-            return `- ${k}: ${valStr}`;
-          }).join('\n');
-          finalSummary += `\n\n---\n**Extracted Data (from investigation):**\n${memLines}`;
+
+        // Clean up memory — filter out failed/timed-out/empty entries
+        const cleanMemory = {};
+        for (const k of memKeys) {
+          const v = agentMemory[k];
+          const s = typeof v === 'string' ? v : JSON.stringify(v);
+          // Skip empty, failed, timed-out, or "Done" entries
+          if (!s || s === 'Done' || s.length < 5) continue;
+          if (s.startsWith('Execution error') || s.startsWith('Code execution timed out')) continue;
+          if (s.startsWith('JS Error:') || s.startsWith('Element not found')) continue;
+          cleanMemory[k] = v;
+        }
+
+        // Don't append raw memory to the summary — let the report generator handle it
+        // Only include a clean reference if there's valuable data
+        const cleanKeys = Object.keys(cleanMemory);
+        if (cleanKeys.length > 0) {
+          // Let the LLM's summary stand on its own — the report will incorporate the data
+          finalSummary += '\n\n📊 **' + cleanKeys.length + ' data points collected** — full analysis in the report below.';
         }
 
         // Capture report data BEFORE history gets cleared at loop exit
