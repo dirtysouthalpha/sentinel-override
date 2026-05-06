@@ -748,13 +748,104 @@ if (window.__sentinelInitialized) {
           return 'Selected "' + cmd.value + '" in dropdown ' + cmd.selector;
         }
 
-        // Native <select> element
+        // Native <select> element — support select by value, visible text, and multi-select
         if (el.tagName !== 'SELECT') return 'Element is not a <select>: ' + cmd.selector;
         hl.highlightElement(el);
-        el.value = cmd.value;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(r => setTimeout(r, 300));
+
+        if (el.multiple && Array.isArray(cmd.value)) {
+          // Multi-select: select multiple options by value or text
+          const options = Array.from(el.options);
+          for (const val of cmd.value) {
+            const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === val.toLowerCase());
+            if (opt) opt.selected = true;
+          }
+          el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+          hl.removeHighlight(el);
+          return 'Multi-selected [' + cmd.value.join(', ') + '] in ' + cmd.selector;
+        }
+
+        // Single select: try exact value match, then visible text match
+        const options = Array.from(el.options);
+        let targetOpt = options.find(o => o.value === cmd.value);
+        if (!targetOpt) {
+          targetOpt = options.find(o => o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
+        }
+        if (!targetOpt) {
+          // Partial text match as fallback
+          targetOpt = options.find(o => o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
+        }
+        if (!targetOpt) {
+          const availableOpts = options.map(o => `"${o.value}" (${o.textContent.trim()})`).join(', ');
+          hl.removeHighlight(el);
+          return 'Error: No matching option "' + cmd.value + '". Available: ' + availableOpts;
+        }
+        el.value = targetOpt.value;
+        el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
-        return 'Selected "' + cmd.value + '" in ' + cmd.selector;
+        return 'Selected "' + targetOpt.textContent.trim() + '" (value: ' + targetOpt.value + ') in ' + cmd.selector;
+      }
+
+      case 'check': {
+        // Checkbox and radio button support — set to explicit checked state
+        const checkEl = dom.findElementBySelector(targetDoc, selector);
+        if (!checkEl) return 'Element not found: ' + cmd.selector;
+        hl.highlightElement(checkEl);
+        checkEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await new Promise(r => setTimeout(r, 300));
+
+        const desiredState = cmd.checked !== undefined ? cmd.checked : true;
+        if (checkEl.type === 'checkbox' || checkEl.type === 'radio') {
+          if (checkEl.checked !== desiredState) {
+            checkEl.focus();
+            await humanDelay(100, 250);
+            checkEl.checked = desiredState;
+            checkEl.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+            checkEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+            hl.removeHighlight(checkEl);
+            return (desiredState ? 'Checked' : 'Unchecked') + ' ' + cmd.selector;
+          }
+          hl.removeHighlight(checkEl);
+          return cmd.selector + ' was already ' + (desiredState ? 'checked' : 'unchecked');
+        }
+        // Handle ARIA checkbox roles (common in SPA frameworks)
+        if (checkEl.getAttribute('role') === 'checkbox' || checkEl.getAttribute('role') === 'switch') {
+          const currentAria = checkEl.getAttribute('aria-checked') === 'true';
+          if (currentAria !== desiredState) {
+            checkEl.click();
+            await humanDelay(100, 200);
+            hl.removeHighlight(checkEl);
+            return (desiredState ? 'Checked' : 'Unchecked') + ' ARIA ' + cmd.selector;
+          }
+          hl.removeHighlight(checkEl);
+          return cmd.selector + ' was already ' + (desiredState ? 'checked' : 'unchecked');
+        }
+        hl.removeHighlight(checkEl);
+        return 'Element is not a checkbox or radio: ' + cmd.selector;
+      }
+
+      case 'check_all': {
+        // Check all matching checkboxes — bulk MSP operations (select multiple policies, devices, etc.)
+        const checkSelector = cmd.selector || 'input[type="checkbox"]';
+        const checkboxes = targetDoc.querySelectorAll(checkSelector);
+        if (checkboxes.length === 0) return 'No checkboxes found matching: ' + checkSelector;
+        const desiredState = cmd.checked !== undefined ? cmd.checked : true;
+        let count = 0;
+        for (const cb of checkboxes) {
+          if (cb.type === 'checkbox' && cb.checked !== desiredState) {
+            hl.highlightElement(cb);
+            await humanDelay(50, 150);
+            cb.checked = desiredState;
+            cb.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+            cb.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+            hl.removeHighlight(cb);
+            count++;
+          }
+        }
+        return (desiredState ? 'Checked' : 'Unchecked') + ' ' + count + '/' + checkboxes.length + ' matching checkboxes';
       }
 
       case 'hover': {
@@ -800,15 +891,25 @@ if (window.__sentinelInitialized) {
         const key = cmd.key || 'Enter';
         const keyMap = {
           'Enter': 'Enter', 'Tab': 'Tab', 'Escape': 'Escape', 'Backspace': 'Backspace',
+          'Delete': 'Delete', 'Home': 'Home', 'End': 'End', 'PageUp': 'PageUp', 'PageDown': 'PageDown',
           'ArrowDown': 'ArrowDown', 'ArrowUp': 'ArrowUp', 'ArrowLeft': 'ArrowLeft', 'ArrowRight': 'ArrowRight',
-          ' ': ' ', 'Space': ' '
+          ' ': ' ', 'Space': ' ', 'F5': 'F5', 'F12': 'F12'
         };
         const keyVal = keyMap[key] || key;
-        const activeEl = targetDoc.activeElement || document.body;
-        activeEl.dispatchEvent(new KeyboardEvent('keydown', { key: keyVal, bubbles: true, composed: true }));
-        activeEl.dispatchEvent(new KeyboardEvent('keyup', { key: keyVal, bubbles: true, composed: true }));
-        if (keyVal === 'Enter') activeEl.dispatchEvent(new KeyboardEvent('keypress', { key: keyVal, bubbles: true, composed: true }));
-        return 'Pressed key: ' + key;
+        const activeEl = targetDoc.activeElement || targetDoc.body;
+        const modifiers = cmd.modifiers || {};
+        const keyOpts = {
+          key: keyVal, bubbles: true, composed: true,
+          ctrlKey: !!modifiers.ctrl || !!modifiers.control,
+          shiftKey: !!modifiers.shift,
+          altKey: !!modifiers.alt,
+          metaKey: !!modifiers.meta || !!modifiers.cmd
+        };
+        activeEl.dispatchEvent(new KeyboardEvent('keydown', keyOpts));
+        activeEl.dispatchEvent(new KeyboardEvent('keypress', keyOpts));
+        activeEl.dispatchEvent(new KeyboardEvent('keyup', keyOpts));
+        const modStr = [modifiers.ctrl && 'Ctrl', modifiers.shift && 'Shift', modifiers.alt && 'Alt', modifiers.meta && 'Meta'].filter(Boolean).join('+');
+        return 'Pressed key: ' + (modStr ? modStr + '+' : '') + key;
       }
 
       case 'execute_js': {

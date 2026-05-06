@@ -19,6 +19,8 @@ let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy sh
 let currentStrategies = [];     // Self-healing: remembers tried approaches
 let agentPlan = null;           // Planning phase: numbered list of steps
 let currentPlanStep = 0;        // Planning phase: which step we're currently on
+let agentSpeed = 'normal';      // Speed mode: 'turbo' (0.2x), 'normal' (1x), 'stealth' (2x)
+let agentPaused = false;        // Pause/resume: agent loop waits when true
 
 // Expose agentRunning for index.js
 export { agentRunning };
@@ -85,6 +87,12 @@ export async function startAgent(goal, sender) {
   agentRunning = true;
   resetAgentState();
 
+  // Load speed mode from settings
+  try {
+    const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
+    agentSpeed = speedSettings.agentSpeedMode || 'normal';
+  } catch (e) { agentSpeed = 'normal'; }
+
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
   registerInitialTab(startTabId, tabInfo?.url || '');
@@ -95,8 +103,28 @@ export async function startAgent(goal, sender) {
 
 export async function stopAgent() {
   agentRunning = false;
+  agentPaused = false;
   await closeAllAgentTabs();
   return 'Agent stopped';
+}
+
+export async function pauseAgent() {
+  if (!agentRunning) return 'Agent not running';
+  agentPaused = true;
+  return 'Agent paused';
+}
+
+export async function resumeAgent() {
+  if (!agentRunning) return 'Agent not running';
+  agentPaused = false;
+  return 'Agent resumed';
+}
+
+export function setAgentSpeed(mode) {
+  if (!['turbo', 'normal', 'stealth'].includes(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
+  agentSpeed = mode;
+  chrome.storage.local.set({ agentSpeedMode: mode }).catch(() => {});
+  return 'Speed set to ' + mode;
 }
 
 // ========== Stall Detection ==========
@@ -270,6 +298,14 @@ async function runAgentLoop(goal, workingTabId) {
 
   while (!finished && agentRunning) {
     try {
+      // Pause check — wait until resumed
+      if (agentPaused) {
+        sendSilentUpdate('⏸ Agent paused — waiting for resume', stepCount);
+        while (agentPaused && agentRunning) await sleep(500);
+        if (!agentRunning) break;
+        sendSilentUpdate('▶ Agent resumed', stepCount);
+      }
+
       stepCount++;
       if (stepCount > CONFIG.maxSteps) {
         sendSilentUpdate(`Reached step limit (${CONFIG.maxSteps}). Finishing.`, stepCount);
@@ -1001,19 +1037,20 @@ async function runAgentLoop(goal, workingTabId) {
       }
       await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
       // Human-like pacing between steps — variable delays so it feels like an operator working
-      // Faster for reads/extractions, slower for complex actions (clicks, types, navigates)
+      // Respects speed mode: turbo (0.2x), normal (1x), stealth (2x)
+      const speedMultiplier = agentSpeed === 'turbo' ? 0.2 : agentSpeed === 'stealth' ? 2.0 : 1.0;
       const actionType = command.type;
-      let pacingDelay;
+      let baseDelay;
       if (['read_page', 'extract', 'extract_list', 'note'].includes(actionType)) {
-        pacingDelay = 800 + Math.random() * 600;    // 800-1400ms: quick data gathering
-      } else if (['click', 'type', 'select', 'navigate'].includes(actionType)) {
-        pacingDelay = 1200 + Math.random() * 800;   // 1200-2000ms: deliberate actions
+        baseDelay = 800 + Math.random() * 600;    // 800-1400ms: quick data gathering
+      } else if (['click', 'type', 'select', 'navigate', 'check', 'check_all'].includes(actionType)) {
+        baseDelay = 1200 + Math.random() * 800;   // 1200-2000ms: deliberate actions
       } else if (['execute_js', 'scroll', 'dismiss_overlay'].includes(actionType)) {
-        pacingDelay = 600 + Math.random() * 400;    // 600-1000ms: quick utility actions
+        baseDelay = 600 + Math.random() * 400;    // 600-1000ms: quick utility actions
       } else {
-        pacingDelay = 1000 + Math.random() * 1000;  // 1000-2000ms: default
+        baseDelay = 1000 + Math.random() * 1000;  // 1000-2000ms: default
       }
-      await sleep(pacingDelay);
+      await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
       console.error('Agent loop error:', err);

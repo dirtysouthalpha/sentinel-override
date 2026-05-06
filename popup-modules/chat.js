@@ -515,6 +515,34 @@ stopBtn.addEventListener('click', () => {
   });
 });
 
+// ========== Speed Controls ==========
+// Speed buttons are in the UI already — wire them up to the agent engine
+document.querySelectorAll('[data-speed]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.getAttribute('data-speed');
+    chrome.runtime.sendMessage({ action: 'set_agent_speed', mode }, (resp) => {
+      if (resp && !resp.ok === false) {
+        // Update active state on buttons
+        document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    });
+  });
+});
+
+// Pause/resume toggle
+const pauseBtn = document.getElementById('pauseBtn');
+if (pauseBtn) {
+  pauseBtn.addEventListener('click', () => {
+    const isPaused = pauseBtn.dataset.paused === 'true';
+    const action = isPaused ? 'resume_agent_loop' : 'pause_agent_loop';
+    chrome.runtime.sendMessage({ action }, () => {
+      pauseBtn.dataset.paused = isPaused ? 'false' : 'true';
+      pauseBtn.textContent = isPaused ? '⏸ Pause' : '▶ Resume';
+    });
+  });
+}
+
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
   if (confirm('Start a new chat? This will clear the current conversation.')) {

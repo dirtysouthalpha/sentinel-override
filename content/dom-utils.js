@@ -162,6 +162,18 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       type: el.getAttribute('type') || 'none'
     };
 
+    // Include <select> dropdown options so the agent knows what values are available
+    if (el.tagName === 'SELECT') {
+      const opts = Array.from(el.options).slice(0, 30);
+      elementData.options = opts.map(o => ({ value: o.value, text: o.textContent.trim().substring(0, 60) }));
+      elementData.multiple = el.multiple;
+    }
+
+    // Include checkbox/radio state
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      elementData.checked = el.checked;
+    }
+
     // Include shadow DOM metadata when applicable
     if (inShadowDOM) {
       elementData.inShadowDOM = true;

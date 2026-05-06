@@ -121,13 +121,41 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
     const valueLower = value.toLowerCase().trim();
 
-    // Try exact or partial text match
+    // Priority matching: exact > starts-with > word boundary > partial (most specific first)
     let matchedEl = null;
+    // 1. Exact match (highest priority)
     for (const opt of optionEls) {
       const optText = (opt.innerText || opt.textContent || '').trim().toLowerCase();
-      if (optText === valueLower || optText.includes(valueLower)) {
-        matchedEl = opt;
-        break;
+      if (optText === valueLower) { matchedEl = opt; break; }
+    }
+    // 2. Exact match against option value attribute
+    if (!matchedEl) {
+      for (const opt of optionEls) {
+        if (opt.value && opt.value.toLowerCase().trim() === valueLower) { matchedEl = opt; break; }
+      }
+    }
+    // 3. Starts with (word boundary)
+    if (!matchedEl) {
+      for (const opt of optionEls) {
+        const optText = (opt.innerText || opt.textContent || '').trim().toLowerCase();
+        if (optText.startsWith(valueLower + ' ') || optText.startsWith(valueLower) && (optText.length === valueLower.length || optText[valueLower.length] === ' ')) {
+          matchedEl = opt; break;
+        }
+      }
+    }
+    // 4. Contains as whole word
+    if (!matchedEl) {
+      const wordRegex = new RegExp('\\b' + valueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      for (const opt of optionEls) {
+        const optText = (opt.innerText || opt.textContent || '').trim();
+        if (wordRegex.test(optText)) { matchedEl = opt; break; }
+      }
+    }
+    // 5. Partial contains (fallback — least specific)
+    if (!matchedEl) {
+      for (const opt of optionEls) {
+        const optText = (opt.innerText || opt.textContent || '').trim().toLowerCase();
+        if (optText.includes(valueLower)) { matchedEl = opt; break; }
       }
     }
 

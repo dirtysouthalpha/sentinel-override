@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sentinel Override",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "Human-like browser automation agent — investigates, configures, and troubleshoots the web with visible interactions",
   "permissions": [
     "activeTab",
@@ -46,5 +46,24 @@
       "run_at": "document_start",
       "all_frames": true
     }
-  ]
+  ],
+  "commands": {
+    "toggle-agent": {
+      "suggested_key": { "default": "Ctrl+Shift+Space" },
+      "description": "Toggle agent start/stop"
+    },
+    "pause-agent": {
+      "suggested_key": { "default": "Ctrl+Shift+P" },
+      "description": "Pause/resume running agent"
+    },
+    "turbo-mode": {
+      "description": "Set speed to turbo (fast, no human-like delays)"
+    },
+    "normal-mode": {
+      "description": "Set speed to normal (human-like delays)"
+    },
+    "stealth-mode": {
+      "description": "Set speed to stealth (slow, maximum human-like randomness)"
+    }
+  }
 }

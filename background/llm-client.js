@@ -132,6 +132,93 @@ UI-SPECIFIC RULES:
 `;
   }
 
+  // -- ConnectWise Manage/PSA --
+  const isConnectWise = url.includes('connectwise') || url.includes('cw.manage') || url.includes('my.connectwise') || url.includes('cwautomate') || text.includes('connectwise');
+  if (isConnectWise) return `
+[ConnectWise Platform Context]
+- Navigation uses a left sidebar with expandable menu sections (Service, Sales, Procurement, etc.)
+- Tables use a filter bar at top — click the filter icon to add criteria, then click Refresh
+- Opening a ticket: Service > Service Tickets > click + or "New Ticket" button
+- Ticket fields: Summary, Company (dropdown), Contact, Type, Subtype, Item, Priority, Status
+- Company dropdown is searchable — type to filter, click to select
+- Time entries: open ticket, click the Time tab, click "Enter Time" or + button
+- Use click to interact with dropdown menus; ConnectWise uses custom dropdowns (not native <select>)
+- For bulk operations, use the checkbox column to select rows, then use the action toolbar
+- SSO/SAML redirects are common — if redirected to a login page, wait for it to load
+- Configurations (devices) are under the Configurations tab on a company or ticket
+`;
+
+  // -- NinjaOne RMM --
+  const isNinjaOne = url.includes('ninjarmm') || url.includes('ninja.io') || url.includes('ninjabe') || text.includes('ninjaone') || text.includes('ninja rmm');
+  if (isNinjaOne) return `
+[NinjaOne Platform Context]
+- Navigation uses a top menu bar with Organizations, Devices, Software, Policies, etc.
+- Device list has a search/filter bar — type to search by hostname, IP, or organization
+- Click a device row to open the device detail panel (slide-in from right)
+- Policy management: Policies > select policy type > edit conditions/actions
+- Organization selector (top-left or top-right dropdown) switches between managed orgs
+- Custom fields are under Organization > Custom Fields or Device > Custom Fields
+- Scripts: Automation > Scripts > search or browse, click to run on selected devices
+- Software management: Software > patching status, approve/deny updates
+- Ninja uses React-based custom dropdowns — use click to open, click to select
+- Tables support column sorting by clicking column headers
+`;
+
+  // -- Datto RMM / Autotask PSA --
+  const isDatto = url.includes('datto') || url.includes('centrestage') || url.includes('autotask') || url.includes('adra') || text.includes('datto rmm') || text.includes('autotask');
+  if (isDatto) return `
+[Datto/Autotask Platform Context]
+- Autotask PSA: navigation via top menu (Dispatch, Service Desk, Projects, etc.)
+- Ticket creation: Service Desk > Tickets > New Ticket
+- Datto RMM: left sidebar navigation (Sites, Devices, Policies, Jobs, etc.)
+- Device search: Devices > use filter bar, supports hostname/IP/serial search
+- Alert management: Alerts page shows active alerts, click to acknowledge or create ticket
+- Integration between Datto RMM and Autotask PSA via Datto Integration
+- Autotask uses custom ASP.NET dropdowns — click to open, may need to type to filter
+- Datto RMM uses Angular-based dropdowns — click to open, click to select
+- Both platforms have session timeouts — if login form appears, re-authenticate
+`;
+
+  // -- IT Glue --
+  const isITGlue = url.includes('itglue') || url.includes('it-glue') || text.includes('it glue');
+  if (isITGlue) return `
+[IT Glue Platform Context]
+- Navigation: left sidebar with Organizations, Passwords, Documents, Configurations, etc.
+- Search bar at top of every page — type to search across all asset types
+- Organizations page lists all managed orgs, click to open org detail
+- Passwords: organized by organization, click to view (may require re-authentication)
+- Documents: rich text editor with version history
+- Configurations: network devices, servers, workstations listed with IPs and credentials
+- IT Glue uses standard HTML forms — type, click, select all work natively
+- Related items section at bottom of each asset links to connected configs/passwords
+`;
+
+  // -- Huntress MDR --
+  const isHuntress = url.includes('huntress') || text.includes('huntress');
+  if (isHuntress) return `
+[Huntress Platform Context]
+- Dashboard shows threat summary with alert counts
+- Left sidebar: Dashboard, Threat Intelligence, Managed Agents, Reports, Account
+- Managed Agents page lists all endpoints with agent status
+- Alert management: Threat Intelligence > click alert to see details
+- Agent deployment: Account > Deployment > download installer or copy install command
+- Reports: generates PDF/CSV reports for compliance
+- Huntress uses custom React dropdowns — click to open, click to select
+`;
+
+  // -- ScreenConnect / ConnectWise Control --
+  const isScreenConnect = url.includes('screenconnect') || url.includes('connectwisecontrol') || text.includes('screenconnect');
+  if (isScreenConnect) return `
+[ScreenConnect Platform Context]
+- Access page lists all managed machines with status (online/offline)
+- Search bar filters by hostname, organization, or custom property
+- To connect: click the checkbox next to machine, click "Connect" or double-click
+- Session types: Control (full desktop), Access (background), Meeting (presentation)
+- Command tab allows running commands on connected machines
+- File transfer tab for uploading/downloading files
+- Custom properties used for tagging/organization — editable in machine details
+`;
+
   return ''; // No platform-specific context needed
 }
 
@@ -409,8 +496,10 @@ RULES:
 5. **NEVER HALLUCINATE** -- Your "finish" summary MUST only contain information you actually extracted from web pages using "extract", "execute_js" with key, or "note". If you did not extract real data from real pages, you MUST say "I was unable to extract data from the page" — NEVER fabricate article titles, product names, statistics, or summaries from your training data. This is a strict requirement.
 6. **NO VAGUE SUMMARIES** -- Include ACTUAL TEXT, names, numbers, URLs, prices extracted from pages. "Found articles" is useless. "Article 'X' by Y says Z" is useful.
 7. Use "extract" + memory to carry data between pages. Reference with ::key::.
-8. For dropdowns: use "select". For hover menus: use "hover" then "click".
-9. One action per step.
+8. For native <select> dropdowns: use "select" (works on <select> elements with visible options). For custom SPA dropdowns (React, Angular): use "click" to open → "click" to select option. For hover menus: use "hover" then "click".
+9. For checkboxes: use "check" with "checked": true/false to set explicit state. For bulk operations: use "check_all" with a selector.
+10. For modifier keys (Ctrl+A, Ctrl+V, etc.): use "press_key" with "modifiers": {"ctrl": true}.
+11. One action per step.
 10. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
    - For briefings/lists: Use clear numbered sections with headlines, key takeaways, and source links
    - For research tasks: Lead with the answer, then support with evidence
@@ -424,9 +513,13 @@ Actions:
 - { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
 - { "type": "navigate", "url": "URL" }
 - { "type": "scroll", "amount": INTEGER }
-- { "type": "select", "selector": "FROM_LIST", "value": "OPTION" }
+- { "type": "select", "selector": "FROM_LIST", "value": "OPTION_TEXT_OR_VALUE" }
+- { "type": "check", "selector": "FROM_LIST", "checked": true|false }
+- { "type": "check_all", "selector": "CSS_SELECTOR", "checked": true|false }
 - { "type": "hover", "selector": "FROM_LIST" }
-- { "type": "press_key", "key": "Enter|Tab|Escape|ArrowDown|..." }
+- { "type": "press_key", "key": "Enter|Tab|Escape|Backspace|ArrowDown|...", "modifiers": {"ctrl": true, "shift": true} }
+- { "type": "upload_file", "selector": "FROM_LIST", "file_name": "example.txt" }
+- { "type": "open_dropdown", "selector": "FROM_LIST" }
 - { "type": "extract", "key": "memory_key", "selector": "FROM_LIST", "attribute": "text|href|value|..." }
 - { "type": "extract_list", "key": "memory_key", "selector": "CSS_SELECTOR", "fields": { "title": "h2", "price": ".price" }, "limit": 10 }
 - { "type": "wait_for_text", "text": "TEXT", "timeout": 5000 }

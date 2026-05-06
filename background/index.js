@@ -74,6 +74,21 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return stopAgent();
     }
 
+    case 'pause_agent_loop': {
+      const { pauseAgent } = await import('./agent-engine.js');
+      return pauseAgent();
+    }
+
+    case 'resume_agent_loop': {
+      const { resumeAgent } = await import('./agent-engine.js');
+      return resumeAgent();
+    }
+
+    case 'set_agent_speed': {
+      const { setAgentSpeed } = await import('./agent-engine.js');
+      return setAgentSpeed(request.mode);
+    }
+
     // SPA messages from content script
     case 'spa_navigation':
     case 'spa_content_changed':
@@ -199,4 +214,48 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 chrome.tabs.onActivated.addListener((activeInfo) => {
   // This listener exists for future popup UI features.
   // No action needed -- agent ignores user tab switches per CONTEXT.md decision.
+});
+
+// ========== Keyboard Shortcut Commands ==========
+chrome.commands.onCommand.addListener(async (command) => {
+  try {
+    switch (command) {
+      case 'toggle-agent': {
+        if (agentRunning) {
+          await stopAgent();
+          chrome.notifications.create({ type: 'basic', iconUrl: 'icon-48.png', title: 'Sentinel Override', message: 'Agent stopped' });
+        }
+        // Start requires a goal — open the side panel instead
+        else { chrome.sidePanel.open(); }
+        break;
+      }
+      case 'pause-agent': {
+        if (agentRunning) {
+          const { pauseAgent, resumeAgent } = await import('./agent-engine.js');
+          // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
+          // Instead, just send both and let the engine decide
+          await pauseAgent(); // Will set agentPaused = true
+        }
+        break;
+      }
+      case 'turbo-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('turbo');
+        chrome.notifications.create({ type: 'basic', iconUrl: 'icon-48.png', title: 'Sentinel Override', message: '🚀 Turbo mode' });
+        break;
+      }
+      case 'normal-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('normal');
+        chrome.notifications.create({ type: 'basic', iconUrl: 'icon-48.png', title: 'Sentinel Override', message: '👤 Normal mode' });
+        break;
+      }
+      case 'stealth-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('stealth');
+        chrome.notifications.create({ type: 'basic', iconUrl: 'icon-48.png', title: 'Sentinel Override', message: '🥷 Stealth mode' });
+        break;
+      }
+    }
+  } catch (e) { console.warn('Command handler error:', e); }
 });
