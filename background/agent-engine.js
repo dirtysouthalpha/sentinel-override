@@ -372,6 +372,15 @@ async function runAgentLoop(goal, workingTabId) {
       const scriptReady = await injectContentScript(tab);
       if (!scriptReady) { sendSilentUpdate('Content script failed -- retrying', stepCount); await sleep(2000); continue; }
 
+      // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
+      try {
+        const overlayResult = await sendMessageWithRetry(tab, { action: 'dismiss_overlays' });
+        if (overlayResult && overlayResult.count > 0) {
+          sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
+          await sleep(800); // let overlay close animate
+        }
+      } catch (e) { /* non-fatal */ }
+
       // Get page data
       let observation, pageContent;
       try {

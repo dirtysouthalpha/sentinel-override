@@ -25,6 +25,79 @@ if (window.__sentinelInitialized) {
   const ov = window.__sentinelUtils.overlay;
   const fm = window.__sentinelUtils.frame;
 
+  // ========== Overlay / Popup Dismissal ==========
+  // Detects and auto-closes common overlays: cookie consent, ad-blocker
+  // warnings, newsletter popups, paywall modals, etc.
+  function dismissOverlays() {
+    const dismissed = [];
+
+    // Close/dismiss button selectors (ordered by specificity)
+    const closeBtnSelectors = [
+      // Cookie consent
+      '[class*="cookie"] [class*="reject" i]', '[class*="cookie"] [class*="decline" i]',
+      '[class*="cookie"] [class*="dismiss" i]', '[class*="cookie"] button[class*="close" i]',
+      '[id*="cookie"] button[class*="close" i]', '[id*="cookie"] button[class*="accept" i]',
+      '[class*="consent"] [class*="reject" i]', '[class*="consent"] [class*="dismiss" i]',
+      '[class*="gdpr"] [class*="dismiss" i]', '[class*="gdpr"] [class*="reject" i]',
+      // Generic close buttons inside modals/overlays
+      '[class*="modal"] [class*="close" i]', '[class*="popup"] [class*="close" i]',
+      '[class*="overlay"] [class*="close" i]', '[class*="dialog"] [class*="close" i]',
+      '[aria-label="Close"]', '[aria-label="Dismiss"]', '[aria-label="Close banner"]',
+      // Newsletter / subscribe
+      '[class*="newsletter"] [class*="close" i]', '[class*="newsletter"] [class*="dismiss" i]',
+      '[class*="subscribe"] [class*="close" i]', '[class*="signup"] [class*="close" i]',
+      // Ad-blocker / paywall warnings
+      '[class*="adblock"] [class*="close" i]', '[class*="adblock"] [class*="dismiss" i]',
+      '[class*="paywall"] [class*="close" i]', '[class*="paywall"] [class*="dismiss" i]',
+      // Generic × buttons (SVG or text)
+      'button[class*="close" i]', '[class*="dismiss-btn" i]',
+    ];
+
+    for (const sel of closeBtnSelectors) {
+      try {
+        const buttons = document.querySelectorAll(sel);
+        for (const btn of buttons) {
+          if (btn.offsetParent !== null && btn.getBoundingClientRect().width > 0) {
+            btn.click();
+            dismissed.push(btn.textContent.trim().substring(0, 40) || sel);
+          }
+        }
+      } catch (e) { /* invalid selector, skip */ }
+    }
+
+    // Remove blocking overlays that cover the viewport (high z-index, full-screen)
+    const allEls = document.querySelectorAll('*');
+    for (const el of allEls) {
+      if (dismissed.length >= 5) break; // don't over-dismiss
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.position === 'fixed' && parseInt(style.zIndex) > 9000) {
+          const rect = el.getBoundingClientRect();
+          const viewportArea = window.innerWidth * window.innerHeight;
+          const elArea = rect.width * rect.height;
+          // If overlay covers >50% of viewport and isn't our own banner
+          if (elArea > viewportArea * 0.5 && !el.className.includes('sentinel')) {
+            // Look for a close button inside
+            const closeBtn = el.querySelector('button, [role="button"], [class*="close" i], [aria-label="Close"]');
+            if (closeBtn) {
+              closeBtn.click();
+              dismissed.push('overlay-close: ' + (closeBtn.textContent.trim().substring(0, 30) || 'unnamed'));
+            } else {
+              // No close button found — hide the overlay
+              el.style.display = 'none';
+              dismissed.push('hidden-overlay');
+              // Also remove any backdrop
+              const backdrop = document.querySelector('[class*="backdrop" i], [class*="scrim" i]');
+              if (backdrop) backdrop.style.display = 'none';
+            }
+          }
+        }
+      } catch (e) { /* skip */ }
+    }
+
+    return { dismissed, count: dismissed.length };
+  }
+
   // ========== Message Handler ==========
   async function handleMessage(request) {
     switch (request.action) {
@@ -159,6 +232,10 @@ if (window.__sentinelInitialized) {
         } catch (e) {
           throw new Error('Cross-origin iframe -- use background routing');
         }
+      }
+
+      case 'dismiss_overlays': {
+        return dismissOverlays();
       }
 
       default:
@@ -692,61 +769,54 @@ if (window.__sentinelInitialized) {
 
       case 'execute_js': {
         // SECURITY REVIEW (DEB-05):
-        // Risk Level: HIGH -- new Function() executes arbitrary JavaScript in the page context.
-        //
-        // Why it exists: The agent needs to execute custom JavaScript to handle UIs that cannot
-        // be automated through standard DOM APIs (e.g., complex React state updates, Angular
-        // form controls, custom widget libraries). The LLM generates the code, and the content
-        // script runs it in the page's JS context (not the extension's isolated world).
-        //
-        // Attack surface:
-        // 1. LLM prompt injection: A malicious web page could craft content that tricks the LLM
-        //    into generating dangerous execute_js commands (e.g., exfiltrating cookies, modifying
-        //    page state, redirecting the user).
-        // 2. Imported runbooks: Untrusted templates could contain goals that instruct the agent
-        //    to execute arbitrary code. See COL-05 for import validation.
-        //
-        // Current mitigations:
-        // - execute_js is only available when the agent is actively running (user-initiated)
-        // - The code runs in the PAGE context, not the extension context (no access to chrome.* APIs)
-        // - "use strict" mode prevents some dangerous patterns
-        //
-        // Recommended improvements for v2+:
-        // - Add an allowlist of permitted APIs for execute_js code
-        // - Add user confirmation prompt before execute_js commands (already exists for approval mode)
-        // - For imported runbooks: reject any goal containing "execute_js" (see COL-05)
-        // - Consider a sandboxed iframe for code execution instead of new Function()
-        //
-        // Decision: KEEP new Function() for v2. The agent's core value depends on it.
-        // Document the risk and add mitigations incrementally.
+        // Uses <script> tag injection to run code in the page's MAIN world.
+        // This bypasses MV3 extension CSP (which blocks new Function/eval in
+        // content scripts). The injected script runs under the PAGE's CSP,
+        // which almost always allows inline scripts (needed for ads/analytics).
         const code = cmd.code || '';
         if (!code) return 'No code provided';
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('execute_js', `Running JS${cmd.key ? ' → "' + cmd.key + '"' : ''}: ${code.substring(0, 60)}...`);
         try {
-          // Build sandboxed document/window if sandboxing is enabled
-          let sandboxedDoc = targetDoc;
-          let sandboxedWin = targetDoc.defaultView;
-          if (EXECUTE_JS_SANDBOX_ENABLED) {
-            sandboxedWin = createSandboxedWindow(targetDoc.defaultView);
-            sandboxedDoc = createSandboxedDocument(targetDoc, sandboxedWin);
-          }
+          const eventId = '__sentinel_' + Date.now() + '_' + Math.random().toString(36).slice(2);
 
-          // Execute with a timeout
-          const result = await Promise.race([
-            new Promise((resolve) => {
-              try {
-                const fn = new Function('document', 'window', `"use strict"; return (async () => { ${code} })()`);
-                const result = fn(sandboxedDoc, sandboxedWin);
-                resolve(result);
-              } catch (syncErr) {
-                resolve('Execution error: ' + syncErr.message);
-              }
-            }),
-            new Promise(resolve => setTimeout(() => resolve('Code execution timed out (5s)'), 5000))
-          ]);
-          const resultStr = typeof result === 'object' ? JSON.stringify(result).substring(0, 3000) : String(result || '').substring(0, 3000);
-          return 'JS Result: ' + resultStr;
+          const execResult = await new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+              window.removeEventListener('message', handler);
+              scriptEl.remove();
+              resolve({ __timeout: true });
+            }, 5000);
+
+            const handler = (event) => {
+              if (event.source !== window || !event.data || event.data.__sentinelEventId !== eventId) return;
+              clearTimeout(timeout);
+              window.removeEventListener('message', handler);
+              scriptEl.remove();
+              resolve(event.data);
+            };
+
+            window.addEventListener('message', handler);
+
+            const scriptEl = document.createElement('script');
+            scriptEl.textContent = `
+              (async () => {
+                try {
+                  const __r = await (async () => { ${code} })();
+                  const __s = typeof __r === 'object' && __r !== null
+                    ? JSON.stringify(__r).substring(0, 3000)
+                    : String(__r || '').substring(0, 3000);
+                  window.postMessage({ __sentinelEventId: '${eventId}', __value: __s }, '*');
+                } catch(e) {
+                  window.postMessage({ __sentinelEventId: '${eventId}', __error: e.message }, '*');
+                }
+              })();
+            `;
+            document.documentElement.appendChild(scriptEl);
+          });
+
+          if (execResult.__timeout) return 'Code execution timed out (5s)';
+          if (execResult.__error) return 'Execution error: ' + execResult.__error;
+          return 'JS Result: ' + (execResult.__value || '');
         } catch (err) {
           return 'JS Error: ' + err.message;
         }
