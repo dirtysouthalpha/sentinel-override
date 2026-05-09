@@ -1,0 +1,701 @@
+// popup-modules/settings.js
+// Settings UI: theme management, provider switching, settings modal, test connection, presets.
+// Verified 2026-05-06.
+// Depends on: ui-common.js (showToast, isValidUrl, sanitizeHtml).
+
+// ========== DOM Elements ==========
+const settingsBtn = document.getElementById('settingsBtn');
+const themeToggle = document.getElementById('themeToggle');
+const settingsModal = document.getElementById('settings-modal');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const setProviderEndpoint = document.getElementById('set-provider-endpoint');
+const setProviderKey = document.getElementById('set-provider-key');
+const setProviderModel = document.getElementById('set-provider-model');
+const exportFormatSelect = document.getElementById('export-format');
+const themeModal = document.getElementById('theme-modal');
+const closeThemeBtn = document.getElementById('closeThemeBtn');
+const saveThemeBtn = document.getElementById('saveThemeBtn');
+
+// ========== Theme Management ==========
+function loadThemePreference() {
+  // Restore named theme (tron, matrix, etc.)
+  const savedNamedTheme = localStorage.getItem('theme-named');
+  if (savedNamedTheme && savedNamedTheme !== 'light') {
+    applyThemePreset(savedNamedTheme);
+    // Update active preset button
+    document.querySelectorAll('[data-theme]').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === savedNamedTheme);
+    });
+    return;
+  }
+  const savedTheme = localStorage.getItem('theme-preference');
+  if (savedTheme) {
+    document.body.classList.toggle('dark-mode', savedTheme === 'dark');
+    updateThemeToggle();
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.body.classList.toggle('dark-mode', prefersDark);
+    updateThemeToggle();
+  }
+}
+
+function updateThemeToggle() {
+  const isDark = document.body.classList.contains('dark-mode');
+  localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('dark-mode');
+  updateThemeToggle();
+}
+
+// ========== Provider Card Switching ==========
+function switchProviderCard(providerId) {
+  const state = getState();
+  state.activeProviderId = providerId;
+
+  // Update active provider button styling
+  document.querySelectorAll('.provider-btn').forEach(btn => {
+    btn.classList.toggle('active-provider', btn.dataset.provider === providerId);
+  });
+
+  // Populate fields from provider config
+  const config = state.providerConfigs[providerId] || {};
+  setProviderEndpoint.value = config.endpoint || '';
+  setProviderKey.value = config.api_key || '';
+  setProviderModel.value = config.model || '';
+
+  // Auto-fill defaults if fields are empty
+  const defaults = providerId === 'anthropic'
+    ? { endpoint: 'https://api.anthropic.com/v1/messages', model: 'claude-haiku-4-5-20251001' }
+    : { endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' };
+
+  if (!setProviderEndpoint.value) setProviderEndpoint.placeholder = defaults.endpoint;
+  if (!setProviderModel.value) setProviderModel.placeholder = defaults.model;
+}
+
+// Wire up provider selector buttons
+document.querySelectorAll('.provider-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchProviderCard(btn.dataset.provider));
+});
+
+// ========== Settings Management ==========
+function loadSettings() {
+  const state = getState();
+  chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
+    // Handle both new provider structure and legacy keys
+    if (result.providers) {
+      state.providerConfigs = result.providers;
+      state.activeProviderId = result.active_provider || 'openai';
+    } else {
+      // Legacy fallback -- migrate on the fly for display
+      const providerId = (result.api_endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai';
+      state.providerConfigs = {
+        anthropic: { api_key: '', model: 'claude-haiku-4-5-20251001', endpoint: 'https://api.anthropic.com/v1/messages', max_tokens: 8000, temperature: 0.3 },
+        openai: { api_key: result.api_key || '', model: result.model || 'gpt-4o', endpoint: result.api_endpoint || 'https://api.openai.com/v1/chat/completions', max_tokens: 8000, temperature: 0.3 }
+      };
+      state.activeProviderId = providerId;
+    }
+    if (result.export_format) exportFormatSelect.value = result.export_format;
+    if (result.agent_context) document.getElementById('set-agent-context').value = result.agent_context;
+  });
+}
+
+// ========== Trusted Input Toggle (#9 — CDP-based input dispatch) ==========
+// Opt-in: when enabled, the agent routes click/type/press_key through
+// chrome.debugger so events are dispatched with isTrusted: true. Default OFF
+// because attaching the debugger surfaces the "Sentinel Override is debugging
+// this browser" banner — acceptable cost only when sites need trusted events.
+const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
+if (useTrustedInputToggle) {
+  chrome.storage.local.get(['useTrustedInput'], (result) => {
+    useTrustedInputToggle.checked = result.useTrustedInput === true;
+  });
+  useTrustedInputToggle.addEventListener('change', () => {
+    const enabled = useTrustedInputToggle.checked;
+    chrome.storage.local.set({ useTrustedInput: enabled }, () => {
+      try {
+        showToast(
+          enabled
+            ? 'Trusted input ON — debugger banner will appear during runs'
+            : 'Trusted input OFF — using synthetic events',
+          enabled ? 'success' : 'info'
+        );
+      } catch (e) { /* showToast may not be available */ }
+    });
+  });
+}
+
+// ========== Expected Tenant (3.7.0) ==========
+// Cross-client safety: when set, the header chip on Microsoft admin URLs
+// turns green when the detected tenant matches and red when it doesn't.
+const expectedTenantInput = document.getElementById('expectedTenantInput');
+if (expectedTenantInput) {
+  chrome.storage.local.get(['expectedTenant'], (result) => {
+    if (typeof result.expectedTenant === 'string') {
+      expectedTenantInput.value = result.expectedTenant;
+    }
+  });
+  // Save on every change (debounced lightly so we don't spam storage).
+  let __tenantSaveTimer = null;
+  expectedTenantInput.addEventListener('input', () => {
+    if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
+    __tenantSaveTimer = setTimeout(() => {
+      const v = (expectedTenantInput.value || '').trim();
+      chrome.storage.local.set({ expectedTenant: v });
+    }, 350);
+  });
+}
+
+// ========== Theme Toggle ==========
+themeToggle.addEventListener('click', toggleTheme);
+
+// ========== Settings Modal ==========
+settingsBtn.addEventListener('click', async () => {
+  const state = getState();
+  // Load provider settings from storage
+  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+
+  if (stored.providers) {
+    state.providerConfigs = stored.providers;
+    state.activeProviderId = stored.active_provider || 'openai';
+  } else {
+    // Legacy fallback -- migrate on the fly for display
+    const providerId = (stored.api_endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai';
+    state.providerConfigs = {
+      anthropic: { api_key: '', model: 'claude-haiku-4-5-20251001', endpoint: 'https://api.anthropic.com/v1/messages', max_tokens: 8000, temperature: 0.3 },
+      openai: { api_key: stored.api_key || '', model: stored.model || 'gpt-4o', endpoint: stored.api_endpoint || 'https://api.openai.com/v1/chat/completions', max_tokens: 8000, temperature: 0.3 }
+    };
+    state.activeProviderId = providerId;
+  }
+
+  switchProviderCard(state.activeProviderId);
+  settingsModal.classList.add('show');
+});
+
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.classList.remove('show');
+});
+
+saveSettingsBtn.addEventListener('click', () => {
+  const state = getState();
+  const endpoint = setProviderEndpoint.value.trim();
+  const apiKey = setProviderKey.value.trim();
+  const model = setProviderModel.value.trim();
+  const format = exportFormatSelect.value;
+  const agentContext = document.getElementById('set-agent-context').value.trim();
+
+  if (!apiKey) {
+    showToast('API key is required', 'error');
+    return;
+  }
+
+  if (endpoint && !isValidUrl(endpoint)) {
+    showToast('Invalid API endpoint URL', 'error');
+    return;
+  }
+
+  // Save to per-provider structure
+  state.providerConfigs[state.activeProviderId] = {
+    api_key: apiKey,
+    model: model,
+    endpoint: endpoint,
+    max_tokens: 8000,
+    temperature: 0.3
+  };
+
+  chrome.storage.local.set({
+    active_provider: state.activeProviderId,
+    providers: state.providerConfigs,
+    export_format: format,
+    agent_context: agentContext
+  }, () => {
+    settingsModal.classList.remove('show');
+    showToast(`Settings saved (${state.activeProviderId})`, 'success');
+  });
+});
+
+// ========== Theme Customization ==========
+document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const theme = btn.dataset.theme;
+    document.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyThemePreset(theme);
+  });
+});
+
+function applyThemePreset(theme) {
+  const presets = {
+    light: {
+      '--bg-primary': '#ffffff',
+      '--text-primary': '#0d0d0d',
+      '--accent-primary': '#0084ff'
+    },
+    dark: {
+      '--bg-primary': '#0d0d0d',
+      '--text-primary': '#ffffff',
+      '--accent-primary': '#0084ff'
+    },
+    matrix: {
+      '--bg-primary': '#0a0a0a',
+      '--bg-secondary': '#0d1a0d',
+      '--bg-tertiary': '#112211',
+      '--bg-input': '#0d1a0d',
+      '--text-primary': '#00ff41',
+      '--text-secondary': '#00cc33',
+      '--text-tertiary': '#00802a',
+      '--accent-primary': '#00ff41',
+      '--accent-hover': '#00cc33',
+      '--border-color': '#004d1a',
+      '--message-user-bg': '#00ff41',
+      '--message-user-text': '#0a0a0a',
+      '--message-assistant-bg': '#0d1a0d',
+      '--message-assistant-text': '#00ff41',
+      '--code-bg': '#050d05',
+      '--error-color': '#ff3333',
+      '--success-color': '#00ff41',
+      '--warning-color': '#ffcc00'
+    },
+    tron: {
+      '--bg-primary': '#000000',
+      '--bg-secondary': '#0a0a14',
+      '--bg-tertiary': '#10102a',
+      '--bg-input': '#0a0a1a',
+      '--text-primary': '#00d4ff',
+      '--text-secondary': '#80e8ff',
+      '--text-tertiary': '#4a6a7a',
+      '--accent-primary': '#00d4ff',
+      '--accent-hover': '#00a8cc',
+      '--border-color': '#003344',
+      '--message-user-bg': '#00d4ff',
+      '--message-user-text': '#000000',
+      '--message-assistant-bg': '#0a0a18',
+      '--message-assistant-text': '#80e8ff',
+      '--code-bg': '#050510',
+      '--error-color': '#ff4444',
+      '--success-color': '#00d4ff',
+      '--warning-color': '#ff8800'
+    },
+    cyberpunk: {
+      '--bg-primary': '#0d0221',
+      '--bg-secondary': '#150535',
+      '--bg-tertiary': '#1e0845',
+      '--bg-input': '#1a0640',
+      '--text-primary': '#ff2a6d',
+      '--text-secondary': '#d1c4e9',
+      '--text-tertiary': '#7c6f99',
+      '--accent-primary': '#ff2a6d',
+      '--accent-hover': '#ff5599',
+      '--border-color': '#3d1a6e',
+      '--message-user-bg': '#ff2a6d',
+      '--message-user-text': '#0d0221',
+      '--message-assistant-bg': '#150535',
+      '--message-assistant-text': '#d1c4e9',
+      '--code-bg': '#0a0118',
+      '--error-color': '#ff0040',
+      '--success-color': '#05d9e8',
+      '--warning-color': '#f5f500'
+    },
+    neon: {
+      '--bg-primary': '#0a0014',
+      '--bg-secondary': '#12001f',
+      '--bg-tertiary': '#1a002a',
+      '--bg-input': '#160025',
+      '--text-primary': '#e040fb',
+      '--text-secondary': '#ce93d8',
+      '--text-tertiary': '#7b5e80',
+      '--accent-primary': '#e040fb',
+      '--accent-hover': '#ab47bc',
+      '--border-color': '#38006b',
+      '--message-user-bg': '#e040fb',
+      '--message-user-text': '#0a0014',
+      '--message-assistant-bg': '#12001f',
+      '--message-assistant-text': '#ce93d8',
+      '--code-bg': '#08000f',
+      '--error-color': '#ff1744',
+      '--success-color': '#00e676',
+      '--warning-color': '#ffea00'
+    },
+    terminal: {
+      '--bg-primary': '#1a1a1a',
+      '--bg-secondary': '#222222',
+      '--bg-tertiary': '#2a2a2a',
+      '--bg-input': '#1e1e1e',
+      '--text-primary': '#33ff33',
+      '--text-secondary': '#b0b0b0',
+      '--text-tertiary': '#666666',
+      '--accent-primary': '#33ff33',
+      '--accent-hover': '#22cc22',
+      '--border-color': '#333333',
+      '--message-user-bg': '#33ff33',
+      '--message-user-text': '#1a1a1a',
+      '--message-assistant-bg': '#222222',
+      '--message-assistant-text': '#cccccc',
+      '--code-bg': '#111111',
+      '--error-color': '#ff4444',
+      '--success-color': '#33ff33',
+      '--warning-color': '#ffaa00'
+    },
+    blood: {
+      '--bg-primary': '#0a0000',
+      '--bg-secondary': '#140000',
+      '--bg-tertiary': '#1e0000',
+      '--bg-input': '#160000',
+      '--text-primary': '#ff1a1a',
+      '--text-secondary': '#cc8888',
+      '--text-tertiary': '#664444',
+      '--accent-primary': '#ff1a1a',
+      '--accent-hover': '#cc0000',
+      '--border-color': '#330000',
+      '--message-user-bg': '#ff1a1a',
+      '--message-user-text': '#0a0000',
+      '--message-assistant-bg': '#140000',
+      '--message-assistant-text': '#cc8888',
+      '--code-bg': '#080000',
+      '--error-color': '#ff0000',
+      '--success-color': '#00cc44',
+      '--warning-color': '#ff6600'
+    }
+  };
+
+  if (presets[theme]) {
+    // Save to localStorage
+    localStorage.setItem('theme-named', theme);
+    // Remove all theme glow classes
+    document.body.className = document.body.className
+      .replace(/theme-\S+/g, '')
+      .trim();
+
+    // Toggle dark-mode class for dark themes
+    const darkThemes = ['dark', 'matrix', 'tron', 'cyberpunk', 'neon', 'terminal', 'blood'];
+    document.body.classList.toggle('dark-mode', darkThemes.includes(theme));
+
+    // Add theme glow class for themed presets
+    if (!['light', 'dark'].includes(theme)) {
+      document.body.classList.add('theme-' + theme);
+    }
+
+    Object.entries(presets[theme]).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(key, value);
+    });
+  }
+}
+
+saveThemeBtn.addEventListener('click', () => {
+  const primary = document.getElementById('colorPrimary').value;
+  const bg = document.getElementById('colorBg').value;
+  const text = document.getElementById('colorText').value;
+
+  document.documentElement.style.setProperty('--accent-primary', primary);
+  document.documentElement.style.setProperty('--bg-primary', bg);
+  document.documentElement.style.setProperty('--text-primary', text);
+
+  localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
+  themeModal.classList.remove('show');
+  showToast('Theme applied', 'success');
+});
+
+closeThemeBtn.addEventListener('click', () => {
+  themeModal.classList.remove('show');
+});
+
+// ========== Preset Buttons ==========
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
+    switchProviderCard(provider);
+    setProviderEndpoint.value = btn.dataset.endpoint;
+    setProviderModel.value = btn.dataset.model;
+    showToast(`Preset loaded: ${btn.textContent}`, 'success');
+  });
+});
+
+// ========== Test Connection Button ==========
+document.getElementById('testConnectionBtn').addEventListener('click', async () => {
+  const endpoint = setProviderEndpoint.value.trim();
+  const apiKey = setProviderKey.value.trim();
+  const model = setProviderModel.value.trim();
+
+  if (!endpoint || !apiKey || !model) {
+    showToast('Fill in endpoint, API key, and model first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('testConnectionBtn');
+  const prevText = btn.textContent;
+  btn.textContent = 'Testing...';
+  btn.disabled = true;
+
+  try {
+    // Determine provider format from endpoint (popup context cannot import background modules)
+    const isAnthropic = endpoint.includes('api.anthropic.com');
+    const headers = isAnthropic
+      ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
+      : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+    const body = isAnthropic
+      ? JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] })
+      : JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] });
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const resp = await fetch(endpoint, { method: 'POST', headers, body, signal: controller.signal });
+    clearTimeout(timer);
+
+    if (resp.ok) {
+      showToast('Connection OK (' + resp.status + ')', 'success');
+    } else {
+      const errText = (await resp.text()).slice(0, 200);
+      showToast('Connection failed: ' + resp.status + ' ' + errText, 'error');
+    }
+  } catch (err) {
+    showToast('Connection error: ' + (err && err.message ? err.message : String(err)), 'error');
+  } finally {
+    btn.textContent = prevText;
+    btn.disabled = false;
+  }
+});
+
+// ========== Provider Catalog Auto-Detect (3.10.0) ==========
+// Loads the 16-provider catalog from the background, populates the dropdown,
+// auto-fills the endpoint on selection, and provides a Detect Models button
+// that calls the provider's /models endpoint with the user's API key.
+
+(function wireProviderCatalog() {
+  const sel = document.getElementById('providerCatalogSelect');
+  const detectBtn = document.getElementById('detectModelsBtn');
+  const modelsSel = document.getElementById('detectedModelsSelect');
+  const useBtn = document.getElementById('useDetectedModelBtn');
+  if (!sel || !detectBtn) return;
+
+  let catalog = [];
+
+  // Load catalog via background message
+  function refreshCatalog() {
+    chrome.runtime.sendMessage({ action: 'get_provider_catalog' }, (resp) => {
+      if (chrome.runtime.lastError) return;
+      const data = (resp && resp.data) ? resp.data : resp;
+      if (!Array.isArray(data)) return;
+      catalog = data;
+      // Repopulate dropdown
+      sel.innerHTML = '<option value="">— Pick a provider —</option>';
+      for (const p of catalog) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label;
+        sel.appendChild(opt);
+      }
+    });
+  }
+  refreshCatalog();
+
+  // Provider selection: auto-fill endpoint + default model
+  sel.addEventListener('change', () => {
+    const id = sel.value;
+    if (!id) return;
+    const provider = catalog.find(p => p.id === id);
+    if (!provider) return;
+    if (provider.endpoint) {
+      const epInput = document.getElementById('set-provider-endpoint');
+      if (epInput) epInput.value = provider.endpoint;
+    }
+    if (provider.defaultModel) {
+      const modelInput = document.getElementById('set-provider-model');
+      if (modelInput && !modelInput.value) modelInput.value = provider.defaultModel;
+    }
+    // Reset detected models
+    modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
+    modelsSel.disabled = true;
+    useBtn.disabled = true;
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) {}
+  });
+
+  // Detect Models button
+  detectBtn.addEventListener('click', async () => {
+    const id = sel.value;
+    if (!id) {
+      try { showToast('Pick a provider first', 'error'); } catch (e) {}
+      return;
+    }
+    const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
+    const customEndpoint = (document.getElementById('set-provider-endpoint') || {}).value || '';
+    const prevText = detectBtn.textContent;
+    detectBtn.textContent = '⏳ Detecting…';
+    detectBtn.disabled = true;
+    modelsSel.innerHTML = '<option value="">(fetching…)</option>';
+    modelsSel.disabled = true;
+    useBtn.disabled = true;
+    try {
+      const resp = await chrome.runtime.sendMessage({
+        action: 'fetch_provider_models',
+        providerId: id,
+        apiKey,
+        customEndpoint
+      });
+      const data = (resp && resp.data) ? resp.data : resp;
+      if (!data || !data.ok) {
+        const msg = (data && data.error) || 'Unknown error';
+        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) {}
+        modelsSel.innerHTML = '<option value="">(detection failed — see toast)</option>';
+        return;
+      }
+      const models = data.models || [];
+      if (models.length === 0) {
+        modelsSel.innerHTML = '<option value="">(no models returned)</option>';
+        try { showToast('No models returned', 'error'); } catch (e) {}
+        return;
+      }
+      modelsSel.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '— Select a model (' + models.length + ' available) —';
+      modelsSel.appendChild(placeholder);
+      for (const m of models) {
+        const o = document.createElement('option');
+        o.value = m;
+        o.textContent = m;
+        modelsSel.appendChild(o);
+      }
+      modelsSel.disabled = false;
+      useBtn.disabled = false;
+      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) {}
+    } catch (e) {
+      try { showToast('Error: ' + e.message, 'error'); } catch (ee) {}
+      modelsSel.innerHTML = '<option value="">(error — see toast)</option>';
+    } finally {
+      detectBtn.textContent = prevText;
+      detectBtn.disabled = false;
+    }
+  });
+
+  // Use Selected Model button
+  useBtn.addEventListener('click', () => {
+    const value = modelsSel.value;
+    if (!value) {
+      try { showToast('Pick a model from the list first', 'error'); } catch (e) {}
+      return;
+    }
+    const modelInput = document.getElementById('set-provider-model');
+    if (modelInput) {
+      modelInput.value = value;
+      try { showToast('Model set to ' + value, 'success'); } catch (e) {}
+    }
+  });
+})();
+
+// ========== Custom CSS Auto-Apply (3.11.0) ==========
+// Lets users paste arbitrary CSS to override the look. Auto-saves on edit,
+// auto-applies on popup open via a <style id="sentinel-custom-css"> tag.
+
+(function wireCustomCss() {
+  const STYLE_ID = 'sentinel-custom-css';
+  const STORAGE_KEY = 'sentinel-custom-css';
+
+  function applyCustomCss(css) {
+    try {
+      let el = document.getElementById(STYLE_ID);
+      if (!el) {
+        el = document.createElement('style');
+        el.id = STYLE_ID;
+        document.head.appendChild(el);
+      }
+      el.textContent = css || '';
+    } catch (e) { /* non-fatal */ }
+  }
+
+  // Load on popup open
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) applyCustomCss(saved);
+  } catch (e) {}
+
+  // Wire UI when present
+  function wire() {
+    const ta = document.getElementById('customCssTextarea');
+    const applyBtn = document.getElementById('customCssApplyBtn');
+    const clearBtn = document.getElementById('customCssClearBtn');
+    const statusEl = document.getElementById('customCssStatus');
+    if (!ta) return;
+
+    // Restore prior value
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) ta.value = saved;
+    } catch (e) {}
+
+    let saveTimer = null;
+    const setStatus = (text, color) => {
+      if (!statusEl) return;
+      statusEl.textContent = text || '';
+      statusEl.style.color = color || 'var(--text-tertiary)';
+      if (text) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => { statusEl.textContent = ''; }, 2200);
+      }
+    };
+
+    let debounce = null;
+    ta.addEventListener('input', () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        const css = ta.value || '';
+        try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
+        applyCustomCss(css);
+        setStatus('✓ saved', '#6fcf80');
+      }, 350);
+    });
+
+    if (applyBtn) applyBtn.addEventListener('click', () => {
+      const css = ta.value || '';
+      try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
+      applyCustomCss(css);
+      setStatus('✓ applied', '#6fcf80');
+    });
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+      ta.value = '';
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      applyCustomCss('');
+      setStatus('cleared', 'var(--text-tertiary)');
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+
+// ========== Theme Auto-Save Confirmation (3.11.0) ==========
+// The existing theme system already persists via localStorage 'theme-named'.
+// Re-wire the preset clicks to auto-save AND auto-close the modal so users
+// don't have to hit Save — picking is the action.
+
+(function wireThemeAutoSave() {
+  function init() {
+    document.querySelectorAll('.theme-preset[data-theme]').forEach(el => {
+      el.addEventListener('click', () => {
+        const theme = el.dataset.theme;
+        if (!theme) return;
+        // Strip prior theme-* classes from body
+        document.body.className = document.body.className.split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
+        if (theme !== 'light' && theme !== 'dark') {
+          document.body.classList.add('theme-' + theme);
+        }
+        if (theme === 'dark') document.body.classList.add('dark-mode');
+        else document.body.classList.remove('dark-mode');
+        try { localStorage.setItem('theme-named', theme); } catch (e) {}
+        // Mark active
+        document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) {}
+      });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+

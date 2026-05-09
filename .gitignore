@@ -1,26 +1,31 @@
-# Backups
-*.BACKUP
-*.venice-backup
-*.bak
+# Environment / secrets — never commit these
+.env
+.env.*
+*.env
+secrets.json
+settings.local.json
+*.key
+*.pem
+config.local.*
+storage-export.json
 
-# OS files
-.DS_Store
-Thumbs.db
-.gitkeep
-
-# Node (if any)
-node_modules/
-package-lock.json
-package.json
-
-# IDE
+# Editor / OS
 .vscode/
 .idea/
+*.swp
+.DS_Store
+Thumbs.db
 
-# Secrets (never commit API keys)
-*.env
-*.key
-secrets*
+# Node / build
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
 
-# Screenshots (mockup HTML files)
-screenshots/
+# Release artifacts (built locally, attached to GitHub release directly)
+sentinel-override-v*.zip
+
+# Internal scratch
+*.tmp
+*.bak

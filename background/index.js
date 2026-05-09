@@ -1,0 +1,400 @@
+// Sentinel Override v3 — Service Worker Entry Point
+// Wires all modules together and handles message routing.
+
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds } from './agent-engine.js';
+import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
+import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
+import { setSPATransitionPending } from './shared-state.js';
+import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
+import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
+import { generateReport } from './report-generator.js';
+import { migrateLegacySettings } from './provider-registry.js';
+import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
+import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
+import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
+import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
+
+// ========== One-time migration ==========
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get(['api_endpoint', 'model'], (result) => {
+    const updates = {};
+    if (result.api_endpoint && result.api_endpoint.includes('bigmodel.cn')) updates.api_endpoint = '';
+    if (result.model && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';
+    if (Object.keys(updates).length > 0) chrome.storage.local.set(updates);
+  });
+});
+
+// ========== Scheduler Initialization ==========
+// Re-register alarms on service worker restart (handles browser restart alarm loss)
+initScheduler();
+
+// ========== Frame Router Initialization ==========
+// Subscribe to webNavigation events to keep the per-tab frame map fresh
+// for cross-origin iframe routing.
+addFrameRouterListeners();
+
+// Schedule alarm listener
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name.startsWith('schedule-')) {
+    const scheduleId = alarm.name.replace('schedule-', '');
+    try {
+      await executeScheduledTask(scheduleId);
+    } catch (err) {
+      console.error('Scheduled task execution failed:', err);
+    }
+  }
+});
+
+// ========== Download Capture (3.9.0) ==========
+// While an agent run is active, capture every download Chrome creates and
+// surface it in the popup chat with the file path. Lets the agent's "Click
+// Export → CSV" step actually deliver the file location to the user.
+try {
+  if (typeof chrome !== 'undefined' && chrome.downloads && chrome.downloads.onCreated) {
+    chrome.downloads.onCreated.addListener((dl) => {
+      try {
+        if (!agentRunning) return;
+        if (!dl || typeof dl !== 'object') return;
+        chrome.runtime.sendMessage({
+          action: 'download_captured',
+          download: {
+            id: dl.id,
+            url: dl.url || '',
+            filename: dl.filename || '',
+            mime: dl.mime || '',
+            startTime: dl.startTime || new Date().toISOString(),
+            totalBytes: dl.totalBytes || 0
+          }
+        }).catch(() => {});
+      } catch (e) { /* non-fatal */ }
+    });
+  }
+} catch (e) { /* downloads API may be unavailable */ }
+
+// ========== Tab Locking ==========
+chrome.action.onClicked.addListener((tab) => {
+  chrome.sidePanel.open({ tabId: tab.id });
+  chrome.sidePanel.setOptions({ tabId: tab.id, path: 'popup.html' });
+});
+
+// ========== Unified Message Handler ==========
+chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
+  switch (request.action) {
+    case 'get_provider_catalog': {
+      // (3.10.0) Return the catalog so the popup can populate the dropdown.
+      try {
+        return PROVIDER_CATALOG.map(p => ({
+          id: p.id, label: p.label,
+          endpoint: p.endpoint,
+          modelsUrl: p.modelsUrl,
+          defaultModel: p.defaultModel,
+          auth: p.auth,
+          docsUrl: p.docsUrl
+        }));
+      } catch (e) { return []; }
+    }
+    case 'fetch_provider_models': {
+      // (3.10.0) Auto-detect models for the selected provider. Caller passes
+      // { providerId, apiKey, customEndpoint } — uses customEndpoint as
+      // the modelsUrl base for the 'custom' provider.
+      try {
+        const id = request.providerId;
+        const apiKey = request.apiKey || '';
+        let provider = getCatalogProvider(id);
+        if (!provider) return { ok: false, error: 'Unknown provider id: ' + id };
+        let modelsUrl = provider.modelsUrl;
+        if (id === 'custom') {
+          // For 'custom', derive modelsUrl from the user's endpoint URL.
+          // Strip /chat/completions and append /models.
+          const ep = request.customEndpoint || '';
+          if (!ep) return { ok: false, error: 'Enter your custom endpoint URL first' };
+          try {
+            const u = new URL(ep);
+            // Strip any /chat/completions or trailing path
+            const base = u.protocol + '//' + u.host + u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '');
+            modelsUrl = base.replace(/\/$/, '') + '/models';
+          } catch (e) {
+            return { ok: false, error: 'Could not parse custom endpoint: ' + e.message };
+          }
+        }
+        const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
+        return { ok: true, models };
+      } catch (e) {
+        return { ok: false, error: e.message || String(e) };
+      }
+    }
+    case 'check_resume_available': {
+      // (3.9.0) Look for a recent checkpoint that suggests an interrupted run.
+      try {
+        const stored = await chrome.storage.session.get('agent_checkpoint');
+        const cp = stored && stored.agent_checkpoint;
+        if (!cp) return { available: false };
+        const age = Date.now() - (cp.lastUpdate || 0);
+        if (age > 60 * 60 * 1000) return { available: false };  // older than 1h, ignore
+        if (agentRunning) return { available: false };          // already running
+        return {
+          available: true,
+          goal: cp.lastGoal || '',
+          stepCount: cp.stepCount || 0,
+          ageSeconds: Math.floor(age / 1000)
+        };
+      } catch (e) {
+        return { available: false };
+      }
+    }
+    case 'resume_from_checkpoint': {
+      // For now, this just clears the checkpoint and starts a NEW run with
+      // the saved goal — a full state restore is more invasive. The new
+      // run picks up the prior agent_memory automatically (see runAgentLoop).
+      try {
+        const stored = await chrome.storage.session.get('agent_checkpoint');
+        const cp = stored && stored.agent_checkpoint;
+        if (!cp || !cp.lastGoal) return { ok: false, error: 'No checkpoint to resume' };
+        await chrome.storage.session.remove('agent_checkpoint');
+        return await startAgent(cp.lastGoal, sender);
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+    case 'execute_command': {
+      const activeTab = getActiveTabId();
+      if (!activeTab) throw new Error('No agent tab specified');
+      const tab = activeTab;
+      const cmd = request.command;
+
+      // Handle navigate inline (no content script needed)
+      if (cmd.type === 'navigate') {
+        if (!isValidUrl(cmd.url)) throw new Error('Invalid URL provided');
+        await chrome.tabs.update(tab, { url: cmd.url });
+        return 'Navigated to ' + cmd.url;
+      }
+
+      // All other commands: inject content script, send message
+      await injectContentScript(tab);
+      return await sendMessageWithRetry(tab, { action: 'execute_command', command: cmd });
+    }
+
+    case 'run_agent_loop': {
+      return await startAgent(request.goal, sender);
+    }
+
+    case 'stop_agent_loop': {
+      return stopAgent();
+    }
+
+    case 'pause_agent_loop': {
+      const { pauseAgent } = await import('./agent-engine.js');
+      return pauseAgent();
+    }
+
+    case 'resume_agent_loop': {
+      const { resumeAgent } = await import('./agent-engine.js');
+      return resumeAgent();
+    }
+
+    case 'set_agent_speed': {
+      const { setAgentSpeed } = await import('./agent-engine.js');
+      return setAgentSpeed(request.mode);
+    }
+
+    // SPA messages from content script
+    case 'spa_navigation':
+    case 'spa_content_changed':
+      // Only set flag if agent is running (ignore transitions when idle)
+      if (agentRunning) {
+        setSPATransitionPending();
+      }
+      return null;
+
+    // Cross-origin iframe commands from content script
+    case 'execute_in_frame': {
+      const { frameIndex, command } = request;
+      const tabId = getActiveTabId();
+      if (tabId == null) {
+        return { ok: false, error: 'execute_in_frame: no active agent tab' };
+      }
+      if (frameIndex == null || frameIndex < 0) {
+        return { ok: false, error: 'execute_in_frame: invalid frameIndex ' + frameIndex };
+      }
+      const frameId = await resolveFrameForSelector(tabId, frameIndex);
+      // frameId === 0 (main frame) is a legitimate value — only reject null/undefined.
+      if (frameId == null) {
+        return { ok: false, error: 'execute_in_frame: frame ' + frameIndex + ' not found in tab ' + tabId };
+      }
+      return await executeInFrame(tabId, frameId, command);
+    }
+
+    case 'enumerate_frames': {
+      return await enumerateFrames(getActiveTabId());
+    }
+
+    // Template CRUD
+    case 'template_list':
+      return await listTemplates();
+
+    case 'template_get':
+      if (!request.id) throw new Error('Template ID required');
+      return await getTemplate(request.id);
+
+    case 'template_save':
+      if (!request.template) throw new Error('Template data required');
+      return await saveTemplate(request.template);
+
+    case 'template_update':
+      if (!request.id) throw new Error('Template ID required');
+      if (!request.updates) throw new Error('Update data required');
+      return await updateTemplate(request.id, request.updates);
+
+    case 'template_delete':
+      if (!request.id) throw new Error('Template ID required');
+      await deleteTemplate(request.id);
+      return { deleted: true };
+
+    case 'template_run': {
+      if (!request.templateId) throw new Error('Template ID required');
+      if (agentRunning) throw new Error('Agent already running');
+      const goal = await resolveTemplateGoal(request.templateId, request.params || {});
+      return await startAgent(goal, sender);
+    }
+
+    // Schedule CRUD
+    case 'schedule_list':
+      return await listSchedules();
+
+    case 'schedule_create':
+      if (!request.schedule) throw new Error('Schedule data required');
+      return await createSchedule(request.schedule);
+
+    case 'schedule_delete':
+      if (!request.id) throw new Error('Schedule ID required');
+      await deleteSchedule(request.id);
+      return { deleted: true };
+
+    case 'schedule_toggle':
+      if (!request.id) throw new Error('Schedule ID required');
+      if (typeof request.enabled !== 'boolean') throw new Error('Enabled flag required');
+      return await toggleSchedule(request.id, request.enabled);
+
+    case 'schedule_results':
+      if (request.id) return await getScheduleResults(request.id);
+      return await getRecentResults(request.limit || 20);
+
+    case 'schedule_clear_results':
+      if (!request.id) throw new Error('Schedule ID required');
+      await clearScheduleResults(request.id);
+      return { cleared: true };
+
+    case 'schedule_clear_badge':
+      chrome.action.setBadgeText({ text: '' });
+      return { cleared: true };
+
+    // Collaboration: export/import
+    case 'collab_export_template':
+      if (!request.id) throw new Error('Template ID required');
+      return await exportTemplate(request.id);
+
+    case 'collab_export_all_templates':
+      return await exportAllTemplates();
+
+    case 'collab_validate_import':
+      if (!request.data) throw new Error('Import data required');
+      return validateImport(request.data);
+
+    case 'collab_import_templates':
+      if (!request.templates || !Array.isArray(request.templates)) throw new Error('Templates array required');
+      return await importTemplates(request.templates, request.conflictMode || 'skip');
+
+    case 'collab_export_report':
+      if (!request.report) throw new Error('Report data required');
+      return exportReportAsMarkdown(request.report);
+
+    // Fire-and-forget messages from content script — acknowledge silently
+    case 'content_script_ready':
+    case 'spa_navigation':
+    case 'spa_content_changed':
+      return null;
+
+    default:
+      throw new Error(`Unknown action: ${request.action}`);
+  }
+}));
+
+// ========== Tab Event Listeners ==========
+
+// Detect externally-closed tabs and clean up context
+chrome.tabs.onRemoved.addListener((tabId) => {
+  handleTabRemoved(tabId);
+});
+
+// Track user tab switches for popup UI awareness AND side-panel visibility.
+// Do NOT change the agent's active tab when the user switches.
+// Per CONTEXT.md decision: agent ignores user's manual tab switches.
+//
+// (3.7.2) When an agent run is in progress, hide the side panel on tabs that
+// are NOT in the Sentinel attached-group, and show it on tabs that ARE.
+// This mirrors Claude in Chrome's "panel only follows the agent's tabs"
+// behavior. When no agent is running, every tab gets the panel.
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  if (!activeInfo || typeof activeInfo.tabId !== 'number') return;
+  try {
+    if (agentRunning) {
+      const attached = isAgentAttachedTab(activeInfo.tabId);
+      await chrome.sidePanel.setOptions({
+        tabId: activeInfo.tabId,
+        enabled: attached,
+        path: 'popup.html'
+      });
+    } else {
+      // No run in progress — keep the panel available everywhere.
+      await chrome.sidePanel.setOptions({
+        tabId: activeInfo.tabId,
+        enabled: true,
+        path: 'popup.html'
+      });
+    }
+  } catch (e) { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
+});
+
+// ========== Keyboard Shortcut Commands ==========
+chrome.commands.onCommand.addListener(async (command) => {
+  try {
+    switch (command) {
+      case 'toggle-agent': {
+        if (agentRunning) {
+          await stopAgent();
+          chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: 'Agent stopped' });
+        }
+        // Start requires a goal — open the side panel instead
+        else { chrome.sidePanel.open(); }
+        break;
+      }
+      case 'pause-agent': {
+        if (agentRunning) {
+          const { pauseAgent, resumeAgent } = await import('./agent-engine.js');
+          // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
+          // Instead, just send both and let the engine decide
+          await pauseAgent(); // Will set agentPaused = true
+        }
+        break;
+      }
+      case 'turbo-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('turbo');
+        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🚀 Turbo mode' });
+        break;
+      }
+      case 'normal-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('normal');
+        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '👤 Normal mode' });
+        break;
+      }
+      case 'stealth-mode': {
+        const { setAgentSpeed } = await import('./agent-engine.js');
+        setAgentSpeed('stealth');
+        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🥷 Stealth mode' });
+        break;
+      }
+    }
+  } catch (e) { console.warn('Command handler error:', e); }
+});
