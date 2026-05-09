@@ -1,0 +1,237 @@
+// Sentinel Override v3 -- Report Generator
+// Generates structured investigation reports after agent task completion.
+// Imports from llm-client.js for LLM calls and message-protocol.js for popup messaging.
+
+import { sendSilentUpdate } from './message-protocol.js';
+import { getActiveProvider, resolveProvider } from './provider-registry.js';
+
+// ========== Report Generation ==========
+/**
+ * Generate a structured investigation report from agent execution data.
+ * Uses callLLMWithRetry for reliable LLM calls with automatic retry.
+ *
+ * @param {object} executionData - Snapshot of agent execution state
+ * @param {string} executionData.goal - The original user goal
+ * @param {Array} executionData.history - Step-by-step action history
+ * @param {object} executionData.agentMemory - Extracted data from investigation
+ * @param {Array|null} executionData.agentPlan - Original execution plan (if any)
+ * @param {number} executionData.stepCount - Total steps executed
+ * @param {number} executionData.apiCallCount - Total API calls made
+ * @param {Array} executionData.tabContexts - Tab contexts with label, url, hasScreenshot
+ * @param {object} CONFIG - Agent configuration object
+ * @returns {Promise<{summary: string, fullReport: string, goal: string, timestamp: string}>}
+ */
+export async function generateReport(executionData, CONFIG) {
+  const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const timestamp = new Date().toISOString();
+
+  sendSilentUpdate('Generating investigation report...');
+
+  // Build a condensed history for the prompt (step + action type + result, not full elements)
+  const condensedHistory = history.map(h => ({
+    step: h.step,
+    action: h.action.type,
+    detail: h.action.selector ? h.action.selector.substring(0, 80) : (h.action.url || h.action.text || ''),
+    result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
+  }));
+
+  // Build memory summary for evidence section — skip failed/empty entries
+  const memoryKeys = Object.keys(agentMemory);
+  const memorySummary = memoryKeys.length > 0
+    ? memoryKeys
+        .filter(k => {
+          const v = agentMemory[k];
+          const s = typeof v === 'string' ? v : JSON.stringify(v);
+          return s && s.length > 3 && s !== 'Done'
+            && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
+            && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
+        })
+        .map(k => {
+          const val = agentMemory[k];
+          const valStr = Array.isArray(val)
+            ? val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n')
+            : String(val).substring(0, 800);
+          return `- ${k}: ${valStr}`;
+        }).join('\n')
+    : 'No usable data was extracted (all extractions failed or timed out).';
+
+  // Build plan context if a plan was generated
+  const planContext = agentPlan && agentPlan.length > 0
+    ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    : '\nNo formal plan was generated (direct execution mode).';
+
+  // Build tab/screenshot references
+  const tabReferences = tabContexts.length > 0
+    ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
+    : '';
+
+  const reportPrompt = `You are a brilliant research analyst and writer — think Claude-quality output. Your job is to take raw data collected by a browser agent and produce a polished, insightful report that the user actually WANTS to read.
+
+## Original Goal
+${goal}
+
+${planContext}
+
+## How the Agent Collected Data
+- Total steps: ${stepCount}
+- API calls: ${apiCallCount}
+- Timestamp: ${timestamp}
+
+## Raw Action History
+${condensedHistory.map(h => `[${h.action}] ${h.result}`).join('\n')}
+
+## Raw Extracted Data
+${memorySummary}
+
+${tabReferences}
+
+---
+
+## YOUR TASK
+
+Synthesize the raw extracted data into a clean, compelling report. Follow these principles:
+
+### Writing Style
+- **Conversational but authoritative** — like a knowledgeable colleague briefing you over coffee, not a robot reading a list
+- **Lead with insight** — open with a 1-2 sentence executive summary that answers the user's core question
+- **Specific > vague** — use actual names, numbers, dates, quotes, URLs. "3.2 million users" not "a large number of users"
+- **Contextualize** — don't just list facts; explain WHY they matter. Connect dots between data points
+- **Structured for scanning** — use headers, numbered lists, bold key terms. The user should find any detail in <5 seconds
+
+### Output Format
+Adapt to the task type:
+
+**For news briefings (top N articles):**
+→ Lead with "Here's your briefing on [topic]..."
+→ Each item: **numbered headline** → 2-3 sentence summary of what happened and why it matters → source link
+→ End with "Bottom line:" — one sentence takeaway
+
+**For research/analysis tasks:**
+→ Lead with the answer/conclusion upfront
+→ Then support with evidence in structured sections
+→ End with recommendations or next steps
+
+**For comparisons:**
+→ Side-by-side format with specific data points
+→ Clear verdict with reasoning
+
+**For data extraction (configs, logs, etc.):**
+→ Clean structured format (tables, key-value pairs)
+→ Anomalies or notable findings highlighted
+→ Summary of what was found
+
+### Rules
+- ONLY use data that was actually extracted — NEVER fabricate, infer, or use training data
+- If data is incomplete or missing, say so explicitly rather than guessing
+- If extracted data contains errors/failed extractions, skip those and work with what succeeded
+- Keep the report tight — every sentence should earn its place
+- Use proper markdown formatting (headers, bold, lists, links)
+- Do NOT wrap in code fences or JSON
+- Return ONLY the report, nothing else`;
+
+  const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
+
+  try {
+    // Make the LLM call for report generation
+    // We reuse callLLMWithRetry but need a minimal call setup
+    // Build a minimal call that uses the retry infrastructure
+    const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
+
+    const fullReport = typeof reportResult === 'string' ? reportResult.trim() : String(reportResult).trim();
+
+    // Extract summary: first paragraph or first 300 chars
+    const firstParagraph = fullReport.split('\n\n')[0] || '';
+    const summary = firstParagraph.length > 300
+      ? firstParagraph.substring(0, 297) + '...'
+      : firstParagraph;
+
+    return { summary, fullReport, goal, timestamp };
+  } catch (err) {
+    console.error('Report generation failed:', err);
+    // Return a fallback report from the raw data
+    const fallbackReport = buildFallbackReport(executionData);
+    return { summary: fallbackReport.split('\n\n')[0], fullReport: fallbackReport, goal, timestamp };
+  }
+}
+
+// ========== LLM Call for Report ==========
+/**
+ * Makes an LLM call specifically for report generation.
+ * Reuses settings from chrome.storage but with a dedicated prompt.
+ */
+async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
+  const providerConfig = await getActiveProvider();
+  const { endpoint, apiKey, model } = providerConfig;
+
+  if (!apiKey) throw new Error('API key not configured');
+
+  const provider = resolveProvider(endpoint, apiKey, model);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout || 45000);
+
+  const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
+
+  const requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
+  const requestHeaders = provider.buildHeaders(apiKey);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: requestHeaders,
+    body: requestBody,
+    signal: controller.signal
+  });
+  clearTimeout(timeout);
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    throw new Error(`Report LLM call failed: ${response.status} - ${errorData}`);
+  }
+
+  const data = await response.json();
+  const responseText = provider.parseResponse(data);
+
+  // Strip code fences if present
+  let cleaned = responseText.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+  }
+
+  return cleaned;
+}
+
+// ========== Fallback Report ==========
+/**
+ * Builds a basic report from execution data when the LLM call fails.
+ * Ensures the user always gets something useful even if report generation errors out.
+ */
+function buildFallbackReport(executionData) {
+  const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
+
+  const memoryLines = Object.keys(agentMemory).map(k => {
+    const val = agentMemory[k];
+    const valStr = Array.isArray(val)
+      ? `${val.length} items: ${val.slice(0, 5).map(v => String(v).substring(0, 100)).join(', ')}`
+      : String(val).substring(0, 300);
+    return `- **${k}**: ${valStr}`;
+  });
+
+  const stepsTaken = history
+    .filter(h => !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
+    .map(h => `${h.step}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
+    .join('\n');
+
+  return `### Goal
+${goal}
+
+### Steps Taken
+${stepsTaken || 'No significant steps recorded.'}
+
+### Key Findings
+Report generation encountered an error. The raw extracted data is shown below.
+
+### Evidence
+${memoryLines.length > 0 ? memoryLines.join('\n') : 'No data was extracted during this investigation.'}
+
+### Conclusions
+Investigation completed in ${stepCount} steps (${apiCallCount} API calls). For a detailed report, retry the task or check the agent's step-by-step log above.`;
+}

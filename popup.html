@@ -1,267 +1,613 @@
 <!DOCTYPE html>
+<!-- Verified 2026-05-06 -->
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SENTINEL OVERRIDE</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
-*:root{--bg-base:#0A0C10;--bg-card:#14171C;--bg-elevated:#1C2026;--bg-input:#0c0e12;--bg-surface:#111318;--bg-surface-low:#1a1c20;--bg-surface-mid:#1e2024;--bg-surface-high:#282a2e;--bg-surface-highest:#333539;--cyan:#00F0FF;--cyan-dim:rgba(0,240,255,0.3);--cyan-glow:rgba(0,240,255,0.15);--cyan-ghost:rgba(0,240,255,0.05);--lime:#95E400;--lime-dim:rgba(149,228,0,0.3);--lime-glow:rgba(149,228,0,0.15);--amber:#FFD47B;--amber-dim:rgba(255,212,123,0.3);--error:#FFB4AB;--error-bg:#93000A;--text-primary:#E2E2E8;--text-secondary:#849495;--text-muted:#5A6A6B;--border:#3B494B;--border-subtle:rgba(0,240,255,0.12);--border-active:rgba(0,240,255,0.4);--font-headline:"Space Grotesk",sans-serif;--font-body:"Inter",sans-serif;--font-mono:"Courier New","Consolas",monospace;--transition:150ms ease}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg-base);color:var(--text-primary);font-family:var(--font-body);font-size:13px;line-height:1.5}
-body::before{content:"";position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(rgba(0,240,255,0.03) 1px,transparent 1px);background-size:100% 4px;pointer-events:none;z-index:9999}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg-base)}::-webkit-scrollbar-thumb{background:var(--bg-surface-high);border:1px solid var(--border-subtle)}
-.app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.header{display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 12px;background:var(--bg-base);border-bottom:1px solid var(--border-subtle);box-shadow:0 1px 8px rgba(0,240,255,0.08);flex-shrink:0;z-index:100}
-.header-title{display:flex;align-items:center;gap:8px;font-family:var(--font-headline);font-weight:700;font-size:14px;font-style:italic;color:var(--cyan);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.header-title img{height:24px;width:24px;border-radius:2px;flex-shrink:0}
-.header-right{display:flex;align-items:center;gap:6px}
-.header-btn{background:none;border:1px solid var(--border-subtle);color:var(--text-secondary);padding:4px 8px;cursor:pointer;font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transition:all var(--transition);display:flex;align-items:center;gap:4px}
-.header-btn:hover{color:var(--cyan);border-color:var(--cyan-dim);background:var(--cyan-ghost)}
-#activeIndicator{width:6px;height:6px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime);flex-shrink:0}
-#activeIndicator.inactive{background:var(--text-muted);box-shadow:none}
-.status-bar{display:flex;align-items:center;justify-content:space-between;padding:4px 12px;background:var(--bg-card);border-bottom:1px solid var(--border-subtle);font-family:var(--font-mono);font-size:10px;flex-shrink:0}
-#status{display:flex;align-items:center;gap:4px}
-.status-dot{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:pd 2s ease-in-out infinite}
-@keyframes pd{0%,100%{opacity:1}50%{opacity:.4}}
-#statusText{color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em}
-#modeBadge{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;padding:1px 6px;border:1px solid var(--amber-dim);color:var(--amber);text-transform:uppercase}
-.tab-nav{display:flex;background:var(--bg-base);border-bottom:1px solid var(--border-subtle);flex-shrink:0;padding:0 4px}
-.tab-btn{flex:1;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-muted);padding:8px 4px;cursor:pointer;font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:all var(--transition)}
-.tab-btn:hover{color:var(--text-secondary);background:var(--cyan-ghost)}
-.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan);background:var(--cyan-ghost);text-shadow:0 0 8px var(--cyan-dim)}
-.tab-content{display:none;flex:1;overflow:hidden}.tab-content.active{display:flex;flex-direction:column}
-.chat-area{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
-#plan-card-container{background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid var(--cyan);padding:12px;display:none}
-#plan-card-container.visible{display:block}
-.plan-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.plan-header span{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cyan);text-transform:uppercase}
-.plan-ref{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
-#step-progress-label{font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);margin-bottom:4px}
-.progress-track{height:4px;background:var(--bg-surface-high);overflow:hidden}
-#plan-progress-fill{height:100%;background:repeating-linear-gradient(90deg,var(--cyan),var(--cyan) 8px,transparent 8px,transparent 10px);transition:width .3s ease}
-#step-progress-fill{height:100%;background:var(--lime);transition:width .3s ease}
-#chat-container{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
-.chat-msg{padding:8px 12px;border-left:2px solid var(--border);font-size:12px;line-height:1.6}
-.chat-msg.user{background:var(--cyan-ghost);border-left-color:var(--cyan)}
-.chat-msg.assistant{background:var(--bg-card);border-left-color:var(--lime)}
-.chat-msg.system{background:var(--bg-surface-low);border-left-color:var(--amber);color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
-#approvalCardContainer{display:none}#approvalCardContainer.visible{display:block}
-#approval-card{background:var(--bg-card);border:1px solid var(--amber-dim);padding:12px}
-.approval-header{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--amber);text-transform:uppercase;margin-bottom:8px}
-.approval-actions{display:flex;gap:4px;margin-top:8px}
-.approval-btn{flex:1;padding:8px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-primary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
-#approvalApprove{border-color:var(--lime-dim);color:var(--lime)}#approvalApprove:hover{background:var(--lime-glow)}
-#approvalSkip{border-color:var(--amber-dim);color:var(--amber)}#approvalSkip:hover{background:rgba(255,212,123,.1)}
-#approvalReject{border-color:rgba(255,180,171,.3);color:var(--error)}#approvalReject:hover{background:rgba(255,180,171,.1)}
-#typing-indicator{display:none;padding:8px;font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
-#typing-indicator.show{display:block}
-#typing-indicator::after{content:"_";animation:bc 1s step-end infinite}
-@keyframes bc{50%{opacity:0}}
-.input-area{display:flex;flex-direction:column;background:var(--bg-card);border-top:1px solid var(--border-subtle);flex-shrink:0;padding:8px 12px;gap:4px}
-#attachmentPreview{display:none;font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);padding:4px 0}
-#attachmentPreview.visible{display:block}
-.input-row{display:flex;gap:4px;align-items:flex-end}
-#goalInput{flex:1;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-body);font-size:13px;padding:8px 12px;resize:none;min-height:42px;max-height:120px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
-#goalInput::placeholder{color:var(--text-muted);font-style:italic}
-#goalInput:focus{border-color:var(--cyan-dim);box-shadow:0 0 8px rgba(0,240,255,.25)}
-.input-btn{width:36px;height:36px;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all var(--transition);flex-shrink:0}
-.input-btn:hover{color:var(--cyan);border-color:var(--cyan-dim);background:var(--cyan-ghost)}
-#sendBtn{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan);font-weight:700}
-#sendBtn:hover{background:var(--text-primary);box-shadow:0 0 15px rgba(0,240,255,.3)}
-#stopBtn{background:var(--error-bg);color:var(--error);border-color:rgba(255,180,171,.3);display:none}
-#stopBtn.visible{display:flex}#stopBtn:hover{background:rgba(255,180,171,.15)}
-.settings-content{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:16px}
-.settings-section{background:var(--bg-card);border:1px solid var(--border-subtle);padding:16px}
-.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.section-title{font-family:var(--font-headline);font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase}
-.section-ref{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}
-.field-group{margin-bottom:12px}
-.field-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.field-label label{font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text-secondary);text-transform:uppercase}
-.field-status{font-family:var(--font-mono);font-size:9px}
-.field-status.secure{color:var(--lime)}.field-status.unset{color:var(--error)}
-.field-input{width:100%;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none;transition:border-color var(--transition),box-shadow var(--transition)}
-.field-input:focus{border-color:var(--cyan-dim);box-shadow:0 0 8px rgba(0,240,255,.25)}
-select.field-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300F0FF' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:28px}
-.theme-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
-.theme-preset{padding:6px;text-align:center;border:1px solid var(--border-subtle);background:var(--bg-input);font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);cursor:pointer;transition:all var(--transition)}
-.theme-preset:hover{border-color:var(--cyan-dim);color:var(--cyan)}
-.theme-preset.active{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-ghost);box-shadow:0 0 8px rgba(0,240,255,.25)}
-.color-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.color-field{display:flex;flex-direction:column;gap:4px}
-.color-field label{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.08em;color:var(--text-secondary);text-transform:uppercase}
-.color-field input[type="color"]{width:100%;height:32px;border:1px solid var(--border-subtle);background:var(--bg-input);cursor:pointer;padding:2px}
-.history-content{flex:1;overflow-y:auto;display:flex;flex-direction:column}
-.history-search{display:flex;gap:4px;padding:12px;background:var(--bg-card);border-bottom:1px solid var(--border-subtle)}
-#searchInput{flex:1;background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-primary);font-family:var(--font-mono);font-size:11px;padding:8px 12px;outline:none}
-#searchInput:focus{border-color:var(--cyan-dim)}
-#searchInput::placeholder{color:var(--text-muted);text-transform:uppercase;font-size:10px}
-#searchCount{font-family:var(--font-mono);font-size:10px;color:var(--text-muted);display:flex;align-items:center;padding:0 8px;white-space:nowrap}
-.history-actions{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border-subtle)}
-.history-btn{background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-secondary);padding:4px 8px;font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
-.history-btn:hover{color:var(--cyan);border-color:var(--cyan-dim)}
-.history-btn.primary{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
-.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.9);z-index:1000;align-items:center;justify-content:center}
-.modal.show{display:flex}
-.modal-content{background:var(--bg-card);border:1px solid var(--cyan-dim);box-shadow:0 0 30px rgba(0,240,255,.2);width:90%;max-height:80%;overflow-y:auto;padding:20px}
-.modal-content h2{font-family:var(--font-headline);font-size:13px;font-weight:700;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;margin-bottom:12px}
-.modal-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
-.modal-btn{padding:8px 16px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-secondary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}
-.modal-btn:hover{color:var(--text-primary);border-color:var(--text-secondary)}
-.modal-btn.save{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}
-.modal-btn.save:hover{box-shadow:0 0 8px rgba(0,240,255,.25)}
-#commandPalette{position:fixed;top:0;left:0;right:0;background:var(--bg-card);border-bottom:1px solid var(--cyan-dim);box-shadow:0 0 15px rgba(0,240,255,.3);z-index:1001;padding:12px;display:none}
-#commandPalette.show{display:block}
-#commandInput{width:100%;background:var(--bg-input);border:1px solid var(--cyan-dim);color:var(--cyan);font-family:var(--font-mono);font-size:12px;padding:8px 12px;outline:none}
-#commandInput::placeholder{color:var(--text-muted);text-transform:uppercase}
-#commandList{max-height:200px;overflow-y:auto;margin-top:8px}
-.command-item{padding:8px 12px;cursor:pointer;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);border-left:2px solid transparent;transition:all var(--transition)}
-.command-item:hover{background:var(--cyan-ghost);color:var(--cyan);border-left-color:var(--cyan)}
-#shortcuts-list{max-height:250px;overflow-y:auto}
-.shortcut-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(0,240,255,.05);font-family:var(--font-mono);font-size:11px}
-#markdownPreview{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,12,16,.95);z-index:1000;overflow-y:auto;padding:20px}
-#markdownPreview.show{display:block}
-#previewContent{background:var(--bg-card);border:1px solid var(--border-subtle);padding:16px;color:var(--text-primary);font-size:12px;line-height:1.6;max-height:100%;overflow-y:auto}
-[data-theme="matrix"]{--cyan:#00FF41;--cyan-dim:rgba(0,255,65,.3);--cyan-glow:rgba(0,255,65,.15);--cyan-ghost:rgba(0,255,65,.05);--lime:#39FF14}
-[data-theme="cyberpunk"]{--cyan:#FF2A6D;--cyan-dim:rgba(255,42,109,.3);--cyan-glow:rgba(255,42,109,.15);--cyan-ghost:rgba(255,42,109,.05);--lime:#05D9E8}
-[data-theme="neon"]{--cyan:#E040FB;--cyan-dim:rgba(224,64,251,.3);--cyan-glow:rgba(224,64,251,.15);--cyan-ghost:rgba(224,64,251,.05)}
-[data-theme="terminal"]{--cyan:#33FF00;--cyan-dim:rgba(51,255,0,.3);--cyan-glow:rgba(51,255,0,.15);--cyan-ghost:rgba(51,255,0,.05);--bg-base:#000;--bg-card:#0a0a0a;--bg-input:#050505}
-[data-theme="blood"]{--cyan:#FF0040;--cyan-dim:rgba(255,0,64,.3);--cyan-glow:rgba(255,0,64,.15);--cyan-ghost:rgba(255,0,64,.05);--lime:#FF4444;--amber:#FF6666}
-[data-theme="dark"]{--cyan:#6C9FFF;--cyan-dim:rgba(108,159,255,.3);--cyan-glow:rgba(108,159,255,.15);--cyan-ghost:rgba(108,159,255,.05);--lime:#6CFF9F}
-.message-group{margin-bottom:8px}.message-wrapper{position:relative;display:flex;flex-direction:column;gap:2px}.message{padding:8px 12px;border-left:2px solid var(--border);font-size:12px;line-height:1.6;word-break:break-word}.message.user-msg{background:var(--cyan-ghost);border-left-color:var(--cyan)}.message.assistant-msg{background:var(--bg-card);border-left-color:var(--lime)}.message.assistant-msg pre{background:var(--bg-input);border:1px solid var(--border-subtle);padding:8px;overflow-x:auto;margin:8px 0;font-family:var(--font-mono);font-size:11px}.message.assistant-msg code{font-family:var(--font-mono);font-size:11px;background:var(--bg-input);padding:1px 4px}.message.assistant-msg pre code{background:none;padding:0}.message.assistant-msg ul,.message.assistant-msg ol{padding-left:20px;margin:4px 0}.message.assistant-msg h1,.message.assistant-msg h2,.message.assistant-msg h3,.message.assistant-msg h4{font-family:var(--font-headline);color:var(--cyan);margin:8px 0 4px;font-size:13px}.message.assistant-msg table{border-collapse:collapse;width:100%;margin:8px 0;font-size:11px}.message.assistant-msg th,.message.assistant-msg td{border:1px solid var(--border-subtle);padding:4px 8px;text-align:left}.message.assistant-msg th{background:var(--bg-surface-high);font-family:var(--font-headline);font-size:10px;letter-spacing:.05em}.message.assistant-msg blockquote{border-left:2px solid var(--amber-dim);padding-left:8px;color:var(--text-secondary);margin:4px 0}.message.assistant-msg a{color:var(--cyan);text-decoration:underline}.message-copy-btn{position:absolute;top:4px;right:4px;background:var(--bg-surface-high);border:1px solid var(--border-subtle);color:var(--text-muted);padding:3px 6px;cursor:pointer;opacity:0;transition:opacity var(--transition);border-radius:2px;display:flex;align-items:center}.message-wrapper:hover .message-copy-btn{opacity:1}.message-copy-btn:hover{color:var(--cyan);border-color:var(--cyan-dim)}.message-copy-btn.copied{color:var(--lime);border-color:var(--lime-dim)}.typing-indicator{display:flex;gap:4px;padding:8px 12px;font-family:var(--font-mono);font-size:11px;color:var(--cyan)}.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:typingBounce 1.4s infinite}.typing-indicator span:nth-child(2){animation-delay:.2s}.typing-indicator span:nth-child(3){animation-delay:.4s}@keyframes typingBounce{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}.welcome-message{text-align:center;padding:40px 20px;color:var(--text-muted)}.welcome-message h2{font-family:var(--font-headline);color:var(--cyan);font-size:18px;margin-bottom:8px;letter-spacing:.1em;text-transform:uppercase}.welcome-message p{font-size:12px}.toast{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);padding:8px 16px;font-family:var(--font-mono);font-size:11px;z-index:10000;border:1px solid var(--border-subtle);background:var(--bg-card);color:var(--text-primary);box-shadow:0 0 12px rgba(0,0,0,.5)}.toast.success{border-color:var(--lime-dim);color:var(--lime)}.toast.error{border-color:rgba(255,180,171,.3);color:var(--error)}.mode-badge{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;padding:1px 6px;border:1px solid;transition:all var(--transition)}.mode-badge.approval{border-color:var(--amber-dim);color:var(--amber)}.mode-badge.yolo{border-color:var(--lime-dim);color:var(--lime)}.plan-card-container{background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid var(--cyan);padding:12px;margin-bottom:8px}.plan-card-header{font-family:var(--font-headline);font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:8px}.plan-card-goal{font-family:var(--font-mono);font-size:10px;color:var(--text-secondary);margin-bottom:10px;padding:4px 8px;background:var(--bg-input);border-left:2px solid var(--cyan)}.plan-steps-list{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.plan-step{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;background:var(--bg-surface-low);border:1px solid var(--border-subtle);border-left:2px solid var(--border);transition:all var(--transition)}.plan-step.active{border-left-color:var(--cyan);background:var(--cyan-ghost)}.plan-step.done{border-left-color:var(--lime);opacity:.7}.plan-step.failed{border-left-color:var(--error);background:rgba(255,180,171,.05)}.plan-step-number{font-family:var(--font-headline);font-size:10px;font-weight:700;color:var(--cyan);min-width:18px;padding-top:1px}.plan-step-content{flex:1;min-width:0}.plan-step-title{font-size:12px;color:var(--text-primary)}.plan-step-type{font-family:var(--font-mono);font-size:9px;color:var(--text-muted);margin-top:2px}.plan-step-status{font-size:12px;flex-shrink:0}.plan-card-warnings{margin-top:8px;padding:8px;background:rgba(255,212,123,.05);border:1px solid var(--amber-dim);font-size:11px;color:var(--amber)}.plan-card-warnings ul{padding-left:16px;margin-top:4px}.plan-card-buttons{display:flex;gap:6px;margin-top:10px}.plan-btn{flex:1;padding:8px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-primary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}.plan-btn:disabled{opacity:.5;cursor:not-allowed}.plan-btn.primary{background:var(--cyan);color:var(--bg-base);border-color:var(--cyan)}.plan-btn.primary:hover:not(:disabled){box-shadow:0 0 10px rgba(0,240,255,.3)}.plan-btn.secondary{border-color:var(--amber-dim);color:var(--amber)}.plan-btn.secondary:hover:not(:disabled){background:rgba(255,212,123,.1)}.plan-progress-bar{height:4px;background:var(--bg-surface-high);margin-top:8px;overflow:hidden}.plan-progress-fill{height:100%;background:repeating-linear-gradient(90deg,var(--cyan),var(--cyan) 8px,transparent 8px,transparent 10px);transition:width .3s ease}.agent-action-group{margin-bottom:6px}.agent-action-card{background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid var(--text-muted);transition:all var(--transition)}.agent-action-inner{padding:8px 12px;cursor:pointer}.agent-action-inner.collapsed .agent-action-desc,.agent-action-inner.collapsed .agent-action-result{display:none}.agent-action-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}.agent-action-type{font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase}.agent-action-step{font-family:var(--font-mono);font-size:9px;color:var(--text-muted)}.collapse-result-badge{margin-left:auto;font-size:10px}.collapse-result-badge.success{color:var(--lime)}.collapse-result-badge.error{color:var(--error)}.collapse-indicator{color:var(--text-muted);font-size:10px}.agent-action-desc{font-size:12px;color:var(--text-secondary)}.agent-action-result{font-family:var(--font-mono);font-size:10px;padding:6px 8px;margin-top:6px;background:var(--bg-input);border-top:1px solid var(--border-subtle)}.agent-action-result.success{color:var(--lime);border-left:2px solid var(--lime)}.agent-action-result.error{color:var(--error);border-left:2px solid var(--error)}.approval-card{background:var(--bg-card);border:1px solid var(--amber-dim);padding:12px;margin-bottom:8px}.approval-card-header{display:flex;align-items:center;gap:6px;font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--amber);text-transform:uppercase;margin-bottom:6px}.approval-card-step{font-family:var(--font-mono);font-size:9px;color:var(--text-muted);margin-bottom:6px}.approval-card-action{font-size:12px;color:var(--text-primary);margin-bottom:8px;line-height:1.5}.approval-card-buttons{display:flex;gap:4px}.approval-card-buttons .approval-btn{flex:1;padding:8px;border:1px solid var(--border-subtle);background:var(--bg-input);color:var(--text-primary);font-family:var(--font-headline);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all var(--transition)}.approval-card-buttons .approval-btn.approve{border-color:var(--lime-dim);color:var(--lime)}.approval-card-buttons .approval-btn.approve:hover{background:var(--lime-glow)}.approval-card-buttons .approval-btn.reject{border-color:rgba(255,180,171,.3);color:var(--error)}.approval-card-buttons .approval-btn.reject:hover{background:rgba(255,180,171,.1)}.approval-card-buttons .approval-btn.skip{border-color:var(--amber-dim);color:var(--amber)}.approval-card-buttons .approval-btn.skip:hover{background:rgba(255,212,123,.1)}.code-header{display:flex;justify-content:space-between;align-items:center;background:var(--bg-surface-high);padding:4px 8px;font-family:var(--font-mono);font-size:9px;color:var(--text-muted);margin-bottom:4px}.code-copy-btn{background:var(--bg-input);border:1px solid var(--border-subtle);color:var(--text-secondary);padding:2px 8px;cursor:pointer;font-family:var(--font-mono);font-size:10px;transition:all var(--transition)}.code-copy-btn:hover{color:var(--cyan);border-color:var(--cyan-dim)}.code-copy-btn.copied{color:var(--lime)}.action-btn{transition:all var(--transition)}.action-btn:hover{color:var(--cyan)!important;border-color:var(--cyan-dim)!important}.attachment-item{display:flex;align-items:center;gap:6px;padding:2px 0}.attachment-item span:first-child{font-size:10px;color:var(--text-secondary)}.attachment-remove{cursor:pointer;color:var(--error);font-size:14px;padding:0 4px}.attachment-remove:hover{color:var(--text-primary)}.command-icon{font-size:14px;flex-shrink:0}.command-text{flex:1;min-width:0}.command-name{font-size:12px;color:var(--text-primary)}.command-desc{font-size:10px;color:var(--text-muted)}.command-item.selected{background:var(--cyan-ghost);color:var(--cyan);border-left-color:var(--cyan)}.command-item{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);border-left:2px solid transparent;transition:all var(--transition)}
-</style>
+  <meta charset="UTF-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
 </head>
-<body data-theme="tron">
-<div class="app-shell">
-<div class="header">
-<div class="header-title"><img src="logo-128.png" alt="SO"><span>Sentinel Override</span></div>
-<div class="header-right">
-<button class="header-btn" id="newChatBtn" title="New Chat">+ NEW</button>
-<button class="header-btn" id="commandPaletteBtn" title="Commands">CMD</button>
-<button class="header-btn" id="shortcutsBtn" title="Shortcuts">SC</button>
-<button class="header-btn" id="settingsBtn" title="Settings">CFG</button>
-<button class="header-btn" id="themeToggle" title="Theme">THM</button>
-<div id="activeIndicator"></div>
-</div>
-</div>
-<div class="status-bar">
-<div id="status"><div class="status-dot"></div><span id="statusText" style="color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">READY</span></div>
-<div style="display:flex;gap:8px;align-items:center;">
-<span id="modeBadge">AUTO</span>
-<input type="checkbox" id="approvalModeToggle" style="accent-color:var(--amber);width:12px;height:12px;cursor:pointer;">
-<span id="approvalModeLabel" style="color:var(--amber);font-family:var(--font-headline);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">OFF</span>
-</div>
-</div>
-<div class="tab-nav">
-<button class="tab-btn active" data-tab="chat">Chat</button>
-<button class="tab-btn" data-tab="settings">Config</button>
-<button class="tab-btn" data-tab="history">History</button>
-</div>
-<div class="tab-content active" id="tab-chat">
-<div class="chat-area">
-<div id="plan-card-container">
-<div class="plan-header"><span>// Mission Plan</span><span class="plan-ref">REF_PLAN_001</span></div>
-<div id="step-progress-label">Step 0/0</div>
-<div class="progress-track"><div id="plan-progress-fill" style="width:0%"></div></div>
-<div style="margin-top:4px;height:3px;background:var(--bg-surface-high);"><div id="step-progress-fill" style="width:0%"></div></div>
-</div>
-<div id="chat-container"></div>
-<div id="approvalCardContainer">
-<div id="approval-card">
-<div class="approval-header">// Approval Required</div>
-<div id="approval-text"></div>
-<div class="approval-actions">
-<button class="approval-btn" id="approvalApprove">APPROVE</button>
-<button class="approval-btn" id="approvalSkip">SKIP</button>
-<button class="approval-btn" id="approvalReject">REJECT</button>
-</div></div></div>
-<div id="typing-indicator">PROCESSING</div>
-</div>
-<div class="input-area">
-<div id="attachmentPreview"></div>
-<div class="input-row">
-<button class="input-btn" id="attachBtn" title="Attach">+</button>
-<textarea id="goalInput" rows="1" placeholder="Enter directive..."></textarea>
-<button class="input-btn" id="voiceBtn" title="Voice">mic</button>
-<button class="input-btn" id="speakBtn" title="TTS">snd</button>
-<button class="input-btn" id="sendBtn" title="Send">▶</button>
-<button class="input-btn" id="stopBtn" title="Stop">■</button>
-</div></div>
-</div>
-<div class="tab-content" id="tab-settings">
-<div class="settings-content">
-<div class="settings-section">
-<div class="section-header"><span class="section-title">// API Authentication</span><span class="section-ref">REF_AUTH_001</span></div>
-<div class="field-group"><div class="field-label"><label for="provider-select">PROVIDER</label></div><select class="field-input" id="provider-select"><option value="openrouter">OpenRouter</option><option value="venice">Venice</option><option value="zai">ZAI</option><option value="poolside">Poolside</option><option value="xiaomi">Xiaomi MiMo</option></select></div>
-<div class="field-group"><div class="field-label"><label for="set-api-endpoint">ENDPOINT</label><span class="field-status secure">[SECURE]</span></div><input type="text" class="field-input" id="set-api-endpoint-inline" placeholder="https://..."></div>
-<div class="field-group"><div class="field-label"><label for="set-api-key">API_KEY</label><span class="field-status secure">[VAULT]</span></div><input type="password" class="field-input" id="set-api-key-inline" placeholder="sk-..."></div>
-<div class="field-group"><div class="field-label"><label for="set-api-model">MODEL</label></div><input type="text" class="field-input" id="set-api-model-inline" placeholder="model-id"></div>
-</div>
-<div class="settings-section">
-<div class="section-header"><span class="section-title">// Theme</span><span class="section-ref">REF_THEME_042</span></div>
-<div class="theme-presets">
-<div class="theme-preset" data-theme="dark">Dark</div>
-<div class="theme-preset active" data-theme="tron">Tron</div>
-<div class="theme-preset" data-theme="matrix">Matrix</div>
-<div class="theme-preset" data-theme="cyberpunk">Cyber</div>
-<div class="theme-preset" data-theme="neon">Neon</div>
-<div class="theme-preset" data-theme="terminal">Termin</div>
-<div class="theme-preset" data-theme="blood">Blood</div>
-</div>
-<div class="color-picker">
-<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary-inline" value="#00F0FF"></div>
-<div class="color-field"><label>Background</label><input type="color" id="colorBg-inline" value="#0A0C10"></div>
-<div class="color-field"><label>Text</label><input type="color" id="colorText-inline" value="#E2E2E8"></div>
-</div></div>
-<div class="settings-section">
-<div class="section-header"><span class="section-title">// Data</span><span class="section-ref">REF_DATA_882</span></div>
-<div class="field-group"><div class="field-label"><label for="export-format">EXPORT FORMAT</label></div><select class="field-input" id="export-format"><option value="json">JSON</option><option value="markdown">Markdown</option><option value="txt">Plain Text</option></select></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;">
-<button class="history-btn" id="exportBtn">EXPORT CHAT</button>
-<button class="history-btn" id="previewBtn">MARKDOWN PREVIEW</button>
-</div></div>
-<button class="modal-btn save" style="width:100%;" id="saveSettingsBtn-inline">SAVE CONFIG</button>
-</div></div>
-<div class="tab-content" id="tab-history">
-<div class="history-content">
-<div class="history-search"><input type="text" id="searchInput" placeholder="Filter session logs..."><span id="searchCount">0/0</span></div>
-<div class="history-actions"><button class="history-btn primary" id="newChatBtnHistory">NEW SESSION</button></div>
-<div style="flex:1;overflow-y:auto;padding:12px;" id="chat-container-history"></div>
-</div></div>
-</div>
-<input type="file" id="file-input" multiple style="display:none;">
-<div id="commandPalette"><input type="text" id="commandInput" placeholder="Type command..."><div id="commandList"></div></div>
-<div id="settings-modal" class="modal"><div class="modal-content"><h2>// Settings</h2>
-<div class="field-group"><div class="field-label"><label>ENDPOINT</label></div><input type="text" class="field-input" id="set-api-endpoint" placeholder="https://..."></div>
-<div class="field-group"><div class="field-label"><label>API_KEY</label></div><input type="password" class="field-input" id="set-api-key" placeholder="sk-..."></div>
-<div class="field-group"><div class="field-label"><label>MODEL</label></div><input type="text" class="field-input" id="set-api-model" placeholder="model-id"></div>
-<div class="modal-actions"><button class="modal-btn" id="closeSettingsBtn">Close</button><button class="modal-btn save" id="saveSettingsBtn">Save</button></div>
-</div></div>
-<div id="theme-modal" class="modal"><div class="modal-content"><h2>// Theme Configuration</h2>
-<div class="theme-presets" style="margin-bottom:16px;">
-<div class="theme-preset" data-theme="dark">Dark</div>
-<div class="theme-preset" data-theme="tron">Tron</div>
-<div class="theme-preset" data-theme="matrix">Matrix</div>
-<div class="theme-preset" data-theme="cyberpunk">Cyber</div>
-<div class="theme-preset" data-theme="neon">Neon</div>
-<div class="theme-preset" data-theme="terminal">Termin</div>
-<div class="theme-preset" data-theme="blood">Blood</div>
-</div>
-<div class="color-picker">
-<div class="color-field"><label>Primary</label><input type="color" id="colorPrimary" value="#00F0FF"></div>
-<div class="color-field"><label>Background</label><input type="color" id="colorBg" value="#0A0C10"></div>
-<div class="color-field"><label>Text</label><input type="color" id="colorText" value="#E2E2E8"></div>
-</div>
-<div class="modal-actions"><button class="modal-btn" id="closeThemeBtn">Cancel</button><button class="modal-btn save" id="saveThemeBtn">Apply</button></div>
-</div></div>
-<div id="shortcuts-modal" class="modal"><div class="modal-content"><h2>// Saved Shortcuts</h2>
-<div id="shortcuts-list"><p style="color:var(--text-muted);text-align:center;padding:20px;font-family:var(--font-mono);font-size:11px;">No shortcuts saved yet.</p></div>
-<div class="modal-actions"><button class="modal-btn" id="closeShortcutsBtn">Close</button></div>
-</div></div>
-<div id="markdownPreview"><div id="previewContent"></div></div>
-<script src="marked.min.js"></script>
-<script src="popup-full.js"></script>
-<script src="popup-init.js"></script>
+<body>
+  <!-- CRT Scanline Overlay -->
+  <div class="scanline-overlay"></div>
+  <!-- Left Edge Accent Bar -->
+  <div class="left-edge-accent"></div>
+
+  <!-- Active Tab Strip (3.7.1) — surfaces WHAT the agent is doing and WHERE.
+       Always shown during a run; hidden between runs. -->
+  <div id="active-tab-strip" class="active-tab-strip" style="display:none;">
+    <img id="ats-favicon" class="ats-favicon" src="" alt="">
+    <div class="ats-info">
+      <div class="ats-line1">
+        <span id="ats-host" class="ats-host">—</span>
+        <span id="ats-step" class="ats-step"></span>
+      </div>
+      <div id="ats-title" class="ats-title"></div>
+      <div id="ats-action" class="ats-action">Initializing…</div>
+    </div>
+    <button id="ats-focus-btn" class="ats-focus-btn" title="Open the agent's working tab in Chrome">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3h7v7"></path>
+        <path d="M10 14L21 3"></path>
+        <path d="M21 14v7H3V3h7"></path>
+      </svg>
+      <span>Focus</span>
+    </button>
+  </div>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <img src="icon-48.png" alt="" class="header-logo">
+      <span class="header-brand">SENTINEL<span class="brand-underscore">_</span>OVERRIDE</span>
+      <span id="modeBadge" class="mode-badge approval">APPROVAL</span>
+      <span id="tenantChip" class="tenant-chip" style="display:none;" title="Detected Microsoft tenant (3.7.0)"></span>
+      <span id="activeIndicator" class="active-indicator" title="Agent active"></span>
+    </div>
+    <div class="header-buttons">
+      <button class="icon-btn" id="newChatBtn" title="New chat (Cmd+N)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="themeToggle" title="Toggle dark mode">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+      <button class="icon-btn" id="commandPaletteBtn" title="Command palette (Cmd+K)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <path d="M9 11h6"></path>
+          <path d="M9 15h6"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="templatesBtn" title="Templates & Runbooks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+      </button>
+      <button class="icon-btn" id="schedulerBtn" title="Schedules">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </button>
+      <button class="icon-btn" id="settingsBtn" title="Settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="m21 21-4.35-4.35"></path>
+      </svg>
+      <input type="text" id="searchInput" placeholder="Search messages...">
+      <span class="search-result-count" id="searchCount" style="display: none;"></span>
+    </div>
+    <div class="toolbar-divider"></div>
+    <button class="toolbar-icon-btn" id="previewBtn" title="Markdown preview">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>
+    </button>
+    <button class="toolbar-icon-btn" id="attachBtn" title="Attach file">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+      </svg>
+    </button>
+    <button class="toolbar-icon-btn" id="exportBtn" title="Export conversation">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Agent Tab Bar -->
+  <div id="agent-tab-bar"></div>
+
+  <!-- Chat Container -->
+  <div id="chat-container">
+    <div class="welcome-message">
+      <h2>Sentinel Override</h2>
+      <p>Automate your browser tasks with AI. What would you like me to do?</p>
+    </div>
+  </div>
+
+  <!-- Templates Panel -->
+  <div id="templates-panel" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0;">Templates & Runbooks</h2>
+      <div style="display:flex;gap:6px;">
+        <button id="importTemplatesBtn" class="small-btn" title="Import templates from JSON file">Import</button>
+        <button id="exportAllTemplatesBtn" class="small-btn" title="Export all templates as JSON">Export All</button>
+        <button id="createTemplateBtn" class="small-btn" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">+ New Template</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <input type="text" id="templateSearchInput" placeholder="Search templates..." style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;outline:none;">
+      <input type="text" id="templateTagFilter" placeholder="Filter by tag..." style="width:140px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;outline:none;">
+    </div>
+    <div id="template-list"></div>
+  </div>
+
+  <!-- Schedules Panel -->
+  <div id="schedules-panel" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0;">Schedules</h2>
+      <button id="createScheduleBtn" class="small-btn" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">+ New Schedule</button>
+    </div>
+    <div id="schedule-list"></div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div id="approvalCardContainer"></div>
+    <div id="attachmentPreview" class="attachment-preview" style="display: none;"></div>
+    <div class="input-container">
+      <div class="textarea-wrapper">
+        <textarea id="goalInput" placeholder="Tell me what to do..." rows="1"></textarea>
+        <div class="action-buttons">
+          <button id="voiceBtn" class="action-btn" title="Voice input (click to speak)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v12a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+          <button id="sendBtn" class="action-btn" title="Send message (Enter)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16857446 C3.34915502,0.9114770592 2.40734225,1.02286667 1.77946707,1.4941588 C0.994623095,2.13399899 0.837654326,3.22915502 1.15159189,3.9789712 L3.03521743,10.4199641 C3.03521743,10.5770615 3.19218622,10.7341589 3.50612381,10.7341589 L16.6915026,11.5196458 C16.6915026,11.5196458 17.1624089,11.5196458 17.1624089,12.0004306 C17.1624089,12.4744748 16.6915026,12.4744748 16.6915026,12.4744748 Z"></path>
+            </svg>
+          </button>
+          <button id="stopBtn" class="action-btn btn-stop" style="display: none;" title="Stop agent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="1"></rect>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="status" style="display: none; margin-top: 8px;">
+      <div class="status-indicator">
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span class="loading-dot"></span>
+        <span id="status-text">Agent is working...</span>
+      </div>
+    </div>
+    <div class="input-footer">Press Enter to send • Shift+Enter for new line • Cmd+K for commands</div>
+  </div>
+
+  <!-- Markdown Preview Panel -->
+  <div class="markdown-preview" id="markdownPreview">
+    <div class="markdown-preview-header">Markdown Preview</div>
+    <div class="markdown-preview-content" id="previewContent"></div>
+  </div>
+
+  <!-- Command Palette -->
+  <div class="command-palette-backdrop" id="commandPaletteBackdrop"></div>
+  <div class="command-palette" id="commandPalette">
+    <div class="command-input">
+      <input type="text" id="commandInput" placeholder="Type a command...">
+    </div>
+    <div class="command-list" id="commandList"></div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal">
+    <div class="modal-content">
+      <h2>Settings</h2>
+      <!-- Active Provider Selector -->
+      <div class="modal-field">
+        <label>Active Provider</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="provider-anthropic" class="provider-btn active-provider" data-provider="anthropic"
+            style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;text-align:center;font-size:13px;">
+            Anthropic Claude
+          </button>
+          <button type="button" id="provider-openai" class="provider-btn" data-provider="openai"
+            style="flex:1;padding:10px;border-radius:8px;border:2px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;text-align:center;font-size:13px;">
+            OpenAI
+          </button>
+        </div>
+      </div>
+
+      <!-- Provider Config Card -->
+      <div class="modal-field" id="provider-config-card" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:12px;">
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>API Endpoint</label>
+          <input type="text" id="set-provider-endpoint" placeholder="https://api.example.com/v1/...">
+        </div>
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>API Key</label>
+          <input type="password" id="set-provider-key" placeholder="Your API key">
+        </div>
+        <div class="modal-field" style="margin-bottom:8px;">
+          <label>Model</label>
+          <input type="text" id="set-provider-model" placeholder="Model ID">
+        </div>
+        <div style="font-size:11px;color:var(--text-tertiary);">
+          Default endpoint and model auto-fill when switching providers.
+        </div>
+      </div>
+      <!-- (3.10.0) Provider Catalog with model auto-detect -->
+      <div class="modal-field" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:12px;margin-top:8px;">
+        <label style="display:block; margin-bottom:6px;">
+          Provider Catalog
+          <span style="font-weight:400;color:var(--text-tertiary);font-size:11px;"> — pick provider, fill API key above, then detect models</span>
+        </label>
+        <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+          <select id="providerCatalogSelect" style="flex:1; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:13px;">
+            <option value="">— Pick a provider —</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button type="button" id="detectModelsBtn" style="padding:8px 14px; border-radius:6px; border:1px solid var(--accent-primary, #ff6b00); background:rgba(255,107,0,0.15); color:var(--accent-primary, #ff6b00); cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap;">🔍 Detect Models</button>
+          <select id="detectedModelsSelect" disabled style="flex:1; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:12px;">
+            <option value="">(no models detected yet)</option>
+          </select>
+          <button type="button" id="useDetectedModelBtn" disabled style="padding:8px 12px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:12px;">Use</button>
+        </div>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Picks the provider's chat endpoint. Click <strong>Detect Models</strong> to query the provider's <code>/models</code> endpoint with your API key. Pick a model from the dropdown and click <strong>Use</strong> to apply it. Some providers (Perplexity, Z.ai) don't expose a models list — enter the model name manually.
+        </div>
+      </div>
+
+      <div class="modal-field">
+        <label>Provider Presets <span style="font-weight:400;color:var(--text-tertiary);">(click to fill endpoint + model)</span></label>
+        <div style="margin-bottom:8px;font-size:11px;color:var(--text-tertiary);">Any OpenAI-compatible API works. Anthropic API is also natively supported.</div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Free / Low Cost</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.3-70b-versatile" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">⚡ Groq (Llama 3.3 70B)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" data-model="gemini-2.0-flash" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 Google AI Studio (Gemini 2.0 Flash)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.0-flash-exp:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Gemini Free)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="meta-llama/llama-3.3-70b-instruct:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Llama Free)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="nvidia/llama-3.1-nemotron-70b-instruct:free" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">🆓 OpenRouter (Nemotron 70B Free)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.z.ai/api/paas/v4/chat/completions" data-model="glm-5.1" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Z.ai (GLM-5.1)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.z.ai/api/coding/paas/v4/chat/completions" data-model="glm-5.1" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Z.ai Coding (GLM-5.1)</button>
+        </div>
+
+        <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Best for Complex Runbooks</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+          <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-haiku-4-5-20251001" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;font-weight:500;">🧠 Anthropic Claude Haiku (fast+cheap)</button>
+          <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🧠 Anthropic Claude Sonnet</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-haiku-4-5" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Haiku)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-sonnet-4-6" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.08);color:var(--text-primary);cursor:pointer;font-size:12px;">🔀 OpenRouter (Claude Sonnet)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.5-pro-preview-03-25" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">OpenRouter (Gemini 2.5 Pro)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.mistral.ai/v1/chat/completions" data-model="mistral-large-latest" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Mistral Large</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.together.xyz/v1/chat/completions" data-model="meta-llama/Llama-3-70b-chat-hf" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Together AI (Llama 3 70B)</button>
+          <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.venice.ai/api/v1/chat/completions" data-model="llama-3.3-70b" style="padding:6px 12px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:12px;">Venice</button>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:8px 10px;border-radius:6px;border:1px solid var(--border-color);">
+          <strong>Free picks:</strong> Groq (fastest free), Google AI Studio (generous free tier — get key at aistudio.google.com).<br>
+          <strong>Best for IT runbooks:</strong> Claude Haiku via Anthropic direct (~$0.001/step) or OpenRouter proxy (no Anthropic account needed).<br>
+          <strong>Anthropic endpoint</strong> (<code>api.anthropic.com</code>) uses native API format automatically — no proxy required.
+        </div>
+      </div>
+      <div class="modal-field">
+        <button type="button" id="testConnectionBtn" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:14px;font-weight:500;">🔌 Test Connection</button>
+      </div>
+      <div class="modal-field">
+        <label>Context Memory <span style="font-weight:400;color:var(--text-tertiary);">(remembered across tabs)</span></label>
+        <textarea id="set-agent-context" rows="3" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit;" placeholder="e.g. Working on React app at localhost:3000. Login credentials: admin/admin"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Export Format</label>
+        <select id="export-format">
+          <option value="markdown">Markdown (.md)</option>
+          <option value="json">JSON (.json)</option>
+          <option value="txt">Text (.txt)</option>
+        </select>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-row-label">
+          <span>Approval Mode</span>
+          <span id="approvalModeLabel">OFF - Agent executes autonomously</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="approvalModeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="toggle-row">
+        <div class="toggle-row-label">
+          <span>Use trusted input dispatch (experimental)</span>
+          <span id="useTrustedInputLabel">Routes clicks and typing through Chrome DevTools Protocol for isTrusted: true events. Required for some sites with strict event verification (banks, captchas). Adds a "Sentinel Override is debugging this browser" banner.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="useTrustedInputToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="form-row" style="margin-top: 16px;">
+        <label for="expectedTenantInput" style="display:block; font-weight:600; font-size:13px; margin-bottom:4px;">Expected Microsoft tenant (3.7.0)</label>
+        <input type="text" id="expectedTenantInput" placeholder="acme.onmicrosoft.com or Acme Corp" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius:6px; color: var(--text-primary, #fff); font-size:13px; box-sizing: border-box;">
+        <div style="font-size:11px; color: var(--text-secondary, #aaa); margin-top:4px; line-height:1.4;">
+          Cross-client safety: when set, the tenant chip in the header turns green when the detected tenant matches and red when it doesn't. Leave blank to skip the check. Detected from the page tenant chip, the <code>tid=</code> URL param, or any <code>*.onmicrosoft.com</code> reference.
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeSettingsBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="saveSettingsBtn" class="modal-btn btn-save">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme Customizer Modal -->
+  <div id="theme-modal" class="modal">
+    <div class="modal-content">
+      <h2>Customize Theme</h2>
+
+      <div style="margin-bottom: 20px;">
+        <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 12px;">Quick Presets</label>
+        <div class="theme-presets">
+          <div class="theme-preset active" data-theme="light">☀️ Light</div>
+          <div class="theme-preset" data-theme="dark">🌙 Dark</div>
+          <div class="theme-preset" data-theme="matrix">💻 Matrix</div>
+          <div class="theme-preset" data-theme="tron">🔷 Tron</div>
+          <div class="theme-preset" data-theme="cyberpunk">⚡ Cyberpunk</div>
+          <div class="theme-preset" data-theme="neon">💜 Neon</div>
+          <div class="theme-preset" data-theme="terminal">🟢 Terminal</div>
+          <div class="theme-preset" data-theme="blood">🩸 Blood</div>
+          <div class="theme-preset" data-theme="sunset">🌅 Sunset</div>
+          <div class="theme-preset" data-theme="ocean">🌊 Ocean</div>
+          <div class="theme-preset" data-theme="midnight">🌌 Midnight</div>
+          <div class="theme-preset" data-theme="paper">📜 Paper</div>
+          <div class="theme-preset" data-theme="forest">🌲 Forest</div>
+          <div class="theme-preset" data-theme="mono">⬛ Mono</div>
+        </div>
+      </div>
+
+      <!-- (3.11.0) Custom CSS — power-user escape hatch. Auto-saves on edit, applies on next popup open. -->
+      <div style="margin-bottom: 20px;">
+        <label style="font-size: 13px; color: var(--text-secondary); display: block; margin-bottom: 6px;">
+          Custom CSS
+          <span style="font-weight: 400; color: var(--text-tertiary); font-size: 11px;"> — paste any CSS to override the look. Auto-saves.</span>
+        </label>
+        <textarea id="customCssTextarea" placeholder="/* Example: */&#10;.header-brand { color: #ff00ff; }&#10;.message.assistant-msg { background: rgba(0, 255, 200, 0.05); }" style="width:100%; min-height:140px; padding:10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-family: monospace; font-size:11px; line-height:1.4; resize:vertical;"></textarea>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button type="button" id="customCssApplyBtn" style="padding:6px 12px; border-radius:6px; border:1px solid var(--accent-primary, #ff6b00); background:rgba(255,107,0,0.15); color:var(--accent-primary, #ff6b00); cursor:pointer; font-size:11px; font-weight:600;">Apply Now</button>
+          <button type="button" id="customCssClearBtn" style="padding:6px 12px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:11px;">Clear</button>
+          <span id="customCssStatus" style="margin-left:auto; font-size:10px; color:var(--text-tertiary); align-self:center;"></span>
+        </div>
+        <div style="font-size:10px; color: var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Targets common selectors: <code>.header</code>, <code>.message</code>, <code>.assistant-msg</code>, <code>.user-msg</code>, <code>.active-tab-strip</code>, <code>.tenant-chip</code>, <code>.message-input</code>. CSS variables: <code>--accent-primary</code>, <code>--bg-primary</code>, <code>--text-primary</code>, <code>--border-color</code>.
+        </div>
+      </div>
+
+      <div class="color-picker">
+        <div class="color-field">
+          <label>Primary Color</label>
+          <input type="color" id="colorPrimary" value="#0084ff">
+        </div>
+        <div class="color-field">
+          <label>Background</label>
+          <input type="color" id="colorBg" value="#ffffff">
+        </div>
+        <div class="color-field">
+          <label>Text</label>
+          <input type="color" id="colorText" value="#0d0d0d">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="closeThemeBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="saveThemeBtn" class="modal-btn btn-save">Apply Theme</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Modal -->
+  <div id="report-modal" class="modal">
+    <div class="modal-content" style="max-width:560px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">Investigation Report</h2>
+        <button id="closeReportBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div id="report-content" style="line-height:1.6;max-height:60vh;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);">
+        <button id="copyReportMdBtn" class="modal-btn btn-save" style="flex:1;">Copy Markdown</button>
+        <button id="downloadReportBtn" class="modal-btn btn-save" style="flex:1;">Download .md</button>
+        <button id="copyReportTextBtn" class="modal-btn btn-cancel" style="flex:1;">Copy Plain Text</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Create/Edit Modal -->
+  <div id="template-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <h2 id="template-modal-title">New Template</h2>
+      <div class="modal-field">
+        <label>Name</label>
+        <input type="text" id="tmpl-name" placeholder="e.g., Check VPN Health">
+      </div>
+      <div class="modal-field">
+        <label>Goal Template</label>
+        <textarea id="tmpl-goal" rows="4" placeholder="Use ::key:: for parameters, e.g.: Navigate to ::url:: and check ::service:: status" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">Use ::parameter_name:: for placeholders that will be prompted at runtime</div>
+      </div>
+      <div class="modal-field">
+        <label>Parameters <span style="font-weight:400;color:var(--text-tertiary);">(auto-detected from goal)</span></label>
+        <div id="tmpl-params-container" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+      <div class="modal-field">
+        <label>Tags <span style="font-weight:400;color:var(--text-tertiary);">(comma-separated)</span></label>
+        <input type="text" id="tmpl-tags" placeholder="e.g., vpn, network, daily">
+      </div>
+      <div class="modal-actions">
+        <button id="closeTemplateModalBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="saveTemplateBtn" class="modal-btn btn-save">Save Template</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Template Modal -->
+  <div id="template-run-modal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+      <h2 id="template-run-title">Run Template</h2>
+      <div id="template-run-goal-preview" style="padding:10px;background:var(--bg-secondary);border-radius:8px;font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.5;border:1px solid var(--border-color);"></div>
+      <div id="tmpl-run-params-container" style="display:flex;flex-direction:column;gap:12px;"></div>
+      <div class="modal-actions">
+        <button id="closeRunModalBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="runTemplateBtn" class="modal-btn btn-save">Run</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create/Edit Schedule Modal -->
+  <div id="schedule-modal" class="modal">
+    <div class="modal-content" style="max-width:480px;">
+      <h2 id="schedule-modal-title">New Schedule</h2>
+      <div class="modal-field">
+        <label>Name</label>
+        <input type="text" id="sch-name" placeholder="e.g., Daily VPN Health Check">
+      </div>
+      <div class="modal-field">
+        <label>Source</label>
+        <select id="sch-source-type" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="template">From Template</option>
+          <option value="goal">Freeform Goal</option>
+        </select>
+      </div>
+      <div id="sch-template-field" class="modal-field">
+        <label>Template</label>
+        <select id="sch-template-id" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="">Loading templates...</option>
+        </select>
+        <div id="sch-template-params" style="margin-top:8px;"></div>
+      </div>
+      <div id="sch-goal-field" class="modal-field" style="display:none;">
+        <label>Goal</label>
+        <textarea id="sch-goal" rows="3" placeholder="Describe what the agent should do..." style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <div class="modal-field">
+        <label>Schedule Type</label>
+        <select id="sch-type" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <option value="once">Run Once</option>
+          <option value="recurring">Recurring</option>
+        </select>
+      </div>
+      <div id="sch-once-fields" class="modal-field">
+        <label>Date & Time</label>
+        <input type="datetime-local" id="sch-run-at" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+      </div>
+      <div id="sch-recurring-fields" style="display:none;">
+        <div class="modal-field">
+          <label>Repeat</label>
+          <select id="sch-interval" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="custom">Custom Interval</option>
+          </select>
+        </div>
+        <div id="sch-weekly-days" class="modal-field" style="display:none;">
+          <label>Days of Week</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="1"> Mon</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="2"> Tue</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="3"> Wed</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="4"> Thu</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="5"> Fri</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="6"> Sat</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text-secondary);cursor:pointer;"><input type="checkbox" class="sch-day-check" value="0"> Sun</label>
+          </div>
+        </div>
+        <div id="sch-custom-interval" class="modal-field" style="display:none;">
+          <label>Every N minutes</label>
+          <input type="number" id="sch-period" min="30" step="30" value="60" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">Minimum 30 minutes (Chrome alarm API limit)</div>
+        </div>
+        <div class="modal-field">
+          <label>Time of Day</label>
+          <input type="time" id="sch-time" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="closeScheduleModalBtn" class="modal-btn btn-cancel">Cancel</button>
+        <button id="saveScheduleBtn" class="modal-btn btn-save">Create Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run History Modal -->
+  <div id="schedule-history-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">Run History</h2>
+        <button id="closeHistoryModalBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div id="schedule-history-list"></div>
+    </div>
+  </div>
+
+  <!-- Hidden Elements -->
+  <input type="file" id="file-input" multiple>
+
+  <!-- Import Preview Modal -->
+  <div id="import-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">Import Templates</h2>
+        <button id="closeImportModalBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div id="import-version-warning" style="display:none;margin-bottom:12px;"></div>
+      <div id="import-preview-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px;"></div>
+      <div class="modal-field">
+        <label>If a template with the same name already exists:</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="radio" name="import-conflict" value="skip" checked> Skip (keep existing)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="radio" name="import-conflict" value="rename"> Rename (import with new name)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;">
+            <input type="radio" name="import-conflict" value="overwrite"> Overwrite (replace existing)
+          </label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="importConfirmBtn" class="modal-btn btn-save">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup-modules/popup-state.js"></script>
+  <script src="marked.min.js"></script>
+  <script src="popup-modules/helpers.js"></script>
+  <script src="popup-modules/ui-common.js"></script>
+  <script src="popup-modules/settings.js"></script>
+  <script src="popup-modules/chat.js"></script>
+  <script src="popup-modules/templates.js"></script>
+  <script src="popup-modules/scheduler-ui.js"></script>
+  <script src="popup-modules/collaboration.js"></script>
+  <script src="popup-full.js"></script>
 </body>
 </html>
