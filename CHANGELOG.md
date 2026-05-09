@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.11.1 — 2026-05-09 (Hotfix: popup load crash on Templates panel)
+
+Patch release fixing a JS error visible in `chrome://extensions` Errors tab.
+
+### Fixed
+- **`popup.html`**: the message input wrapper had `class="input-area"` but no matching `id`, so `templates.js` calls to `document.getElementById('input-area')` returned `null`, triggering `Cannot read properties of null (reading 'style')` whenever the Templates panel was opened. Added `id="input-area"` to the existing `<div class="input-area">`.
+- **`popup-modules/templates.js`**: hardened every module-level DOM lookup with defensive null checks (`_setDisplay`, `_toggleClass`, `_on` helpers) so a missing element from any future popup.html refactor cannot crash the entire popup module load. The Templates panel now degrades gracefully if any element ever goes missing again.
+- **`manifest.json`**: bumped `3.11.0` → `3.11.1`.
+
 ## v3.11.0 — 2026-05-09 (Tenant Lockdown + Theme Auto-Save + Custom CSS)
 
 Three additions following the design philosophy: **simple visible UI, sophisticated internals, smart defaults**. Each is invisible until needed, never adds a checkbox, never asks the user to configure something they could be wrong about.

@@ -13,19 +13,29 @@ let runningTemplateId = null;
 // relativeTime is in window.Helpers (popup-modules/helpers.js)
 
 // ========== Panel Toggle ==========
+// Defensive: any of these elements being absent must not crash the popup.
+function _setDisplay(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = value;
+}
+function _toggleClass(id, cls, on) {
+  const el = document.getElementById(id);
+  if (el) el.classList[on ? 'add' : 'remove'](cls);
+}
+
 function showTemplatesPanel() {
-  document.getElementById('templates-panel').style.display = 'flex';
-  document.getElementById('chat-container').style.display = 'none';
-  document.getElementById('input-area').style.display = 'none';
-  document.getElementById('templatesBtn').classList.add('active');
+  _setDisplay('templates-panel', 'flex');
+  _setDisplay('chat-container', 'none');
+  _setDisplay('input-area', 'none');
+  _toggleClass('templatesBtn', 'active', true);
   loadTemplates();
 }
 
 function hideTemplatesPanel() {
-  document.getElementById('templates-panel').style.display = 'none';
-  document.getElementById('chat-container').style.display = 'flex';
-  document.getElementById('input-area').style.display = 'flex';
-  document.getElementById('templatesBtn').classList.remove('active');
+  _setDisplay('templates-panel', 'none');
+  _setDisplay('chat-container', 'flex');
+  _setDisplay('input-area', 'flex');
+  _toggleClass('templatesBtn', 'active', false);
 }
 
 // ========== Template List ==========
@@ -119,13 +129,13 @@ function renderTemplateList(templates) {
 }
 
 // ========== Search and Filter ==========
-document.getElementById('templateSearchInput').addEventListener('input', () => {
-  loadTemplates();
-});
-
-document.getElementById('templateTagFilter').addEventListener('input', () => {
-  loadTemplates();
-});
+// Defensive: addEventListener on null would throw and abort the entire module.
+function _on(id, ev, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(ev, fn);
+}
+_on('templateSearchInput', 'input', () => loadTemplates());
+_on('templateTagFilter', 'input', () => loadTemplates());
 
 // ========== Create Template ==========
 function openCreateTemplateModal(goalText) {
@@ -280,10 +290,7 @@ function updateParamEditor(existingParams) {
   });
 }
 
-// Wire goal input to auto-detect params
-document.getElementById('tmpl-goal').addEventListener('input', () => {
-  updateParamEditor();
-});
+// Wire goal input to auto-detect params (defensive: now wired via _on at the bottom).
 
 // ========== Run Template ==========
 function openRunModal(templateId) {
@@ -378,28 +385,26 @@ function deleteTemplate(templateId, templateName) {
 }
 
 // ========== Event Wiring ==========
-document.getElementById('createTemplateBtn').addEventListener('click', () => {
-  openCreateTemplateModal();
-});
-
-document.getElementById('saveTemplateBtn').addEventListener('click', () => {
+// Defensive: any missing button must not crash the entire module load.
+_on('createTemplateBtn', 'click', () => openCreateTemplateModal());
+_on('saveTemplateBtn', 'click', () => {
   if (editingTemplateId) {
     saveEditedTemplate();
   } else {
     saveNewTemplate();
   }
 });
-
-document.getElementById('closeTemplateModalBtn').addEventListener('click', () => {
-  document.getElementById('template-modal').classList.remove('show');
+_on('closeTemplateModalBtn', 'click', () => {
+  const modal = document.getElementById('template-modal');
+  if (modal) modal.classList.remove('show');
   editingTemplateId = null;
 });
-
-document.getElementById('runTemplateBtn').addEventListener('click', () => {
-  executeTemplate();
-});
-
-document.getElementById('closeRunModalBtn').addEventListener('click', () => {
-  document.getElementById('template-run-modal').classList.remove('show');
+_on('runTemplateBtn', 'click', () => executeTemplate());
+_on('closeRunModalBtn', 'click', () => {
+  const modal = document.getElementById('template-run-modal');
+  if (modal) modal.classList.remove('show');
   runningTemplateId = null;
 });
+
+// Auto-detect parameters when goal text changes (defensive).
+_on('tmpl-goal', 'input', () => updateParamEditor());
