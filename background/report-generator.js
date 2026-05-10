@@ -37,15 +37,15 @@ export async function generateReport(executionData, CONFIG) {
 
   // Build memory summary for evidence section — skip failed/empty entries
   const memoryKeys = Object.keys(agentMemory);
-  const memorySummary = memoryKeys.length > 0
-    ? memoryKeys
-        .filter(k => {
-          const v = agentMemory[k];
-          const s = typeof v === 'string' ? v : JSON.stringify(v);
-          return s && s.length > 3 && s !== 'Done'
-            && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
-            && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
-        })
+  const usableKeys = memoryKeys.filter(k => {
+    const v = agentMemory[k];
+    const s = typeof v === 'string' ? v : JSON.stringify(v);
+    return s && s.length > 3 && s !== 'Done'
+      && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
+      && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
+  });
+  const memorySummary = usableKeys.length > 0
+    ? usableKeys
         .map(k => {
           const val = agentMemory[k];
           const valStr = Array.isArray(val)
@@ -54,6 +54,12 @@ export async function generateReport(executionData, CONFIG) {
           return `- ${k}: ${valStr}`;
         }).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
+  // (3.12.0) List of memory keys the report MUST cite from. Passed into
+  // the prompt so the report-LLM can emit [src:key] tags that the popup
+  // renders as clickable audit chips.
+  const citableKeysList = usableKeys.length > 0
+    ? usableKeys.map(k => `\`${k}\``).join(', ')
+    : '(none — investigation produced no extractable data)';
 
   // Build plan context if a plan was generated
   const planContext = agentPlan && agentPlan.length > 0
@@ -127,7 +133,28 @@ Adapt to the task type:
 - Keep the report tight — every sentence should earn its place
 - Use proper markdown formatting (headers, bold, lists, links)
 - Do NOT wrap in code fences or JSON
-- Return ONLY the report, nothing else`;
+- Return ONLY the report, nothing else
+
+### Source-Cited Outputs (MANDATORY)
+Every specific factual claim in your report — numbers, prices, dates, statistics, named quotes, named people / companies / IPs, URLs you actually visited — MUST end with an inline tag in the form **\`[src:memory_key]\`** where \`memory_key\` is one of the keys listed below in "Available memory keys to cite from". The popup renders these as clickable orange chips that expand the underlying data, so the reader can audit any claim back to its source.
+
+**Available memory keys to cite from:** ${citableKeysList}
+
+Examples of correctly cited claims:
+
+- "M4 Max Mac Studio starts at $1,999 [src:apple_store_pricing]"
+- "47 sign-ins from IP 173.189.68.113 [src:entra_signins]"
+- "Repository has 110,000 stars [src:github_repo_meta]"
+
+Hard rules:
+
+1. **Every** number, price, date, percentage, statistic, named entity, named quote, or specific URL needs a \`[src:key]\` tag pointing to a real memory key from the list above.
+2. If a claim has NO supporting memory key (e.g., it's general framing or your interpretation), either drop the specific number / leave it un-cited as prose, OR tag it \`[unverified]\` and move it to a "Caveats" section.
+3. Do NOT invent memory keys. If you can't find a real key for a claim, either remove the claim or mark it \`[unverified]\`.
+4. Headers, transitions, and structural prose do not need tags — only specific factual claims do.
+5. Cite generously — overcitation is acceptable; under-citation is not.
+
+This is not optional. A report with specific numbers but no \`[src:*]\` tags is broken, even if the prose looks polished.`;
 
   const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
 

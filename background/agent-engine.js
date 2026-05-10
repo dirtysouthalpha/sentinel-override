@@ -9,6 +9,7 @@ import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled } from './shared-state.js';
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
+import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -30,6 +31,10 @@ let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every at
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
 const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
+let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
+let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
+let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this run; useCount bumps at run end
+let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
 
 // Expose agentRunning for index.js
 export { agentRunning };
@@ -167,6 +172,28 @@ export async function startAgent(goal, sender) {
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
   registerInitialTab(startTabId, tabInfo?.url || '');
+
+  // (3.12.0) Load client knowledge for the active client. Format relevant
+  // entries as a prompt section that gets injected into every step's
+  // system prompt via agentState.clientKnowledgeText.
+  try {
+    const activeClient = await getActiveClient();
+    if (activeClient && activeClient.id) {
+      activeClientId = activeClient.id;
+      const startUrl = tabInfo?.url || '';
+      const relevantEntries = await getRelevantEntries(activeClient.id, startUrl);
+      clientKnowledgeUsedIds = relevantEntries.map(e => e.id);
+      clientKnowledgeText = await formatPromptSection(activeClient.id, startUrl);
+    } else {
+      activeClientId = null;
+      clientKnowledgeText = '';
+      clientKnowledgeUsedIds = [];
+    }
+  } catch (e) {
+    activeClientId = null;
+    clientKnowledgeText = '';
+    clientKnowledgeUsedIds = [];
+  }
 
   // (3.9.0) Forensic run log — start a fresh buffer with a UUID. Persisted
   // every step to chrome.storage.local.run_logs[runLogId] for export.
@@ -765,25 +792,118 @@ function evaluateHallucinationRisk(summary, agentMemory, history) {
 // a Resume button. The user resolves the challenge in the page, then clicks
 // Resume.
 
-const MFA_PATTERNS = [
+// (3.12.0) Confidence-based MFA detection. The previous flat regex array
+// false-positived on retail/checkout pages (coupon code fields, security
+// product descriptions, news articles mentioning two-factor). Real MFA
+// pages have stacked evidence: auth-provider URL + step-up language +
+// short-input field. Match scheme:
+//   1. Tier-1 cue alone (specific to MFA flows) -> fire
+//   2. Auth-provider URL + ANY tier-2 cue -> fire
+//   3. 2+ tier-2 cues on same page -> fire
+//   4. Otherwise -> no fire
+// Domain exclusion list short-circuits known non-MFA contexts.
+
+const MFA_TIER1_PATTERNS = [
+  /approve\s+(?:the\s+|this\s+)?sign.?in\s+request/i,
+  /we'?ve\s+sent\s+(?:a\s+|an\s+)?(?:verification\s+)?code\s+to/i,
+  /open\s+your\s+authenticator\s+app/i,
+  /tap\s+the\s+number\s+you\s+see/i,         // Microsoft number-matching MFA
+  /\bduo\s+(?:push|prompt|mobile)\b/i,
+  /\bpush\s+(?:notification|approval)\s+sent\b/i,
+  /enter\s+the\s+(?:verification\s+|security\s+)?code\s+(?:from|sent\s+to)/i,
+  /\bwaiting\s+for\s+approval\b/i,
+  /security\s+key\s+(?:plugged\s+in|connected|inserted)/i
+];
+
+const MFA_TIER2_PATTERNS = [
   /verify\s+your\s+identity/i,
-  /enter\s+(?:the\s+)?(?:verification\s+)?code/i,
-  /approve\s+(?:the\s+)?sign.?in\s+request/i,
-  /we'?ve\s+sent.*?code/i,
-  /6.?digit\s+(?:code|number|verification)/i,
   /two.?factor\s+(?:authentication|verification)/i,
   /multi.?factor\s+authentication/i,
   /authenticator\s+app/i,
   /one.?time\s+(?:passcode|password|code)/i,
   /\bOTP\b/,
-  /enter\s+your\s+code/i,
-  /check\s+your\s+phone/i
+  /6.?digit\s+(?:code|number|verification)/i,
+  /check\s+your\s+phone/i,
+  /enter\s+(?:the\s+)?verification\s+code/i,
+  /verification\s+code\s+(?:was\s+)?sent/i
 ];
 
-function detectMfaInText(text) {
+const MFA_AUTH_URL_PATTERNS = [
+  /login\.microsoftonline\.com/i,
+  /login\.live\.com/i,
+  /accounts\.google\.com/i,
+  /login\.okta\.com/i,
+  /\.okta\.com\/(?:signin|verify|mfa)/i,
+  /\.duosecurity\.com/i,
+  /sts\.[a-z0-9.-]+\.(com|net|org)/i,
+  /\/(?:mfa|2fa|otp|challenge|verify|signin|sign-in)(?:[\/?#]|$)/i,
+  /auth\.[a-z0-9.-]+\.(com|net|org)/i
+];
+
+// Pages that should NEVER fire MFA, even with weak text cues. Stops
+// shopping / news / social sites from tripping the detector.
+const MFA_EXCLUDE_DOMAINS = [
+  /amazon\.[a-z.]+\/(?:s|gp|dp|product|cart|checkout)/i,
+  /ebay\.[a-z.]+\/(?:itm|sch|str)/i,
+  /walmart\.com\/(?:ip|search|cart)/i,
+  /target\.com\/(?:p|s|c)/i,
+  /bestbuy\.com\/(?:site|cart)/i,
+  /apple\.com\/shop/i,
+  /bhphotovideo\.com\/c/i,
+  /newegg\.com\/p/i,
+  /github\.com\/[^/]+\/[^/]+(?:\/|$)/i,    // GitHub repos
+  /\/blog\//i,
+  /\/news\//i,
+  /\/article\//i,
+  /\/(?:product|products|shop|store|cart|checkout)\//i,
+  /(?:youtube|youtu\.be|twitter|x\.com|reddit|linkedin|facebook|instagram|tiktok)\.com/i
+];
+
+function detectMfaInText(text, currentUrl) {
+  if (!text || typeof text !== 'string') return null;
+  const url = (currentUrl || '').toLowerCase();
+
+  // Hard exclude known non-MFA contexts -- protects against shopping /
+  // news / social pages with random "verify" or "two-factor" text.
+  for (const re of MFA_EXCLUDE_DOMAINS) {
+    if (re.test(url)) return null;
+  }
+
+  const sample = text.substring(0, 5000);
+
+  // Tier 1: any single match fires.
+  for (const re of MFA_TIER1_PATTERNS) {
+    const m = sample.match(re);
+    if (m) return m[0];
+  }
+
+  const isAuthUrl = MFA_AUTH_URL_PATTERNS.some(re => re.test(url));
+
+  // Tier 2: collect matches, decide based on count + URL.
+  const tier2Hits = [];
+  for (const re of MFA_TIER2_PATTERNS) {
+    const m = sample.match(re);
+    if (m) tier2Hits.push(m[0]);
+  }
+
+  // Auth URL + any tier-2 cue -> fire.
+  if (isAuthUrl && tier2Hits.length >= 1) return tier2Hits[0];
+
+  // Multiple tier-2 cues on same page -> fire (covers MFA flows on
+  // less-common auth domains).
+  if (tier2Hits.length >= 2) return tier2Hits[0];
+
+  return null;
+}
+
+// Legacy alias kept for any external callers expecting the old name.
+function _legacyDetectMfaInText(text) {
+  // Original flat-regex behavior preserved internally if anything
+  // imports the old patterns directly.
   if (!text || typeof text !== 'string') return null;
   const sample = text.substring(0, 5000);
-  for (const re of MFA_PATTERNS) {
+  const ALL_PATTERNS = [...MFA_TIER1_PATTERNS, ...MFA_TIER2_PATTERNS];
+  for (const re of ALL_PATTERNS) {
     const m = sample.match(re);
     if (m) return m[0];
   }
@@ -1173,7 +1293,7 @@ async function runAgentLoop(goal, workingTabId) {
       // pause the agent, notify the desktop, and post a chat banner. The
       // existing pauseAgent/resumeAgent infra unblocks the loop.
       try {
-        const _mfaHit = detectMfaInText(pageText);
+        const _mfaHit = detectMfaInText(pageText, currentUrl);
         if (_mfaHit && mfaAckUrl !== currentUrl) {
           agentPaused = true;
           sendSilentUpdate('⏸ MFA challenge detected (' + _mfaHit + ') — agent paused', stepCount);
@@ -1308,7 +1428,7 @@ async function runAgentLoop(goal, workingTabId) {
         ' (' + _stepsRemaining + ' remaining; ' + productiveSteps + ' productive bumps so far). ' +
         'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
         'Aimless read_page / scroll = unproductive (does not extend).';
-      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint };
+      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -2191,6 +2311,25 @@ async function runAgentLoop(goal, workingTabId) {
       sendActionResult(stepCount, result, actionFailed);
       history.push({ step: stepCount, action: command, result });
 
+      // (3.12.0) Vision-based action verification flag. After every modifying
+      // action that didn't fail outright, mark the next observation cycle to
+      // explicitly verify the action took effect. The actual verification
+      // runs via prompt-injection in llm-client.js — no extra API call,
+      // just forces the LLM to look at the post-action screenshot and
+      // confirm before continuing.
+      try {
+        if (!actionFailed && command && MODIFYING_ACTIONS.has(command.type)) {
+          pendingVerification = {
+            type: command.type,
+            description: (command.text || command.selector || command.value || command.url || command.key || '').toString().substring(0, 120),
+            attemptedAt: stepCount
+          };
+        } else if (command && !MODIFYING_ACTIONS.has(command.type)) {
+          // Non-modifying action consumes any pending flag implicitly.
+          pendingVerification = null;
+        }
+      } catch (e) { pendingVerification = null; }
+
       // (3.9.0) Forensic run log: persist a structured record per step.
       try {
         if (runLogId) {
@@ -2309,6 +2448,14 @@ async function runAgentLoop(goal, workingTabId) {
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
+
+  // (3.12.0) Tally client-knowledge entries used and bump the client's runCount.
+  // Quiet, non-fatal — never let knowledge bookkeeping break the run finish path.
+  try {
+    if (activeClientId) {
+      await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
+    }
+  } catch (e) { /* non-fatal */ }
 
   // Signal completion via messaging (replaces polling for scheduler)
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch(() => {});

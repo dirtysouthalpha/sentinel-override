@@ -732,6 +732,27 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState.agentMemory, null, 2)}\n`
     : '';
 
+  // (3.12.0) Client knowledge context. agent-engine.js pre-formats this
+  // string at run start and passes it through agentState.clientKnowledgeText.
+  // When set, it lists facts learned from prior runs for the active client
+  // — site quirks, timing rules, custom paths, recurring errors. Inject
+  // verbatim so the LLM sees them every step.
+  const clientKnowledgeCtx = (agentState.clientKnowledgeText && typeof agentState.clientKnowledgeText === 'string')
+    ? agentState.clientKnowledgeText
+    : '';
+
+  // (3.12.0) Vision-based action verification. When the immediately prior
+  // step was a modifying action (click, type, select, check, press_key,
+  // upload_file), force the model to look at the post-action screenshot
+  // and explicitly confirm the action took effect BEFORE proposing the next
+  // command. No extra API call -- this just sharpens the existing
+  // observation cycle so silent failures (click registered but modal didn't
+  // close, form filled but hidden validation rejected) get caught.
+  const _pv = agentState.pendingVerification;
+  const verificationCtx = (_pv && _pv.type)
+    ? `\n## VERIFY YOUR LAST ACTION FIRST\nYour previous step was: **${_pv.type}** -> "${(_pv.description || '').replace(/"/g, '\\"').substring(0, 100)}".\n\nBefore proposing the next command, examine the current screenshot and confirm the action took effect. Look for evidence:\n- Click on a button -> Did the modal close? Did the page navigate? Did a success message appear?\n- Type in a field -> Does the field now contain the typed text?\n- Select a dropdown -> Did the selected value update?\n- Check / check_all -> Are the checkboxes now in the expected state?\n- press_key (Enter/Tab/etc.) -> Did the form submit / focus advance / dropdown open?\n\nIf the page state confirms the action took effect: proceed with the next planned step.\n\nIf the page does NOT reflect the action (button still highlighted, modal still open, field still empty, no navigation): treat the step as failed. Do NOT proceed as if it succeeded. Choose ONE recovery:\n1. Retry the same action with a different selector (often the click missed or hit a wrapper element).\n2. wait 1500ms, then re-observe -- some SPAs commit asynchronously.\n3. scroll_to the element first, then retry.\n4. Use execute_js to trigger the action programmatically (.click(), dispatchEvent('click'), HTMLElement.value setter + 'input' event).\n\nThis verification is mandatory -- never skip past a destructive action without confirming it landed.\n`
+    : '';
+
   // Inject plan context if a plan was generated
   let planCtx = '';
   if (agentState.agentPlan && agentState.agentPlan.length > 0) {
@@ -1085,7 +1106,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${patternCtx}${memoryCtx}${tabCtxSection}${loopCtx}
+${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}
 Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? 'Budget: ' + agentState.budgetHint + '\n' : ''}Goal: ${goal}

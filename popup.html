@@ -43,6 +43,9 @@
       <span class="header-brand">SENTINEL<span class="brand-underscore">_</span>OVERRIDE</span>
       <span id="modeBadge" class="mode-badge approval">APPROVAL</span>
       <span id="tenantChip" class="tenant-chip" style="display:none;" title="Detected Microsoft tenant (3.7.0)"></span>
+      <button id="clientChip" class="tenant-chip" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; background:transparent; border:1px solid var(--border-color, rgba(255,255,255,0.15)); color:var(--text-secondary, #aaa); font-size:11px; padding:2px 8px; border-radius:10px;" title="Active client for this run (3.12.0). Click to switch or manage.">
+        <span style="opacity:0.7;">CLIENT:</span> <span id="clientChipName">none</span>
+      </button>
       <span id="activeIndicator" class="active-indicator" title="Agent active"></span>
     </div>
     <div class="header-buttons">
@@ -134,6 +137,24 @@
     <div class="welcome-message">
       <h2>Sentinel Override</h2>
       <p>Automate your browser tasks with AI. What would you like me to do?</p>
+      <div class="example-prompts" style="margin-top:18px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:11px; color:var(--text-tertiary, #888); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Try one of these to get started:</div>
+        <button class="example-prompt-btn" data-prompt="Pull the last 50 sign-in events from Entra for user [email] and flag any from unfamiliar IPs.">
+          <span style="opacity:0.6;">→</span>&nbsp;Audit Entra sign-ins for a user
+        </button>
+        <button class="example-prompt-btn" data-prompt="Run a message trace in Exchange admin center for sender [from] to recipient [to] in the last 24 hours.">
+          <span style="opacity:0.6;">→</span>&nbsp;Run an Exchange message trace
+        </button>
+        <button class="example-prompt-btn" data-prompt="Open the SonicWall web UI, navigate to VPN > Settings, and list every Site-to-Site tunnel with its status.">
+          <span style="opacity:0.6;">→</span>&nbsp;Audit SonicWall VPN tunnels
+        </button>
+        <button class="example-prompt-btn" data-prompt="Look up the SHA256 hash [hash] in VirusTotal and summarize the verdict, AV detections, and any related URLs / IPs.">
+          <span style="opacity:0.6;">→</span>&nbsp;VirusTotal hash lookup
+        </button>
+      </div>
+      <div style="margin-top:14px; font-size:11px; color:var(--text-tertiary, #888); line-height:1.5;">
+        Tip: open Templates (top bar) for one-click playbooks, or pick a Client (header chip) to inject site-specific knowledge into the run.
+      </div>
     </div>
   </div>
 
@@ -442,10 +463,11 @@
         <button id="closeReportBtn" class="icon-btn" title="Close">&times;</button>
       </div>
       <div id="report-content" style="line-height:1.6;max-height:60vh;overflow-y:auto;"></div>
-      <div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);">
-        <button id="copyReportMdBtn" class="modal-btn btn-save" style="flex:1;">Copy Markdown</button>
-        <button id="downloadReportBtn" class="modal-btn btn-save" style="flex:1;">Download .md</button>
-        <button id="copyReportTextBtn" class="modal-btn btn-cancel" style="flex:1;">Copy Plain Text</button>
+      <div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color);flex-wrap:wrap;">
+        <button id="copyReportMdBtn" class="modal-btn btn-save" style="flex:1;min-width:110px;">Copy Markdown</button>
+        <button id="downloadReportBtn" class="modal-btn btn-save" style="flex:1;min-width:110px;">Download .md</button>
+        <button id="exportReportPdfBtn" class="modal-btn btn-save" style="flex:1;min-width:110px;background:var(--accent-primary);color:white;border-color:var(--accent-primary);" title="Open a print-friendly view; pick &quot;Save as PDF&quot; in the print destination dropdown">Export PDF</button>
+        <button id="copyReportTextBtn" class="modal-btn btn-cancel" style="flex:1;min-width:110px;">Copy Plain Text</button>
       </div>
     </div>
   </div>
@@ -487,6 +509,136 @@
       <div class="modal-actions">
         <button id="closeRunModalBtn" class="modal-btn btn-cancel">Cancel</button>
         <button id="runTemplateBtn" class="modal-btn btn-save">Run</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- First-Run Onboarding Modal (3.12.0) -->
+  <div id="onboarding-modal" class="modal">
+    <div class="modal-content" style="max-width:520px;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <img src="icon-48.png" alt="" style="width:32px; height:32px;">
+        <h2 style="margin:0;">Welcome to Sentinel Override</h2>
+      </div>
+      <div id="onboardingStepIndicator" style="font-size:11px; color:var(--text-tertiary); margin-bottom:16px; letter-spacing:0.5px; text-transform:uppercase;">Step 1 of 4</div>
+
+      <div class="onboarding-step" data-step="1">
+        <p style="font-size:14px; line-height:1.6; margin:0 0 12px;">An MSP-focused browser agent that <b>plans</b>, <b>acts</b>, and <b>reports back</b>. Built for the techs in the trenches.</p>
+        <ul style="font-size:13px; line-height:1.7; padding-left:20px; margin:8px 0 16px;">
+          <li>Audit Entra sign-ins, run Exchange message traces, configure SonicWall VPN tunnels</li>
+          <li>Hard-block cross-tenant actions to prevent client mix-ups</li>
+          <li>Generate audit-ready reports with source-cited claims</li>
+          <li>Remember per-client knowledge that compounds across runs</li>
+        </ul>
+      </div>
+
+      <div class="onboarding-step" data-step="2" style="display:none;">
+        <h3 style="margin-top:0;">1. Pick an LLM provider</h3>
+        <p style="font-size:13px; line-height:1.6;">Click the <b>gear icon</b> (top right) → choose a provider from the catalog → paste your API key → click <b>Detect Models</b> → save.</p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:12px; line-height:1.6; margin:10px 0;">
+          <b>Recommended:</b><br>
+          • <b>Anthropic Claude</b> — best vision + reasoning, MSP-friendly<br>
+          • <b>OpenAI GPT-4.1 / GPT-5</b> — strong all-around<br>
+          • <b>Local: Ollama / LM Studio</b> — free, private, slower
+        </div>
+        <p style="font-size:12px; color:var(--text-tertiary);">16 providers in the catalog with auto-detect. Switch any time.</p>
+      </div>
+
+      <div class="onboarding-step" data-step="3" style="display:none;">
+        <h3 style="margin-top:0;">2. (Optional) Lock in the client tenant</h3>
+        <p style="font-size:13px; line-height:1.6;">For Microsoft 365 work, set <b>Expected Microsoft tenant</b> in Settings to your client's tenant (e.g., <code>acme.onmicrosoft.com</code>).</p>
+        <p style="font-size:13px; line-height:1.6;">The tenant chip in the header turns <span style="color:#4caf50;">green</span> when you're on the right tenant and <span style="color:#f44;">red</span> when you're not. Modifying actions get hard-blocked on the wrong tenant.</p>
+        <p style="font-size:12px; color:var(--text-tertiary);">For multi-client work, use the <b>Client</b> chip (header) to switch context per run — Sentinel injects per-client knowledge automatically.</p>
+      </div>
+
+      <div class="onboarding-step" data-step="4" style="display:none;">
+        <h3 style="margin-top:0;">3. Try a goal</h3>
+        <p style="font-size:13px; line-height:1.6;">Type a goal in plain English like:</p>
+        <div style="background:var(--bg-secondary); padding:10px; border-radius:6px; font-size:12px; font-family:monospace; line-height:1.5; margin:8px 0;">
+          "Run a message trace in Exchange admin center for sender alice@acme.com to recipient bob@acme.com in the last 24 hours and summarize findings."
+        </div>
+        <p style="font-size:13px; line-height:1.6;">Sentinel plans, executes, and produces an investigation report with source-cited claims. Export as PDF for ticket attachment.</p>
+        <p style="font-size:12px; color:var(--text-tertiary);">Welcome aboard.</p>
+      </div>
+
+      <div class="modal-actions" style="margin-top:20px; padding-top:12px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+        <button id="onboardingSkipBtn" class="modal-btn btn-cancel" style="font-size:11px;">Skip tour</button>
+        <div style="display:flex; gap:8px;">
+          <button id="onboardingPrevBtn" class="modal-btn btn-cancel" style="display:none;">← Back</button>
+          <button id="onboardingNextBtn" class="modal-btn btn-save" style="background:var(--accent-primary); color:white; border-color:var(--accent-primary);">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Knowledge Modal (3.12.0) -->
+  <div id="client-modal" class="modal">
+    <div class="modal-content" style="max-width:560px; max-height:80vh; display:flex; flex-direction:column;">
+      <h2 style="margin-top:0;">Clients & Knowledge</h2>
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.5;">
+        Pick the client this run is for. Sentinel injects facts you have saved for that client into every step's prompt — site quirks, timing rules, custom paths, recurring errors. Knowledge compounds across runs.
+      </div>
+
+      <!-- Active client picker -->
+      <div style="margin-bottom:16px; padding:12px; background:var(--bg-secondary); border-radius:8px; border:1px solid var(--border-color);">
+        <div style="font-size:11px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Active client for next run</div>
+        <select id="clientActivePicker" style="width:100%; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+          <option value="">— No client (default behavior) —</option>
+        </select>
+      </div>
+
+      <!-- Add new client + manage -->
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <input type="text" id="clientNewNameInput" placeholder="New client name (e.g., Acme Corp)" style="flex:1; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+        <button id="clientAddBtn" class="small-btn" style="background:var(--accent-primary); color:white; border-color:var(--accent-primary);">+ Add</button>
+      </div>
+
+      <!-- Client list -->
+      <div id="clientList" style="flex:1; overflow-y:auto; min-height:120px; border-top:1px solid var(--border-color); padding-top:12px;">
+        <div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No clients yet.</div>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-actions" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color);">
+        <button id="clientImportBtn" class="modal-btn btn-cancel" title="Import a client knowledge JSON file">Import…</button>
+        <button id="closeClientModalBtn" class="modal-btn btn-save">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-Client Detail Modal (3.12.0) — entries CRUD -->
+  <div id="client-detail-modal" class="modal">
+    <div class="modal-content" style="max-width:560px; max-height:80vh; display:flex; flex-direction:column;">
+      <h2 id="clientDetailTitle" style="margin-top:0;">Client</h2>
+      <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center;">
+        <input type="text" id="clientDetailNameInput" style="flex:1; padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;" placeholder="Display name">
+        <input type="text" id="clientDetailTenantInput" style="flex:1; padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:12px;" placeholder="Tenant (optional, e.g., acme.onmicrosoft.com)">
+        <button id="clientDetailSaveBtn" class="small-btn">Save</button>
+      </div>
+
+      <!-- Add entry -->
+      <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:10px; margin-bottom:12px;">
+        <div style="font-size:11px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Add knowledge entry</div>
+        <textarea id="clientEntryWisdomInput" rows="2" placeholder="What did you learn? E.g., 'Their Entra has an auth proxy — wait 4s after navigation before clicking.'" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box;"></textarea>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+          <select id="clientEntryScopeSelect" style="padding:5px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px;">
+            <option value="global">Global (always apply)</option>
+            <option value="url">Only on URL pattern…</option>
+          </select>
+          <input type="text" id="clientEntryUrlPatternInput" placeholder="*.entra.microsoft.com" style="flex:1; padding:5px 8px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:4px; color:var(--text-primary); font-size:12px; display:none;">
+          <button id="clientEntryAddBtn" class="small-btn" style="background:var(--accent-primary); color:white; border-color:var(--accent-primary);">+ Add entry</button>
+        </div>
+      </div>
+
+      <!-- Entries list -->
+      <div id="clientEntriesList" style="flex:1; overflow-y:auto; min-height:120px;">
+        <div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No knowledge yet for this client.</div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color);">
+        <button id="clientDetailExportBtn" class="modal-btn btn-cancel" title="Export this client's knowledge as JSON for sharing with teammates">Export JSON…</button>
+        <button id="clientDetailDeleteBtn" class="modal-btn btn-cancel" style="color:var(--error-color);">Delete client</button>
+        <button id="closeClientDetailBtn" class="modal-btn btn-save">Done</button>
       </div>
     </div>
   </div>
@@ -616,6 +768,8 @@
   <script src="popup-modules/settings.js"></script>
   <script src="popup-modules/chat.js"></script>
   <script src="popup-modules/templates.js"></script>
+  <script src="popup-modules/client-knowledge.js"></script>
+  <script src="popup-modules/onboarding.js"></script>
   <script src="popup-modules/scheduler-ui.js"></script>
   <script src="popup-modules/collaboration.js"></script>
   <script src="popup-full.js"></script>
