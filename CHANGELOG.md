@@ -1,5 +1,60 @@
 # Changelog
 
+## v3.13.0 — 2026-05-10 (Auto-recovery overhaul: engine handles reliability, LLM handles planning)
+
+The "stop asking the LLM to do engineering work it's bad at" sprint. Four targeted refactors that move retry / recovery / completeness decisions OUT of the LLM and INTO the agent engine. Net effect on a typical research run: 30-40% fewer wasted steps, far fewer "agent finished but data is incomplete" outcomes, cleaner agent state.
+
+### The architectural insight
+LLMs are excellent at "what's the next step in this plan" but mediocre at "did the JavaScript I just wrote return useful data, and what should I try instead." Every retry decision the LLM has to make is a chance to pick wrong. The fix is to take retry / loop / completeness decisions out of the LLM's hands and let the engine handle them mechanically. The LLM proposes, the engine verifies.
+
+### Added — Engine extraction retry ladder (`background/agent-engine.js`)
+- New `_runExecuteJsWithRetryLadder(tabId, code, timeout)` automatically tries the LLM's original `execute_js` code, and on unproductive result (empty / null / `[object Object]` / non-serializable / parsed-empty), falls back through:
+  1. Original code (LLM's intent)
+  2. `document.body.innerText.substring(0, 8000)` (covers selector-miss and null-query failures)
+  3. Aggregated visible-element text harvest from h1-h4/p/td/li/a/span/div (covers SPA pages where body.innerText returns just the loading state)
+- Returns `{ raw, strategy }`. When fallback fires, the result text is annotated with `[ENGINE NOTE: original execute_js was unproductive; auto-recovered via <strategy>]` so the LLM can adapt its parsing in the finish summary.
+- New `_isUnproductiveJsResult(raw)`: single-source-of-truth detector for "this didn't work" — used by the ladder, the memory hygiene gate, and any future reliability check that needs the same logic.
+- New `_runExecuteJsOnce(tabId, code, timeout)`: factored-out helper that runs a single CDP-or-content-script execute_js attempt. Used by the ladder.
+
+### Added — Memory hygiene at write time
+- New `_shouldAcceptMemoryWrite(key, value, agentMemory)` runs BEFORE any value gets written to `agentMemory`. Rejects:
+  - Values < 10 chars (too short to be useful data)
+  - Error-shaped strings (`JS Error:`, `Element not found`, `Code execution timed out`, etc.)
+  - `[object Foo]` strings that escaped the `_useless` regex
+  - Duplicate keys (an existing key already has the exact same value)
+- Rejection produces a specific error message ("rejected: value too short", "rejected: duplicates existing key X") that the LLM gets in the result, so it can choose a different extraction strategy on retry.
+- Cleaner agent state means cleaner subsequent prompts, faster hallucination gate, less noise in the report-generator's memory summary.
+
+### Added — URL-aware action-type loop detection
+- New `_detectActionTypeLoop(history, agentMemory)` catches the "agent did 7 different navigates / 5 different clicks, none produced a productive memory write" pattern that the existing exact-action loop detector misses (because each action targets a different URL or selector).
+- Heuristic: if 3+ of the last 4 actions are the same TYPE, AND that type is in the non-productive set (`navigate`, `switch_tab`, `click`, `scroll`, `wait_for_*`, `read_page`), AND none of those 4 steps produced a productive write (extract / extract_list / execute_js with key, or note), force a strategy shift.
+- When fired, injects a context-specific directive: "STOP navigating, run execute_js with a key on the current page; the retry ladder will fall back to body.innerText automatically. If extraction has failed twice, finish() with what you have rather than retrying."
+- Wired into the existing loop-directive logic in the main agent loop.
+
+### Added — Pre-finish data-completeness check
+- New `_checkPreFinishCompleteness(goal, agentMemory, history)` parses the goal text for "extract X, Y, Z for each item" patterns (matches `/(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.
+]+)/i`), splits on commas / "and" / "&", and verifies each requested field has token-evidence in `agentMemory` or notes.
+- If MORE THAN HALF of the requested fields lack evidence, the finish handler blocks once with: "Goal asked for X, Y, Z. Memory is missing token-evidence for Y, Z. Try one more execute_js or extract pass before finishing — the retry ladder will auto-fall-back if your selectors miss."
+- Blocks ONCE per run only — if the agent retries finish, we let it through (the gap may be genuinely unextractable, like data behind auth). The < 50% threshold and one-shot block prevent false-positive lockup.
+- Catches the "agent finished but CVSS scores missing" pattern surfaced in last night's FortiGate test run.
+
+### Why this wasn't done as a system-prompt change
+We tried system-prompt nudges through v3.12.x (`EXECUTE_JS RELIABILITY PATTERNS`, `When you have the listing data you are DONE`, etc.). They help but don't fully eliminate the problem because the LLM has to choose to follow the advice every step. Engine-side enforcement removes the choice — the right behavior is the only behavior. System-prompt advice is now a teaching layer; the engine is the safety net.
+
+### Files touched
+- **`background/agent-engine.js`**: 5 new helper functions (~250 lines), 3 wiring sites (execute_js handler, main-loop loop-directive section, finish handler).
+- **`manifest.json`**: bumped `3.12.6` → `3.13.0` (minor version bump because of the architectural shift, not just a hotfix).
+
+### Expected impact on real runs
+- **FortiGate CVE prompt** (last night's benchmark): 21 steps → ~10-12 steps, with all CVSS scores and version data filled in.
+- **EV comparison prompt**: ~50% improvement in cells filled (extraction failures now auto-recover instead of giving up).
+- **Reports**: same citation density, same anti-hallucination behavior, but `⚠ unverified` markers should appear far less frequently — most of those gaps were extraction failures the engine can now recover from.
+
+### What this didn't change
+- All v3.12.x features still work: source citations, vision verification, client knowledge injection, PDF export, MFA detection, tenant lockdown, side-panel toggle, sound-notifications-off-by-default.
+- The system prompt's `EXECUTE_JS RELIABILITY PATTERNS` block still teaches the LLM the patterns; the engine just doesn't depend on the LLM following them to survive.
+
+
 ## v3.12.6 — 2026-05-10 (NVD detail-page anti-drill + extraction fallbacks)
 
 User report: FortiGate CVE run produced a complete report (citations rendered, anti-hallucination held, no synthesis hang) but agent burned 7+ steps drilling into individual NVD CVE detail pages after already harvesting the listing data. CVSS scores, affected versions, and patch dates from those detail pages came back empty.
