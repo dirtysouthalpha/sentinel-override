@@ -910,6 +910,277 @@ function _legacyDetectMfaInText(text) {
   return null;
 }
 
+// ========== v3.13.0 Auto-Recovery Helpers ==========
+// Engine-side reliability layer. The LLM is good at "what's the next step";
+// it's bad at "did my code actually work, and what should I try instead".
+// These helpers move retry/recovery decisions OUT of the LLM and INTO the
+// engine, which means: fewer wasted steps, fewer hallucinations from
+// retry-go-wrong, and the LLM can focus on planning vs. error handling.
+
+/**
+ * Detect whether a raw JS-result string is unproductive (empty, error,
+ * non-serializable, parsed-but-empty). Used by the retry ladder and by
+ * memory hygiene at write time. Single source of truth for "this didn't work".
+ */
+function _isUnproductiveJsResult(raw) {
+  if (raw == null) return true;
+  if (typeof raw !== 'string') raw = String(raw);
+  if (raw === '' || raw === 'Done') return true;
+  if (raw.startsWith('JS Error:')) return true;
+  if (raw.startsWith('Code execution timed out')) return true;
+  if (raw.startsWith('Execution error')) return true;
+
+  let val = raw;
+  if (raw.startsWith('JS Result: ')) val = raw.substring(11);
+  const trim = val.trim();
+
+  if (trim.length < 5) return true;
+  if (trim === 'undefined' || trim === 'null') return true;
+  if (/^\s*\[object\s+\w+\]\s*$/i.test(trim)) return true;
+
+  // Parsed-but-empty check
+  try {
+    const p = JSON.parse(trim);
+    if (p === null) return true;
+    if (Array.isArray(p) && p.length === 0) return true;
+    if (typeof p === 'object' && Object.keys(p).length === 0) return true;
+  } catch (e) { /* not JSON, that's fine */ }
+
+  return false;
+}
+
+/**
+ * Run a single execute_js attempt via CDP first, falling back to content
+ * script if CDP attach is denied (chrome:// pages, devtools, etc.).
+ * Returns the raw "JS Result: ..." string or an error string.
+ */
+async function _runExecuteJsOnce(tabId, code, timeout) {
+  // CDP path (preferred -- bypasses page CSP)
+  try {
+    const cdpResult = await cdpExecuteJs(tabId, code, { timeout });
+    if (cdpResult && cdpResult.ok) {
+      const valStr = cdpResult.value === undefined || cdpResult.value === null
+        ? ''
+        : (typeof cdpResult.value === 'object'
+            ? JSON.stringify(cdpResult.value).slice(0, 3000)
+            : String(cdpResult.value).slice(0, 3000));
+      return 'JS Result: ' + valStr;
+    } else if (cdpResult && cdpResult.attachDenied) {
+      // Fall through to content-script path
+    } else if (cdpResult && cdpResult.error) {
+      // Fall through too -- content script may succeed where CDP errored
+    }
+  } catch (e) { /* fall through */ }
+
+  // Content-script path (fallback for chrome:// or CDP-failed sites)
+  try {
+    const csRes = await sendMessageWithRetry(tabId, {
+      action: 'execute_command',
+      command: { type: 'execute_js', code, timeout }
+    });
+    return csRes || 'Done';
+  } catch (e) {
+    return 'JS Error: ' + (e && e.message ? e.message : String(e));
+  }
+}
+
+/**
+ * Auto-recovery retry ladder for execute_js. Tries the LLM's original code
+ * first; if that returns unproductive (empty / null / [object Object] /
+ * non-serializable), automatically retries with progressively more
+ * conservative strategies. The LLM is NEVER asked to choose between these --
+ * the engine handles it mechanically.
+ *
+ * Strategies (in order):
+ *   1. original   -- LLM's intended code
+ *   2. body_text  -- document.body.innerText (covers null-query and
+ *                    selector-miss cases; LLM can parse text in finish)
+ *   3. visible    -- aggregated innerText from all common visible
+ *                    elements (covers SPA pages where body.innerText
+ *                    misses lazy-rendered children)
+ *
+ * Returns { raw, strategy }. raw is the same shape the rest of the
+ * pipeline expects; strategy is for logging / forensic run log.
+ */
+async function _runExecuteJsWithRetryLadder(tabId, originalCode, timeout) {
+  // Strategy 1: LLM's original code
+  let raw = await _runExecuteJsOnce(tabId, originalCode || '', timeout);
+  if (!_isUnproductiveJsResult(raw)) {
+    return { raw, strategy: 'original' };
+  }
+
+  // Strategy 2: body.innerText fallback (covers most LLM-extraction failures)
+  const FB_BODY_TEXT = 'return (document.body && document.body.innerText) ? document.body.innerText.substring(0, 8000) : "";';
+  raw = await _runExecuteJsOnce(tabId, FB_BODY_TEXT, timeout);
+  if (!_isUnproductiveJsResult(raw)) {
+    return { raw, strategy: 'body_text_fallback' };
+  }
+
+  // Strategy 3: aggregate visible-element text (SPA-heavy sites where
+  // body.innerText returns just the loading state)
+  const FB_VISIBLE = "return Array.from(document.querySelectorAll('h1,h2,h3,h4,p,td,li,a,span,div')).map(e => (e.innerText || '').trim()).filter(t => t && t.length > 3).slice(0, 300).join('\\n').substring(0, 8000);";
+  raw = await _runExecuteJsOnce(tabId, FB_VISIBLE, timeout);
+  if (!_isUnproductiveJsResult(raw)) {
+    return { raw, strategy: 'visible_text_fallback' };
+  }
+
+  return { raw, strategy: 'all_failed' };
+}
+
+/**
+ * Memory-hygiene gate: should this candidate value be written to agentMemory?
+ * Returns { ok: bool, reason: string }. Reasons help debug / log why a write
+ * was rejected. Run BEFORE writing -- prevents garbage from polluting future
+ * prompts and the report-generator's memory summary.
+ */
+function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
+  if (!key || typeof key !== 'string') return { ok: false, reason: 'empty key' };
+  if (candidateValue == null) return { ok: false, reason: 'null/undefined value' };
+
+  const valStr = typeof candidateValue === 'string'
+    ? candidateValue
+    : (Array.isArray(candidateValue) || typeof candidateValue === 'object'
+        ? JSON.stringify(candidateValue)
+        : String(candidateValue));
+
+  if (valStr.length < 10) return { ok: false, reason: 'value too short' };
+
+  // Reject error-shaped strings
+  if (/^(JS Error|Execution error|Code execution timed out|Element not found|JS execution failed)/i.test(valStr.trim())) {
+    return { ok: false, reason: 'error-shaped value' };
+  }
+
+  // Reject [object Foo] strings
+  if (/^\s*\[object\s+\w+\]\s*$/i.test(valStr.trim())) {
+    return { ok: false, reason: 'non-serialized object' };
+  }
+
+  // Reject duplicates -- if an existing memory key has the EXACT same value,
+  // overwriting it is meaningless and clutters the prompt.
+  for (const existingKey of Object.keys(agentMemory || {})) {
+    if (existingKey === key) continue;
+    const ev = agentMemory[existingKey];
+    const evStr = typeof ev === 'string' ? ev : JSON.stringify(ev);
+    if (evStr === valStr) {
+      return { ok: false, reason: 'duplicates existing key ' + existingKey };
+    }
+  }
+
+  return { ok: true, reason: '' };
+}
+
+/**
+ * (3.13.0) Pre-finish data-completeness check. Parse the goal text for
+ * data fields the user asked for ("extract X, Y, Z for each item"), then
+ * verify memory has plausible data for each. Returns null if everything's
+ * present, or a string describing the gap so we can block the finish and
+ * push the LLM to extract the missing piece.
+ *
+ * Heuristic, not authoritative -- false positives only delay finish by
+ * one step, which is cheap. False negatives let a sparse report through,
+ * which is the existing v3.10 hallucination gate's job. This adds a
+ * complementary "did you actually get what was asked for" pass.
+ */
+function _checkPreFinishCompleteness(goal, agentMemory, history) {
+  if (!goal || typeof goal !== 'string') return null;
+  if (!agentMemory || typeof agentMemory !== 'object') return null;
+
+  const goalLower = goal.toLowerCase();
+  const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
+  const noteText = history
+    .filter(h => h && h.action && h.action.type === 'note' && h.action.text)
+    .map(h => h.action.text.toLowerCase())
+    .join(' ');
+  const allEvidence = memorySerialized + ' ' + noteText;
+
+  // Patterns we care about: "extract X" / "give me X" / "find X" + commas
+  // For each: the CVE ID, CVSS v3 base score, affected FortiOS versions, ...
+  const fieldListMatch = goal.match(/(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i);
+  if (!fieldListMatch) return null;
+
+  const fieldList = fieldListMatch[1];
+  // Split on commas / "and" / "&" -- get individual field names
+  const rawFields = fieldList.split(/[,]|\s+and\s+|\s+&\s+/i)
+    .map(f => f.trim().replace(/^the\s+/i, '').replace(/\.$/, ''))
+    .filter(f => f.length > 3 && f.length < 60);
+
+  if (rawFields.length < 2) return null;  // not a structured field list
+
+  // For each requested field, check whether ANY token from it appears in
+  // memory or notes. This is a deliberately loose heuristic.
+  const missing = [];
+  for (const field of rawFields) {
+    // Pull "key" tokens from the field name (skip filler words)
+    const filler = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
+    const tokens = field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t));
+    if (tokens.length === 0) continue;
+    // Match if ANY meaningful token from this field shows up in evidence
+    const found = tokens.some(t => allEvidence.includes(t));
+    if (!found) missing.push(field);
+  }
+
+  if (missing.length === 0) return null;
+
+  // Don't fire on every gap -- only if MORE THAN HALF of asked fields are
+  // missing. Otherwise the existing hallucination gate handles it via
+  // [unverified] tagging.
+  if (missing.length / rawFields.length < 0.5) return null;
+
+  return 'Goal asked for: ' + rawFields.join(', ') + '. Memory is missing token-evidence for: ' + missing.join(', ') + '. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.';
+}
+
+/**
+ * URL-aware loop detector. Catches "agent did 7 navigates to 7 different
+ * pages, none produced a productive memory write". Loop detection that
+ * requires repeated EXACT actions is too narrow -- this version says:
+ *
+ *   "If 3+ of the last 4 actions are the same TYPE, and none of them
+ *    resulted in a productive memory write, that is a loop. Force
+ *    a strategy shift."
+ *
+ * Returns { isLoop: bool, type: string, count: number } so the caller can
+ * inject a context-specific directive.
+ */
+function _detectActionTypeLoop(history, agentMemory) {
+  if (!Array.isArray(history) || history.length < 4) return { isLoop: false };
+  const recent = history.slice(-4);
+  const types = recent.map(h => (h && h.action && h.action.type) || '');
+  // Most common type in the window
+  const counts = {};
+  for (const t of types) counts[t] = (counts[t] || 0) + 1;
+  let dominantType = null, dominantCount = 0;
+  for (const t of Object.keys(counts)) {
+    if (counts[t] > dominantCount) { dominantType = t; dominantCount = counts[t]; }
+  }
+  if (dominantCount < 3) return { isLoop: false };
+
+  // Check whether THIS dominant-type window produced any productive memory.
+  // A "productive" step is one that wrote a key with a usable value to memory.
+  // We can't know which key was written by which step, but we can check:
+  // did the memory keys count GROW during this 4-step window? If not, loop.
+  // (Imperfect but conservative -- false positives only delay the run a bit.)
+  // Implementation: store a memory-key-count snapshot in agent state at each
+  // step and compare. For now we use a simpler heuristic: the dominant type
+  // is non-modifying AND no new note/extract/execute_js-with-key happened.
+  const NON_PRODUCTIVE = new Set(['navigate', 'switch_tab', 'click', 'scroll', 'wait_for_text', 'wait_for_element', 'read_page']);
+  if (!NON_PRODUCTIVE.has(dominantType)) return { isLoop: false };
+
+  // Count productive actions in the window
+  const recentProductive = recent.filter(h => {
+    if (!h || !h.action) return false;
+    const t = h.action.type;
+    if (t === 'note') return true;
+    if (t === 'extract' || t === 'extract_list') return !!h.action.key;
+    if (t === 'execute_js') return !!h.action.key;
+    return false;
+  });
+  if (recentProductive.length === 0) {
+    return { isLoop: true, type: dominantType, count: dominantCount };
+  }
+
+  return { isLoop: false };
+}
+
 // ========== Heuristic Plan Generator ==========
 // Fallback when LLM-based plan generation fails. Analyzes the goal text
 // to produce a basic step-by-step plan without any API calls.
@@ -1338,6 +1609,16 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // 1. Consecutive non-productive actions from end of history
+      // (3.13.0) URL-aware loop detection -- catches "agent did 7 navigates
+      // to 7 different pages, none extracted anything" pattern that the
+      // existing exact-action check misses.
+      if (!loopDirective) {
+        const typeLoop = _detectActionTypeLoop(history, agentMemory);
+        if (typeLoop.isLoop) {
+          loopDirective = '\n⚠ ACTION-TYPE LOOP -- ' + typeLoop.count + ' of last 4 actions were "' + typeLoop.type + '" with no productive memory write. The current strategy is not yielding data. You MUST switch action types now:\n1. If you have been navigating, STOP -- run execute_js with a key on the current page to extract whatever data is visible. The retry ladder will fall back to body.innerText automatically.\n2. If you have been clicking, try a different selector or use execute_js to read the DOM directly.\n3. If you have been read_page-ing, switch to extract / extract_list with a key.\n4. If extraction has failed twice on this page, finish() with what you have and move on rather than retrying.\n';
+        }
+      }
+
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (history.length >= 3 && !loopDirective) {
         const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
@@ -1518,6 +1799,29 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Handle finish — but block premature finishes (model giving up without trying)
       if (command.type === 'finish') {
+        // (3.13.0) Pre-finish data completeness check. Parses the goal
+        // text for "extract X, Y, Z" patterns and verifies memory has
+        // evidence for each field. Blocks finish (once) if MORE THAN HALF
+        // of the asked fields lack token-evidence in memory + notes.
+        // Saves the "agent finished but CVSS missing" failure mode by
+        // forcing one more extraction pass with the retry ladder.
+        try {
+          const _completenessGap = _checkPreFinishCompleteness(goal, agentMemory, history);
+          // Only block ONCE per run -- if the agent retries finish after
+          // the block, we let it through (the gap may be genuinely
+          // unextractable, like data behind auth).
+          const _alreadyBlocked = history.some(h => h && h.result &&
+            typeof h.result === 'string' &&
+            h.result.startsWith('BLOCKED: pre-finish completeness'));
+          if (_completenessGap && !_alreadyBlocked && stepCount < (dynamicMaxSteps - 5)) {
+            history.push({ step: stepCount, action: command, result: 'BLOCKED: pre-finish completeness -- ' + _completenessGap });
+            if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+            sendSilentUpdate('Finish blocked — completeness check requesting one more extraction pass', stepCount);
+            await sleep(800);
+            continue;
+          }
+        } catch (e) { /* completeness check failure is non-fatal */ }
+
         const memCount = Object.keys(agentMemory).length;
         const noteCount = history.filter(h => h.action.type === 'note').length;
         const hasData = memCount > 0 || noteCount > 0;
@@ -2042,37 +2346,24 @@ async function runAgentLoop(goal, workingTabId) {
         }
         if (!extractSucceeded) actionFailed = true;
       } else if (command.type === 'execute_js' && command.key) {
-        // execute_js with key: run JS and save result to agent memory.
-        //
-        // CSP-bypass path: try chrome.debugger Runtime.evaluate first. The
-        // content-script <script>-tag injection (sendMessageWithRetry path
-        // below) is silently blocked on sites with strict CSPs (script-src
-        // without 'unsafe-inline'), e.g. drudgereport.com, github.com,
-        // many banks. CDP has elevated privileges and bypasses page CSP.
-        let res;
-        let cdpUsed = false;
-        try {
-          const cdpResult = await cdpExecuteJs(tab, command.code || '', { timeout: command.timeout });
-          if (cdpResult && cdpResult.ok) {
-            cdpUsed = true;
-            const valStr = cdpResult.value === undefined || cdpResult.value === null
-              ? ''
-              : (typeof cdpResult.value === 'object'
-                  ? JSON.stringify(cdpResult.value).slice(0, 3000)
-                  : String(cdpResult.value).slice(0, 3000));
-            res = 'JS Result: ' + valStr;
-          } else if (cdpResult && cdpResult.attachDenied) {
-            // chrome://, devtools://, extension pages — debugger denied.
-            // Fall through to content-script path silently.
-          } else if (cdpResult && cdpResult.error) {
-            console.warn('[CDP] execute_js failed, falling back to content script:', cdpResult.error);
-          }
-        } catch (e) {
-          console.warn('[CDP] execute_js threw, falling back to content script:', e && e.message);
+        // (3.13.0) Engine-side auto-recovery retry ladder for execute_js.
+        // Try the LLM's original code first; on unproductive result, the
+        // engine automatically retries with body.innerText, then with an
+        // aggregated visible-element text harvest. The LLM is NEVER asked
+        // to choose between these strategies -- engine handles mechanically.
+        // Outcomes:
+        //   strategy: 'original'              -> LLM's code worked
+        //   strategy: 'body_text_fallback'    -> selector missed, text saved
+        //   strategy: 'visible_text_fallback' -> SPA-heavy page text saved
+        //   strategy: 'all_failed'            -> surface error to LLM
+        const ladder = await _runExecuteJsWithRetryLadder(tab, command.code || '', command.timeout);
+        if (ladder.strategy !== 'original') {
+          console.log('[Sentinel] execute_js auto-recovered via:', ladder.strategy);
+          // Append a hint to the result so the LLM knows which strategy
+          // succeeded. Helps it adapt subsequent extractions on this page.
+          ladder.raw = ladder.raw + '\n\n[ENGINE NOTE: original execute_js was unproductive; auto-recovered via ' + ladder.strategy + ' strategy. The data above is from ' + (ladder.strategy === 'body_text_fallback' ? 'document.body.innerText' : 'aggregated visible-element text') + '. Parse it with regex/string ops in your finish summary.]';
         }
-        if (!cdpUsed) {
-          res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        }
+        let res = ladder.raw;
         result = res || 'Done';
         // Extract the JS result value
         let jsValue = result;
@@ -2115,6 +2406,18 @@ async function runAgentLoop(goal, workingTabId) {
                 savedValue = parsed;
               }
             } catch (e) { /* not JSON — keep the raw string */ }
+            // (3.13.0) Memory hygiene at write time -- reject garbage values
+            // BEFORE they pollute future prompts. Single source of truth via
+            // _shouldAcceptMemoryWrite. Cleaner state means cleaner subsequent
+            // prompts, faster hallucination gate, less report-time noise.
+            if (savedValue !== null) {
+              const hygiene = _shouldAcceptMemoryWrite(savedKey, savedValue, agentMemory);
+              if (!hygiene.ok) {
+                actionFailed = true;
+                result = 'JS result rejected by memory hygiene: ' + hygiene.reason + '. Try a different extraction strategy or move on to another data source.';
+                savedValue = null;
+              }
+            }
             if (savedValue !== null) {
               agentMemory[savedKey] = savedValue;
               const memKeys = Object.keys(agentMemory);
