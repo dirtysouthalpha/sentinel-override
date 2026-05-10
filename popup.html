@@ -346,6 +346,16 @@
           <span class="toggle-slider"></span>
         </label>
       </div>
+      <div class="toggle-row">
+        <div class="toggle-row-label">
+          <span>Sound notifications</span>
+          <span id="soundEnabledLabel">Off by default. When on, Sentinel posts desktop toast notifications (with the Windows notification chime) for events like MFA challenges, agent stop, and scheduled task completion. Chat banners and the Errors tab are unaffected either way.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="soundEnabledToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
       <div class="form-row" style="margin-top: 16px;">
         <label for="expectedTenantInput" style="display:block; font-weight:600; font-size:13px; margin-bottom:4px;">Expected Microsoft tenant (3.7.0)</label>
         <input type="text" id="expectedTenantInput" placeholder="acme.onmicrosoft.com or Acme Corp" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius:6px; color: var(--text-primary, #fff); font-size:13px; box-sizing: border-box;">

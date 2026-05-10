@@ -7,7 +7,7 @@ import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreens
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
-import { isSPATransitionPending, clearSPATransition } from './shared-state.js';
+import { isSPATransitionPending, clearSPATransition, notifyIfEnabled } from './shared-state.js';
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 
 // ========== Agent State ==========
@@ -1177,14 +1177,12 @@ async function runAgentLoop(goal, workingTabId) {
         if (_mfaHit && mfaAckUrl !== currentUrl) {
           agentPaused = true;
           sendSilentUpdate('⏸ MFA challenge detected (' + _mfaHit + ') — agent paused', stepCount);
-          try {
-            chrome.notifications.create('mfa_pause_' + Date.now(), {
-              type: 'basic',
-              iconUrl: chrome.runtime.getURL('icon-48.png'),
-              title: 'Sentinel Override — MFA required',
-              message: 'Approve / enter the code on ' + (currentUrl || 'the page') + ', then click Resume.'
-            });
-          } catch (e) { /* notifications permission optional */ }
+          notifyIfEnabled('mfa_pause_' + Date.now(), {
+            type: 'basic',
+            iconUrl: chrome.runtime.getURL('icon-48.png'),
+            title: 'Sentinel Override — MFA required',
+            message: 'Approve / enter the code on ' + (currentUrl || 'the page') + ', then click Resume.'
+          });
           try {
             chrome.runtime.sendMessage({
               action: 'mfa_pause',
