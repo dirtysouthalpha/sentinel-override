@@ -242,6 +242,56 @@ UI-SPECIFIC RULES:
   count (e.g., "results") with 30000ms timeout.
 `;
 
+  // -- NIST NVD CVE Database (3.12.4) --
+  const isNvd = url.includes('nvd.nist.gov') || url.includes('cve.mitre.org') || url.includes('cve.org');
+  if (isNvd) return `
+[NIST NVD / CVE Database -- Platform Context (3.12.4)]
+
+EXTRACTION STRATEGY -- read this carefully:
+
+1. NVD search results pages (\`nvd.nist.gov/vuln/search\`) are the GOLD MINE.
+   Each result row already contains: CVE ID, CVSS v3 base score AND severity
+   label (e.g., "9.8 CRITICAL"), description / summary text, affected CPEs
+   (often inline or one expand-click away), CNA name, and assigned date.
+
+   ONE execute_js on the search results page can harvest all of this for ALL
+   listed CVEs. DO NOT click into individual CVE detail pages -- each detail
+   page costs 4-6 steps (navigate, wait, scroll, extract, back, navigate-next).
+   For a "find me 3 CVEs" goal, that's 12-18 wasted steps versus 1 step on
+   the listing.
+
+   Working pattern:
+   { type: "execute_js", code: "return Array.from(document.querySelectorAll('[data-testid=\\"vuln-row\\"], tr.vuln-row, .vuln-table tbody tr')).slice(0, 10).map(r => ({cve: (r.querySelector('a[href*=\\"/vuln/detail/\\"]') || {}).innerText, cvss: (r.querySelector('[data-testid*=\\"cvss\\"], .severityDetail') || {}).innerText, summary: (r.querySelector('.row-result-snippet, p, td:nth-child(2)') || {}).innerText, published: (r.querySelector('.publish-date, [data-testid*=\\"publish\\"]') || {}).innerText}))", key: "nvd_results" }
+
+   Fallback if those selectors miss (NVD UI changes), regex on body text:
+   { type: "execute_js", code: "const t = document.body.innerText; const lines = t.split('\\\\n'); const out = []; let cur = null; for (const line of lines) { const m = line.match(/^(CVE-\\\\d{4}-\\\\d{4,7})$/); if (m) { if (cur) out.push(cur); cur = {cve: m[1]}; } else if (cur && /^\\\\d+\\\\.\\\\d/.test(line.trim())) { cur.cvss = line.trim(); } else if (cur && line.length > 30 && !cur.summary) { cur.summary = line.trim(); } } if (cur) out.push(cur); return out.slice(0, 10);", key: "nvd_results_fallback" }
+
+2. Search filters that matter:
+   - Keyword search: top of page, "Search Vulnerability Database"
+   - Date filters: use "Last 3 Months" or "Last Year" for "recent" goals
+   - For vendor-specific lookups, prefer the Advanced Search CPE filter
+     (e.g., cpe:2.3:o:fortinet:fortios:*) over fuzzy keyword matching --
+     keyword returns lots of unrelated hits.
+   - Sort: default is by description-match score; for "most recent",
+     change to "Date Last Modified" descending.
+
+3. NVD detail pages (nvd.nist.gov/vuln/detail/CVE-XXXX-XXXXX) are only
+   needed for full CPE enumeration, complete reference list, or advisor
+   links. Skip them for spec/comparison goals.
+
+4. CISA KEV catalog (cisa.gov/kev) is the authoritative source for
+   "exploited in the wild" status. If a CVE is in KEV, it has confirmed
+   in-wild exploitation. Cite as [src:kev_<cveid>].
+
+5. MITRE / CVE.org (cve.org/CVERecord?id=...) has the CNA's official
+   description but typically NO CVSS score -- NVD enriches it. Use CVE.org
+   only when NVD is rate-limiting or for very-recent CVEs not yet in NVD.
+
+NEVER fabricate CVSS scores or affected versions when extraction fails.
+If a score wasn't on the page you read, leave it as "not captured" and
+recommend the user check NVD directly. The hallucination gate enforces this.
+\`;
+
   // -- VirusTotal --
   const isVirusTotal = url.includes('virustotal.com') || url.includes('vt-api') ||
                        text.includes('virustotal') || text.includes(' vt ');
