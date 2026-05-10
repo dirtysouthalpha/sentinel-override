@@ -1,5 +1,22 @@
 # Changelog
 
+## v3.12.4 — 2026-05-10 (Hotfix: report-LLM hang on heavy extraction + NVD platform context)
+
+User report: research run on three FortiGate CVEs hung indefinitely on "Generating investigation report..." despite the agent successfully extracting CVE data from NIST NVD. Root cause: the report-generator's synthesis prompt stuffed the full agent memory (multi-KB JSON arrays per key) into the user prompt with no per-entry cap, blowing past smaller models' context windows and triggering provider timeouts that the existing 45s fetch abort didn't surface cleanly.
+
+Secondary issue from same run: the agent burned 14 of 15 planned steps on NVD detail-page navigation (4-6 steps each) instead of harvesting all CVE data from the search-results listing in one pass.
+
+### Fixed
+- **`background/report-generator.js`**: new `_truncateMemoryValue(val, 600)` helper hard-caps each memory entry at 600 chars before injecting into the synthesis prompt. The truncation appends `... [truncated; full value in run log]` so the LLM knows there's more data available, and citation chips still resolve because the keys are intact. Survives any provider context window.
+- **`background/llm-client.js`**: new `[NIST NVD / CVE Database]` platform-context block (3.12.4) injected when the agent is on `nvd.nist.gov`, `cve.mitre.org`, or `cve.org`. Tells the LLM that NVD search results pages embed CVSS / description / CPE inline per row — extract from the listing page in ONE `execute_js` instead of clicking into each detail page (4-6 steps each). Includes working selector pattern, regex-on-body-text fallback, advanced-search CPE filter guidance for vendor-specific lookups, and CISA KEV catalog reference for in-wild exploitation status.
+- **`manifest.json`**: bumped `3.12.3` → `3.12.4`.
+
+### Net effect on a re-run of "find 3 recent FortiGate CVEs"
+- Same step budget should now hit all three sources (NVD listing extract + Fortinet PSIRT + news context) instead of getting stuck on NVD detail-page-by-detail-page navigation.
+- Report synthesis won't hang regardless of how much data was extracted.
+- Source citations still work; chip keys are unchanged.
+
+
 ## v3.12.3 — 2026-05-10 (Hotfix: client knowledge handlers double-wrapped responses)
 
 User report: clicking the CLIENT chip did nothing. Diagnostic showed listener attached and click firing, but `refreshClientPicker` threw `TypeError: list.map is not a function`.

@@ -44,15 +44,33 @@ export async function generateReport(executionData, CONFIG) {
       && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
       && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
   });
+  // (3.12.4) Hard-cap each memory entry at 600 chars before injecting into
+  // the synthesis prompt. The previous logic stringified up to 5 array items
+  // per key with no per-key total cap, which produced multi-KB-per-key
+  // sections for research-heavy runs (NVD CVE lists, multi-page article
+  // briefings). Stuffed into a 6000-token model with a 4000-token context
+  // budget for the user prompt, this could hang or 4xx the LLM call. Cap is
+  // intentionally low -- the report-LLM doesn't need the raw scrape, just
+  // enough to cite from. The original full data lives in the run log.
+  function _truncateMemoryValue(val, maxChars) {
+    if (val == null) return '';
+    let valStr;
+    if (Array.isArray(val)) {
+      valStr = val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
+    } else if (typeof val === 'object') {
+      try { valStr = JSON.stringify(val); } catch (e) { valStr = String(val); }
+    } else {
+      valStr = String(val);
+    }
+    if (valStr.length > maxChars) {
+      valStr = valStr.substring(0, maxChars) + '... [truncated; full value in run log]';
+    }
+    return valStr;
+  }
   const memorySummary = usableKeys.length > 0
     ? usableKeys
-        .map(k => {
-          const val = agentMemory[k];
-          const valStr = Array.isArray(val)
-            ? val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n')
-            : String(val).substring(0, 800);
-          return `- ${k}: ${valStr}`;
-        }).join('\n')
+        .map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 600)}`)
+        .join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
   // (3.12.0) List of memory keys the report MUST cite from. Passed into
   // the prompt so the report-LLM can emit [src:key] tags that the popup
