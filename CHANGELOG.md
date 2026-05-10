@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.12.5 — 2026-05-10 (Stabilization: simplify NVD context block to fix SW registration)
+
+User report: after v3.12.4, service worker registration failed with "Invalid or unexpected token". Root cause: the NVD platform-context block in `llm-client.js` used a template literal containing JS code samples with nested escape sequences (`\\"`, `\\\\n`, `\\\\d`). Node's parser accepted them; Chrome's V8 in service-worker module-loading context did not.
+
+### Fixed
+- **`background/llm-client.js`**: rewrote the NVD platform-context block as a plain JS string array joined with newline. Same teaching content (extraction strategy, search filters, CISA KEV reference, MITRE/CVE.org guidance) but no embedded JavaScript code samples and no nested escape sequences — eliminates any V8/node parser disagreement risk.
+- **`manifest.json`**: bumped `3.12.4` → `3.12.5`.
+
+### Why this matters
+The previous file passed `node --check` cleanly but Chrome refused to register the service worker. SW registration failure is silent at the manifest level — Chrome shows "registration failed status code 15" but doesn't tell you which file/line. When in doubt, prefer plain prose blocks in system prompts over embedded code samples that need heavy escaping.
+
+
 ## v3.12.4 — 2026-05-10 (Hotfix: report-LLM hang on heavy extraction + NVD platform context)
 
 User report: research run on three FortiGate CVEs hung indefinitely on "Generating investigation report..." despite the agent successfully extracting CVE data from NIST NVD. Root cause: the report-generator's synthesis prompt stuffed the full agent memory (multi-KB JSON arrays per key) into the user prompt with no per-entry cap, blowing past smaller models' context windows and triggering provider timeouts that the existing 45s fetch abort didn't surface cleanly.
