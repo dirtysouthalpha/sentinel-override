@@ -4,7 +4,7 @@
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
-import { setSPATransitionPending } from './shared-state.js';
+import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
 import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
 import { generateReport } from './report-generator.js';
@@ -72,9 +72,13 @@ try {
 } catch (e) { /* downloads API may be unavailable */ }
 
 // ========== Tab Locking ==========
+// Both calls return promises; without .catch() they surface as
+// "Uncaught (in promise)" in chrome://extensions if the tab is closed
+// or transitioning between activation and the API resolving.
 chrome.action.onClicked.addListener((tab) => {
-  chrome.sidePanel.open({ tabId: tab.id });
-  chrome.sidePanel.setOptions({ tabId: tab.id, path: 'popup.html' });
+  if (!tab || typeof tab.id !== 'number') return;
+  chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+  chrome.sidePanel.setOptions({ tabId: tab.id, path: 'popup.html' }).catch(() => {});
 });
 
 // ========== Unified Message Handler ==========
@@ -362,10 +366,18 @@ chrome.commands.onCommand.addListener(async (command) => {
       case 'toggle-agent': {
         if (agentRunning) {
           await stopAgent();
-          chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: 'Agent stopped' });
+          notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: 'Agent stopped' });
         }
-        // Start requires a goal — open the side panel instead
-        else { chrome.sidePanel.open(); }
+        // Start requires a goal — open the side panel instead.
+        // sidePanel.open() needs a tabId or windowId; query active tab first.
+        else {
+          try {
+            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (activeTab && typeof activeTab.id === 'number') {
+              await chrome.sidePanel.open({ tabId: activeTab.id }).catch(() => {});
+            }
+          } catch (e) { /* no active tab — silently ignore */ }
+        }
         break;
       }
       case 'pause-agent': {
@@ -380,19 +392,19 @@ chrome.commands.onCommand.addListener(async (command) => {
       case 'turbo-mode': {
         const { setAgentSpeed } = await import('./agent-engine.js');
         setAgentSpeed('turbo');
-        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🚀 Turbo mode' });
+        notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🚀 Turbo mode' });
         break;
       }
       case 'normal-mode': {
         const { setAgentSpeed } = await import('./agent-engine.js');
         setAgentSpeed('normal');
-        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '👤 Normal mode' });
+        notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '👤 Normal mode' });
         break;
       }
       case 'stealth-mode': {
         const { setAgentSpeed } = await import('./agent-engine.js');
         setAgentSpeed('stealth');
-        chrome.notifications.create({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🥷 Stealth mode' });
+        notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🥷 Stealth mode' });
         break;
       }
     }

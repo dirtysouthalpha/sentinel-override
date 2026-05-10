@@ -127,6 +127,33 @@ if (useTrustedInputToggle) {
   });
 }
 
+// ========== Sound Notifications Toggle (3.11.3) ==========
+// Off by default. When enabled, the agent posts desktop notifications
+// (Windows notification chime) for events like MFA challenges, agent stop,
+// scheduled-task completion, and mode changes. Chat banners and the Errors
+// tab are unaffected either way. The toggle is checked by every
+// chrome.notifications.create call site via notifyIfEnabled() in
+// background/shared-state.js, so flipping this silences ALL six sites at once.
+const soundEnabledToggle = document.getElementById('soundEnabledToggle');
+if (soundEnabledToggle) {
+  chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
+    soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
+  });
+  soundEnabledToggle.addEventListener('change', () => {
+    const enabled = soundEnabledToggle.checked;
+    chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
+      try {
+        showToast(
+          enabled
+            ? 'Sound notifications ON — desktop toasts enabled'
+            : 'Sound notifications OFF — silent mode',
+          'info'
+        );
+      } catch (e) {}
+    });
+  });
+}
+
 // ========== Expected Tenant (3.7.0) ==========
 // Cross-client safety: when set, the header chip on Microsoft admin URLs
 // turns green when the detected tenant matches and red when it doesn't.

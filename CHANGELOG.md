@@ -1,5 +1,33 @@
 # Changelog
 
+## v3.11.3 — 2026-05-10 (Silent by default + sound-notifications toggle)
+
+User reported hearing the Windows notification chime during agent runs. Investigation found six `chrome.notifications.create()` sites firing across various events. Decision: make Sentinel silent by default and put the desktop-toast feature behind an explicit opt-in toggle.
+
+### Changed
+- **Silent by default**: Sentinel no longer fires desktop notifications unless the user explicitly enables them. Chat banners and the Errors-tab logging are unaffected.
+- **`background/shared-state.js`**: new `notifyIfEnabled(...)` helper that reads `sentinelSoundEnabled` from `chrome.storage.local` (default `false`) and only calls `chrome.notifications.create()` when enabled. Accepts both call signatures (`opts` or `id, opts`).
+- **`background/index.js`** (4 sites), **`background/agent-engine.js`** (1 site), **`background/scheduler.js`** (1 site): all six `chrome.notifications.create()` call sites swapped for `notifyIfEnabled(...)`. One toggle silences every site at once.
+- **`popup.html`**: new "Sound notifications" toggle row in the Settings modal, immediately after the trusted-input toggle.
+- **`popup-modules/settings.js`**: wires the toggle to `chrome.storage.local.sentinelSoundEnabled` with persist-on-change and a confirmation toast.
+
+### Why this matters
+The MFA detector regex (`verify your identity`, `enter the code`, `two-factor`, `push notification`) is loose enough to false-positive on retail/checkout pages, which on Windows produces a notification chime every time. Even on real MSP work, three of the six sites (Turbo / Normal / Stealth keyboard shortcuts) fire on every speed change. Off-by-default puts the user in control without sacrificing the feature for those who want it.
+
+- **`manifest.json`**: bumped `3.11.2` → `3.11.3`.
+
+## v3.11.2 — 2026-05-09 (Hotfix: silence benign side-panel race-condition errors)
+
+Patch release for noisy "Uncaught (in promise)" entries in `chrome://extensions` Errors tab.
+
+### Fixed
+- **`background/index.js`** — three `chrome.sidePanel.*` calls in non-async listener contexts (`chrome.action.onClicked` and `chrome.commands.onCommand`) returned promises that were never `.catch()`-ed. When a tab was closed or transitioning between activation and the API resolving, Chrome rejected with `No active side panel for tabId: <n>` and the rejection surfaced as `Uncaught (in promise)`. The error was harmless but cluttered the Errors tab. Added `.catch(() => {})` to all three sites and a defensive tab existence check in the icon-click handler.
+- **`background/index.js`** — the `toggle-agent` keyboard shortcut path called `chrome.sidePanel.open()` with no `tabId`/`windowId`, which Chrome rejects. Now queries the active tab first and only opens with a valid `tabId`.
+- **`manifest.json`** — bumped `3.11.1` → `3.11.2`.
+
+### Why these errors don't (and didn't) affect functionality
+Every `sidePanel` call from `agent-engine.js` was already wrapped in try/catch. The `tabs.onActivated` handler in `index.js` was also wrapped. The three sites fixed in this patch were the only unprotected ones. The errors were cosmetic — the side panel rendered correctly in every case — but cosmetic errors in a public extension look bad.
+
 ## v3.11.1 — 2026-05-09 (Hotfix: popup load crash on Templates panel)
 
 Patch release fixing a JS error visible in `chrome://extensions` Errors tab.

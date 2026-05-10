@@ -7,6 +7,7 @@ import { agentRunning, startAgent } from './agent-engine.js';
 import { resolveTemplateGoal } from './template-manager.js';
 import { getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
+import { notifyIfEnabled } from './shared-state.js';
 
 // ========== Storage Constants ==========
 const SCHEDULES_KEY = 'sentinel_schedules';
@@ -192,7 +193,7 @@ function sendNotification(schedule, result) {
     }
   }
 
-  chrome.notifications.create(`schedule-result-${result.id}`, {
+  notifyIfEnabled(`schedule-result-${result.id}`, {
     type: 'basic',
     iconUrl: chrome.runtime.getURL('icon-128.png'),
     title,

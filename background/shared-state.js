@@ -20,3 +20,24 @@ export function isSPATransitionPending() { return _spaTransitionPending; }
 
 /** Clear the SPA transition flag after it has been handled. */
 export function clearSPATransition() { _spaTransitionPending = false; }
+
+// (3.11.3) Centralized "fire a desktop notification only if the user enabled
+// sound notifications" helper. Default: OFF — Sentinel runs silently unless
+// the user opts in via Settings > Sound notifications. Replaces direct
+// chrome.notifications.create() calls site-wide so a single toggle silences
+// every site at once.
+//
+// Accepts either form chrome.notifications.create supports:
+//   notifyIfEnabled(opts)            — auto-generated id
+//   notifyIfEnabled(id, opts)        — caller-supplied id
+export async function notifyIfEnabled(idOrOpts, optsIfId) {
+  try {
+    const { sentinelSoundEnabled } = await chrome.storage.local.get({ sentinelSoundEnabled: false });
+    if (!sentinelSoundEnabled) return;
+    if (typeof idOrOpts === 'string') {
+      chrome.notifications.create(idOrOpts, optsIfId);
+    } else {
+      chrome.notifications.create(idOrOpts);
+    }
+  } catch (e) { /* notifications permission optional / storage unavailable */ }
+}
