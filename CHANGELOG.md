@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.12.2 — 2026-05-10 (Hotfix: toolbar icon now toggles side panel)
+
+User report: clicking the Sentinel toolbar icon while the side panel was open did nothing — it could only open, never close. The manual `chrome.action.onClicked` listener could only call `chrome.sidePanel.open()`; there is no `chrome.sidePanel.close()` API to pair with it, so manual toggling was impossible.
+
+### Fixed
+- **`background/index.js`**: replaced the manual `chrome.action.onClicked` listener with `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })`. With this set, Chrome handles the icon click natively as a true toggle — first click opens the panel, second click closes it. Per-tab `setOptions` in the `tabs.onActivated` handler still controls per-tab visibility during runs; the two APIs coexist fine.
+- **`manifest.json`**: bumped `3.12.1` → `3.12.2`.
+
+
 ## v3.12.1 — 2026-05-10 (Hotfix: execute_js extraction reliability)
 
 Real-world test on a multi-EV comparison run showed the agent failing to extract spec data from manufacturer sites — only 1 of 12 target data points came through. Root cause: the LLM was writing extraction code that returned DOM elements or unguarded null queries, the wrapper rejected the result with a vague "non-serializable value" error, and the LLM gave up rather than retrying with a different approach.

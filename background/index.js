@@ -85,15 +85,21 @@ try {
   }
 } catch (e) { /* downloads API may be unavailable */ }
 
-// ========== Tab Locking ==========
-// Both calls return promises; without .catch() they surface as
-// "Uncaught (in promise)" in chrome://extensions if the tab is closed
-// or transitioning between activation and the API resolving.
-chrome.action.onClicked.addListener((tab) => {
-  if (!tab || typeof tab.id !== 'number') return;
-  chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
-  chrome.sidePanel.setOptions({ tabId: tab.id, path: 'popup.html' }).catch(() => {});
-});
+// ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
+// Tell Chrome to handle the action-icon click natively as a toggle. With
+// this set, clicking the toolbar icon opens the panel; clicking again
+// closes it. Without it, our previous manual onClicked listener could
+// only open -- there is no chrome.sidePanel.close() API to pair with
+// .open(), so manual toggling is impossible. Letting Chrome own the
+// behavior is the supported path for true open/close from one icon.
+//
+// Per-tab setOptions in the tabs.onActivated handler still controls
+// whether the panel is enabled on a given tab during a run -- those
+// two APIs coexist fine.
+try {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', e && e.message));
+} catch (e) { /* non-fatal on older Chrome */ }
 
 // ========== Unified Message Handler ==========
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
