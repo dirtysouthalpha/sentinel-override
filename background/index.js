@@ -281,50 +281,78 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return await startAgent(goal, sender);
     }
 
-    // ========== Client Knowledge (3.12.0) ==========
+    // ========== Client Knowledge (3.12.0+ -- 3.12.3 unwrap fix) ==========
+    // wrapMessageHandler already wraps every return as { ok: true, data: <ret> }.
+    // Earlier handlers double-wrapped with { ok: true, data: ... }, so the popup
+    // saw { ok: true, data: { ok: true, data: <array> } } and list.map blew up.
+    // Now: handlers return data directly, throw on error -- wrapper handles the rest.
     case 'client_list':
-      return { ok: true, data: await ck_listClients() };
+      return await ck_listClients();
 
     case 'client_get_active':
-      return { ok: true, data: await ck_getActiveClient() };
+      return await ck_getActiveClient();
 
-    case 'client_set_active':
-      return await ck_setActiveClient(request.id || null);
+    case 'client_set_active': {
+      const r = await ck_setActiveClient(request.id || null);
+      if (!r.ok) throw new Error(r.error || 'Set active failed');
+      return null;
+    }
 
     case 'client_get':
       if (!request.id) throw new Error('Client ID required');
-      return { ok: true, data: await ck_getClient(request.id) };
+      return await ck_getClient(request.id);
 
-    case 'client_create':
-      return await ck_createClient(request.client || {});
+    case 'client_create': {
+      const r = await ck_createClient(request.client || {});
+      if (!r.ok) throw new Error(r.error || 'Create failed');
+      return r.client;
+    }
 
-    case 'client_update':
+    case 'client_update': {
       if (!request.id) throw new Error('Client ID required');
-      return await ck_updateClient(request.id, request.updates || {});
+      const r = await ck_updateClient(request.id, request.updates || {});
+      if (!r.ok) throw new Error(r.error || 'Update failed');
+      return r.client;
+    }
 
-    case 'client_delete':
+    case 'client_delete': {
       if (!request.id) throw new Error('Client ID required');
-      return await ck_deleteClient(request.id);
+      const r = await ck_deleteClient(request.id);
+      if (!r.ok) throw new Error(r.error || 'Delete failed');
+      return null;
+    }
 
-    case 'client_entry_add':
+    case 'client_entry_add': {
       if (!request.clientId) throw new Error('Client ID required');
-      return await ck_addEntry(request.clientId, request.entry || {});
+      const r = await ck_addEntry(request.clientId, request.entry || {});
+      if (!r.ok) throw new Error(r.error || 'Add entry failed');
+      return r.entry;
+    }
 
-    case 'client_entry_update':
+    case 'client_entry_update': {
       if (!request.clientId || !request.entryId) throw new Error('Client + entry IDs required');
-      return await ck_updateEntry(request.clientId, request.entryId, request.updates || {});
+      const r = await ck_updateEntry(request.clientId, request.entryId, request.updates || {});
+      if (!r.ok) throw new Error(r.error || 'Update entry failed');
+      return r.entry;
+    }
 
-    case 'client_entry_delete':
+    case 'client_entry_delete': {
       if (!request.clientId || !request.entryId) throw new Error('Client + entry IDs required');
-      return await ck_deleteEntry(request.clientId, request.entryId);
+      const r = await ck_deleteEntry(request.clientId, request.entryId);
+      if (!r.ok) throw new Error(r.error || 'Delete entry failed');
+      return null;
+    }
 
     case 'client_export':
       if (!request.id) throw new Error('Client ID required');
-      return { ok: true, data: await ck_exportClient(request.id) };
+      return await ck_exportClient(request.id);
 
-    case 'client_import':
+    case 'client_import': {
       if (!request.payload) throw new Error('Import payload required');
-      return await ck_importClient(request.payload, { rename: request.rename });
+      const r = await ck_importClient(request.payload, { rename: request.rename });
+      if (!r.ok) throw new Error(r.error || 'Import failed');
+      return r.client;
+    }
 
     // Schedule CRUD
     case 'schedule_list':

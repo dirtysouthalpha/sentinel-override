@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.12.3 — 2026-05-10 (Hotfix: client knowledge handlers double-wrapped responses)
+
+User report: clicking the CLIENT chip did nothing. Diagnostic showed listener attached and click firing, but `refreshClientPicker` threw `TypeError: list.map is not a function`.
+
+### Fixed
+- **`background/index.js`**: 12 `client_*` message handlers were manually returning `{ ok: true, data: ... }`, but `wrapMessageHandler` ALREADY wraps every return value the same way. So the popup got `{ ok: true, data: { ok: true, data: <array> } }` and `list.map()` failed because `list` was an object, not the array. Refactored: handlers now return data directly and throw on error; the wrapper handles success/failure shaping uniformly. The popup-side `(res && res.data) || []` now correctly resolves to the array.
+- **`manifest.json`**: bumped `3.12.2` → `3.12.3`.
+
+
 ## v3.12.2 — 2026-05-10 (Hotfix: toolbar icon now toggles side panel)
 
 User report: clicking the Sentinel toolbar icon while the side panel was open did nothing — it could only open, never close. The manual `chrome.action.onClicked` listener could only call `chrome.sidePanel.open()`; there is no `chrome.sidePanel.close()` API to pair with it, so manual toggling was impossible.
