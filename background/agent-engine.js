@@ -2094,7 +2094,11 @@ async function runAgentLoop(goal, workingTabId) {
           const _trim = jsValue.trim();
           if (_useless.test(_trim) || _trim === 'undefined' || _trim === 'null') {
             actionFailed = true;
-            result = 'JS returned a non-serializable value ("' + _trim.slice(0, 60) + '"). Wrap your return in JSON.stringify(), or return primitive fields explicitly.';
+            // (3.12.1) More actionable guidance — tell the LLM the SPECIFIC
+            // recovery patterns rather than vague "wrap in JSON.stringify".
+            // The wrapper already does that; the bug is usually returning a
+            // DOM node, a null query, or an unawaited Promise.
+            result = 'JS returned a non-serializable value ("' + _trim.slice(0, 60) + '"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: `return document.body.innerText.substring(0, 5000)` and parse in finish. (2) Use regex on body text: `const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;`. (3) Fall back to `read_page` action. (4) If you returned a DOM element, change to `el.innerText` instead. (5) If you returned a query that may be null, guard with `(document.querySelector(sel) || {}).innerText || null`.';
           } else {
             let savedKey = command.key;
             let savedValue = jsValue;

@@ -1098,6 +1098,60 @@ running out of step budget:
    in detail (the ones with notes/extracts), with the rest left as the
    harvested headline + URL. The hallucination gate enforces this.
 
+## EXECUTE_JS RELIABILITY PATTERNS (3.12.1)
+
+execute_js with a \`key\` is your most powerful extraction tool, but it fails silently when written carelessly. The wrapper handles JSON.stringify automatically when your return is a plain object/array, but it CANNOT recover from these failure modes:
+
+**What breaks extraction:**
+
+1. **Returning a DOM element directly.** \`return document.querySelector('.price')\` -> serializes as \`{}\` or empty. The wrapper rejects this as "non-serializable value".
+2. **Returning the result of querySelector when no match exists.** \`return document.querySelector('.foo').innerText\` throws TypeError on null. Always null-guard.
+3. **Returning a Promise without awaiting.** \`return fetch('/api')\` -> wrapper sees \`{}\`, rejects.
+4. **Returning circular references** (rare, but happens with React fiber nodes).
+
+**Patterns that ALWAYS work:**
+
+\`\`\`js
+// GOOD -- explicit text extraction with null guard
+return {
+  price: (document.querySelector('.price-tag') || {}).innerText || null,
+  title: (document.querySelector('h1') || {}).innerText || null,
+  range: (document.querySelector('[data-spec="range"]') || {}).innerText || null
+};
+
+// GOOD -- array of objects from a list
+return Array.from(document.querySelectorAll('.spec-row')).map(row => ({
+  label: (row.querySelector('.label') || {}).innerText || '',
+  value: (row.querySelector('.value') || {}).innerText || ''
+})).filter(o => o.label && o.value);
+
+// GOOD -- regex-extract from page text
+const text = document.body.innerText;
+const priceMatch = text.match(/\\$([0-9,]+(?:\\.[0-9]{2})?)/);
+const rangeMatch = text.match(/(\\d{2,3})\\s*mi\\b.*?range/i);
+return {
+  price: priceMatch ? priceMatch[1] : null,
+  range: rangeMatch ? rangeMatch[1] : null
+};
+
+// GOOD -- just text, when structure is unknown
+return document.body.innerText.substring(0, 5000);
+\`\`\`
+
+**Recovery when extraction fails:**
+
+If a previous \`execute_js\` step returned \"non-serializable value\" or \"empty result\":
+
+1. **DON'T retry the same code.** It will fail the same way.
+2. **Switch to text-based extraction.** Return \`document.body.innerText.substring(0, 5000)\` and parse the text in your finish summary instead of relying on selectors.
+3. **Use regex on the raw page text** for prices, dates, percentages, named entities — much more robust than CSS selectors that change between page versions.
+4. **Fall back to read_page** if the JS approach has failed twice — the rendered DOM extract may surface what your selectors missed.
+5. **As a last resort, note** what you can see in the screenshot directly instead of trying to extract — your vision can read prices off pages even when DOM selectors fail.
+
+**The pattern for spec/comparison goals (price, range, time, warranty):**
+
+For multi-spec extraction tasks, prefer ONE execute_js per page that returns an object with ALL fields, using regex on \`document.body.innerText\` rather than fragile selectors. Manufacturer sites change their CSS classes more often than they change the words \"Starting at $\" or \"EPA-rated range\".
+
 ## ELEMENT REFERENCE IDS (forward-compatible)
 
 Each observed element may include a \`ref\` field (e.g., \`ref_5\`). When the
