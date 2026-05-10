@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.12.6 — 2026-05-10 (NVD detail-page anti-drill + extraction fallbacks)
+
+User report: FortiGate CVE run produced a complete report (citations rendered, anti-hallucination held, no synthesis hang) but agent burned 7+ steps drilling into individual NVD CVE detail pages after already harvesting the listing data. CVSS scores, affected versions, and patch dates from those detail pages came back empty.
+
+### Improved
+- **`background/llm-client.js`**: tightened the NVD platform-context block. New top-level rule: "When you have the listing data, you are DONE." Explicit instruction to NOT click into detail pages just to get "more detail" — the listing already has CVE ID, CVSS score with severity label, summary, CNA, and dates inline per row. Drilling is now framed as a budget-waster, with three named exceptions (full CPE enumeration, complete reference list, exploit-module refs).
+- Added concrete detail-page extraction fallbacks for cases where drilling IS warranted: regex pattern for CVSS score in body text (`/\d+\.\d+\s+(CRITICAL|HIGH|MEDIUM|LOW)/`), CVSS vector string locator (`CVSS:3.1/AV:`), CPE selector targets (`.vuln-detail-table td, .cpe-text, [class*=cpe]`), and description-element hook (`#vulnDescription`).
+- **`manifest.json`**: bumped `3.12.5` → `3.12.6`.
+
+### Net effect on a re-run of the FortiGate CVE prompt
+- Should finish with ~10 steps instead of 21
+- Same citation density, anti-hallucination, report quality
+- Listing-page data is treated as authoritative for spec/severity/ranking goals
+- Detail-page extraction (when needed) actually succeeds via regex fallback
+
+
 ## v3.12.5 — 2026-05-10 (Stabilization: simplify NVD context block to fix SW registration)
 
 User report: after v3.12.4, service worker registration failed with "Invalid or unexpected token". Root cause: the NVD platform-context block in `llm-client.js` used a template literal containing JS code samples with nested escape sequences (`\\"`, `\\\\n`, `\\\\d`). Node's parser accepted them; Chrome's V8 in service-worker module-loading context did not.
