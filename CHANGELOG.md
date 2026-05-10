@@ -1,5 +1,20 @@
 # Changelog
 
+## v3.12.1 — 2026-05-10 (Hotfix: execute_js extraction reliability)
+
+Real-world test on a multi-EV comparison run showed the agent failing to extract spec data from manufacturer sites — only 1 of 12 target data points came through. Root cause: the LLM was writing extraction code that returned DOM elements or unguarded null queries, the wrapper rejected the result with a vague "non-serializable value" error, and the LLM gave up rather than retrying with a different approach.
+
+### Fixed
+- **`background/llm-client.js`**: new `EXECUTE_JS RELIABILITY PATTERNS (3.12.1)` section in the system prompt. Concrete examples of code that ALWAYS works (text extraction with null guards, array-of-objects pattern, regex-on-bodytext pattern, fallback to body.innerText), plus a five-option recovery playbook when extraction returns empty. The pattern guidance for spec/comparison goals specifically — prefer regex on body.innerText over fragile CSS selectors that manufacturers change more often than they change the words "Starting at $".
+- **`background/agent-engine.js`**: replaced the vague "wrap your return in JSON.stringify()" failure message with five specific recovery patterns (text-only return, regex extract, read_page fallback, DOM element fix, null-guard pattern). The wrapper already handles JSON.stringify; that wasn't the actual bug.
+- **`manifest.json`**: bumped `3.12.0` → `3.12.1`.
+
+### What this didn't break
+- Source-citation chips still render correctly (verified in the v3.12.0 EV test report — chips appeared inline)
+- Anti-hallucination gate still holds (the test report explicitly refused to fabricate missing numbers)
+- Vision verification, client knowledge, and PDF export all unchanged
+
+
 ## v3.12.0 — 2026-05-10 (Cross-Run Client Knowledge + Vision Verification + PDF Export + UX Polish)
 
 The "make it usable as a daily MSP tool for me and my teammates" sprint. Six landed features, all built on top of the v3.11 base.
