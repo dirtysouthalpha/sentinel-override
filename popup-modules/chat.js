@@ -815,6 +815,25 @@ goalInput.addEventListener('input', () => {
   updateMarkdownPreview();
 });
 
+// (3.12.0) Example-prompt buttons in welcome state -- click to populate input
+document.querySelectorAll('.example-prompt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prompt = btn.dataset.prompt || btn.textContent.trim();
+    goalInput.value = prompt;
+    goalInput.style.height = 'auto';
+    goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+    goalInput.focus();
+    // Position cursor at first [bracket] placeholder if present, so the
+    // user can immediately fill in their value.
+    const bracketMatch = prompt.match(/\[([^\]]+)\]/);
+    if (bracketMatch) {
+      const start = prompt.indexOf(bracketMatch[0]);
+      goalInput.setSelectionRange(start, start + bracketMatch[0].length);
+    }
+    updateMarkdownPreview();
+  });
+});
+
 goalInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -1413,6 +1432,9 @@ function openReportModal(markdown) {
   try {
     reportContent.innerHTML = sanitizeHtml(marked.parse(markdown));
     addCodeCopyButtons(reportContent);
+    // (3.12.0) Decorate [src:key] / [unverified] markers in the rendered
+    // report as clickable chips. Mirrors the chat-message render path.
+    try { renderSourceChipsIn(reportContent); } catch (e) { /* non-fatal */ }
   } catch (err) {
     reportContent.textContent = markdown;
   }
@@ -1473,6 +1495,32 @@ downloadReportBtn.addEventListener('click', () => {
     showToast('Report downloaded', 'success');
   }
 });
+
+// Export: PDF (3.12.0) -- stash report in storage, open print-friendly page,
+// browser print dialog appears with "Save as PDF" as a destination option.
+const exportReportPdfBtn = document.getElementById('exportReportPdfBtn');
+if (exportReportPdfBtn) {
+  exportReportPdfBtn.addEventListener('click', async () => {
+    const state = getState();
+    if (!state.currentReportMarkdown) {
+      showToast('No report to export', 'error');
+      return;
+    }
+    try {
+      const payload = {
+        fullReport: state.currentReportMarkdown,
+        goal: (state.currentReport && state.currentReport.goal) || '',
+        timestamp: (state.currentReport && state.currentReport.timestamp) || new Date().toISOString()
+      };
+      await chrome.storage.local.set({ _pendingPrintReport: payload });
+      const url = chrome.runtime.getURL('report-print.html');
+      await chrome.tabs.create({ url });
+      showToast('Print dialog opening — pick "Save as PDF" as destination', 'info');
+    } catch (e) {
+      showToast('PDF export failed: ' + (e && e.message ? e.message : e), 'error');
+    }
+  });
+}
 
 // Export: Copy as Plain Text
 copyReportTextBtn.addEventListener('click', () => {

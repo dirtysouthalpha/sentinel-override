@@ -13,6 +13,20 @@ import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplat
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
 import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
 import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
+import {
+  listClients as ck_listClients,
+  getClient as ck_getClient,
+  getActiveClient as ck_getActiveClient,
+  setActiveClient as ck_setActiveClient,
+  createClient as ck_createClient,
+  updateClient as ck_updateClient,
+  deleteClient as ck_deleteClient,
+  addEntry as ck_addEntry,
+  updateEntry as ck_updateEntry,
+  deleteEntry as ck_deleteEntry,
+  exportClient as ck_exportClient,
+  importClient as ck_importClient
+} from './client-knowledge.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -260,6 +274,51 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       const goal = await resolveTemplateGoal(request.templateId, request.params || {});
       return await startAgent(goal, sender);
     }
+
+    // ========== Client Knowledge (3.12.0) ==========
+    case 'client_list':
+      return { ok: true, data: await ck_listClients() };
+
+    case 'client_get_active':
+      return { ok: true, data: await ck_getActiveClient() };
+
+    case 'client_set_active':
+      return await ck_setActiveClient(request.id || null);
+
+    case 'client_get':
+      if (!request.id) throw new Error('Client ID required');
+      return { ok: true, data: await ck_getClient(request.id) };
+
+    case 'client_create':
+      return await ck_createClient(request.client || {});
+
+    case 'client_update':
+      if (!request.id) throw new Error('Client ID required');
+      return await ck_updateClient(request.id, request.updates || {});
+
+    case 'client_delete':
+      if (!request.id) throw new Error('Client ID required');
+      return await ck_deleteClient(request.id);
+
+    case 'client_entry_add':
+      if (!request.clientId) throw new Error('Client ID required');
+      return await ck_addEntry(request.clientId, request.entry || {});
+
+    case 'client_entry_update':
+      if (!request.clientId || !request.entryId) throw new Error('Client + entry IDs required');
+      return await ck_updateEntry(request.clientId, request.entryId, request.updates || {});
+
+    case 'client_entry_delete':
+      if (!request.clientId || !request.entryId) throw new Error('Client + entry IDs required');
+      return await ck_deleteEntry(request.clientId, request.entryId);
+
+    case 'client_export':
+      if (!request.id) throw new Error('Client ID required');
+      return { ok: true, data: await ck_exportClient(request.id) };
+
+    case 'client_import':
+      if (!request.payload) throw new Error('Import payload required');
+      return await ck_importClient(request.payload, { rename: request.rename });
 
     // Schedule CRUD
     case 'schedule_list':

@@ -1,0 +1,334 @@
+// popup-modules/client-knowledge.js (3.12.0)
+// Wires the Clients & Knowledge UI: header chip, picker modal, per-client
+// detail modal with entries CRUD, export/import. Talks to background via
+// chrome.runtime.sendMessage with action: 'client_*'.
+//
+// Dependencies: ui-common.js (showToast, sanitizeHtml/escapeHtml).
+
+// ---------- Defensive helpers ----------
+function _on(id, ev, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(ev, fn);
+}
+function _set(id, prop, value) {
+  const el = document.getElementById(id);
+  if (el) el[prop] = value;
+}
+function _get(id) { return document.getElementById(id); }
+function _safeEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ---------- State ----------
+let _editingClientId = null;
+let _activeClientCache = null;
+
+// ---------- Backend calls ----------
+function _send(action, body) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action, ...(body || {}) }, (res) => {
+      if (chrome.runtime.lastError) {
+        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        return;
+      }
+      resolve(res || { ok: false, error: 'No response' });
+    });
+  });
+}
+
+// ---------- Header chip ----------
+async function refreshHeaderChip() {
+  const chip = _get('clientChip');
+  const name = _get('clientChipName');
+  if (!chip || !name) return;
+  const res = await _send('client_get_active');
+  const active = res && res.data;
+  _activeClientCache = active || null;
+  if (active && active.displayName) {
+    name.textContent = active.displayName;
+    chip.style.color = 'var(--accent-primary, #4caf50)';
+    chip.style.borderColor = 'var(--accent-primary, #4caf50)';
+    chip.title = `Active client: ${active.displayName}. ${(active.entries || []).length} knowledge entries. Click to switch.`;
+  } else {
+    name.textContent = 'none';
+    chip.style.color = 'var(--text-secondary, #aaa)';
+    chip.style.borderColor = 'var(--border-color, rgba(255,255,255,0.15))';
+    chip.title = 'No active client. Click to set one.';
+  }
+}
+
+// ---------- Picker modal ----------
+async function openClientModal() {
+  await refreshClientPicker();
+  await refreshClientList();
+  const modal = _get('client-modal');
+  if (modal) modal.classList.add('show');
+}
+function closeClientModal() {
+  const modal = _get('client-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function refreshClientPicker() {
+  const sel = _get('clientActivePicker');
+  if (!sel) return;
+  const [listRes, activeRes] = await Promise.all([_send('client_list'), _send('client_get_active')]);
+  const list = (listRes && listRes.data) || [];
+  const active = activeRes && activeRes.data;
+  sel.innerHTML = '<option value="">— No client (default behavior) —</option>'
+    + list.map(c => `<option value="${_safeEsc(c.id)}" ${active && active.id === c.id ? 'selected' : ''}>${_safeEsc(c.displayName)} (${(c.entries || []).length} entries)</option>`).join('');
+}
+
+async function refreshClientList() {
+  const container = _get('clientList');
+  if (!container) return;
+  const res = await _send('client_list');
+  const list = (res && res.data) || [];
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No clients yet. Add your first one above.</div>';
+    return;
+  }
+  container.innerHTML = list.map(c => `
+    <div class="template-card" data-client-id="${_safeEsc(c.id)}" style="margin-bottom:8px;">
+      <div class="template-card-header">
+        <div class="template-card-name">${_safeEsc(c.displayName)}</div>
+        <div class="template-card-actions">
+          <button class="small-btn" data-action="open" data-id="${_safeEsc(c.id)}">Manage</button>
+          <button class="small-btn" data-action="export" data-id="${_safeEsc(c.id)}">Export</button>
+          <button class="small-btn" data-action="delete" data-id="${_safeEsc(c.id)}" style="color:var(--error-color);">Delete</button>
+        </div>
+      </div>
+      <div class="template-card-meta" style="margin-top:4px;">
+        <span>${(c.entries || []).length} entries</span>
+        <span>Runs: ${c.runCount || 0}</span>
+        ${c.tenant ? `<span title="Linked tenant">${_safeEsc(c.tenant)}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+  container.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if (action === 'open') {
+        closeClientModal();
+        await openClientDetailModal(id);
+      } else if (action === 'export') {
+        await exportClientToFile(id);
+      } else if (action === 'delete') {
+        const c = list.find(x => x.id === id);
+        if (!confirm(`Delete client "${c ? c.displayName : id}" and all its knowledge entries? This cannot be undone.`)) return;
+        const res = await _send('client_delete', { id });
+        if (res.ok) {
+          await refreshClientPicker();
+          await refreshClientList();
+          await refreshHeaderChip();
+          try { window.showToast && showToast('Client deleted', 'success'); } catch (e) {}
+        } else {
+          alert(res.error || 'Delete failed');
+        }
+      }
+    });
+  });
+}
+
+// ---------- Detail modal (per-client entries) ----------
+async function openClientDetailModal(clientId) {
+  const res = await _send('client_get', { id: clientId });
+  if (!res.ok || !res.data) {
+    alert(res.error || 'Client not found');
+    return;
+  }
+  _editingClientId = clientId;
+  const c = res.data;
+  _set('clientDetailTitle', 'textContent', c.displayName);
+  _set('clientDetailNameInput', 'value', c.displayName || '');
+  _set('clientDetailTenantInput', 'value', c.tenant || '');
+  _set('clientEntryWisdomInput', 'value', '');
+  _set('clientEntryUrlPatternInput', 'value', '');
+  const scopeSel = _get('clientEntryScopeSelect');
+  if (scopeSel) scopeSel.value = 'global';
+  _toggleUrlPatternVisibility();
+  await refreshEntriesList(clientId);
+  const modal = _get('client-detail-modal');
+  if (modal) modal.classList.add('show');
+}
+function closeClientDetailModal() {
+  _editingClientId = null;
+  const modal = _get('client-detail-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function refreshEntriesList(clientId) {
+  const container = _get('clientEntriesList');
+  if (!container) return;
+  const res = await _send('client_get', { id: clientId });
+  const c = res && res.data;
+  if (!c || !Array.isArray(c.entries) || c.entries.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No knowledge yet for this client. Add an entry above as you learn things during runs.</div>';
+    return;
+  }
+  container.innerHTML = c.entries.map(e => `
+    <div style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:10px; margin-bottom:8px;">
+      <div style="display:flex; gap:8px; align-items:flex-start; justify-content:space-between;">
+        <div style="flex:1;">
+          <div style="font-size:13px; color:var(--text-primary); line-height:1.5;">${_safeEsc(e.wisdom)}</div>
+          <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; display:flex; gap:8px;">
+            <span>${e.scope === 'url' ? `URL: <code>${_safeEsc(e.urlPattern || '*')}</code>` : 'Always applies'}</span>
+            <span>Used ${e.useCount || 0}x</span>
+          </div>
+        </div>
+        <button class="small-btn" data-entry-action="delete" data-entry-id="${_safeEsc(e.id)}" style="color:var(--error-color); flex-shrink:0;">×</button>
+      </div>
+    </div>
+  `).join('');
+  container.querySelectorAll('[data-entry-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const entryId = btn.dataset.entryId;
+      const r = await _send('client_entry_delete', { clientId: _editingClientId, entryId });
+      if (r.ok) {
+        await refreshEntriesList(_editingClientId);
+        await refreshClientList();
+      } else {
+        alert(r.error || 'Delete failed');
+      }
+    });
+  });
+}
+
+function _toggleUrlPatternVisibility() {
+  const sel = _get('clientEntryScopeSelect');
+  const inp = _get('clientEntryUrlPatternInput');
+  if (!sel || !inp) return;
+  inp.style.display = sel.value === 'url' ? '' : 'none';
+}
+
+// ---------- Export / Import ----------
+async function exportClientToFile(clientId) {
+  const res = await _send('client_export', { id: clientId });
+  if (!res.ok || !res.data) {
+    alert(res.error || 'Export failed');
+    return;
+  }
+  const json = JSON.stringify(res.data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = (res.data.client.displayName || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  a.download = `sentinel-client-${safeName}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function importClientFromFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const res = await _send('client_import', { payload });
+      if (res.ok) {
+        await refreshClientPicker();
+        await refreshClientList();
+        try { window.showToast && showToast('Client imported: ' + res.client.displayName, 'success'); } catch (e) {}
+      } else {
+        alert(res.error || 'Import failed');
+      }
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    }
+  };
+  input.click();
+}
+
+// ---------- Wiring ----------
+_on('clientChip', 'click', () => openClientModal());
+_on('closeClientModalBtn', 'click', () => closeClientModal());
+_on('closeClientDetailBtn', 'click', () => closeClientDetailModal());
+_on('clientImportBtn', 'click', () => importClientFromFile());
+
+_on('clientActivePicker', 'change', async () => {
+  const sel = _get('clientActivePicker');
+  if (!sel) return;
+  const id = sel.value || null;
+  await _send('client_set_active', { id });
+  await refreshHeaderChip();
+});
+
+_on('clientAddBtn', 'click', async () => {
+  const inp = _get('clientNewNameInput');
+  if (!inp) return;
+  const name = inp.value.trim();
+  if (!name) { try { window.showToast && showToast('Enter a client name', 'error'); } catch (e) {} return; }
+  const res = await _send('client_create', { client: { displayName: name } });
+  if (res.ok) {
+    inp.value = '';
+    await refreshClientPicker();
+    await refreshClientList();
+  } else {
+    alert(res.error || 'Create failed');
+  }
+});
+
+_on('clientDetailSaveBtn', 'click', async () => {
+  if (!_editingClientId) return;
+  const name = (_get('clientDetailNameInput') || {}).value || '';
+  const tenant = (_get('clientDetailTenantInput') || {}).value || '';
+  const res = await _send('client_update', { id: _editingClientId, updates: { displayName: name, tenant } });
+  if (res.ok) {
+    _set('clientDetailTitle', 'textContent', name);
+    await refreshClientList();
+    await refreshHeaderChip();
+    try { window.showToast && showToast('Saved', 'success'); } catch (e) {}
+  } else {
+    alert(res.error || 'Save failed');
+  }
+});
+
+_on('clientDetailDeleteBtn', 'click', async () => {
+  if (!_editingClientId) return;
+  if (!confirm('Delete this client and ALL its knowledge entries? Cannot be undone.')) return;
+  const res = await _send('client_delete', { id: _editingClientId });
+  if (res.ok) {
+    closeClientDetailModal();
+    await refreshClientPicker();
+    await refreshClientList();
+    await refreshHeaderChip();
+  } else {
+    alert(res.error || 'Delete failed');
+  }
+});
+
+_on('clientDetailExportBtn', 'click', async () => {
+  if (_editingClientId) await exportClientToFile(_editingClientId);
+});
+
+_on('clientEntryScopeSelect', 'change', _toggleUrlPatternVisibility);
+
+_on('clientEntryAddBtn', 'click', async () => {
+  if (!_editingClientId) return;
+  const wisdom = (_get('clientEntryWisdomInput') || {}).value || '';
+  const scope = (_get('clientEntryScopeSelect') || {}).value || 'global';
+  const urlPattern = (_get('clientEntryUrlPatternInput') || {}).value || '';
+  if (!wisdom.trim()) { try { window.showToast && showToast('Enter what you learned', 'error'); } catch (e) {} return; }
+  const res = await _send('client_entry_add', { clientId: _editingClientId, entry: { wisdom, scope, urlPattern } });
+  if (res.ok) {
+    _set('clientEntryWisdomInput', 'value', '');
+    _set('clientEntryUrlPatternInput', 'value', '');
+    await refreshEntriesList(_editingClientId);
+    await refreshClientList();
+    try { window.showToast && showToast('Knowledge saved', 'success'); } catch (e) {}
+  } else {
+    alert(res.error || 'Add failed');
+  }
+});
+
+// ---------- Init ----------
+refreshHeaderChip();

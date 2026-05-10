@@ -1,5 +1,58 @@
 # Changelog
 
+## v3.12.0 — 2026-05-10 (Cross-Run Client Knowledge + Vision Verification + PDF Export + UX Polish)
+
+The "make it usable as a daily MSP tool for me and my teammates" sprint. Six landed features, all built on top of the v3.11 base.
+
+### Added — Cross-run client knowledge (the big one)
+- **Per-client knowledge that compounds across runs** (`background/client-knowledge.js`, `popup-modules/client-knowledge.js`, `popup.html` + 2 modals). Each client has a list of "wisdom" entries — site quirks, timing rules, custom paths, recurring errors. Sentinel injects relevant entries into every step's system prompt automatically. Runs for the same client get smarter over time.
+- **Scope per entry**: `global` (always inject) or `url` with a glob pattern (only when URL matches `*.entra.microsoft.com`).
+- **Header chip** shows active client. Click to switch or open the management modal.
+- **Per-client detail modal** for entry CRUD: add, list, delete entries; rename / re-tenant the client.
+- **Export / import** for team sharing — single JSON file per client. Drop into another tech's Sentinel and they get the same per-client wisdom.
+- **`background/index.js`**: 13 new message handlers (`client_list`, `client_get_active`, `client_set_active`, `client_create`, `client_update`, `client_delete`, `client_get`, `client_entry_add`, `client_entry_update`, `client_entry_delete`, `client_export`, `client_import`).
+- **Run-time integration** (`background/agent-engine.js`): on `startAgent`, loads active client + filters entries by URL match, formats as a system-prompt section, passes through `agentState.clientKnowledgeText`. On run finish, increments `useCount` for entries that were injected and bumps client `runCount`.
+- **System prompt** (`background/llm-client.js`): new `clientKnowledgeCtx` section assembled into the per-step prompt between memory context and tab context.
+
+### Added — Vision-based action verification
+- **After every modifying action** (`click` / `click_at` / `type` / `select` / `check` / `check_all` / `press_key` / `upload_file`), `agent-engine.js` sets `pendingVerification` with the action description and step number.
+- **System-prompt injection** (`llm-client.js`): on the next observation cycle, the model receives a "VERIFY YOUR LAST ACTION FIRST" section that forces explicit examination of the post-action screenshot — did the modal close, did the field fill, did the page navigate? If verification fails, the model must choose a recovery (retry with different selector, wait + re-observe, scroll-to-then-click, or `execute_js` programmatic trigger). Cannot proceed past a destructive action without confirmation.
+- **No extra API calls** — uses the existing observation cycle, just sharpens it with an explicit verification step. Catches silent failures (click registered but didn't fire, form filled but hidden validation rejected) that the previous "trust the DOM" path missed.
+
+### Added — PDF report export
+- **New "Export PDF" button** in the report modal (`popup.html`).
+- **`report-print.html`**: print-friendly standalone page that reads the report from `chrome.storage.local._pendingPrintReport`, renders markdown via local `marked.min.js` (no CDN), decorates `[src:key]` and `[unverified]` markers as inline chips, and auto-triggers `window.print()`.
+- **Print CSS** with proper page-break rules, margin reset, source-chip rendering for paper, and accessible link colors. The user picks "Save as PDF" as print destination.
+- **`popup-modules/chat.js`**: button stashes the report payload in storage, opens the print page in a new tab, browser dialog appears.
+- Direct-to-ticket workflow for Connectwise / Halo / Autotask attachments.
+
+### Fixed — Source-citation chips actually appear in reports now
+- **Root cause**: `report-generator.js` runs a separate LLM call with its own prompt that did not mention `[src:memory_key]` tags, so the report-LLM produced polished prose without citations. The hallucination gate's source-tag rule lived only in the agent-engine system prompt, never reached the report stage.
+- **Fix #1** (`report-generator.js`): inject a "SOURCE-CITED OUTPUTS (MANDATORY)" section into the report prompt, listing the actual usable memory keys the report MUST cite from. Hard rules: every number, price, date, statistic, named entity must have a `[src:key]` tag. Unverifiable claims must be tagged `[unverified]` and moved to a Caveats section.
+- **Fix #2** (`popup-modules/chat.js`): the full-report modal previously rendered markdown without calling `renderSourceChipsIn()`. Even if the LLM had emitted tags, they'd appear as plain text. Now wired so chips render in both the chat assistant message AND the full-report modal.
+
+### Fixed — MFA detector false positives
+- **Old**: flat regex array matched `enter your code`, `two-factor`, `push notification`, etc., on any page including coupon code fields, security blog posts, news articles. Would trigger MFA pause + chat banner during retail browsing.
+- **New tiered scheme** (`background/agent-engine.js`):
+  - **Tier 1** (single match fires): high-confidence cues like `approve sign-in request`, `tap the number you see` (Microsoft number-matching), `Duo push prompt`, `we've sent a verification code to`.
+  - **Tier 2** (needs auth-URL OR 2+ stacked matches): looser cues like `verify your identity`, `two-factor authentication`.
+  - **Auth-URL whitelist**: `login.microsoftonline.com`, `accounts.google.com`, `*.okta.com`, `*.duosecurity.com`, `/mfa/`, `/2fa/`, etc.
+  - **Domain exclusion list**: Amazon, eBay, Walmart, Target, Apple Shop, B&H, GitHub repos, blog/news/article paths, social sites — short-circuit before checking text.
+- Now requires real evidence (auth provider URL + at least one cue) before pausing.
+
+### Added — UX polish
+- **Welcome state with example prompts** (`popup.html`, `popup.css`, `popup-modules/chat.js`): four MSP-specific examples (Entra sign-in audit, Exchange message trace, SonicWall VPN audit, VirusTotal hash lookup). Click to populate the textarea; `[bracket]` placeholders auto-select for quick filling.
+- **First-run onboarding modal** (`popup.html`, `popup-modules/onboarding.js`): four-step walkthrough on first install — what Sentinel does, provider setup pointer, expected-tenant pointer, try-a-goal pointer. Persisted via `sentinelOnboardingDone` flag so it only appears once per install.
+
+### Implementation notes
+- Client knowledge `useCount` increments at run end based on which entries were injected at run start, so frequently-used entries surface first in future UI sorts.
+- Knowledge entries are capped at 1000 chars each; up to 8 tags per entry.
+- The MFA detector exclusion list is conservative — better to miss a true MFA on an obscure auth domain (where the user can manually pause) than to false-positive every shopping run.
+- Vision verification adds ~250 tokens per destructive-action step in the system prompt. Negligible cost vs the value of catching silent failures.
+- PDF export uses the user's browser print dialog by design — no PDF library to bundle, works identically across Chrome / Edge / Brave.
+- Onboarding can be re-triggered manually by clearing `sentinelOnboardingDone` from `chrome.storage.local` (planned: a "Show tour again" link in Settings).
+- `manifest.json` bumped `3.11.3` → `3.12.0` (minor version because of the new client-knowledge feature surface; patches were 3.11.x).
+
 ## v3.11.3 — 2026-05-10 (Silent by default + sound-notifications toggle)
 
 User reported hearing the Windows notification chime during agent runs. Investigation found six `chrome.notifications.create()` sites firing across various events. Decision: make Sentinel silent by default and put the desktop-toast feature behind an explicit opt-in toggle.

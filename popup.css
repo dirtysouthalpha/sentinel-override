@@ -1348,6 +1348,32 @@ body {
   line-height: 1.5;
 }
 
+/* (3.12.0) Example prompt buttons in welcome state */
+.example-prompts {
+  width: 100%;
+  max-width: 320px;
+}
+
+.example-prompt-btn {
+  background: var(--bg-secondary, rgba(255,255,255,0.04));
+  border: 1px solid var(--border-color, rgba(255,255,255,0.12));
+  color: var(--text-secondary, #ccc);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.example-prompt-btn:hover {
+  background: var(--accent-a10, rgba(74, 156, 255, 0.08));
+  border-color: var(--accent-primary, #4a9cff);
+  color: var(--text-primary, #fff);
+}
+
 /* ================================================================
    TOAST NOTIFICATIONS
    ================================================================ */
