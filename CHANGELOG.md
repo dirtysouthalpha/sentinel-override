@@ -1,5 +1,45 @@
 # Changelog
 
+## v3.36.2 — 2026-05-12 (HOTFIX — duplicated content/index.js tail caused SyntaxError on every page)
+
+Second blocker found during the same Ambio viewLinc OQ ticket run. After v3.36.1 fixed the TDZ and the loop started ticking through Steps 1-4, every page injection threw `SyntaxError: Illegal return statement` at content/index.js:2089. The agent loop was alive but couldn't actually click/type/extract anything on the page — the content script DOM bridge was dying on parse.
+
+### Root cause
+
+During the v3.26.0 emergency tail-restoration (the recurring chat.js/content.js heredoc-append issue), the repair script ran twice or appended past the existing EOF marker. Result: the `extract_list / open_dropdown / dismiss_overlay / scroll_to / switch_to_frame` case blocks were duplicated at the end of content/index.js. The duplicate started with `+ describeTarget(cmd);` at module top level — a stray statement that wasn't inside any function, with `return` keywords inside the case blocks that are illegal at module scope.
+
+Chrome silently rejected the entire script on parse, so the content script never finished initializing. Every agent action (`click`, `type`, `extract`) ran through `chrome.tabs.sendMessage` which returned empty / no-handler results — the engine then treated those as benign no-ops and moved on to the next step, masking the underlying break.
+
+### Fix
+
+Truncate content/index.js to its first `// (3.26.0) End-of-file marker — sync flush.` line. Everything after that marker was duplicate garbage. After truncation:
+- File: 2067 lines (was inflated past line 2089 with the dupe)
+- node --check: PASS
+- `describeTarget(cmd)` count: 35 (was 70+ with the dupe)
+
+### Why v3.36.1 testing didn't catch it
+
+The v3.36.1 hotfix was a single-line move in agent-engine.js. The smoke test I ran was `node --check` on agent-engine.js only. content/index.js was assumed-clean because its v3.26.0 incident was thought-resolved. It wasn't — the cleanup left a duplicate that compiled fine for `node --check` (no syntax error at file scope until the duplicate added `+ describeTarget(cmd);` at top level, which only fails in actual Chrome content-script load, not node).
+
+Lesson: every hotfix needs `node --check` on EVERY file that has had truncation/restoration history, not just the file being patched. Adding to the v3.x test playbook.
+
+### Impact
+
+- v3.26.0 → v3.36.1: content/index.js parse error on every page. Loop ran but actions were silently no-ops. Symptom: steps tick by, telemetry looks active, but the viewLinc tab never shows cursor movement / click pulses / element highlights.
+- v3.36.2: clean parse. Content script loads. Actions reach the page.
+
+### Files touched
+
+- `content/index.js` — truncated to 2067 lines (was 2089+ with duplicate).
+- `manifest.json` — 3.36.1 → 3.36.2.
+- `CHANGELOG.md` — this entry.
+
+### Combined with v3.36.1
+
+These two fixes together (TDZ + content-script dupe) restore actual runnable state. After v3.36.2 reloads, the agent should make visible moves on the viewLinc tab for the first time in this debugging session.
+
+---
+
 ## v3.36.1 — 2026-05-12 (CRITICAL HOTFIX — TDZ crash on every step, blocking all runs since v3.25.1)
 
 **Critical bug, latent since v3.25.1.** Every agent run since v3.25.1 has been crashing on its first step with a `ReferenceError: Cannot access 'dynamicMaxSteps' before initialization`. The outer try/catch swallowed the error, slept 3 seconds, re-entered the loop, and the same crash fired again — looking from the outside like the agent was "hung waiting for LLM response". It wasn't. It was throwing a JavaScript temporal-dead-zone error 30+ times per minute.
