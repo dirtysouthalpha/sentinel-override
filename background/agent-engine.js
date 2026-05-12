@@ -2062,6 +2062,11 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   let consecutiveNavigates = 0;
+  // Observation skip cache — reused when previous step was non-mutating and
+  // the URL/SPA-route hasn't changed.
+  let _cachedObservation = null;
+  let _cachedPageContent = null;
+  let _lastObservedUrl = '';
 
   // Generate a plan before execution
   sendSilentUpdate('Planning task...');
@@ -2152,6 +2157,10 @@ async function runAgentLoop(goal, workingTabId) {
           spaCtx.screenshotCache.cachedBase64Image = null;
           spaCtx.screenshotCache.lastScreenshotUrl = null;
         }
+        // Invalidate observation cache so the next step does a full re-scan.
+        _cachedObservation = null;
+        _cachedPageContent = null;
+        _lastObservedUrl = '';
         // Don't skip the iteration -- just let the normal observe/scan flow run
         // with fresh data. The continue is NOT used here because we want the
         // normal flow to pick up the new page state.
@@ -2283,21 +2292,37 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (e) { /* non-fatal */ }
 
-      // Get page data
+      // Get page data — skip re-observation when the previous action was
+      // non-mutating (note/extract/scroll/wait) AND no SPA transition occurred
+      // AND the URL hasn't changed.  On slow portals this halves step latency.
       let observation, pageContent;
-      // (3.16.0) Observation phase activity item
-      activityStart(stepCount, 'observe', 'Observing page');
-      try {
-        observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
-        pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
-        const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
-        const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
-        activityDone(stepCount, 'observe', 'Observed ' + elemCount + ' elements, ' + textLen + ' chars of text', null);
-      } catch (err) {
-        activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
-        sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
-        await sleep(2000);
-        continue;
+      const _prevAction = history.length > 0 ? history[history.length - 1] : null;
+      const _prevType = _prevAction && _prevAction.action ? _prevAction.action.type : '';
+      const _nonMutating = /^(note|extract|extract_list|scroll|wait_for_text|wait_for_element|wait_for_navigation|read_page)$/.test(_prevType);
+      const _obsUrl = (tabInfo && tabInfo.url) || '';
+      const _skipObserve = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation;
+      if (_skipObserve) {
+        observation = _cachedObservation;
+        pageContent = _cachedPageContent;
+        activityDone(stepCount, 'observe', '(cached — page unchanged)', null);
+      } else {
+        // (3.16.0) Observation phase activity item
+        activityStart(stepCount, 'observe', 'Observing page');
+        try {
+          observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
+          pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
+          const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
+          const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
+          activityDone(stepCount, 'observe', 'Observed ' + elemCount + ' elements, ' + textLen + ' chars of text', null);
+          _cachedObservation = observation;
+          _cachedPageContent = pageContent;
+          _lastObservedUrl = _obsUrl;
+        } catch (err) {
+          activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
+          sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
+          await sleep(2000);
+          continue;
+        }
       }
 
       // Update snapshot for the current tab
@@ -3263,6 +3288,8 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           await sleep(1000); continue;
         }
+        // User explicitly approved — mark so content-script guards pass.
+        if (approval.approved) command.approvalGranted = true;
       }
 
       // Show action card
@@ -4080,11 +4107,43 @@ async function requestApproval(command, stepNumber) {
       }
     };
     chrome.runtime.onMessage.addListener(listener);
-    // Fail-closed timeout: if no user response in 60s, REJECT rather than approve.
-    // Auto-approving an AFK user is the opposite of safe.
-    const timeoutId = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      finish({ approved: false, skipped: false, rejected: true, reason: 'approval_timeout' });
+    // After 60 s with no response: pause the agent and notify the user rather
+    // than silently rejecting. The agent stays paused until the user responds
+    // (or hits the 5-minute hard wall).
+    const timeoutId = setTimeout(async () => {
+      // Pause the loop so the step isn't counted as failed while the tech is AFK.
+      agentPaused = true;
+      sendSilentUpdate('⏸ Approval pending — agent paused. Click Approve/Reject in the chat or the notification to continue.', stepNumber);
+      try {
+        await notifyIfEnabled('approval_pending_' + requestId, {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icon-48.png'),
+          title: 'Sentinel Override — Approval needed',
+          message: 'Step ' + stepNumber + ': ' + description.substring(0, 100) + '. Open Sentinel to approve or reject.'
+        });
+      } catch (e) {}
+      // Hard-reject after 5 minutes total (4 more minutes from here).
+      // The listener is still active so a user response still resolves early.
+      const hardRejectId = setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(listener);
+        agentPaused = false; // unblock loop so it can clean up
+        finish({ approved: false, skipped: false, rejected: true, reason: 'approval_hard_timeout' });
+      }, 240000);
+      // If the user responds before the hard wall, clear the hard-reject timer.
+      const origListener = listener;
+      chrome.runtime.onMessage.removeListener(origListener);
+      chrome.runtime.onMessage.addListener((message) => {
+        if (message && message.action === 'approval_response' && message.requestId === requestId) {
+          clearTimeout(hardRejectId);
+          agentPaused = false;
+          chrome.runtime.onMessage.removeListener(arguments.callee);
+          finish({
+            approved: message.approved === true,
+            skipped: message.skipped === true,
+            rejected: message.rejected === true
+          });
+        }
+      });
     }, 60000);
   });
 }

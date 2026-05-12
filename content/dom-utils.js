@@ -217,9 +217,11 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     let bbox = null;
     try {
       const r = el.getBoundingClientRect();
+      // Emit page-absolute coords so click_at remains accurate after scroll.
+      // scrollX/scrollY convert viewport-relative rect to document-absolute position.
       bbox = {
-        x: Math.round(r.left),
-        y: Math.round(r.top),
+        x: Math.round(r.left + window.scrollX),
+        y: Math.round(r.top + window.scrollY),
         w: Math.round(r.width),
         h: Math.round(r.height)
       };
@@ -233,7 +235,11 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       role: el.getAttribute('role') || 'none',
       type: el.getAttribute('type') || 'none',
       ref: refId,
-      bbox: bbox
+      bbox: bbox,
+      // Semantic hints included so stale-ref fallback can match by identity
+      // rather than brittle nth-of-type selector chains.
+      ariaLabel: (el.getAttribute('aria-label') || '').substring(0, 100) || undefined,
+      elementId: el.id || undefined
     };
 
     if (el.tagName === 'SELECT') {

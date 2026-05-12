@@ -2608,6 +2608,9 @@ function showTenantOverrideCard(payload) {
 
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === 'cdp_reattach_warning') {
+    updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
+  }
   if (message.action === 'agent_update') {
     if (message.stepNumber && message.stepNumber > 0) {
       appendLogLine(message.stepNumber, message.text);

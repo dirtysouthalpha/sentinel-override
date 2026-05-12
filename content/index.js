@@ -67,6 +67,7 @@ if (window.__sentinelInitialized) {
   // Track recent DOM insertions so we only consider freshly-added overlays.
   const __sentinelRecentInsertions = new WeakMap();
   let __sentinelDismissalCount = 0;
+  let __sentinelLastDismissRoute = '';
   const SENTINEL_MAX_DISMISSALS = 3;
   const SENTINEL_RECENT_MS = 5000;
 
@@ -112,6 +113,16 @@ if (window.__sentinelInitialized) {
 
   function dismissOverlays() {
     const dismissed = [];
+
+    // Reset the dismissal cap when the SPA route changes (pathname+hash) so
+    // new modals on the next "page" are still dismissed even without a full reload.
+    try {
+      const _route = location.pathname + location.hash;
+      if (_route !== __sentinelLastDismissRoute) {
+        __sentinelDismissalCount = 0;
+        __sentinelLastDismissRoute = _route;
+      }
+    } catch (e) {}
 
     if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) {
       return { dismissed: [], count: 0, capped: true };
@@ -934,10 +945,36 @@ if (window.__sentinelInitialized) {
       if (el) {
         return { el, viaRef: true, staleRef: false };
       }
-      // Ref provided but stale -- log and fall through to selector
+      // Ref stale — try semantic identity matches before falling back to the
+      // brittle nth-of-type selector chain, which breaks on SPA re-renders.
       try {
-        console.warn('[Sentinel Override] ' + cmd.ref + ' stale, falling back to selector');
+        console.warn('[Sentinel Override] ' + cmd.ref + ' stale, attempting semantic fallback');
       } catch (e) {}
+      // 1. aria-label match (most reliable stable identifier)
+      if (cmd.ariaLabel) {
+        try {
+          const byAria = targetDoc.querySelector('[aria-label="' + cmd.ariaLabel.replace(/"/g, '\\"') + '"]');
+          if (byAria) return { el: byAria, viaRef: false, staleRef: true };
+        } catch (e) {}
+      }
+      // 2. id match
+      if (cmd.elementId) {
+        try {
+          const byId = targetDoc.getElementById(cmd.elementId);
+          if (byId) return { el: byId, viaRef: false, staleRef: true };
+        } catch (e) {}
+      }
+      // 3. visible text + tag match (e.g. a button that always says "Save")
+      if (cmd.elementText && cmd.tag) {
+        try {
+          const tag = String(cmd.tag).toLowerCase();
+          const needle = String(cmd.elementText).trim();
+          const byText = Array.from(targetDoc.querySelectorAll(tag))
+            .find(el => (el.innerText || el.textContent || '').trim() === needle);
+          if (byText) return { el: byText, viaRef: false, staleRef: true };
+        } catch (e) {}
+      }
+      // 4. nth-of-type selector as last resort
       if (cmd.selector) {
         const fallback = dom.findElementBySelector(targetDoc, cmd.selector);
         return { el: fallback, viaRef: false, staleRef: true };
@@ -1663,6 +1700,17 @@ if (window.__sentinelInitialized) {
         // risky if the background SW terminates mid-await.
         const code = cmd.code || '';
         if (!code) return 'No code provided';
+
+        // Static guard: block code that accesses privileged browser APIs unless
+        // the caller has been explicitly approved (cmd.approvalGranted === true).
+        // This is a defence-in-depth layer; the agent-engine approval gate is the
+        // primary control, but this fires even if the gate is bypassed or disabled.
+        if (!cmd.approvalGranted) {
+          const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
+          if (_PRIV_RE.test(code)) {
+            return 'BLOCKED: execute_js code accesses a privileged API (cookie / fetch / XHR / WebSocket / eval / storage). Enable approval mode and re-run — the approval card will show the full code before it executes.';
+          }
+        }
 
         try {
           console.warn('[Sentinel Override] execute_js running with full page privileges:', code.slice(0, 200));
