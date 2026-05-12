@@ -1,5 +1,63 @@
 # Changelog
 
+## v3.25.0 — 2026-05-12 (Live Telemetry Panel — stop the black box)
+
+User ask: "We need to make sure we're always seeing what it's doing or where it hangs at, the whole black box thing doesn't work when troubleshooting."
+
+v3.25.0 ships a slide-up Live Telemetry Panel that shows every internal event — LLM calls with elapsed time + provider/model details, recovery skill consultations, lifecycle transitions, page observations, memory writes, CDP attach/detach, errors, and more — in real time as the agent runs. Pinned to the bottom of the side panel (past the rail), filterable, searchable, copyable. When something hangs, you open the panel and SEE where.
+
+### Added — `background/telemetry.js` (new emit module)
+
+- `emit(category, level, message, payload)` — broadcasts a `telemetry_event` chrome.runtime message + mirrors to SW DevTools console.
+- Convenience: `tel.error/warn/info/debug/trace(category, message, payload?)`.
+- Verbosity gating: `chrome.storage.local.telemetryLevel` ('quiet' / 'normal' / 'verbose' / 'debug'), default 'normal'. Re-reads on storage change via `chrome.storage.onChanged` listener so verbosity flips take effect immediately.
+- 11 standard categories: `llm`, `skill`, `platform`, `memory`, `cdp`, `page`, `sleep`, `storage`, `network`, `lifecycle`, `error`.
+- Monotonic `seq` counter on every event so the panel can detect dropped messages.
+
+### Added — Hooks across the agent loop (`background/agent-engine.js`)
+
+Initial hook set in v3.25.0:
+- `lifecycle` — agent start (with goal + startTabId), stop (user-initiated), per-step start (with stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures).
+- `llm` — call started (with elementsCount, pageTextLen, historyEntries, hasScreenshot), call finished (with durationMs + decided action type), call failed (with durationMs + error).
+- `skill` — recovery skill consultations (with applied skill IDs, autoApplied flag, last result preview).
+
+More hooks (memory writes, CDP events, page observations, storage writes, sleep delays) deferred to v3.25.1+ — easier to add incrementally than tune all at once. The framework supports any number; each new hook is one `tel.<level>('<category>', '<message>', { ...payload })` line.
+
+### Added — Slide-up panel (`popup-modules/telemetry-panel.js`)
+
+- Fixed-position panel, 40vh tall by default, slides up from the bottom of the side panel (past the 42px left rail).
+- Header bar: search box + Pause/Auto-scroll toggle + Copy + Clear + Close.
+- Filter chips: All / Errors+Warn / LLM / Skills / Platform / Memory / Page / Lifecycle / CDP / Network / Storage. Clicking a chip filters live events + retroactively from buffer.
+- Each event row: HH:MM:SS.ms timestamp + level dot (color-coded) + category badge (color-coded by category) + message. Click row to expand JSON payload inline.
+- Circular buffer: last 500 events in memory. DOM shows last 250 of filtered set (auto-trims older nodes to keep render snappy).
+- Auto-scroll detection: scrolling up pauses auto-scroll automatically; scrolling back near bottom re-enables it. Manual Pause button overrides.
+- Copy button: dumps all currently-filtered events to clipboard as plaintext (`HH:MM:SS.ms [level/category] message  {payload}`) — drop straight into a bug report or chat.
+
+### Added — Rail button + settings toggle
+
+- New rail icon (pulse-line activity icon) opens/closes the telemetry panel. Tooltip "Live Telemetry".
+- New Settings dropdown "Live Telemetry Verbosity" with 4 levels. Default Normal. Changes apply on next emit (no reload needed).
+
+### Bumped
+
+- `manifest.json`: `3.24.0` → `3.25.0`.
+
+### Files touched
+
+- `background/telemetry.js` — NEW (~110 lines).
+- `background/agent-engine.js` — imported tel; hooks at startAgent, stopAgent, step start, LLM start/finish/fail, skill consult (~8 hook sites in this release).
+- `popup-modules/telemetry-panel.js` — NEW (~280 lines). Self-contained IIFE.
+- `popup-modules/settings.js` — wires the verbosity dropdown.
+- `popup.html` — rail button + verbosity dropdown + script tag.
+
+### Honest notes
+
+- Initial hook set is intentionally minimal (~8 hooks) — covers the most-frequently-asked questions ("is the LLM hung?", "did a skill fire?", "what step are we on?"). The framework is in place; v3.25.1+ adds more hooks based on real-run diagnostics.
+- Telemetry events are NOT persisted across sessions — the panel is a live diagnostic surface, not a historical log. The forensic run log (v3.9.0) is still where durable per-step records live.
+- Open the SW console alongside the panel for the same events mirrored to console.log/warn/error — useful for grep + cross-referencing with other browser-internal events.
+- Performance: every emit is a fire-and-forget chrome.runtime.sendMessage + console call. Per-event cost is sub-millisecond. Even at high verbosity on a 100-step run, total overhead is well under 1% of run time.
+
+
 ## v3.24.0 — 2026-05-12 (Recent Chats — session archive + restore)
 
 User ask: "When I close the extension it closes the chat also, but have the ability to bring it back, last 10 or so prompts and actions and all."

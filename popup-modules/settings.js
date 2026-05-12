@@ -185,6 +185,22 @@ if (adaptiveExpansionModeSelect) {
   });
 }
 
+// ========== Telemetry Verbosity (3.25.0) ==========
+// Live Telemetry panel verbosity. Background/telemetry.js reads this on
+// every emit() to decide whether to broadcast the event. Storage changes
+// take effect immediately via the onChanged listener in telemetry.js.
+const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
+if (telemetryLevelSelect) {
+  chrome.storage.local.get(['telemetryLevel'], (result) => {
+    telemetryLevelSelect.value = result.telemetryLevel || 'normal';
+  });
+  telemetryLevelSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
+      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) {}
+    });
+  });
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
@@ -824,7 +840,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       el.addEventListener('click', () => {
         const theme = el.dataset.theme;
         if (!theme) return;
-        // Strip prior theme-* classes from body
         document.body.className = document.body.className.split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
         if (theme !== 'light' && theme !== 'dark') {
           document.body.classList.add('theme-' + theme);
@@ -832,7 +847,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         if (theme === 'dark') document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
         try { localStorage.setItem('theme-named', theme); } catch (e) {}
-        // Mark active
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
         try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) {}
       });
@@ -844,4 +858,3 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     init();
   }
 })();
-
