@@ -1,5 +1,48 @@
 # Changelog
 
+## v3.36.3 — 2026-05-12 (HOTFIX² — content/index.js dedupe actually done this time)
+
+v3.36.2's verifier agent reported "no truncation needed — the duplicate had already been removed in a prior pass." It was wrong. The file still had a 184-line duplicate (lines 2068-2251 on the Windows source path), with `+ describeTarget(cmd);` at module top level on line 2068 and a top-level `return` on line 2089 — still throwing `Uncaught SyntaxError: Illegal return statement` at content/index.js:2089 on every page injection. Sentinel Override's loop kept ticking but no action could reach the DOM.
+
+### Root cause of the v3.36.2 miss
+
+The verifier agent ran `wc -l` and `node --check` against the Linux mount path `/sessions/.../mnt/sentinel-override-3.13.0/content/index.js`. The Linux mount and the Windows `$SRC` path had drifted — they were no longer the same file. The mount showed 2067 lines clean; the Windows source had 2252 lines with the dupe. Robocopy reads from $SRC (Windows), so the duplicate kept shipping to $REPO.
+
+### Fix
+
+Direct Edit on the Windows source `C:\Users\brandon.goolsby\Downloads\sentinel-override-3.13.0\content\index.js`:
+- `old_string`: the entire 184-line duplicate (line 2067's EOF marker + all duplicated case blocks + setupSPAObservers + sendMessage + second EOF marker).
+- `new_string`: just the single EOF marker.
+
+After: file is 2067 lines, single EOF marker on line 2067, no duplicate.
+
+### Verified by
+
+Read tool on the Windows path after the Edit:
+```
+2065   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
+2066 }
+2067 // (3.26.0) End-of-file marker — sync flush. (v3.36.3 dedupe applied)
+```
+
+That's it. No more `+ describeTarget(cmd);` at top level. Content script will parse cleanly on injection.
+
+### Lesson
+
+Linux mount vs Windows source verification mismatch is a real failure mode in this session. From here on, when verifying file content for ship-readiness, the verification must include either (a) a re-read via the Windows-rooted Read tool, or (b) explicit confirmation that the bash-checked file size matches what robocopy will copy. The verifier agent's "mount looks clean" claim is insufficient.
+
+### Files touched
+
+- `content/index.js` — duplicate removed (2252 → 2067 lines).
+- `manifest.json` — 3.36.2 → 3.36.3.
+- `CHANGELOG.md` — this entry.
+
+### Push priority
+
+Ship immediately. v3.36.2 didn't fix the actual problem; v3.36.3 does.
+
+---
+
 ## v3.36.2 — 2026-05-12 (HOTFIX — duplicated content/index.js tail caused SyntaxError on every page)
 
 Second blocker found during the same Ambio viewLinc OQ ticket run. After v3.36.1 fixed the TDZ and the loop started ticking through Steps 1-4, every page injection threw `SyntaxError: Illegal return statement` at content/index.js:2089. The agent loop was alive but couldn't actually click/type/extract anything on the page — the content script DOM bridge was dying on parse.
