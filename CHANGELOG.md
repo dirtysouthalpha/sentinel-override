@@ -1,5 +1,92 @@
 # Changelog
 
+## v3.24.0 — 2026-05-12 (Recent Chats — session archive + restore)
+
+User ask: "When I close the extension it closes the chat also, but have the ability to bring it back, last 10 or so prompts and actions and all."
+
+v3.24.0 ships exactly that. Sessions auto-archive when the side panel closes, when an agent run finishes, or when the user clicks New Chat. A new rail button opens a Recent Chats modal showing the last 10 archives — pick one to restore the full chat (messages + action cards + activity streams + final report) back into the chat view.
+
+### Added — `popup-modules/recent-chats.js`
+
+- New `chrome.storage.local.recent_chats` storage key, capped at 10 sessions. Each entry: `{id, goal, createdAt, finishedAt, messagesCount, hadReport, runLogId, htmlSnapshot, conversationHistory, archivedReason}`.
+- Snapshot strategy: serialize the chatContainer's `innerHTML` so action cards, activity streams, banners, and report cards all restore visually. Plus the underlying `conversationHistory` array for message-level fidelity.
+- `archiveCurrentChat(opts)` — captures the current state. Called on visibilitychange (panel hidden), beforeunload, agent_finished + report_update ready, and New Chat click. Dedup: skips archives within 5 seconds of the last identical snapshot (prevents duplicates from rapid panel-toggle).
+- `listRecentChats()` / `restoreChat(id)` / `deleteRecentChat(id)` / `clearAllRecent()` — public API.
+- Restore flow: archives the current chat first (so work-in-progress isn't lost), then replaces chatContainer's innerHTML with the snapshot and syncs conversationHistory. Adds a "Restored chat · archived 4 min ago · 12 messages · had report" banner at the top with a Dismiss button.
+- Exposed globally as `window.__sentinelRecentChats` so chat.js and other modules can call archive on events.
+
+### Added — Recent Chats rail button + modal (`popup.html`)
+
+- New rail icon (clock-with-circle-arrow-back design) between Run Log History and Command Palette. Tooltip "Recent Chats". Same `.rail-btn` styling so it picks up themes / hover tooltips from v3.19.0.
+- New modal `#recent-chats-modal`: header + description + scrollable list + Clear All footer. Same pattern as Run Log History modal (v3.14.0).
+- List rendering shows: goal preview (max 200 chars), age (just now / 4 min ago / 2h ago / 3d ago), message count, "report" tag if a final report was captured, archived reason (panel-closed / finished / new-chat / unload), Restore + Delete buttons per row.
+
+### Added — chat.js integration
+
+- New Chat button: archives current chat before clearing (no more lost sessions on accidental click). Toast updated: "Chat cleared (archived to Recent Chats)".
+- `report_update` `ready` handler: archives 250ms after the report card renders (lets the DOM settle) — captures the full post-run state.
+- `visibilitychange` event (in recent-chats.js): archives when `document.visibilityState === 'hidden'`. Fires on side panel close, browser minimize, tab switch.
+- `beforeunload` event (in recent-chats.js): belt-and-suspenders archive for hard closes.
+
+### Bumped
+
+- `manifest.json`: `3.23.0` → `3.24.0`.
+
+### Files touched
+
+- `popup-modules/recent-chats.js` — NEW, ~260 lines. Self-contained IIFE. Exposes `window.__sentinelRecentChats` API.
+- `popup-modules/chat.js` — New Chat button now archives first; report_update ready triggers archive.
+- `popup.html` — new rail button + modal markup, recent-chats.js script tag.
+
+### Honest caveats
+
+- Restored sessions are **display-only**. Buttons inside historical action cards / Approval cards / etc. won't dispatch — there's no live agent for them to talk to. The restoration shows what HAPPENED; it doesn't resume the agent.
+- HTML snapshots can be ~10-100 KB per session. 10 sessions × 100 KB = 1 MB. chrome.storage.local quota is 5 MB total; v3.24.0 uses well under that even with run log history + other state.
+- The chat container's innerHTML serialization captures event listeners as static markup — buttons in restored cards look real but are inert. Clear visual contract that "this is history, not live."
+- "Pin a session" / "Star a chat" features are deferred to v3.25.0 — eviction at 10 is FIFO; if you want to keep a specific session, restore it (which pushes it back to position 1 of the list) or export the final report.
+
+
+## v3.23.0 — 2026-05-12 (Movable + fit-to-viewport modals)
+
+User report: opened Settings, the modal extended off the right edge of the Chrome side panel — couldn't see / reach the Detect Models button, API key field truncated, etc. Same root cause as the report-modal overflow we fixed in v3.20.2, but applied to every modal in the app.
+
+### Fixed — Modals were being pushed off-screen by a stale CSS rule from v3.17.0
+
+When the left action rail shipped in v3.17.0, I added `.modal { left: 50% !important }` thinking it would compensate for the body's 42px padding-left. That was wrong — combined with the existing `width: 100%`, it pushed the modal's LEFT EDGE to mid-viewport, so the modal extended from middle of the panel off the right side. Modals' `.modal-content` (the actual content box) sits inside the flexbox-centered .modal wrapper; the rail's body-padding doesn't affect `position: fixed` overlays at all. The override was unnecessary and harmful.
+
+Removed. Modals now use the original `position: fixed; top: 0; left: 0; width: 100%; height: 100%; justify-content: center` pattern, which centers the modal-content correctly across the full viewport (the rail sits at z-index 50; modals at z-index 1000 — modals overlay the rail cleanly when open).
+
+### Added — Responsive modal sizing (`popup.css`)
+
+- `.modal-content` max-width now `min(640px, calc(100vw - 24px))` — caps at 640px for nice typography but shrinks to fit narrower side panels. The 24px leaves a small gutter against the panel edges.
+- `.modal-content` max-height `calc(100vh - 60px)` — internal scroll on tall content; the drag bar + actions stay reachable.
+- Inline `style="max-width:520px"` etc. on individual modals (template-modal, report-modal, etc.) get the same viewport cap via specificity-bumping selectors.
+
+### Added — Draggable modals (`popup-modules/modal-drag.js`)
+
+- Click + drag the title bar (the `<h2>` at the top of any `.modal-content`) to reposition the modal within the viewport. Works with mouse, trackpad, and touch via PointerEvent.
+- Cursor shows `grab` on hover, `grabbing` during drag.
+- A small `⠿` braille drag-handle indicator appears at the right edge of the title (subtle when idle, brightens on hover).
+- Constrained to the viewport — at least 80px of the modal stays on-screen in every direction so you can never drag it fully off.
+- Position resets to center on close. Each modal-open starts fresh (not persisted across opens — by design; if you regularly want a non-center position, that's a v3.24+ candidate).
+- Title-bar inputs / buttons / selects keep `cursor: auto` and don't initiate drag — only clicks on the title text or the empty area trigger movement.
+- MutationObserver watches for dynamically-added modals (run log history, template runner, etc.) so the wire-up survives lazy DOM construction.
+
+### Bumped
+
+- `manifest.json`: `3.22.0` → `3.23.0`.
+
+### Files touched
+
+- `popup.css` — removed the stale `left: 50% !important` rule; appended the responsive sizing + drag-state styles.
+- `popup-modules/modal-drag.js` — new file, ~120 lines. Self-contained IIFE; no external dependencies.
+- `popup.html` — added `<script src="popup-modules/modal-drag.js"></script>` before popup-full.js.
+
+### Behavior after reload
+
+Settings modal opens fully within the side panel (no more cut-off right side). Title bar has a `⠿` indicator on the right; click and drag it to move the modal around. Same for Theme Customizer, Templates, Run Log History, Mode Mismatch card, Client Knowledge — every modal that uses `.modal-content`.
+
+
 ## v3.22.0 — 2026-05-12 (MSP platform profiles — M365, FortiGate, IT Glue, Aruba, SonicWall on-box)
 
 The platform-profile system shipped in v3.18.0 (SonicWall NSM only). v3.22.0 fills out the five platforms Brandon's MSP runs daily: M365 admin surfaces, FortiGate / FortiManager, IT Glue, Aruba (Central + Instant + OS-CX), and SonicWall on-box web admin.

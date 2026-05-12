@@ -3068,12 +3068,13 @@ body {
 }
 .scanline-overlay { pointer-events: none; }
 
-/* Restore full-width for overlays that intentionally sit above the rail */
-.command-palette,
-.command-palette-backdrop,
-.modal {
-  left: 50% !important;
-}
+/* (3.23.0) The v3.17.0 attempt to "keep modals centered despite body
+   padding-left from the rail" set left: 50% which was a bug — combined
+   with width: 100% it pushed the modal's left edge to mid-viewport, so
+   the modal extended off the right side. Removed. Modals use
+   position: fixed + justify-content: center on the .modal flexbox to
+   center the .modal-content inside the full viewport (rail-overlapping
+   is fine; modals are z-index 1000 vs rail's 50). */
 
 /* The old left edge accent bar conflicts with the rail visually — hide it */
 .left-edge-accent { display: none !important; }
@@ -3294,4 +3295,74 @@ body {
   background: rgba(255,107,0,0.12);
   color: var(--accent-primary, #ff6b00);
   border-color: var(--accent-primary, #ff6b00);
+}
+
+/* ========== Movable / Fit-to-Viewport Modals (3.23.0) ========== */
+
+/* Modals fit the Chrome side panel at any width. Cap max-width so they
+   don't get absurd on detached/wide panels; floor minimums so content
+   doesn't get squeezed. */
+.modal-content {
+  /* Override the 420px default — fit to viewport with sensible bounds. */
+  max-width: min(640px, calc(100vw - 24px)) !important;
+  /* Reserve breathing room top/bottom so the drag bar + actions stay on-screen. */
+  max-height: calc(100vh - 60px) !important;
+  /* Keep internal scroll for tall content. */
+  overflow-y: auto;
+  /* Smooth motion when the user drags. */
+  transition: transform 60ms ease-out;
+  /* When the drag module sets a custom transform, this transition prevents it from looking jumpy. */
+}
+
+/* Per-modal inline max-widths (e.g., style="max-width:560px;") will still
+   apply but cap at the viewport via the rule above. Inline 520/560 sizes
+   shrink gracefully on narrow panels. */
+.modal-content[style*="max-width:520px"],
+.modal-content[style*="max-width:560px"],
+.modal-content[style*="max-width:480px"] {
+  max-width: min(640px, calc(100vw - 24px)) !important;
+}
+
+/* Title bar is the drag handle. .modal-content h2 (the first heading) gets a
+   grab cursor + tiny "::" affordance. The modal-drag.js module wires the
+   pointer events. */
+.modal-content h2 {
+  cursor: grab;
+  user-select: none;
+  position: relative;
+  padding-right: 24px;
+}
+.modal-content h2.dragging {
+  cursor: grabbing;
+}
+.modal-content h2::after {
+  content: '⠿';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: var(--text-tertiary, #888);
+  opacity: 0.5;
+  pointer-events: none;
+  letter-spacing: -2px;
+}
+.modal-content h2:hover::after {
+  opacity: 0.9;
+  color: var(--accent-primary, #ff6b00);
+}
+
+/* When the modal is being dragged, suspend the transition so the cursor
+   stays locked to the title bar without lag. */
+.modal-content.dragging {
+  transition: none !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px var(--accent-a10) !important;
+}
+
+/* Disable the dragging cursor + handle inside form inputs that happen to
+   live in h2 (rare but possible). */
+.modal-content h2 input,
+.modal-content h2 button,
+.modal-content h2 select {
+  cursor: auto;
 }
