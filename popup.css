@@ -1483,6 +1483,19 @@ body {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+/* (3.32.0) Don't stretch checkboxes/radios — the rule above was built for
+   text inputs but inherited by every input inside .modal-field, which made
+   checkboxes fill the row and squeeze label text to single-character columns.
+   This override restores native checkbox sizing. */
+.modal-field input[type="checkbox"],
+.modal-field input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  background: transparent;
+  flex-shrink: 0;
+}
+
 .modal-field input:focus,
 .modal-field select:focus {
   outline: none;

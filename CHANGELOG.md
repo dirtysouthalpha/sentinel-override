@@ -1,5 +1,55 @@
 # Changelog
 
+## v3.32.0 — 2026-05-12 (Settings layout fix — checkboxes were stretched + labels wrapping per character)
+
+User-reported visual bug. The three v3.27.0 / v3.28.0 / v3.29.0 checkboxes in the Live Telemetry settings card (Persist telemetry / Redact payloads / Adaptive skill priority) rendered with the checkbox stretched to fill the row width and the label text wrapping one character per line on the right side. Completely unreadable.
+
+### Root cause
+
+`popup.css` line 1473 has:
+```css
+.modal-field input,
+.modal-field select {
+  width: 100%;
+  padding: 8px 10px;
+  ...
+}
+```
+
+This rule was built for the text inputs in settings cards (API key, endpoint, etc.) but it inherits to *every* `<input>` element inside `.modal-field`, including checkboxes. The 100% width made the checkbox fill the row, the 8px padding made it tall, and the leftover sliver of space caused the label `<span>` (which had no `flex:1`) to compress until text wrapped at ~3 characters per line.
+
+### Fix
+
+Two changes:
+
+1. **New CSS rule** in `popup.css` directly under the offending one:
+   ```css
+   .modal-field input[type="checkbox"],
+   .modal-field input[type="radio"] {
+     width: 16px;
+     height: 16px;
+     padding: 0;
+     background: transparent;
+     flex-shrink: 0;
+   }
+   ```
+   This is the permanent fix — any future checkbox dropped into a `.modal-field` will render with native sizing.
+
+2. **Inline overrides + `flex:1` on label spans** in `popup.html` for the three existing offenders. Belt-and-suspenders in case a future selector ever overrides the CSS rule. Each input now has explicit `width:16px !important; height:16px !important; padding:0 !important; background:transparent !important;` and each wrapping `<span>` has `flex:1; min-width:0;` so the label claims the remaining row width.
+
+### Files touched
+
+- `popup.css` — new `.modal-field input[type="checkbox"], .modal-field input[type="radio"]` rule.
+- `popup.html` — inline style hardening on the three telemetry checkboxes + `flex:1; min-width:0` on each label span.
+- `manifest.json` — 3.31.0 → 3.32.0.
+- `CHANGELOG.md` — this entry.
+
+### Deferred
+
+The persistent-dismissal feature originally planned for v3.32.0 is bumped to v3.33.0 to keep this release focused on the visible bug fix.
+
+---
+
 ## v3.31.0 — 2026-05-12 (Score-driven retry suggestions — turn the score into an action)
 
 v3.30.0 gave every run a 0-100 trust score. v3.31.0 makes the score actionable: after a low/questionable-scored run finishes, the chat now offers 1-3 diagnostic re-run suggestions targeted at whichever breakdown component pulled the score down. Each suggestion has a one-click "Apply & retry" button that adjusts the relevant setting and re-fires the original goal.
