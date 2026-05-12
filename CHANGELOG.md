@@ -1,5 +1,57 @@
 # Changelog
 
+## v3.36.1 — 2026-05-12 (CRITICAL HOTFIX — TDZ crash on every step, blocking all runs since v3.25.1)
+
+**Critical bug, latent since v3.25.1.** Every agent run since v3.25.1 has been crashing on its first step with a `ReferenceError: Cannot access 'dynamicMaxSteps' before initialization`. The outer try/catch swallowed the error, slept 3 seconds, re-entered the loop, and the same crash fired again — looking from the outside like the agent was "hung waiting for LLM response". It wasn't. It was throwing a JavaScript temporal-dead-zone error 30+ times per minute.
+
+### Root cause
+
+`background/agent-engine.js` line 2115 (v3.25.1 telemetry hook):
+```js
+tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
+```
+
+`dynamicMaxSteps` is declared with `const` on line 2126 — **11 lines after the reference**. JavaScript's temporal-dead-zone semantics throw before initialization even though the declaration is in scope.
+
+The bug went undetected from v3.25.1 → v3.36.0 because:
+1. The try/catch wrapper swallowed the error silently.
+2. Telemetry verbosity at "Normal" doesn't surface the loop catch's error.
+3. The chat UI just showed "Sentinel Override is thinking..." / "Waiting for response..." which looked like a slow LLM.
+4. All testing during v3.25.1 → v3.36.0 was on small/sandbox surfaces where the user wasn't watching the SW DevTools console.
+
+User caught it during the Ambio viewLinc OQ ticket run by opening service-worker DevTools — the console showed the same `ReferenceError` repeating in a tight loop.
+
+### Fix
+
+Moved the telemetry emit AFTER the `const dynamicMaxSteps = ...` initialization. Single-line move. No other behavior changes.
+
+```js
+const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
+// (3.36.1) telemetry emit moved here, was previously above this line
+tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
+```
+
+### Impact
+
+- v3.25.1 → v3.36.0: **no runs could complete a single step.** Anything that looked like progress was actually the planner-LLM call (which runs before the loop) finishing, then the loop crashing on entry.
+- v3.36.1: agent loop runs normally. Telemetry "Step N starting" event now fires correctly with the dynamicMaxSteps value visible in the panel.
+
+### Why I shipped this without catching it
+
+I added the telemetry hook in v3.25.1 expecting `dynamicMaxSteps` to be in lexical scope (it is) without checking init-order (it isn't). `node --check` doesn't catch TDZ because TDZ is a runtime semantic. The smoke tests I wrote post-v3.25.1 didn't actually start an agent run end-to-end — they only verified the telemetry module surface. Lesson: every new telemetry hook needs an actual run-the-loop smoke test, not just a `node --check`.
+
+### Files touched
+
+- `background/agent-engine.js` — one line moved (telemetry emit relocated below `const dynamicMaxSteps`).
+- `manifest.json` — 3.36.0 → 3.36.1.
+- `CHANGELOG.md` — this entry.
+
+### Push priority
+
+Ship this immediately. Every prior version since v3.25.1 is broken for actual runs.
+
+---
+
 ## v3.36.0 — 2026-05-12 (Ambio viewLinc platform profile — GxP OQ validation pickup)
 
 User had a Claude-in-Chrome session running ticket #1129537 (Ambio viewLinc 5.2.1.859 OQ 9.12/9.15/9.16 validation) hit the rate limit mid-flight, with 4 hours until reset. Asked Sentinel Override to pick it up — which meant building a profile so the adaptive engine actually knows the platform.
