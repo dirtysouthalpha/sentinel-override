@@ -2621,192 +2621,98 @@ chrome.runtime.onMessage.addListener((message) => {
           chatContainer.appendChild(card);
           chatContainer.scrollTop = chatContainer.scrollHeight;
         }
-        // Helper used inside the score card markup above
-        function _trustRow(label, comp) {
-          if (!comp) return '';
-          const pts = (typeof comp.points === 'number') ? comp.points : 0;
-          const max = (typeof comp.max === 'number') ? comp.max : 0;
-          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
-          const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
-          const widthPct = Math.min(100, Math.round(ratio * 100));
-          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
-                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
-                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
-                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
-                   '</div>' +
-                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
-                 '</div>';
-        }
-      } catch (e) { /* non-fatal */ }
-    } catch (err) {
-      console.error('Error displaying completion message:', err);
-    }
-    resetUI();
-  }
-  if (message.action === 'request_approval') {
-    removeTypingIndicator();
-    showApprovalCard(message.payload);
-  }
-  if (message.action === 'agent_action') {
-    removeTypingIndicator();
-    addActionCard(message.payload);
-    updateActiveTabAction(message.payload);
-    if (message.payload && message.payload.stepNumber) updateActiveTabStep(message.payload.stepNumber);
-    try {
-      if (message.payload && message.payload.stepNumber && message.payload.description) {
-        updateStepCardAction(message.payload.stepNumber, message.payload.description);
-      }
-    } catch (e) {}
-  }
-  if (message.action === 'agent_action_result') {
-    updateActionCardResult(message.stepNumber, message.result, message.isError);
-  }
-  if (message.action === 'tab_state_update' && message.tabs) {
-    renderTabBar(message.tabs);
-    try {
-      const active = (message.tabs || []).find(t => t.isActive);
-      if (active && active.tabId) __atsStripState.tabId = active.tabId;
-    } catch (e) {}
-  }
-  if (message.action === 'screenshot_update' && message.base64Image) {
-    updateMiniShot(message.base64Image);
-    showMiniShot();
-  }
-  if (message.action === 'request_tenant_override') {
-    showTenantOverrideCard(message.payload);
-  }
-  if (message.action === 'mfa_pause') {
-    showMfaBanner(message.url, message.hint, message.stepNumber);
-  }
-  if (message.action === 'sign_in_wall_pause') {
-    showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber);
-  }
-  if (message.action === 'adapted_goal_available') {
-    try { showAdaptedGoalCard(message); } catch (e) { console.warn('showAdaptedGoalCard failed:', e && e.message); }
-  }
-  if (message.action === 'mode_mismatch_pause') {
-    try { showModeMismatchCard(message); } catch (e) { console.warn('showModeMismatchCard failed:', e && e.message); }
-  }
-  if (message.action === 'agent_step_start') {
-    try { _ensureActivityStream(message.stepNumber); } catch (e) { console.warn('agent_step_start failed:', e && e.message); }
-  }
-  if (message.action === 'agent_activity') {
-    try { showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail); } catch (e) { console.warn('agent_activity failed:', e && e.message); }
-  }
-  if (message.action === 'tenant_detected') {
-    renderTenantChip(message.tenant, message.expected);
-  }
-  if (message.action === 'download_captured') {
-    showDownloadCaptured(message.download);
-  }
-  if (message.action === 'run_log_available') {
-    showRunLogExportButton(message.runLogId, message.entryCount);
-  }
-  if (message.action === 'report_update') {
-    if (message.status === 'generating') {
-      addReportGeneratingIndicator();
-    } else if (message.status === 'ready' && message.report) {
-      removeReportGeneratingIndicator();
-      addReportCard(message.report);
-      // (3.24.0) Archive once the report is rendered — captures the full
-      // post-run state into Recent Chats so the user can restore it later.
-      try {
-        if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
-          setTimeout(() => window.__sentinelRecentChats.archive({ reason: 'finished' }), 250);
-        }
-      } catch (e) {}
-    } else if (message.status === 'error') {
-      removeReportGeneratingIndicator();
-      showToast('Report generation failed: ' + (message.error || 'Unknown error'), 'error');
-    }
-  }
-});
-               '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
-                   '</div>' +
-                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
-                 '</div>';
-        }
-      } catch (e) { /* non-fatal */ }
-    } catch (err) {
-      console.error('Error displaying completion message:', err);
-    }
-    resetUI();
-  }
-  if (message.action === 'request_approval') {
-    removeTypingIndicator();
-    showApprovalCard(message.payload);
-  }
-  if (message.action === 'agent_action') {
-    removeTypingIndicator();
-    addActionCard(message.payload);
-    updateActiveTabAction(message.payload);
-    if (message.payload && message.payload.stepNumber) updateActiveTabStep(message.payload.stepNumber);
-    try {
-      if (message.payload && message.payload.stepNumber && message.payload.description) {
-        updateStepCardAction(message.payload.stepNumber, message.payload.description);
-      }
-    } catch (e) {}
-  }
-  if (message.action === 'agent_action_result') {
-    updateActionCardResult(message.stepNumber, message.result, message.isError);
-  }
-  if (message.action === 'tab_state_update' && message.tabs) {
-    renderTabBar(message.tabs);
-    try {
-      const active = (message.tabs || []).find(t => t.isActive);
-      if (active && active.tabId) __atsStripState.tabId = active.tabId;
-    } catch (e) {}
-  }
-  if (message.action === 'screenshot_update' && message.base64Image) {
-    updateMiniShot(message.base64Image);
-    showMiniShot();
-  }
-  if (message.action === 'request_tenant_override') {
-    showTenantOverrideCard(message.payload);
-  }
-  if (message.action === 'mfa_pause') {
-    showMfaBanner(message.url, message.hint, message.stepNumber);
-  }
-  if (message.action === 'sign_in_wall_pause') {
-    showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber);
-  }
-  if (message.action === 'adapted_goal_available') {
-    try { showAdaptedGoalCard(message); } catch (e) { console.warn('showAdaptedGoalCard failed:', e && e.message); }
-  }
-  if (message.action === 'mode_mismatch_pause') {
-    try { showModeMismatchCard(message); } catch (e) { console.warn('showModeMismatchCard failed:', e && e.message); }
-  }
-  if (message.action === 'agent_step_start') {
-    try { _ensureActivityStream(message.stepNumber); } catch (e) { console.warn('agent_step_start failed:', e && e.message); }
-  }
-  if (message.action === 'agent_activity') {
-    try { showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail); } catch (e) { console.warn('agent_activity failed:', e && e.message); }
-  }
-  if (message.action === 'tenant_detected') {
-    renderTenantChip(message.tenant, message.expected);
-  }
-  if (message.action === 'download_captured') {
-    showDownloadCaptured(message.download);
-  }
-  if (message.action === 'run_log_available') {
-    showRunLogExportButton(message.runLogId, message.entryCount);
-  }
-  if (message.action === 'report_update') {
-    if (message.status === 'generating') {
-      addReportGeneratingIndicator();
-    } else if (message.status === 'ready' && message.report) {
-      removeReportGeneratingIndicator();
-      addReportCard(message.report);
-      // (3.24.0) Archive once the report is rendered — captures the full
-      // post-run state into Recent Chats so the user can restore it later.
-      try {
-        if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
-          setTimeout(() => window.__sentinelRecentChats.archive({ reason: 'finished' }), 250);
-        }
-      } catch (e) {}
-    } else if (message.status === 'error') {
-      removeReportGeneratingIndicator();
-      showToast('Report generation failed: ' + (message.error || 'Unknown error'), 'error');
-    }
+        // (3.31.0) Retry-suggestion cards. Render one card per suggestion
+        // when the score is low/questionable. Each card has a one-click
+        // "Apply & retry" button (or a manual prompt when applyKeys is empty).
+        try {
+          const suggestions = Array.isArray(message.retrySuggestions) ? message.retrySuggestions : [];
+          const originalGoal = typeof message.originalGoal === 'string' ? message.originalGoal : '';
+          for (const sug of suggestions) {
+            if (!sug || !sug.id) continue;
+            const sevColor = sug.severity === 'high' ? '#f44'
+              : sug.severity === 'medium' ? '#e0af68'
+              : '#7aa2f7';
+            const isAutoApply = Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0;
+            const isResetSkills = sug.id === 'reset-skills-and-retry';
+            const sCard = document.createElement('div');
+            sCard.className = 'retry-suggestion-card';
+            sCard.dataset.suggestionId = sug.id;
+            sCard.style.cssText = 'margin:6px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ' + sevColor + '; border-left-width:3px; border-radius:6px; font-size:12px;';
+            // Header + reason
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex; justify-content:space-between; align-items:flex-start; gap:10px;';
+            const textWrap = document.createElement('div');
+            textWrap.style.cssText = 'flex:1; min-width:0;';
+            const lbl = document.createElement('div');
+            lbl.style.cssText = 'font-weight:600; color:' + sevColor + '; margin-bottom:3px;';
+            lbl.textContent = sug.label || '(no label)';
+            textWrap.appendChild(lbl);
+            const why = document.createElement('div');
+            why.style.cssText = 'color:var(--text-secondary); line-height:1.4;';
+            why.textContent = sug.reason || '';
+            textWrap.appendChild(why);
+            header.appendChild(textWrap);
+            // Action buttons
+            const btnWrap = document.createElement('div');
+            btnWrap.style.cssText = 'display:flex; flex-direction:column; gap:4px; flex-shrink:0;';
+            if (isAutoApply || isResetSkills) {
+              const applyBtn = document.createElement('button');
+              applyBtn.textContent = isResetSkills ? 'Reset & retry' : 'Apply & retry';
+              applyBtn.style.cssText = 'padding:5px 10px; font-size:11px; background:' + sevColor + '; color:#fff; border:none; border-radius:4px; cursor:pointer; white-space:nowrap;';
+              applyBtn.addEventListener('click', async () => {
+                applyBtn.disabled = true;
+                applyBtn.textContent = '⏳';
+                try {
+                  // Special-case: reset-skills uses a message API, not a storage write.
+                  if (isResetSkills) {
+                    await new Promise((resolve) => chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, () => resolve()));
+                  }
+                  // Apply each (key, value) pair to chrome.storage.local.
+                  if (Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0) {
+                    const updates = {};
+                    for (let i = 0; i < sug.applyKeys.length; i++) {
+                      updates[sug.applyKeys[i]] = sug.applyValues[i];
+                    }
+                    await chrome.storage.local.set(updates);
+                  }
+                  // Re-fire the original goal as a new run.
+                  if (originalGoal) {
+                    // Use the same send-message path that the regular send button uses.
+                    try {
+                      const inputBox = document.getElementById('goalInput') || document.getElementById('chat-input');
+                      if (inputBox && typeof inputBox.value !== 'undefined') {
+                        inputBox.value = originalGoal;
+                      }
+                      // Prefer the existing sendGoal helper if it's defined; otherwise post a runtime message.
+                      if (typeof sendGoal === 'function') sendGoal();
+                      else chrome.runtime.sendMessage({ action: 'start_agent', goal: originalGoal });
+                    } catch (e) {}
+                  }
+                  sCard.style.opacity = '0.5';
+                  applyBtn.textContent = 'Applied';
+                } catch (e) {
+                  applyBtn.disabled = false;
+                  applyBtn.textContent = sug.label && sug.label.startsWith('Reset') ? 'Reset & retry' : 'Apply & retry';
+                }
+              });
+              btnWrap.appendChild(applyBtn);
+            }
+            const dismissBtn = document.createElement('button');
+            dismissBtn.textContent = 'Dismiss';
+            dismissBtn.style.cssText = 'padding:5px 10px; font-size:11px; background:transparent; color:var(--text-secondary); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:4px; cursor:pointer; white-space:nowrap;';
+            dismissBtn.addEventListener('click', () => {
+              try { sCard.remove(); } catch (e) {}
+            });
+            btnWrap.appendChild(dismissBtn);
+            header.appendChild(btnWrap);
+            sCard.appendChild(header);
+            chatContainer.appendChild(sCard);
+          }
+          if (suggestions.length > 0) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          }
+        } catch (e) { /* retry-suggestion render non-fatal */ }
+      } catch (e) { /* trust-score render non-fatal */ }
+    } catch (e) { /* agent_finished outer non-fatal */ }
   }
 });

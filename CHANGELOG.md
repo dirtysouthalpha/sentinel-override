@@ -1,5 +1,78 @@
 # Changelog
 
+## v3.31.0 — 2026-05-12 (Score-driven retry suggestions — turn the score into an action)
+
+v3.30.0 gave every run a 0-100 trust score. v3.31.0 makes the score actionable: after a low/questionable-scored run finishes, the chat now offers 1-3 diagnostic re-run suggestions targeted at whichever breakdown component pulled the score down. Each suggestion has a one-click "Apply & retry" button that adjusts the relevant setting and re-fires the original goal.
+
+Stop reading the breakdown to figure out why it scored 47 — the agent now tells you what to try next.
+
+### Added — `suggestRetryActions(scoreResult)` in `background/trust-score.js`
+
+Pure function that inspects a score breakdown and returns 0-3 ranked suggestions. Each suggestion is `{ id, label, reason, severity, applyKeys, applyValues }`. No suggestions returned for high/good runs — only fires when band is `questionable` or `low`.
+
+Six triggers, in order of how aggressively they fire:
+
+1. **Heavy failure rate** (`failure.gap > 0.4`) — suggests **Approval mode**. Reason notes the streak length if there was one. `applyKeys=['approvalMode']`.
+2. **Weak recovery** (`recovery.gap > 0.5` and ≥3 skill fires) — suggests **Reset skill stats and retry**. The adaptive priorities from v3.29.0 may be miscalibrated; resetting gives them a fresh trial round. Uses the `reset_skill_stats` message API rather than a storage write (chat handler treats this id as a special case).
+3. **Weak plan adherence** (`plan.gap > 0.4` and a plan existed) — suggests **Adaptive Prompts**. The goal needs platform-aware rewriting before execution. `applyKeys=['adaptivePromptsMode', 'adaptiveExpansionMode']`.
+4. **Weak productivity** (`productivity.gap > 0.5` and rate <30%) — suggests **Refine the goal and retry**. No auto-apply — the operator has to rewrite the goal manually. Mention specific portal, exact data to extract, deliverable format.
+5. **Poor efficiency** (`efficiency.gap > 0.5` and ratio >2.5 API calls per productive step) — suggests **Try a leaner model**. No auto-apply (model swap needs API key context).
+6. **Multiple safety blocks** (`safety.blocks >= 2`) — suggests **Verify expected tenant**. Manual confirmation step before retry.
+
+Returns max 3 suggestions; the natural push order also encodes priority so the most-impactful suggestion leads.
+
+### Added — Suggestions in `agent_finished` broadcast (background/agent-engine.js)
+
+After the existing trust-score computation, the engine calls `suggestRetryActions()` and tucks the resulting array into the `agent_finished` payload alongside `trustScore` and `originalGoal`. One info-level `lifecycle` telemetry event fires when suggestions are emitted, with the count + ids in payload — answers the "did anyone actually use these?" question later.
+
+Single recompute path: the run-log block declares its own `_trustScore`, the agent_finished block declares `_finalTrustScore` independently. Pure-function cost is trivial; explicit dependency is worth it.
+
+### Added — Retry suggestion cards in chat (popup-modules/chat.js)
+
+Render one card per suggestion immediately after the trust-score card, when present. Each card has:
+
+- Severity-colored left border (red high / amber medium / blue low) and a matching colored label.
+- Reason text explaining *why* this suggestion was generated (e.g. "12 failures with a 5+ failure streak — approval mode would let you catch each one").
+- "Apply & retry" button when `applyKeys` is non-empty (or the special `reset-skills-and-retry` id). Click → writes the storage keys, optionally invokes the `reset_skill_stats` message, sets the original goal in the input box, and re-fires the run via `sendGoal()` or `start_agent` message fallback.
+- "Dismiss" button on every card.
+- Disabled state on the Apply button while the retry kicks off, with a "Applied" badge after.
+
+All rendering is inline in the `agent_finished` handler — same isolation pattern as the v3.30.0 score card, for the same reason (chat.js has had recurring large-edit truncation issues).
+
+### Telemetry
+
+One info-level `lifecycle` event per suggestion-bearing finish:
+```
+Retry suggestions: 2 (retry-approval-mode, enable-adaptive-prompts)
+  { count: 2, suggestions: [{id, severity, applyKeys}, ...], scoreBand: 'low' }
+```
+
+Pair with the v3.30.0 `Trust score: <n>/100` telemetry to trace: score → suggestions emitted → operator action (visible in panel as the next agent_started event, or its absence if the user dismissed).
+
+### Why this matters
+
+The trust score on its own is diagnostic — useful for tracking "is this thing getting better?" over time. The suggestions are *prescriptive* — useful in the moment.
+
+If approval mode would have caught the failure cluster, the operator now sees that recommendation without having to read the breakdown and remember the setting name. If skill priorities have drifted out of calibration, the agent tells you instead of you noticing after a half-dozen low-scored runs in a row.
+
+This is the closest the project has come to genuinely *learning* from a single bad run.
+
+### Files touched
+
+- `background/trust-score.js` — new `suggestRetryActions()` function (+130 lines).
+- `background/agent-engine.js` — `suggestRetryActions` import + suggestions in agent_finished payload + telemetry emit + originalGoal echo.
+- `popup-modules/chat.js` — inline retry-suggestion card render in the `agent_finished` handler.
+- `manifest.json` — 3.30.0 → 3.31.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- "Dismiss permanently" — clicking Dismiss only hides the card for this run; the suggestion will reappear next time the same condition triggers. Adding persistent dismissal needs a `dismissed_suggestions` storage list with TTL.
+- Auto-retry on threshold — deferred. We want operators to keep choosing for now (signal whether the suggestions are actually useful).
+- Suggestion analytics — "this suggestion fired 12 times, you applied 8 of them, 6 of those scored higher on retry" — deferred until we have enough fired suggestions to measure.
+
+---
+
 ## v3.30.0 — 2026-05-12 (Run Trust Score — one number for "how well did this run actually do")
 
 Every release since v3.13.0 has chipped away at "the agent did something useful, probably." v3.30.0 finally puts a number on it. Each completed run gets a 0-100 trust score that rolls up failure rate, productivity, recovery effectiveness, plan adherence, token efficiency, and safety incidents into a single readout you can quote: "that run scored 87/100, trustworthy."

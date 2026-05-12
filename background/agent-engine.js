@@ -17,7 +17,7 @@ import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.j
 // effects, no chrome.* deps. We aggregate the run's metrics here at the end
 // of the loop and stamp the result onto both the report card and the
 // run-log index entry.
-import { computeTrustScore } from './trust-score.js';
+import { computeTrustScore, suggestRetryActions } from './trust-score.js';
 import { getSkillStats } from './skills/index.js';
 
 // ========== Agent State ==========
@@ -3017,26 +3017,48 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_e) {}
 
+        // (3.31.0) Compute trust score for the agent_finished payload.
+        // We recompute here rather than reaching into the run-log block's
+        // scope (where _trustScore is declared) — keeps the dependency
+        // explicit and the cost is one cheap pure-function call.
+        const _finalTrustScore = (function () {
+          try {
+            return computeTrustScore({
+              totalSteps: stepCount,
+              failedSteps,
+              productiveSteps,
+              consecutiveFailureMax,
+              skillStats: getSkillStats(),
+              apiCallCount,
+              planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
+              planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
+              safetyBlocks
+            });
+          } catch (e) { return null; }
+        })();
+        const _retrySuggestions = (function () {
+          try { return suggestRetryActions(_finalTrustScore); } catch (e) { return []; }
+        })();
+        // Telemetry for the suggestions emitted — useful for "did anyone
+        // actually use these?" questions later. One info event with the
+        // count + ids, individual suggestions visible by expanding payload.
+        try {
+          if (_retrySuggestions.length > 0) {
+            tel.info('lifecycle', 'Retry suggestions: ' + _retrySuggestions.length + ' (' + _retrySuggestions.map(s => s.id).join(', ') + ')', {
+              count: _retrySuggestions.length,
+              suggestions: _retrySuggestions.map(s => ({ id: s.id, severity: s.severity, applyKeys: s.applyKeys })),
+              scoreBand: _finalTrustScore ? _finalTrustScore.band : null
+            });
+          }
+        } catch (e) {}
         chrome.runtime.sendMessage({
           action: 'agent_finished',
           summary: finalSummary,
-          // (3.30.0) Include the trust score so the report card / chat can
-          // render a band badge immediately, without an extra round-trip.
-          trustScore: (function () {
-            try {
-              return computeTrustScore({
-                totalSteps: stepCount,
-                failedSteps,
-                productiveSteps,
-                consecutiveFailureMax,
-                skillStats: getSkillStats(),
-                apiCallCount,
-                planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
-                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
-                safetyBlocks
-              });
-            } catch (e) { return null; }
-          })()
+          // (3.30.0) Trust score and (3.31.0) retry suggestions in one payload.
+          trustScore: _finalTrustScore,
+          retrySuggestions: _retrySuggestions,
+          // (3.31.0) Echo the goal so chat can re-fire it on one-click retry.
+          originalGoal: goal
         }).catch(() => {});
         sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
