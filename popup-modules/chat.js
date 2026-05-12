@@ -958,7 +958,14 @@ if (pauseBtn) {
 
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
-  if (confirm('Start a new chat? This will clear the current conversation.')) {
+  if (confirm('Start a new chat? This will clear the current conversation. (The current chat will be archived to Recent Chats.)')) {
+    // (3.24.0) Archive the current chat to Recent Chats BEFORE clearing so
+    // the user can restore it via the Recent Chats rail button.
+    try {
+      if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
+        window.__sentinelRecentChats.archive({ reason: 'new-chat' });
+      }
+    } catch (e) {}
     chrome.storage.local.set({ chat_history: [] }, () => {
       const state = getState();
       state.conversationHistory = [];
@@ -971,7 +978,7 @@ newChatBtn.addEventListener('click', () => {
       goalInput.value = '';
       goalInput.style.height = 'auto';
       resetUI();
-      showToast('Chat cleared', 'success');
+      showToast('Chat cleared (archived to Recent Chats)', 'success');
     });
   }
 });
@@ -2530,6 +2537,7 @@ function showTenantOverrideCard(payload) {
 }
 
 
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
@@ -2639,6 +2647,13 @@ chrome.runtime.onMessage.addListener((message) => {
     } else if (message.status === 'ready' && message.report) {
       removeReportGeneratingIndicator();
       addReportCard(message.report);
+      // (3.24.0) Archive once the report is rendered — captures the full
+      // post-run state into Recent Chats so the user can restore it later.
+      try {
+        if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
+          setTimeout(() => window.__sentinelRecentChats.archive({ reason: 'finished' }), 250);
+        }
+      } catch (e) {}
     } else if (message.status === 'error') {
       removeReportGeneratingIndicator();
       showToast('Report generation failed: ' + (message.error || 'Unknown error'), 'error');
