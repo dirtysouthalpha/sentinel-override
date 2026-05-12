@@ -169,3 +169,122 @@ function round(n, digits = 0) {
   const m = Math.pow(10, digits);
   return Math.round(n * m) / m;
 }
+
+// ==========================================================================
+// (3.31.0) Score-driven retry suggestions
+// ==========================================================================
+//
+// Turn a low trust score from "a number you read" into "an action you can
+// take." After every run, the engine inspects the breakdown and emits 0-3
+// suggested re-run configurations targeting the weakest component(s). The
+// chat renders these as one-click apply cards.
+//
+// Each suggestion has:
+//   - id           stable identifier (used to dedupe + persist user-rejected suggestions)
+//   - label        button text ("Re-run with approval mode")
+//   - reason       one-liner explaining WHY ("12 failures — approval mode would let you catch each one")
+//   - severity     'high' | 'medium' | 'low' — drives card border color
+//   - applyKeys    storage keys to set before re-running
+//   - applyValues  values to write for those keys
+//
+// applyKeys/applyValues are applied in order. The chat-side handler sets
+// each key in chrome.storage.local, then re-fires the most recent goal as
+// a new run. If applyKeys is empty, the suggestion is informational only —
+// the user has to act manually (e.g. "Verify expected tenant before retry").
+
+/**
+ * Generate retry suggestions based on a trust-score result. Returns an
+ * empty array when the score is high/good — no nudge needed for healthy runs.
+ *
+ * @param {{score, band, breakdown}} scoreResult
+ * @returns {Array<{id, label, reason, severity, applyKeys, applyValues}>}
+ */
+export function suggestRetryActions(scoreResult) {
+  if (!scoreResult || typeof scoreResult.score !== 'number') return [];
+  if (scoreResult.band === 'high' || scoreResult.band === 'good') return [];
+
+  const bd = scoreResult.breakdown || {};
+  const suggestions = [];
+  const severity = scoreResult.band === 'low' ? 'high' : 'medium';
+
+  const gap = (comp) => {
+    if (!comp || typeof comp.points !== 'number' || typeof comp.max !== 'number' || comp.max === 0) return 0;
+    return Math.max(0, (comp.max - comp.points) / comp.max);
+  };
+  const failureGap = gap(bd.failure);
+  const productivityGap = gap(bd.productivity);
+  const recoveryGap = gap(bd.recovery);
+  const planGap = gap(bd.plan);
+  const efficiencyGap = gap(bd.efficiency);
+  const safetyBlocks = (bd.safety && bd.safety.blocks) || 0;
+
+  if (failureGap > 0.4) {
+    const streak = bd.failure && bd.failure.streakPenalty ? bd.failure.streakPenalty : 0;
+    const streakNote = streak > 0 ? ' with a ' + Math.ceil(streak / 5 + 2) + '+ failure streak' : '';
+    suggestions.push({
+      id: 'retry-approval-mode',
+      label: 'Re-run with approval mode',
+      reason: 'High failure rate' + streakNote + ' - approval mode lets you catch each step before it commits.',
+      severity,
+      applyKeys: ['approvalMode'],
+      applyValues: [true]
+    });
+  }
+
+  if (recoveryGap > 0.5 && bd.recovery && bd.recovery.fires >= 3) {
+    suggestions.push({
+      id: 'reset-skills-and-retry',
+      label: 'Reset skill stats and retry',
+      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + bd.recovery.successes + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
+      severity,
+      applyKeys: [],
+      applyValues: []
+    });
+  }
+
+  if (planGap > 0.4 && bd.plan && bd.plan.planLength > 0) {
+    suggestions.push({
+      id: 'enable-adaptive-prompts',
+      label: 'Re-run with Adaptive Prompts',
+      reason: 'Only completed ' + bd.plan.planCompleted + '/' + bd.plan.planLength + ' planned steps. Adaptive Prompts will rewrite the goal for the detected platform before execution.',
+      severity,
+      applyKeys: ['adaptivePromptsMode', 'adaptiveExpansionMode'],
+      applyValues: ['auto', 'light']
+    });
+  }
+
+  if (productivityGap > 0.5 && bd.productivity && bd.productivity.rate < 0.3) {
+    suggestions.push({
+      id: 'refine-goal',
+      label: 'Refine the goal and retry',
+      reason: 'Only ' + Math.round(bd.productivity.rate * 100) + '% of steps produced output. Try a more concrete goal - name the specific portal, the exact data to extract, and the deliverable format.',
+      severity: 'medium',
+      applyKeys: [],
+      applyValues: []
+    });
+  }
+
+  if (efficiencyGap > 0.5 && bd.efficiency && bd.efficiency.ratio && bd.efficiency.ratio > 2.5) {
+    suggestions.push({
+      id: 'try-leaner-model',
+      label: 'Try a leaner model',
+      reason: 'Used ' + bd.efficiency.ratio + ' API calls per productive step. A smaller/faster model may give cleaner runs at lower cost.',
+      severity: 'low',
+      applyKeys: [],
+      applyValues: []
+    });
+  }
+
+  if (safetyBlocks >= 2) {
+    suggestions.push({
+      id: 'verify-tenant-before-retry',
+      label: 'Verify expected tenant',
+      reason: safetyBlocks + ' safety block' + (safetyBlocks > 1 ? 's' : '') + ' fired (cross-tenant or sensitive-field). Confirm the expected tenant in Settings before re-running so the agent stays scoped.',
+      severity: 'high',
+      applyKeys: [],
+      applyValues: []
+    });
+  }
+
+  return suggestions.slice(0, 3);
+}
