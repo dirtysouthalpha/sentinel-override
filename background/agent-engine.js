@@ -2112,7 +2112,6 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
       try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) {}
-      tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -2124,6 +2123,13 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (e) {}
       const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
+      // (3.36.1) Hotfix — telemetry emit moved AFTER `const dynamicMaxSteps`
+      // declaration. Previously this line was above the const and tripped a
+      // temporal-dead-zone ReferenceError every step on the first iteration,
+      // hanging every run. The "let dynamicMaxSteps" in the outer block-scope
+      // is in TDZ until the line that initializes it runs, so the previous
+      // ordering blew up before any LLM call could fire.
+      tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
       if (stepCount > dynamicMaxSteps) {
         sendSilentUpdate(`Reached step limit (${dynamicMaxSteps}, baseline ${CONFIG.maxSteps} + ${productiveSteps} productive bumps). Finishing.`, stepCount);
         const _hardLimitSummary = 'Reached step limit of ' + dynamicMaxSteps + '. Task may be incomplete — ' + productiveSteps + ' productive actions extended the run.';
