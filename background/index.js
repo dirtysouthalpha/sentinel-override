@@ -13,6 +13,11 @@ import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplat
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
 import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
 import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
+// (3.26.0) Bridge for content-script telemetry — content/index.js cannot
+// import telemetry.js directly (different context), so it posts a
+// `content_telemetry_event` message and we re-emit via tel.emit() so the
+// verbosity gate, console mirror, and panel broadcast all apply uniformly.
+import { tel } from './telemetry.js';
 import {
   listClients as ck_listClients,
   getClient as ck_getClient,
@@ -104,6 +109,33 @@ try {
 // ========== Unified Message Handler ==========
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
   switch (request.action) {
+    // (3.26.0) Content-script telemetry bridge. The content script can't
+    // import telemetry.js (different execution context, no module access in
+    // MAIN world), so it sends `content_telemetry_event` messages and we
+    // re-emit through the same tel.emit() that background-side code uses.
+    // This means: verbosity gating, console mirror, sequence numbering, and
+    // panel broadcast all behave identically for content-side events.
+    //
+    // Request shape:
+    //   { action: 'content_telemetry_event', category, level, message, payload }
+    //
+    // We auto-stamp `tabId` and `frameUrl` from the sender so the panel can
+    // attribute events to the originating tab without the content script
+    // having to look those up itself.
+    case 'content_telemetry_event': {
+      try {
+        const cat = String(request.category || 'content');
+        const lvl = ['error', 'warn', 'info', 'debug', 'trace'].includes(request.level) ? request.level : 'info';
+        const msg = String(request.message || '');
+        const payload = (request.payload && typeof request.payload === 'object') ? { ...request.payload } : {};
+        // Auto-stamp the sender info so panel rows show which tab fired.
+        if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
+        if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);
+        tel[lvl](cat, msg, payload);
+      } catch (e) { /* never throw on telemetry */ }
+      return { ok: true };
+    }
+
     case 'get_provider_catalog': {
       // (3.10.0) Return the catalog so the popup can populate the dropdown.
       try {
