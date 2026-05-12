@@ -216,6 +216,32 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return resumeAgent();
     }
 
+    // (3.14.1) Used by the sign-in wall banner's "Focus tab" button: switch
+    // the active Chrome tab+window to the URL whose auth wall caused the pause.
+    case 'focus_tab_by_url': {
+      try {
+        const target = String(request.url || '');
+        if (!target) return { ok: false, error: 'focus_tab_by_url: missing url' };
+        let targetHost;
+        try { targetHost = new URL(target).host; } catch (e) { targetHost = ''; }
+        const tabs = await chrome.tabs.query({});
+        // Prefer exact URL match, fall back to host match (Microsoft sign-in
+        // walks the user through multiple URLs on the same host).
+        let match = tabs.find(t => t && t.url === target);
+        if (!match && targetHost) {
+          match = tabs.find(t => {
+            try { return t && t.url && new URL(t.url).host === targetHost; } catch (e) { return false; }
+          });
+        }
+        if (!match) return { ok: false, error: 'no matching tab' };
+        try { await chrome.tabs.update(match.id, { active: true }); } catch (e) {}
+        try { await chrome.windows.update(match.windowId, { focused: true }); } catch (e) {}
+        return { ok: true, tabId: match.id };
+      } catch (e) {
+        return { ok: false, error: e && e.message ? e.message : 'unknown' };
+      }
+    }
+
     case 'set_agent_speed': {
       const { setAgentSpeed } = await import('./agent-engine.js');
       return setAgentSpeed(request.mode);

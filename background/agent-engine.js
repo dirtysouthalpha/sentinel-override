@@ -4,18 +4,22 @@
 
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate } from './message-protocol.js';
+import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
-import { isSPATransitionPending, clearSPATransition, notifyIfEnabled } from './shared-state.js';
+import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
+import { rewriteGoalForPlatform } from './adaptive-prompts.js';
+import { runRecoverySkills } from './skills/index.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
 let apiCallCount = 0;
 let lastApiCallTime = 0;
 let agentMemory = {};           // Extract-and-remember: carries data between pages
+let history = [];               // (3.15.1) Per-run action history. MUST be module-level so the trimHistory()/persistHistory() helpers at module scope can access it. Cleared in-place at start of each runAgentLoop via history.length = 0 (preserves the array reference for any captured closures).
+let _lastAiCallMs = null;       // (3.21.0) Duration of the most recent LLM call in ms; consumed by the slow-llm-call recovery skill.
 let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy shift
 let currentStrategies = [];     // Self-healing: remembers tried approaches
 let agentPlan = null;           // Planning phase: numbered list of steps
@@ -23,6 +27,7 @@ let currentPlanStep = 0;        // Planning phase: which step we're currently on
 let agentSpeed = 'normal';      // Speed mode: 'turbo' (0.2x), 'normal' (1x), 'stealth' (2x)
 let agentPaused = false;        // Pause/resume: agent loop waits when true
 let mfaAckUrl = null;           // (3.7.0) URL where the user last acknowledged MFA — prevents re-pausing on the same challenge
+let signInWallAckUrls = new Set(); // (3.14.1) URLs where the user has acknowledged a sign-in wall this run — prevents re-pausing after manual sign-in
 let detectedTenant = null;      // (3.7.0) {tid, onmicrosoft, chipText, hostname} most recently detected on a Microsoft admin URL
 let tenantOverrideUrls = new Set(); // (3.11.0) URLs where the tech has explicitly approved a cross-tenant action this run
 let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in storage
@@ -103,6 +108,80 @@ try {
   }
 } catch (e) { /* non-fatal */ }
 
+// ========== Run Log Index Helper (3.14.0) ==========
+// Maintains an ordered list of recent runIds so the popup can browse and
+// re-export past logs even if the user dismissed the post-run banner. Cap is
+// soft (~20) — older entries get their detail records evicted from storage
+// to prevent unbounded growth.
+const RUN_LOG_INDEX_MAX = 20;
+const RUN_LOG_INDEX_KEY = 'run_log_index';
+
+async function _updateRunLogIndex(runLogId, fields) {
+  if (!runLogId) return;
+  try {
+    const stored = await chrome.storage.local.get(RUN_LOG_INDEX_KEY);
+    const list = Array.isArray(stored[RUN_LOG_INDEX_KEY]) ? stored[RUN_LOG_INDEX_KEY].slice() : [];
+    const idx = list.findIndex(e => e && e.runLogId === runLogId);
+    if (idx >= 0) {
+      list[idx] = Object.assign({}, list[idx], fields, { runLogId });
+    } else {
+      list.unshift(Object.assign({ runLogId }, fields));
+    }
+    // Drop overflow and evict detail records for those runs.
+    const evict = list.splice(RUN_LOG_INDEX_MAX);
+    if (evict.length) {
+      const evictKeys = evict.map(e => 'run_log_' + e.runLogId).filter(Boolean);
+      try { await chrome.storage.local.remove(evictKeys); } catch (e) {}
+    }
+    await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
+  } catch (e) { /* non-fatal */ }
+}
+
+// ========== Activity Phase Tracking (3.16.0) ==========
+// Per-step micro-action emitter. Each loop iteration goes through a
+// predictable set of phases (observe → consult AI → dispatch → wait → result).
+// _activity helpers wrap sendAgentActivity with auto-timing so the popup
+// renders a Claude-in-Chrome-style checklist with spinner / checkmark /
+// failed states + per-item durations.
+//
+// State of in-flight items so we can compute duration on completion.
+const _activityStartedAt = new Map(); // key: `${stepNumber}:${key}` -> Date.now()
+
+function _activityKey(stepNumber, key) { return (stepNumber || 0) + ':' + (key || 'misc'); }
+
+/** Mark a sub-action as in-progress. Auto-records start time for duration calc. */
+function activityStart(stepNumber, key, label) {
+  try {
+    _activityStartedAt.set(_activityKey(stepNumber, key), Date.now());
+    sendAgentActivity(stepNumber, key, label, 'in_progress', null);
+  } catch (e) { /* never crash the loop on telemetry */ }
+}
+
+/** Mark a sub-action as done. Computes duration if start was recorded. */
+function activityDone(stepNumber, key, label, detail) {
+  try {
+    const startedAt = _activityStartedAt.get(_activityKey(stepNumber, key));
+    const durationMs = startedAt ? (Date.now() - startedAt) : null;
+    _activityStartedAt.delete(_activityKey(stepNumber, key));
+    sendAgentActivity(stepNumber, key, label, 'done', Object.assign({ durationMs }, detail || {}));
+  } catch (e) {}
+}
+
+/** Mark a sub-action as failed. Computes duration if start was recorded. */
+function activityFail(stepNumber, key, label, detail) {
+  try {
+    const startedAt = _activityStartedAt.get(_activityKey(stepNumber, key));
+    const durationMs = startedAt ? (Date.now() - startedAt) : null;
+    _activityStartedAt.delete(_activityKey(stepNumber, key));
+    sendAgentActivity(stepNumber, key, label, 'failed', Object.assign({ durationMs }, detail || {}));
+  } catch (e) {}
+}
+
+/** Update an in-progress item's label without changing state (e.g., elapsed counter). */
+function activityUpdate(stepNumber, key, label) {
+  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) {}
+}
+
 // ========== Configuration ==========
 const CONFIG = {
   minDelayBetweenCalls: 2000,
@@ -130,6 +209,31 @@ const CONFIG = {
   },
 };
 
+// ========== History Helpers ==========
+// Deduplicated from ~47 inline occurrences across the agent loop.
+function trimHistory() {
+  if (history.length > CONFIG.maxHistoryEntries) {
+    history.splice(0, history.length - CONFIG.maxHistoryEntries);
+  }
+}
+
+async function persistHistory() {
+  trimHistory();
+  await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+}
+
+function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
+  return {
+    goal,
+    history: history.slice(),
+    agentMemory: { ...agentMemory },
+    agentPlan: agentPlan ? agentPlan.slice() : null,
+    stepCount,
+    apiCallCount,
+    tabContexts: getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot }))
+  };
+}
+
 // ========== State Reset ==========
 export function resetAgentState() {
   apiCallCount = 0;
@@ -140,6 +244,10 @@ export function resetAgentState() {
   currentStrategies = [];
   agentPlan = null;
   currentPlanStep = 0;
+  mfaAckUrl = null;
+  signInWallAckUrls = new Set();
+  history.length = 0;   // (3.15.1) clear in-place so module-level helpers keep their reference
+  _lastAiCallMs = null; // (3.21.0) reset slow-llm-call skill input
   resetAllContexts();
 }
 
@@ -209,14 +317,306 @@ export async function startAgent(goal, sender) {
       tenant: null,
       url: tabInfo?.url || ''
     }];
+    // (3.14.0) Track this run in the index so the popup can list it later
+    // even if the user dismisses the post-run banner.
+    try {
+      await _updateRunLogIndex(runLogId, {
+        goal: (goal || '').slice(0, 200),
+        startedAt: Date.now(),
+        completed: false,
+        stepCount: 0,
+        startUrl: tabInfo?.url || ''
+      });
+    } catch (e) { /* non-fatal */ }
   } catch (e) { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
   // Subsequent open_tab handlers add their tabs to the same group.
   try { await attachTabToSentinelGroup(startTabId); } catch (e) { /* non-fatal */ }
 
-  runAgentLoop(goal, startTabId);
+  // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
+  // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
+  // is false (or vice versa), pause for explicit user decision before the
+  // run starts. Prevents the "user wrote APPROVAL in the prompt but the
+  // toggle was still AUTONOMOUS" disaster scenario on live config changes.
+  // Run BEFORE adaptive-prompts so a cancelled run doesn't burn an LLM call.
+  try {
+    const modeDirective = _detectGoalModeDirective(goal);
+    if (modeDirective.detected) {
+      const stored = await chrome.storage.local.get(['approvalMode']);
+      const actualWants = (stored.approvalMode === true) ? 'approval' : 'autonomous';
+      if (modeDirective.wants !== actualWants) {
+        // Log to forensic run log
+        try {
+          if (runLogId) {
+            runLogBuffer.push({
+              step: 0,
+              timestamp: new Date().toISOString(),
+              kind: 'mode_mismatch_detected',
+              goalWants: modeDirective.wants,
+              actualMode: actualWants,
+              evidence: modeDirective.evidence,
+              confidence: modeDirective.confidence
+            });
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+          }
+        } catch (e) { /* non-fatal */ }
+
+        const decision = await _waitForModeMismatchDecision({
+          goalWants: modeDirective.wants,
+          actualMode: actualWants,
+          evidence: modeDirective.evidence,
+          confidence: modeDirective.confidence
+        });
+
+        // Log the decision
+        try {
+          if (runLogId) {
+            runLogBuffer.push({
+              step: 0,
+              timestamp: new Date().toISOString(),
+              kind: 'mode_mismatch_decision',
+              decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
+            });
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+          }
+        } catch (e) {}
+
+        if (decision.cancel) {
+          agentRunning = false;
+          try { await detachAllSentinelTabs(); } catch (e) {}
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch(() => {});
+          return 'Agent cancelled by user (mode mismatch)';
+        }
+        // If decision.flip === true, the popup has already written the new
+        // approvalMode to storage. The action loop reads storage on every
+        // step (line ~2185), so it will pick up the new value automatically.
+        // No further action needed here.
+      }
+    }
+  } catch (e) { console.warn('[Sentinel] mode-directive check failed (non-fatal):', e && e.message); }
+
+  // (3.15.0) Adaptive Prompts: rewrite the goal for the detected platform
+  // BEFORE the agent loop starts. Settings:
+  //   adaptivePromptsMode: 'auto' (default) | 'approval' | 'off'
+  //   adaptiveExpansionMode: 'light' (default) | 'off' | 'full'
+  // 'auto' rewrites silently; 'approval' waits for the user to accept the
+  // diff via a popup card. Failures fall back to the original goal.
+  let finalGoal = goal;
+  try {
+    const apSettings = await chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode', 'technicianInfo']);
+    const apMode = (apSettings.adaptivePromptsMode || 'auto').toString();
+    if (apMode !== 'off') {
+      const result = await rewriteGoalForPlatform(
+        goal,
+        tabInfo?.url || '',
+        apSettings.technicianInfo || null,
+        apSettings.adaptiveExpansionMode || 'light'
+      );
+      if (result && result.adapted) {
+        // Log to forensic run log
+        try {
+          if (runLogId) {
+            runLogBuffer.push({
+              step: 0,
+              timestamp: new Date().toISOString(),
+              kind: 'adaptive_prompt_applied',
+              platform: result.platform ? result.platform.id : '',
+              mismatchCount: (result.mismatchHints || []).length,
+              durationMs: result.durationMs,
+              originalLength: (result.originalGoal || '').length,
+              adaptedLength: (result.adaptedGoal || '').length
+            });
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+          }
+        } catch (e) { /* non-fatal */ }
+
+        if (apMode === 'approval') {
+          // Pause until user clicks Accept / Use Original / Edit on the popup card
+          const decision = await _waitForAdaptedGoalDecision(result, startTabId);
+          if (decision.useOriginal) {
+            finalGoal = goal;
+          } else if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) {
+            finalGoal = decision.editedGoal;
+          } else if (decision.approved) {
+            finalGoal = result.adaptedGoal;
+          } else {
+            // Timeout or unknown — default to adapted (autonomous-like fallback)
+            finalGoal = result.adaptedGoal;
+          }
+        } else {
+          // Auto mode: swap silently but still broadcast the card so the
+          // popup can show what changed (collapsed by default).
+          try {
+            chrome.runtime.sendMessage({
+              action: 'adapted_goal_available',
+              mode: 'auto',
+              platform: result.platform,
+              summary: result.summary,
+              mismatchHints: result.mismatchHints,
+              originalGoal: result.originalGoal,
+              adaptedGoal: result.adaptedGoal
+            }).catch(() => {});
+          } catch (e) {}
+          finalGoal = result.adaptedGoal;
+        }
+      }
+    }
+  } catch (e) { console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', e && e.message); finalGoal = goal; }
+
+  runAgentLoop(finalGoal, startTabId);
   return 'Agent started in background';
+}
+
+// (3.15.0) Approval flow for Adaptive Prompts. Broadcasts the rewritten goal
+// to the popup, waits for the user's decision via adapted_goal_response, and
+// keeps the SW alive during the wait.
+async function _waitForAdaptedGoalDecision(rewriteResult, startTabId) {
+  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'ap-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const kaName = 'adaptive_prompt_' + requestId;
+  try { startSwKeepalive(kaName); } catch (e) {}
+  return new Promise((resolve) => {
+    const finish = (payload) => {
+      try { stopSwKeepalive(kaName); } catch (e) {}
+      resolve(payload);
+    };
+    chrome.runtime.sendMessage({
+      action: 'adapted_goal_available',
+      mode: 'approval',
+      requestId,
+      platform: rewriteResult.platform,
+      summary: rewriteResult.summary,
+      mismatchHints: rewriteResult.mismatchHints,
+      originalGoal: rewriteResult.originalGoal,
+      adaptedGoal: rewriteResult.adaptedGoal
+    }).catch(() => {});
+    const listener = (message) => {
+      if (message && message.action === 'adapted_goal_response' && message.requestId === requestId) {
+        chrome.runtime.onMessage.removeListener(listener);
+        clearTimeout(timeoutId);
+        finish({
+          approved: message.approved === true,
+          useOriginal: message.useOriginal === true,
+          edited: message.edited === true,
+          editedGoal: message.editedGoal
+        });
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    // Cap at 5 minutes — if the user walks away, proceed with adapted goal
+    // rather than blocking the run forever.
+    const timeoutId = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(listener);
+      finish({ approved: true, useOriginal: false, edited: false, reason: 'approval_timeout_default_adapted' });
+    }, 5 * 60 * 1000);
+  });
+}
+
+// (3.15.2) Goal mode-directive detection. MSP technicians often write "Mode:
+// APPROVAL" or "agent pauses for technician approval before each click" in the
+// goal text to express intent. But the actual approval gating is driven by
+// chrome.storage.local.approvalMode (a Settings toggle) — the goal text is
+// just prose. A mismatch is dangerous on live production changes: the user
+// writes "APPROVAL" expecting the agent to pause, but the toggle is still
+// AUTONOMOUS so the agent clicks Apply unprompted. This helper catches that
+// before the run starts.
+function _detectGoalModeDirective(goal) {
+  if (!goal || typeof goal !== 'string') return { detected: false };
+  const text = goal.substring(0, 6000);
+
+  // Tier 1: Explicit "Mode: APPROVAL" / "Mode: AUTONOMOUS" / "Mode: YOLO"
+  const tier1 = text.match(/\bMode\s*[:=\-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i);
+  if (tier1) {
+    const w = tier1[1].toUpperCase();
+    return {
+      detected: true,
+      wants: (w === 'APPROVAL') ? 'approval' : 'autonomous',
+      evidence: tier1[0],
+      confidence: 'high'
+    };
+  }
+
+  // Tier 2: "<word> mode" phrasing
+  const tier2 = text.match(/\b(approval|autonomous|yolo)\s+mode\b/i);
+  if (tier2) {
+    const w = tier2[1].toUpperCase();
+    return {
+      detected: true,
+      wants: (w === 'APPROVAL') ? 'approval' : 'autonomous',
+      evidence: tier2[0],
+      confidence: 'high'
+    };
+  }
+
+  // Tier 3: phrases that imply approval-required behavior
+  if (/\b(?:agent|sentinel)\s+(?:pauses?|must\s+pause|should\s+pause|will\s+pause)\s+(?:for|before|on|to\s+wait|until)/i.test(text) ||
+      /\b(?:PAUSE|pause)\s+(?:and\s+)?wait\s+for\s+(?:technician|user|operator|human|brandon)\s+approval/i.test(text) ||
+      /\bwait\s+for\s+(?:technician|user|operator|brandon)\s+approval\s+(?:before|prior\s+to)\s+(?:each|every|any)/i.test(text)) {
+    return {
+      detected: true,
+      wants: 'approval',
+      evidence: 'phrase implying agent must pause for human approval',
+      confidence: 'medium'
+    };
+  }
+
+  // Tier 4: phrases implying autonomous behavior (less common but possible)
+  if (/\b(?:no\s+approvals?\s+required|execute\s+all\s+steps?\s+(?:autonomously|without\s+pausing)|do\s+not\s+pause)\b/i.test(text)) {
+    return {
+      detected: true,
+      wants: 'autonomous',
+      evidence: 'phrase implying agent should run autonomously',
+      confidence: 'medium'
+    };
+  }
+
+  return { detected: false };
+}
+
+// (3.15.2) Pause flow for when the goal's mode directive disagrees with the
+// actual approval-mode setting. Modeled after _waitForAdaptedGoalDecision.
+// Resolves to one of: { flip: true } (user flipped setting, proceed),
+// { continue: true } (proceed as-is), { cancel: true } (stop run).
+async function _waitForModeMismatchDecision(info) {
+  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'mm-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const kaName = 'mode_mismatch_' + requestId;
+  try { startSwKeepalive(kaName); } catch (e) {}
+  return new Promise((resolve) => {
+    const finish = (payload) => {
+      try { stopSwKeepalive(kaName); } catch (e) {}
+      resolve(payload);
+    };
+    chrome.runtime.sendMessage({
+      action: 'mode_mismatch_pause',
+      requestId,
+      goalWants: info.goalWants,
+      actualMode: info.actualMode,
+      evidence: info.evidence,
+      confidence: info.confidence
+    }).catch(() => {});
+    const listener = (message) => {
+      if (message && message.action === 'mode_mismatch_response' && message.requestId === requestId) {
+        chrome.runtime.onMessage.removeListener(listener);
+        clearTimeout(timeoutId);
+        finish({
+          flip: message.flip === true,
+          continue: message.continue === true,
+          cancel: message.cancel === true
+        });
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+    // 5-minute cap. Default action on timeout: CANCEL the run. Mode mismatch
+    // is a safety issue; "user walked away" should NOT silently proceed.
+    const timeoutId = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(listener);
+      finish({ flip: false, continue: false, cancel: true, reason: 'mode_mismatch_timeout' });
+    }, 5 * 60 * 1000);
+  });
 }
 
 export async function stopAgent() {
@@ -625,6 +1025,267 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
   return block;
 }
 
+// ========== Ticket Mode Formatters (3.14.0) ==========
+// Additional MSP output templates per the user's preference doc. Each takes
+// (summary, goal, tech, options) and returns a markdown-formatted block. The
+// dispatcher `formatTicketOutput(format, ...)` routes to the right one based on
+// chrome.storage.local.ticketMode/ticketFormat settings.
+//
+// Formats: TICKET_KICKOFF, FINAL_NOTES (existing), WAITING_ON_CLIENT,
+// WAITING_ON_VENDOR, IT_GLUE_KB, CLIENT_EMAIL.
+
+function _ticketHeader(ticketNum, label) {
+  return ticketNum ? `**Ticket #${ticketNum}** — ${label}` : label;
+}
+
+function _ticketStamp() {
+  return new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+}
+
+function _splitTriedSection(summary) {
+  // Pull "what's been tried" candidates from the summary — anything that reads
+  // like a remediation step. Falls back to a single line if nothing matches.
+  if (!summary) return ['Pending technician input.'];
+  const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
+  const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
+  return matches.length ? matches : [(lines[0] || '').slice(0, 200)];
+}
+
+function formatTicketKickoff(summary, goal, tech, options) {
+  const opts = options || {};
+  const ticketNum = extractTicketNumber(goal);
+  const tried = _splitTriedSection(summary).map(s => '- ' + s).join('\n');
+  // Resolution path: derive from the summary's last 1-3 sentences (treat them
+  // as recommended next steps). If empty, leave numbered placeholders so the
+  // tech can fill in.
+  const sentences = (summary || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+  const tail = sentences.slice(-3);
+  const pathLines = tail.length
+    ? tail.map((s, i) => `${i + 1}. ${s.replace(/\s+/g, ' ').slice(0, 240)}`)
+    : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
+
+  const lines = [
+    '## ' + _ticketHeader(ticketNum, 'Ticket Kickoff'),
+    '',
+    '**MAIN ISSUE:**',
+    '- ' + ((goal || '').split(/\n/)[0] || '').slice(0, 280),
+    '',
+    '**WHAT HAS BEEN TRIED:**',
+    tried,
+    '',
+    '**FASTEST SAFE RESOLUTION PATH:**',
+    pathLines.join('\n'),
+    '',
+    '---',
+    '',
+    '### Investigation findings',
+    '',
+    summary || '(no summary)',
+    '',
+    '---',
+    '',
+    '_' + tech.name + ' · ' + tech.title + ' · ' + tech.company + '_',
+    '_Phone: ' + tech.phone + ' · Email: ' + tech.email + '_'
+  ];
+  return lines.join('\n');
+}
+
+function formatWaitingOnClient(summary, goal, tech, options) {
+  const opts = options || {};
+  const ticketNum = extractTicketNumber(goal);
+  const stamp = _ticketStamp();
+  const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
+  const followUp = new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+
+  const lines = [
+    '## ' + _ticketHeader(ticketNum, 'Waiting on Client'),
+    '',
+    '**Action Taken:**',
+    '- ' + firstSentence,
+    '',
+    '**Contact Attempt Details:**',
+    '- Automated investigation completed at ' + stamp + '. Awaiting client confirmation or additional details.',
+    '',
+    '**Next Step and Time:**',
+    '- Follow up by ' + followUp + ' (or sooner if client responds).',
+    '',
+    '**Ownership Statement:**',
+    '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will re-engage once client responds.',
+    '',
+    '---',
+    '',
+    '### Investigation findings',
+    '',
+    summary || '(no summary)',
+    '',
+    '---',
+    '',
+    '_' + tech.name + ' · Phone: ' + tech.phone + ' · Email: ' + tech.email + '_'
+  ];
+  return lines.join('\n');
+}
+
+function formatWaitingOnVendor(summary, goal, tech, options) {
+  const opts = options || {};
+  const ticketNum = extractTicketNumber(goal);
+  const stamp = _ticketStamp();
+  const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
+  const followUp = new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+
+  const lines = [
+    '## ' + _ticketHeader(ticketNum, 'Waiting on Vendor'),
+    '',
+    '**Action Taken:**',
+    '- ' + firstSentence,
+    '',
+    '**Contact Attempt Details:**',
+    '- Vendor case opened at ' + stamp + '. Awaiting vendor response / ETA.',
+    '',
+    '**Next Step and Time:**',
+    '- Follow up by ' + followUp + ' (or on vendor response).',
+    '',
+    '**Ownership Statement:**',
+    '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will follow up with vendor and update ticket.',
+    '',
+    '---',
+    '',
+    '### Investigation findings',
+    '',
+    summary || '(no summary)',
+    '',
+    '---',
+    '',
+    '_' + tech.name + ' · Phone: ' + tech.phone + ' · Email: ' + tech.email + '_'
+  ];
+  return lines.join('\n');
+}
+
+function formatItGlueKb(summary, goal, tech, options) {
+  const opts = options || {};
+  const goalShort = ((goal || '').split(/\n/)[0] || '').slice(0, 100);
+  const ticketNum = extractTicketNumber(goal);
+  const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
+
+  // Derive resolution steps from the summary's numbered/bulleted lines or
+  // sentence breakdown.
+  const lines = (summary || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const stepCandidates = lines.filter(l => /^(\d+[\.\)]|\-|\*)\s+/.test(l)).slice(0, 8);
+  const steps = stepCandidates.length
+    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[\.\)]|\-|\*)\s+/, '')}`)
+    : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
+
+  const envBits = [];
+  if (/m365|microsoft|entra|exchange|defender|purview/i.test(goal || '')) envBits.push('Microsoft 365 / Entra ID');
+  if (/sonicwall|fortigate|firewall/i.test(goal || '')) envBits.push('Firewall (vendor-specific)');
+  if (/sentinelone|crowdstrike|defender for endpoint/i.test(goal || '')) envBits.push('EDR platform');
+  if (/connectwise|ninjaone|kaseya|datto/i.test(goal || '')) envBits.push('RMM/PSA platform');
+  if (envBits.length === 0) envBits.push('General — see investigation findings for specifics');
+
+  const out = [
+    '## IT Glue Knowledge Base Entry',
+    '',
+    '**Title:**',
+    '- ' + (title || 'Untitled'),
+    '',
+    '**Issue:**',
+    '- ' + ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240),
+    '',
+    '**Environment:**',
+    '- ' + envBits.join('; '),
+    '',
+    '**Resolution Steps:**',
+    steps.length ? steps.join('\n') : '1. (steps not auto-derivable — fill in manually)',
+    '',
+    '**Verification:**',
+    '- Confirm the configured state is present and the original symptom no longer reproduces.',
+    '',
+    '**Screenshots:**',
+    '- (attach the agent\'s screenshots from the investigation report)',
+    '',
+    '---',
+    '',
+    '### Source — Investigation findings',
+    '',
+    summary || '(no summary)',
+    '',
+    '---',
+    '',
+    '_Documented by ' + tech.name + ' · ' + tech.company + '_'
+  ];
+  return out.join('\n');
+}
+
+function formatClientEmail(summary, goal, tech, options) {
+  const opts = options || {};
+  const ticketNum = extractTicketNumber(goal);
+  const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
+  const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
+  const briefIssue = ((goal || '').split(/\n/)[0] || '').replace(/^(ticket|incident)\s*#?\d*[:\-\s]+/i, '').slice(0, 80) || 'your reported issue';
+  const oneLine = ((summary || '').split(/(?<=[.!?])\s+/)[0] || 'The issue has been investigated and addressed.').slice(0, 240);
+
+  const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
+
+  const body = [
+    'Hello [Client Name],',
+    '',
+    `The issue reported in ${ticketRef} has been resolved. ${oneLine}`,
+    '',
+    `Everything is now working as expected. If you need further assistance, contact us at ${tech.phone} or ${tech.email}.`,
+    '',
+    'Best regards,',
+    tech.name,
+    tech.title,
+    tech.company,
+    `Phone: ${tech.phone} | Email: ${tech.email}`
+  ];
+
+  const block = [
+    '## Client Email',
+    '',
+    '**Subject:** ' + subject,
+    '',
+    '**Body:**',
+    '',
+    body.join('\n'),
+    '',
+    '---',
+    '',
+    '_Replace `[Client Name]` before sending. Investigation findings (for your reference, not in email body):_',
+    '',
+    summary || '(no summary)'
+  ];
+  return block.join('\n');
+}
+
+// Dispatcher — returns formatted text for the requested format. Format values
+// match the user's preference doc: 'TICKET_KICKOFF', 'FINAL_NOTES',
+// 'WAITING_ON_CLIENT', 'WAITING_ON_VENDOR', 'IT_GLUE_KB', 'CLIENT_EMAIL', or
+// 'auto'. 'auto' picks based on goal/summary heuristics.
+function _autoPickFormat(summary, goal) {
+  const text = (goal + ' ' + summary).toLowerCase();
+  if (/waiting on (the )?vendor|vendor (case|ticket)|vendor support/.test(text)) return 'WAITING_ON_VENDOR';
+  if (/waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/.test(text)) return 'WAITING_ON_CLIENT';
+  if (/(create|document|write).*(kb|knowledge base|it glue)/.test(text)) return 'IT_GLUE_KB';
+  if (/draft (an?|the) email|send (an?|the) email|email the client/.test(text)) return 'CLIENT_EMAIL';
+  if (/kickoff|new ticket|just opened|investigate this ticket/.test(text)) return 'TICKET_KICKOFF';
+  return 'FINAL_NOTES';  // default
+}
+
+function formatTicketOutput(format, summary, goal, tech, options) {
+  const fmt = (format || 'auto').toString().toUpperCase();
+  const resolved = (fmt === 'AUTO') ? _autoPickFormat(summary, goal) : fmt;
+  switch (resolved) {
+    case 'TICKET_KICKOFF':     return formatTicketKickoff(summary, goal, tech, options);
+    case 'WAITING_ON_CLIENT':  return formatWaitingOnClient(summary, goal, tech, options);
+    case 'WAITING_ON_VENDOR':  return formatWaitingOnVendor(summary, goal, tech, options);
+    case 'IT_GLUE_KB':         return formatItGlueKb(summary, goal, tech, options);
+    case 'CLIENT_EMAIL':       return formatClientEmail(summary, goal, tech, options);
+    case 'FINAL_NOTES':
+    default:                   return formatTicketFinalNotes(summary, goal, tech, options);
+  }
+}
+
 // ========== Tenant Lockdown (3.11.0) ==========
 // Hard-blocks modifying actions on Microsoft admin URLs when the detected
 // tenant does not match the user's expectedTenant setting. Forces a separate
@@ -668,7 +1329,16 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
   const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
     : 'tenant-override-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  // (3.14.0) Pin SW alive — tenant override has a 90s timeout, well past the
+  // MV3 idle limit. Without this, the listener gets GC'd before the user even
+  // sees the prompt.
+  const kaName = 'tenant_override_' + requestId;
+  try { startSwKeepalive(kaName); } catch (e) {}
   return new Promise((resolve) => {
+    const finish = (payload) => {
+      try { stopSwKeepalive(kaName); } catch (e) {}
+      resolve(payload);
+    };
     chrome.runtime.sendMessage({
       action: 'request_tenant_override',
       payload: {
@@ -686,7 +1356,7 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
       if (message && message.action === 'tenant_override_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
-        resolve({
+        finish({
           approved: message.approved === true,
           rejected: message.rejected === true
         });
@@ -696,7 +1366,7 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
     // Fail-closed: 90s timeout = reject (never silently approve cross-tenant work)
     const timeoutId = setTimeout(() => {
       chrome.runtime.onMessage.removeListener(listener);
-      resolve({ approved: false, rejected: true, reason: 'tenant_override_timeout' });
+      finish({ approved: false, rejected: true, reason: 'tenant_override_timeout' });
     }, 90000);
   });
 }
@@ -907,6 +1577,69 @@ function _legacyDetectMfaInText(text) {
     const m = sample.match(re);
     if (m) return m[0];
   }
+  return null;
+}
+
+// ========== Sign-In Wall Detection (3.14.1) ==========
+// Detects authentication walls (username/password forms) BEFORE the LLM tries
+// to drive past them. Different from MFA detection: MFA fires AFTER credentials
+// have been entered. Sign-in wall fires when we hit the login page at all and
+// have no way to enter the user's password (the runtime password-field block in
+// content/index.js already prevents auto-fill).
+//
+// Trigger requires BOTH signals to be true:
+//   1. URL matches a known auth host
+//   2. Page has at least one visible password input in the observation
+// This guards against false positives on post-auth redirect pages that
+// briefly pass through login.microsoftonline.com without showing a form.
+
+const SIGN_IN_WALL_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|accounts\.google\.com|accounts\.youtube\.com|login\.okta\.com|[^.]+\.okta\.com|[^.]+\.oktapreview\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|github\.com\/login|gitlab\.com\/users\/sign_in|bitbucket\.org\/account\/signin|login\.salesforce\.com|[^.]+\.my\.salesforce\.com|signin\.intuit\.com|login\.duosecurity\.com|connect\.secureauth\.com|adfs\..+|sts\..+)/i;
+
+const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|email)|use\s+your\s+microsoft\s+account|stay\s+signed\s+in)\b/i;
+
+// Returns { matched: true, host, evidence } when a sign-in wall is detected,
+// or null. Evidence describes WHY we matched (URL + password-field selector
+// or text cue) so the banner can show useful context.
+function detectSignInWall(allElements, currentUrl, pageText) {
+  if (!currentUrl) return null;
+  let host;
+  try { host = new URL(currentUrl).host; } catch (e) { return null; }
+  if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
+
+  // Signal 1: a password input is present in the observed elements
+  let pwField = null;
+  if (Array.isArray(allElements)) {
+    pwField = allElements.find(e => {
+      if (!e) return false;
+      if (e.type === 'password') return true;
+      const sel = String(e.selector || '').toLowerCase();
+      if (sel.includes('password') || sel.includes('passwd') || sel.includes('passwordinput')) return true;
+      return false;
+    });
+  }
+  if (pwField) {
+    return { matched: true, host, evidence: 'password input on ' + host, selector: pwField.selector || '' };
+  }
+
+  // Signal 2 (fallback): page text contains sign-in cues AND we're on a known auth host
+  // This catches the brief username-only first step before the password field renders
+  // (Microsoft's two-step sign-in: email page → password page).
+  if (pageText && SIGN_IN_WALL_TEXT_RE.test(pageText)) {
+    // Require a username/email input to be present so we don't trip on
+    // post-auth redirect screens that say "Stay signed in?" without a form.
+    if (Array.isArray(allElements)) {
+      const emailField = allElements.find(e => {
+        if (!e) return false;
+        if (e.type === 'email') return true;
+        const sel = String(e.selector || '').toLowerCase();
+        return /(email|username|loginfmt|user_?id|user_?name|signin)/i.test(sel);
+      });
+      if (emailField) {
+        return { matched: true, host, evidence: 'email/username input on ' + host, selector: emailField.selector || '' };
+      }
+    }
+  }
+
   return null;
 }
 
@@ -1261,7 +1994,10 @@ async function runAgentLoop(goal, workingTabId) {
   console.log('Agent starting loop for goal:', goal);
   _lastGoal = goal || '';
   let finished = false;
-  let history = [];
+  // (3.15.1) `history` is module-level — see declaration near agentMemory.
+  // Clear in-place so the array reference stays valid for any captured
+  // closures (the module-level trimHistory/persistHistory helpers).
+  history.length = 0;
   let stepCount = 0;
   let reportData = null;  // Snapshot for async report generation
   agentPlan = null;
@@ -1338,6 +2074,9 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       stepCount++;
+      // (3.16.0) Signal new step to the popup so it can create a fresh
+      // activity stream container BEFORE observation/AI consultation begin.
+      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) {}
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -1351,7 +2090,11 @@ async function runAgentLoop(goal, workingTabId) {
       const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
       if (stepCount > dynamicMaxSteps) {
         sendSilentUpdate(`Reached step limit (${dynamicMaxSteps}, baseline ${CONFIG.maxSteps} + ${productiveSteps} productive bumps). Finishing.`, stepCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Reached step limit of ${dynamicMaxSteps}. Task may be incomplete — ${productiveSteps} productive actions extended the run.` }).catch(() => {});
+        const _hardLimitSummary = 'Reached step limit of ' + dynamicMaxSteps + '. Task may be incomplete — ' + productiveSteps + ' productive actions extended the run.';
+        finished = true;
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: _hardLimitSummary }).catch(() => {});
+        sendReportUpdate('generating');
         break;
       }
 
@@ -1375,7 +2118,10 @@ async function runAgentLoop(goal, workingTabId) {
       let tab = getActiveTabId();
       if (!tab) {
         sendSilentUpdate('No active tab -- stopping', stepCount);
+        finished = true;
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
         chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'No active tab. Task interrupted.' }).catch(() => {});
+        sendReportUpdate('generating');
         break;
       }
 
@@ -1389,7 +2135,10 @@ async function runAgentLoop(goal, workingTabId) {
         if (lostTab) { tabInfo = lostTab; }
         else {
           sendSilentUpdate('Agent tab was closed. Task stopped.', stepCount);
+          finished = true;
+          reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
           chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'Agent tab closed. Task interrupted.' }).catch(() => {});
+          sendReportUpdate('generating');
           break;
         }
       }
@@ -1427,7 +2176,7 @@ async function runAgentLoop(goal, workingTabId) {
               const reinjected = await injectContentScript(tab);
               if (reinjected) {
                 history.push({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
-                await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+                await persistHistory();
               }
               continue;
             }
@@ -1481,10 +2230,16 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Get page data
       let observation, pageContent;
+      // (3.16.0) Observation phase activity item
+      activityStart(stepCount, 'observe', 'Observing page');
       try {
         observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
         pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
+        const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
+        const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
+        activityDone(stepCount, 'observe', 'Observed ' + elemCount + ' elements, ' + textLen + ' chars of text', null);
       } catch (err) {
+        activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
         sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
         await sleep(2000);
         continue;
@@ -1558,6 +2313,57 @@ async function runAgentLoop(goal, workingTabId) {
           ...e,
           text: e.text && e.text.length > 80 ? e.text.substring(0, 77) + '...' : e.text
         }));
+
+      // (3.14.1) Sign-in wall detection. Fires when we hit a login page on a
+      // known auth host with a password (or username) input — BEFORE the LLM
+      // gets a chance to bang on it uselessly. The runtime password-field
+      // block in content/index.js already prevents auto-fill, so without this
+      // pause the agent would just loop on the sign-in page until the step
+      // budget runs out. Tracked per-URL so we don't re-pause after the user
+      // manually signs in.
+      try {
+        const _wallHit = detectSignInWall(allElements, currentUrl, pageText);
+        if (_wallHit && !signInWallAckUrls.has(currentUrl)) {
+          agentPaused = true;
+          sendSilentUpdate('⏸ Sign-in wall detected (' + _wallHit.host + ') — sign in manually, then click Resume', stepCount);
+          notifyIfEnabled('sign_in_wall_' + Date.now(), {
+            type: 'basic',
+            iconUrl: chrome.runtime.getURL('icon-48.png'),
+            title: 'Sentinel Override — Sign in required',
+            message: 'Sign in to ' + _wallHit.host + ' in the browser, then click Resume.'
+          });
+          try {
+            chrome.runtime.sendMessage({
+              action: 'sign_in_wall_pause',
+              url: currentUrl,
+              host: _wallHit.host,
+              evidence: _wallHit.evidence,
+              stepNumber: stepCount
+            }).catch(() => {});
+          } catch (e) {}
+          // Log to forensic run log so HR/compliance reviews see when the agent
+          // paused for credentials.
+          try {
+            if (runLogId) {
+              runLogBuffer.push({
+                step: stepCount,
+                timestamp: new Date().toISOString(),
+                kind: 'sign_in_wall_pause',
+                url: currentUrl,
+                host: _wallHit.host,
+                evidence: _wallHit.evidence
+              });
+              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+            }
+          } catch (e) {}
+          // Wait until user resumes (Resume button → resumeAgent message)
+          while (agentPaused && agentRunning) await sleep(500);
+          if (!agentRunning) break;
+          signInWallAckUrls.add(currentUrl);
+          sendSilentUpdate('▶ Resumed after sign-in', stepCount);
+          continue; // re-observe — the page should be past the wall now
+        }
+      } catch (_e) { /* never crash the loop on detection issues */ }
 
       // (3.7.0) MFA challenge detection. If the freshly observed page text
       // matches a known MFA cue and we haven't already acknowledged this URL,
@@ -1688,15 +2494,92 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('Step limit reached -- finishing', stepCount);
         sendActionResult(stepCount, { type: 'finish', summary }, false);
         history.push({ step: stepCount, action: { type: 'finish', summary }, result: summary });
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
         chrome.runtime.sendMessage({ action: 'agent_finished', summary }).catch(() => {});
+        sendReportUpdate('generating');
         break;
+      }
+
+      // (3.21.0) Recovery skill library — consult before the LLM call.
+      // Skills can either AUTO-APPLY a deterministic recovery command
+      // (skipping the LLM round-trip entirely) or inject a directive into
+      // the next prompt. Built on the failure-pattern signals already
+      // accumulated in history + consecutiveFailures + _lastAiCallMs.
+      let _skillAutoCommand = null;
+      try {
+        const _lastHistEntry = history.length > 0 ? history[history.length - 1] : null;
+        const _lastResult = _lastHistEntry && typeof _lastHistEntry.result === 'string' ? _lastHistEntry.result : '';
+        const _lastFailed = _lastResult.startsWith('BLOCKED:') ||
+                            _lastResult.startsWith('Element not found') ||
+                            _lastResult.startsWith('Error') ||
+                            _lastResult.startsWith('JS Error') ||
+                            /returned (?:an empty|null|a non-serializable)/i.test(_lastResult) ||
+                            /memory hygiene/i.test(_lastResult);
+        const _skillCtx = {
+          lastCommand: _lastHistEntry ? _lastHistEntry.action : null,
+          lastResult: _lastResult,
+          lastActionFailed: _lastFailed,
+          history: history.slice(-5),
+          consecutiveFailures,
+          agentMemory,
+          stepCount,
+          dynamicMaxSteps,
+          currentUrl,
+          allElements,
+          pageText,
+          lastAiCallMs: _lastAiCallMs,
+          consecutiveNavigates,
+          productiveSteps
+        };
+        const _recovery = runRecoverySkills(_skillCtx);
+        if (_recovery.appliedSkillIds.length > 0) {
+          sendSilentUpdate('Recovery skills consulted: ' + _recovery.appliedSkillIds.join(', '), stepCount);
+          // Forensic log
+          try {
+            if (runLogId) {
+              runLogBuffer.push({
+                step: stepCount,
+                timestamp: new Date().toISOString(),
+                kind: 'recovery_skills_consulted',
+                skill_ids: _recovery.appliedSkillIds,
+                auto_applied: !!_recovery.autoApply,
+                auto_apply_type: _recovery.autoApply ? _recovery.autoApply.type : null
+              });
+              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+            }
+          } catch (e) {}
+          // Activity stream surface — single item showing which skills fired
+          try {
+            const _label = _recovery.autoApply
+              ? 'Skill auto-applied: ' + _recovery.appliedSkillIds[0]
+              : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
+            activityDone(stepCount, 'recovery-skills', _label, null);
+          } catch (e) {}
+        }
+        if (_recovery.autoApply) {
+          // Deterministic recovery — skip the LLM consult for this step.
+          // Tag the command so the dispatch activity label shows the
+          // recovery context.
+          _skillAutoCommand = _recovery.autoApply;
+        } else if (_recovery.promptInjection) {
+          // Append to loopDirective so the LLM sees the directive on the
+          // next consult call.
+          loopDirective += _recovery.promptInjection;
+        }
+      } catch (e) {
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (ee) {}
       }
 
       // Progress indicator
       let apiWaitSeconds = 0;
+      // (3.16.0) Begin the consult-ai activity item with a spinner. The
+      // periodic timer updates the label with elapsed seconds so the user
+      // sees the spinner DOING something even on long calls.
+      activityStart(stepCount, 'consult-ai', 'Consulting AI · call #' + (apiCallCount + 1));
       const progressTimer = setInterval(() => {
         apiWaitSeconds += 5;
         sendSilentUpdate(`Consulting AI... (${apiWaitSeconds}s)`, stepCount);
+        activityUpdate(stepCount, 'consult-ai', 'Consulting AI · ' + apiWaitSeconds + 's elapsed');
       }, 5000);
 
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
@@ -1715,31 +2598,68 @@ async function runAgentLoop(goal, workingTabId) {
       // most recent observation needs the image (passed separately as base64Image arg).
       const promptHistory = history.slice(-CONFIG.historyWindow).map(h => {
         if (!h || typeof h !== 'object') return h;
-        if ('base64Image' in h || 'screenshot' in h || (h.action && (h.action.base64Image || h.action.screenshot))) {
-          const cleaned = { ...h };
-          delete cleaned.base64Image;
-          delete cleaned.screenshot;
-          if (cleaned.action && typeof cleaned.action === 'object') {
-            const a = { ...cleaned.action };
-            delete a.base64Image;
-            delete a.screenshot;
-            cleaned.action = a;
-          }
-          return cleaned;
+        const cleaned = { ...h };
+        // Strip screenshots (large) from past entries — only the most recent
+        // observation needs the image (passed separately as base64Image).
+        delete cleaned.base64Image;
+        delete cleaned.screenshot;
+        if (cleaned.action && typeof cleaned.action === 'object') {
+          const a = { ...cleaned.action };
+          delete a.base64Image;
+          delete a.screenshot;
+          // (3.20.0) Cap action.text and action.code in past history to
+          // prevent the prompt from carrying 5KB of typed text or JS source
+          // forever. The current step's command is passed fresh; past
+          // versions only need a hint of what happened.
+          if (typeof a.text === 'string' && a.text.length > 200) a.text = a.text.slice(0, 200) + '…';
+          if (typeof a.code === 'string' && a.code.length > 300) a.code = a.code.slice(0, 300) + '…';
+          cleaned.action = a;
         }
-        return h;
+        // (3.20.0) Cap result field — 800 chars is plenty for the LLM to
+        // remember "what came back". Article bodies, log dumps, and other
+        // large outputs would otherwise bloat every subsequent step's
+        // prompt by thousands of tokens.
+        if (typeof cleaned.result === 'string' && cleaned.result.length > 800) {
+          cleaned.result = cleaned.result.slice(0, 800) + '… [truncated; ' + (cleaned.result.length - 800) + ' more chars in memory]';
+        }
+        return cleaned;
       });
-      try {
-        command = await callLLMWithRetry(
-          trimmedElements, allElements.length, pageText, base64Image,
-          goal, promptHistory, stepCount, currentUrl,
-          0, // retryCount
-          CONFIG,
-          agentState
-        );
-      } finally {
+      let _aiCallError = null;
+      // (3.21.0) If a recovery skill auto-applied, use that command and
+      // skip the LLM consult entirely. Saves ~5-30s per recovery + an LLM
+      // call's worth of cost.
+      if (_skillAutoCommand) {
         clearInterval(progressTimer);
-        base64Image = null; // release screenshot memory after LLM call
+        base64Image = null;
+        command = _skillAutoCommand;
+        activityDone(stepCount, 'consult-ai', 'Skipped (skill auto-applied)', null);
+        _lastAiCallMs = 0;
+      } else {
+        const _aiStart = Date.now();
+        try {
+          command = await callLLMWithRetry(
+            trimmedElements, allElements.length, pageText, base64Image,
+            goal, promptHistory, stepCount, currentUrl,
+            0, // retryCount
+            CONFIG,
+            agentState
+          );
+        } catch (_e) {
+          _aiCallError = _e;
+          throw _e;
+        } finally {
+          _lastAiCallMs = Date.now() - _aiStart;
+          clearInterval(progressTimer);
+          base64Image = null; // release screenshot memory after LLM call
+          // (3.16.0) Mark the consult-ai activity as done or failed.
+          if (_aiCallError) {
+            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (_aiCallError.message || 'unknown'), null);
+          } else if (command && command.type) {
+            activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
+          } else {
+            activityDone(stepCount, 'consult-ai', 'AI consultation complete', null);
+          }
+        }
       }
 
       // Sync apiCallCount — callLLM mutates agentState.apiCallCount by reference, but the
@@ -1790,8 +2710,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate('Invalid selector -- re-asking AI', stepCount);
           consecutiveFailures++;
           history.push({ step: stepCount, action: command, result: `Invalid selector "${command.selector}" -- not in element list.` });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
           await sleep(1000);
           continue;
         }
@@ -1815,7 +2734,7 @@ async function runAgentLoop(goal, workingTabId) {
             h.result.startsWith('BLOCKED: pre-finish completeness'));
           if (_completenessGap && !_alreadyBlocked && stepCount < (dynamicMaxSteps - 5)) {
             history.push({ step: stepCount, action: command, result: 'BLOCKED: pre-finish completeness -- ' + _completenessGap });
-            if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
+            trimHistory();
             sendSilentUpdate('Finish blocked — completeness check requesting one more extraction pass', stepCount);
             await sleep(800);
             continue;
@@ -1829,8 +2748,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Block finish if no real data was extracted and we haven't tried enough
         if (!hasData && stepCount < 8) {
           history.push({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
           await sleep(1000);
           continue;
@@ -1843,8 +2761,7 @@ async function runAgentLoop(goal, workingTabId) {
         });
         if (!hasRealData && !hasData && stepCount < 15) {
           history.push({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
           await sleep(1000);
           continue;
@@ -1863,8 +2780,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (!hasRecentCommitClick(history)) {
               const blockMsg = 'BLOCKED: configuration change detected but no Save/Apply/Commit click in recent history. Find and click the Apply/Save/Commit/Deploy button before finishing.';
               history.push({ step: stepCount, action: command, result: blockMsg });
-              if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-              await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+              await persistHistory();
               sendSilentUpdate('Finish blocked — change not yet committed', stepCount);
               await sleep(1000);
               continue;
@@ -1872,8 +2788,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (!hasPostCommitVerification(history)) {
               const blockMsg = 'BLOCKED: change committed but not verified. Re-read the page or extract from the relevant table to confirm the change is active before finishing.';
               history.push({ step: stepCount, action: command, result: blockMsg });
-              if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-              await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+              await persistHistory();
               sendSilentUpdate('Finish blocked — change not verified', stepCount);
               await sleep(1000);
               continue;
@@ -1904,8 +2819,7 @@ async function runAgentLoop(goal, workingTabId) {
               '  4. Log Analytics KQL for >60-day windows that the UI doesn\'t support.\n' +
               'Re-attempt the investigation using one of these paths before calling finish again.';
             history.push({ step: stepCount, action: command, result: blockMsg });
-            if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-            await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+            await persistHistory();
             sendSilentUpdate('Finish blocked — try Graph API or alternate URL before giving up', stepCount);
             await sleep(1000);
             continue;
@@ -1964,8 +2878,7 @@ async function runAgentLoop(goal, workingTabId) {
               const blockMsg = 'BLOCKED: hallucination risk detected — ' + _risk.reason +
                 ' Either: (a) trim the summary to ONLY items you actually read/extracted, or (b) clearly tag unread items with "headline only — not read in this run". Then call finish again.';
               history.push({ step: stepCount, action: command, result: blockMsg });
-              if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-              await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+              await persistHistory();
               sendSilentUpdate('Finish blocked — claim density exceeds evidence', stepCount);
               await sleep(1000);
               continue;
@@ -1973,13 +2886,21 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_e) { /* never crash the loop on hallucination check */ }
 
-        // (3.8.0) Auto-format ticket investigations into the user's FINAL_NOTES
-        // template with technician details auto-filled. Applied AFTER the
-        // memory-summary suffix so all data points flow through the report.
+        // (3.14.0) Ticket-mode output formatting. Dispatches to one of six
+        // MSP-aware templates based on settings:
+        //   - chrome.storage.local.ticketMode === true  → always format
+        //   - chrome.storage.local.ticketFormat         → 'auto' or specific format
+        // When ticketMode is off, we still auto-apply FINAL_NOTES on
+        // ticket-style goals (legacy 3.8.0 behavior) for backward compatibility.
         try {
-          if (isTicketInvestigationGoal(goal)) {
+          const _tmSettings = await chrome.storage.local.get(['ticketMode', 'ticketFormat']);
+          const _tmEnabled = _tmSettings.ticketMode === true;
+          const _tmFormat = (_tmSettings.ticketFormat || 'auto').toString();
+          const _autoApplyLegacy = !_tmEnabled && isTicketInvestigationGoal(goal);
+          if (_tmEnabled || _autoApplyLegacy) {
             const tech = await getTechnicianInfo();
-            finalSummary = formatTicketFinalNotes(finalSummary, goal, tech, {
+            const fmt = _tmEnabled ? _tmFormat : 'FINAL_NOTES';
+            finalSummary = formatTicketOutput(fmt, finalSummary, goal, tech, {
               stepCount, apiCallCount
             });
           }
@@ -1998,6 +2919,15 @@ async function runAgentLoop(goal, workingTabId) {
             await chrome.storage.local.set({
               ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now(), completed: true }
             });
+            // (3.14.0) Stamp the index entry as completed with final step count.
+            try {
+              await _updateRunLogIndex(runLogId, {
+                completed: true,
+                finishedAt: Date.now(),
+                stepCount,
+                apiCallCount
+              });
+            } catch (e) { /* non-fatal */ }
             try {
               chrome.runtime.sendMessage({ action: 'run_log_available', runLogId, entryCount: runLogBuffer.length }).catch(() => {});
             } catch (e) {}
@@ -2014,10 +2944,16 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'note') {
         const noteText = command.text || command.summary || 'No note text';
         sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
+        // (3.20.0) Surface the actual note content in the per-step activity
+        // stream so the user can SEE what was captured, not just "Recording
+        // a note". Truncated for display; full text remains in history.
+        try {
+          const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
+          activityDone(stepCount, 'note-content', 'Noted: "' + _preview + '"', null);
+        } catch (e) {}
         history.push({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
-        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        await persistHistory();
         await sleep(500);
         continue;
       }
@@ -2041,8 +2977,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (entries.length > 0) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Console: ' + entries.length + ' entries', false);
           history.push({ step: stepCount, action: command, result });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
         } catch (e) {
           sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
         }
@@ -2061,8 +2996,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (entries.length > 0) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Network: ' + entries.length + ' requests', false);
           history.push({ step: stepCount, action: command, result });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
         } catch (e) {
           sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
         }
@@ -2081,8 +3015,7 @@ async function runAgentLoop(goal, workingTabId) {
         const result = waitResult || 'Wait completed';
         sendActionResult(stepCount, result, false);
         history.push({ step: stepCount, action: command, result });
-        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        await persistHistory();
         await sleep(500);
         continue;
       }
@@ -2147,8 +3080,7 @@ async function runAgentLoop(goal, workingTabId) {
               } catch (e) {}
             }
             history.push({ step: stepCount, action: command, result: 'BLOCKED: cross-tenant action rejected by tenant lockdown (expected ' + _block.expected + ', detected ' + _block.detected + ')' });
-            if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-            await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+            await persistHistory();
             sendSilentUpdate('🛑 Cross-tenant override denied — action skipped', stepCount);
             await sleep(1000);
             continue;
@@ -2163,20 +3095,21 @@ async function runAgentLoop(goal, workingTabId) {
         const approval = await requestApproval(command, stepCount);
         if (approval.rejected) {
           history.push({ step: stepCount, action: command, result: 'Rejected by user' });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
           await sleep(1000); continue;
         }
         if (approval.skipped) {
           history.push({ step: stepCount, action: command, result: 'Skipped by user' });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
           await sleep(1000); continue;
         }
       }
 
       // Show action card
       sendActionMessage(command, stepCount, observation);
+      // (3.16.0) Begin the dispatch activity item — gives the user a "Now
+      // doing: <X>" indicator that finalizes when the action completes.
+      activityStart(stepCount, 'dispatch', describeAction(command));
 
       // Invalidate screenshot cache for actions that can change the page.
       // (#10) scroll_to changes viewport position which affects bbox/elementFromPoint
@@ -2195,6 +3128,45 @@ async function runAgentLoop(goal, workingTabId) {
       const urlBeforeCommand = tabInfo.url;
       let result;
       let actionFailed = false;
+
+      // (3.20.1) Fail-fast for targetable actions with NO target. The LLM
+      // sometimes emits {type: 'click'} with no selector / ref / coords —
+      // the content script then can't find anything to click, dispatches a
+      // no-op, and the result is "Click: undefined" with no useful feedback.
+      // Catch it here and return a clear error to the LLM so it picks a
+      // different strategy next step.
+      const _targetableActions = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
+      if (_targetableActions.has(command.type)) {
+        const _hasSelector = typeof command.selector === 'string' && command.selector.length > 0;
+        const _hasRef      = typeof command.ref === 'string' && command.ref.length > 0;
+        const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
+        if (!_hasSelector && !_hasRef && !_hasCoords) {
+          const _msg = 'BLOCKED: ' + command.type + ' command has no target — supply at least one of selector, ref, or x/y coords. The observation panel above lists usable selectors/refs.';
+          activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
+          sendActionResult(stepCount, _msg, true);
+          history.push({ step: stepCount, action: command, result: _msg });
+          await persistHistory();
+          await sleep(800);
+          continue;
+        }
+      }
+
+      // (3.20.1) Navigate-loop guard. If the LLM emits 2 consecutive navigate
+      // commands to the same URL, force a strategy shift. Earlier guards
+      // exist for read_page; navigate had none, so we'd see Step 2 → /policy,
+      // Step 5 → /policy and waste steps.
+      if (command.type === 'navigate' && typeof command.url === 'string') {
+        const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
+        if (_recent.length >= 1) {
+          const _msg = 'BLOCKED: already navigated to ' + command.url + ' in the last step. Do NOT navigate to the same URL twice. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.';
+          activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
+          sendActionResult(stepCount, _msg, true);
+          history.push({ step: stepCount, action: command, result: _msg });
+          await persistHistory();
+          await sleep(800);
+          continue;
+        }
+      }
 
       // Handle open_tab
       if (command.type === 'open_tab') {
@@ -2215,8 +3187,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
         sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
-        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        await persistHistory();
         continue;
       }
 
@@ -2237,8 +3208,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
         sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
-        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        await persistHistory();
         continue;
       }
 
@@ -2258,8 +3228,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
         sendActionResult(stepCount, result, actionFailed);
         history.push({ step: stepCount, action: command, result });
-        if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-        await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+        await persistHistory();
         continue;
       }
 
@@ -2340,6 +3309,10 @@ async function runAgentLoop(goal, workingTabId) {
             result = `Extracted ${parsed.key} = ${preview}`;
             extractSucceeded = true;
             productiveSteps++;  // (3.8.0)
+            // (3.20.0) Show extraction outcome in the activity stream
+            try {
+              activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
+            } catch (e) {}
           }
         } catch (e) {
           // extract result wasn't JSON -- treat as failure
@@ -2426,6 +3399,14 @@ async function runAgentLoop(goal, workingTabId) {
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
+              // (3.20.0) Surface JS-extraction outcome in activity stream
+              try {
+                const _itemCount = Array.isArray(savedValue) ? savedValue.length : null;
+                const _summary = _itemCount !== null
+                  ? _itemCount + ' items captured'
+                  : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
+                activityDone(stepCount, 'js-extract-content', 'Saved "' + savedKey + '" → ' + _summary, null);
+              } catch (e) {}
             }
           }
         }
@@ -2601,8 +3582,7 @@ async function runAgentLoop(goal, workingTabId) {
             action: { type: 'note', text: `STALL RECOVERY: Re-assessing page state. Previous approach: ${stall.reason}` },
             result: 'Stall detected -- forcing page re-scan and strategy change'
           });
-          if (history.length > CONFIG.maxHistoryEntries) history.splice(0, history.length - CONFIG.maxHistoryEntries);
-          await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+          await persistHistory();
 
           // Skip the normal sleep to recover faster
           continue;
@@ -2616,6 +3596,15 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       sendActionResult(stepCount, result, actionFailed);
+      // (3.16.0) Finalize the dispatch activity item with the outcome.
+      try {
+        const _resPreview = typeof result === 'string' ? result.substring(0, 160) : '';
+        if (actionFailed) {
+          activityFail(stepCount, 'dispatch', describeAction(command) + ' — failed', { result: _resPreview });
+        } else {
+          activityDone(stepCount, 'dispatch', describeAction(command), { result: _resPreview });
+        }
+      } catch (e) {}
       history.push({ step: stepCount, action: command, result });
 
       // (3.12.0) Vision-based action verification flag. After every modifying
@@ -2699,7 +3688,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (history.length > CONFIG.maxHistoryEntries) {
         history.splice(0, history.length - CONFIG.maxHistoryEntries);
       }
-      await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+      await persistHistory();
       // Service-worker resilience checkpoint (#16, lite). Resume is TODO.
       await writeCheckpoint(stepCount);
       // Human-like pacing between steps — variable delays so it feels like an operator working
@@ -2729,16 +3718,10 @@ async function runAgentLoop(goal, workingTabId) {
 
   if (finished) await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
 
-  // Release any CDP debugger attachments held during the run.
-  try { await detachAllDebuggees(); } catch (e) { /* non-fatal */ }
-
-  // Batch-close all agent-created tabs
-  await closeAllAgentTabs();
-
-  // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs(); } catch (e) { /* non-fatal */ }
-
-  // Generate report (await so we can include it in the completion message)
+  // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
+  // In MV3, closing all agent tabs can create a window where the service worker
+  // has no pending events and gets terminated before the report fetch completes.
+  // reportData is already a snapshot, so cleanup order doesn't affect its content.
   let agentReport = null;
   if (reportData) {
     try {
@@ -2751,7 +3734,19 @@ async function runAgentLoop(goal, workingTabId) {
       sendReportUpdate('error', null, err.message);
       await chrome.storage.local.set({ last_agent_report_error: err.message });
     }
+  } else {
+    console.warn('Agent finished without reportData — skipping report generation');
+    sendReportUpdate('error', null, 'Agent finished without collecting execution data');
   }
+
+  // Release any CDP debugger attachments held during the run.
+  try { await detachAllDebuggees(); } catch (e) { /* non-fatal */ }
+
+  // Batch-close all agent-created tabs
+  await closeAllAgentTabs();
+
+  // (3.7.2) Dissolve the visual tab group at natural loop end too.
+  try { await detachAllSentinelTabs(); } catch (e) { /* non-fatal */ }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
@@ -2794,18 +3789,44 @@ async function enforceRateLimit() {
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // ========== Approval Mode ==========
+// (3.20.1) Defensive target-formatter — never shows "undefined". Falls back
+// to ref, then to (x,y) coordinates, then to a "(no target)" placeholder so
+// the activity stream label is always meaningful.
+function _describeTarget(cmd) {
+  if (!cmd) return '(no target)';
+  if (cmd.selector) return cmd.selector;
+  if (cmd.ref) return 'ref:' + cmd.ref;
+  if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return '(' + cmd.x + ',' + cmd.y + ')';
+  if (cmd.label) return '"' + cmd.label + '"';
+  return '(no target)';
+}
 function describeAction(command) {
   switch (command.type) {
-    case 'click': return `Click: ${command.selector}`;
-    case 'type': return `Type into ${command.selector}: '${command.text || ''}'`;
-    case 'navigate': return `Navigate to ${command.url}`;
-    case 'scroll': return `Scroll ${(command.amount||0)>=0?'down':'up'}`;
-    case 'select': return `Select "${command.value}" in ${command.selector}`;
-    case 'hover': return `Hover: ${command.selector}`;
-    case 'press_key': return `Press: ${command.key}`;
-    case 'execute_js': return `Run JS: ${command.code || ''}`;
-    case 'extract': return `Extract "${command.key}" from ${command.selector}`;
-    default: return `${command.type}: ${JSON.stringify(command)}`;
+    case 'click':       return `Click: ${_describeTarget(command)}`;
+    case 'click_at':    return `Click at: ${_describeTarget(command)}`;
+    case 'type':        return `Type into ${_describeTarget(command)}: '${(command.text || '').toString().slice(0, 80)}'`;
+    case 'navigate':    return `Navigate to ${command.url || '(no url)'}`;
+    case 'scroll':      return `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
+    case 'scroll_to':   return `Scroll to ${_describeTarget(command)}`;
+    case 'select':      return `Select "${command.value || ''}" in ${_describeTarget(command)}`;
+    case 'hover':       return `Hover: ${_describeTarget(command)}`;
+    case 'check':       return `Check: ${_describeTarget(command)}`;
+    case 'check_all':   return `Check all matching ${_describeTarget(command)}`;
+    case 'press_key':   return `Press: ${command.key || '(no key)'}`;
+    case 'execute_js':  return `Run JS: ${(command.code || '').toString().slice(0, 60)}${command.key ? ' → ' + command.key : ''}`;
+    case 'extract':     return `Extract "${command.key || ''}" from ${_describeTarget(command)}`;
+    case 'extract_list':return `Extract list "${command.key || ''}" from ${_describeTarget(command)}`;
+    case 'open_tab':    return `Open tab: ${command.label || command.url || '(no url)'}`;
+    case 'switch_tab':  return `Switch to: ${command.label || command.tab_id || ''}`;
+    case 'close_tab':   return `Close tab: ${command.label || command.tab_id || ''}`;
+    case 'note':        return `Note: ${(command.text || command.summary || '').toString().slice(0, 80)}`;
+    case 'finish':      return `Finish: ${(command.summary || '').toString().slice(0, 80)}`;
+    case 'wait_for_text':       return `Wait for text: "${(command.text || '').toString().slice(0, 60)}"`;
+    case 'wait_for_element':    return `Wait for element: ${_describeTarget(command)}`;
+    case 'wait_for_navigation': return 'Wait for navigation';
+    case 'read_page':   return 'Read page';
+    case 'dismiss_overlay': return 'Dismiss overlay';
+    default: return `${command.type}: ${JSON.stringify(command).slice(0, 100)}`;
   }
 }
 
@@ -2815,7 +3836,16 @@ async function requestApproval(command, stepNumber) {
   const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
     : `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  // (3.14.0) Pin the service worker alive while we wait for the user. Without
+  // this, an AFK user past the ~30s MV3 idle timer kills the SW and the
+  // listener gets GC'd — silent timeout, no recovery.
+  const kaName = 'approval_' + requestId;
+  try { startSwKeepalive(kaName); } catch (e) {}
   return new Promise((resolve) => {
+    const finish = (payload) => {
+      try { stopSwKeepalive(kaName); } catch (e) {}
+      resolve(payload);
+    };
     chrome.runtime.sendMessage({
       action: 'request_approval',
       payload: { action: command.type, description, stepNumber, requestId },
@@ -2825,7 +3855,7 @@ async function requestApproval(command, stepNumber) {
       if (message && message.action === 'approval_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
-        resolve({
+        finish({
           approved: message.approved === true,
           skipped: message.skipped === true,
           rejected: message.rejected === true
@@ -2837,7 +3867,7 @@ async function requestApproval(command, stepNumber) {
     // Auto-approving an AFK user is the opposite of safe.
     const timeoutId = setTimeout(() => {
       chrome.runtime.onMessage.removeListener(listener);
-      resolve({ approved: false, skipped: false, rejected: true, reason: 'approval_timeout' });
+      finish({ approved: false, skipped: false, rejected: true, reason: 'approval_timeout' });
     }, 60000);
   });
 }

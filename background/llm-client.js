@@ -5,6 +5,7 @@
 import { sendSilentUpdate } from './message-protocol.js';
 import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
 import { resolveProvider, getActiveProvider, getModelSupportsVision, detectProviderFromEndpoint } from './provider-registry.js';
+import { getPlatformProfile } from './platforms/index.js';
 
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
 // Detects when a goal mentions 2+ M365/security admin centers (Entra,
@@ -104,6 +105,71 @@ end-to-end. You have the budget and the tools — execute the sweep.
 `;
 }
 
+// (3.20.0) Multi-article research pattern detection. The naive pattern
+// (open_tab → note → close_tab × N) burns 3 steps per article — 30 steps
+// for 10 articles, overflowing a typical step budget. This directive
+// teaches a tighter pattern: batch-open in groups, then loop with
+// read_page + note WITHOUT close, then close at the end.
+const MULTI_ARTICLE_PATTERN = /\b(top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b|\b(give|provide|write|do)\s+(?:me\s+)?(?:a\s+)?(?:full\s+)?(?:breakdown|summary|recap|briefing|overview)\s+(?:on|for|of)\s+each\b/i;
+
+export function getMultiArticleDirective(goal) {
+  if (!goal || typeof goal !== 'string') return '';
+  if (!MULTI_ARTICLE_PATTERN.test(goal)) return '';
+  // Try to extract N if present
+  const m = goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i);
+  const n = m ? parseInt(m[1], 10) : 0;
+  const nLabel = (n > 0) ? n : 'N';
+
+  return `
+## 📰 MULTI-ARTICLE RESEARCH — USE BATCH PATTERN (3.20.0)
+
+This goal asks for a deep breakdown of ${nLabel} articles. The NAIVE pattern
+of open_tab → note → close_tab per article burns 3 steps × ${nLabel} = ${n > 0 ? (3 * n) : '3N'} steps and
+will overflow your budget. Use this BATCH pattern instead:
+
+### Phase A — One step: extract the article list
+- Navigate to the source page, then run ONE \`execute_js\` with a \`key\` to
+  scrape all ${nLabel} headlines + URLs in one shot. Save as e.g. \`top_links\`.
+- Filter dedup early (don't re-extract the same headline twice).
+
+### Phase B — Batch open tabs (3-5 at a time)
+- Use \`open_tab\` with a label like \`article-1\`, \`article-2\`, ... for the
+  first 3-5 URLs. Do NOT close tabs between articles in this phase.
+- After each open_tab, the agent automatically switches to the new tab.
+
+### Phase C — Loop: read + note, WITHOUT close_tab
+- For each open tab: \`read_page\` then \`note\` with a 2-3 sentence summary
+  (NOT a single-step open+close cycle). 2 steps per article, not 3.
+- The \`note\` action persists the summary to history with portal-prefix
+  memory keys recommended (\`article_1_summary\`, \`article_2_summary\`...).
+
+### Phase D — Batch-close at the end
+- After all ${nLabel} articles have been read + noted, you may close tabs in
+  one pass if needed for memory pressure. But the finish handler closes all
+  agent-created tabs automatically — usually you don't need explicit
+  close_tab actions at all.
+
+### Step-budget math
+- Phase A: 2 steps (navigate + execute_js).
+- Phase B-C: ~2 steps per article = 2*${nLabel} = ${n > 0 ? (2 * n) : '2N'} steps.
+- Total: ~2 + 2*${nLabel} = ${n > 0 ? (2 + 2 * n) : '2 + 2N'} steps. Well within a 20-step budget for N≤9.
+
+### Honest scope-setting
+- If the goal genuinely asks for 10 deep article summaries AND the step
+  budget is tight, prioritize: deliver thorough breakdowns of the top 3-5
+  articles + headline-only listing for the rest. Mark the rest clearly as
+  "[headline only — not read in this run]" so the user knows the limit.
+- Never invent article content you didn't actually read.
+
+### Cross-origin caveat
+- If the goal source page (e.g., drudgereport.com, Hacker News) is just a
+  headline aggregator and articles are on other domains, \`execute_js\`
+  with \`fetch()\` running on the aggregator's page will be blocked by CORS
+  for cross-origin article URLs. Stick with the batch open_tab pattern in
+  that case — that's the right call.
+`;
+}
+
 // ========== Platform Context Detection ==========
 // Detects which UI the agent is currently operating in based on the page URL
 // and goal text, then injects platform-specific behavioral guidance.
@@ -111,7 +177,10 @@ end-to-end. You have the budget and the tools — execute the sweep.
 // hardcoded here -- those come from the user's goal/Context Memory. This
 // function only provides UI interaction patterns for each platform type.
 
-export function getPlatformContext(currentUrl, goal) {
+// (3.18.0) Renamed to internal; the new wrapper below appends structured
+// selector hints from the platforms/ profile system. Existing prose logic
+// untouched — selectors complement, not replace.
+function _getPlatformProseInternal(currentUrl, goal) {
   const url  = (currentUrl || '').toLowerCase();
   const text = (goal || '').toLowerCase();
 
@@ -555,6 +624,86 @@ UI-SPECIFIC RULES:
   return ''; // No platform-specific context needed
 }
 
+// (3.18.0) Format the structured profile's knownSelectors + waitStrings +
+// pageTypes as a prose block for the agent's runtime system prompt. The LLM
+// gets "try these selectors first" hints which reduce trial-and-error
+// observe-and-flail loops on complex SPAs like SonicWall NSM 7.x.
+function _formatProfileSelectorsBlock(profile, currentUrl) {
+  if (!profile) return '';
+  const sel = profile.knownSelectors;
+  const wait = profile.waitStrings;
+  const pageTypes = profile.pageTypes;
+  if (!sel && !wait && !pageTypes) return '';
+
+  const parts = [];
+  parts.push('');
+  parts.push('━━━ PLATFORM SELECTOR PROFILE (' + (profile.label || profile.id) + ') ━━━');
+  parts.push('These are KNOWN selectors for this platform. Try them FIRST before falling back to runtime element scanning. Each entry is a defensive comma-separated alternatives list — the content script will resolve whichever matches.');
+  parts.push('');
+
+  // Page-type classification — tell the LLM what surface it's on so it can
+  // pick relevant selectors.
+  if (Array.isArray(pageTypes) && pageTypes.length && currentUrl) {
+    let detected = null;
+    for (const pt of pageTypes) {
+      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) {}
+    }
+    if (detected) {
+      parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));
+      parts.push('');
+    }
+  }
+
+  if (sel && typeof sel === 'object') {
+    parts.push('KNOWN SELECTORS (use as preferred targets):');
+    for (const [k, v] of Object.entries(sel)) {
+      if (typeof v === 'string') {
+        parts.push('  ' + k + ': ' + v);
+      } else if (Array.isArray(v)) {
+        parts.push('  ' + k + ': [' + v.map(s => '"' + s + '"').join(', ') + ']');
+      } else if (typeof v === 'function') {
+        // Function-valued selectors are parameterized — describe the slot
+        // rather than dump source.
+        parts.push('  ' + k + ': (parameterized — pass label or text to resolve)');
+      }
+    }
+    parts.push('');
+  }
+
+  if (wait && typeof wait === 'object') {
+    parts.push('WAIT-TEXT SIGNALS (use with wait_for_text):');
+    for (const [k, v] of Object.entries(wait)) {
+      if (Array.isArray(v) && v.length) {
+        parts.push('  ' + k + ': any of [' + v.map(s => '"' + s + '"').join(', ') + ']');
+      }
+    }
+    parts.push('');
+  }
+
+  if (profile.knownGotchas) {
+    parts.push('KNOWN GOTCHAS: ' + profile.knownGotchas);
+    parts.push('');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * (3.18.0) Public platform-context API. Returns the existing hardcoded prose
+ * (for backwards compat with all current callers) PLUS a structured selector
+ * block sourced from background/platforms/<id>.js when a profile matches.
+ * Same single-string return shape — no changes needed at the call sites.
+ */
+export function getPlatformContext(currentUrl, goal) {
+  const prose = _getPlatformProseInternal(currentUrl, goal);
+  let selectorBlock = '';
+  try {
+    const profile = getPlatformProfile(currentUrl, goal);
+    selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
+  } catch (e) { /* never crash prompt-building on profile lookup */ }
+  return prose + selectorBlock;
+}
+
 // ========== Vision Support ==========
 // Three-tier resolution:
 //   1. Provider/model registry in provider-registry.js (deterministic).
@@ -638,7 +787,7 @@ DECOMPOSITION RULES — follow these exactly:
 10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change
 11. Maximum 15 steps — be thorough but not redundant
 
-${urlContext}${platformContext}${patternContext}${(function(){const d = getMultiPortalDirective(goal); return d || '';})()}
+${urlContext}${platformContext}${patternContext}${(function(){const d = getMultiPortalDirective(goal); return d || '';})()}${(function(){const d = getMultiArticleDirective(goal); return d || '';})()}
 Goal: ${goal}
 
 Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
@@ -1247,7 +1396,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}
+${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}
 Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? 'Budget: ' + agentState.budgetHint + '\n' : ''}Goal: ${goal}

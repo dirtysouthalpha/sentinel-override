@@ -154,6 +154,125 @@ if (soundEnabledToggle) {
   });
 }
 
+// ========== Adaptive Prompts (3.15.0) ==========
+// Pre-execution platform-aware goal rewrite. Two settings:
+//   adaptivePromptsMode: 'auto' | 'approval' | 'off' (default 'auto')
+//   adaptiveExpansionMode: 'off' | 'light' | 'full' (default 'light')
+const adaptivePromptsModeSelect = document.getElementById('adaptivePromptsModeSelect');
+const adaptiveExpansionModeSelect = document.getElementById('adaptiveExpansionModeSelect');
+
+if (adaptivePromptsModeSelect) {
+  chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode'], (result) => {
+    adaptivePromptsModeSelect.value = result.adaptivePromptsMode || 'auto';
+    if (adaptiveExpansionModeSelect) {
+      adaptiveExpansionModeSelect.value = result.adaptiveExpansionMode || 'light';
+    }
+  });
+  adaptivePromptsModeSelect.addEventListener('change', () => {
+    const v = adaptivePromptsModeSelect.value;
+    chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
+      try {
+        const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
+        showToast('Adaptive Prompts: ' + label, 'info');
+      } catch (e) {}
+    });
+  });
+}
+
+if (adaptiveExpansionModeSelect) {
+  adaptiveExpansionModeSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value });
+  });
+}
+
+// ========== Ticket Mode (3.14.0) ==========
+// Toggle wraps every finish summary into one of six MSP templates
+// (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
+// IT_GLUE_KB / CLIENT_EMAIL). When off, only ticket-shaped goals get
+// auto-formatted into FINAL_NOTES (legacy 3.8.0 behavior).
+// Technician details are persisted to chrome.storage.local.technicianInfo
+// and consumed by background/agent-engine.js's getTechnicianInfo().
+const ticketModeToggle = document.getElementById('ticketModeToggle');
+const ticketFormatRow = document.getElementById('ticketFormatRow');
+const ticketFormatSelect = document.getElementById('ticketFormatSelect');
+const __TECH_INPUTS = {
+  name:    document.getElementById('techNameInput'),
+  title:   document.getElementById('techTitleInput'),
+  company: document.getElementById('techCompanyInput'),
+  phone:   document.getElementById('techPhoneInput'),
+  email:   document.getElementById('techEmailInput'),
+};
+const TECH_DEFAULTS = {
+  name: 'Brandon Goolsby',
+  title: 'IT Support Technician',
+  company: 'Premier Networx',
+  phone: '706-426-6313',
+  email: 'support@augustaitguys.com'
+};
+
+function __setTicketFormatRowVisible(visible) {
+  if (!ticketFormatRow) return;
+  ticketFormatRow.style.display = visible ? 'block' : 'none';
+}
+
+if (ticketModeToggle) {
+  // Load saved state and prefill technician fields.
+  chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
+    const enabled = result.ticketMode === true;
+    ticketModeToggle.checked = enabled;
+    __setTicketFormatRowVisible(enabled);
+    if (ticketFormatSelect) {
+      ticketFormatSelect.value = result.ticketFormat || 'auto';
+    }
+    const tech = Object.assign({}, TECH_DEFAULTS, result.technicianInfo || {});
+    for (const key of Object.keys(__TECH_INPUTS)) {
+      const el = __TECH_INPUTS[key];
+      if (el) el.value = tech[key] || '';
+    }
+  });
+
+  ticketModeToggle.addEventListener('change', () => {
+    const enabled = ticketModeToggle.checked;
+    __setTicketFormatRowVisible(enabled);
+    chrome.storage.local.set({ ticketMode: enabled }, () => {
+      try {
+        showToast(
+          enabled
+            ? 'Ticket Mode ON — finish summaries will be formatted as ticket blocks'
+            : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
+          enabled ? 'success' : 'info'
+        );
+      } catch (e) {}
+    });
+  });
+}
+
+if (ticketFormatSelect) {
+  ticketFormatSelect.addEventListener('change', () => {
+    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value });
+  });
+}
+
+// Debounced save for technician inputs — on every keystroke.
+{
+  let __techSaveTimer = null;
+  const queueTechSave = () => {
+    if (__techSaveTimer) clearTimeout(__techSaveTimer);
+    __techSaveTimer = setTimeout(() => {
+      const tech = {};
+      for (const key of Object.keys(__TECH_INPUTS)) {
+        const el = __TECH_INPUTS[key];
+        if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
+      }
+      chrome.storage.local.set({ technicianInfo: tech });
+    }, 400);
+  };
+  for (const key of Object.keys(__TECH_INPUTS)) {
+    const el = __TECH_INPUTS[key];
+    if (el) el.addEventListener('input', queueTechSave);
+  }
+}
+
 // ========== Expected Tenant (3.7.0) ==========
 // Cross-client safety: when set, the header chip on Microsoft admin URLs
 // turns green when the detected tenant matches and red when it doesn't.
