@@ -1,5 +1,79 @@
 # Changelog
 
+## v3.30.0 — 2026-05-12 (Run Trust Score — one number for "how well did this run actually do")
+
+Every release since v3.13.0 has chipped away at "the agent did something useful, probably." v3.30.0 finally puts a number on it. Each completed run gets a 0-100 trust score that rolls up failure rate, productivity, recovery effectiveness, plan adherence, token efficiency, and safety incidents into a single readout you can quote: "that run scored 87/100, trustworthy."
+
+This is the metric you'd point at when comparing Sentinel to other browser agents. Most directly aligned with the "trustworthy as Claude in Chrome" target.
+
+### Added — `background/trust-score.js` (new pure module)
+
+Single-export `computeTrustScore(metrics)` returns `{ score, band, breakdown }`. Pure function, no `chrome.*` dependencies, testable in isolation. Component weights sum to 100, with one negative-deduction component:
+
+- **40 pts — Failure rate.** `40 * (1 - failedSteps/totalSteps)`. Additional streak penalty: -5 per consecutive failure beyond 2, capped at -20. So a 10-step run with 1 isolated failure scores 36/40, but a 10-step run with a 5-failure streak scores 20/40 even at the same overall rate.
+- **20 pts — Productivity density.** `20 * productiveSteps/totalSteps`. Captures whether the agent actually *did* anything (extract/note/finish-blocker) vs spinning on observations.
+- **15 pts — Recovery effectiveness.** If recovery skills fired this run, what fraction led to a successful next step? If no skills needed, full 15 (no recovery required = healthy run).
+- **10 pts — Plan adherence.** `planCompleted / planLength`. If no plan was generated, defaults to full 10 (not a penalty for unplanned runs).
+- **10 pts — Token efficiency.** `apiCallCount / productiveSteps`. <1 → full credit, 3+ → zero, smoothly interpolated. Captures wasteful retry loops.
+- **-5 pts — Safety incidents.** Each cross-tenant block / sensitive-field block / CSP-blocked execute_js deducts 2 points, capped at -5. These are *good outcomes* (we prevented something bad), but the underlying request was suspect — the small deduction reflects the LLM choosing to attempt the blocked action in the first place.
+
+### Added — Trust bands
+
+`trustBand(score)` returns one of:
+- `'high'` (≥80) — green, "Trustworthy"
+- `'good'` (≥60) — blue, "Good"
+- `'questionable'` (≥40) — amber, "Questionable"
+- `'low'` (<40) — red, "Low"
+
+Boundaries deliberately require *not just absence of failures* but actual productive output. A run with no failures and no productive steps scores ~70-75 — good band, not great.
+
+### Added — `describeTrustScore(scoreResult)`
+
+Returns a one-line summary like `Trust 73/100 · good (weak productivity, 1 safety block)`. Used in telemetry messages and (eventually) the Run Log hover-tip. Leads with the dominant weakness so the operator sees what's pulling the score down without expanding the breakdown.
+
+### Added — Agent-engine integration (background/agent-engine.js)
+
+- New module-level counters: `failedSteps`, `consecutiveFailureMax`, `safetyBlocks`. Reset in `resetAgentState()`.
+- Increment sites: `failedSteps++` and max-streak update at the existing self-healing failure path; `safetyBlocks++` at the cross-tenant lockdown site and on `CSP_BLOCKED` / `BLOCKED: target field appears sensitive` result strings.
+- Score computed at run finalize. Attached to:
+  1. The forensic run-log index entry (`trustScore`, `trustBand`, `trustBreakdown` fields).
+  2. The `run_log_available` broadcast message (so the popup-side Run Log list can render the badge without a re-fetch).
+  3. The `agent_finished` broadcast (so the chat report card renders the badge immediately).
+- Telemetry `lifecycle` info emit: `Trust score: 87/100 (high)` with the full breakdown in payload.
+
+### Added — Chat report card badge (popup-modules/chat.js)
+
+When `agent_finished` carries a `trustScore` payload, the chat appends a trust-score card right after the completion summary. Card shows:
+- Header line: bold score (`Trust 87/100`) in band-colored text + band label ("Trustworthy" / "Good" / "Questionable" / "Low") + ▾ details toggle.
+- Click-to-expand breakdown: per-component bars (Failure rate / Productivity / Recovery / Plan / Efficiency / Safety) with progress bars showing points/max. Bars are color-coded by ratio.
+- Inline render — no top-level helper added to chat.js. The file has had recurring large-edit truncation issues; isolating the score-card markup inside the `agent_finished` handler keeps the blast radius small.
+
+### Why this matters
+
+Until now, "how did the run go?" required eyeballing the step count, the report content, and any error toasts. Now there's a single number that:
+- Tells you at-a-glance whether to trust the output without reading the full report.
+- Gets persisted alongside the forensic log so historical trends are recoverable.
+- Will eventually drive auto-retry decisions (low scores → suggest re-run with a different mode).
+- Gives you a quotable metric for the "is this thing good?" conversation.
+
+### Files touched
+
+- `background/trust-score.js` — new (170 lines, pure function + helpers).
+- `background/agent-engine.js` — counter declarations + reset + 2 increment sites + run-finalize integration + `agent_finished` payload + telemetry emit.
+- `popup-modules/chat.js` — inline trust-score card render in the `agent_finished` handler.
+- `manifest.json` — 3.29.0 → 3.30.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- Score badge in the Past Runs dropdown (telemetry panel) — the data is already on the run-log index entry, but rendering it in the dropdown UI is deferred to v3.31.0.
+- Score badge in the standalone report-view tab — deferred. The chat report card carries it for now.
+- Auto-retry on low scores — deferred until we have at least a week of real scores to set the threshold from.
+- Trend chart of scores over time — deferred.
+- Per-platform score breakdown — deferred (pairs naturally with v3.29's per-platform skill stats, both wait on the platform-tagging layer).
+
+---
+
 ## v3.29.0 — 2026-05-12 (Adaptive skill priority — outcome-driven recovery learning)
 
 The recovery skill library (v3.21.0) ships with 8 skills, each with a hand-picked static priority number. v3.29.0 turns those numbers into a starting point and lets real-run outcomes nudge them up or down. A skill that consistently rescues runs gets promoted; a skill that fires noisily but doesn't actually help gets demoted. The static priorities still anchor — adjustments cap at ±20.

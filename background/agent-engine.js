@@ -13,6 +13,12 @@ import { getActiveClient, getRelevantEntries, formatPromptSection, markRunComple
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
 import { runRecoverySkills } from './skills/index.js';
 import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
+// (3.30.0) Trust-score computation at run finalize. Pure function — no side
+// effects, no chrome.* deps. We aggregate the run's metrics here at the end
+// of the loop and stamp the result onto both the report card and the
+// run-log index entry.
+import { computeTrustScore } from './trust-score.js';
+import { getSkillStats } from './skills/index.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -35,6 +41,11 @@ let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in 
 let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
+// (3.30.0) Trust-score counters. Module-level so the loop can update them
+// from any branch and the run finalize block can read them at the end.
+let failedSteps = 0;            // running count of steps where actionFailed=true
+let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
+let safetyBlocks = 0;           // sensitive-field block + cross-tenant block + CSP block hits
 const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
@@ -254,6 +265,11 @@ export function resetAgentState() {
   signInWallAckUrls = new Set();
   history.length = 0;   // (3.15.1) clear in-place so module-level helpers keep their reference
   _lastAiCallMs = null; // (3.21.0) reset slow-llm-call skill input
+  // (3.30.0) Reset trust-score counters at the same time as the rest of
+  // run-scoped state so a re-run starts from a clean slate.
+  failedSteps = 0;
+  consecutiveFailureMax = 0;
+  safetyBlocks = 0;
   resetAllContexts();
 }
 
@@ -2954,21 +2970,74 @@ async function runAgentLoop(goal, workingTabId) {
             // suspends after agent_finished fires.
             try { await telEndRun(runLogId); } catch (e) {}
             // (3.14.0) Stamp the index entry as completed with final step count.
+            // (3.30.0) Compute the trust score and attach it to the index entry
+            // so the popup-side Run Log list can render it without recomputing.
+            let _trustScore = null;
+            try {
+              const _skillStats = getSkillStats();
+              _trustScore = computeTrustScore({
+                totalSteps: stepCount,
+                failedSteps,
+                productiveSteps,
+                consecutiveFailureMax,
+                skillStats: _skillStats,
+                apiCallCount,
+                planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
+                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
+                safetyBlocks
+              });
+              tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
+                score: _trustScore.score,
+                band: _trustScore.band,
+                breakdown: _trustScore.breakdown,
+                runLogId
+              });
+            } catch (e) { /* non-fatal */ }
             try {
               await _updateRunLogIndex(runLogId, {
                 completed: true,
                 finishedAt: Date.now(),
                 stepCount,
-                apiCallCount
+                apiCallCount,
+                // (3.30.0) Persist score on the index for the Run Log UI.
+                trustScore: _trustScore ? _trustScore.score : null,
+                trustBand: _trustScore ? _trustScore.band : null,
+                trustBreakdown: _trustScore ? _trustScore.breakdown : null
               });
             } catch (e) { /* non-fatal */ }
             try {
-              chrome.runtime.sendMessage({ action: 'run_log_available', runLogId, entryCount: runLogBuffer.length }).catch(() => {});
+              chrome.runtime.sendMessage({
+                action: 'run_log_available',
+                runLogId,
+                entryCount: runLogBuffer.length,
+                trustScore: _trustScore ? _trustScore.score : null,
+                trustBand: _trustScore ? _trustScore.band : null
+              }).catch(() => {});
             } catch (e) {}
           }
         } catch (_e) {}
 
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: finalSummary }).catch(() => {});
+        chrome.runtime.sendMessage({
+          action: 'agent_finished',
+          summary: finalSummary,
+          // (3.30.0) Include the trust score so the report card / chat can
+          // render a band badge immediately, without an extra round-trip.
+          trustScore: (function () {
+            try {
+              return computeTrustScore({
+                totalSteps: stepCount,
+                failedSteps,
+                productiveSteps,
+                consecutiveFailureMax,
+                skillStats: getSkillStats(),
+                apiCallCount,
+                planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
+                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
+                safetyBlocks
+              });
+            } catch (e) { return null; }
+          })()
+        }).catch(() => {});
         sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
         break;
@@ -3074,6 +3143,10 @@ async function runAgentLoop(goal, workingTabId) {
       try {
         const _block = shouldLockoutCrossTenantAction(command, currentUrl, detectedTenant, expectedTenant);
         if (_block) {
+          // (3.30.0) Trust-score: count each cross-tenant block as a safety
+          // incident. These are *good* outcomes (we prevented something bad)
+          // but they reflect the underlying LLM request being suspect.
+          safetyBlocks++;
           sendSilentUpdate('🛑 Cross-tenant action blocked — awaiting override approval', stepCount);
           // Forensic log: override request fired
           if (runLogId) {
@@ -3629,6 +3702,21 @@ async function runAgentLoop(goal, workingTabId) {
       // Track success/failure for self-healing
       if (actionFailed) {
         consecutiveFailures++;
+        // (3.30.0) Trust-score counters — failedSteps accumulates over the run,
+        // consecutiveFailureMax tracks the worst streak so even runs that
+        // recover get penalized for getting stuck in the middle.
+        failedSteps++;
+        if (consecutiveFailures > consecutiveFailureMax) consecutiveFailureMax = consecutiveFailures;
+        // (3.30.0) Safety-block detection — content-script returns specific
+        // string prefixes for these. Only count the safety variants, not the
+        // many internal "BLOCKED: " guardrails (those reflect agent logic
+        // failures, which already get counted via failedSteps).
+        if (typeof result === 'string') {
+          if (result.startsWith('CSP_BLOCKED') ||
+              result.startsWith('BLOCKED: target field appears sensitive')) {
+            safetyBlocks++;
+          }
+        }
         currentStrategies.push(`${command.type}:${command.selector || command.url || ''}`);
         if (currentStrategies.length > 10) currentStrategies.shift();
       } else {
