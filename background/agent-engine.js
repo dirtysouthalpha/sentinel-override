@@ -2192,18 +2192,31 @@ async function runAgentLoop(goal, workingTabId) {
         await sleep(500);
       }
 
-      // Redirect internal pages
+      // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
+      // Do NOT auto-navigate away — the tech may deliberately be on
+      // chrome://extensions, chrome://net-internals, or edge://policy for
+      // diagnostic work. Instead, surface a clear error and let the loop end.
       if (tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')) {
-        sendSilentUpdate('Internal page -- navigating to Google', stepCount);
-        await chrome.tabs.update(tab, { url: 'https://www.google.com' });
-        await sleep(3000);
-        continue;
+        history.push({ step: stepCount, action: { type: 'note' }, result: 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.' });
+        sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
+        break;
       }
 
       // Auto-navigate to URL found in goal (first iteration only)
       // Smart: checks current page hostname before navigating
       if (stepCount === 1 && goal) {
-        const urlMatch = goal.match(/https?:\/\/[^\s"'<>,]+/i) || goal.match(/(?:go to|visit|navigate to|open)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i);
+        // Strip email addresses before URL extraction so "support@example.com" is
+        // never mistaken for a navigation target.
+        const _goalForUrlExtract = goal.replace(/[\w.+\-]+@[\w.\-]+/g, '');
+        // Only auto-navigate when the goal starts with an explicit navigation
+        // imperative OR contains a full https:// URL. Avoid triggering on ticket
+        // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
+        const _isExplicitNav = /^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
+          || /\bbegin at:\s*\S/i.test(_goalForUrlExtract)
+          || /\bstart url:\s*\S/i.test(_goalForUrlExtract);
+        const urlMatch = _isExplicitNav
+          ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
+          : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
           try {
@@ -3433,6 +3446,13 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const parsed = JSON.parse(result.replace('JS Result: ', ''));
           if (parsed.key !== undefined && parsed.value !== undefined) {
+            // Reject error-shaped values so failure strings ("Element not found",
+            // "JS Error: ...", etc.) are never stored as real data in memory.
+            const _extractValStr = parsed.value === null ? '' : (typeof parsed.value === 'string' ? parsed.value : JSON.stringify(parsed.value));
+            if (!_extractValStr || /^(Element not found|Error|JS Error|JS execution failed|Execution error|Code execution timed out|No element|timed out|Done\.|undefined)/i.test(_extractValStr.trim())) {
+              extractSucceeded = false;
+              // fall through to actionFailed = true below
+            } else {
             // (3.8.2) Auto-prefix memory key with the portal name when on a
             // known platform, so multi-portal investigations group findings
             // cleanly in the report (e.g. "entra_signins" vs "exchange_rules").
@@ -3478,6 +3498,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
             } catch (e) {}
+            } // close else (error-string guard)
           }
         } catch (e) {
           // extract result wasn't JSON -- treat as failure
