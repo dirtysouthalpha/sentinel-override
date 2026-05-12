@@ -2577,6 +2577,156 @@ chrome.runtime.onMessage.addListener((message) => {
         const lastMsg = chatContainer.querySelector('.message-group:last-child .message.assistant-msg, .message-group:last-child .assistant-wrapper');
         if (lastMsg) renderSourceChipsIn(lastMsg);
       } catch (e) { /* non-fatal */ }
+      // (3.30.0) Trust score badge — inline render so we don't add a new
+      // top-level helper to this file (chat.js has had recurring truncation
+      // issues during large edits). All UI for the score is contained here.
+      try {
+        const ts = message.trustScore;
+        if (ts && typeof ts.score === 'number') {
+          const bandColor = ts.band === 'high' ? '#9ece6a'
+            : ts.band === 'good' ? '#7aa2f7'
+            : ts.band === 'questionable' ? '#e0af68'
+            : '#f44';
+          const bandLabel = ts.band === 'high' ? 'Trustworthy'
+            : ts.band === 'good' ? 'Good'
+            : ts.band === 'questionable' ? 'Questionable'
+            : 'Low';
+          const bd = ts.breakdown || {};
+          const card = document.createElement('div');
+          card.className = 'trust-score-card';
+          card.style.cssText = 'margin:8px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ' + bandColor + '; border-left-width:4px; border-radius:6px; font-size:12px;';
+          // Header line: score + band label + collapse toggle
+          card.innerHTML =
+            '<div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-tcs-toggle="1">' +
+              '<div>' +
+                '<strong style="color:' + bandColor + '; font-size:14px;">Trust ' + ts.score + '/100</strong>' +
+                '<span style="color:var(--text-secondary); margin-left:8px;">' + bandLabel + '</span>' +
+              '</div>' +
+              '<span style="font-size:10px; color:var(--text-tertiary);">▾ details</span>' +
+            '</div>' +
+            '<div style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color, rgba(255,255,255,0.06));" data-tcs-body="1">' +
+              _trustRow('Failure rate',  bd.failure)      +
+              _trustRow('Productivity',  bd.productivity) +
+              _trustRow('Recovery',      bd.recovery)     +
+              _trustRow('Plan',          bd.plan)         +
+              _trustRow('Efficiency',    bd.efficiency)   +
+              (bd.safety && bd.safety.blocks > 0 ? _trustRow('Safety (deduct)', bd.safety) : '') +
+            '</div>';
+          // Click-to-expand
+          card.addEventListener('click', () => {
+            const body = card.querySelector('[data-tcs-body]');
+            if (!body) return;
+            body.style.display = body.style.display === 'none' ? 'block' : 'none';
+          });
+          chatContainer.appendChild(card);
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        // Helper used inside the score card markup above
+        function _trustRow(label, comp) {
+          if (!comp) return '';
+          const pts = (typeof comp.points === 'number') ? comp.points : 0;
+          const max = (typeof comp.max === 'number') ? comp.max : 0;
+          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
+          const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
+          const widthPct = Math.min(100, Math.round(ratio * 100));
+          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
+                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
+                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
+                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
+                   '</div>' +
+                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
+                 '</div>';
+        }
+      } catch (e) { /* non-fatal */ }
+    } catch (err) {
+      console.error('Error displaying completion message:', err);
+    }
+    resetUI();
+  }
+  if (message.action === 'request_approval') {
+    removeTypingIndicator();
+    showApprovalCard(message.payload);
+  }
+  if (message.action === 'agent_action') {
+    removeTypingIndicator();
+    addActionCard(message.payload);
+    updateActiveTabAction(message.payload);
+    if (message.payload && message.payload.stepNumber) updateActiveTabStep(message.payload.stepNumber);
+    try {
+      if (message.payload && message.payload.stepNumber && message.payload.description) {
+        updateStepCardAction(message.payload.stepNumber, message.payload.description);
+      }
+    } catch (e) {}
+  }
+  if (message.action === 'agent_action_result') {
+    updateActionCardResult(message.stepNumber, message.result, message.isError);
+  }
+  if (message.action === 'tab_state_update' && message.tabs) {
+    renderTabBar(message.tabs);
+    try {
+      const active = (message.tabs || []).find(t => t.isActive);
+      if (active && active.tabId) __atsStripState.tabId = active.tabId;
+    } catch (e) {}
+  }
+  if (message.action === 'screenshot_update' && message.base64Image) {
+    updateMiniShot(message.base64Image);
+    showMiniShot();
+  }
+  if (message.action === 'request_tenant_override') {
+    showTenantOverrideCard(message.payload);
+  }
+  if (message.action === 'mfa_pause') {
+    showMfaBanner(message.url, message.hint, message.stepNumber);
+  }
+  if (message.action === 'sign_in_wall_pause') {
+    showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber);
+  }
+  if (message.action === 'adapted_goal_available') {
+    try { showAdaptedGoalCard(message); } catch (e) { console.warn('showAdaptedGoalCard failed:', e && e.message); }
+  }
+  if (message.action === 'mode_mismatch_pause') {
+    try { showModeMismatchCard(message); } catch (e) { console.warn('showModeMismatchCard failed:', e && e.message); }
+  }
+  if (message.action === 'agent_step_start') {
+    try { _ensureActivityStream(message.stepNumber); } catch (e) { console.warn('agent_step_start failed:', e && e.message); }
+  }
+  if (message.action === 'agent_activity') {
+    try { showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail); } catch (e) { console.warn('agent_activity failed:', e && e.message); }
+  }
+  if (message.action === 'tenant_detected') {
+    renderTenantChip(message.tenant, message.expected);
+  }
+  if (message.action === 'download_captured') {
+    showDownloadCaptured(message.download);
+  }
+  if (message.action === 'run_log_available') {
+    showRunLogExportButton(message.runLogId, message.entryCount);
+  }
+  if (message.action === 'report_update') {
+    if (message.status === 'generating') {
+      addReportGeneratingIndicator();
+    } else if (message.status === 'ready' && message.report) {
+      removeReportGeneratingIndicator();
+      addReportCard(message.report);
+      // (3.24.0) Archive once the report is rendered — captures the full
+      // post-run state into Recent Chats so the user can restore it later.
+      try {
+        if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
+          setTimeout(() => window.__sentinelRecentChats.archive({ reason: 'finished' }), 250);
+        }
+      } catch (e) {}
+    } else if (message.status === 'error') {
+      removeReportGeneratingIndicator();
+      showToast('Report generation failed: ' + (message.error || 'Unknown error'), 'error');
+    }
+  }
+});
+               '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
+                   '</div>' +
+                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
+                 '</div>';
+        }
+      } catch (e) { /* non-fatal */ }
     } catch (err) {
       console.error('Error displaying completion message:', err);
     }
