@@ -3,6 +3,35 @@
 // Verified 2026-05-06.
 // Handles DOM observation, element scanning, action execution, and dynamic tools.
 // Orchestrates utility modules loaded on window.__sentinelUtils.
+//
+// (3.26.0) Content-side telemetry helper — fires `content_telemetry_event`
+// messages to the background, which re-emits via tel.emit() (telemetry.js).
+// Defined at module top so every handler below has access. Fire-and-forget;
+// never blocks the agent or throws.
+
+// (3.26.0) Content-script telemetry emit helper. Bound to window so it
+// survives the re-injection guard (re-injection skips the else-branch but
+// the helper is defined unconditionally above it).
+if (!window.__sentinelContentTel) {
+  window.__sentinelContentTel = function _ctel(category, level, message, payload) {
+    try {
+      chrome.runtime.sendMessage({
+        action: 'content_telemetry_event',
+        category: String(category || 'content'),
+        level: String(level || 'info'),
+        message: String(message || '').substring(0, 500),
+        payload: payload || null
+      }).catch(() => {});
+    } catch (e) { /* chrome.runtime gone during shutdown */ }
+  };
+  // Per-level shorthands so call sites stay terse.
+  window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
+  window.__sentinelContentTel.warn  = (c, m, p) => window.__sentinelContentTel(c, 'warn',  m, p);
+  window.__sentinelContentTel.info  = (c, m, p) => window.__sentinelContentTel(c, 'info',  m, p);
+  window.__sentinelContentTel.debug = (c, m, p) => window.__sentinelContentTel(c, 'debug', m, p);
+  window.__sentinelContentTel.trace = (c, m, p) => window.__sentinelContentTel(c, 'trace', m, p);
+}
+const ctel = window.__sentinelContentTel;
 
 // Re-injection guard: if already initialized, just signal ready and return early.
 // This prevents duplicate message listeners and duplicate MutationObservers
@@ -993,13 +1022,39 @@ if (window.__sentinelInitialized) {
       case 'click': {
         const resolved = resolveCommandTarget(cmd, targetDoc);
         const el = resolved.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) {
+          // (3.26.0) Content-side telemetry: click target unresolved. This is
+          // the single most common content-side failure mode (selector hallucination,
+          // SPA late mount, or shadow DOM hit). Surface in panel so operators
+          // see exactly which selector missed.
+          try {
+            ctel.warn('page', 'Click target not found', {
+              selector: cmd.selector || null,
+              ref: cmd.ref || null,
+              label: cmd.label || null,
+              staleRef: !!resolved.staleRef,
+              url: location.href.substring(0, 200)
+            });
+          } catch (e) {}
+          return 'Element not found: ' + describeTarget(cmd);
+        }
 
         // (#20) Reject disabled / pointer-events:none / aria-disabled targets
         // before doing any visual work, so the agent can react.
         if (dom.checkInteractable) {
           const reason = dom.checkInteractable(el, 'click');
-          if (reason) return 'Cannot click ' + describeTarget(cmd) + ': ' + reason;
+          if (reason) {
+            try {
+              ctel.warn('page', 'Click rejected: ' + reason, {
+                selector: cmd.selector || null,
+                ref: cmd.ref || null,
+                reason: reason,
+                tag: (el.tagName || '').toLowerCase(),
+                url: location.href.substring(0, 200)
+              });
+            } catch (e) {}
+            return 'Cannot click ' + describeTarget(cmd) + ': ' + reason;
+          }
         }
 
         // Visual feedback: show banner and highlight
@@ -1131,7 +1186,20 @@ if (window.__sentinelInitialized) {
       case 'type': {
         const resolved = resolveCommandTarget(cmd, targetDoc);
         const el = resolved.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) {
+          // (3.26.0) Content-side telemetry: type target unresolved.
+          try {
+            ctel.warn('page', 'Type target not found', {
+              selector: cmd.selector || null,
+              ref: cmd.ref || null,
+              label: cmd.label || null,
+              staleRef: !!resolved.staleRef,
+              textLen: (cmd.text || '').length,
+              url: location.href.substring(0, 200)
+            });
+          } catch (e) {}
+          return 'Element not found: ' + describeTarget(cmd);
+        }
 
         // (3.7.0) Sensitive-field block. Hard-stops typing into password,
         // pre-shared-key, API-secret, recovery-code, and PII fields no matter
@@ -1139,13 +1207,36 @@ if (window.__sentinelInitialized) {
         // because most enterprise UIs use plain text inputs for these.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
+          // (3.26.0) Sensitive-field block is a SECURITY event. Surface at
+          // warn level (always visible) so operators audit what was blocked.
+          try {
+            ctel.warn('page', 'Type BLOCKED: sensitive field (matched "' + __sensitiveMatch + '")', {
+              match: __sensitiveMatch,
+              tag: (el.tagName || '').toLowerCase(),
+              type: el.type || null,
+              name: (el.name || '').substring(0, 60),
+              id: (el.id || '').substring(0, 60),
+              url: location.href.substring(0, 200)
+            });
+          } catch (e) {}
           return 'BLOCKED: target field appears sensitive (matched "' + __sensitiveMatch + '"). Sentinel does not auto-fill credentials, secrets, recovery codes, or PII. Have the user enter this value manually.';
         }
 
         // (#20) Reject disabled targets up front.
         if (dom.checkInteractable) {
           const reason = dom.checkInteractable(el, 'type');
-          if (reason) return 'Cannot type into ' + describeTarget(cmd) + ': ' + reason;
+          if (reason) {
+            try {
+              ctel.warn('page', 'Type rejected: ' + reason, {
+                selector: cmd.selector || null,
+                ref: cmd.ref || null,
+                reason: reason,
+                tag: (el.tagName || '').toLowerCase(),
+                url: location.href.substring(0, 200)
+              });
+            } catch (e) {}
+            return 'Cannot type into ' + describeTarget(cmd) + ': ' + reason;
+          }
         }
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('type', `Typing "${(cmd.text || '').substring(0, 50)}" into ${(el.innerText || el.tagName || '').substring(0, 40)}`);
@@ -1608,6 +1699,20 @@ if (window.__sentinelInitialized) {
               const blocked = (e && e.blockedURI) || '';
               if (dir.indexOf('script-src') === 0 && (blocked === 'inline' || blocked === '')) {
                 __cspBlocked = true;
+                // (3.26.0) Content-side telemetry: capture the FIRST CSP
+                // violation so operators see the exact directive that's
+                // blocking inline scripts. Useful for distinguishing strict
+                // SentinelOne-style policies from looser CDN-only policies.
+                try {
+                  ctel.warn('page', 'CSP violation: ' + dir, {
+                    directive: dir,
+                    blockedURI: blocked,
+                    effectiveDirective: (e && e.effectiveDirective) || '',
+                    sample: (e && e.sample) ? String(e.sample).substring(0, 120) : '',
+                    sourceFile: (e && e.sourceFile) ? String(e.sourceFile).substring(0, 200) : '',
+                    url: location.href.substring(0, 200)
+                  });
+                } catch (te) {}
               }
             } catch (err) {}
           };
@@ -1669,10 +1774,34 @@ if (window.__sentinelInitialized) {
             // can pattern-match and route to alternative strategies.
             return 'CSP_BLOCKED: page denies inline scripts (Content-Security-Policy script-src). The content-script execute_js path cannot run here. Use read_page, read_network_requests, or extract / extract_list against the live DOM instead.';
           }
-          if (execResult.__timeout) return 'Code execution timed out (' + execTimeout + 'ms)';
-          if (execResult.__error) return 'Execution error: ' + execResult.__error;
+          if (execResult.__timeout) {
+            // (3.26.0) Telemetry: execute_js timeout. Different cause profile
+            // from CSP — usually a long-running script, infinite loop in the
+            // LLM-generated code, or a page that's not responding.
+            try {
+              ctel.warn('page', 'execute_js timed out (' + execTimeout + 'ms)', {
+                timeoutMs: execTimeout,
+                key: cmd.key || null,
+                codeLen: code.length,
+                url: location.href.substring(0, 200)
+              });
+            } catch (e) {}
+            return 'Code execution timed out (' + execTimeout + 'ms)';
+          }
+          if (execResult.__error) {
+            try {
+              ctel.warn('page', 'execute_js threw: ' + String(execResult.__error).slice(0, 80), {
+                error: execResult.__error,
+                key: cmd.key || null,
+                codeLen: code.length,
+                url: location.href.substring(0, 200)
+              });
+            } catch (e) {}
+            return 'Execution error: ' + execResult.__error;
+          }
           return 'JS Result: ' + (execResult.__value || '');
         } catch (err) {
+          try { ctel.error('page', 'execute_js outer failure', { error: err.message || String(err), url: location.href.substring(0, 200) }); } catch (e) {}
           return 'JS Error: ' + err.message;
         }
       }
@@ -1680,7 +1809,21 @@ if (window.__sentinelInitialized) {
       case 'extract': {
         const resolvedEx = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedEx.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) {
+          // (3.26.0) Telemetry: extract target unresolved. Same shape as
+          // click/type misses — helps operators spot stale selectors fast.
+          try {
+            ctel.warn('page', 'Extract target not found', {
+              selector: cmd.selector || null,
+              ref: cmd.ref || null,
+              key: cmd.key || null,
+              attribute: cmd.attribute || 'text',
+              staleRef: !!resolvedEx.staleRef,
+              url: location.href.substring(0, 200)
+            });
+          } catch (e) {}
+          return 'Element not found: ' + describeTarget(cmd);
+        }
         let value;
         const attr = cmd.attribute || 'text';
         if (attr === 'text') {
@@ -1921,3 +2064,188 @@ if (window.__sentinelInitialized) {
 
   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
 }
+// (3.26.0) End-of-file marker — sync flush.
++ describeTarget(cmd);
+        const limit = cmd.limit || 20;
+        const fields = cmd.fields || {};
+        const items = containers.slice(0, limit).map(container => {
+          const item = {};
+          for (const [fieldName, fieldSelector] of Object.entries(fields)) {
+            try {
+              const child = fieldSelector === 'self'
+                ? container
+                : container.querySelector(fieldSelector);
+              if (child) {
+                item[fieldName] = (child.innerText || child.textContent || child.getAttribute('href') || '').trim().substring(0, 200);
+              } else {
+                item[fieldName] = '';
+              }
+            } catch (e) {
+              item[fieldName] = '';
+            }
+          }
+          return item;
+        });
+        return JSON.stringify({ key: cmd.key, value: items });
+      }
+
+      case 'open_dropdown': {
+        const el = dom.findElementBySelector(targetDoc, selector);
+        if (!el) return 'Element not found: ' + cmd.selector;
+        hl.highlightElement(el);
+        // (G3) Cursor travels to the dropdown trigger before opening.
+        try {
+          if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
+            await window.__sentinelCursor.moveToElement(el);
+          }
+        } catch (e) {}
+        if (dd) {
+          const options = await dd.openDropdown(targetDoc, el);
+          if (!options || options.length === 0) {
+            hl.removeHighlight(el);
+            return 'Failed to open dropdown or no options found: ' + cmd.selector;
+          }
+          const optionTexts = options
+            .map(o => (o.innerText || o.textContent || '').trim())
+            .filter(t => t.length > 0)
+            .slice(0, 50);
+          hl.removeHighlight(el);
+          return 'Dropdown opened. Options: ' + optionTexts.join(', ');
+        }
+        hl.removeHighlight(el);
+        return 'Dropdown utilities not available';
+      }
+
+      case 'dismiss_overlay': {
+        if (ov) {
+          const dismissed = await ov.dismissOverlay(document);
+          return dismissed ? 'Overlay dismissed successfully' : 'No overlay detected';
+        }
+        return 'Overlay utilities not available';
+      }
+
+      case 'scroll_to': {
+        // (#10) Scroll a specific element into view. Accepts ref or selector.
+        // Awaits layout stability so the next action in the loop is operating
+        // on a settled rect (matters for lazy-loaded images / virtualized lists).
+        const resolvedScroll = resolveCommandTarget(cmd, targetDoc);
+        const el = resolvedScroll.el;
+        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (window.__sentinelOverlay) {
+          window.__sentinelOverlay.showActionBanner('scroll_to', `Scrolling to: ${(el.innerText || el.tagName || '').substring(0, 60)}`);
+        }
+        hl.highlightElement(el);
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) {
+          try { el.scrollIntoView(); } catch (ee) {}
+        }
+        await waitForStableRect(el, 2, 800);
+
+        // (G3) After the scroll settles, glide the cursor to the element so
+        // the user sees what's now in focus.
+        try {
+          if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
+            await window.__sentinelCursor.moveToElement(el, { duration: 250 });
+          }
+        } catch (e) {}
+
+        try {
+          const r = el.getBoundingClientRect();
+          if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
+        } catch (e) {}
+        setTimeout(() => hl.removeHighlight(el), 1500);
+        const note = resolvedScroll.staleRef ? ' (selector fallback after stale ref)' : '';
+        return 'Scrolled to ' + describeTarget(cmd) + note;
+      }
+
+      case 'switch_to_frame': {
+        const frameIndex = cmd.frame_index || 0;
+        const iframes = document.querySelectorAll('iframe');
+        if (!iframes[frameIndex]) return 'Iframe not found at index ' + frameIndex;
+        try {
+          const iframeDoc = iframes[frameIndex].contentWindow.document;
+          const title = iframeDoc.title || '';
+          const url = iframes[frameIndex].src || '';
+          return 'Switched to iframe ' + frameIndex + ': ' + title + ' (' + url + '). Use read_page to scan content.';
+        } catch (e) {
+          return 'Cannot access iframe ' + frameIndex + ' (cross-origin)';
+        }
+      }
+
+      default:
+        return 'Unknown command type: ' + cmd.type;
+    }
+  }
+
+  function safeSendMessage(msg) {
+    try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch (e) {}
+  }
+
+  function setupSPAObservers() {
+    let spaDebounce = null;
+
+    const domObserver = new MutationObserver((mutations) => {
+      const significantChange = mutations.some(m =>
+        m.addedNodes.length > 0 || m.removedNodes.length > 0
+      );
+      if (significantChange) {
+        clearTimeout(spaDebounce);
+        spaDebounce = setTimeout(() => {
+          safeSendMessage({
+            action: 'spa_content_changed',
+            url: window.location.href
+          });
+        }, 500);
+      }
+    });
+
+    domObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    let lastUrl = window.location.href;
+
+    const dispatchSPATransition = (url) => {
+      clearTimeout(spaDebounce);
+      spaDebounce = setTimeout(() => {
+        safeSendMessage({
+          action: 'spa_navigation',
+          url: url
+        });
+      }, 300);
+    };
+
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+
+    history.pushState = function(...args) {
+      originalPushState.apply(this, args);
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    };
+
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(this, args);
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    };
+
+    window.addEventListener('popstate', () => {
+      if (window.location.href !== lastUrl) {
+        lastUrl = window.location.href;
+        dispatchSPATransition(lastUrl);
+      }
+    });
+  }
+
+  setupSPAObservers();
+
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
+}
+// (3.26.0) End-of-file marker — sync flush.

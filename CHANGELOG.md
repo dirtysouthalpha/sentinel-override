@@ -1,5 +1,109 @@
 # Changelog
 
+## v3.26.0 — 2026-05-12 (Content-script telemetry bridge)
+
+The agent runs in three execution contexts — service worker (background), side panel (popup), and the page itself (content script). v3.25.0 lit up the first two; v3.26.0 finishes the picture by routing content-script events through the same panel, with the same filters and verbosity gate.
+
+This matters because the content script is where most "the agent did something weird and I don't know why" moments happen: stale selectors, sensitive-field blocks, disabled-element rejections, CSP violations, execute_js timeouts. Until now those returned a string to the engine and that's all you saw.
+
+### Added — Telemetry bridge (background/index.js)
+
+- New `content_telemetry_event` message handler. Content script sends `{ category, level, message, payload }`; background re-emits via `tel.<level>(category, message, payload)`. This means content-side events get verbosity gating, console mirror, sequence numbering, and panel broadcast for free — no separate transport.
+- Sender auto-stamping: every content event is annotated with `tabId` and `frameUrl` (truncated to 200 chars) so the panel can attribute events to the originating tab.
+
+### Added — Content-side emit helper (content/index.js)
+
+- `window.__sentinelContentTel` (alias `ctel`) — fire-and-forget helper with per-level shorthands (`.error`, `.warn`, `.info`, `.debug`, `.trace`).
+- Defined unconditionally before the re-injection guard so handlers in both the initial load and re-injected paths can use it.
+- Never throws (wrapped in try/catch); never blocks (uses `.catch(() => {})` on the promise).
+
+### Added — Content-script hooks (content/index.js)
+
+Six high-signal hooks at the sites that have produced the most "what happened?" moments during real runs:
+
+- `click` target not found — warn level. Includes selector, ref, label, staleRef flag, and current URL. This is the single most common content-side failure; surfaces selector hallucination and SPA late-mount issues immediately.
+- `click` rejected (disabled / pointer-events:none / aria-disabled) — warn level. Includes the rejection reason from `dom.checkInteractable`.
+- `type` target not found — warn level. Same shape as the click variant, plus the text length so you can see when long passages were about to be entered into a missing field.
+- `type` BLOCKED by sensitive-field detector — warn level (always visible). Logs the matched pattern (e.g. "password", "recovery-code", "API-secret"), field tag/name/id. This is a security event; operators audit these.
+- `type` rejected (disabled / aria-disabled) — warn level.
+- `extract` target not found — warn level.
+- CSP `securitypolicyviolation` — warn level. Captures the first violation observed during an execute_js injection window with directive, blockedURI, effectiveDirective, sample, and sourceFile. Distinguishes strict SentinelOne-style policies from looser CDN-only policies.
+- `execute_js` timeout — warn level. Includes timeoutMs, key, codeLen. Different cause profile from CSP block — usually long-running scripts or unresponsive pages.
+- `execute_js` runtime error — warn level. Truncated exception message + key + codeLen.
+- `execute_js` outer failure — error level. Catches infrastructure failures (script element rejected, etc.).
+
+### Why these specifically
+
+Every one of these has been the silent cause of a "the agent stopped working" report at least once during v3.13 → v3.25. Now they all surface to the same panel as the LLM and skill events — so when a click misses, you see the selector + URL right next to the LLM decision that emitted it.
+
+### Panel UI — no changes required
+
+The existing `popup-modules/telemetry-panel.js` filter chips, search, copy, clear, level dots, and category badges all work as-is. Content events use the `page` category, which already has a filter chip and color badge. The `tabId`/`frameUrl` payload fields surface when you click a row to expand.
+
+### Files touched
+
+- `background/index.js` — new `content_telemetry_event` case in the message handler (+ tel import).
+- `content/index.js` — `window.__sentinelContentTel` helper at module top + 9 emit sites (click ×2, type ×3, extract ×1, CSP ×1, execute_js ×3).
+- `manifest.json` — 3.25.1 → 3.26.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- Forensic-log persistence of telemetry events (cross-session debugging) — deferred to v3.27.0.
+- Telemetry export-as-JSON button — deferred to v3.27.0.
+- Content-side shadow-DOM hit logging — deferred until shadow-intercept.js gets its own telemetry pass (it runs in MAIN world and needs a different bridge).
+
+---
+
+## v3.25.1 — 2026-05-12 (Telemetry hook expansion)
+
+Builds out the v3.25.0 framework with high-signal hooks at the sites that mattered during the v3.13 → v3.21 incident parade — memory writes, navigates, CDP attach/detach, network/console reads, platform detection, recovery-skill matches, and goal rewriting. Same panel, same filters, same verbosity dropdown — just much more visible from the operator's seat.
+
+### Added — Telemetry hooks (background/agent-engine.js)
+
+- `memory` — every `extract` / `extract_list` / `execute_js` memory write logs the key, length, isArray flag, and (for execute_js) which retry-ladder strategy succeeded (`original` / `body_text_fallback` / `visible_text_fallback`). Lets you watch memory build in real time and spot keys getting repeatedly overwritten.
+- `page` — navigate kickoff (target URL + fromUrl), navigate success (arrivedUrl + durationMs), navigate landed-elsewhere warnings (intended vs arrivedUrl), and invalid-URL rejections.
+- `network` — agent-level read_network_requests (with failed count) and read_console_messages (with filter + returned count). Errors surface at error level with the exception message.
+- `sleep` — trace-level only for sleeps ≥ 1500ms (the post-navigate / page-load waits that operators actually care about — short jitter sleeps are suppressed to keep the panel readable).
+- `storage` — run log opened (with runLogId + goal length) + run log finalized (with entries + stepCount + apiCallCount); paired bracket-style events for postmortem export. `persistHistory` emits at trace level only.
+
+### Added — Telemetry hooks (background/tab-manager.js)
+
+- `cdp` — debugger attach (debug then info levels — debug during attach, info on success with attachedCount), debugger detach-all (with tabId list), unexpected detaches via `chrome.debugger.onDetach` (warn level — most common cause is the user clicking "Cancel" on the orange CDP banner mid-run, which silently breaks subsequent trusted-input clicks).
+- `cdp` — `cdpExecuteJs` runtime exceptions (warn + truncated error message) and outer failures (warn + attachDenied flag). Trace-level success emit when codeLen + value-present is useful for chasing extract retries.
+- `network` — `readConsoleMessages` and `readNetworkRequests` emit at debug level with returned count + filter so you can confirm what observation passes are returning before the LLM acts on them.
+
+### Added — Telemetry hooks (background/llm-client.js + adaptive-prompts.js + skills/index.js)
+
+- `platform` — `getPlatformContext` emits once per (profileId, host) change so the panel shows platform transitions (e.g. "m365_admin → entra → exchange") without spamming every observation cycle. Includes a "No platform profile match" debug emit so unrecognized portals are easy to spot.
+- `platform` — adaptive-prompts goal rewriter emits one telemetry event at the end of every rewrite attempt: info if adapted, debug for soft skips (no profile, no adaptation needed, goal too short), warn for unexpected errors. Payload includes platformId, mismatchHintCount, durationMs, adaptedLen vs originalLen.
+- `skill` — per-skill match logging at debug level (skillId, priority, stepCount, consecutiveFailures, lastActionFailed, lastCommandType). agent-engine continues to emit the aggregated summary at info level; these per-skill events let you trace exactly which skills' `matches()` predicates fired.
+
+### Why these hooks specifically
+
+These eight categories cover every failure pattern we hit during the v3.13 → v3.25 incident parade:
+- M365 SMTP sign-in wall freeze → `page` + `sleep` telemetry now shows the post-navigate wait timing out.
+- SonicWall NSM menu mismatch → `platform` shows when the profile matched + whether goal-rewriting fired.
+- SentinelOne CSP-blocked execute_js → `cdp` warn emits the exact runtime exception.
+- Drudge Report multi-article inefficiency → `memory` telemetry shows per-article writes accumulating.
+- Cloudflare history-scope crash → `lifecycle` + `error` telemetry brackets the run.
+- Unexpected debugger detach mid-run → new `cdp` warn fires immediately.
+
+### Files touched
+
+- `background/telemetry.js` — unchanged (framework was complete in v3.25.0)
+- `background/agent-engine.js` — +8 emit sites (memory ×2, page ×4, network ×4, sleep ×1, storage ×3)
+- `background/tab-manager.js` — +5 emit sites + import (cdp attach/detach/onDetach, cdpExecuteJs, console/network reads)
+- `background/llm-client.js` — +1 emit site + de-dup helper + import (platform detection)
+- `background/adaptive-prompts.js` — +1 emit site + import (rewriter outcome)
+- `background/skills/index.js` — +2 emit sites + import (per-skill match + predicate error)
+- `manifest.json` — 3.25.0 → 3.25.1
+- `CHANGELOG.md` — this entry
+
+No popup-side changes. Existing telemetry panel UI consumes the new events without modification.
+
+---
+
 ## v3.25.0 — 2026-05-12 (Live Telemetry Panel — stop the black box)
 
 User ask: "We need to make sure we're always seeing what it's doing or where it hangs at, the whole black box thing doesn't work when troubleshooting."
