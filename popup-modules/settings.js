@@ -223,6 +223,29 @@ if (telemetryPersistToggle) {
   });
 }
 
+// ========== Telemetry Redaction (3.28.0) ==========
+// Default ON. Scrubs API keys, bearer/Basic auth, JWT tokens, OAuth query
+// params, and JSON fields named password/secret/apikey/etc. before broadcast
+// + persist + export. The SW console (chrome://extensions DevTools) always
+// shows raw events regardless of this setting — it's a trust boundary anyway.
+// Operators can disable for deep debugging when they need to see raw payloads.
+const telemetryRedactToggle = document.getElementById('telemetryRedactToggle');
+if (telemetryRedactToggle) {
+  chrome.storage.local.get(['telemetryRedact'], (result) => {
+    // Default ON: only set false if explicitly stored as false.
+    telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
+  });
+  telemetryRedactToggle.addEventListener('change', () => {
+    chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
+      try {
+        showToast(telemetryRedactToggle.checked
+          ? 'Telemetry redaction ON — secrets scrubbed before persist'
+          : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
+      } catch (e) {}
+    });
+  });
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /

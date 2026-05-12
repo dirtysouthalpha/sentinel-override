@@ -49,11 +49,126 @@ let _persistEnabled = false;
 let _persistFlushTimer = null;
 let _pendingPersistFlush = false;
 
+// (3.28.0) Redaction layer. With v3.27.0 persistence + Export JSON shipped,
+// telemetry payloads can leak across sessions and into bug-report files. We
+// scrub aggressively by default — operators can disable via
+// chrome.storage.local.telemetryRedact = false if needed for debugging.
+let _redactEnabled = true;
+
+// API key / secret patterns. Anchored conservatively so we don't false-positive
+// on URLs that legitimately contain hex/base64.
+const REDACT_PATTERNS = [
+  // OpenAI: sk-proj-* / sk-* (40+ chars after prefix)
+  { re: /\b(sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,})\b/g, label: 'openai-key' },
+  // Anthropic: sk-ant-* (api key prefix)
+  { re: /\b(sk-ant-[A-Za-z0-9_-]{20,})\b/g, label: 'anthropic-key' },
+  // GitHub: ghp_*, gho_*, ghu_*, ghs_*, ghr_*
+  { re: /\b(gh[pousr]_[A-Za-z0-9]{20,})\b/g, label: 'github-token' },
+  // AWS access key id
+  { re: /\b(AKIA[0-9A-Z]{16})\b/g, label: 'aws-access-key' },
+  // Google API key
+  { re: /\b(AIza[0-9A-Za-z_-]{35})\b/g, label: 'google-api-key' },
+  // Slack tokens
+  { re: /\b(xox[abprs]-[A-Za-z0-9-]{10,})\b/g, label: 'slack-token' },
+  // Stripe live keys
+  { re: /\b((?:sk|pk|rk)_live_[A-Za-z0-9]{20,})\b/g, label: 'stripe-key' },
+  // Bearer / Basic auth headers (case-insensitive). Capture the SCHEME so we
+  // can preserve it in the redacted output — useful for confirming the auth
+  // type in a bug report without leaking the credential itself.
+  { re: /\b(Bearer|Basic)\s+([A-Za-z0-9+/=._-]{8,})/gi, label: 'auth-header' },
+  // JWT-shaped tokens (three dot-separated base64 segments, decent length)
+  { re: /\b(eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})\b/g, label: 'jwt' },
+];
+
+// JSON field names whose VALUES should be redacted regardless of pattern match.
+// Matched case-insensitively against the full key name.
+const REDACT_KEY_PATTERNS = [
+  /password/i,
+  /passwd/i,
+  /secret/i,
+  /^api[_-]?key$/i,
+  /^auth[_-]?token$/i,
+  /^access[_-]?token$/i,
+  /^refresh[_-]?token$/i,
+  /^bearer[_-]?token$/i,
+  /^session[_-]?token$/i,
+  /private[_-]?key/i,
+  /^client[_-]?secret$/i,
+  /^csrf[_-]?token$/i,
+  /^recovery[_-]?code$/i,
+  /^mfa[_-]?code$/i,
+];
+
+// URL query params to scrub. Other params pass through.
+const REDACT_QUERY_PARAMS = new Set([
+  'token', 'access_token', 'refresh_token', 'auth_token', 'id_token',
+  'apikey', 'api_key', 'key', 'secret', 'password', 'pwd', 'sig', 'signature',
+  'code', 'state'  // OAuth flow values
+]);
+
+function _redactString(s) {
+  if (typeof s !== 'string' || s.length === 0) return s;
+  let out = s;
+  // Pattern-based replacements
+  for (const { re, label } of REDACT_PATTERNS) {
+    out = out.replace(re, (full, p1, p2) => {
+      // Special case: auth headers — preserve scheme, redact credential
+      if (label === 'auth-header' && p1 && p2) return p1 + ' [REDACTED:' + label + ']';
+      return '[REDACTED:' + label + ']';
+    });
+  }
+  // URL query-param scrub (string-level; we don't try to parse — just match)
+  out = out.replace(/([?&])(token|access_token|refresh_token|auth_token|id_token|apikey|api_key|key|secret|password|pwd|sig|signature|code|state)=([^&\s"'<>]+)/gi,
+    (m, sep, k) => sep + k + '=[REDACTED]');
+  return out;
+}
+
+function _redactValue(value, keyHint) {
+  // Field-name driven scrub (handles whole-value redaction for password-like keys)
+  if (keyHint && typeof value === 'string' && value.length > 0) {
+    for (const kre of REDACT_KEY_PATTERNS) {
+      if (kre.test(keyHint)) return '[REDACTED]';
+    }
+  }
+  if (value == null) return value;
+  if (typeof value === 'string') return _redactString(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map(v => _redactValue(v, keyHint));
+  if (typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      out[k] = _redactValue(v, k);
+    }
+    return out;
+  }
+  return value;
+}
+
+function _redactEvent(event) {
+  if (!_redactEnabled || !event) return event;
+  try {
+    // We construct a new object rather than mutating in place — the unredacted
+    // event may still be useful in SW console logs (we don't scrub those for
+    // backwards compatibility; operators can flip _redactConsoleAlso if needed).
+    return {
+      ...event,
+      message: _redactString(event.message),
+      payload: _redactValue(event.payload, null)
+    };
+  } catch (e) {
+    // If redaction throws, fail open with the original event rather than
+    // dropping telemetry entirely — visibility is the whole point of the panel.
+    return event;
+  }
+}
+
 (function loadLevel() {
   try {
-    chrome.storage.local.get(['telemetryLevel', 'telemetryPersist'], (r) => {
+    chrome.storage.local.get(['telemetryLevel', 'telemetryPersist', 'telemetryRedact'], (r) => {
       if (r && typeof r.telemetryLevel === 'string') _currentLevel = r.telemetryLevel;
       if (r && typeof r.telemetryPersist === 'boolean') _persistEnabled = r.telemetryPersist;
+      // (3.28.0) Default ON for safety; respects explicit false from storage.
+      if (r && typeof r.telemetryRedact === 'boolean') _redactEnabled = r.telemetryRedact;
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
@@ -68,6 +183,11 @@ let _pendingPersistFlush = false;
         } else if (_persistEnabled && _currentRunId && !_persistFlushTimer) {
           _scheduleFlush();
         }
+      }
+      if (changes.telemetryRedact) {
+        // Default-true semantics: any explicit value sets the flag; missing/unset = true.
+        const v = changes.telemetryRedact.newValue;
+        _redactEnabled = (v === undefined || v === null) ? true : !!v;
       }
     });
   } catch (e) {}
@@ -185,7 +305,7 @@ function _shouldEmit(level) {
 export function emit(category, level, message, payload) {
   if (level !== 'error' && !_shouldEmit(level)) return;
   _seq++;
-  const event = {
+  const rawEvent = {
     action: 'telemetry_event',
     ts: Date.now(),
     seq: _seq,
@@ -194,8 +314,16 @@ export function emit(category, level, message, payload) {
     message: String(message || '').substring(0, 500),
     payload: payload || null
   };
+  // (3.28.0) Scrub before broadcast + persist. The SW console mirror below
+  // still gets the RAW event so operators with chrome://extensions DevTools
+  // open can see un-redacted detail — that's already a trust boundary
+  // (anyone with DevTools could read storage anyway), but no version of the
+  // event ever leaves the SW unredacted when telemetryRedact is on.
+  const event = _redactEvent(rawEvent);
   try {
-    const consoleArgs = ['[Sentinel/' + event.category + ']', event.message];
+    // SW console shows rawEvent — chrome://extensions DevTools access is
+    // already a trust boundary, and unredacted output helps deep debugging.
+    const consoleArgs = ['[Sentinel/' + rawEvent.category + ']', rawEvent.message];
     if (payload) consoleArgs.push(payload);
     if (level === 'error') console.error.apply(console, consoleArgs);
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
