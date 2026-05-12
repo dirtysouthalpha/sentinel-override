@@ -1033,6 +1033,74 @@ previewBtn.addEventListener('click', () => {
   previewBtn.classList.toggle('active');
 });
 
+// (3.34.0) Closable preview pane. Three dismissal paths so the panel can
+// never trap the user when it covers the toolbar:
+//   1. × button in the preview header (visible inside the panel itself).
+//   2. Click outside the preview while it's open.
+//   3. Escape key.
+// All three converge on the same _closeMarkdownPreview() helper so the
+// toggle state and previewBtn .active class stay in sync.
+function _closeMarkdownPreview() {
+  if (!markdownPreview) return;
+  if (markdownPreview.classList.contains('show')) {
+    markdownPreview.classList.remove('show');
+    try { previewBtn.classList.remove('active'); } catch (e) {}
+  }
+}
+const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
+if (_mdPreviewCloseBtn) {
+  _mdPreviewCloseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    _closeMarkdownPreview();
+  });
+}
+// Outside-click dismiss. We don't dismiss when the user clicks inside the
+// preview itself, nor when they click the previewBtn (that's a manual toggle).
+document.addEventListener('mousedown', (e) => {
+  if (!markdownPreview || !markdownPreview.classList.contains('show')) return;
+  if (markdownPreview.contains(e.target)) return;
+  if (previewBtn && (e.target === previewBtn || previewBtn.contains(e.target))) return;
+  _closeMarkdownPreview();
+}, true);
+// Escape: if preview is open, close it; if other dismissable overlays are
+// open, let their own handlers take priority (we check preview class first).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (markdownPreview && markdownPreview.classList.contains('show')) {
+    _closeMarkdownPreview();
+    e.stopPropagation();
+  }
+});
+
+// (3.34.0) Safety-net Escape handler. If any other modal overlay is open
+// (Settings, Templates, Recent Chats, Run Log, etc.) and the user presses
+// Escape, dismiss the top-most one even if its own close button is broken
+// or covered. We run this AFTER the preview handler so preview takes
+// precedence, and we only fire if the preview didn't claim the event.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (markdownPreview && markdownPreview.classList.contains('show')) return;
+  // Find the top-most visible .modal-overlay.show — use the last one in DOM
+  // order since modals stack visually with the last-added on top.
+  const openModals = document.querySelectorAll('.modal-overlay.show');
+  if (openModals.length === 0) return;
+  const top = openModals[openModals.length - 1];
+  try { top.classList.remove('show'); } catch (err) {}
+});
+
+// (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
+// translucent area OUTSIDE the modal-content (i.e. directly on the
+// .modal-overlay), dismiss the modal. Skip clicks inside .modal-content
+// itself — those should be handled by interior buttons.
+document.addEventListener('mousedown', (e) => {
+  const target = e.target;
+  if (!target || !target.classList || !target.classList.contains('modal-overlay')) return;
+  if (!target.classList.contains('show')) return;
+  // The class is on the overlay element AND the click landed on the overlay
+  // itself (not on a descendant inside modal-content), so dismiss.
+  try { target.classList.remove('show'); } catch (err) {}
+}, true);
+
 function updateMarkdownPreview() {
   const text = goalInput.value;
   if (text) {
@@ -2624,9 +2692,38 @@ chrome.runtime.onMessage.addListener((message) => {
         // (3.31.0) Retry-suggestion cards. Render one card per suggestion
         // when the score is low/questionable. Each card has a one-click
         // "Apply & retry" button (or a manual prompt when applyKeys is empty).
+        // (3.33.0) Persistent dismissal: skip suggestions whose id was
+        // dismissed within the last 7 days. Storage shape:
+        //   dismissed_suggestions = { [id]: dismissedAtMs }
+        // Pre-render we fetch the map, prune any entries older than the TTL
+        // (which serves as a passive cleanup pass — no separate timer needed),
+        // and write the trimmed map back. The dismiss button click writes
+        // a fresh entry so the same suggestion stays hidden across runs.
         try {
-          const suggestions = Array.isArray(message.retrySuggestions) ? message.retrySuggestions : [];
+          const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;  // 7 days
+          const rawSuggestions = Array.isArray(message.retrySuggestions) ? message.retrySuggestions : [];
           const originalGoal = typeof message.originalGoal === 'string' ? message.originalGoal : '';
+          // Fetch dismissed map, prune expired, filter incoming suggestions.
+          chrome.storage.local.get('dismissed_suggestions', (stored) => {
+            const now = Date.now();
+            const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
+              ? stored.dismissed_suggestions : {};
+            // Prune entries older than TTL.
+            const dismissedMap = {};
+            for (const [id, ts] of Object.entries(raw)) {
+              if (typeof ts === 'number' && (now - ts) < DISMISS_TTL_MS) dismissedMap[id] = ts;
+            }
+            // Persist the pruned map back if anything changed (lazy cleanup).
+            if (Object.keys(dismissedMap).length !== Object.keys(raw).length) {
+              try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch (e) {}
+            }
+            const suggestions = rawSuggestions.filter(s => s && s.id && !dismissedMap[s.id]);
+            _renderSuggestionsList(suggestions, originalGoal, dismissedMap);
+          });
+        } catch (e) { /* non-fatal */ }
+        // Helper closures live inside the try-catch above so they can see
+        // _trustRow without polluting the chat.js namespace.
+        function _renderSuggestionsList(suggestions, originalGoal, dismissedMap) {
           for (const sug of suggestions) {
             if (!sug || !sug.id) continue;
             const sevColor = sug.severity === 'high' ? '#f44'
@@ -2683,7 +2780,6 @@ chrome.runtime.onMessage.addListener((message) => {
                       if (inputBox && typeof inputBox.value !== 'undefined') {
                         inputBox.value = originalGoal;
                       }
-                      // Prefer the existing sendGoal helper if it's defined; otherwise post a runtime message.
                       if (typeof sendGoal === 'function') sendGoal();
                       else chrome.runtime.sendMessage({ action: 'start_agent', goal: originalGoal });
                     } catch (e) {}
@@ -2701,7 +2797,17 @@ chrome.runtime.onMessage.addListener((message) => {
             dismissBtn.textContent = 'Dismiss';
             dismissBtn.style.cssText = 'padding:5px 10px; font-size:11px; background:transparent; color:var(--text-secondary); border:1px solid var(--border-color, rgba(255,255,255,0.12)); border-radius:4px; cursor:pointer; white-space:nowrap;';
             dismissBtn.addEventListener('click', () => {
-              try { sCard.remove(); } catch (e) {}
+              try {
+                sCard.remove();
+                if (sug && sug.id) {
+                  chrome.storage.local.get('dismissed_suggestions', (stored) => {
+                    const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
+                      ? stored.dismissed_suggestions : {};
+                    map[sug.id] = Date.now();
+                    try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch (e2) {}
+                  });
+                }
+              } catch (e) {}
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);
@@ -2711,8 +2817,26 @@ chrome.runtime.onMessage.addListener((message) => {
           if (suggestions.length > 0) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
-        } catch (e) { /* retry-suggestion render non-fatal */ }
+        }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
+        function _trustRow(label, comp) {
+          if (!comp) return '';
+          const pts = (typeof comp.points === 'number') ? comp.points : 0;
+          const max = (typeof comp.max === 'number') ? comp.max : 0;
+          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
+          const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
+          const widthPct = Math.min(100, Math.round(ratio * 100));
+          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
+                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
+                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
+                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
+                   '</div>' +
+                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
+                 '</div>';
+        }
       } catch (e) { /* trust-score render non-fatal */ }
-    } catch (e) { /* agent_finished outer non-fatal */ }
+    } catch (err) {
+      console.error('Error displaying completion message:', err);
+    }
+    resetUI();
   }
 });

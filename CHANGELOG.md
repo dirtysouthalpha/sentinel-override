@@ -1,5 +1,90 @@
 # Changelog
 
+## v3.34.0 — 2026-05-12 (Closable popups — × button, Escape, click-outside on every overlay)
+
+User-reported: the Markdown Preview panel opens to ~40% of the side-panel width but has no close button visible. When it covers the previewBtn or any other toolbar control, the operator gets stuck. The same risk applies to any modal/popup that lands in front of the extension UI.
+
+v3.34.0 closes that gap with three independent dismissal paths.
+
+### Added — Markdown Preview close paths (popup.html + popup-modules/chat.js)
+
+- **× button** in the markdown-preview-header. Always visible inside the panel, sized 18px so it's tap-friendly. Title "Close preview (Esc)" explains the keyboard shortcut.
+- **Click outside** the preview. Mousedown listener checks `markdownPreview.contains(e.target)` — clicks inside the preview itself do nothing; everything else dismisses. Skips the previewBtn so the toggle button still works normally.
+- **Escape key**. Top-priority handler — fires before the generic-modal Escape handler.
+
+All three converge on a single `_closeMarkdownPreview()` helper so the `markdownPreview.show` class and the `previewBtn.active` class stay in sync no matter which path you use.
+
+### Added — Safety-net Escape handler for all `.modal-overlay.show`
+
+If any visible modal-overlay is on screen and the user presses Escape, the top-most one (last in DOM order = visually on top) gets dismissed even if its own close button is broken or covered. This is intentionally a "last resort" handler — individual modals still own their close buttons; this catches the case where one is misconfigured.
+
+Runs AFTER the markdown-preview Escape handler so the preview takes priority when both are open.
+
+### Added — Click-the-backdrop dismissal for `.modal-overlay`
+
+The dark translucent area behind a modal (the `.modal-overlay` element itself) now responds to mousedown. Clicking inside `.modal-content` does nothing (interior buttons handle their own clicks). Clicking the backdrop dismisses the modal. Standard browser-modal behavior.
+
+### Why a global handler instead of per-modal
+
+There are 16+ modal-overlay containers in popup.html (settings, templates, run-log, recent-chats, client-knowledge, skill stats, etc.). Wiring close buttons + Escape + backdrop-click on each one would mean 48+ event listeners. A delegated handler at document level is one listener that covers every current and future modal — and acts as a backstop if a future modal forgets to wire its own close.
+
+### Files touched
+
+- `popup.html` — markdown-preview-header now has `<button id="markdownPreviewCloseBtn">×</button>` and uses flex layout.
+- `popup-modules/chat.js` — `_closeMarkdownPreview()` helper + click handler on the new × + outside-click handler + Escape handler + safety-net Escape for `.modal-overlay.show` + click-the-backdrop dismiss.
+- `manifest.json` — 3.33.0 → 3.34.0.
+- `CHANGELOG.md` — this entry.
+
+### Deferred (bundled v3.33.0 work also in this push)
+
+The persistent suggestion dismissal from v3.33.0 is included in this release (the Edit was already on disk when the user hit the markdown-preview bug). Both ship together as v3.34.0 — the persistent-dismissal feature stays unchanged from its v3.33.0 implementation but gets the v3.34.0 closable-popup fixes alongside.
+
+---
+
+## v3.33.0 — 2026-05-12 (Persistent suggestion dismissal — once dismissed, stays gone for 7 days)
+
+Resurrects the v3.32.0 plan that got bumped for the settings layout fix. v3.31.0 retry suggestions reappeared on every low-scored run, including the ones you'd just dismissed because they weren't the issue. Now dismissals persist for a week.
+
+### Added — Per-suggestion dismissal persistence (popup-modules/chat.js)
+
+Storage shape:
+```
+chrome.storage.local.dismissed_suggestions = { [suggestionId]: dismissedAtMs }
+```
+
+- **TTL: 7 days.** Anything older auto-expires next time the suggestions block renders.
+- **Passive cleanup** — no separate timer. The render path reads the map, prunes expired entries, writes the trimmed map back, then filters incoming suggestions. Cleanup runs naturally whenever a finish brings up suggestions, which is the only time dismissed entries matter.
+- **Dismiss button** now writes a fresh `dismissedAtMs` entry on click via async read-merge-write. Concurrent dismissals from a duplicate panel won't clobber each other.
+
+### Render-path filter
+
+The retry-suggestions block now wraps its for-loop in an inner helper called from a `chrome.storage.local.get` callback. The callback:
+1. Reads `dismissed_suggestions`.
+2. Builds a fresh map containing only entries newer than the TTL.
+3. Writes the trimmed map back if anything was pruned (lazy GC).
+4. Filters the incoming `retrySuggestions` array against the map.
+5. Calls the render helper with the filtered list.
+
+If a suggestion id was dismissed less than 7 days ago, it never makes it to a rendered card.
+
+### Why 7 days
+
+Long enough that dismissing the same low-quality nudge isn't a daily chore. Short enough that if the underlying issue genuinely returns weeks later (different platform, different goal pattern), the suggestion gets a fresh chance to be helpful. Hardcoded for now — Settings-level TTL slider deferred until anyone asks.
+
+### Files touched
+
+- `popup-modules/chat.js` — wrapped suggestion render in storage-callback + persistent dismiss handler.
+- `manifest.json` — 3.32.0 → 3.33.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- "Clear all dismissed suggestions" button in Settings — deferred. The 7-day TTL plus the lazy-cleanup pass means dismissed entries will naturally roll off without operator intervention.
+- Per-id custom TTL — deferred. All suggestions share the 7-day window.
+- Telemetry for filtered/dismissed suggestions — deferred until v3.31's suggestion-apply outcome tracking lands (which needs richer signal anyway).
+
+---
+
 ## v3.32.0 — 2026-05-12 (Settings layout fix — checkboxes were stretched + labels wrapping per character)
 
 User-reported visual bug. The three v3.27.0 / v3.28.0 / v3.29.0 checkboxes in the Live Telemetry settings card (Persist telemetry / Redact payloads / Adaptive skill priority) rendered with the checkbox stretched to fill the row width and the label text wrapping one character per line on the right side. Completely unreadable.
