@@ -459,6 +459,16 @@
             </span>
           </span>
         </label>
+        <!-- (3.28.0) Redact sensitive payloads — strips API keys, bearer tokens, password-named fields, OAuth query params before broadcast + persist + export. -->
+        <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
+          <input type="checkbox" id="telemetryRedactToggle" style="margin-top:3px; flex-shrink:0;" checked>
+          <span>
+            <strong style="font-size:13px;">Redact sensitive payloads</strong>
+            <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
+              Scrub API keys (OpenAI sk-*, Anthropic, GitHub, AWS, Google, Slack, Stripe), bearer/Basic auth headers, JWT tokens, OAuth query params (?token=, ?code=, etc.), and JSON fields named password/secret/apikey/auth_token/recovery_code/mfa_code before any event leaves the service worker. Recommended ON — disable only if you need raw payloads for deep debugging. SW console (chrome://extensions DevTools) always shows raw events regardless.
+            </span>
+          </span>
+        </label>
       </div>
 
       <!-- (3.14.0) Ticket Mode — wraps every finish summary into one of six MSP templates. -->

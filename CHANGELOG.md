@@ -1,5 +1,86 @@
 # Changelog
 
+## v3.28.0 — 2026-05-12 (Telemetry redaction — close the persist/export leak)
+
+v3.27.0 shipped persistence + Export JSON. That immediately created a new leak surface: API keys, bearer tokens, or password values that happen to ride along in a telemetry payload now survive across sessions and walk out the door inside bug-report attachments. v3.28.0 plugs that with an aggressive default-ON scrubber in `emit()`.
+
+### Added — Redaction layer (background/telemetry.js)
+
+Three-tier scrub applied to every emit, before broadcast + before persistence:
+
+**1. Pattern-based replacements** (9 patterns, run against message + every string in payload):
+- OpenAI: `sk-proj-*`, `sk-svcacct-*`, `sk-*` (20+ char tail)
+- Anthropic: `sk-ant-*`
+- GitHub: `ghp_*`, `gho_*`, `ghu_*`, `ghs_*`, `ghr_*`
+- AWS access key: `AKIA[16 chars]`
+- Google API key: `AIza[35 chars]`
+- Slack: `xoxb-*` / `xoxp-*` / `xoxr-*` / `xoxs-*` / `xoxa-*`
+- Stripe live keys: `sk_live_*`, `pk_live_*`, `rk_live_*`
+- Bearer / Basic auth headers (scheme preserved, credential redacted)
+- JWT-shaped tokens (`eyJ*.eyJ*.*`)
+
+Each replacement uses a labeled placeholder like `[REDACTED:openai-key]` so operators can see at a glance which credential type was scrubbed — useful for triaging "wait, what key was in that payload?" moments without leaking the value.
+
+**2. JSON field-name driven scrubs** (case-insensitive whole-value replacement when the key matches):
+- `password`, `passwd`, `secret`
+- `api_key` / `apikey` (exact)
+- `auth_token`, `access_token`, `refresh_token`, `bearer_token`, `session_token`
+- `private_key`, `client_secret`, `csrf_token`
+- `recovery_code`, `mfa_code`
+
+Recursive — handles nested objects + arrays. So if a network response payload includes `{ user: { recovery_code: 'A1B2-C3D4' } }`, the recovery code gets `[REDACTED]` regardless of the surrounding shape.
+
+**3. URL query-param scrub** (string-level regex against any URL-shaped substring):
+- `?token=*`, `?access_token=*`, `?refresh_token=*`, `?id_token=*`
+- `?apikey=*`, `?api_key=*`, `?key=*`, `?secret=*`
+- `?password=*`, `?pwd=*`, `?sig=*`, `?signature=*`
+- `?code=*`, `?state=*` (OAuth flow values)
+
+This catches the most common leak path: navigate / page telemetry capturing a URL with credentials in the query string. The param name passes through; only the value is `[REDACTED]`.
+
+### Trust-boundary design
+
+- **chrome.runtime broadcast (panel)** — redacted.
+- **chrome.storage persistence** — redacted.
+- **Export JSON download** — redacted (consumes the same persisted/buffered events).
+- **SW console (chrome://extensions DevTools)** — RAW. Reason: anyone with DevTools access can read storage anyway, and deep debugging needs unredacted output. This is an established trust boundary in the codebase.
+
+### Added — Settings toggle (popup.html + popup-modules/settings.js)
+
+- New "Redact sensitive payloads" checkbox in the existing Live Telemetry settings card. **Default ON.**
+- Wired to `chrome.storage.local.telemetryRedact`. Tested against three states: explicit-true → on, explicit-false → off, unset → on (safer default).
+- `chrome.storage.onChanged` listener in telemetry.js reacts immediately — no reload needed.
+- Toast confirms each toggle: "Telemetry redaction ON — secrets scrubbed before persist" or "Telemetry redaction OFF — raw payloads will be stored".
+
+### Fail-open semantics
+
+If `_redactEvent()` throws for any reason (malformed payload, circular reference in object), it returns the **original** event. Rationale: visibility is the whole point of the panel. Better to leak a single buggy event to the operator than to silently drop telemetry and look like a hang. The console mirror always shows raw events anyway, so the worst case is parity with v3.27.0.
+
+### Why these patterns specifically
+
+Every regex was selected based on real values that have appeared in telemetry during v3.13 → v3.27 testing:
+- Brandon's Z.AI / GLM API keys (covered by the generic 20-char tail patterns).
+- Microsoft tenant bearer tokens captured during `read_network_requests` on Entra portals.
+- OAuth `?code=` values in M365 sign-in redirects.
+- SentinelOne JWTs in execute_js CSP-block error messages.
+- Stripe `sk_live_*` keys mistakenly pasted into ticket descriptions during testing.
+
+### Files touched
+
+- `background/telemetry.js` — +120 lines (REDACT_PATTERNS, REDACT_KEY_PATTERNS, REDACT_QUERY_PARAMS, _redactString, _redactValue, _redactEvent + wiring in emit()).
+- `popup.html` — Redact checkbox in the Live Telemetry settings card.
+- `popup-modules/settings.js` — Redact toggle wiring (default-ON storage semantics).
+- `manifest.json` — 3.27.0 → 3.28.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- Per-event "🛡 Redacted" badge in the panel UI — deferred. The placeholder text `[REDACTED:label]` is visible at the message level which is currently sufficient.
+- Custom user-defined regex patterns — deferred until at least one user requests it.
+- Console-mirror redaction toggle (`telemetryRedactConsoleAlso`) — deferred; SW DevTools is a fine trust boundary for now.
+
+---
+
 ## v3.27.0 — 2026-05-12 (Telemetry export + cross-session persistence)
 
 Finishes the v3.25.0 telemetry framework. Two big additions: every run's events can now survive a panel close / browser restart (opt-in), and you can dump the current panel buffer to a downloadable JSON file at any time.
