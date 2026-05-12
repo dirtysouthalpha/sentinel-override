@@ -12,7 +12,7 @@ import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
 import { runRecoverySkills } from './skills/index.js';
-import { tel } from './telemetry.js';
+import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -220,7 +220,12 @@ function trimHistory() {
 
 async function persistHistory() {
   trimHistory();
-  await chrome.storage.local.set({ agent_history: history.slice(-CONFIG.maxStoredHistory) });
+  const slice = history.slice(-CONFIG.maxStoredHistory);
+  await chrome.storage.local.set({ agent_history: slice });
+  // (3.25.1) Storage telemetry at trace level — fires once per step. Useful
+  // only when chasing storage-quota or persistence bugs, so it's gated to
+  // trace to avoid panel noise during normal runs.
+  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) {}
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
@@ -330,6 +335,13 @@ export async function startAgent(goal, sender) {
         startUrl: tabInfo?.url || ''
       });
     } catch (e) { /* non-fatal */ }
+    // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
+    // for matching telemetry events to forensic log entries during postmortems.
+    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) {}
+    // (3.27.0) Tell the telemetry persistence layer this is a new run. If the
+    // user has telemetryPersist enabled in settings, events start streaming
+    // to chrome.storage.local from this point onward.
+    try { telStartRun(runLogId, goal); } catch (e) {}
   } catch (e) { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
@@ -623,6 +635,10 @@ async function _waitForModeMismatchDecision(info) {
 
 export async function stopAgent() {
   tel.info('lifecycle', 'Agent stopping (user-initiated)');
+  // (3.27.0) End the telemetry persistence run on user-initiated stop, not
+  // just on natural finish. Otherwise the buffer dangles until the next run
+  // starts, and the "finishedAt" field never gets stamped.
+  try { await telEndRun(runLogId); } catch (e) {}
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
@@ -2928,6 +2944,15 @@ async function runAgentLoop(goal, workingTabId) {
             await chrome.storage.local.set({
               ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now(), completed: true }
             });
+            // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
+            // with the run_log_opened event so postmortem export pulls the
+            // full slice between them.
+            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) {}
+            // (3.27.0) Tell the persistence layer this run is done. Flushes
+            // the buffer one last time and stamps finishedAt on the index.
+            // Awaited so the storage write completes before the SW potentially
+            // suspends after agent_finished fires.
+            try { await telEndRun(runLogId); } catch (e) {}
             // (3.14.0) Stamp the index entry as completed with final step count.
             try {
               await _updateRunLogIndex(runLogId, {
@@ -2985,9 +3010,14 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionMessage(command, stepCount, observation);
           if (entries.length > 0) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Console: ' + entries.length + ' entries', false);
+          // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
+          // tab-manager already emits a debug-level read summary; this one is
+          // at info level because the LLM explicitly chose to consume it.
+          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) {}
           history.push({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
+          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (te) {}
           sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3004,9 +3034,16 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionMessage(command, stepCount, observation);
           if (entries.length > 0) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Network: ' + entries.length + ' requests', false);
+          // (3.25.1) Telemetry: LLM-requested network read. Tag the failed
+          // count so 4xx/5xx spikes during a run are easy to spot.
+          try {
+            const _failed = entries.filter(e => e.failed || (e.status >= 400)).length;
+            tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
+          } catch (e) {}
           history.push({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
+          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (te) {}
           sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3243,15 +3280,23 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (command.type === 'navigate') {
         if (!isValidUrl(command.url)) {
+          // (3.25.1) Telemetry: invalid navigate URL — usually means the LLM
+          // hallucinated a URL or pasted a fragment without a scheme.
+          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) {}
           result = 'Invalid URL: ' + command.url;
           actionFailed = true;
         } else {
+          // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
+          // below so operators can see latency + landing-URL mismatches.
+          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) {}
+          const _navStart = Date.now();
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
           await sleep(1500);
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
+            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) {}
             result = 'Navigated to ' + command.url + ' (content script failed to load)';
             actionFailed = true;
           } else {
@@ -3262,8 +3307,10 @@ async function runAgentLoop(goal, workingTabId) {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
+                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) {}
                 result = 'Navigated to ' + arrivedUrl;
               } else {
+                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) {}
                 result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
                 actionFailed = true;
               }
@@ -3312,6 +3359,14 @@ async function runAgentLoop(goal, workingTabId) {
               delete agentMemory[memKeys[0]];
             }
             await chrome.storage.local.set({ agent_memory: agentMemory });
+            // (3.25.1) Telemetry: memory write from extract/extract_list. Lets
+            // the operator watch memory grow in real time and catch keys that
+            // are repeatedly overwritten or empty.
+            try {
+              const _isArr = Array.isArray(parsed.value);
+              const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
+              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory).length });
+            } catch (e) {}
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
               : `"${String(parsed.value).substring(0, 100)}"`;
@@ -3405,6 +3460,14 @@ async function runAgentLoop(goal, workingTabId) {
               const memKeys = Object.keys(agentMemory);
               if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
               await chrome.storage.local.set({ agent_memory: agentMemory });
+              // (3.25.1) Telemetry: memory write from execute_js. Tagged with
+              // the recovery ladder strategy so operators can see when an
+              // execute_js fell back to body_text / visible_text.
+              try {
+                const _isArr = Array.isArray(savedValue);
+                const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' ? Object.keys(savedValue).length : null));
+                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory).length });
+              } catch (e) {}
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
@@ -3795,7 +3858,15 @@ async function enforceRateLimit() {
   lastApiCallTime = Date.now();
 }
 
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function sleep(ms) {
+  // (3.25.1) Telemetry at trace level for longer sleeps only. We deliberately
+  // skip short (<300ms) sleeps because they fire dozens of times per step
+  // (between CDP mouse events, between content-script roundtrips) and would
+  // drown out the panel. >=1500ms sleeps are usually post-navigate / page-load
+  // waits, which are exactly what operators want to see.
+  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) {}
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // ========== Approval Mode ==========
 // (3.20.1) Defensive target-formatter — never shows "undefined". Falls back

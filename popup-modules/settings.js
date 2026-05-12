@@ -201,6 +201,28 @@ if (telemetryLevelSelect) {
   });
 }
 
+// ========== Telemetry Persistence (3.27.0) ==========
+// Opt-in checkbox. When enabled, background/telemetry.js mirrors every emit
+// into chrome.storage.local keyed by runLogId, with the last 5 runs retained
+// (older runs auto-evicted). Survives panel close + browser restart.
+// Off by default to keep the storage footprint minimal for users who don't
+// need cross-session debugging.
+const telemetryPersistToggle = document.getElementById('telemetryPersistToggle');
+if (telemetryPersistToggle) {
+  chrome.storage.local.get(['telemetryPersist'], (result) => {
+    telemetryPersistToggle.checked = !!result.telemetryPersist;
+  });
+  telemetryPersistToggle.addEventListener('change', () => {
+    chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
+      try {
+        showToast(telemetryPersistToggle.checked
+          ? 'Telemetry will now persist across sessions (last 5 runs)'
+          : 'Telemetry persistence disabled', 'info');
+      } catch (e) {}
+    });
+  });
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
@@ -833,6 +855,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 // The existing theme system already persists via localStorage 'theme-named'.
 // Re-wire the preset clicks to auto-save AND auto-close the modal so users
 // don't have to hit Save — picking is the action.
+
 
 (function wireThemeAutoSave() {
   function init() {

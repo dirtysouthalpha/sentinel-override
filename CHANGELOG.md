@@ -1,5 +1,81 @@
 # Changelog
 
+## v3.27.0 — 2026-05-12 (Telemetry export + cross-session persistence)
+
+Finishes the v3.25.0 telemetry framework. Two big additions: every run's events can now survive a panel close / browser restart (opt-in), and you can dump the current panel buffer to a downloadable JSON file at any time.
+
+The push: a colleague reports "the agent hung yesterday" — you used to be looking at an empty panel. Now you toggle Past Runs ▾, pick the run, and replay it.
+
+### Added — Cross-session telemetry persistence (background/telemetry.js)
+
+- New `startRun(runId, goal)` / `endRun(runId)` lifecycle hooks. agent-engine calls these alongside the existing run-log open/finalize sites so the telemetry index matches the forensic log 1:1.
+- Background-side buffering: every emit also pushes into an in-memory `_runBuffer`. A 5-second flush timer writes the buffer to `chrome.storage.local.telemetry_run_<id>` and bumps the count on `telemetry_runs_index`.
+- Storage cap: 5 runs maximum (oldest evicted with their event lists). Per-run hard cap of 1000 events to prevent runaway runs from hitting Chrome's QUOTA_BYTES_PER_ITEM.
+- Settings-toggle reactive: flipping the persistence checkbox mid-run starts/stops the flush timer immediately via the existing `chrome.storage.onChanged` listener.
+- Three new exported helpers for the panel: `listPersistedRuns()` returns the index, `loadPersistedRun(runId)` returns the events for one run, `deletePersistedRun(runId)` removes a single run from storage.
+- Early-flush trigger: if `_runBuffer` exceeds 200 events between scheduled flushes (i.e. the agent is firing >40 events/sec), flush immediately to bound memory.
+- Quota-safe error path: if a storage write throws (typically QUOTA_BYTES_PER_ITEM), drop the buffer instead of retry-looping.
+
+### Added — Telemetry-engine run lifecycle (background/agent-engine.js)
+
+- `telStartRun(runLogId, goal)` called at the same point as the forensic run-log open (right after `_updateRunLogIndex`).
+- `telEndRun(runLogId)` called on both natural completion (after `_updateRunLogIndex` finalize) and user-initiated `stopAgent`. The natural-finish path is `await`ed so storage flushes before the service worker has a chance to suspend after `agent_finished` fires.
+
+### Added — Export JSON button (popup-modules/telemetry-panel.js)
+
+- New "Export" button in the panel header, between Copy and Past Runs. Dumps the *filtered* events (respecting active filter chip + search query) as a downloadable `sentinel-telemetry-<ISO timestamp>.json` file.
+- Schema: `{ schemaVersion, exportedAt, filter, search, totalEvents, filteredEvents, viewingPastRun, events: [...] }`. Pastes cleanly into a bug report.
+- Uses `URL.createObjectURL` + anchor click trick — no extra Chrome APIs needed. Object URL revoked after 1.5s.
+
+### Added — Past Runs dropdown (popup-modules/telemetry-panel.js)
+
+- New "Past Runs ▾" button opens an anchored dropdown listing persisted runs (most recent first).
+- Each item shows: completion glyph (✓ vs ⋯), goal snippet (60 chars), start timestamp (localized), event count, and a per-item delete (✕) button.
+- "● Live stream" item at top always shows the current run's buffer size and switches back to live view.
+- Click a row → snapshot the live buffer into `_liveBuffer`, swap the visible `events` array with the loaded run's events, render. Click "Back to Live" → reverse.
+- While viewing a past run, incoming `telemetry_event` messages get routed into `_liveBuffer` instead of being dropped, so nothing's lost when the operator toggles back.
+- Sticky orange "Viewing past run · &lt;goal&gt; · &lt;timestamp&gt;" banner above the event list. Includes a Back to Live button so it works without the dropdown.
+- Outside-click + Escape both dismiss the dropdown.
+
+### Added — Message handlers (background/index.js)
+
+Three new bridge cases so the popup-side panel can read persistence state without importing telemetry.js:
+- `list_persisted_telemetry_runs` → `listPersistedRuns()`
+- `load_persisted_telemetry_run` (with `runId`) → `loadPersistedRun(runId)`
+- `delete_persisted_telemetry_run` (with `runId`) → `deletePersistedRun(runId)`
+
+### Added — Settings toggle (popup.html + popup-modules/settings.js)
+
+- New "Persist telemetry across sessions" checkbox in the existing Live Telemetry Verbosity card. Visually grouped with the verbosity dropdown under a top-border so both controls feel like one telemetry-settings unit.
+- Wired to `chrome.storage.local.telemetryPersist` (default false). Shows a toast on change.
+
+### Why these specifically
+
+The v3.25.0 panel solved the "I can't see what's happening right now" problem. v3.27.0 solves the two adjacent problems:
+1. **"It happened yesterday"** — persistence + Past Runs.
+2. **"Look at what I'm seeing"** — Export JSON button.
+
+Both are opt-in / no-cost when not used. The persistence checkbox is OFF by default, so users who don't need cross-session debugging get zero storage overhead.
+
+### Files touched
+
+- `background/telemetry.js` — +175 lines (persistence layer + 4 exported helpers).
+- `background/agent-engine.js` — startRun/endRun wiring at run-log open, finalize, and stopAgent (+3 emit sites).
+- `background/index.js` — 3 new message-handler cases + import.
+- `popup-modules/telemetry-panel.js` — Export button + Past Runs dropdown + Viewing banner + live-buffer routing while viewing past.
+- `popup-modules/settings.js` — Persistence checkbox wiring.
+- `popup.html` — Persistence checkbox markup in the existing Telemetry settings card.
+- `manifest.json` — 3.26.0 → 3.27.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- Per-run goal-text filtering on the Past Runs dropdown — deferred; 5 runs is small enough that scrolling works.
+- Telemetry-event redaction (strip API keys / tokens before persist) — deferred to v3.28.0 if user reports show sensitive payloads leaking.
+- Cross-device sync (chrome.storage.sync) — deliberately not supported; the per-item quota is 8KB which a single run blows past instantly.
+
+---
+
 ## v3.26.0 — 2026-05-12 (Content-script telemetry bridge)
 
 The agent runs in three execution contexts — service worker (background), side panel (popup), and the page itself (content script). v3.25.0 lit up the first two; v3.26.0 finishes the picture by routing content-script events through the same panel, with the same filters and verbosity gate.

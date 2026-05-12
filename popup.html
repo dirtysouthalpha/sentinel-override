@@ -449,6 +449,16 @@
         <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
           Open the panel from the rail (the activity-pulse icon). Verbosity changes take effect on next event — no reload required.
         </div>
+        <!-- (3.27.0) Persist telemetry across sessions — keeps the last 5 runs in chrome.storage.local. -->
+        <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
+          <input type="checkbox" id="telemetryPersistToggle" style="margin-top:3px; flex-shrink:0;">
+          <span>
+            <strong style="font-size:13px;">Persist telemetry across sessions</strong>
+            <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
+              Save each run's telemetry to local storage. Survives panel close + browser restart. Capped at the last 5 runs (older runs auto-evicted) to stay under quota. Open Past Runs ▾ in the panel header to load a previous session.
+            </span>
+          </span>
+        </label>
       </div>
 
       <!-- (3.14.0) Ticket Mode — wraps every finish summary into one of six MSP templates. -->
