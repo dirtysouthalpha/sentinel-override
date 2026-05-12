@@ -17,7 +17,8 @@ import { exportTemplate, exportAllTemplates, validateImport, importTemplates, ex
 // import telemetry.js directly (different context), so it posts a
 // `content_telemetry_event` message and we re-emit via tel.emit() so the
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
-import { tel } from './telemetry.js';
+// (3.27.0) Also exposes Past Runs queries to the popup-side panel.
+import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
 import {
   listClients as ck_listClients,
   getClient as ck_getClient,
@@ -134,6 +135,19 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         tel[lvl](cat, msg, payload);
       } catch (e) { /* never throw on telemetry */ }
       return { ok: true };
+    }
+
+    // (3.27.0) Telemetry-panel Past Runs bridge. The panel runs in the side
+    // panel context and can't import telemetry.js directly — these handlers
+    // expose the persistence read/delete API.
+    case 'list_persisted_telemetry_runs': {
+      try { return await listPersistedRuns(); } catch (e) { return []; }
+    }
+    case 'load_persisted_telemetry_run': {
+      try { return await loadPersistedRun(request.runId); } catch (e) { return []; }
+    }
+    case 'delete_persisted_telemetry_run': {
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
     }
 
     case 'get_provider_catalog': {
