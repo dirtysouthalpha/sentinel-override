@@ -451,9 +451,9 @@
         </div>
         <!-- (3.27.0) Persist telemetry across sessions — keeps the last 5 runs in chrome.storage.local. -->
         <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
-          <input type="checkbox" id="telemetryPersistToggle" style="margin-top:3px; flex-shrink:0;">
-          <span>
-            <strong style="font-size:13px;">Persist telemetry across sessions</strong>
+          <input type="checkbox" id="telemetryPersistToggle" style="margin-top:3px; flex-shrink:0; width:16px !important; height:16px !important; padding:0 !important; background:transparent !important; border:1px solid var(--border-color); appearance:auto;">
+          <span style="flex:1; min-width:0;">
+            <strong style="font-size:13px; display:block;">Persist telemetry across sessions</strong>
             <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
               Save each run's telemetry to local storage. Survives panel close + browser restart. Capped at the last 5 runs (older runs auto-evicted) to stay under quota. Open Past Runs ▾ in the panel header to load a previous session.
             </span>
@@ -461,9 +461,9 @@
         </label>
         <!-- (3.28.0) Redact sensitive payloads — strips API keys, bearer tokens, password-named fields, OAuth query params before broadcast + persist + export. -->
         <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
-          <input type="checkbox" id="telemetryRedactToggle" style="margin-top:3px; flex-shrink:0;" checked>
-          <span>
-            <strong style="font-size:13px;">Redact sensitive payloads</strong>
+          <input type="checkbox" id="telemetryRedactToggle" style="margin-top:3px; flex-shrink:0; width:16px !important; height:16px !important; padding:0 !important; background:transparent !important; border:1px solid var(--border-color); appearance:auto;" checked>
+          <span style="flex:1; min-width:0;">
+            <strong style="font-size:13px; display:block;">Redact sensitive payloads</strong>
             <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
               Scrub API keys (OpenAI sk-*, Anthropic, GitHub, AWS, Google, Slack, Stripe), bearer/Basic auth headers, JWT tokens, OAuth query params (?token=, ?code=, etc.), and JSON fields named password/secret/apikey/auth_token/recovery_code/mfa_code before any event leaves the service worker. Recommended ON — disable only if you need raw payloads for deep debugging. SW console (chrome://extensions DevTools) always shows raw events regardless.
             </span>
@@ -471,9 +471,9 @@
         </label>
         <!-- (3.29.0) Adaptive skill priority — outcome-driven re-ranking of the recovery skill library. -->
         <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
-          <input type="checkbox" id="telemetrySkillAdaptToggle" style="margin-top:3px; flex-shrink:0;" checked>
-          <span>
-            <strong style="font-size:13px;">Adaptive skill priority</strong>
+          <input type="checkbox" id="telemetrySkillAdaptToggle" style="margin-top:3px; flex-shrink:0; width:16px !important; height:16px !important; padding:0 !important; background:transparent !important; border:1px solid var(--border-color); appearance:auto;" checked>
+          <span style="flex:1; min-width:0;">
+            <strong style="font-size:13px; display:block;">Adaptive skill priority</strong>
             <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
               Track which recovery skills actually rescue runs vs which fire and the next step still fails. The engine adjusts each skill's effective priority by up to ±20 based on its success rate (requires ≥3 fires to start adjusting). High-performers fire first when multiple match. Reset stats below to start fresh after big changes.
             </span>
