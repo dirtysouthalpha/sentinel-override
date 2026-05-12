@@ -56,6 +56,12 @@
         <line x1="12" y1="12" x2="15.5" y2="13.5"></line>
       </svg>
     </button>
+    <!-- (3.25.0) Telemetry Panel — slide-up live event stream for diagnosing hangs -->
+    <button class="rail-btn" id="telemetryRailBtn" title="Live Telemetry">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+      </svg>
+    </button>
     <div class="rail-divider"></div>
     <button class="rail-btn" id="commandPaletteBtn" title="Command palette (Cmd+K)">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -425,6 +431,23 @@
         </select>
         <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
           Controls whether the rewriter is allowed to ADD phases/steps to short goals. Full mode is impressive but risks the agent doing work you didn't ask for.
+        </div>
+      </div>
+
+      <!-- (3.25.0) Live Telemetry verbosity -->
+      <div class="modal-field" style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+        <label style="display:block; margin-bottom:8px;">
+          Live Telemetry Verbosity
+          <span style="font-weight:400;color:var(--text-tertiary); font-size:11px;"> — controls the level of detail shown in the Live Telemetry panel</span>
+        </label>
+        <select id="telemetryLevelSelect" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:13px;">
+          <option value="quiet">Quiet — errors only</option>
+          <option value="normal">Normal — info, warn, errors (recommended)</option>
+          <option value="verbose">Verbose — debug + above</option>
+          <option value="debug">Debug — every internal trace</option>
+        </select>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Open the panel from the rail (the activity-pulse icon). Verbosity changes take effect on next event — no reload required.
         </div>
       </div>
 
@@ -905,6 +928,7 @@
   <script src="popup-modules/collaboration.js"></script>
   <script src="popup-modules/modal-drag.js"></script>
   <script src="popup-modules/recent-chats.js"></script>
+  <script src="popup-modules/telemetry-panel.js"></script>
   <script src="popup-full.js"></script>
 </body>
 </html>

@@ -12,6 +12,7 @@ import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
 import { runRecoverySkills } from './skills/index.js';
+import { tel } from './telemetry.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -270,6 +271,7 @@ export async function startAgent(goal, sender) {
 
   agentRunning = true;
   resetAgentState();
+  tel.info('lifecycle', 'Agent started', { goal: (goal || '').substring(0, 200), startTabId });
 
   // Load speed mode from settings
   try {
@@ -620,6 +622,7 @@ async function _waitForModeMismatchDecision(info) {
 }
 
 export async function stopAgent() {
+  tel.info('lifecycle', 'Agent stopping (user-initiated)');
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
@@ -2077,6 +2080,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
       try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) {}
+      tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -2534,6 +2538,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _recovery = runRecoverySkills(_skillCtx);
         if (_recovery.appliedSkillIds.length > 0) {
           sendSilentUpdate('Recovery skills consulted: ' + _recovery.appliedSkillIds.join(', '), stepCount);
+          tel.info('skill', 'Recovery skills fired: ' + _recovery.appliedSkillIds.join(', '), { autoApplied: !!_recovery.autoApply, autoApplyType: _recovery.autoApply ? _recovery.autoApply.type : null, lastResult: _skillCtx.lastResult });
           // Forensic log
           try {
             if (runLogId) {
@@ -2583,6 +2588,7 @@ async function runAgentLoop(goal, workingTabId) {
       }, 5000);
 
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
+      tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: promptHistory.length, hasScreenshot: !!base64Image });
       let command;
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
@@ -2654,10 +2660,13 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
             activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (_aiCallError.message || 'unknown'), null);
+            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: _aiCallError.message || String(_aiCallError) });
           } else if (command && command.type) {
             activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
+            tel.info('llm', 'LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
           } else {
             activityDone(stepCount, 'consult-ai', 'AI consultation complete', null);
+            tel.info('llm', 'LLM call complete (no command)', { durationMs: _lastAiCallMs });
           }
         }
       }
