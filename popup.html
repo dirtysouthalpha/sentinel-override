@@ -469,6 +469,20 @@
             </span>
           </span>
         </label>
+        <!-- (3.29.0) Adaptive skill priority — outcome-driven re-ranking of the recovery skill library. -->
+        <label style="display:flex; align-items:flex-start; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); cursor:pointer;">
+          <input type="checkbox" id="telemetrySkillAdaptToggle" style="margin-top:3px; flex-shrink:0;" checked>
+          <span>
+            <strong style="font-size:13px;">Adaptive skill priority</strong>
+            <span style="display:block; font-weight:400; color:var(--text-tertiary); font-size:11px; line-height:1.4; margin-top:2px;">
+              Track which recovery skills actually rescue runs vs which fire and the next step still fails. The engine adjusts each skill's effective priority by up to ±20 based on its success rate (requires ≥3 fires to start adjusting). High-performers fire first when multiple match. Reset stats below to start fresh after big changes.
+            </span>
+          </span>
+        </label>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+          <button id="skillStatsViewBtn" type="button" style="padding:6px 12px; font-size:12px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">View skill stats</button>
+          <button id="skillStatsResetBtn" type="button" style="padding:6px 12px; font-size:12px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Reset stats</button>
+        </div>
       </div>
 
       <!-- (3.14.0) Ticket Mode — wraps every finish summary into one of six MSP templates. -->

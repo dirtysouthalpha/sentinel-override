@@ -19,6 +19,8 @@ import { exportTemplate, exportAllTemplates, validateImport, importTemplates, ex
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
 import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
+// (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
+import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
 import {
   listClients as ck_listClients,
   getClient as ck_getClient,
@@ -148,6 +150,19 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     }
     case 'delete_persisted_telemetry_run': {
       try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+    }
+
+    // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
+    // to render the per-skill success-rate table, then optionally resets via
+    // reset_skill_stats. Both are popup-initiated, no side effects on the agent loop.
+    case 'list_skills_with_stats': {
+      try { return listSkills(); } catch (e) { return []; }
+    }
+    case 'get_skill_stats': {
+      try { return getSkillStats(); } catch (e) { return {}; }
+    }
+    case 'reset_skill_stats': {
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
     }
 
     case 'get_provider_catalog': {

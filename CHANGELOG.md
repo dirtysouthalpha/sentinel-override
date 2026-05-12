@@ -1,5 +1,95 @@
 # Changelog
 
+## v3.29.0 — 2026-05-12 (Adaptive skill priority — outcome-driven recovery learning)
+
+The recovery skill library (v3.21.0) ships with 8 skills, each with a hand-picked static priority number. v3.29.0 turns those numbers into a starting point and lets real-run outcomes nudge them up or down. A skill that consistently rescues runs gets promoted; a skill that fires noisily but doesn't actually help gets demoted. The static priorities still anchor — adjustments cap at ±20.
+
+### Added — Skill outcome tracking (background/skills/index.js)
+
+Per-skill stats persisted to `chrome.storage.local.skill_stats`:
+```
+{
+  [skillId]: {
+    fires: integer,            // total times this skill was applied
+    successes: integer,        // times the NEXT step's action did NOT fail
+    failures: integer,         // times the next step's action also failed
+    lastFiredAt: epoch ms,
+    lastOutcomeAt: epoch ms
+  }
+}
+```
+
+Outcome attribution: simple "next step success" heuristic. The skill fires, the engine dispatches the next action (either the autoApply command directly or the LLM's follow-up after a prompt injection), and the verdict is whichever action that is. If multiple skills fire in one step, they all share the same outcome credit. Partial-credit attribution is a research problem we don't need to start getting signal.
+
+### Added — Effective priority calculation
+
+```
+effectivePriority(skill) = basePriority + Math.round((successRate - 0.5) * 40)
+```
+
+- successRate = 1.0 → +20 boost (the skill fires and ~always rescues the run)
+- successRate = 0.5 → 0 (neutral — coin flip, no signal)
+- successRate = 0.0 → -20 penalty (the skill fires but the next step still fails)
+
+Requires ≥3 fires before any adjustment applies — avoids jumping conclusions on tiny samples. Skills with fewer fires use the static priority as-is.
+
+`runRecoverySkills()` sorts by effective priority (not static), so as your runs accumulate, the order in which skills compete to autoApply shifts toward the ones that have actually been working.
+
+### Added — Self-contained outcome loop
+
+No agent-engine changes required. `runRecoverySkills()` records outcomes for the *previous* call's pending skills at the top of every invocation, judging against `context.lastActionFailed`. This means:
+- The same call site that already fires recovery skills now also closes the learning loop.
+- If the agent stops mid-run, the pending skills' outcomes are simply lost (no leak, no corruption — they just don't get credited this run).
+
+### Added — Settings toggle + reset (popup.html + popup-modules/settings.js)
+
+- "Adaptive skill priority" checkbox in the existing Live Telemetry settings card. **Default ON.** Wired to `chrome.storage.local.telemetrySkillAdapt`. When OFF, all skills fall back to their static priority.
+- "Reset stats" button next to it. Confirmation dialog before wiping. Clears in-memory cache + storage entry.
+- "View skill stats" button opens a modal table: skill ID, description, fires, successes/failures, success rate (color-coded ≥70% green / ≥40% amber / red), base priority, effective priority + delta. Sorted by effective priority descending — top rows fire first when multiple match.
+
+### Added — Bridge handlers (background/index.js)
+
+Three new message cases:
+- `list_skills_with_stats` → `listSkills()` (now returns stats + effectivePriority on each skill).
+- `get_skill_stats` → `getSkillStats()` (raw stats map with successRate + base/effective priority computed).
+- `reset_skill_stats` → `resetSkillStats()` (clears in-memory + storage, emits telemetry).
+
+### Telemetry
+
+Every skill outcome emits a `skill` category event at debug level:
+```
+Skill outcome: <id> → success | failure
+  { skillId, success, fires, successes, failures, successRate, adjustedPriority }
+```
+
+Pair with the v3.25.1 "Skill matched" debug events to trace a full skill lifecycle: matched → fired → outcome → stat updated → effective priority adjusted.
+
+### Why this matters
+
+The static priorities in v3.21.0 were guesses based on which skills *seemed* most likely to be load-bearing. After a month of real runs you'd want to know:
+- Did `selectorMiss` actually rescue runs, or did the LLM ignore its injection 80% of the time?
+- Is `consecutiveFailures` firing too eagerly, marking transient hiccups as fatal?
+- Did the `cspBlocked` skill that we shipped in v3.21.1 turn out to fire on pages that weren't actually CSP-blocked?
+
+v3.29.0 gives you the data. Open "View skill stats" after a week and the answers are in front of you.
+
+### Files touched
+
+- `background/skills/index.js` — +140 lines (stats state, _effectivePriority, _recordPendingOutcomes, resetSkillStats, getSkillStats, sort + pending-stamp wiring).
+- `background/index.js` — 3 new message-handler cases + import.
+- `popup-modules/settings.js` — Adaptive toggle, Reset button, View Stats modal (renders the stats table).
+- `popup.html` — checkbox + two buttons in the Live Telemetry settings card.
+- `manifest.json` — 3.28.0 → 3.29.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- Per-skill manual enable/disable from the View Stats modal — deferred until a skill earns a "permanently bad, never fire" verdict in real runs.
+- Outcome attribution over a longer window (success-within-3-steps rather than just-next-step) — deferred until next-step proves insufficient.
+- Cross-domain skill stats (e.g. `selectorMiss` performs differently on M365 vs SonicWall) — deferred. The current scheme is a global rollup; per-platform stats would need a tagging layer.
+
+---
+
 ## v3.28.0 — 2026-05-12 (Telemetry redaction — close the persist/export leak)
 
 v3.27.0 shipped persistence + Export JSON. That immediately created a new leak surface: API keys, bearer tokens, or password values that happen to ride along in a telemetry payload now survive across sessions and walk out the door inside bug-report attachments. v3.28.0 plugs that with an aggressive default-ON scrubber in `emit()`.

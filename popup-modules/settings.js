@@ -246,6 +246,123 @@ if (telemetryRedactToggle) {
   });
 }
 
+// ========== Adaptive Skill Priority (3.29.0) ==========
+// Default ON. Re-ranks recovery skills based on observed outcomes — a skill
+// with high success rate (next step succeeded after it fired) gets a boost,
+// noisy skills with low success rate get penalized. The "View skill stats"
+// button opens a modal showing per-skill fire count, success rate, and the
+// gap between base vs effective priority.
+const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptToggle');
+if (telemetrySkillAdaptToggle) {
+  chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
+    telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
+  });
+  telemetrySkillAdaptToggle.addEventListener('change', () => {
+    chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
+      try {
+        showToast(telemetrySkillAdaptToggle.checked
+          ? 'Adaptive skill priority ON — outcomes will re-rank skills'
+          : 'Adaptive skill priority OFF — static priorities only', 'info');
+      } catch (e) {}
+    });
+  });
+}
+
+const skillStatsResetBtn = document.getElementById('skillStatsResetBtn');
+if (skillStatsResetBtn) {
+  skillStatsResetBtn.addEventListener('click', () => {
+    if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
+    chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
+      try {
+        if (resp && resp.ok) showToast('Skill stats reset', 'success');
+        else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
+      } catch (e) {}
+    });
+  });
+}
+
+const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
+if (skillStatsViewBtn) {
+  skillStatsViewBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (skills) => {
+      if (!Array.isArray(skills)) skills = [];
+      _renderSkillStatsModal(skills);
+    });
+  });
+}
+
+function _renderSkillStatsModal(skills) {
+  // Strip any existing modal first so re-clicks always show fresh data.
+  const existing = document.getElementById('skillStatsModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'skillStatsModal';
+  modal.className = 'modal-overlay';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1500; display:flex; align-items:center; justify-content:center; padding:24px;';
+
+  const inner = document.createElement('div');
+  inner.className = 'modal-content';
+  inner.style.cssText = 'background:var(--bg-secondary, #161616); border:1px solid var(--border-color); border-radius:8px; max-width:min(720px, calc(100vw - 48px)); width:100%; max-height:calc(100vh - 48px); display:flex; flex-direction:column; overflow:hidden;';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'padding:14px 18px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;';
+  header.innerHTML = '<strong style="font-size:14px;">Recovery skill stats</strong><button id="skillStatsCloseBtn" style="background:transparent; border:none; color:var(--text-secondary); font-size:18px; cursor:pointer;">×</button>';
+  inner.appendChild(header);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'overflow-y:auto; padding:12px 18px; font-size:12px;';
+
+  if (skills.length === 0) {
+    body.innerHTML = '<p style="color:var(--text-tertiary);">No skills registered.</p>';
+  } else {
+    const table = document.createElement('table');
+    table.style.cssText = 'width:100%; border-collapse:collapse; font-size:12px;';
+    table.innerHTML = '<thead><tr style="text-align:left; color:var(--text-tertiary); border-bottom:1px solid var(--border-color);"><th style="padding:6px 4px;">Skill</th><th style="padding:6px 4px; text-align:right;">Fires</th><th style="padding:6px 4px; text-align:right;">Success</th><th style="padding:6px 4px; text-align:right;">Rate</th><th style="padding:6px 4px; text-align:right;">Base</th><th style="padding:6px 4px; text-align:right;">Effective</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    // Sort by effectivePriority descending so the most-impactful skills lead.
+    skills.sort((a, b) => (b.effectivePriority || 0) - (a.effectivePriority || 0));
+    for (const s of skills) {
+      const tr = document.createElement('tr');
+      tr.style.cssText = 'border-bottom:1px solid var(--border-color);';
+      const stats = s.stats || { fires: 0, successes: 0, failures: 0 };
+      const rate = stats.fires > 0 ? (stats.successes / stats.fires) : null;
+      const rateStr = rate === null ? '—' : (Math.round(rate * 100) + '%');
+      const rateColor = rate === null ? 'var(--text-tertiary)' :
+        rate >= 0.7 ? '#9ece6a' :
+        rate >= 0.4 ? '#e0af68' :
+        '#f44';
+      const delta = (s.effectivePriority || 0) - (s.priority || 0);
+      const deltaStr = delta === 0 ? '' : (delta > 0 ? ' (+' + delta + ')' : ' (' + delta + ')');
+      const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
+      tr.innerHTML =
+        '<td style="padding:6px 4px;"><strong>' + s.id + '</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">' + (s.description || '') + '</div></td>' +
+        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.fires + '</td>' +
+        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.successes + ' / ' + stats.failures + '</td>' +
+        '<td style="padding:6px 4px; text-align:right; color:' + rateColor + '; font-variant-numeric:tabular-nums;">' + rateStr + '</td>' +
+        '<td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">' + (s.priority || 0) + '</td>' +
+        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + (s.effectivePriority || 0) + '<span style="color:' + deltaColor + ';">' + deltaStr + '</span></td>';
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    body.appendChild(table);
+    const note = document.createElement('p');
+    note.style.cssText = 'margin-top:14px; font-size:11px; color:var(--text-tertiary); line-height:1.5;';
+    note.textContent = 'Effective priority = base ± up to 20 based on success rate. Requires ≥3 fires before adjusting (avoids judging on tiny samples). Sorted by effective priority descending — top rows fire first when multiple skills match.';
+    body.appendChild(note);
+  }
+
+  inner.appendChild(body);
+  modal.appendChild(inner);
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById('skillStatsCloseBtn').addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  const escClose = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escClose); } };
+  document.addEventListener('keydown', escClose);
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
@@ -669,6 +786,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 // auto-fills the endpoint on selection, and provides a Detect Models button
 // that calls the provider's /models endpoint with the user's API key.
 
+
 (function wireProviderCatalog() {
   const sel = document.getElementById('providerCatalogSelect');
   const detectBtn = document.getElementById('detectModelsBtn');
@@ -678,15 +796,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 
   let catalog = [];
 
-  // Load catalog via background message
   function refreshCatalog() {
     chrome.runtime.sendMessage({ action: 'get_provider_catalog' }, (resp) => {
       if (chrome.runtime.lastError) return;
       const data = (resp && resp.data) ? resp.data : resp;
       if (!Array.isArray(data)) return;
       catalog = data;
-      // Repopulate dropdown
-      sel.innerHTML = '<option value="">— Pick a provider —</option>';
+      sel.innerHTML = '<option value="">- Pick a provider -</option>';
       for (const p of catalog) {
         const opt = document.createElement('option');
         opt.value = p.id;
@@ -697,7 +813,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
   }
   refreshCatalog();
 
-  // Provider selection: auto-fill endpoint + default model
   sel.addEventListener('change', () => {
     const id = sel.value;
     if (!id) return;
@@ -711,14 +826,12 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       const modelInput = document.getElementById('set-provider-model');
       if (modelInput && !modelInput.value) modelInput.value = provider.defaultModel;
     }
-    // Reset detected models
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
     try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) {}
   });
 
-  // Detect Models button
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
@@ -728,9 +841,9 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
     const customEndpoint = (document.getElementById('set-provider-endpoint') || {}).value || '';
     const prevText = detectBtn.textContent;
-    detectBtn.textContent = '⏳ Detecting…';
+    detectBtn.textContent = 'Detecting...';
     detectBtn.disabled = true;
-    modelsSel.innerHTML = '<option value="">(fetching…)</option>';
+    modelsSel.innerHTML = '<option value="">(fetching...)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
     try {
@@ -744,7 +857,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
         try { showToast('Detect failed: ' + msg, 'error'); } catch (e) {}
-        modelsSel.innerHTML = '<option value="">(detection failed — see toast)</option>';
+        modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
       const models = data.models || [];
@@ -756,7 +869,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       modelsSel.innerHTML = '';
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = '— Select a model (' + models.length + ' available) —';
+      placeholder.textContent = '- Select a model (' + models.length + ' available) -';
       modelsSel.appendChild(placeholder);
       for (const m of models) {
         const o = document.createElement('option');
@@ -769,14 +882,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) {}
     } catch (e) {
       try { showToast('Error: ' + e.message, 'error'); } catch (ee) {}
-      modelsSel.innerHTML = '<option value="">(error — see toast)</option>';
+      modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
       detectBtn.disabled = false;
     }
   });
 
-  // Use Selected Model button
   useBtn.addEventListener('click', () => {
     const value = modelsSel.value;
     if (!value) {
@@ -791,10 +903,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
   });
 })();
 
-// ========== Custom CSS Auto-Apply (3.11.0) ==========
-// Lets users paste arbitrary CSS to override the look. Auto-saves on edit,
-// auto-applies on popup open via a <style id="sentinel-custom-css"> tag.
-
 (function wireCustomCss() {
   const STYLE_ID = 'sentinel-custom-css';
   const STORAGE_KEY = 'sentinel-custom-css';
@@ -808,16 +916,14 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         document.head.appendChild(el);
       }
       el.textContent = css || '';
-    } catch (e) { /* non-fatal */ }
+    } catch (e) {}
   }
 
-  // Load on popup open
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) applyCustomCss(saved);
   } catch (e) {}
 
-  // Wire UI when present
   function wire() {
     const ta = document.getElementById('customCssTextarea');
     const applyBtn = document.getElementById('customCssApplyBtn');
@@ -825,7 +931,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     const statusEl = document.getElementById('customCssStatus');
     if (!ta) return;
 
-    // Restore prior value
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) ta.value = saved;
@@ -849,7 +954,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         const css = ta.value || '';
         try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
         applyCustomCss(css);
-        setStatus('✓ saved', '#6fcf80');
+        setStatus('saved', '#6fcf80');
       }, 350);
     });
 
@@ -857,7 +962,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       const css = ta.value || '';
       try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
       applyCustomCss(css);
-      setStatus('✓ applied', '#6fcf80');
+      setStatus('applied', '#6fcf80');
     });
     if (clearBtn) clearBtn.addEventListener('click', () => {
       ta.value = '';
@@ -873,12 +978,6 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     wire();
   }
 })();
-
-// ========== Theme Auto-Save Confirmation (3.11.0) ==========
-// The existing theme system already persists via localStorage 'theme-named'.
-// Re-wire the preset clicks to auto-save AND auto-close the modal so users
-// don't have to hit Save — picking is the action.
-
 
 (function wireThemeAutoSave() {
   function init() {
