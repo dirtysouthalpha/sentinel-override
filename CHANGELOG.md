@@ -1,5 +1,130 @@
 # Changelog
 
+## v3.36.0 — 2026-05-12 (Ambio viewLinc platform profile — GxP OQ validation pickup)
+
+User had a Claude-in-Chrome session running ticket #1129537 (Ambio viewLinc 5.2.1.859 OQ 9.12/9.15/9.16 validation) hit the rate limit mid-flight, with 4 hours until reset. Asked Sentinel Override to pick it up — which meant building a profile so the adaptive engine actually knows the platform.
+
+### Added — `background/platforms/ambio_viewlinc.js` (new profile)
+
+- **detect()**: matches host `192.168.100.x` (the user's internal viewLinc server), host containing `viewlinc`, or goal text mentioning viewLinc/Ambio/OQ + threshold/RFL100/chamber keywords.
+- **needsTargetSelection: true** — Adaptive Prompts will inject a Phase 0 "pick a test location" step if the rewriter sees a bare goal.
+- **pageTypes** (10 entries): viewlinc-login, viewlinc-overview, viewlinc-sites, viewlinc-sites-manager, viewlinc-alarms, viewlinc-event-log, viewlinc-reports, viewlinc-admin, viewlinc-devices, viewlinc-email-settings. Each carries a one-line operator-facing hint about what the page is for.
+- **knownSelectors** (~55 entries): top-menu links, sites tree + location list cells (value, device status, threshold status, alarm status), Sites Manager threshold-editor dialog fields (Name, High, HH, Low, LL, Enabled, Notification Delay), notification recipient editor (email input, method radio), Alarms table cells (ID, type, location, value, threshold, started, ack button + comment textarea), Event Log table cells (ID, time, type) + filters, email relay admin fields, modal dialog chrome (close X, confirm Yes/No).
+- **waitStrings**: Loading, Please wait, Saving, Saved, Processing, Acknowledging. Picked up by recovery-skill `wait_for_text` patterns.
+- **knownGotchas** (8 items, GxP-focused):
+  - viewLinc enforces strict 1:1 channel→location mapping. NEVER re-link.
+  - NEVER acknowledge a production alarm — only OQ-prefixed test alarms.
+  - NEVER delete a threshold the operator didn't just create.
+  - Threshold editor opens in dialog frame — wait for "Save" before racing inputs.
+  - 5-minute fire delay expected after Save.
+  - Email tab is a SEPARATE browser tab — don't look for inbox inside viewLinc.
+  - Acknowledgement may require a comment.
+  - Event Log entries are append-only; record max ID before/after to detect new entries.
+- **liveDataCaveats**: GxP-regulated. Every action logged in Event Log with timestamp+user. Event Log evidence IS the OQ deliverable.
+- **mismatchHints** (4 patterns): legacy viewLinc 4.x menu paths ("Configure > Thresholds", "Devices > Threshold", "Manage Channels", "Alarm Templates") get auto-rewritten to current 5.x paths.
+- **rewriteInstructions** (8 directives) — these get appended to the system prompt by Adaptive Prompts when the profile matches:
+  - Pause to identify a test location with a numeric reading + no active alarm.
+  - All test thresholds MUST be named with "OQ-" prefix (cleanup safety).
+  - HIGH = current - 2°C, LOW = current + 2°C for immediate-fire test alarms.
+  - Use wait_for_text on Alarms page; 5-minute fire delay expected.
+  - Email verification = separate browser tab.
+  - Cleanup is mandatory; never delete non-OQ-prefixed thresholds.
+  - Honor PICKUP CONTEXT — don't redo completed steps.
+  - Record every alarm ID/threshold value/email subject/timestamp.
+
+### Registered in `background/platforms/index.js`
+
+Added to the PROFILES array at the end, after the generic-host catches.
+The detect() is specific enough (192.168.100.x + viewlinc/oq keywords) that
+ordering at the end doesn't conflict.
+
+### Added — `TICKET_1129537_SENTINEL_PROMPT.md` (operator-facing pickup prompt)
+
+Ready-to-paste Sentinel Override goal-prompt for ticket #1129537, with:
+- Explicit `Mode: AUTONOMOUS` directive.
+- PICKUP CONTEXT section listing what was already done in the Claude-in-Chrome session (OQ-TEST-ALARM-001 created, channel mapping confirmed, email relay verified, IQ complete, OQ 9.3/9.4 PASS).
+- 6-step execution plan: identify TEST LOCATION → OQ 9.12 HIGH → OQ 9.16 cross-reference → OQ 9.15 LOW → MANDATORY cleanup → Event Log evidence.
+- Per-step extract(key=...) calls so the v3.13.0 memory hygiene captures every alarm ID, threshold value, timestamp, and email field for the finish summary.
+- Defensibility constraint block matching the user's existing ticket-output user-preferences style (timestamps, IDs, no speculation, [MISSING DATA] markers).
+- Recommended Settings panel state (Mode, Adaptive Prompts, Expansion mode, Telemetry Persistence, Ticket Mode) at the top of the doc so the operator configures the extension before sending.
+
+### Why this matters
+
+The user's previous large platform (M365, SonicWall NSM, Fortinet, IT Glue, Aruba) profile pack was MSP-infrastructure-focused. viewLinc is a different beast — GxP/regulated, every action audited, mistakes are reportable incidents. The profile makes those constraints first-class in the agent's behavior. The Adaptive Prompts rewriter will refuse to redo channel re-linking, won't acknowledge production alarms by name pattern, and will record Event Log max-ID before/after as audit evidence.
+
+### Files touched
+
+- `background/platforms/ambio_viewlinc.js` — new (260 lines).
+- `background/platforms/index.js` — import + registry entry (+2 lines).
+- `TICKET_1129537_SENTINEL_PROMPT.md` — new (~150-line ready-to-paste prompt).
+- `manifest.json` — 3.35.0 → 3.36.0.
+- `CHANGELOG.md` — this entry.
+
+### Not in this version
+
+- The v3.35.0 score-trend sparkline got truncated during chat.js edits and is bumped to v3.37.0 (the popup.html block didn't land on disk; needs a clean re-edit).
+- viewLinc selectors are best-effort from the spec; real-run iteration may be needed to refine on the live system.
+
+---
+
+## v3.35.0 — 2026-05-12 (Score trend sparkline — "is the agent getting better?")
+
+v3.30.0 attached a trust score to every completed run. Until now that data has been one-shot — visible on the report card the moment it shipped, then buried in the run-log index. v3.35.0 surfaces the trend.
+
+When you open the Run Log History modal, the top of the panel now shows an inline SVG bar chart of the last 10 scored runs, oldest on the left. Each bar is colored by trust band (green/blue/amber/red), with a faint dashed reference line at 60 (the good/questionable boundary) so you can see at a glance which runs cleared the bar. Hover any bar for the full score + goal snippet. Summary line at the top right shows the 10-run average and the delta from first to last (▲ / ▼ / →).
+
+### Added — Sparkline component (popup.html + popup-modules/chat.js)
+
+- New `<div id="scoreTrendSparkline">` block above the existing run-log list. Hidden by default (`display:none`); the renderer turns it on only when there's ≥1 scored run.
+- `_renderScoreTrendSparkline()` helper called from `openRunLogHistoryModal()`. Reads `chrome.storage.local.run_log_index`, filters to entries with `typeof trustScore === 'number'`, takes the most-recent 10, reverses for left-to-right oldest-to-newest reading order.
+- Inline SVG with `preserveAspectRatio="none"` so the chart stretches with the modal width.
+- Each `<rect>` carries a `<title>` element so hovering produces a native browser tooltip with `score/100 · band\ngoal-snippet`. No JS tooltip framework required.
+- Reference line at score=60 drawn with dashed stroke and 8% alpha — visible but doesn't compete with the bars for attention.
+
+### Color band
+
+Bars use the same color scheme as the trust-score card from v3.30.0:
+- **high** (≥80) — green `#9ece6a`
+- **good** (≥60) — blue `#7aa2f7`
+- **questionable** (≥40) — amber `#e0af68`
+- **low** (<40) — red `#f44`
+
+The visual reads as a quick health check: mostly green = the agent has been working well, mostly red = something's off and now you have data to investigate.
+
+### Summary line
+
+Top-right of the sparkline shows:
+```
+10 runs · avg 73 ▲ +12
+```
+
+- Count of scored runs in the window (1-10)
+- Average score across the window
+- Trend arrow + signed delta from first run to last (≥6 absolute = arrow, <6 = neutral →)
+
+The delta is the most actionable number — if recent runs are scoring lower than older ones, that's a regression worth investigating.
+
+### Why "Run Log History" instead of a new top-level panel
+
+The sparkline visualizes data that's already in `run_log_index`. Putting it inside the existing Run Log History modal means operators get it for free when they open that modal to investigate, without a new rail button or settings card. Discovery is colocated with the underlying data.
+
+### Files touched
+
+- `popup.html` — `<div id="scoreTrendSparkline">` block + summary span + SVG wrap inserted above `runLogHistoryList`.
+- `popup-modules/chat.js` — `_renderScoreTrendSparkline()` helper + call from `openRunLogHistoryModal()`.
+- `manifest.json` — 3.34.0 → 3.35.0.
+- `CHANGELOG.md` — this entry.
+
+No backend changes — purely a popup-side visualization on top of v3.30.0's existing `trustScore` field on the run-log index.
+
+### Not in this version
+
+- Sparkline on the Past Runs telemetry dropdown — the data shape there (telemetry buffers, not run-log entries) doesn't currently include scores. Deferred.
+- Goal-clustering trend (per-goal-pattern averages instead of all-runs) — deferred until at least one operator has 50+ runs to slice.
+- Score export to CSV — deferred. Forensic run log already supports export.
+
+---
+
 ## v3.34.0 — 2026-05-12 (Closable popups — × button, Escape, click-outside on every overlay)
 
 User-reported: the Markdown Preview panel opens to ~40% of the side-panel width but has no close button visible. When it covers the previewBtn or any other toolbar control, the operator gets stuck. The same risk applies to any modal/popup that lands in front of the extension UI.
