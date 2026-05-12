@@ -1472,6 +1472,8 @@ Actions:
 - { "type": "scroll_to", "ref": "ref_N" }  -- scroll a specific element into view (also accepts "selector")
 - { "type": "read_console_messages", "filter": "errors|warning|null", "limit": 50 }  -- (3.7.0) returns buffered browser console entries (level, text, url, line, timestamp). Use to diagnose JS errors, failed AJAX, broken scripts on M365/Exchange/Entra/etc.
 - { "type": "read_network_requests", "filter": "failed|4xx|5xx|null", "url_includes": "graph.microsoft.com", "limit": 30 }  -- (3.7.0) returns buffered network requests (method, url, status, duration, failed). Use to diagnose API errors that don't surface in the UI.
+- { "type": "lookup", "domain": "HOSTNAME_OR_IP", "record_type": "A|AAAA|MX|TXT|CNAME|NS|PTR" }  -- (3.37.0) DNS-over-HTTPS lookup via Cloudflare (1.1.1.1). No page interaction needed. Use to resolve hostnames, verify MX/SPF records, check PTR/reverse DNS. Default record_type is A.
+- { "type": "run_remote_command", "command": "COMMAND_STRING", "command_type": "powershell|cmd|bash" }  -- (3.37.0) Drives the active ScreenConnect or NinjaOne command interface to run a shell command on the remote machine. Automatically detects the platform and uses the correct command runner UI. Returns the command output. Use for ping, nslookup, ipconfig, Get-EventLog, Test-NetConnection, etc.
 
 ${base64Image ? (function() {
   // (#11) DPR-aware coordinate guidance. Coordinates the model emits in click_at

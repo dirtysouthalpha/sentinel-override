@@ -3,6 +3,7 @@
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
+import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
@@ -3173,6 +3174,108 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
+      // (3.37.0) DNS-over-HTTPS lookup — no page interaction, pure background fetch
+      if (command.type === 'lookup') {
+        const _domain = String(command.domain || command.host || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+        const _type = String(command.record_type || command.type_field || 'A').toUpperCase();
+        if (!_domain) {
+          const _r = 'lookup: domain is required';
+          sendActionResult(stepCount, _r, true);
+          history.push({ step: stepCount, action: command, result: _r });
+          await persistHistory();
+          continue;
+        }
+        sendSilentUpdate(`DNS lookup: ${_domain} (${_type})`, stepCount);
+        sendActionMessage(command, stepCount, observation);
+        try {
+          const _dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(_domain)}&type=${encodeURIComponent(_type)}`;
+          const _dohResp = await fetch(_dohUrl, { headers: { Accept: 'application/dns-json' } });
+          if (!_dohResp.ok) throw new Error('DoH HTTP ' + _dohResp.status);
+          const _dohJson = await _dohResp.json();
+          const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
+          const _status = _dohJson.Status === 0 ? 'NOERROR' : `RCODE ${_dohJson.Status}`;
+          const _result = JSON.stringify({ domain: _domain, recordType: _type, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
+          if (_answers.length > 0) productiveSteps++;
+          sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
+          history.push({ step: stepCount, action: command, result: _result });
+          await persistHistory();
+        } catch (e) {
+          const _r = 'lookup failed: ' + (e.message || String(e));
+          sendActionResult(stepCount, _r, true);
+          history.push({ step: stepCount, action: command, result: _r });
+          await persistHistory();
+        }
+        await sleep(300);
+        continue;
+      }
+
+      // (3.37.0) run_remote_command — drives ScreenConnect / NinjaRMM command interface
+      if (command.type === 'run_remote_command') {
+        const _cmd = String(command.command || '').trim();
+        const _cmdType = String(command.command_type || 'powershell').toLowerCase();
+        if (!_cmd) {
+          const _r = 'run_remote_command: command is required';
+          sendActionResult(stepCount, _r, true);
+          history.push({ step: stepCount, action: command, result: _r });
+          await persistHistory();
+          continue;
+        }
+        sendSilentUpdate(`Remote command (${_cmdType}): ${_cmd.slice(0, 60)}`, stepCount);
+        sendActionMessage(command, stepCount, observation);
+        try {
+          const _profile = getPlatformProfile(tabInfo.url, goal);
+          const _ci = _profile && _profile.commandInterface ? _profile.commandInterface : null;
+          const _inputSel = (_ci && _ci.inputSelector) || 'textarea[data-command], .command-input textarea, .code-editor textarea';
+          const _submitSel = (_ci && _ci.submitSelector) || 'button[type="submit"]:has-text("Run"), button:has-text("Execute")';
+          const _outputSel = (_ci && _ci.outputSelector) || '#commandOutput, .command-output, .job-result pre';
+          const _outputMs = (_ci && _ci.outputTimeoutMs) || 15000;
+          const _readyText = (_ci && _ci.outputReadyText) || null;
+
+          // Optionally set command type via a select element
+          if (_ci && _ci.typeSelect && _ci.commandTypes && _ci.commandTypes[_cmdType]) {
+            const _typeSel = _ci.typeSelect;
+            const _typeVal = _ci.commandTypes[_cmdType];
+            await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'select', selector: _typeSel, value: _typeVal } }).catch(() => {});
+            await sleep(300);
+          }
+
+          // Clear + type the command
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _inputSel } }).catch(() => {});
+          await sleep(200);
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: `(function(){var el=document.querySelector(${JSON.stringify(_inputSel)});if(el){el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}})()` } }).catch(() => {});
+          await sleep(150);
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'type', selector: _inputSel, text: _cmd } }).catch(() => {});
+          await sleep(300);
+
+          // Submit
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _submitSel } }).catch(() => {});
+
+          // Wait for output
+          if (_readyText) {
+            await sendMessageWithRetry(tab, { action: 'wait_for', condition: { type: 'wait_for_text', text: _readyText, timeout: _outputMs } }).catch(() => {});
+          } else {
+            await sleep(_outputMs > 5000 ? Math.min(_outputMs, 15000) : _outputMs);
+          }
+
+          // Read back output
+          const _outputJs = `(function(){var el=document.querySelector(${JSON.stringify(_outputSel)});return el?(el.innerText||el.value||el.textContent||'').trim():'(output element not found)';})()`;
+          const _outResp = await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: _outputJs, key: '_rc_output' } }).catch(() => null);
+          const _output = (_outResp && typeof _outResp === 'string') ? _outResp : '(could not read output — check page manually)';
+          const _result = JSON.stringify({ command: _cmd, command_type: _cmdType, platform: _profile ? _profile.id : 'generic', output: _output });
+          if (_output && _output !== '(output element not found)' && _output !== '(could not read output — check page manually)') productiveSteps++;
+          sendActionResult(stepCount, `Command ran on ${_profile ? _profile.label : 'remote machine'}`, false);
+          history.push({ step: stepCount, action: command, result: _result });
+          await persistHistory();
+        } catch (e) {
+          const _r = 'run_remote_command failed: ' + (e.message || String(e));
+          sendActionResult(stepCount, _r, true);
+          history.push({ step: stepCount, action: command, result: _r });
+          await persistHistory();
+        }
+        await sleep(500);
+        continue;
+      }
+
       // Handle wait_for actions
       if (command.type === 'wait_for_text' || command.type === 'wait_for_element' || command.type === 'wait_for_navigation') {
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
@@ -4067,6 +4170,8 @@ function describeAction(command) {
     case 'wait_for_navigation': return 'Wait for navigation';
     case 'read_page':   return 'Read page';
     case 'dismiss_overlay': return 'Dismiss overlay';
+    case 'lookup':            return `DNS lookup: ${command.domain || '(no domain)'} (${command.record_type || 'A'})`;
+    case 'run_remote_command': return `Remote cmd (${command.command_type || 'powershell'}): ${(command.command || '').toString().slice(0, 60)}`;
     default: return `${command.type}: ${JSON.stringify(command).slice(0, 100)}`;
   }
 }

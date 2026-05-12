@@ -15,6 +15,8 @@ import { fortigate } from './fortigate.js';
 import { itglue } from './itglue.js';
 import { aruba } from './aruba.js';
 import { ambioViewlinc } from './ambio_viewlinc.js';
+import { screenconnect } from './screenconnect.js';
+import { ninjarmm } from './ninjarmm.js';
 
 const PROFILES = [
   // Most-specific first. NSM before on-box, ITG before generic. Aruba covers
@@ -22,6 +24,7 @@ const PROFILES = [
   // because those have stricter URL matches.
   // (3.36.0) ambioViewlinc detects on the specific 192.168.100.x server +
   // viewlinc/oq keyword combo, so it slots before the catch-alls.
+  // (3.37.0) ScreenConnect and NinjaRMM added for run_remote_command support.
   sonicwallNsm,
   sonicwallOnbox,
   m365Admin,
@@ -29,6 +32,8 @@ const PROFILES = [
   itglue,
   aruba,
   ambioViewlinc,
+  screenconnect,
+  ninjarmm,
 ];
 
 /** Resolve the best-matching platform profile for the current goal+URL. Returns null if none match. */
