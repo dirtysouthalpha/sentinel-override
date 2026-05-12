@@ -255,8 +255,14 @@
   </div>
 
   <!-- Markdown Preview Panel -->
+  <!-- (3.34.0) Header now includes a close × button so the preview can be
+       dismissed when it covers the previewBtn or the operator can't easily
+       reach the bottom toolbar. Click-outside + Escape also close it. -->
   <div class="markdown-preview" id="markdownPreview">
-    <div class="markdown-preview-header">Markdown Preview</div>
+    <div class="markdown-preview-header" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>Markdown Preview</span>
+      <button id="markdownPreviewCloseBtn" title="Close preview (Esc)" style="background:transparent; border:none; color:var(--text-secondary); font-size:18px; line-height:1; cursor:pointer; padding:2px 6px;">×</button>
+    </div>
     <div class="markdown-preview-content" id="previewContent"></div>
   </div>
 
