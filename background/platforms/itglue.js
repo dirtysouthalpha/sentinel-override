@@ -1,0 +1,164 @@
+// background/platforms/itglue.js
+// IT Glue documentation platform — v3.22.0 (new)
+//
+// IT Glue is an MSP documentation system. Organizations contain Assets
+// (configurations, contacts, domains, locations, passwords, SSL certs,
+// flexible-asset types) plus Documents and Embedded files. The agent's
+// most common MSP workflows: search for a config, read documentation,
+// pull a list of expiring SSL certs, find domain registrar info, write
+// a runbook entry.
+//
+// SAFETY: passwords are intentionally NEVER auto-extracted. The
+// sensitive-field block in content/index.js already covers password-style
+// inputs, but IT Glue's password Asset is a dedicated category that should
+// be treated as read-with-redaction in summaries. This profile reinforces
+// that in rewriteInstructions.
+
+export const itglue = {
+  id: 'itglue',
+  label: 'IT Glue',
+  memoryKeyPrefix: 'itglue_',
+
+  detect(url, goal) {
+    if (!url) return false;
+    try {
+      const host = new URL(url).host.toLowerCase();
+      if (/(^|\.)itglue\.com$/i.test(host)) return true;
+      if (/(^|\.)partner\.itglue\.com$/i.test(host)) return true;
+    } catch (e) {}
+    return /\bit\s*glue\b/i.test(String(goal || ''));
+  },
+
+  pageTypes: [
+    { name: 'itglue-login',           urlMatch: /\/login|\/sign_in/i, hint: 'IT Glue login page. SSO often configured — user signs in manually.' },
+    { name: 'itglue-dashboard',       urlMatch: /\/#\/dashboard|\/$/i, hint: 'IT Glue root dashboard. Sidebar: Organizations, Networks, Domains, SSL, Settings.' },
+    { name: 'itglue-orgs-list',       urlMatch: /\/#\/organizations(?:\/|$)/i, hint: 'Organization list. Search/filter at top. Click row to drill into a specific org.' },
+    { name: 'itglue-org-overview',    urlMatch: /\/#\/organizations\/\d+\/?$|\/#\/organizations\/\d+\/overview/i, hint: 'Organization detail. Tabs/sidebar: Configurations, Contacts, Documents, Domains, Passwords, SSL Certs, Flexible Assets, Locations.' },
+    { name: 'itglue-configurations',  urlMatch: /\/#\/organizations\/\d+\/configurations/i, hint: 'Configurations list for the current org (servers, workstations, routers, etc.). Filter by Type/Status.' },
+    { name: 'itglue-config-detail',   urlMatch: /\/#\/organizations\/\d+\/configurations\/\d+/i, hint: 'Configuration detail. Specs, relationships to other assets, related documents, custom fields.' },
+    { name: 'itglue-documents',       urlMatch: /\/#\/organizations\/\d+\/documents/i, hint: 'Documents list. Click row to open. WYSIWYG editor for content.' },
+    { name: 'itglue-passwords',       urlMatch: /\/#\/organizations\/\d+\/passwords/i, hint: 'Password vault for the org. NEVER auto-extract password values — record only metadata (name, username, last_updated).' },
+    { name: 'itglue-domains',         urlMatch: /\/#\/(?:organizations\/\d+\/)?domains/i, hint: 'Domain tracker: registrar, expiration, DNS provider.' },
+    { name: 'itglue-ssl-certs',       urlMatch: /\/#\/(?:organizations\/\d+\/)?ssl/i, hint: 'SSL certificate tracker: subject, issuer, expiration, days remaining.' },
+    { name: 'itglue-flex-assets',     urlMatch: /\/#\/organizations\/\d+\/flexible_assets/i, hint: 'Flexible assets — MSP-customized asset types (Email, Backups, AV, etc.).' },
+    { name: 'itglue-search-results',  urlMatch: /\/#\/search|search=/i, hint: 'Global search results across orgs + asset types.' },
+  ],
+
+  knownSelectors: {
+    // Generic chrome (IT Glue is an Ember.js SPA)
+    leftNav:                    'nav.sidebar, [class*="sidenav"], .global-nav',
+    orgPicker:                  '[class*="org-picker"], [aria-label*="organization" i] [role="combobox"]',
+    globalSearchInput:          'input[type="search"][placeholder*="Search" i], .global-search input, #search-box input',
+    breadcrumb:                 '.breadcrumb, [aria-label="breadcrumb" i] ol',
+    userMenuButton:             '[class*="user-menu"], [aria-label*="account" i] button',
+
+    // Organizations
+    orgsListTable:              '.organizations-table, table[class*="org-list"], .ember-table',
+    orgsListSearch:             'input[placeholder*="Search organizations" i], .org-search input',
+    orgRow:                     '.organizations-table tr, .ember-table-row',
+    orgNameCell:                'td.org-name, td:first-of-type a',
+
+    // Org sidebar (after drilling in)
+    orgSidebar:                 '.org-sidebar, nav.org-nav, [class*="organization-nav"]',
+    orgNavConfigurations:       'a[href*="configurations"]',
+    orgNavContacts:             'a[href*="contacts"]',
+    orgNavDocuments:            'a[href*="documents"]',
+    orgNavDomains:              'a[href*="domains"]',
+    orgNavPasswords:            'a[href*="passwords"]',
+    orgNavSslCerts:             'a[href*="ssl"]',
+    orgNavFlexibleAssets:       'a[href*="flexible_assets"]',
+    orgNavLocations:            'a[href*="locations"]',
+
+    // Configurations
+    configTable:                '.configurations-table, table[class*="config"]',
+    configSearchInput:          'input[placeholder*="Search" i][placeholder*="config" i]',
+    configTypeFilter:           'select[name*="type" i], [class*="type-filter"]',
+    configStatusFilter:         'select[name*="status" i], [class*="status-filter"]',
+    configRow:                  '.configurations-table tr, .ember-table-row',
+    configNameCell:             'td.name, td:first-of-type a',
+    configAddButton:            'button[aria-label="New configuration" i], a:has-text("New Configuration")',
+
+    // Config detail
+    configDetailHeader:         '.config-detail-header, h1.config-name',
+    configDetailTabs:           '.detail-tabs, [role="tablist"]',
+    configRelatedItems:         '[class*="related-items"], section.relationships',
+    configCustomFields:         '[class*="custom-fields"], section.fields',
+    configEditButton:           'button[aria-label="Edit" i], a:has-text("Edit Configuration")',
+
+    // Documents
+    docsTable:                  '.documents-table, table[class*="docs"]',
+    docsSearchInput:             'input[placeholder*="Search docs" i], .doc-search input',
+    docRow:                     '.documents-table tr',
+    docTitleCell:               'td.title, td:first-of-type a',
+    docEditor:                  '.document-editor, .froala-editor, [contenteditable="true"][class*="doc"]',
+    docSaveButton:              'button[aria-label="Save" i], button:has-text("Save")',
+
+    // Passwords (sensitive — DO NOT auto-extract values)
+    passwordsTable:             '.passwords-table, table[class*="passwords"]',
+    passwordRow:                '.passwords-table tr',
+    passwordNameCell:           'td.name, td:first-of-type',
+    passwordRevealButton:       'button[aria-label*="reveal" i], button[aria-label*="show password" i]',  // DO NOT CLICK
+    passwordCopyButton:         'button[aria-label*="copy" i][aria-label*="password" i]',                  // DO NOT CLICK
+
+    // Domains
+    domainsTable:               '.domains-table, table[class*="domains"]',
+    domainNameCell:             'td.name, td.domain-name',
+    domainExpirationCell:       'td.expiration, td[class*="expires"]',
+    domainRegistrarCell:        'td.registrar',
+
+    // SSL certs
+    sslTable:                   '.ssl-table, table[class*="ssl"]',
+    sslSubjectCell:             'td.subject, td.common-name',
+    sslIssuerCell:              'td.issuer',
+    sslExpirationCell:          'td.expiration, td[class*="expires"]',
+    sslDaysRemainingCell:       'td.days-remaining',
+
+    // Flexible assets
+    flexAssetTable:             '.flex-asset-table, table[class*="flexible"]',
+    flexAssetTypeFilter:        'select[name*="flexible-asset-type" i]',
+
+    // Common dialog patterns
+    dialogSaveBtn:              'button[type="submit"]:has-text("Save"), button.primary:has-text("Save")',
+    dialogCancelBtn:             'button:has-text("Cancel"), button[aria-label="Cancel" i]',
+    confirmYesBtn:              'button:has-text("Yes"), button:has-text("Confirm")',
+  },
+
+  waitStrings: {
+    dashboardLoaded:        ['Welcome', 'Organizations', 'Quick Find', 'Recently Viewed', 'Dashboard'],
+    orgsListLoaded:         ['Organizations', 'Type', 'Status', 'Last Updated'],
+    configsLoaded:          ['Name', 'Configuration Type', 'Operating System', 'Status', 'Last Updated', 'No matching results'],
+    docsLoaded:             ['Documents', 'Name', 'Author', 'Last Edited'],
+    passwordsLoaded:        ['Passwords', 'Name', 'Username', 'Category', 'Last Updated'],
+    saveSucceeded:          ['saved', 'updated', 'created', 'success'],
+    saveFailed:             ['error', 'failed', 'invalid'],
+    sessionExpired:         ['Sign in', 'session has expired', 'Please log in'],
+  },
+
+  needsTargetSelection: true,  // Most goals require picking the right org first
+  preflightInstructions: [
+    'Phase 0 — Pick the right organization before any per-org work.',
+    'Step 0a: From the IT Glue dashboard, use Organizations > pick the target org by name.',
+    'Step 0b: Confirm the org name appears in the breadcrumb / page header before proceeding.',
+    'Step 0c: Save to memory: itglue_org_id, itglue_org_name.',
+    'If the target org is ambiguous (e.g., goal says "Acme" but two orgs match), STOP with finish summary "[MISSING DATA — multiple org matches for \'Acme\'; specify which]".',
+  ].join('\n'),
+
+  liveDataCaveats: 'IT Glue data is real-time within a few seconds — no significant lag. SSL cert expiration data is synced from external scanners hourly; for emergency checks, verify directly against the live cert via openssl or browser.',
+
+  knownGotchas: [
+    'IT Glue is an Ember.js SPA — URL paths use hash routing (#/...). After clicking a nav item, wait 1-2s for the route + data to load before scraping.',
+    'Passwords category is SENSITIVE. NEVER click Reveal or Copy buttons; never extract password values. Record only metadata (name, username, category, last_updated). The sensitive-field block in content/index.js further protects against accidental typing into password fields.',
+    'Asset relationships are bidirectional — modifying one configuration\'s relationships affects the related asset. Read-only investigation should not trigger save buttons.',
+    'Global search returns top hits from ALL asset types (configurations, contacts, docs, etc.). Narrow by setting the type filter before reading.',
+    'Document editor is Froala WYSIWYG. Avoid raw HTML manipulation; use the type action against the editor body for content updates.',
+    'Some MSPs put domain registrar credentials in the Passwords category — auditing domains requires also checking that section, but follow the password-handling rules above.',
+  ].join(' '),
+
+  rewriteInstructions: `When rewriting goals for IT Glue:
+- Insert Phase 0 to pick the target organization (use Organizations list + search). Subsequent steps assume the org context is set.
+- Memory keys must begin with 'itglue_'.
+- For password-related goals, prefer to record METADATA only (name, username, last_updated, category). NEVER auto-click reveal/copy buttons or extract password text. The deliverable should reference passwords by name+username, not value.
+- Asset relationships are bidirectional; read-only audit work should avoid Save buttons even by accident.
+- Wait_for_text on org-dashboard signals after navigating into an org.
+- Preserve the user's deliverable structure exactly.`
+};
