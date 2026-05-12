@@ -1201,6 +1201,7 @@ const COMMANDS = [
   { name: 'Toggle Dark Mode', desc: 'Switch theme', action: 'toggle-dark', icon: 'moon' },
   { name: 'Open Settings', desc: 'Configure API and preferences', action: 'settings', icon: 'settings' },
   { name: 'Customize Theme', desc: 'Customize colors', action: 'theme', icon: 'palette' },
+  { name: 'Run Log History', desc: 'Browse and re-export past forensic run logs', action: 'run-log-history', icon: 'log' },
   { name: 'About', desc: 'About Sentinel Override', action: 'about', icon: 'info' },
 ];
 
@@ -1285,6 +1286,9 @@ window.executeCommand = (action) => {
     case 'theme':
       themeModal.classList.add('show');
       break;
+    case 'run-log-history':
+      try { openRunLogHistoryModal(); } catch (e) { try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {} }
+      break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
       break;
@@ -1357,6 +1361,14 @@ function removeReportGeneratingIndicator() {
  * @param {object} report - Report object with summary, fullReport, goal, timestamp
  */
 function addReportCard(report) {
+  // (3.19.1) Defensive guard — some report-generation failure paths can call
+  // this with undefined/null. Don't crash the popup; surface a non-blocking
+  // toast and bail. The user can re-run the report from the modal.
+  if (!report || typeof report !== 'object') {
+    try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch (e) {}
+    console.warn('[Sentinel] addReportCard called without a report object; ignoring.');
+    return;
+  }
   const state = getState();
   state.currentReport = report;
 
@@ -1421,6 +1433,42 @@ function addReportCard(report) {
  * @param {string} markdown - The full report markdown
  */
 function openReportModal(markdown) {
+  // (3.20.2) Reports now open as a full browser tab rather than as an
+  // in-panel modal — the modal overflowed the narrow Chrome side panel
+  // (560px max-width into ~400px viewport) and covered the chat. The new
+  // tab uses the full window width and leaves the side panel uncovered.
+  // The legacy in-panel modal stays in the DOM as a fallback path; pass
+  // {fallback: true} or call openReportModalInline directly to use it.
+  const state = getState();
+  state.currentReportMarkdown = markdown;
+
+  // Stash the report data so report-view.html can read it on load.
+  const payload = {
+    fullReport: markdown,
+    goal: (state.currentReport && state.currentReport.goal) || '',
+    timestamp: (state.currentReport && state.currentReport.timestamp) || new Date().toISOString()
+  };
+  try {
+    chrome.storage.local.set({ _pendingViewReport: payload }, () => {
+      try {
+        const url = chrome.runtime.getURL('report-view.html');
+        chrome.tabs.create({ url });
+      } catch (e) {
+        // Tab creation failed — fall back to the in-panel modal.
+        console.warn('[Sentinel] report-view tab failed, falling back to modal:', e && e.message);
+        openReportModalInline(markdown);
+      }
+    });
+  } catch (e) {
+    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', e && e.message);
+    openReportModalInline(markdown);
+  }
+}
+
+// (3.20.2) Legacy in-panel modal path. Kept as a fallback when the new tab
+// can't open (e.g., chrome.tabs unavailable, popup contexts). Not wired by
+// default; openReportModal above handles routing.
+function openReportModalInline(markdown) {
   const state = getState();
   state.currentReportMarkdown = markdown;
 
@@ -1432,8 +1480,6 @@ function openReportModal(markdown) {
   try {
     reportContent.innerHTML = sanitizeHtml(marked.parse(markdown));
     addCodeCopyButtons(reportContent);
-    // (3.12.0) Decorate [src:key] / [unverified] markers in the rendered
-    // report as clickable chips. Mirrors the chat-message render path.
     try { renderSourceChipsIn(reportContent); } catch (e) { /* non-fatal */ }
   } catch (err) {
     reportContent.textContent = markdown;
@@ -1592,6 +1638,452 @@ function showMfaBanner(url, hint, stepNumber) {
   });
 }
 
+// ========== Sign-In Wall Banner (3.14.1) ==========
+// Surfaced when the agent hits a login page on a known auth host and can't
+// auto-fill credentials. User signs in manually in the affected tab, then
+// clicks Resume. Re-uses the existing pause/resume_agent_loop infra.
+function showSignInWallBanner(url, host, evidence, stepNumber) {
+  const existing = document.getElementById('sign-in-wall-banner');
+  if (existing) existing.remove();
+
+  let hostname = host || '';
+  try { if (!hostname) hostname = new URL(url || '').hostname; } catch (e) { hostname = url || 'the page'; }
+
+  const banner = document.createElement('div');
+  banner.id = 'sign-in-wall-banner';
+  banner.className = 'safety-banner';
+  banner.style.borderColor = 'var(--accent-primary, #ff6b00)';
+  banner.style.background = 'linear-gradient(180deg, rgba(255,107,0,0.08) 0%, transparent 100%)';
+  banner.innerHTML = `
+    <div class="safety-banner-header" style="color: var(--accent-primary, #ff6b00);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+        <polyline points="10 17 15 12 10 7"></polyline>
+        <line x1="15" y1="12" x2="3" y2="12"></line>
+      </svg>
+      <span>Sign-in required — agent paused</span>
+    </div>
+    <div style="font-size: 12px; line-height: 1.5; margin: 6px 0 8px 22px;">
+      Detected on <strong>${escapeHtml(hostname)}</strong>${evidence ? ` (${escapeHtml(String(evidence).substring(0, 80))})` : ''}.
+      Sentinel doesn't auto-fill credentials. Switch to the affected tab, sign in manually (and complete any MFA), then click Resume.
+    </div>
+    <div class="safety-banner-actions" style="margin-left: 22px;">
+      <button class="safety-banner-dismiss" id="signInWallResumeBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Resume</button>
+      <button class="safety-banner-dismiss" id="signInWallFocusBtn" style="margin-left: 6px;" title="Switch focus to the affected tab">Focus tab</button>
+      <button class="safety-banner-dismiss" id="signInWallDismissBtn" style="margin-left: 6px;">Dismiss</button>
+    </div>
+  `;
+
+  chatContainer.appendChild(banner);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  document.getElementById('signInWallResumeBtn').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch(() => {});
+    banner.remove();
+  });
+  document.getElementById('signInWallFocusBtn').addEventListener('click', () => {
+    // Best-effort: ask the background to focus the URL's tab via the existing
+    // active-tab focus hook (re-uses focus_tab message handled by index.js).
+    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch(() => {});
+  });
+  document.getElementById('signInWallDismissBtn').addEventListener('click', () => {
+    banner.remove();
+  });
+}
+
+// ========== Per-Step Activity Stream (3.16.0) ==========
+// Claude-in-Chrome-style per-step checklist. Each step's card gets a stream
+// of activity items (observe, consult-ai, dispatch, etc.) with status icons
+// (spinner / checkmark / x) and per-item durations. Lets the user SEE what
+// the agent is doing inside the step rather than waiting on a stale status
+// bar that says "Consulting AI... (5s)" and nothing else.
+
+// Map of stepNumber -> { card, stream } DOM references. Avoids
+// re-querySelector-ing on every activity update.
+const __activityState = new Map();
+
+function _activityIcon(status) {
+  // SVG icons sized for line-height: 14px circle/check/x
+  if (status === 'done') {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+  }
+  if (status === 'failed') {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+  }
+  if (status === 'in_progress') {
+    // Animated spinner — CSS @keyframes spin defined in popup.css
+    return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="activity-spinner" style="flex-shrink:0;"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>';
+  }
+  // pending
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0; opacity:0.4;"><circle cx="12" cy="12" r="9"></circle></svg>';
+}
+
+function _formatDuration(ms) {
+  if (!ms || ms < 0) return '';
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return m + 'm ' + s + 's';
+}
+
+/** Ensure a step card exists for this stepNumber and return its activity stream container. */
+function _ensureActivityStream(stepNumber) {
+  if (__activityState.has(stepNumber)) {
+    return __activityState.get(stepNumber).stream;
+  }
+  // Look up the action card by stepNumber (created by addActionCard) — if it
+  // doesn't exist yet (agent_step_start arrived first), create a placeholder
+  // card so the activity items have somewhere to go.
+  const welcome = chatContainer.querySelector('.welcome-message');
+  if (welcome) welcome.remove();
+  let card = chatContainer.querySelector('.agent-action-group[data-step="' + stepNumber + '"]');
+  if (!card) {
+    // Create a placeholder step card
+    card = document.createElement('div');
+    card.className = 'message-group agent-action-group activity-step-card';
+    card.setAttribute('data-step', stepNumber);
+    card.innerHTML = `
+      <div class="message-wrapper assistant-wrapper">
+        <div class="message assistant-msg activity-step-msg">
+          <div class="activity-step-header" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span class="activity-step-label" style="font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">Step ${stepNumber}</span>
+            <span class="activity-step-action" style="font-size:12px; color:var(--text-primary); line-height:1.4;">Preparing…</span>
+          </div>
+          <div class="activity-stream" data-step="${stepNumber}"></div>
+        </div>
+      </div>
+    `;
+    chatContainer.appendChild(card);
+  } else {
+    // Existing action card from addActionCard — append an activity stream if not present
+    if (!card.querySelector('.activity-stream')) {
+      const msg = card.querySelector('.message.assistant-msg, .assistant-wrapper');
+      if (msg) {
+        const stream = document.createElement('div');
+        stream.className = 'activity-stream';
+        stream.setAttribute('data-step', stepNumber);
+        stream.style.cssText = 'margin-top:6px;';
+        msg.appendChild(stream);
+      }
+    }
+  }
+  const stream = card.querySelector('.activity-stream');
+  __activityState.set(stepNumber, { card, stream });
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+  return stream;
+}
+
+/** Upsert an activity item in the step's stream. */
+function showAgentActivity(stepNumber, key, label, status, detail) {
+  if (!stepNumber || stepNumber < 1) return;
+  const stream = _ensureActivityStream(stepNumber);
+  if (!stream) return;
+
+  let item = stream.querySelector('.activity-item[data-key="' + CSS.escape(String(key)) + '"]');
+  if (!item) {
+    item = document.createElement('div');
+    item.className = 'activity-item';
+    item.setAttribute('data-key', String(key));
+    item.style.cssText = 'display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px; line-height:1.5;';
+    stream.appendChild(item);
+  }
+  item.setAttribute('data-status', status || 'in_progress');
+
+  // Color by status
+  const statusColor = (status === 'done') ? 'var(--success-color, #4caf50)'
+    : (status === 'failed') ? 'var(--error-color, #f44336)'
+    : 'var(--accent-primary, #ff6b00)';
+
+  // Duration string from detail
+  let durationStr = '';
+  if (detail && typeof detail.durationMs === 'number' && status !== 'in_progress') {
+    durationStr = ' <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ' + _formatDuration(detail.durationMs) + '</span>';
+  }
+
+  item.innerHTML =
+    '<span style="color:' + statusColor + '; display:inline-flex;">' + _activityIcon(status) + '</span>' +
+    '<span style="color:' + (status === 'failed' ? 'var(--error-color, #f44336)' : 'var(--text-primary)') + '; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(label || '') + '</span>' +
+    durationStr;
+
+  // (3.19.1) When the consult-ai item finalizes, if no agent_action message
+  // has updated the step headline yet (typical for internal actions like
+  // note / extract / extract_list / read_page / finish / wait_for_*), use
+  // the AI-decided label as the headline so the user doesn't see
+  // "Preparing…" stuck for the rest of the step.
+  if (key === 'consult-ai' && status === 'done' && typeof label === 'string') {
+    const state = __activityState.get(stepNumber);
+    const card = state ? state.card : null;
+    if (card) {
+      const actionEl = card.querySelector('.activity-step-action');
+      if (actionEl && (actionEl.textContent === 'Preparing…' || actionEl.textContent.trim() === '')) {
+        // Convert "AI decided: note" → "Recording a note", "AI decided: finish" → "Finishing run"
+        const m = label.match(/AI decided:\s*(\w+)/i);
+        if (m) {
+          const t = m[1].toLowerCase();
+          const pretty = {
+            note: 'Recording a note',
+            extract: 'Extracting data',
+            extract_list: 'Extracting list',
+            read_page: 'Reading the page',
+            finish: 'Finishing the run',
+            wait_for_text: 'Waiting for text',
+            wait_for_element: 'Waiting for element',
+            wait_for_navigation: 'Waiting for navigation',
+            dismiss_overlay: 'Dismissing overlay',
+            scroll: 'Scrolling',
+          }[t] || (t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' '));
+          actionEl.textContent = pretty;
+        }
+      }
+    }
+  }
+
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+/** Update the step card's headline action label (called when agent_action arrives). */
+function updateStepCardAction(stepNumber, actionDescription) {
+  if (!stepNumber || stepNumber < 1) return;
+  const state = __activityState.get(stepNumber);
+  const card = state ? state.card : chatContainer.querySelector('.agent-action-group[data-step="' + stepNumber + '"]');
+  if (!card) return;
+  const actionEl = card.querySelector('.activity-step-action');
+  if (actionEl) actionEl.textContent = actionDescription || '';
+}
+
+/** Drop tracked state for the step (called when agent_finished fires for a clean reset). */
+function clearActivityState() {
+  __activityState.clear();
+}
+
+// ========== Mode Mismatch Card (3.15.2) ==========
+// Surfaced when the goal text contains a "Mode: APPROVAL" / "Mode: AUTONOMOUS"
+// directive that disagrees with the current Approval Mode setting. Prevents
+// the user-wrote-APPROVAL-but-toggle-was-AUTONOMOUS disaster on live changes.
+function showModeMismatchCard(payload) {
+  if (!payload) return;
+  const existing = document.getElementById('mode-mismatch-card');
+  if (existing) existing.remove();
+
+  const requestId = payload.requestId || '';
+  const goalWants = (payload.goalWants || 'approval').toLowerCase();
+  const actualMode = (payload.actualMode || 'autonomous').toLowerCase();
+  const evidence = (payload.evidence || '').toString().substring(0, 200);
+  const confidence = payload.confidence || 'high';
+
+  // Headline color: red if the goal wants approval but actual is autonomous
+  // (more dangerous direction); orange the other way.
+  const dangerous = (goalWants === 'approval' && actualMode === 'autonomous');
+  const borderColor = dangerous ? '#C00000' : 'var(--accent-primary, #ff6b00)';
+  const headerColor = dangerous ? '#FF8A8A' : 'var(--accent-primary, #ff6b00)';
+  const bgGrad = dangerous ? 'linear-gradient(180deg, rgba(192,0,0,0.10) 0%, transparent 100%)' : 'linear-gradient(180deg, rgba(255,107,0,0.08) 0%, transparent 100%)';
+
+  const card = document.createElement('div');
+  card.id = 'mode-mismatch-card';
+  card.className = 'safety-banner';
+  card.style.cssText = 'border: 2px solid ' + borderColor + '; background: ' + bgGrad + '; margin: 8px 14px; padding: 14px 16px; border-radius: 8px;';
+  card.innerHTML = `
+    <div style="display:flex; align-items:center; gap:8px; color:${headerColor}; font-weight:700; font-size:13px; margin-bottom:8px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span>Approval Mode mismatch — confirm before running</span>
+    </div>
+    <div style="font-size: 12px; line-height: 1.55; margin-bottom: 10px;">
+      Your goal asks for <strong style="text-transform:uppercase;">${escapeHtml(goalWants)}</strong> mode${evidence ? ' (matched: <em>"' + escapeHtml(evidence) + '"</em>)' : ''}, but the toggle is currently <strong style="text-transform:uppercase;">${escapeHtml(actualMode)}</strong>.
+      ${dangerous ? '<br><span style="color:#FF8A8A;">Running in AUTONOMOUS mode will execute every action without pausing — including clicks that modify settings.</span>' : ''}
+    </div>
+    <div style="font-size:11px; line-height:1.5; padding:8px 10px; background:rgba(0,0,0,0.18); border-radius:4px; margin-bottom:10px;">
+      <div style="font-family:monospace;"><span style="color:#888;">Goal wants:</span> <strong>${escapeHtml(goalWants.toUpperCase())}</strong></div>
+      <div style="font-family:monospace;"><span style="color:#888;">Toggle is:</span> <strong>${escapeHtml(actualMode.toUpperCase())}</strong></div>
+      ${confidence ? '<div style="margin-top:2px; color:#bbb;">Match confidence: ' + escapeHtml(confidence) + '</div>' : ''}
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:6px;">
+      <button id="modeMismatchFlipBtn" style="flex:1; min-width:140px; padding:9px 12px; border-radius:6px; border:1px solid ${borderColor}; background:${borderColor}; color:white; cursor:pointer; font-size:12px; font-weight:600;">Flip to ${escapeHtml(goalWants.toUpperCase())} &amp; continue</button>
+      <button id="modeMismatchContinueBtn" style="flex:1; min-width:140px; padding:9px 12px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:12px;">Continue as ${escapeHtml(actualMode.toUpperCase())}</button>
+      <button id="modeMismatchCancelBtn" style="flex:1; min-width:80px; padding:9px 12px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:12px;">Cancel run</button>
+    </div>
+  `;
+  chatContainer.appendChild(card);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  const sendResponse = (payload) => {
+    try {
+      chrome.runtime.sendMessage(Object.assign({
+        action: 'mode_mismatch_response',
+        requestId
+      }, payload)).catch(() => {});
+    } catch (e) {}
+  };
+
+  document.getElementById('modeMismatchFlipBtn').addEventListener('click', () => {
+    const wantsApproval = (goalWants === 'approval');
+    // Write the new setting from the popup side so updateApprovalModeUI and
+    // the toggle reflect it without needing a separate broadcast.
+    chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
+      try {
+        if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
+          approvalModeToggle.checked = wantsApproval;
+        }
+        if (typeof updateApprovalModeUI === 'function') {
+          updateApprovalModeUI(wantsApproval);
+        }
+      } catch (e) {}
+      sendResponse({ flip: true });
+      card.remove();
+    });
+  });
+  document.getElementById('modeMismatchContinueBtn').addEventListener('click', () => {
+    sendResponse({ continue: true });
+    card.remove();
+  });
+  document.getElementById('modeMismatchCancelBtn').addEventListener('click', () => {
+    sendResponse({ cancel: true });
+    card.remove();
+  });
+}
+
+// ========== Adapted Goal Card (3.15.0) ==========
+// Surfaced before the agent loop starts when Adaptive Prompts has rewritten
+// the goal for the detected platform. In 'auto' mode the card is collapsed
+// by default and informational only. In 'approval' mode the card has three
+// buttons (Use Adapted / Use Original / Edit) and the agent is paused until
+// the user decides.
+function showAdaptedGoalCard(payload) {
+  if (!payload) return;
+  // Remove any prior card so we don't stack on repeated agent starts
+  const existing = document.getElementById('adapted-goal-card');
+  if (existing) existing.remove();
+
+  const mode = payload.mode || 'auto';
+  const platform = payload.platform || {};
+  const summary = (payload.summary || '').toString();
+  const originalGoal = (payload.originalGoal || '').toString();
+  const adaptedGoal = (payload.adaptedGoal || '').toString();
+  const mismatchCount = Array.isArray(payload.mismatchHints) ? payload.mismatchHints.length : 0;
+  const requestId = payload.requestId || '';
+
+  const card = document.createElement('div');
+  card.id = 'adapted-goal-card';
+  card.className = 'safety-banner';
+  card.style.borderColor = 'var(--accent-primary, #ff6b00)';
+  card.style.background = 'linear-gradient(180deg, rgba(120,180,255,0.06) 0%, transparent 100%)';
+
+  const platformLabel = platform.label ? escapeHtml(platform.label) : 'a detected platform';
+  const mismatchLine = mismatchCount > 0
+    ? `${mismatchCount} menu mismatch${mismatchCount === 1 ? '' : 'es'} corrected`
+    : 'no on-box menu mismatches detected';
+  const collapsedByDefault = mode === 'auto';
+  const summaryHtml = summary
+    ? '<pre style="white-space: pre-wrap; font-family: inherit; font-size: 12px; line-height: 1.5; margin: 0; color: var(--text-secondary);">' + escapeHtml(summary) + '</pre>'
+    : '<div style="font-size: 12px; color: var(--text-tertiary); font-style: italic;">(no summary provided)</div>';
+
+  const actionsHtml = (mode === 'approval')
+    ? `
+      <div class="safety-banner-actions" style="margin-left: 22px; margin-top: 8px;">
+        <button class="safety-banner-dismiss" id="adaptedGoalAcceptBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Use Adapted Goal</button>
+        <button class="safety-banner-dismiss" id="adaptedGoalOriginalBtn" style="margin-left: 6px;">Use Original</button>
+        <button class="safety-banner-dismiss" id="adaptedGoalEditBtn" style="margin-left: 6px;">Edit…</button>
+      </div>
+    `
+    : `
+      <div style="margin-left: 22px; margin-top: 8px; font-size: 11px; color: var(--text-tertiary);">
+        Auto-applied. Settings → Adaptive Prompts → Approval to review next time.
+      </div>
+    `;
+
+  card.innerHTML = `
+    <div class="safety-banner-header" style="color: var(--accent-primary, #ff6b00);">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"></path>
+        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+      </svg>
+      <span>Goal adapted for ${platformLabel}</span>
+    </div>
+    <div style="font-size: 12px; line-height: 1.5; margin: 6px 0 8px 22px;">
+      ${mismatchLine}.
+      <button id="adaptedGoalToggleBtn" style="margin-left: 6px; padding: 1px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer;">
+        ${collapsedByDefault ? 'Show details' : 'Hide details'}
+      </button>
+    </div>
+    <div id="adaptedGoalDetails" style="margin-left: 22px; ${collapsedByDefault ? 'display: none;' : ''}">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); margin-bottom: 4px;">Changes</div>
+      ${summaryHtml}
+      <details style="margin-top: 10px;">
+        <summary style="cursor: pointer; font-size: 11px; color: var(--text-secondary);">View adapted goal (${adaptedGoal.length} chars)</summary>
+        <pre id="adaptedGoalText" style="white-space: pre-wrap; font-family: inherit; font-size: 11px; line-height: 1.45; margin: 6px 0 0; padding: 8px 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; max-height: 220px; overflow: auto;">${escapeHtml(adaptedGoal)}</pre>
+      </details>
+      <details style="margin-top: 6px;">
+        <summary style="cursor: pointer; font-size: 11px; color: var(--text-secondary);">View original goal (${originalGoal.length} chars)</summary>
+        <pre style="white-space: pre-wrap; font-family: inherit; font-size: 11px; line-height: 1.45; margin: 6px 0 0; padding: 8px 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; max-height: 160px; overflow: auto; opacity: 0.75;">${escapeHtml(originalGoal)}</pre>
+      </details>
+    </div>
+    ${actionsHtml}
+  `;
+
+  chatContainer.appendChild(card);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
+
+  const toggleBtn = document.getElementById('adaptedGoalToggleBtn');
+  const details = document.getElementById('adaptedGoalDetails');
+  if (toggleBtn && details) {
+    toggleBtn.addEventListener('click', () => {
+      const hidden = details.style.display === 'none';
+      details.style.display = hidden ? '' : 'none';
+      toggleBtn.textContent = hidden ? 'Hide details' : 'Show details';
+    });
+  }
+
+  if (mode === 'approval') {
+    const sendResponse = (payload) => {
+      try {
+        chrome.runtime.sendMessage(Object.assign({
+          action: 'adapted_goal_response',
+          requestId
+        }, payload)).catch(() => {});
+      } catch (e) {}
+    };
+    document.getElementById('adaptedGoalAcceptBtn').addEventListener('click', () => {
+      sendResponse({ approved: true });
+      card.remove();
+    });
+    document.getElementById('adaptedGoalOriginalBtn').addEventListener('click', () => {
+      sendResponse({ useOriginal: true });
+      card.remove();
+    });
+    document.getElementById('adaptedGoalEditBtn').addEventListener('click', () => {
+      // Replace the pre with a textarea, replace the buttons with Save/Cancel.
+      const textEl = document.getElementById('adaptedGoalText');
+      if (!textEl) return;
+      const ta = document.createElement('textarea');
+      ta.value = adaptedGoal;
+      ta.style.cssText = 'width: 100%; min-height: 200px; font-family: inherit; font-size: 11px; line-height: 1.45; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--accent-primary, #ff6b00); border-radius: 6px; color: var(--text-primary); box-sizing: border-box; resize: vertical;';
+      textEl.parentElement.replaceChild(ta, textEl);
+      const actions = card.querySelector('.safety-banner-actions');
+      if (actions) {
+        actions.innerHTML = `
+          <button class="safety-banner-dismiss" id="adaptedGoalSaveEditBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Save & Run</button>
+          <button class="safety-banner-dismiss" id="adaptedGoalCancelEditBtn" style="margin-left: 6px;">Cancel</button>
+        `;
+        document.getElementById('adaptedGoalSaveEditBtn').addEventListener('click', () => {
+          sendResponse({ edited: true, editedGoal: ta.value });
+          card.remove();
+        });
+        document.getElementById('adaptedGoalCancelEditBtn').addEventListener('click', () => {
+          // Restore the buttons to their original state by removing the card
+          // and re-rendering — simplest path that keeps the original adapted
+          // text intact for a second look.
+          card.remove();
+          showAdaptedGoalCard(payload);
+        });
+      }
+    });
+  }
+}
+
 // ========== Download Capture (3.9.0) ==========
 function showDownloadCaptured(dl) {
   if (!dl) return;
@@ -1641,6 +2133,7 @@ function showRunLogExportButton(runLogId, entryCount) {
     <div class="safety-banner-actions" style="margin-left: 22px;">
       <button class="safety-banner-dismiss" id="exportRunLogJsonBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Export JSON</button>
       <button class="safety-banner-dismiss" id="exportRunLogCsvBtn" style="margin-left: 6px;">Export CSV</button>
+      <button class="safety-banner-dismiss" id="viewRunLogHistoryBtn" style="margin-left: 6px;" title="Browse all stored run logs">View past runs</button>
       <button class="safety-banner-dismiss" id="dismissRunLogBtn" style="margin-left: 6px;">Dismiss</button>
     </div>
   `;
@@ -1650,7 +2143,151 @@ function showRunLogExportButton(runLogId, entryCount) {
   document.getElementById('exportRunLogJsonBtn').addEventListener('click', () => exportRunLog('json'));
   document.getElementById('exportRunLogCsvBtn').addEventListener('click', () => exportRunLog('csv'));
   document.getElementById('dismissRunLogBtn').addEventListener('click', () => banner.remove());
+  const histBtn = document.getElementById('viewRunLogHistoryBtn');
+  if (histBtn) histBtn.addEventListener('click', () => openRunLogHistoryModal());
 }
+
+// ========== Run Log History Modal (3.14.0) ==========
+// Lists the last 20 runs from chrome.storage.local.run_log_index with
+// re-export buttons. Lets users recover logs even if they dismissed the
+// post-run banner.
+
+async function openRunLogHistoryModal() {
+  const modal = document.getElementById('run-log-history-modal');
+  if (!modal) return;
+  modal.classList.add('show');
+  await renderRunLogHistoryList();
+}
+
+function closeRunLogHistoryModal() {
+  const modal = document.getElementById('run-log-history-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function renderRunLogHistoryList() {
+  const listEl = document.getElementById('runLogHistoryList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">Loading…</div>';
+  try {
+    const stored = await chrome.storage.local.get('run_log_index');
+    const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
+    if (list.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No runs recorded yet. Start an agent run to populate this list.</div>';
+      return;
+    }
+    const fmtDate = (ts) => {
+      if (!ts) return '—';
+      try { return new Date(ts).toLocaleString(); } catch (e) { return '—'; }
+    };
+    const fmtDuration = (start, end) => {
+      if (!start || !end) return '';
+      const sec = Math.max(0, Math.round((end - start) / 1000));
+      if (sec < 60) return sec + 's';
+      const m = Math.floor(sec / 60), s = sec % 60;
+      return m + 'm ' + s + 's';
+    };
+    const rowsHtml = list.map((entry, i) => {
+      const id = entry.runLogId || '';
+      const goalShort = (entry.goal || '(no goal)').replace(/</g, '&lt;').slice(0, 140);
+      const statusChip = entry.completed
+        ? '<span style="display:inline-block; padding:2px 6px; font-size:10px; border-radius:8px; background:rgba(0,255,100,0.12); color:#33cc66; border:1px solid #2a9d4a;">COMPLETE</span>'
+        : '<span style="display:inline-block; padding:2px 6px; font-size:10px; border-radius:8px; background:rgba(255,180,0,0.12); color:#cc8800; border:1px solid #aa7700;">INCOMPLETE</span>';
+      const duration = fmtDuration(entry.startedAt, entry.finishedAt);
+      const subtitle = [
+        fmtDate(entry.startedAt),
+        (entry.stepCount || 0) + ' steps',
+        (entry.apiCallCount || 0) + ' AI calls',
+        duration
+      ].filter(Boolean).join(' · ');
+      return `
+        <div class="run-log-history-row" data-runid="${id}" style="padding:10px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; background:var(--bg-secondary);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13px; color:var(--text-primary); line-height:1.4; word-break:break-word;">${goalShort}</div>
+              <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px;">${subtitle}</div>
+            </div>
+            <div style="flex-shrink:0;">${statusChip}</div>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <button class="small-btn run-log-export-json" data-runid="${id}" style="font-size:11px;">Export JSON</button>
+            <button class="small-btn run-log-export-csv" data-runid="${id}" style="font-size:11px;">Export CSV</button>
+            <button class="small-btn run-log-delete" data-runid="${id}" style="font-size:11px; color:var(--error-color); margin-left:auto;">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    listEl.innerHTML = rowsHtml;
+    // Wire row buttons
+    listEl.querySelectorAll('.run-log-export-json').forEach(b => {
+      b.addEventListener('click', () => exportRunLogById(b.dataset.runid, 'json'));
+    });
+    listEl.querySelectorAll('.run-log-export-csv').forEach(b => {
+      b.addEventListener('click', () => exportRunLogById(b.dataset.runid, 'csv'));
+    });
+    listEl.querySelectorAll('.run-log-delete').forEach(b => {
+      b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
+    });
+  } catch (e) {
+    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + (e && e.message ? e.message : 'unknown error') + '</div>';
+  }
+}
+
+async function exportRunLogById(runLogId, format) {
+  if (!runLogId) return;
+  // Re-use the existing exportRunLog flow by stuffing __lastRunLogId.
+  __lastRunLogId = runLogId;
+  await exportRunLog(format);
+}
+
+async function deleteRunLogById(runLogId) {
+  if (!runLogId) return;
+  if (!confirm('Delete this run log permanently? This cannot be undone.')) return;
+  try {
+    const stored = await chrome.storage.local.get('run_log_index');
+    const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
+    const next = list.filter(e => e && e.runLogId !== runLogId);
+    await chrome.storage.local.set({ run_log_index: next });
+    await chrome.storage.local.remove('run_log_' + runLogId);
+    try { showToast('Run log deleted', 'info'); } catch (e) {}
+    await renderRunLogHistoryList();
+  } catch (e) {
+    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {}
+  }
+}
+
+async function clearAllRunLogs() {
+  if (!confirm('Delete ALL stored run logs permanently? This cannot be undone.')) return;
+  try {
+    const stored = await chrome.storage.local.get('run_log_index');
+    const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
+    const keys = list.map(e => 'run_log_' + e.runLogId).filter(Boolean);
+    if (keys.length) {
+      try { await chrome.storage.local.remove(keys); } catch (e) {}
+    }
+    await chrome.storage.local.set({ run_log_index: [] });
+    try { showToast('All run logs cleared', 'info'); } catch (e) {}
+    await renderRunLogHistoryList();
+  } catch (e) {
+    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {}
+  }
+}
+
+// Wire modal close buttons and "Clear All" once at module load.
+(function wireRunLogHistoryModal() {
+  const close1 = document.getElementById('closeRunLogHistoryBtn');
+  const close2 = document.getElementById('closeRunLogHistoryBtn2');
+  const clearBtn = document.getElementById('runLogHistoryClearBtn');
+  if (close1) close1.addEventListener('click', closeRunLogHistoryModal);
+  if (close2) close2.addEventListener('click', closeRunLogHistoryModal);
+  if (clearBtn) clearBtn.addEventListener('click', clearAllRunLogs);
+  // (3.17.0) Wire the new left-action-rail Run Log button to the same modal.
+  const railBtn = document.getElementById('runLogHistoryRailBtn');
+  if (railBtn) railBtn.addEventListener('click', () => {
+    try { openRunLogHistoryModal(); } catch (e) {}
+  });
+  // Expose for command-palette / other entry points.
+  try { window.__openRunLogHistory = openRunLogHistoryModal; } catch (e) {}
+})();
 
 async function exportRunLog(format) {
   if (!__lastRunLogId) return;
@@ -1846,7 +2483,6 @@ function showTenantOverrideCard(payload) {
   card.className = 'safety-banner';
   card.style.cssText = 'border: 2px solid #C00000; background: rgba(192,0,0,0.12); margin: 8px 14px; padding: 14px 16px; border-radius: 8px;';
   card.innerHTML = `
-    <div style="display:flex; align-items:center; gap:8px; color:#FF8A8A; font-weight:700; font-size:13px; margin-bottom:8px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
         <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -1893,19 +2529,17 @@ function showTenantOverrideCard(payload) {
   });
 }
 
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_update') {
-    // Route to the step card's log area. Step 0 = pre-loop messages (planning, startup).
     if (message.stepNumber && message.stepNumber > 0) {
       appendLogLine(message.stepNumber, message.text);
     } else {
-      // Pre-loop status (planning phase etc) -- show in the status bar
       updateStatus(message.text);
     }
   }
   if (message.action === 'page_context') {
-    // Show current page URL in the status bar so user can track where the agent is
     if (message.url) {
       try {
         const hostname = new URL(message.url).hostname;
@@ -1913,10 +2547,8 @@ chrome.runtime.onMessage.addListener((message) => {
       } catch (e) {
         updateStatus('On: ' + message.url.substring(0, 60));
       }
-      // (3.7.1) Update the prominent active-tab strip
       updateActiveTabPage(message.url, message.title || '');
       if (message.stepNumber) updateActiveTabStep(message.stepNumber);
-      // (3.8.1) Capture the tabId so the Focus button can target it directly.
       if (typeof message.tabId === 'number') {
         __atsStripState.tabId = message.tabId;
       }
@@ -1926,16 +2558,13 @@ chrome.runtime.onMessage.addListener((message) => {
     removeTypingIndicator();
     removeApprovalCard();
     renderTabBar([]);
-    // (3.7.1) Hide the active-tab strip + screenshot panel between runs
     hideActiveTabStrip();
     hideMiniShot();
+    try { clearActivityState(); } catch (e) {}
     try {
       const summary = message.summary || 'Done';
-      // If summary already has substantial content, don't prefix with "Task completed"
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
       addMessage(prefix + summary, 'assistant');
-      // (3.10.0) Decorate any [src:key] / [unverified] markers in the rendered
-      // summary as clickable chips. Run on the most-recent assistant message.
       try {
         const lastMsg = chatContainer.querySelector('.message-group:last-child .message.assistant-msg, .message-group:last-child .assistant-wrapper');
         if (lastMsg) renderSourceChipsIn(lastMsg);
@@ -1952,23 +2581,25 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_action') {
     removeTypingIndicator();
     addActionCard(message.payload);
-    // (3.7.1) Update the strip with a plain-English description of the action
     updateActiveTabAction(message.payload);
     if (message.payload && message.payload.stepNumber) updateActiveTabStep(message.payload.stepNumber);
+    try {
+      if (message.payload && message.payload.stepNumber && message.payload.description) {
+        updateStepCardAction(message.payload.stepNumber, message.payload.description);
+      }
+    } catch (e) {}
   }
   if (message.action === 'agent_action_result') {
     updateActionCardResult(message.stepNumber, message.result, message.isError);
   }
   if (message.action === 'tab_state_update' && message.tabs) {
     renderTabBar(message.tabs);
-    // (3.7.1) Capture the active tabId so the strip's Focus button can target it
     try {
       const active = (message.tabs || []).find(t => t.isActive);
       if (active && active.tabId) __atsStripState.tabId = active.tabId;
     } catch (e) {}
   }
   if (message.action === 'screenshot_update' && message.base64Image) {
-    // (3.7.1) Live agent's-view thumbnail — updates every step
     updateMiniShot(message.base64Image);
     showMiniShot();
   }
@@ -1976,10 +2607,22 @@ chrome.runtime.onMessage.addListener((message) => {
     showTenantOverrideCard(message.payload);
   }
   if (message.action === 'mfa_pause') {
-    // (3.7.0) MFA challenge detected on the page — show a chat-level banner
-    // with a Resume button. The agent is already paused server-side; we just
-    // need to tell the user and give them a one-click resume.
     showMfaBanner(message.url, message.hint, message.stepNumber);
+  }
+  if (message.action === 'sign_in_wall_pause') {
+    showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber);
+  }
+  if (message.action === 'adapted_goal_available') {
+    try { showAdaptedGoalCard(message); } catch (e) { console.warn('showAdaptedGoalCard failed:', e && e.message); }
+  }
+  if (message.action === 'mode_mismatch_pause') {
+    try { showModeMismatchCard(message); } catch (e) { console.warn('showModeMismatchCard failed:', e && e.message); }
+  }
+  if (message.action === 'agent_step_start') {
+    try { _ensureActivityStream(message.stepNumber); } catch (e) { console.warn('agent_step_start failed:', e && e.message); }
+  }
+  if (message.action === 'agent_activity') {
+    try { showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail); } catch (e) { console.warn('agent_activity failed:', e && e.message); }
   }
   if (message.action === 'tenant_detected') {
     renderTenantChip(message.tenant, message.expected);

@@ -12,8 +12,69 @@
 <body>
   <!-- CRT Scanline Overlay -->
   <div class="scanline-overlay"></div>
-  <!-- Left Edge Accent Bar -->
-  <div class="left-edge-accent"></div>
+
+  <!-- (3.17.0) Left Action Rail — icon-only navigation, frees up the header
+       so all controls are reachable without expanding the sidebar. Buttons
+       keep their original IDs so chat.js handlers don't need rewiring. -->
+  <nav id="action-rail" aria-label="Sentinel actions">
+    <button class="rail-btn" id="newChatBtn" title="New chat (Cmd+N)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+      </svg>
+    </button>
+    <div class="rail-divider"></div>
+    <button class="rail-btn" id="templatesBtn" title="Templates & Runbooks">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+    </button>
+    <button class="rail-btn" id="schedulerBtn" title="Schedules">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+    </button>
+    <button class="rail-btn" id="runLogHistoryRailBtn" title="Run Log History">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="9" y1="13" x2="15" y2="13"></line>
+        <line x1="9" y1="17" x2="15" y2="17"></line>
+      </svg>
+    </button>
+    <div class="rail-divider"></div>
+    <button class="rail-btn" id="commandPaletteBtn" title="Command palette (Cmd+K)">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <path d="M9 11h6"></path>
+        <path d="M9 15h6"></path>
+      </svg>
+    </button>
+    <button class="rail-btn" id="settingsBtn" title="Settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
+      </svg>
+    </button>
+    <div class="rail-spacer"></div>
+    <button class="rail-btn" id="themeToggle" title="Toggle dark mode">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"></circle>
+        <line x1="12" y1="1" x2="12" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="23"></line>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+        <line x1="1" y1="12" x2="3" y2="12"></line>
+        <line x1="21" y1="12" x2="23" y2="12"></line>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+      </svg>
+    </button>
+  </nav>
 
   <!-- Active Tab Strip (3.7.1) — surfaces WHAT the agent is doing and WHERE.
        Always shown during a run; hidden between runs. -->
@@ -48,54 +109,7 @@
       </button>
       <span id="activeIndicator" class="active-indicator" title="Agent active"></span>
     </div>
-    <div class="header-buttons">
-      <button class="icon-btn" id="newChatBtn" title="New chat (Cmd+N)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-        </svg>
-      </button>
-      <button class="icon-btn" id="themeToggle" title="Toggle dark mode">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
-      </button>
-      <button class="icon-btn" id="commandPaletteBtn" title="Command palette (Cmd+K)">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-          <path d="M9 11h6"></path>
-          <path d="M9 15h6"></path>
-        </svg>
-      </button>
-      <button class="icon-btn" id="templatesBtn" title="Templates & Runbooks">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-      </button>
-      <button class="icon-btn" id="schedulerBtn" title="Schedules">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
-      </button>
-      <button class="icon-btn" id="settingsBtn" title="Settings">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path>
-        </svg>
-      </button>
-    </div>
+    <!-- (3.17.0) Header buttons moved to left action rail (#action-rail). -->
   </div>
 
   <!-- Toolbar -->
@@ -376,6 +390,73 @@
           <input type="checkbox" id="soundEnabledToggle">
           <span class="toggle-slider"></span>
         </label>
+      </div>
+
+      <!-- (3.15.0) Adaptive Prompts — pre-execution platform-aware goal rewrite. -->
+      <div class="modal-field" style="background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+        <label style="display:block; margin-bottom:8px;">
+          Adaptive Prompts
+          <span style="font-weight:400;color:var(--text-tertiary); font-size:11px;"> — rewrite goals for the cloud portal you're on before the agent runs</span>
+        </label>
+        <select id="adaptivePromptsModeSelect" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:13px;">
+          <option value="auto">Auto — rewrite silently, show diff card (recommended)</option>
+          <option value="approval">Approval — show diff and wait for accept/edit</option>
+          <option value="off">Off — never rewrite</option>
+        </select>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Detects which platform you're on (SonicWall NSM, M365 admin, FortiGate, etc.) and rewrites your goal with the correct menu paths. Adds ~2-4s per run. Falls back to the original goal on any error.
+        </div>
+
+        <label style="display:block; margin:12px 0 6px;">Expansion Mode</label>
+        <select id="adaptiveExpansionModeSelect" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:13px;">
+          <option value="light">Light — only expand short, one-sentence goals (recommended)</option>
+          <option value="off">Off — never add steps the user didn't ask for</option>
+          <option value="full">Full — fully expand short directives into multi-phase plans</option>
+        </select>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Controls whether the rewriter is allowed to ADD phases/steps to short goals. Full mode is impressive but risks the agent doing work you didn't ask for.
+        </div>
+      </div>
+
+      <!-- (3.14.0) Ticket Mode — wraps every finish summary into one of six MSP templates. -->
+      <div class="toggle-row">
+        <div class="toggle-row-label">
+          <span>Ticket Mode</span>
+          <span id="ticketModeLabel">Format every finish summary into a TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR / IT_GLUE_KB / CLIENT_EMAIL block. When off, only ticket-shaped goals get auto-formatted into FINAL_NOTES.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ticketModeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Ticket format dropdown — shown only when Ticket Mode is on. -->
+      <div id="ticketFormatRow" class="modal-field" style="display:none; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+        <label>Default Output Format</label>
+        <select id="ticketFormatSelect" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color); border-radius:6px; color: var(--text-primary); font-size:13px;">
+          <option value="auto">Auto (pick from goal/summary)</option>
+          <option value="TICKET_KICKOFF">Ticket Kickoff (new/unresolved)</option>
+          <option value="FINAL_NOTES">Final Notes (resolved)</option>
+          <option value="WAITING_ON_CLIENT">Waiting on Client</option>
+          <option value="WAITING_ON_VENDOR">Waiting on Vendor</option>
+          <option value="IT_GLUE_KB">IT Glue KB Article</option>
+          <option value="CLIENT_EMAIL">Client Email (resolved)</option>
+        </select>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-top:6px; line-height:1.4;">
+          Auto picks the format based on the goal text ("waiting on vendor" → vendor block, "kickoff" → kickoff, etc.). Pick a specific format to override.
+        </div>
+
+        <!-- Technician details used to auto-fill the templates. -->
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-color);">
+          <label style="margin-bottom:8px; display:block;">Technician Details <span style="font-weight:400;color:var(--text-tertiary);">(auto-filled into every template)</span></label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <input type="text" id="techNameInput" placeholder="Brandon Goolsby" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+            <input type="text" id="techTitleInput" placeholder="IT Support Technician" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+            <input type="text" id="techCompanyInput" placeholder="Premier Networx" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+            <input type="text" id="techPhoneInput" placeholder="706-426-6313" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px;">
+            <input type="text" id="techEmailInput" placeholder="support@augustaitguys.com" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:13px; grid-column:span 2;">
+          </div>
+        </div>
       </div>
       <div class="form-row" style="margin-top: 16px;">
         <label for="expectedTenantInput" style="display:block; font-weight:600; font-size:13px; margin-bottom:4px;">Expected Microsoft tenant (3.7.0)</label>
@@ -726,6 +807,26 @@
         <button id="closeHistoryModalBtn" class="icon-btn" title="Close">&times;</button>
       </div>
       <div id="schedule-history-list"></div>
+    </div>
+  </div>
+
+  <!-- Run Log History Modal (3.14.0) — browse and re-export past forensic run logs -->
+  <div id="run-log-history-modal" class="modal">
+    <div class="modal-content" style="max-width:560px; max-height:80vh; display:flex; flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h2 style="margin:0;">Run Log History</h2>
+        <button id="closeRunLogHistoryBtn" class="icon-btn" title="Close">&times;</button>
+      </div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:12px; line-height:1.5;">
+        Forensic run logs (last 20 runs). Each row captures every click, type, navigate, and JS execution with a timestamp and screenshot hash — exportable for ticket attachments and HR/compliance review.
+      </div>
+      <div id="runLogHistoryList" style="flex:1; overflow-y:auto; min-height:160px; border-top:1px solid var(--border-color); padding-top:8px;">
+        <div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">Loading…</div>
+      </div>
+      <div class="modal-actions" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+        <button id="runLogHistoryClearBtn" class="modal-btn btn-cancel" style="color:var(--error-color);" title="Delete all stored run logs">Clear All</button>
+        <button id="closeRunLogHistoryBtn2" class="modal-btn btn-save">Done</button>
+      </div>
     </div>
   </div>
 

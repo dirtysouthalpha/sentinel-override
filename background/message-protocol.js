@@ -245,6 +245,47 @@ export function sendTabStateUpdate(tabs) {
 }
 
 /**
+ * (3.16.0) Broadcast a granular per-step activity item. Each step emits a
+ * stream of micro-actions (observe, screenshot, consult-ai, dispatch,
+ * wait-load, sleep, result) so the popup can render a Claude-in-Chrome-style
+ * checklist with spinner / checkmark / failed states.
+ *
+ * @param {number} stepNumber - Current step number (groups items into a step's card)
+ * @param {string} key - Stable identifier within the step (e.g. 'observe', 'consult-ai', 'dispatch'). Upserted by key.
+ * @param {string} label - Human-readable label ("Observing page", "Consulting AI · 5s")
+ * @param {string} status - 'in_progress' | 'done' | 'failed' | 'pending'
+ * @param {object} [detail] - Optional context: { durationMs, evidence, ... }
+ */
+export function sendAgentActivity(stepNumber, key, label, status, detail) {
+  chrome.runtime.sendMessage({
+    action: 'agent_activity',
+    stepNumber: stepNumber || 0,
+    key: key || 'misc',
+    label: label || '',
+    status: status || 'in_progress',
+    detail: detail || null,
+    timestamp: Date.now()
+  }).catch(() => {});
+}
+
+/**
+ * (3.16.0) Signal that a new agent step is starting. Popup creates the
+ * step's card + empty activity stream container so subsequent
+ * sendAgentActivity calls land in the right place.
+ *
+ * @param {number} stepNumber
+ * @param {number} [totalPlannedSteps]
+ */
+export function sendAgentStepStart(stepNumber, totalPlannedSteps) {
+  chrome.runtime.sendMessage({
+    action: 'agent_step_start',
+    stepNumber: stepNumber || 0,
+    totalPlannedSteps: totalPlannedSteps || 0,
+    timestamp: Date.now()
+  }).catch(() => {});
+}
+
+/**
  * (3.7.1) Forward the latest captured screenshot to the popup so the live
  * mini-shot panel can render the agent's-eye view. Fire-and-forget.
  *

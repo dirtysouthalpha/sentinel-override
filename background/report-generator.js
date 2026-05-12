@@ -219,12 +219,19 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
   const requestHeaders = provider.buildHeaders(apiKey);
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: requestHeaders,
-    body: requestBody,
-    signal: controller.signal
-  });
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: requestBody,
+      signal: controller.signal
+    });
+  } catch (err) {
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') throw new Error(`Report LLM call timed out after ${(CONFIG.fetchTimeout || 45000) / 1000}s`);
+    throw err;
+  }
   clearTimeout(timeout);
 
   if (!response.ok) {

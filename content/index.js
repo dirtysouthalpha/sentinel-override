@@ -1595,18 +1595,42 @@ if (window.__sentinelInitialized) {
         try {
           const eventId = '__sentinel_' + Date.now() + '_' + Math.random().toString(36).slice(2);
 
+          // (3.21.1) CSP-violation detector. Pages with strict Content-Security-
+          // Policy (SentinelOne, GitHub, etc.) block inline <script> injection.
+          // The script appendChild() silently succeeds, the script never runs,
+          // and we'd otherwise hit the timeout with a generic "Code execution
+          // timed out" error that masks the real cause. Listen for CSP violation
+          // events during the injection window so we can return a clear error.
+          let __cspBlocked = false;
+          const __cspListener = (e) => {
+            try {
+              const dir = (e && e.violatedDirective) || '';
+              const blocked = (e && e.blockedURI) || '';
+              if (dir.indexOf('script-src') === 0 && (blocked === 'inline' || blocked === '')) {
+                __cspBlocked = true;
+              }
+            } catch (err) {}
+          };
+          try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) {}
+
           const execResult = await new Promise((resolve) => {
             const timeout = setTimeout(() => {
               window.removeEventListener('message', handler);
-              scriptEl.remove();
-              resolve({ __timeout: true });
+              try { scriptEl.remove(); } catch (e) {}
+              // (3.21.1) Distinguish CSP block from a true timeout. If a CSP
+              // violation fired in this window, the script never executed.
+              if (__cspBlocked) {
+                resolve({ __cspBlocked: true });
+              } else {
+                resolve({ __timeout: true });
+              }
             }, execTimeout);
 
             const handler = (event) => {
               if (event.source !== window || !event.data || event.data.__sentinelEventId !== eventId) return;
               clearTimeout(timeout);
               window.removeEventListener('message', handler);
-              scriptEl.remove();
+              try { scriptEl.remove(); } catch (e) {}
               resolve(event.data);
             };
 
@@ -1637,6 +1661,14 @@ if (window.__sentinelInitialized) {
             document.documentElement.appendChild(scriptEl);
           });
 
+          // (3.21.1) Clean up CSP listener regardless of which path we returned through.
+          try { document.removeEventListener('securitypolicyviolation', __cspListener); } catch (e) {}
+
+          if (execResult.__cspBlocked) {
+            // Clear, actionable error that the agent-engine's recovery skills
+            // can pattern-match and route to alternative strategies.
+            return 'CSP_BLOCKED: page denies inline scripts (Content-Security-Policy script-src). The content-script execute_js path cannot run here. Use read_page, read_network_requests, or extract / extract_list against the live DOM instead.';
+          }
           if (execResult.__timeout) return 'Code execution timed out (' + execTimeout + 'ms)';
           if (execResult.__error) return 'Execution error: ' + execResult.__error;
           return 'JS Result: ' + (execResult.__value || '');

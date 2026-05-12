@@ -1,5 +1,681 @@
 # Changelog
 
+## v3.21.1 — 2026-05-12 (Hotfix: CSP-blocked execute_js + new csp-blocked recovery skill)
+
+User caught running on SentinelOne (`usea1-pax8.sentinelone.net`): page console shows `Executing inline script violates the following Content Security Policy directive 'script-src 'self' ...'`. The agent's content-script execute_js path injects an inline `<script>` tag which strict-CSP sites block; the script silently never runs, the promise hits the 8s timeout, and the LLM saw a generic "Code execution timed out" with no clue the CSP was the cause.
+
+CDP `Runtime.evaluate` bypasses page CSP and was supposed to be the primary path — but if the debugger banner has been dismissed mid-run, the agent falls back to the content-script path, hits the CSP wall, and there was no recovery signal.
+
+### Fixed — CSP detection in content/index.js execute_js
+
+- New `securitypolicyviolation` event listener registered before injecting the `<script>` element; cleaned up after. If a `script-src` violation fires in that window, the path returns `'CSP_BLOCKED: page denies inline scripts (Content-Security-Policy script-src). The content-script execute_js path cannot run here. Use read_page, read_network_requests, or extract / extract_list against the live DOM instead.'` instead of a generic timeout.
+- The clear error string is pattern-matchable by the recovery-skills library.
+
+### Added — `csp-blocked` recovery skill (`background/skills/csp-blocked.js`)
+
+- Highest priority (95) so it fires before other failure skills.
+- `matches(ctx)`: pattern-matches the `CSP_BLOCKED:` prefix.
+- `autoApply(ctx)`: returns a `read_page` command. The LLM then sees the page contents via the standard observation path (no JS execution required) and can pick CSP-friendly alternatives.
+- `promptInjection(ctx)`: comprehensive directive listing the 5 CSP-friendly alternatives (read_page, extract, extract_list, read_network_requests, read_console_messages) plus a CDP-debugger-banner note for users who dismissed it.
+- Registered first in `background/skills/index.js` `SKILLS` array.
+
+### Bumped
+
+- `manifest.json`: `3.21.0` → `3.21.1`.
+
+### Expected behavior on a re-run of the SentinelOne goal
+
+When the agent emits an execute_js on a CSP-strict page and the content-script path is used (because CDP banner was dismissed, or CDP attach failed):
+
+1. Content-script returns `CSP_BLOCKED: ...` instead of timing out at 8s.
+2. The csp-blocked skill auto-applies `read_page` — saving the LLM round-trip.
+3. The next LLM call sees the page text + element list AND the recovery directive listing alternatives.
+4. The LLM picks `extract`, `extract_list`, or `read_network_requests` to get the data without inline scripts.
+
+End-to-end: the agent now recovers from the SentinelOne CSP wall in ~2 steps instead of timing out repeatedly at 8s/step.
+
+### Honest scope note
+
+- The deeper fix is making sure CDP Runtime.evaluate always works (it bypasses CSP). v3.22.0 will add a "CDP availability check" at run start with a one-click "enable trusted input + reattach" banner if the user has dismissed it. For now, v3.21.1 makes the FALLBACK path's failure clear and recoverable.
+
+
+## v3.21.0 — 2026-05-12 (Recovery Skill Library — first pass at self-healing)
+
+The first concrete answer to "make this self-healing": a library of small modules that detect specific failure patterns and either auto-apply a deterministic recovery command (skipping the LLM round-trip entirely) or inject targeted directives into the LLM's next prompt.
+
+Each skill is independently testable, individually disable-able, and the library is designed to grow as new failure patterns surface in real runs.
+
+### Added — Skills framework (`background/skills/index.js`)
+
+- New `runRecoverySkills(context)` consultation API. Returns `{autoApply, promptInjection, appliedSkillIds}`.
+- Context shape: `{lastCommand, lastResult, lastActionFailed, history, consecutiveFailures, agentMemory, stepCount, dynamicMaxSteps, currentUrl, allElements, pageText, lastAiCallMs, consecutiveNavigates, productiveSteps}`.
+- Each skill exports `{id, description, priority, matches(ctx), autoApply(ctx), promptInjection(ctx)}`.
+- Priority ordering: higher fires first for autoApply. All matching skills contribute their promptInjection.
+- Defensive error handling: a skill that throws is skipped, not crashing the loop.
+
+### Added — Seven starter skills (`background/skills/*.js`)
+
+| ID | Fires when | Auto-applies | Prompt injection |
+|---|---|---|---|
+| `click-no-target` | `click`/`type`/`hover` had no selector/ref/coords (v3.20.1 guard) | `read_page` — fresh observation | Teaches selector/ref selection from element list |
+| `navigate-loop` | Same URL navigated twice in a row (v3.20.1 guard) | `read_page` — page is already loaded | Teaches in-page interaction over re-navigation |
+| `selector-miss` | "Element not found" / "no element" / "not in element list" | `read_page` — DOM may have changed | Teaches ref over selector, scroll/wait alternatives |
+| `unproductive-extract` | Extract/JS returned null/empty/non-serializable | — (LLM choice) | Body-text regex, network capture, visible-text harvest patterns |
+| `empty-observation` | Observation returned < 5 elements + < 200 chars | `wait_for_navigation` (only if last was navigate) | Wait / JS-inspect / try different URL / honest finish |
+| `consecutive-failures` | 3+ consecutive failures | — | Force strategy shift; honest finish if budget tight |
+| `slow-llm-call` | Most recent LLM call took > 25s | — | Token-bloat hints; focused next action guidance |
+
+### Wired — Agent loop consultation (`background/agent-engine.js`)
+
+- New module-level `_lastAiCallMs` tracks the most recent LLM call's duration (used by `slow-llm-call` skill). Reset in `resetAgentState`.
+- Skills consult fires BEFORE the LLM prompt is built so an auto-applied command can short-circuit the entire round-trip. When a skill auto-applies:
+  - `progressTimer` cleared
+  - `base64Image` freed
+  - `command` set directly from the skill's return value
+  - `activityDone(consult-ai, 'Skipped (skill auto-applied)')` fires
+  - The dispatch proceeds with the recovery command
+- When skills only contribute prompt injections (no auto-apply), the directives are appended to `loopDirective` under a `## ⚙ RECOVERY DIRECTIVES (Sentinel skill library)` section so the LLM treats them as engine-level guidance, not user goal text.
+- Forensic run log captures every skills consultation: `{step, kind: 'recovery_skills_consulted', skill_ids, auto_applied, auto_apply_type}`.
+- Activity stream surfaces a `recovery-skills` item showing which skills fired.
+
+### Bumped
+
+- `manifest.json`: `3.20.2` → `3.21.0`.
+
+### Expected impact on real runs
+
+The user's recent failure modes — Click: undefined cascades, navigate loops, unproductive extracts — were all visible-but-not-actioned. Now:
+
+- A `click-no-target` failure triggers an auto-applied `read_page`, the LLM sees the fresh observation next step, and recovers in 1 wasted step instead of 3-5.
+- A `selector-miss` failure auto-recovers similarly.
+- 3 consecutive failures (any cause) now inject a "STEP BACK and pick a fundamentally different approach" directive, with concrete alternatives. Slows the flail.
+- Slow LLM calls get an explicit "trim your prompts" hint to the LLM itself.
+
+Not a magic wand — the agent can still fail. But each failure now has a defined recovery path instead of "agent stares at the wall waiting for the LLM to figure it out."
+
+### Adding new skills
+
+When a new failure pattern surfaces in a real run, the recipe is:
+1. Create `background/skills/<my-skill>.js` exporting the skill object.
+2. Import in `background/skills/index.js` and add to the `SKILLS` array.
+3. Run `node --check` on both files. Reload extension. Done.
+
+No agent-engine changes. No system-prompt rewrites. No version bump required for skill-only additions.
+
+### Honest scope notes
+
+- Auto-apply commands are conservative — only `read_page` and `wait_for_navigation` are dispatched without LLM consultation in this release. More ambitious auto-applies (e.g., constructing an `execute_js` from a template) deferred until the basic skills prove out.
+- Skills don't yet save their own state across runs. v3.22.0 candidate: per-skill outcome tracking so the engine can learn which recoveries work best for which sites.
+- The `slow-llm-call` skill is purely informational — it can't make the provider faster. The token-budget caps in v3.20.0 are the actual mitigation.
+
+
+## v3.20.2 — 2026-05-12 (Report pops out as full browser tab)
+
+User report: the in-panel report modal overflowed the narrow Chrome side panel (560px max-width crammed into a ~400px viewport) AND covered the chat. v3.20.2 detaches the full report into its own browser tab so the side panel stays uncovered and the report gets the full window width to breathe.
+
+### Added — `report-view.html` (full-tab reading view)
+
+- New 320-line standalone HTML file. Reading-optimized typography (14px body, 1.65 line-height, 980px max-width column). Dark mode default + light-mode toggle (respects the same `theme-preference` storage key as the popup).
+- Sticky toolbar with: brand, generation timestamp, **Copy Markdown**, **Download .md**, **Print / PDF**, **Theme** buttons.
+- Reads the report from `chrome.storage.local._pendingViewReport` (set by the popup on click) with fallbacks to `_pendingPrintReport` and `last_agent_report` so the user can re-open even after a popup restart.
+- Source-citation chips (`[src:key]`, `[unverified]`) render inline with tooltips.
+- Print button uses the browser's native print → "Save as PDF" path, replacing the prior dedicated `report-print.html` flow for the View pane (the print file still exists for the explicit PDF Export button).
+
+### Changed — `openReportModal` in `chat.js` now opens a tab
+
+- Old behavior: rendered into `#report-modal` in the side panel. Overflowed at narrow widths, covered chat.
+- New behavior: stash the report payload in `_pendingViewReport`, open `report-view.html` in a new browser tab via `chrome.tabs.create`. Side panel stays untouched; the activity stream, chat history, and rail all remain visible.
+- The legacy modal path is preserved as `openReportModalInline(markdown)` and used as a fallback if `chrome.tabs.create` throws (e.g., headless contexts). Not wired by default.
+
+### Bumped
+
+- `manifest.json`: `3.20.1` → `3.20.2`.
+
+### Compat notes
+
+- The modal markup (`<div id="report-modal">`) stays in `popup.html` for the inline fallback. The HTML can be removed in v3.21+ once the tab path proves stable.
+- All existing report storage keys (`last_agent_report`, `_pendingPrintReport`) untouched.
+- PDF Export button still goes through `report-print.html` (auto-prints on load). View Full Report goes through `report-view.html` (no auto-print).
+- `report-view.html` lives at the package root so `chrome.runtime.getURL('report-view.html')` resolves correctly.
+
+
+## v3.20.1 — 2026-05-12 (Hotfix: "Click: undefined" + navigate-loop guard)
+
+Two patterns caught on a SentinelOne console run where the agent flailed for 6 steps with `Click: undefined` showing in chat and repeated navigates to the same URL.
+
+### Fixed — `describeAction` shows "undefined" when click/type/etc. has no selector
+
+- Old behavior: `describeAction({type:'click', ref:'ref_5'})` returned `"Click: undefined"` because it only read `command.selector`. User saw "Click: undefined" in the activity stream with no idea what was being attempted.
+- New `_describeTarget(cmd)` helper falls back to `ref` → `(x,y)` coordinates → `command.label` → `"(no target)"`. Used by all 20+ action types in `describeAction`. The activity stream now always shows a meaningful target.
+- Bonus: `describeAction` was missing cases for `click_at`, `scroll_to`, `check`, `check_all`, `extract_list`, `open_tab`, `switch_tab`, `close_tab`, `note`, `finish`, all four `wait_for_*` variants, `read_page`, and `dismiss_overlay`. They all fell through to the generic `JSON.stringify` default. Now every action type has a tailored label.
+
+### Added — Fail-fast guard for targetable actions with no target
+
+- Before dispatch, if a `click` / `type` / `hover` / `select` / `check` / `extract` / `scroll_to` / `wait_for_element` command has NO `selector`, NO `ref`, AND NO `x`+`y`, block immediately with a clear error message back to the LLM: `"BLOCKED: <type> command has no target — supply at least one of selector, ref, or x/y coords."`
+- Wastes 1 step instead of 2-3 (dispatch + content-script timeout + failed result). Plus tells the LLM exactly what's wrong so it can recover. Previously the LLM just got an "Element not found" back and often re-emitted the same broken command.
+- Logged to the activity stream as a `failed` dispatch item so the user sees what went wrong.
+
+### Added — Navigate-loop guard (`background/agent-engine.js`)
+
+- If the agent emits a `navigate` to the exact same URL as the previous step's navigate, block with: `"BLOCKED: already navigated to <url> in the last step. Do NOT navigate to the same URL twice. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper."`
+- Mirrors the existing read_page loop guard. The SentinelOne run had Step 2 → /policy and Step 5 → /policy both navigating to the same URL — wasted 30+s of LLM time and didn't make progress.
+
+### Bumped
+
+- `manifest.json`: `3.20.0` → `3.20.1`.
+
+### Still to investigate (not blocking the hotfix)
+
+- **1m 33s LLM call on step 5.** Almost certainly retries — `CONFIG.fetchTimeout` is 45s and `callLLMWithRetry` retries on transient errors, so 2 retries × 45s = 90s. Either the provider was rate-limiting or returning 5xx. Worth surfacing retry attempts in the activity stream so the user knows what's happening; deferred to v3.21.0.
+- **No SentinelOne profile.** Adding one (Exclusions / Policy Engine / Path Exclusions selectors) would prevent SentinelOne flail going forward. v3.21.0 candidate.
+
+
+## v3.20.0 — 2026-05-12 (Token budget audit + multi-article pattern + activity content preview)
+
+Three fixes addressing patterns from last night's Drudge Report top-10 run: AI calls taking 11-36s per step, agent burning 30 steps for 10 articles, note actions not showing content in the activity stream.
+
+### Fixed — Token budget bloat from large result fields (`background/agent-engine.js`)
+
+- The `promptHistory` mapper sliced history to the last 5 entries but did NOT cap the `result` field per entry. When the agent extracted an article body (7000+ chars) or pasted log dumps, that text rode along in every subsequent step's prompt — easily 4-5K tokens of dead weight per call.
+- New caps:
+  - `result` field: max 800 chars per entry, with `"… [truncated; N more chars in memory]"` suffix.
+  - `action.text` in past entries: max 200 chars (typed input doesn't need full text in history).
+  - `action.code` in past entries: max 300 chars (JS source doesn't need to ride along forever).
+- The CURRENT step's full command still goes through unmodified — caps only apply to past history. Memory retains the full data; only the prompt-side echo is trimmed.
+- Expected impact: per-step prompt size drops by ~3-5K tokens on extraction-heavy runs. LLM call time should fall from 11-36s back into the 3-8s range on Claude Haiku.
+
+### Added — Activity stream content preview for note/extract/execute_js (`background/agent-engine.js`)
+
+- Note handler now emits an `activityDone(stepCount, 'note-content', 'Noted: "<preview>"')` after recording the note. User sees the actual note text (up to 140 chars) in the activity stream instead of just "Recording a note".
+- Extract handler emits `'Extracted "key" → preview'` showing what was captured.
+- execute_js with key emits `'Saved "key" → N items captured'` or a value preview.
+- All three pipe through the existing `agent_activity` channel — no new message types, no popup changes needed.
+- Companion to v3.19.1's "Preparing…" fix: now you can see BOTH what action was decided AND what content came back.
+
+### Added — Multi-article research directive (`background/llm-client.js`)
+
+- New `getMultiArticleDirective(goal)` detects goals with patterns like "top 10 articles", "full breakdown on each", "summary of N items", "first 5 stories", etc. Returns a system-prompt addition (~75 lines) teaching:
+  - **Phase A:** ONE `execute_js` to extract all article URLs in one shot.
+  - **Phase B:** Batch open_tab in groups of 3-5 (parallel browser tabs).
+  - **Phase C:** Loop read_page → note WITHOUT close_tab in between. 2 steps per article instead of 3.
+  - **Phase D:** Skip explicit close_tab — finish handler closes all agent tabs automatically.
+- Step-budget math: ~2 + 2N steps for N articles (was ~3N + extraction overhead).
+- Honest scope-setting included: when budget is tight, prioritize thorough breakdowns of the top 3-5 + headline-only for the rest. Mark "[headline only — not read]" so the user knows the cutoff.
+- Cross-origin caveat included: aggregator pages (Drudge, Hacker News) can't fetch() their linked articles due to CORS, so batch open_tab is still the right pattern there.
+- Wired into both prompt builders alongside the existing `getMultiPortalDirective`. Same gating pattern: only fires when the regex matches.
+
+### Bumped
+
+- `manifest.json`: `3.19.1` → `3.20.0`.
+
+### Compat notes
+
+- All caps and directives are additive. History truncation only affects what's SENT to the LLM each step; the full history remains in memory for the forensic run log and the final report.
+- The multi-article directive's regex is conservative — it only fires on explicit "top N articles" / "full breakdown on each" patterns. Goals like "what's on Drudge today" won't trigger it (the agent's existing planning handles those fine).
+- No new storage keys, no new message types, no UI changes.
+
+### Still to do (v3.21.0+ candidates)
+
+- **`background_fetch` action** — cross-origin article body grab via background script. Would collapse Phase B-C of multi-article research from N steps into 1.
+- **Report-generator error-path tightening** — root-cause fix for the `addReportCard(undefined)` crash that v3.19.1 patched with a defensive guard.
+- **History summarization at trim time** — for runs that exceed 30 history entries, the rollup helper exists but doesn't always fire. Audit + tighten.
+
+
+## v3.19.1 — 2026-05-12 (Hotfix: addReportCard crash + "Preparing…" stuck label)
+
+Two bugs caught from the user's Drudge Report top-10 articles run.
+
+### Fixed — `TypeError: Cannot read properties of undefined (reading 'summary')` in `addReportCard`
+
+- Stack trace pointed at `popup-modules/chat.js:1393` inside `addReportCard`. Reading `report.summary` crashed when `report` was undefined.
+- Added a defensive guard at the top of `addReportCard`: if the argument is missing or not an object, surface a non-blocking toast and bail. Doesn't crash the popup or block the activity stream.
+- Root cause is likely a race between `agent_finished` and `report_update` — when the report-generator times out, the listener might receive a malformed update. Defensive guard fixes the symptom; v3.20.0 will tighten the report generator's error path.
+
+### Fixed — Step card stuck at "Preparing…" for internal actions
+
+- Steps that dispatched `note`, `extract`, `extract_list`, `read_page`, `finish`, `wait_for_text`, `wait_for_element`, `wait_for_navigation`, `dismiss_overlay`, or `scroll` left the step card headline at the placeholder "Preparing…" forever. Cause: those handlers don't call `sendActionMessage` (no agent_action message), so `updateStepCardAction` never fires.
+- Fix in `showAgentActivity`: when the `consult-ai` activity item finalizes with status `done` and a label like `"AI decided: note"`, AND the step headline is still the placeholder, parse the action type from the label and set a human-readable headline. Mapping: `note` → "Recording a note", `extract` → "Extracting data", `extract_list` → "Extracting list", `read_page` → "Reading the page", `finish` → "Finishing the run", `wait_for_*` → "Waiting for ...", `dismiss_overlay` → "Dismissing overlay", `scroll` → "Scrolling". Unknown types get title-cased.
+- Single-point fix in `popup-modules/chat.js`; no agent-engine changes. Works retroactively for all internal action types without needing per-handler instrumentation.
+
+### Bumped
+
+- `manifest.json`: `3.19.0` → `3.19.1`.
+
+### Observed in the same run (not yet fixed — v3.20.0 candidates)
+
+- AI consultation taking 11-36s per step on a 7000-character page. Likely prompt-size bloat from history accumulation + page content + system prompt overhead. Needs a token-budget audit.
+- Multi-article research pattern (open_tab → note → close_tab × N) is inefficient. 30 steps needed for 10 articles on a 20-step budget. Better pattern: parallel `execute_js` with `fetch()` to grab article bodies in fewer steps. Needs system-prompt teaching addition.
+- Note actions don't persist content effectively to memory — the LLM emits a note but the activity stream doesn't show what was noted. Investigation needed.
+
+
+## v3.19.0 — 2026-05-12 (UI polish — tooltips, density, welcome grid, panel highlight)
+
+Follow-up polish on the v3.17.0 left-rail redesign. Refinements only — no behavior changes.
+
+### Added — Custom rail tooltips (`popup.css`)
+
+- Native `title=""` tooltips replaced with CSS `::after` pseudo-elements that pull text from the `title` attribute and slide in to the right of the icon on hover.
+- 120ms ease-out transition with a 6px slide. Theme-aware via `--bg-tertiary` / `--text-primary` / `--border-color` vars — Tron / Matrix / Cyberpunk presets all style them correctly.
+- Native tooltips were slow (varies by OS, 1-2s delay on Windows), inconsistent, and got truncated by the side panel. CSS tooltips appear instantly and stay readable.
+
+### Changed — Header density
+
+- Vertical padding tightened: 8px top/bottom (was ~14px). Min-height 38px.
+- Wordmark size up to 14px with 600 weight + 0.5px letter-spacing — more presence now that there's room.
+- Logo bumped from 18px to 22px.
+- Header-title gap reduced to 10px for cleaner spacing.
+- Mode badge / tenant chip / client chip: tighter padding (2px×8px) and 10px font — same readability, less footprint.
+
+### Changed — Toolbar slimming
+
+- Toolbar padding 6px top/bottom (was ~10px).
+- Search box input 12px font, 4×8 padding.
+- Toolbar icon buttons 26×26 (was ~32×32) with 4px padding.
+- Divider shorter (16px height) with tighter horizontal margins.
+
+### Changed — Welcome message refresh
+
+- Example prompt buttons now render as a CSS Grid (1-column on narrow side panels, 2-column at ≥480px width). Was a single vertical stack — felt sparse.
+- Hover state: tertiary background + accent-color border so users see the buttons are interactive.
+- Active state: 0.98 scale press animation.
+- Welcome heading: 18px (was 22px), tighter intro paragraph.
+
+### Changed — Active-tab strip refinement
+
+- Padding 6px top/bottom (was ~10px). Min-height 36px. Still positioned 42px from left (past the rail) per v3.17.0.
+
+### Changed — Rail panel-active highlight
+
+- `#action-rail .rail-btn.active` now triggers the orange-accent active state (matches the existing `.rail-btn-active` class). Existing toggle code in `templates.js` and `scheduler-ui.js` that adds `.active` to those buttons now visually highlights them in the rail when their panel is open — no JS changes needed.
+
+### Added — Narrow side panel responsive tweaks
+
+- At widths <420px, tenant chip and client chip text truncate with ellipsis instead of wrapping.
+
+### Bumped
+
+- `manifest.json`: `3.18.0` → `3.19.0`.
+
+### Compat notes
+
+- All CSS changes are additive or specificity-bumping. No existing styles removed; all v3.17.0 / v3.18.0 work intact.
+- No JS changes. No new IDs, no new event handlers.
+- All existing themes (Tron, Matrix, Cyberpunk, Neon, Terminal, Blood, Sunset, Ocean, Midnight, Paper, Forest, Mono) pick up the new tooltips and density via CSS vars.
+
+
+## v3.18.0 — 2026-05-12 (Per-platform selector profiles for SonicWall NSM 7.x)
+
+The agent now ships with structured DOM selector hints for SonicOS 7.x running under NSM 7.x. Instead of discovering the IPSec VPN policy table, Client tab, Virtual Adapter dropdown, IP pool inputs, and Commit button via runtime scan-and-flail loops, the LLM gets a preferred-selectors list at the top of every step's prompt. Same defensive fallbacks still work — these are hints, not hard requirements.
+
+This is REVAMP item #20. It's the change that would have made the SonicWall NSM VPN runs from earlier tonight actually succeed.
+
+### Added — Full selector profile (`background/platforms/sonicwall_nsm.js`)
+
+- **`pageTypes`** — 7 URL-pattern classifiers that tell the LLM what surface it's on: `nsm-home`, `firewall-list`, `device-console`, `device-vpn-base`, `device-users`, `device-logs`, `policy-edit`. Each comes with a `hint` describing what's available at that level.
+- **`knownSelectors`** — 30+ entries covering the NSM workflow end-to-end:
+  - Firewall list table, row, search input, drill-into-firewall anchor.
+  - Per-device left nav: VPN / Users / Logs / Firewall / Network / Settings.
+  - VPN policies table, row, name cell, edit pencil.
+  - VPN policy edit dialog: container, tab strip, tab buttons, with text-match candidates for the Client / General / Network / Proposals / Advanced tabs.
+  - Client tab: Virtual Adapter dropdown + option text candidates (`None` / `DHCP Lease` / `Internal DHCP Server` / `External DHCP Server`).
+  - IP Address Pool: Start IP, End IP, Subnet Mask, DNS Server 1/2 inputs.
+  - Dialog buttons: OK / Cancel / Apply.
+  - NSM commit toolbar: pending-changes indicator + commit button.
+  - Users > Local Users: table, search, row, edit icon, Groups / VPN Access tabs.
+  - Logs / Reporting: category filter, time range picker, table, apply-filters button.
+  - Onboarding overlay + dismiss button (catches the welcome-tour overlay that caused step-1 flailing in earlier runs).
+
+  Each selector is written as a defensive comma-separated alternatives list (e.g. `'input[name*="startIp" i], input[placeholder*="Start IP" i], input[aria-label*="Start IP" i]'`) so the content script's resolver can pick whichever matches the actual NSM build the user is on.
+
+- **`waitStrings`** — 7 wait-text signal groups for use with `wait_for_text`: `deviceConsoleLoaded`, `policyDialogOpened`, `policyDialogClientTab`, `saveSucceeded`, `saveFailed`, `commitPending`, `sessionExpired`. Each is an array of phrases the LLM can wait for after a navigation/click.
+
+### Added — Selector-block injection into runtime system prompt (`background/llm-client.js`)
+
+- Renamed the existing public `getPlatformContext` body to `_getPlatformProseInternal` (private). Existing prose for SonicWall, FortiGate, Cisco, etc. is unchanged.
+- New `_formatProfileSelectorsBlock(profile, currentUrl)` formats the structured profile data (pageTypes detection, knownSelectors, waitStrings, knownGotchas) as a prose section the LLM can reason over.
+- New public `getPlatformContext(currentUrl, goal)` wrapper calls both and concatenates. Existing call sites in agent-engine.js and llm-client.js itself need NO changes — same return shape.
+- Selector hints appear under a `━━━ PLATFORM SELECTOR PROFILE ━━━` divider so the LLM can clearly see "use these first" as a separate instruction from the hardcoded prose advice.
+- Page-type detection runs the current URL through `pageTypes[].urlMatch` regexes; the matching type's `hint` appears at the top of the block. The LLM knows what surface it's on without having to infer from the URL alone.
+
+### Bumped
+
+- `manifest.json`: `3.17.0` → `3.18.0`.
+
+### Compat notes
+
+- All other platforms (Fortinet, Cisco, Microsoft 365 surfaces, Sentinel/CrowdStrike, etc.) still use the hardcoded prose in `_getPlatformProseInternal` and will until their profile entries are filled out. Adding `knownSelectors` to `m365_admin.js`, `fortigate.js`, etc. is a v3.18.1+ task.
+- Function-valued selectors (e.g. `policyDialogTab: (name) => ...`) are emitted to the LLM as `"(parameterized — pass label or text to resolve)"` rather than dumping source. Future versions can teach the content script to call these.
+- Profile data is not user-editable yet. v3.18.1+ may add a settings panel for per-tenant overrides (e.g., MSP A's SonicWall has a custom skin with non-default selectors).
+
+### Expected impact on a SonicWall NSM 7.x run
+
+Compared to tonight's 14-step thrash run:
+
+- Step 1: agent sees `pageTypes` classifier match → recognizes `firewall-list` → uses `drillIntoFirewall` selector to click the right row in one shot instead of clicking a header/wrong cell.
+- Step 2-3: per-device console loaded → `deviceNavVpn` selector finds the VPN nav directly → opens VPN base settings.
+- Step 4: `vpnPolicyRow` + `vpnPolicyNameCell` selectors find row 5 "WAN GroupVPN" → click opens edit dialog.
+- Step 5: `policyDialogTab` + `policyTabClientText` finds the Client tab.
+- Step 6-8: `virtualAdapterDropdown` + `virtualAdapterOptions` selects "DHCP Lease" (the actual SonicOS 7.x label — not "Internal DHCP Server" as in the user's prompt).
+- Step 9-11: `ipPoolStartIp` / `ipPoolEndIp` / `ipPoolSubnetMask` fields auto-targeted.
+- Step 12: `dialogOkButton` clicks save.
+- Step 13: `commitPendingButton` pushes the change. `waitStrings.saveSucceeded` confirms.
+
+Same goal, ~13 productive steps instead of 14+ wasted on flail. Selectors are best-effort against published SonicWall docs and DOM conventions — first real run on a live NSM 7.x box will tell us which ones need tightening.
+
+
+## v3.17.0 — 2026-05-12 (Left-edge action rail — UI redesign)
+
+User feedback: "I'm having to expand to see all the buttons too far, maybe we should add the button small and to the left part of the sidebar."
+
+The header was carrying too much weight — wordmark, mode badge, tenant chip, client chip, active indicator, AND six icon buttons (New Chat, Theme, Command Palette, Templates, Schedules, Settings). On the default Chrome side panel width (~370px), the buttons got pushed off-screen. v3.17.0 introduces a vertical action rail on the left edge so all controls are reachable at any sidebar width.
+
+### Added — Left action rail (`popup.html`)
+
+- New `<nav id="action-rail">` element fixed to the left edge, 42px wide, full height.
+- Buttons (in order): New Chat → Templates → Schedules → **Run Log History** (new from this rail) → Command Palette → Settings → (spacer) → Theme Toggle pinned at bottom.
+- Each button keeps its original DOM id (`newChatBtn`, `templatesBtn`, `schedulerBtn`, `commandPaletteBtn`, `settingsBtn`, `themeToggle`) so all existing JS event handlers in chat.js, settings.js, templates.js, scheduler-ui.js continue working without modification.
+- New rail-only button: `runLogHistoryRailBtn` wired to the existing `openRunLogHistoryModal` function (previously reachable only via the command palette or the post-run banner).
+
+### Changed — Header simplification
+
+- `.header-buttons` div is now empty (CSS hides empty header-buttons via `:empty { display: none }` so it doesn't reserve space).
+- Header keeps: wordmark, mode badge, tenant chip, client chip, active indicator. Plenty of room even on narrow side panels.
+
+### Added — Rail styling (`popup.css`)
+
+- `#action-rail` flex column, theme-aware via existing CSS vars.
+- `.rail-btn` 32x32, transparent background, hover state with border + bg shift, active state (scale 0.94), focus-visible outline using accent color.
+- `.rail-btn-active` class for "this panel is currently open" state (orange accent, ready to wire from templates.js / scheduler-ui.js).
+- `.rail-divider` thin separator between functional groups.
+- `.rail-spacer` flex:1 pushes the theme toggle to the bottom.
+- `body { padding-left: 42px }` shifts all in-flow content right of the rail.
+- `.active-tab-strip { left: 42px !important }` repositions the absolutely-positioned top strip past the rail.
+- `.left-edge-accent { display: none !important }` hides the old decorative 4px bar (redundant with the rail's right border).
+
+### Bumped
+
+- `manifest.json`: `3.16.0` → `3.17.0` (minor — visible UX change, no breaking behavior).
+
+### Compat notes
+
+- Modals (Settings, Templates, Run Log History, etc.) sit above the rail with their own z-index. No interaction issues.
+- Command palette is a full-screen overlay; still works.
+- All existing handlers, message routes, and storage keys unchanged.
+- Theme presets (Tron, Matrix, Cyberpunk, etc.) automatically style the rail because it uses CSS variables.
+
+
+## v3.16.0 — 2026-05-12 (Live Activity Indicator — Claude-in-Chrome-style per-step checklist)
+
+User feedback: "I wish I had the ability to see what it's doing when it sits there, I don't know if it's stuck, thinking, or what." Followed by: "I like the way Claude in Chrome does it too, where it shows it's activity and clicking here, doing that kinda thing for each step."
+
+v3.16.0 ships exactly that. Each step now shows a streamed checklist of micro-actions with spinner / checkmark / failed icons and per-item durations — so you can see the agent observing, consulting AI, and dispatching actions in real time instead of staring at a frozen status bar.
+
+### Added — Activity protocol (`background/message-protocol.js`)
+
+- `sendAgentStepStart(stepNumber, totalPlannedSteps)` — fired BEFORE observation/AI consultation. Popup creates the step card + empty activity stream container immediately so the user sees something appear the instant a step begins.
+- `sendAgentActivity(stepNumber, key, label, status, detail)` — granular per-sub-action emit. `key` is a stable identifier within the step (`observe`, `consult-ai`, `dispatch`, etc.) so the popup upserts by key as status transitions in_progress → done / failed.
+
+### Added — Activity helpers (`background/agent-engine.js`)
+
+- `activityStart(stepNumber, key, label)` — marks an item in_progress, auto-records the start time for duration calc.
+- `activityDone(stepNumber, key, label, detail)` — marks done; computes duration from the recorded start time.
+- `activityFail(stepNumber, key, label, detail)` — marks failed; computes duration.
+- `activityUpdate(stepNumber, key, label)` — keep status in_progress but refresh the label (used for the elapsed-seconds counter on long LLM calls).
+- Module-level `_activityStartedAt: Map<key, ts>` tracks in-flight items so durations are accurate.
+
+### Hooked — runAgentLoop instrumentation
+
+- **Step start:** `sendAgentStepStart()` fires immediately after `stepCount++` so the step card materializes before any work.
+- **Observation:** `activityStart('observe', 'Observing page')` → on success: `'Observed N elements, M chars of text'` with duration; on error: `failed` with the error message.
+- **AI consultation:** `activityStart('consult-ai', 'Consulting AI · call #N')`, then the existing 5-second progress timer also calls `activityUpdate()` so the label updates to `'Consulting AI · 15s elapsed'`. Finalizes with the LLM's chosen action type (`'AI decided: click'`) or the failure reason.
+- **Action dispatch:** `activityStart('dispatch', describeAction(command))` when the action is about to dispatch; finalizes via `activityDone`/`activityFail` after `sendActionResult` with a result-preview snippet.
+
+### Added — Activity stream UI (`popup-modules/chat.js`)
+
+- `_ensureActivityStream(stepNumber)` creates or reuses the per-step card + stream container. Works whether the card was created by `addActionCard` (action arrived first) or by `agent_step_start` (step started before any action).
+- `showAgentActivity(stepNumber, key, label, status, detail)` upserts items by key. Each item renders: SVG status icon (spinner / checkmark / X / pending circle) + label + duration suffix.
+- `updateStepCardAction(stepNumber, description)` wired into the `agent_action` handler so the step card's headline syncs with the action description.
+- `clearActivityState()` called on `agent_finished` so state doesn't leak across runs.
+
+### Added — CSS (`popup.css`)
+
+- `@keyframes sentinelSpin` + `.activity-spinner` for the in-progress animation.
+- `.activity-stream` flex column layout, `.activity-item` with status-driven opacity transitions.
+- `.activity-step-card` styling for the per-step header (label + action description on one line).
+
+### Bumped
+
+- `manifest.json`: `3.15.2` → `3.16.0` (minor — new user-visible feature, no breaking changes).
+
+### What you'll see
+
+Run the agent on any goal. Each step's card now looks like:
+
+```
+STEP 3   Click "Save" button
+  ✓ Observing page · 0.4s
+  ✓ AI decided: click · 8.2s
+  ⟳ Click "Save" button   (spinning, in progress)
+```
+
+When the dispatch finishes, the spinner becomes a checkmark with a duration. When AI is taking a long time, the label updates with elapsed seconds so you know it's still working. When something fails, you get an X with the error in the label.
+
+### Honest scope notes
+
+- Heartbeat pulse dot, stuck detection with auto-cancel UI, and forensic-log capture of phase transitions are deferred to v3.16.1. The activity stream alone closes most of the "is it stuck or thinking" gap.
+- Only the main dispatch path (line ~3442 of agent-engine.js) and the AI consult phase are instrumented for completion events. Early-return paths (open_tab, switch_tab, close_tab) start the dispatch item but don't currently finalize it — they'll show as in-progress until the next step start clears the visual. Will tighten in v3.16.1.
+- The Active Tab Strip at the top still shows the most-recent action, not the live activity item. Two-cursor problem — both are useful; I'll unify in v3.16.1.
+
+
+## v3.15.2 — 2026-05-12 (Mode-directive mismatch detector)
+
+User scenario: pasted a goal for a live SonicWall config change that said `Mode: APPROVAL — agent pauses for technician approval before each click/type that modifies system state` — but the Approval Mode toggle in Settings was still OFF (AUTONOMOUS). The agent was about to click Apply on a production WAN GroupVPN policy without ever pausing. The goal text was just prose; the actual gating is driven by `chrome.storage.local.approvalMode`. v3.15.2 catches this mismatch BEFORE the run starts.
+
+### Added — Goal mode-directive detector (`background/agent-engine.js`)
+
+- New `_detectGoalModeDirective(goal)` four-tier regex:
+  1. Explicit `Mode: APPROVAL` / `Mode: AUTONOMOUS` / `Mode: YOLO` (high confidence)
+  2. `"approval mode"` / `"autonomous mode"` phrasing (high confidence)
+  3. `"agent pauses for approval"` / `"PAUSE and wait for technician approval"` / similar (medium confidence)
+  4. `"no approvals required"` / `"execute autonomously"` (medium confidence, autonomous direction)
+- Returns `{detected, wants: 'approval'|'autonomous', evidence, confidence}` or `{detected: false}`.
+
+### Added — Pause flow before adaptive-prompts (`startAgent`)
+
+- New block at the top of `startAgent`, runs BEFORE the adaptive-prompts LLM call (so a cancelled run doesn't burn a rewriter call). Reads `chrome.storage.local.approvalMode`, compares against the detected directive, and:
+  - Match → proceed silently.
+  - Mismatch → broadcast `mode_mismatch_pause` to popup, wait for user decision via `_waitForModeMismatchDecision()` (SW keepalive-wrapped, 5-min cap, **default action on timeout: CANCEL the run**).
+- Forensic run log captures two entries per mismatched run: `mode_mismatch_detected` (the gap) and `mode_mismatch_decision` (what the user chose).
+
+### Added — Mode mismatch card (`popup-modules/chat.js`)
+
+- New `showModeMismatchCard(payload)`. Three buttons:
+  - **Flip to ＜MODE＞ & continue** — writes `approvalMode` from the popup side, syncs the toggle checkbox + mode badge UI via existing `updateApprovalModeUI()`, sends `{flip: true}` back to background.
+  - **Continue as ＜CURRENT＞** — proceeds without changing the toggle. Sends `{continue: true}`.
+  - **Cancel run** — stops the agent before any work. Sends `{cancel: true}`.
+- Visual emphasis: when the goal asks for APPROVAL but actual is AUTONOMOUS (more dangerous direction), the card border is red. The other direction (goal autonomous, actual approval) is orange.
+- Wired to `mode_mismatch_pause` message in the existing background-message listener.
+
+### Bumped
+
+- `manifest.json`: `3.15.1` → `3.15.2`.
+
+### Why this isn't a simple "auto-flip" feature
+
+I considered just having the rewriter detect the directive and silently flip the toggle, but that would mask real configuration drift between user intent and stored settings. Explicit pause + decision keeps the user in control and produces a forensic-log trail of what was changed and why.
+
+
+## v3.15.1 — 2026-05-12 (Hotfix: history-scope ReferenceError, latent since v3.13.0)
+
+User-reported runtime error: `Loop error: history is not defined`, thrown from the agent loop after step 2's scroll on dash.cloudflare.com.
+
+### Root cause
+
+When v3.13.0 extracted `trimHistory()` and `persistHistory()` from ~47 inline occurrences, the helpers were placed at MODULE scope (lines 166–175 of `background/agent-engine.js`) but continued to reference `history` as a free variable. `history` itself was declared as `let history = [];` INSIDE `runAgentLoop` (line 1780).
+
+JavaScript lexical scoping rules mean a function defined at module scope cannot reach into another function's local scope. The helpers were looking for a module-level `history` that didn't exist. Any call to `trimHistory()` or `persistHistory()` from inside `runAgentLoop` would resolve `history` against the module scope, find nothing, and throw `ReferenceError: history is not defined`.
+
+The bug was latent in v3.13.0, v3.14.0, v3.14.1, and v3.15.0. It only surfaced now because some agent runs happened to hit specific control flow that triggered `persistHistory()` in a way that exposed it — most action handlers call `await persistHistory()` after each step, so it should have fired immediately, but the call site that triggered this report was the scroll handler's exit path.
+
+### Fix
+
+- **`background/agent-engine.js`** — moved `let history = [];` from inside `runAgentLoop` to module scope, alongside `agentMemory` and other state vars. Inside `runAgentLoop`, replaced `let history = [];` with `history.length = 0;` to clear the array IN PLACE — preserves the array reference so any captured closures (the module-level helpers) still see the same array.
+- **`resetAgentState()`** — added `history.length = 0;` for safety so explicit resets also clear the array.
+- Concurrent agent runs are still prevented by the existing `if (agentRunning) throw` guard in `startAgent`, so module-level `history` is safe.
+
+### Audit of other shadowed locals
+
+- `consecutiveNavigates` — local to `runAgentLoop`, never accessed by module-level helpers. Safe.
+- `agentMemory`, `agentPlan`, `runLogId`, `runLogBuffer` — all already module-level. Safe.
+- `summarizeHistoryBatch`, `maybeRollupHistory`, `maybePostProgressUpdate`, `captureReportData` — all take `history` as an explicit parameter rather than closing over a free variable. Safe.
+- Only `trimHistory` and `persistHistory` had the bug. Both fixed.
+
+### Bumped
+
+- `manifest.json`: `3.15.0` → `3.15.1`.
+
+### How to verify
+
+Reload the unpacked extension. Run any goal that involves a scroll, click, or extract action. Should NOT see `Loop error: history is not defined` in the agent log. Pre-existing behavior otherwise unchanged.
+
+
+## v3.15.0 — 2026-05-12 (Adaptive Prompts)
+
+Pre-execution platform-aware goal rewrite. The agent detects which cloud portal you're on (SonicWall NSM, M365 admin, FortiGate, on-box SonicOS) and rewrites your goal with the correct menu paths and a Phase 0 drill-down BEFORE the run starts. Closes the SonicWall NSM failure mode that flailed for 9 steps last night. Full notes in `RELEASE_NOTES_v3.15.0.md`.
+
+### Added — Platform profile system (`background/platforms/*`)
+
+- New directory with one file per platform. Each profile exports `{id, label, memoryKeyPrefix, detect(url, goal), needsTargetSelection, preflightInstructions, mismatchHints, liveDataCaveats, knownGotchas, rewriteInstructions}`.
+- Profiles shipped:
+  - **`sonicwall_nsm`** — NSM cloud orchestrator. Inserts Phase 0 ("MANAGE > FIREWALLS > drill into target firewall"), translates 9 on-box menu paths, notes the 5-15 min analytics lag.
+  - **`sonicwall_onbox`** — SonicOS web admin. Canonical surface; minimal rewrites.
+  - **`m365_admin`** — Covers admin.cloud.microsoft, entra.microsoft.com, admin.exchange.microsoft.com, purview.microsoft.com, security.microsoft.com, intune.microsoft.com, login.microsoftonline.com. Includes an `inferSurface(goal)` heuristic that detects which sub-portal a goal targets (Entra vs Exchange vs Purview vs Defender) so the agent navigates to the right portal first.
+  - **`fortigate`** — FortiGate + FortiManager device drill-down hint.
+- New `background/platforms/index.js` exports `getPlatformProfile(url, goal)` (order-sensitive registry; first match wins) and `findMismatchHints(profile, goal)`.
+
+### Added — Adaptive Prompts engine (`background/adaptive-prompts.js`)
+
+- New `rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo, expansionMode)` makes one LLM call (~2-4s, ~$0.001) via the same provider as the main agent.
+- Returns `{adapted, adaptedGoal, originalGoal, platform, summary, mismatchHints, error, durationMs}`. Falls back to the original goal on any error — never blocks a run.
+- Short-circuits without an LLM call when the goal is short, has no detected mismatches, and the platform doesn't require Phase 0.
+- Tightly-scoped system prompt: "Preserve intent, structure, deliverable, output style. Only change menu paths, add Phase 0 if required, prefix memory keys."
+
+### Added — Wired into `startAgent` (`background/agent-engine.js`)
+
+- `startAgent` now reads `adaptivePromptsMode` from storage. Three modes:
+  - `auto` (default) — rewrite silently, swap goal, broadcast `adapted_goal_available` so the popup shows a collapsed informational card.
+  - `approval` — rewrite, broadcast the card, pause via `_waitForAdaptedGoalDecision()` until the user accepts / rejects / edits. SW kept alive via 3.14.0 `startSwKeepalive`. 5-min outer timeout defaults to Accept Adapted.
+  - `off` — never rewrite.
+- Forensic run log captures one `adaptive_prompt_applied` entry per run with platform id, mismatch count, duration, before/after lengths.
+
+### Added — Adapted Goal card (`popup-modules/chat.js`)
+
+- New `showAdaptedGoalCard(payload)` renders a collapsible card with: platform name, mismatch count line, Show/Hide toggle, summary bullet list, two `<details>` panels (full adapted goal, full original goal).
+- Approval mode adds three buttons: Use Adapted Goal, Use Original, Edit. Edit replaces the adapted text with a textarea and the buttons with Save & Run / Cancel. Save sends `adapted_goal_response` with `edited: true, editedGoal: <textarea value>`.
+- New `adapted_goal_available` message handler in the listener.
+
+### Added — Settings UI (`popup.html` + `popup-modules/settings.js`)
+
+- New section with two dropdowns:
+  - **Adaptive Prompts**: `Auto` (default) / `Approval` / `Off`
+  - **Expansion Mode**: `Light` (default) / `Off` / `Full` — controls whether the rewriter is allowed to add phases to short user goals.
+- Both auto-save on change.
+
+### Storage keys (new)
+
+- `adaptivePromptsMode` (default `'auto'`)
+- `adaptiveExpansionMode` (default `'light'`)
+
+### Bumped
+
+- `manifest.json`: `3.14.1` → `3.15.0`.
+
+### Compat notes
+
+- All existing settings untouched. The two new keys default to safe sensible values; users who skip Settings get Auto + Light.
+- Profile dispatch is order-sensitive in `platforms/index.js` — more-specific profiles before fallback profiles. Adding a platform = add one file + one line.
+- No migration required. Goals submitted before v3.15.0 still work; they just don't get the rewrite pass on this run.
+
+
+## v3.14.1 — 2026-05-11 (Hotfix: sign-in wall detector)
+
+User-reported freeze: agent navigated to entra.microsoft.com → redirected to login.microsoftonline.com sign-in page → got stuck because the v3.7.0 password-field hard-block (which is working as designed) prevents auto-fill, but nothing told the agent to *stop trying* and ask for human help. Step counter kept incrementing while no visible progress happened.
+
+### Added — Sign-in wall detector (`background/agent-engine.js`)
+
+- New `detectSignInWall(allElements, currentUrl, pageText)`: returns `{matched, host, evidence, selector}` when BOTH (a) the URL matches a known auth host (`login.microsoftonline.com`, `accounts.google.com`, `*.okta.com`, `auth0.com`, `signin.aws.amazon.com`, `github.com/login`, `*.my.salesforce.com`, `adfs.*`, etc.) AND (b) the observed page has a password input — OR has an email/username input with sign-in text cues (catches Microsoft's two-step sign-in where the email page renders before the password page).
+- Wired into the agent loop right BEFORE the existing MFA detection (auth wall comes first chronologically: sign in → MFA → app). When matched: pause the agent, broadcast `sign_in_wall_pause` to the popup, write a forensic-log entry, and wait for user to click Resume.
+- New module-level `signInWallAckUrls` Set tracks URLs the user has already acknowledged this run — prevents re-pausing on the same URL after manual sign-in. Cleared in `resetAgentState()` so each new run starts fresh.
+
+### Added — Manual-resume banner (`popup-modules/chat.js`)
+
+- New `showSignInWallBanner(url, host, evidence, stepNumber)` — orange banner styled like the MFA banner with three actions: **Resume** (sends `resume_agent_loop`), **Focus tab** (sends `focus_tab_by_url` so the user is one click away from the auth tab), **Dismiss**.
+- Message handler for `sign_in_wall_pause` added to the existing `chrome.runtime.onMessage` listener.
+
+### Added — Tab focus helper (`background/index.js`)
+
+- New `focus_tab_by_url` message handler that finds a tab matching the requested URL (exact match, falling back to host match), activates it, and focuses its window. Used by the banner's Focus tab button so the user can hop straight to the auth wall without alt-tabbing.
+
+### Diagnosed but already shipped
+
+- The runtime password-field hard-block (REVAMP #5) is already in place — `content/index.js:1140` (synthetic type path) and `content/index.js:595` (CDP focus_element path). Both use `__sentinelCheckSensitiveField` with a label-context regex covering password, PSK, API key, recovery code, SSN, CC, account number, etc. No new code needed for that line of defense.
+
+### Files touched
+
+- `background/agent-engine.js` — detector + loop wiring + state reset.
+- `popup-modules/chat.js` — banner + message handler.
+- `background/index.js` — `focus_tab_by_url` handler.
+- `manifest.json` — `3.14.0` → `3.14.1`.
+
+### Behavior change
+
+If you load v3.14.1 and immediately re-run the M365 SMTP relay goal that froze, you'll see a paused-state banner the moment the agent lands on `login.microsoftonline.com` with a password field visible. Sign in manually in the affected tab (handle MFA as usual via the existing MFA banner), click Resume, and the agent picks up from the post-auth page.
+
+
+## v3.14.0 — 2026-05-11 (Ticket Mode + Run Log History + SW Keepalive)
+
+The "ship the three highest-leverage MSP workflow features from the REVAMP backlog" release. v3.13.0 made the agent smarter; v3.14.0 makes its output paste-ready and its forensic trail browsable. Full notes in `RELEASE_NOTES_v3.14.0.md`.
+
+### Added — Ticket Mode with six output templates
+
+- **`background/agent-engine.js`**: promoted the 3.8.0 single-format `formatTicketFinalNotes` into a full dispatcher (`formatTicketOutput`) with five new formatters:
+  - `formatTicketKickoff` — `MAIN ISSUE` / `WHAT HAS BEEN TRIED` / `FASTEST SAFE RESOLUTION PATH`. Derives "tried" lines from summary text via verb regex; resolution path from the trailing sentences.
+  - `formatWaitingOnClient` — pending-client framing with 24h default follow-up timestamp.
+  - `formatWaitingOnVendor` — diagnostics-complete framing with vendor case opening + follow-up commitment.
+  - `formatItGlueKb` — Title / Issue / Environment / Resolution Steps / Verification / Screenshots. Environment auto-detected from goal keywords (M365, firewall, EDR, RMM/PSA).
+  - `formatClientEmail` — Subject line + email body with `[Client Name]` placeholder and contact footer auto-filled.
+- New `_autoPickFormat(summary, goal)` heuristic routes the `auto` setting based on goal text ("waiting on vendor" → vendor block, "draft an email" → email, etc.). Defaults to `FINAL_NOTES`.
+- Finish handler now reads `chrome.storage.local.ticketMode` (boolean) and `ticketFormat` (string). When the toggle is on, every finish runs through the dispatcher. When off, the legacy 3.8.0 behavior (auto-detect ticket-shaped goals → `FINAL_NOTES`) remains.
+- **`popup.html`**: Settings modal gains a Ticket Mode toggle row + a conditionally-shown format dropdown + a technician details grid (name / title / company / phone / email).
+- **`popup-modules/settings.js`**: load/save/wire for the toggle + dropdown + debounced auto-save for technician fields. Defaults match the prior hardcoded values (Brandon Goolsby / Premier Networx / 706-426-6313 / support@augustaitguys.com), so users who don't edit see identical output.
+
+### Added — Run Log History modal
+
+- **`background/agent-engine.js`**: new `_updateRunLogIndex(runLogId, fields)` helper maintains a `run_log_index` storage array (capped at 20). Called at run start (initial entry with goal/startedAt/startUrl) and run finish (mark `completed: true` with finishedAt/stepCount/apiCallCount). Overflow runs get their detail records (`run_log_<id>`) evicted from storage to prevent unbounded growth.
+- **`popup.html`**: new `run-log-history-modal` with rows for each indexed run, status chip, per-row Export JSON / Export CSV / Delete buttons, footer Clear All button.
+- **`popup-modules/chat.js`**: `openRunLogHistoryModal` / `renderRunLogHistoryList` / `exportRunLogById` / `deleteRunLogById` / `clearAllRunLogs`. Surfaced from two entry points:
+  - The existing post-run export banner gets a new "View past runs" button.
+  - The command palette (`Cmd/Ctrl+K`) gains a "Run Log History" entry.
+- Re-export reuses the existing 3.9.0 export path by stuffing `__lastRunLogId` before dispatching, so JSON and CSV output is identical to the post-run banner.
+
+### Added — Service-worker keepalive during approval / tenant-override waits
+
+- **`background/shared-state.js`**: new `startSwKeepalive(name)` / `stopSwKeepalive(name)` ref-counted helpers. While any name is active, a `chrome.storage.session.set` ping fires every 20s — any `chrome.*` API call resets the MV3 idle timer, so the SW survives well past the ~30s idle limit.
+- **`background/agent-engine.js`**: `requestApproval` and `requestTenantOverride` both wrap their wait Promise in `startSwKeepalive` / `stopSwKeepalive` calls. Keepalive is released on every exit path (resolve, reject, timeout).
+- Previously: an AFK user past the 30s idle mark killed the SW mid-approval-wait, the `chrome.runtime.onMessage` listener was GC'd, and the eventual user click resolved into the void. Silent timeout, no recovery.
+- Now: the SW stays alive for the full 60s (approval) / 90s (tenant override) timeout window, so the listener is still registered when the user clicks.
+
+### Bumped
+
+- `manifest.json`: `3.13.0` → `3.14.0` (minor — additive features, no architecture changes).
+
+### Compat notes
+
+- All existing settings keys untouched. `technicianInfo` and `run_log_index` are new keys; first read returns sensible defaults.
+- Manifest permissions unchanged (`alarms`, `notifications`, `storage`, etc. already declared in 3.13.0).
+- No migration required for existing `run_log_<id>` records — they're not back-filled into the index, but new runs from 3.14.0 onward populate it.
+
+
 ## v3.13.0 — 2026-05-10 (Auto-recovery overhaul: engine handles reliability, LLM handles planning)
 
 The "stop asking the LLM to do engineering work it's bad at" sprint. Four targeted refactors that move retry / recovery / completeness decisions OUT of the LLM and INTO the agent engine. Net effect on a typical research run: 30-40% fewer wasted steps, far fewer "agent finished but data is incomplete" outcomes, cleaner agent state.
