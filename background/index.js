@@ -505,6 +505,22 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
 // ========== Tab Event Listeners ==========
 
+// SSO / OAuth popup detection: when a new window opens during an agent run
+// and its first tab matches a known auth host, bring it to focus and notify
+// the technician so they can complete sign-in without hunting for the window.
+const _SSO_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|accounts\.google\.com|login\.okta\.com|[^.]+\.okta\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|login\.duosecurity\.com)/i;
+chrome.windows.onCreated.addListener(async (win) => {
+  if (!agentRunning) return;
+  try {
+    const tabs = await chrome.tabs.query({ windowId: win.id });
+    const ssoTab = tabs.find(t => t.url && _SSO_HOSTS_RE.test(t.url));
+    if (ssoTab) {
+      await chrome.windows.update(win.id, { focused: true });
+      sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
+    }
+  } catch (e) { /* non-fatal — window may have closed before query ran */ }
+});
+
 // Detect externally-closed tabs and clean up context
 chrome.tabs.onRemoved.addListener((tabId) => {
   handleTabRemoved(tabId);

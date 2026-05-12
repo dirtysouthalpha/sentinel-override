@@ -102,6 +102,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
 // of an agent run, instead of attach/detach on every screenshot. This avoids the
 // CDP banner shifting viewport pixels by ~30px between captures.
 const attachedDebuggees = new Set();
+const userDetachedTabs = new Set(); // tabs where the user dismissed the CDP banner
 let onDetachListenerInstalled = false;
 
 // (3.7.0) Per-tab observability buffers for read_console_messages and
@@ -295,10 +296,12 @@ function installDetachListenerOnce() {
   onDetachListenerInstalled = true;
   try {
     chrome.debugger.onDetach.addListener((source /*, reason */) => {
-      // If the user manually detaches via the debugger banner, drop our tracking.
+      // If the user manually detaches via the debugger banner, drop our tracking
+      // and remember this tab so we can warn the user on next re-attach.
       if (source && typeof source.tabId === 'number') {
         attachedDebuggees.delete(source.tabId);
         clearObservabilityBuffers(source.tabId);
+        userDetachedTabs.add(source.tabId);
       }
     });
   } catch (e) { /* in non-extension contexts (tests) chrome.debugger may be absent */ }
@@ -333,9 +336,22 @@ async function ensureDebuggerAttached(tabId) {
     await ensureObservabilityListeners(tabId);
     return;
   }
+  const wasUserDetached = userDetachedTabs.has(tabId);
   await chrome.debugger.attach({ tabId }, '1.3');
   attachedDebuggees.add(tabId);
   await ensureObservabilityListeners(tabId);
+  // Warn the user that the debugger re-attached after they dismissed the banner,
+  // so they're aware trusted input is active again.
+  if (wasUserDetached) {
+    userDetachedTabs.delete(tabId);
+    try {
+      chrome.runtime.sendMessage({
+        action: 'cdp_reattach_warning',
+        tabId,
+        message: 'Debugger re-attached after banner was dismissed. Trusted input is active. Dismiss this banner again to fall back to synthetic events.'
+      }).catch(() => {});
+    } catch (e) {}
+  }
 }
 
 /**
