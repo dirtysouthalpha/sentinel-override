@@ -329,9 +329,7 @@ export async function startAgent(goal, sender) {
   // (3.9.0) Forensic run log — start a fresh buffer with a UUID. Persisted
   // every step to chrome.storage.local.run_logs[runLogId] for export.
   try {
-    runLogId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : ('run_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10));
+    runLogId = crypto.randomUUID();
     runLogBuffer = [{
       step: 0,
       timestamp: new Date().toISOString(),
@@ -502,9 +500,7 @@ export async function startAgent(goal, sender) {
 // to the popup, waits for the user's decision via adapted_goal_response, and
 // keeps the SW alive during the wait.
 async function _waitForAdaptedGoalDecision(rewriteResult, startTabId) {
-  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'ap-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const requestId = crypto.randomUUID();
   const kaName = 'adaptive_prompt_' + requestId;
   try { startSwKeepalive(kaName); } catch (e) {}
   return new Promise((resolve) => {
@@ -610,9 +606,7 @@ function _detectGoalModeDirective(goal) {
 // Resolves to one of: { flip: true } (user flipped setting, proceed),
 // { continue: true } (proceed as-is), { cancel: true } (stop run).
 async function _waitForModeMismatchDecision(info) {
-  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'mm-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const requestId = crypto.randomUUID();
   const kaName = 'mode_mismatch_' + requestId;
   try { startSwKeepalive(kaName); } catch (e) {}
   return new Promise((resolve) => {
@@ -1361,9 +1355,7 @@ function shouldLockoutCrossTenantAction(command, currentUrl, detectedTenant, exp
 }
 
 async function requestTenantOverride(blockInfo, command, stepNumber) {
-  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : 'tenant-override-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  const requestId = crypto.randomUUID();
   // (3.14.0) Pin SW alive — tenant override has a 90s timeout, well past the
   // MV3 idle limit. Without this, the listener gets GC'd before the user even
   // sees the prompt.
@@ -2045,16 +2037,12 @@ async function runAgentLoop(goal, workingTabId) {
   expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
   tenantOverrideUrls = new Set();  // (3.11.0) cleared per-run
   detectedTenant = null;
-  // Restore agent_memory from prior session. agentMemory is a plain object
-  // (see writes at lines ~883/920 which do chrome.storage.local.set({ agent_memory: agentMemory })).
-  // Restore in the same shape.
-  if (stored.agent_memory && typeof stored.agent_memory === 'object' && !Array.isArray(stored.agent_memory)) {
-    try {
-      agentMemory = { ...stored.agent_memory };
-    } catch (e) {
-      agentMemory = {};
-    }
-  }
+  // Each run gets a clean memory namespace — never carry over data from a prior
+  // task.  Restoring the previous global agent_memory caused cross-client data
+  // contamination (yesterday's Acme findings leaked into today's Beta Co task).
+  // Memory is still persisted per-step so it survives unexpected SW termination
+  // within a run; it's deliberately discarded between runs.
+  agentMemory = {};
   await chrome.storage.local.set({ agent_history: [] });
 
   if (stored.agent_context && stored.agent_context.trim()) {
@@ -4004,8 +3992,17 @@ async function saveLearnedPattern(goal, history, success) {
   try {
     const stored = await chrome.storage.local.get(['learned_patterns']);
     const patterns = stored.learned_patterns || [];
+    // Scrub PII before persisting — IPs, emails, ticket numbers, and quoted
+    // strings (often client names) are replaced with safe placeholders so
+    // chrome.storage.local doesn't accumulate identifiable client data.
+    const _scrubPii = (str) => String(str)
+      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, 'XXX.XXX.XXX.XXX')
+      .replace(/[\w.+\-]+@[\w.\-]+/g, '[email]')
+      .replace(/\b(?:TKT|TICKET|INC|INCIDENT|SR|#)\s*\d+/gi, '[ticket]')
+      .replace(/"[^"]{2,60}"/g, '"[client]"')
+      .replace(/'[^']{2,60}'/g, "'[client]'");
     patterns.push({
-      goal: goal.substring(0, 100),
+      goal: _scrubPii(goal.substring(0, 100)),
       steps: history.map(h => ({ type: h.action.type, selector: h.action.selector })),
       success,
       timestamp: Date.now()
@@ -4077,9 +4074,7 @@ function describeAction(command) {
 async function requestApproval(command, stepNumber) {
   const description = describeAction(command);
   // Per-call requestId so concurrent approvals don't cross-contaminate listeners.
-  const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `req-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = crypto.randomUUID();
   // (3.14.0) Pin the service worker alive while we wait for the user. Without
   // this, an AFK user past the ~30s MV3 idle timer kills the SW and the
   // listener gets GC'd — silent timeout, no recovery.
