@@ -1,5 +1,73 @@
 # Changelog
 
+## v3.22.0 — 2026-05-12 (MSP platform profiles — M365, FortiGate, IT Glue, Aruba, SonicWall on-box)
+
+The platform-profile system shipped in v3.18.0 (SonicWall NSM only). v3.22.0 fills out the five platforms Brandon's MSP runs daily: M365 admin surfaces, FortiGate / FortiManager, IT Glue, Aruba (Central + Instant + OS-CX), and SonicWall on-box web admin.
+
+Each profile injects ~15-30 `knownSelectors` + per-surface `pageTypes` + `waitStrings` into the agent's runtime system prompt whenever the agent lands on a matching URL. Reduces observe-and-flail loops; gives the LLM "try these first" hints before falling back to runtime DOM scanning.
+
+### Added — Expanded M365 admin profile (`background/platforms/m365_admin.js`)
+
+- 19 `pageTypes` covering: login wall, admin home / users / groups, entra home / users / sign-ins / conditional access, exchange home / mailflow / message trace / mailboxes, purview home / audit, defender home / incidents / advanced hunting (KQL), intune home, azure portal.
+- 35+ `knownSelectors`: generic chrome (sidebar, search), admin users table, entra sign-ins table + filters, exchange message trace form (date / sender / recipient / run), purview audit search form, defender KQL editor, dialog OK/Cancel/Save patterns, primary-iframe selector for the many cross-origin embeds.
+- 7 `waitStrings` groups: tenant-loaded, sign-in-logs-populated, message-trace-results, audit-search-results, save-succeeded, save-failed, session-expired.
+- 5 `knownGotchas`: tenant lockdown, moved menus (Purview /audit/auditsearch NOT /auditlogsearch), separate Power Platform / Teams admin portals, heavy bundle load times, ag-grid virtual scrolling.
+
+### Added — Expanded FortiGate profile (`background/platforms/fortigate.js`)
+
+- 12 `pageTypes`: login, dashboard, policy, address objects, services, IPsec VPN, SSL VPN, users, log viewer, FortiManager ADOM/device/install-wizard.
+- 30+ `knownSelectors`: chrome (sidebar, ADOM picker), login (username/password/submit), policy table + add/edit/source/dest/service/action/save, address objects (table/create/name/type/value), IPsec (table/rows/status/phase1/phase2 tabs), logs (category/time/source/table/apply/export), FortiManager (ADOM list, device table, install wizard with target checkboxes + Next/Install).
+- 7 `waitStrings`: dashboard-loaded, policy-saved, commit-applied, tunnel-up, tunnel-down, login-required, session-expired.
+- 6 `knownGotchas`: ADOM context affects all nav, log views need explicit filters, FortiOS 7 Vue SPA rendering delay, FortiManager async install (check Task Manager), virtual scrolling on Log viewer/Sessions.
+
+### Added — IT Glue profile (`background/platforms/itglue.js`, NEW)
+
+- 12 `pageTypes` covering: login, dashboard, orgs list, org overview, configurations, config detail, documents, passwords (sensitive), domains, SSL certs, flexible assets, search results.
+- 40+ `knownSelectors`: Ember-style chrome, org picker, global search, orgs list (table/search/row), org sidebar nav (configurations/contacts/documents/domains/passwords/ssl/flexible-assets/locations), configurations (table/search/type-filter/status-filter/add), config detail (header/tabs/related-items/custom-fields), documents (table/search/editor/save), passwords (table/row/reveal-button/copy-button — flagged DO NOT CLICK), domains (registrar/expiration), SSL certs (subject/issuer/expiration/days-remaining), flexible assets.
+- `needsTargetSelection: true` — auto-inserts Phase 0 to pick the right organization before per-org work.
+- **Safety reinforced**: Passwords category selectors are flagged as DO-NOT-CLICK. The sensitive-field block in content/index.js still handles password-input typing, but this profile additionally instructs the LLM to record password metadata only (name, username, last_updated), never values.
+- 6 `knownGotchas` including the Ember.js hash routing, password sensitivity, bidirectional asset relationships, global search scope filtering, Froala WYSIWYG editor.
+
+### Added — Aruba profile (`background/platforms/aruba.js`, NEW)
+
+- 13 `pageTypes` across THREE surfaces: Aruba Central cloud (login, dashboard, groups, devices, AP detail, switch detail, wireless, clients, alerts, reports), Aruba Instant on-IP (master/cluster), Aruba OS-CX on-IP (login, dashboard).
+- 40+ `knownSelectors`: Central group/site picker, devices table + status filter, AP detail (clients/RF/firmware), switch detail (ports/VLANs), wireless (SSID list + edit + security), clients (filter by AP/SSID), alerts (severity + time range), Instant (nav: wireless/security/APs), OS-CX (nav: interfaces/VLANs/system, port table).
+- 8 `waitStrings`: central-loaded, devices-populated, clients-populated, save-succeeded, save-failed, device-online, device-offline, session-expired.
+- `needsTargetSelection: true` — auto-inserts Phase 0 to pick group/site on Central before device-specific work. Instant/OS-CX skip Phase 0 (URL itself selects the device).
+- 6 `knownGotchas`: long-poll/websocket staleness, short OS-CX session timeout, Aruba Instant "unsupported browser" bypass on older firmware, sticky group/site selection causing wrong-data cascades, async location updates, group-scoped wireless changes pushing to all APs.
+
+### Added — Expanded SonicWall on-box profile (`background/platforms/sonicwall_onbox.js`)
+
+- 14 `pageTypes`: login, dashboard, network interfaces / zones, firewall rules / NAT, VPN settings / DHCP / status, users local / groups, log view, system status / licenses.
+- 35+ `knownSelectors`: chrome (left-nav, top-bar, status-bar, page-content), login (username/password/submit), firewall rules (table/add/row/edit/source-zone/dest-zone/service/action/save), VPN (policy table + dialog tabs General/Client/Proposals + virtual adapter + IP pool + subnet mask + OK), users (table/search/row/edit + Groups + VPN Access tabs), logs (category/severity/time/table/apply/export), zones (table + Allow IKE/VPN checkboxes), licenses (GVC seat row).
+- 7 `waitStrings`: dashboard, rules-table, vpn-policy-dialog, save-succeeded/failed, commit-required, session-expired.
+- 6 `knownGotchas`: XHR rendering on right pane, firmware-version-renamed menus (detect via System > Status first), table-not-paginated dump strategy, commit Apply/Accept extra step, SonicOS 7.x hash routing, silent session expiry.
+
+### Changed — `background/platforms/index.js` registry
+
+- Added imports for `itglue` and `aruba` profiles.
+- Profile order: sonicwallNsm → sonicwallOnbox → m365Admin → fortigate → itglue → aruba. Most-specific first.
+
+### Bumped
+
+- `manifest.json`: `3.21.1` → `3.22.0`.
+
+### Honest caveats
+
+- Selectors are best-effort against my training knowledge — they will need refinement based on real runs. Each profile uses defensive comma-separated alternatives so when one selector misses, an adjacent one in the same line usually catches.
+- IT Glue's password Asset selectors include `passwordRevealButton` / `passwordCopyButton` so the LLM can SEE them in the element list and learn to AVOID them. The actual safety enforcement still relies on the v3.7.0 sensitive-field block.
+- Aruba covers three surfaces in one profile because the cloud (Central) and on-IP (Instant/OS-CX) have different DOMs but the same MSP mental model. If the selectors get unwieldy I'll split.
+- M365 admin tables in cross-origin iframes — the selectors in this profile won't reach data inside them. The agent's existing `read_network_requests` action (filtering for graph.microsoft.com / outlook.office.com) is the fallback path; this is called out in `liveDataCaveats`.
+
+### How to add the next platform (e.g., ConnectWise, NinjaOne, Datto)
+
+1. Create `background/platforms/<name>.js` with the standard profile shape (id, label, detect, pageTypes, knownSelectors, waitStrings, knownGotchas, rewriteInstructions).
+2. Add import + register in `background/platforms/index.js` PROFILES array (most-specific first).
+3. `node --check` both files. Reload extension. Done.
+
+No agent-engine changes. No system-prompt rewrites. Profile data is injected into the runtime system prompt via `llm-client.js`'s `getPlatformContext` (wired in v3.18.0).
+
+
 ## v3.21.1 — 2026-05-12 (Hotfix: CSP-blocked execute_js + new csp-blocked recovery skill)
 
 User caught running on SentinelOne (`usea1-pax8.sentinelone.net`): page console shows `Executing inline script violates the following Content Security Policy directive 'script-src 'self' ...'`. The agent's content-script execute_js path injects an inline `<script>` tag which strict-CSP sites block; the script silently never runs, the promise hits the 8s timeout, and the LLM saw a generic "Code execution timed out" with no clue the CSP was the cause.

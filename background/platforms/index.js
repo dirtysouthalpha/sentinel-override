@@ -1,5 +1,5 @@
 // background/platforms/index.js
-// Platform profile registry — v3.15.0
+// Platform profile registry — v3.22.0
 //
 // Adds new platforms by importing the profile here and registering it. The
 // Adaptive Prompts engine (background/adaptive-prompts.js) iterates the list
@@ -12,12 +12,19 @@ import { sonicwallNsm } from './sonicwall_nsm.js';
 import { sonicwallOnbox } from './sonicwall_onbox.js';
 import { m365Admin } from './m365_admin.js';
 import { fortigate } from './fortigate.js';
+import { itglue } from './itglue.js';
+import { aruba } from './aruba.js';
 
 const PROFILES = [
+  // Most-specific first. NSM before on-box, ITG before generic. Aruba covers
+  // Central + Instant + OS-CX in one profile and lives after Microsoft/Sonic
+  // because those have stricter URL matches.
   sonicwallNsm,
   sonicwallOnbox,
   m365Admin,
   fortigate,
+  itglue,
+  aruba,
 ];
 
 /** Resolve the best-matching platform profile for the current goal+URL. Returns null if none match. */
