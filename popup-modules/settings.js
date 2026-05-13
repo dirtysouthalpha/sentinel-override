@@ -487,8 +487,9 @@ function _renderLearnedPatterns(patterns) {
   list.innerHTML = patterns.map((p, i) => {
     const date = p.timestamp ? new Date(p.timestamp).toLocaleDateString() : '';
     const steps = Array.isArray(p.steps) ? p.steps.length : '?';
+    const safeGoal = escapeHtml(p.goal || '(no goal)');
     return `<div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border-color);">
-      <span title="${p.goal || ''}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">${i + 1}. ${p.goal || '(no goal)'} <span style="color:var(--text-tertiary,#666);">(${steps} steps, ${date})</span></span>
+      <span title="${safeGoal}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">${i + 1}. ${safeGoal} <span style="color:var(--text-tertiary,#666);">(${steps} steps, ${date})</span></span>
       <button data-idx="${i}" class="delete-pattern-btn" style="font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--error-color,#ef4444); background:transparent; color:var(--error-color,#ef4444); cursor:pointer; flex-shrink:0;">✕</button>
     </div>`;
   }).join('');
