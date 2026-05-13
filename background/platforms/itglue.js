@@ -160,7 +160,7 @@ export const itglue = {
 - For password-related goals, prefer to record METADATA only (name, username, last_updated, category). NEVER auto-click reveal/copy buttons or extract password text. The deliverable should reference passwords by name+username, not value.
 - Asset relationships are bidirectional; read-only audit work should avoid Save buttons even by accident.
 - Wait_for_text on org-dashboard signals after navigating into an org.
-- Preserve the user's deliverable structure exactly.\`,
+- Preserve the user's deliverable structure exactly.`,
 
   workflowHints: [
     {
