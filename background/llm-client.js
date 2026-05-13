@@ -1512,7 +1512,7 @@ RULES:
 9. For checkboxes: use "check" with "checked": true/false to set explicit state. For bulk operations: use "check_all" with a selector.
 10. For modifier keys (Ctrl+A, Ctrl+V, etc.): use "press_key" with "modifiers": {"ctrl": true}.
 11. One action per step.
-10. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
+12. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
    - For briefings/lists: Use clear numbered sections with headlines, key takeaways, and source links
    - For research tasks: Lead with the answer, then support with evidence
    - For comparisons: Use structured "vs" format with specific data points
