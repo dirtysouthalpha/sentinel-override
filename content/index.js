@@ -169,8 +169,16 @@ if (window.__sentinelInitialized) {
 
     // Remove blocking overlays that cover the viewport — but only with strong
     // positive signals AND only if recently inserted. Skip structural roots.
+    // (3.41.0) Pre-filter via targeted selector instead of querySelectorAll('*')
+    // to avoid calling getComputedStyle on every element on the page (severe
+    // layout thrashing on SPAs with 5000+ DOM nodes).
     const SKIP_TAGS = new Set(['HTML', 'BODY', 'MAIN']);
-    const allEls = document.querySelectorAll('*');
+    const allEls = document.querySelectorAll(
+      '[role="dialog"],[role="alertdialog"],[aria-modal="true"],' +
+      '[class*="modal"],[class*="overlay"],[class*="popup"],' +
+      '[class*="backdrop"],[class*="lightbox"],[class*="cookie"],' +
+      '[class*="dialog"],[class*="drawer"],[class*="sheet"]'
+    );
     for (const el of allEls) {
       if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
       try {

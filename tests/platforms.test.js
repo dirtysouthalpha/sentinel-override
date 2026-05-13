@@ -74,3 +74,52 @@ describe('listAllProfiles', () => {
     }
   });
 });
+
+describe('workflowHints shape validation', () => {
+  test('all profiles with workflowHints have valid hint entries', () => {
+    const list = listAllProfiles();
+    for (const descriptor of list) {
+      // Re-import full profile to get workflowHints — listAllProfiles returns descriptors only
+      // We test via getPlatformProfile with a goal-only match using the profile id
+      const profile = getPlatformProfile(null, descriptor.id);
+      if (!profile || !profile.workflowHints) continue;
+      expect(Array.isArray(profile.workflowHints)).toBe(true);
+      for (const wh of profile.workflowHints) {
+        expect(wh.match).toBeInstanceOf(RegExp);
+        expect(typeof wh.hint).toBe('string');
+        expect(wh.hint.length).toBeGreaterThan(20);
+      }
+    }
+  });
+
+  test('sonicwall_onbox has workflowHints', () => {
+    const profile = getPlatformProfile('https://192.168.1.1/main.html', '');
+    expect(profile.workflowHints).toBeDefined();
+    expect(profile.workflowHints.length).toBeGreaterThan(0);
+  });
+
+  test('fortigate has workflowHints', () => {
+    const profile = getPlatformProfile('https://fortigate.local/ng/dashboard', '');
+    expect(profile.workflowHints).toBeDefined();
+    expect(profile.workflowHints.length).toBeGreaterThan(0);
+  });
+
+  test('m365_admin has workflowHints', () => {
+    const profile = getPlatformProfile('https://admin.microsoft.com/AdminPortal/Home', '');
+    expect(profile.workflowHints).toBeDefined();
+    expect(profile.workflowHints.length).toBeGreaterThan(0);
+  });
+
+  test('connectwise_manage has workflowHints', () => {
+    const profile = getPlatformProfile('https://na.myconnectwise.net/v2023_1/services/system?screen=TicketList', '');
+    expect(profile.workflowHints).toBeDefined();
+    expect(profile.workflowHints.length).toBeGreaterThan(0);
+  });
+
+  test('workflowHint regex matches expected goal text', () => {
+    const sonicwall = getPlatformProfile('https://192.168.1.1/main.html', '');
+    const tunnelHint = sonicwall.workflowHints.find(wh => wh.match.test('Check if the VPN tunnel is up'));
+    expect(tunnelHint).toBeDefined();
+    expect(tunnelHint.hint).toMatch(/Phase/);
+  });
+});

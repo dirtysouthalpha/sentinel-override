@@ -154,7 +154,7 @@ export const aruba = {
 - Memory keys must begin with 'aruba_'.
 - For configuration CHANGES on Central, the workflow is edit → save (deploys to group). For instant changes, edit → apply. For OS-CX, edit → save running config + commit-changes to startup config.
 - Wait_for_text on devicesPopulated or clientsPopulated signals before scraping lists.
-- Preserve the user's deliverable structure exactly.\`,
+- Preserve the user's deliverable structure exactly.`,
 
   workflowHints: [
     {

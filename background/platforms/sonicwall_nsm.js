@@ -209,7 +209,7 @@ export const sonicwallNsm = {
 - Note that for live data (active sessions, current seat usage), the per-device console is canonical; NSM-root analytics views lag 5-15 minutes.
 - If the goal asks for active VPN sessions, point to Device > VPN > Active VPN Sessions (sometimes "Currently Active VPN Tunnels") and fall through to direct firewall admin if absent.
 - Tell the agent to dismiss onboarding overlays ONCE and not write overlay_dismiss_count or similar engine metadata to memory.
-- Preserve the user's deliverable structure, output style, and phase boundaries exactly. Only menu paths, memory-key prefix, and Phase 0 (if needed) may be added/changed.\`,
+- Preserve the user's deliverable structure, output style, and phase boundaries exactly. Only menu paths, memory-key prefix, and Phase 0 (if needed) may be added/changed.`,
 
   workflowHints: [
     {

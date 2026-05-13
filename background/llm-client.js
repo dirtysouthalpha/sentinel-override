@@ -704,14 +704,26 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
  * block sourced from background/platforms/<id>.js when a profile matches.
  * Same single-string return shape — no changes needed at the call sites.
  */
+// (3.41.0) Cache platform context by URL+goal prefix — rebuilding the selector
+// block and prose on every LLM call (50-100 times per run) is wasteful when
+// the URL is stable. TTL of 30s covers SPA route transitions.
+const _platformContextCache = new Map();
+const _PLATFORM_CTX_TTL_MS = 30000;
+
 export function getPlatformContext(currentUrl, goal) {
+  const _cacheKey = (currentUrl || '') + '||' + (goal || '').slice(0, 50);
+  const _cached = _platformContextCache.get(_cacheKey);
+  if (_cached && Date.now() - _cached.ts < _PLATFORM_CTX_TTL_MS) return _cached.ctx;
+
   const prose = _getPlatformProseInternal(currentUrl, goal);
   let selectorBlock = '';
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
   } catch (e) { /* never crash prompt-building on profile lookup */ }
-  return prose + selectorBlock;
+  const ctx = prose + selectorBlock;
+  _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
+  return ctx;
 }
 
 // ========== Vision Support ==========
