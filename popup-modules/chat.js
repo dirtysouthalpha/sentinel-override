@@ -9,6 +9,9 @@ const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
 const sendBtn = document.getElementById('sendBtn');
 const stopBtn = document.getElementById('stopBtn');
+const injectContextBar = document.getElementById('injectContextBar');
+const injectContextInput = document.getElementById('injectContextInput');
+const injectContextBtn = document.getElementById('injectContextBtn');
 const voiceBtn = document.getElementById('voiceBtn');
 const status = document.getElementById('status');
 const statusText = document.getElementById('status-text');
@@ -433,6 +436,8 @@ function showApprovalCard(payload) {
   const stepNumber = (payload && payload.stepNumber) || '?';
   const requestId = payload && payload.requestId;
   const actionType = payload && payload.type;
+  // Prefer human-readable target label over raw CSS selector in the card subtitle
+  const targetLabel = (payload && (payload.ariaLabel || payload.elementText || payload.selector)) || null;
   // Code body for execute_js / run_js -style actions. Several historical field
   // names are tolerated so this card stays compatible regardless of which one
   // the background sends.
@@ -468,7 +473,7 @@ function showApprovalCard(payload) {
       </svg>
       <span>Agent requests approval${isRisky ? ' — risky' : ''}</span>
     </div>
-    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ' &middot; ' + escapeHtml(String(actionType)) : ''}</div>
+    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ' &middot; ' + escapeHtml(String(actionType)) : ''}${targetLabel ? ' &middot; <em>' + escapeHtml(String(targetLabel).slice(0, 80)) + '</em>' : ''}</div>
     ${bodyHtml}
     <div class="approval-card-buttons">
       <button class="approval-btn approve" id="approvalApprove">Approve</button>
@@ -854,9 +859,30 @@ sendBtn.addEventListener('click', sendMessage);
 function setAgentActive(isActive) {
   if (isActive) {
     activeIndicator.classList.add('active');
+    if (injectContextBar) injectContextBar.style.display = 'flex';
   } else {
     activeIndicator.classList.remove('active');
+    if (injectContextBar) injectContextBar.style.display = 'none';
+    if (injectContextInput) injectContextInput.value = '';
   }
+}
+
+// Mid-run context injection
+function sendInjectedContext() {
+  if (!injectContextInput) return;
+  const note = injectContextInput.value.trim();
+  if (!note) return;
+  chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
+    if (chrome.runtime.lastError || (resp && resp.ok === false)) return;
+    injectContextInput.value = '';
+    addMessage('📌 Note sent to agent: ' + note, 'user');
+  });
+}
+if (injectContextBtn) injectContextBtn.addEventListener('click', sendInjectedContext);
+if (injectContextInput) {
+  injectContextInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendInjectedContext(); }
+  });
 }
 
 function sendMessage() {

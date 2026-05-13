@@ -1529,6 +1529,20 @@ IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thi
 
   const data = await response.json();
 
+  // Extract real token usage from the API response (provider-normalised).
+  // Anthropic: data.usage = { input_tokens, output_tokens }
+  // OpenAI:    data.usage = { prompt_tokens, completion_tokens, total_tokens }
+  // Missing fields default to 0 so accumulation always works.
+  const _u = data.usage || {};
+  const _realUsage = {
+    input:  (_u.input_tokens  || _u.prompt_tokens             || 0),
+    output: (_u.output_tokens || _u.completion_tokens          || 0),
+  };
+  if (_realUsage.input > 0 || _realUsage.output > 0) {
+    agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _realUsage.input;
+    agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _realUsage.output;
+  }
+
   // Parse response using provider registry
   const responseText = provider.parseResponse(data);
   return parseLLMResponse(responseText);

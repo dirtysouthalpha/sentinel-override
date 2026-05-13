@@ -131,6 +131,17 @@ export const sonicwallOnbox = {
 
   mismatchHints: [],
 
+  // run_remote_command: SonicWall System > Diagnostics > Ping/Traceroute/DNS
+  commandInterface: {
+    inputSelector:   'input[name*="host" i], input[id*="target" i], input[id*="Host" i]',
+    typeSelect:      'select[name*="tool" i], select[id*="tool" i], select[id*="DiagType"]',
+    submitSelector:  'input[type="submit"], button[type="submit"], a[onclick*="diag" i]',
+    outputSelector:  'pre.diag-output, textarea[readonly], #diagOutput, .diagnostic-result',
+    outputReadyText: null,
+    outputTimeoutMs: 10000,
+    commandTypes: { cmd: 'Ping' },
+  },
+
   needsTargetSelection: false,
   preflightInstructions: '',
 

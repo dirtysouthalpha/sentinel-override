@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
@@ -275,6 +275,14 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'resume_agent_loop': {
       const { resumeAgent } = await import('./agent-engine.js');
       return resumeAgent();
+    }
+
+    case 'inject_context': {
+      if (!agentRunning) return { ok: false, error: 'No agent running' };
+      const note = typeof request.note === 'string' ? request.note.trim() : '';
+      if (!note) return { ok: false, error: 'Empty note' };
+      injectContext(note);
+      return { ok: true };
     }
 
     // (3.14.1) Used by the sign-in wall banner's "Focus tab" button: switch
