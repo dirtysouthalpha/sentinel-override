@@ -210,7 +210,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
 
   if (!apiKey) throw new Error('API key not configured');
 
-  const provider = resolveProvider(endpoint, apiKey, model);
+  const provider = resolveProvider(endpoint);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout || 45000);
 
