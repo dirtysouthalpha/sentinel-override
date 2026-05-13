@@ -6,6 +6,14 @@
 // Each provider defines how to build headers, request bodies, parse responses,
 // and handle vision (base64 image) content for its specific API format.
 
+// Adds cache_control to the last tool so Anthropic caches the full tool list.
+function _cacheLastTool(tools) {
+  if (!tools || tools.length === 0) return tools;
+  const copy = tools.slice();
+  copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
+  return copy;
+}
+
 export const PROVIDERS = {
   anthropic: {
     id: 'anthropic',
@@ -14,18 +22,19 @@ export const PROVIDERS = {
     defaultModel: 'claude-sonnet-4-6',
 
     /** Build HTTP headers for Anthropic Messages API. */
-    buildHeaders: (apiKey) => ({
+    buildHeaders: (apiKey, opts = {}) => ({
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
+      'anthropic-version': '2023-06-01',
+      ...(opts.thinking ? { 'anthropic-beta': 'interleaved-thinking-2025-05-14' } : {})
     }),
 
-    /** Build request body for Anthropic Messages API. */
+    /** Build request body for Anthropic Messages API (text-output path, e.g. planning/reports). */
     buildBody: (model, systemPrompt, userContent, opts = {}) => ({
       model,
       max_tokens: opts.maxTokens || 8000,
       temperature: opts.temperature || 0.3,
-      system: systemPrompt,
+      system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userContent }]
     }),
 
@@ -47,20 +56,20 @@ export const PROVIDERS = {
       model,
       max_tokens:  opts.maxTokens  || 8000,
       temperature: opts.temperature ?? 0.1,
-      system:      systemPrompt,
-      tools,
+      system:      [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+      tools:       _cacheLastTool(tools),
       tool_choice: { type: 'any' },
       messages:    [{ role: 'user', content: userContent }]
     }),
 
-    /** Build request body with extended thinking enabled (requires temperature: 1). */
+    /** Build request body with extended thinking + tool use (requires temperature: 1). */
     buildBodyWithThinking: (model, systemPrompt, userContent, tools, thinkingBudget, opts = {}) => ({
       model,
       max_tokens:  (opts.maxTokens || 8000) + thinkingBudget,
       temperature: 1,
-      system:      systemPrompt,
+      system:      [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       thinking:    { type: 'enabled', budget_tokens: thinkingBudget },
-      tools,
+      tools:       _cacheLastTool(tools),
       tool_choice: { type: 'any' },
       messages:    [{ role: 'user', content: userContent }]
     }),
@@ -72,13 +81,12 @@ export const PROVIDERS = {
       return { type: block.name, ...block.input };
     },
 
-    /** Build request body with extended thinking for text (non-tool) responses.
-     *  Used by adaptive-prompts rewriter for complex goal rewrites. */
+    /** Build request body with extended thinking for text (non-tool) responses (adaptive-prompts). */
     buildBodyTextWithThinking: (model, systemPrompt, userContent, thinkingBudget, opts = {}) => ({
       model,
       max_tokens:  (opts.maxTokens || 4000) + thinkingBudget,
       temperature: 1,
-      system:      systemPrompt,
+      system:      [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       thinking:    { type: 'enabled', budget_tokens: thinkingBudget },
       messages:    [{ role: 'user', content: userContent }]
     }),
