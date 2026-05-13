@@ -1593,7 +1593,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
   } else {
     requestBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000, temperature: 0.1 }));
   }
-  const requestHeaders = provider.buildHeaders(apiKey);
+  const requestHeaders = provider.buildHeaders(apiKey, { thinking: useThinking });
 
   let response;
   try {
@@ -1618,19 +1618,18 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
 
   const data = await response.json();
 
-  // Extract real token usage from the API response (provider-normalised).
-  // Anthropic: data.usage = { input_tokens, output_tokens, cache_read_input_tokens }
-  // OpenAI:    data.usage = { prompt_tokens, completion_tokens, total_tokens }
-  // Missing fields default to 0 so accumulation always works.
+  // Extract real token usage (provider-normalised).
+  // Anthropic: { input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens }
+  // OpenAI:    { prompt_tokens, completion_tokens, total_tokens }
   const _u = data.usage || {};
-  const _realUsage = {
-    input:  (_u.input_tokens  || _u.prompt_tokens             || 0),
-    output: (_u.output_tokens || _u.completion_tokens          || 0),
-  };
-  if (_realUsage.input > 0 || _realUsage.output > 0) {
-    agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _realUsage.input;
-    agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _realUsage.output;
+  const _in  = _u.input_tokens  || _u.prompt_tokens    || 0;
+  const _out = _u.output_tokens || _u.completion_tokens || 0;
+  if (_in > 0 || _out > 0) {
+    agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _in;
+    agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _out;
   }
+  if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
+  if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;
 
   // Parse response — tool use path for Anthropic, text-JSON path for all others
   if (provider.supportsToolUse && data.stop_reason === 'tool_use') {

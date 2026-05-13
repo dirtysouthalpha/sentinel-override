@@ -3155,9 +3155,11 @@ async function runAgentLoop(goal, workingTabId) {
           originalGoal: goal,
           // (3.38.0) Real token counts accumulated from API response.usage each step.
           tokenUsage: {
-            input:  agentState.totalInputTokens  || 0,
-            output: agentState.totalOutputTokens || 0,
-            total:  (agentState.totalInputTokens || 0) + (agentState.totalOutputTokens || 0),
+            input:       agentState.totalInputTokens   || 0,
+            output:      agentState.totalOutputTokens  || 0,
+            total:      (agentState.totalInputTokens   || 0) + (agentState.totalOutputTokens || 0),
+            cacheRead:   agentState.totalCacheReadTokens  || 0,
+            cacheWrite:  agentState.totalCacheWriteTokens || 0,
           }
         }).catch(() => {});
         sendReportUpdate('generating');
