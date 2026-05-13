@@ -160,5 +160,28 @@ export const itglue = {
 - For password-related goals, prefer to record METADATA only (name, username, last_updated, category). NEVER auto-click reveal/copy buttons or extract password text. The deliverable should reference passwords by name+username, not value.
 - Asset relationships are bidirectional; read-only audit work should avoid Save buttons even by accident.
 - Wait_for_text on org-dashboard signals after navigating into an org.
-- Preserve the user's deliverable structure exactly.`
+- Preserve the user's deliverable structure exactly.\`,
+
+  workflowHints: [
+    {
+      match: /asset.*lookup|find.*configuration|configuration.*lookup|find.*asset|device.*record/i,
+      hint: 'Phase 0: Navigate to the correct Organization (search in the Organizations list, wait_for_text the org name). Phase 1: Navigate to Configurations within the org. Phase 2: Use the search/filter to locate the asset by name, serial, or IP. Phase 3: Click the configuration record and extract: name, type, serial number, IP address, status, and last updated date. Save to memory key itglue_config_<asset_name>.',
+    },
+    {
+      match: /password.*lookup|find.*password|credential.*lookup|password.*record/i,
+      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Navigate to Passwords within the org. Phase 2: Search for the password record by name or category. Phase 3: Extract METADATA ONLY — name, username, category, last_updated. Do NOT click reveal, copy, or show password buttons. Record to memory key itglue_password_<name> as metadata only.',
+    },
+    {
+      match: /kb.*article|knowledge.*base|create.*article|update.*article|document/i,
+      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Navigate to Documents (or Articles) within the org. Phase 2: To create: click New Document, fill in the title and body. To update: locate the article by name, click Edit. Phase 3: Click Save. Confirm the article appears in the list. Save the article title and URL to memory key itglue_article_<title>.',
+    },
+    {
+      match: /contact.*lookup|find.*contact|contact.*email|contact.*phone/i,
+      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Click the Contacts tab. Phase 2: Search for the contact by name. Phase 3: Extract name, title, email, phone, and location. Save to memory key itglue_contact_<name>. Do not click any password or credential fields visible on the contact record.',
+    },
+    {
+      match: /network.*glue|flexible.*asset|runbook|procedure/i,
+      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Navigate to Flexible Assets (or the specific asset type: Runbooks, Procedures, etc.). Phase 2: Locate the asset by name or tag. Phase 3: Extract the key fields — this varies by template, so read the field labels before extracting values. Save a structured summary to memory key itglue_asset_<name>.',
+    },
+  ],
 };

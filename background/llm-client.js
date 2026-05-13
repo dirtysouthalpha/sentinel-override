@@ -793,8 +793,8 @@ DECOMPOSITION RULES — follow these exactly:
 6. Configuration changes: navigate to config section → find item → open edit → set values → save → verify success
 7. Multi-page research: navigate to source → extract links → open each in tab → read → note findings → close tabs → summarize
 8. ALWAYS include data extraction steps (extract, execute_js with key, or note) — never just navigate and read without saving
-9. ALWAYS include verification after saves/commits (wait for success message, re-read to confirm)
-10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change
+9. ALWAYS include verification after saves/commits (wait for success message, then use a verify action to confirm the value persisted)
+10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change, followed by a verify action
 11. Maximum 15 steps — be thorough but not redundant
 
 ${urlContext}${platformContext}${patternContext}${(function(){const d = getMultiPortalDirective(goal); return d || '';})()}${(function(){const d = getMultiArticleDirective(goal); return d || '';})()}
@@ -1486,6 +1486,7 @@ Actions:
   PRESET shorthand (auto-selects domain + record_type): { "type": "lookup", "domain": "example.com", "preset": "spf" } | { "preset": "dmarc" } | { "preset": "dkim", "selector": "google" }  -- (3.39.0) spf→TXT@domain, dmarc→TXT@_dmarc.domain, dkim→TXT@selector._domainkey.domain.
 - { "type": "run_remote_command", "command": "COMMAND_STRING", "command_type": "powershell|cmd|bash" }  -- (3.37.0) Drives the active ScreenConnect or NinjaOne command interface to run a shell command on the remote machine. Automatically detects the platform and uses the correct command runner UI. Returns the command output. Use for ping, nslookup, ipconfig, Get-EventLog, Test-NetConnection, etc.
 - { "type": "repeat_for_each", "items_key": "MEMORY_KEY", "item_var": "item", "do": [ACTIONS] }  -- (3.39.0) Iterate over a memory array and run sub-actions for each item. Use {{item}} or {{item.field}} in sub-action fields for substitution. Example: iterate a list of usernames and click each one.
+- { "type": "verify", "selector": "CSS_SELECTOR", "expected": "EXPECTED_TEXT_OR_VALUE" }  -- (3.40.0) Read back a field or element to confirm a save/config-change persisted. Returns "verified: <actual>" if the element's text/value contains expected, or "MISMATCH: expected <expected>, got <actual>". Use after any Save/Apply/OK click to confirm the change stuck. Can also omit expected to simply read back the current value.
 
 ${base64Image ? (function() {
   // (#11) DPR-aware coordinate guidance. Coordinates the model emits in click_at

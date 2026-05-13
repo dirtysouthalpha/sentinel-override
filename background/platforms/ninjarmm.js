@@ -85,4 +85,27 @@ export const ninjarmm = {
   ],
 
   mismatchHints: [],
+
+  workflowHints: [
+    {
+      match: /device.*health|device.*status|endpoint.*health|agent.*status|device.*overview/i,
+      hint: 'Phase 1: Navigate to the target device (search by name in the top search bar or browse Organizations > Locations). Phase 2: The device detail panel shows OS, last-seen, agent version, CPU, memory, and disk. Wait for the panel to load (wait_for_text "Last Activity" or "Agent Version"). Phase 3: Check the Health Score and any active conditions (warnings, critical alerts). Save to memory key ninjarmm_device_<name>.',
+    },
+    {
+      match: /run.*script|deploy.*script|execute.*script|run.*automation|script.*device/i,
+      hint: 'Phase 1: Navigate to the target device. Phase 2: Click the Scripting tab (or Run Automation button). Phase 3: Select the script type (PowerShell, Bash, Batch) and enter the script or select from the library. Phase 4: Click Run. Wait for "Completed" status in the job output panel (up to 60 seconds). Read the output below. Save the output to memory key ninjarmm_script_output.',
+    },
+    {
+      match: /alert.*review|alert.*triage|active.*alert|open.*alert|condition.*alert/i,
+      hint: 'Phase 1: Navigate to ACTIVITIES > Alerts (or the Alerts tab in the left sidebar). Phase 2: Filter by organization, severity, or device as needed. Phase 3: For each alert, extract: device name, alert condition, severity, triggered-at timestamp, and message. Phase 4: Note which alerts are acknowledged vs. unacknowledged. Save to memory key ninjarmm_alerts.',
+    },
+    {
+      match: /patch.*status|patch.*compliance|missing.*patch|update.*status|windows.*update/i,
+      hint: 'Phase 1: Navigate to the target device or organization. Phase 2: Click the Patching tab (or navigate to MANAGEMENT > Patching). Phase 3: Filter for Missing or Failed patches. Phase 4: Extract patch name, KB number, severity, and status for each missing patch. Save patch compliance summary to memory key ninjarmm_patch_status.',
+    },
+    {
+      match: /backup.*status|backup.*job|backup.*failed|continuity.*backup/i,
+      hint: 'Phase 1: Navigate to the target device or MANAGEMENT > Backup. Phase 2: Review the backup job list — note job name, last run time, status (Success/Warning/Failed), and protected data size. Phase 3: For failed jobs, click the job row to see the failure reason. Save backup status to memory key ninjarmm_backup_status.',
+    },
+  ],
 };

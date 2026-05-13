@@ -75,4 +75,23 @@ export const screenconnect = {
     'The command output appears in the output pane below the input. Allow up to 15 seconds for results.',
     'Machine names in the access list are in the "Name" column. Use the search box to filter by name, IP, or tag.',
   ],
+
+  workflowHints: [
+    {
+      match: /connect.*device|remote.*session|open.*session|start.*session|remote.*into/i,
+      hint: 'Phase 1: In the Access tab, search for the target machine by name or IP using the search box. Wait for the results to filter. Phase 2: Click the machine row to open session options, then click Connect (or the play/connect icon). The session opens in a new tab or popup — wait for the remote desktop to render. Phase 3: Confirm the connection is live (look for the desktop or login screen).',
+    },
+    {
+      match: /run.*command|execute.*command|remote.*command|run.*script|powershell|cmd.*prompt/i,
+      hint: 'Phase 1: Connect to the target machine (search by name, click Connect). Phase 2: Once in the session, click the Toolbox tab (wrench icon). Phase 3: Select the command type (CMD or PowerShell). Type the command in the input field. Click Run. Phase 4: Wait up to 15 seconds for the output pane to populate. Read the output from the pane below the input. Save to memory key screenconnect_cmd_output.',
+    },
+    {
+      match: /transfer.*file|upload.*file|file.*transfer|send.*file/i,
+      hint: 'Phase 1: Connect to the target machine session. Phase 2: Click the Files tab (folder icon) in the session toolbar. Phase 3: Use the local file browser on the left to navigate to the source file. Use the remote file browser on the right to navigate to the destination. Phase 4: Select the file and click Transfer. Wait for the transfer progress bar to complete.',
+    },
+    {
+      match: /event.*log|machine.*log|session.*log|host.*log|activity.*log/i,
+      hint: 'Phase 1: In the Access tab, click the machine name to open its detail panel (do NOT click Connect). Phase 2: Navigate to the Session History or Event Log tab within the detail panel. Phase 3: Review events for the relevant time window — connection attempts, disconnects, commands run. Save notable events to memory key screenconnect_event_log.',
+    },
+  ],
 };

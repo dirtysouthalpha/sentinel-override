@@ -188,4 +188,23 @@ export const ambioViewlinc = {
     'When the operator has provided PICKUP CONTEXT listing previously-completed steps, treat those as already done — do NOT re-create the OQ-TEST-ALARM-001 location, do NOT re-link channels, do NOT redo IQ tests.',
     'Record every alarm ID, threshold value, email subject, and timestamp in the finish summary. Defensibility requires the Event Log + report cross-reference.',
   ],
+
+  workflowHints: [
+    {
+      match: /sensor.*reading|current.*reading|temperature.*reading|humidity.*reading|location.*value/i,
+      hint: 'Phase 1: Navigate to the Views tab and locate the target location in the location tree. Phase 2: Click the location to open its current readings panel. Phase 3: Extract the current value, unit, channel name, and timestamp. Check whether the reading is within the configured threshold range (no active alarms). Save to memory key viewlinc_reading_<location>.',
+    },
+    {
+      match: /alarm.*history|alarm.*log|alarm.*event|past.*alarm|alarm.*report/i,
+      hint: 'Phase 1: Navigate to the Alarms tab (or Reports > Alarm History). Phase 2: Set the time range filter to the relevant window. Filter by location or device if needed. Phase 3: For each alarm entry, extract: location name, alarm name, alarm type (High/Low/Offline), start time, end time, and acknowledged-by. Phase 4: Export or save the alarm list to memory key viewlinc_alarm_history.',
+    },
+    {
+      match: /report.*generat|create.*report|export.*data|trend.*report|compliance.*report/i,
+      hint: 'Phase 1: Navigate to Reports. Phase 2: Select the report template (e.g., "Alarm Summary", "Readings", "Trend"). Phase 3: Configure the report parameters: location(s), time range, and format (PDF/CSV). Phase 4: Click Generate or Run. Wait for the report to render (wait_for_text "Report complete" or for a download link to appear). Save the report metadata to memory key viewlinc_report.',
+    },
+    {
+      match: /threshold.*config|alarm.*threshold|set.*threshold|create.*threshold|limit.*config/i,
+      hint: 'Phase 1: Navigate to the target location in the Views tree. Phase 2: Right-click the location (or use the Settings icon) to open Threshold Settings. Phase 3: Click Add Threshold. Fill in: name (use "OQ-" prefix for test thresholds), type (High/Low), value, and delay. Phase 4: Click Save. Navigate to the Alarms tab and wait_for_text the new threshold name before confirming it is active.',
+    },
+  ],
 };
