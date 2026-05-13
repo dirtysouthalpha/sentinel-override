@@ -336,7 +336,7 @@ function _renderSkillStatsModal(skills) {
       const deltaStr = delta === 0 ? '' : (delta > 0 ? ' (+' + delta + ')' : ' (' + delta + ')');
       const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
       tr.innerHTML =
-        '<td style="padding:6px 4px;"><strong>' + s.id + '</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">' + (s.description || '') + '</div></td>' +
+        '<td style="padding:6px 4px;"><strong>' + escapeHtml(s.id) + '</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">' + escapeHtml(s.description || '') + '</div></td>' +
         '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.fires + '</td>' +
         '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.successes + ' / ' + stats.failures + '</td>' +
         '<td style="padding:6px 4px; text-align:right; color:' + rateColor + '; font-variant-numeric:tabular-nums;">' + rateStr + '</td>' +
@@ -381,11 +381,11 @@ const __TECH_INPUTS = {
   email:   document.getElementById('techEmailInput'),
 };
 const TECH_DEFAULTS = {
-  name: 'Brandon Goolsby',
-  title: 'IT Support Technician',
-  company: 'Premier Networx',
-  phone: '706-426-6313',
-  email: 'support@augustaitguys.com'
+  name: '',
+  title: '',
+  company: '',
+  phone: '',
+  email: ''
 };
 
 function __setTicketFormatRowVisible(visible) {

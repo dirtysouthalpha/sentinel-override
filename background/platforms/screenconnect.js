@@ -16,7 +16,7 @@ export const screenconnect = {
     try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/screenconnect\.com|connectwise\.com\/control/i.test(host)) return true;
+      if (/screenconnect\.com|connectwise\.com/i.test(host)) return true;
       if (/\/Host#Access|\/Host#Support|\/Backstage|\/Host#Join/i.test(u.href)) return true;
     } catch (e) {}
     return /\b(?:screenconnect|control\.connectwise|sc\.local|schost)\b/i.test(String(goal || ''));
@@ -62,19 +62,23 @@ export const screenconnect = {
   },
 
   waitStrings: {
-    sessionReady:    'Connected',
-    commandComplete: null,
+    sessionReady:    ['Connected'],
+    commandComplete: [],
   },
 
   commitFlow: [],
   sessionExpiredText: 'Session has expired',
 
-  hints: [
-    'ScreenConnect sessions open in a new tab or popup window.',
+  knownGotchas: [
+    'ScreenConnect sessions open in a new tab or popup window — switch tabs after clicking Connect.',
     'To run a command: navigate to the active session, click the Toolbox tab, select the command type, enter the command, and click Run.',
     'The command output appears in the output pane below the input. Allow up to 15 seconds for results.',
     'Machine names in the access list are in the "Name" column. Use the search box to filter by name, IP, or tag.',
+    'commandComplete wait string is null because ScreenConnect has no stable "done" text — rely on timeout instead.',
   ],
+
+  liveDataCaveats:
+    'ScreenConnect is a Kendo UI SPA. Session state (connected/disconnected) is reflected in the session list icons, not in a status text element. The Toolbox command runner has no structured completion signal — wait for output pane to stop updating or use timeout.',
 
   workflowHints: [
     {

@@ -18,7 +18,7 @@ export const ninjarmm = {
       if (/ninjarmm\.com|ninjarmm\.io|app\.ninjarmm/i.test(host)) return true;
       if (/ninjarmm/i.test(host)) return true;
     } catch (e) {}
-    return /\b(?:ninjarmm|ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i.test(String(goal || ''));
+    return /\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i.test(String(goal || ''));
   },
 
   pageTypes: [
@@ -70,19 +70,22 @@ export const ninjarmm = {
   },
 
   waitStrings: {
-    dashboardReady: 'Dashboard',
-    commandComplete: 'Completed',
+    dashboardReady: ['Dashboard'],
+    commandComplete: ['Completed'],
   },
 
   commitFlow: ['Save', 'Apply'],
   sessionExpiredText: 'Your session has expired',
 
-  hints: [
+  knownGotchas: [
     'NinjaOne uses a React SPA with hash routing (#). Page transitions may not trigger a full reload.',
     'To run a command on a device: navigate to the device, click the Scripting tab, click Run Automation, select the script type, enter the command, and click Run.',
     'Script output appears in the job output panel. Wait for "Completed" status before reading results.',
     'Device search is in the top search bar. You can filter the device list by organization or location using the sidebar.',
   ],
+
+  liveDataCaveats:
+    'NinjaOne device data is near-real-time but may lag by 1-2 minutes for agent check-in. Scripting jobs can take up to 60 seconds to return output.',
 
   mismatchHints: [],
 

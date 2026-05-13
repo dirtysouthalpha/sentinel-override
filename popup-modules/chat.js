@@ -967,7 +967,7 @@ document.querySelectorAll('[data-speed]').forEach(btn => {
   btn.addEventListener('click', () => {
     const mode = btn.getAttribute('data-speed');
     chrome.runtime.sendMessage({ action: 'set_agent_speed', mode }, (resp) => {
-      if (resp && !resp.ok === false) {
+      if (resp && resp.ok !== false) {
         // Update active state on buttons
         document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');

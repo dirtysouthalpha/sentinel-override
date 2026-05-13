@@ -145,14 +145,11 @@ export const ambioViewlinc = {
     confirmDialogNo:           'button:has-text("No"), button:has-text("Cancel"), .confirm-dialog .btn-secondary',
   },
 
-  waitStrings: [
-    'Loading',
-    'Please wait',
-    'Saving',
-    'Saved',
-    'Processing',
-    'Acknowledging',
-  ],
+  waitStrings: {
+    loading:       ['Loading', 'Please wait'],
+    saving:        ['Saving', 'Saved'],
+    processing:    ['Processing', 'Acknowledging'],
+  },
 
   knownGotchas: [
     'viewLinc enforces strict 1:1 channel→location mapping. NEVER re-link a channel that is already linked to a production location.',

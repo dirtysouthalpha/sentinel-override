@@ -72,15 +72,15 @@ export const connectwiseManage = {
   },
 
   waitStrings: {
-    pageReady:       'Service Desk',
-    ticketSaved:     'Record Saved',
-    loginPrompt:     'User Name',
+    pageReady:       ['Service Desk'],
+    ticketSaved:     ['Record Saved'],
+    loginPrompt:     ['User Name'],
   },
 
   commitFlow: ['Save', 'OK'],
   sessionExpiredText: 'Your session has expired',
 
-  hints: [
+  knownGotchas: [
     'ConnectWise Manage uses Kendo UI custom dropdowns — click to open, then click to select an item.',
     'The Company field on tickets is a search-as-you-type autocomplete — type company name and click the suggestion.',
     'After editing a ticket, look for a Save button in the header toolbar or at the bottom of the form.',
@@ -88,6 +88,9 @@ export const connectwiseManage = {
     'Configurations (devices) are linked to companies — navigate to the company first, then the Configurations tab.',
     'Time entries are on the Time tab of each ticket. Use "Enter Time" or the + icon.',
   ],
+
+  liveDataCaveats:
+    'CW Manage is an ASP.NET SPA. Dropdowns are custom Kendo controls — standard select option selection may not trigger change events. Always click the dropdown, then click the desired option from the popup list.',
 
   mismatchHints: [
     { pattern: /automate|labtech/i, onbox: 'ConnectWise Automate (RMM)', nsm: 'This is Manage (PSA), not Automate (RMM). Navigate to a separate CW Automate instance for RMM tasks.' },

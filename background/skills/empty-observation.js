@@ -13,6 +13,14 @@ export const emptyObservation = {
 
   matches(ctx) {
     if (!ctx) return false;
+    // Only fire when the last action actually failed to produce useful results
+    // (observe_page or a navigation that should have populated the page).
+    // Skip if the previous action succeeded normally — an empty page after a
+    // successful click/extract is expected, not a recovery scenario.
+    const lastType = ctx.lastCommand && ctx.lastCommand.type;
+    const lastFailed = !!ctx.lastActionFailed;
+    const isPostObserve = lastType === 'read_page' || lastType === 'navigate';
+    if (!isPostObserve && !lastFailed) return false;
     // Only fire when we have an observation but it's nearly empty
     const elemCount = Array.isArray(ctx.allElements) ? ctx.allElements.length : 0;
     const textLen = (ctx.pageText || '').length;

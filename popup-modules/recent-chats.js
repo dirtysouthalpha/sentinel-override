@@ -120,8 +120,10 @@
       // Archive current state first (don't lose work-in-progress)
       await archiveCurrentChat({ reason: 'replaced-by-restore' });
 
-      // Clear and restore
-      chatContainer.innerHTML = entry.htmlSnapshot || '';
+      // Clear and restore (sanitize stored HTML — could be tampered via storage)
+      chatContainer.innerHTML = (typeof sanitizeHtml === 'function')
+        ? sanitizeHtml(entry.htmlSnapshot || '')
+        : (entry.htmlSnapshot || '');
 
       // Sync conversationHistory
       const state = (typeof getState === 'function') ? getState() : null;

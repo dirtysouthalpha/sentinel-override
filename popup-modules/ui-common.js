@@ -14,13 +14,27 @@ function escapeHtml(text) {
 // ========== HTML Sanitization ==========
 function sanitizeHtml(dirtyHtml) {
   const doc = new DOMParser().parseFromString(dirtyHtml, 'text/html');
-  // Remove dangerous elements and attributes
-  const dangerous = doc.querySelectorAll('script, iframe, object, embed, form, link[rel="import"], base, meta');
+  // Remove dangerous elements (includes SVG/MathML foreign content vectors)
+  const dangerous = doc.querySelectorAll('script, iframe, object, embed, form, link[rel="import"], base, meta, svg, math');
   dangerous.forEach(el => el.remove());
-  // Remove event handler attributes from all remaining elements
+  // Remove event handler attributes and dangerous URLs from all remaining elements
   doc.querySelectorAll('*').forEach(el => {
     for (const attr of Array.from(el.attributes)) {
-      if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
+      const name = attr.name.toLowerCase();
+      const val = attr.value.toLowerCase().trim();
+      // Remove on* event handlers
+      if (name.startsWith('on')) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      // Remove javascript:, data:, vbscript: URLs in href/src/action/formaction/xlink:href
+      if (/^(href|src|action|formaction|xlink:href)$/.test(name)
+          && /^\s*(javascript\s*:|data\s*:|vbscript\s*:)/i.test(val)) {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      // Remove style attributes that could contain expression() or url(javascript:)
+      if (name === 'style' && /expression\s*\(|url\s*\(\s*['"]?\s*javascript/i.test(val)) {
         el.removeAttribute(attr.name);
       }
     }

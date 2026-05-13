@@ -21,7 +21,7 @@ export const dattoRmm = {
       if (/centrastage\.net|dattormm\.com|datto\.com\/rmm/i.test(host)) return true;
       if (/autotask\.net|atask\.net/i.test(host)) return true;
     } catch (e) {}
-    return /\b(?:datto\s+rmm|autotask|centrastage|datto\s+rmm)\b/i.test(String(goal || ''));
+    return /\b(?:datto\s+rmm|autotask|centrastage)\b/i.test(String(goal || ''));
   },
 
   pageTypes: [
@@ -95,15 +95,15 @@ export const dattoRmm = {
   },
 
   waitStrings: {
-    pageReady:       'Dashboard',
-    commandComplete: 'Completed',
-    loginPrompt:     'Username',
+    pageReady:       ['Dashboard'],
+    commandComplete: ['Completed'],
+    loginPrompt:     ['Username'],
   },
 
   commitFlow: ['Save', 'Apply'],
   sessionExpiredText: 'Your session has expired',
 
-  hints: [
+  knownGotchas: [
     'Datto RMM uses Angular dropdowns — click to open, then click the desired option.',
     'To run a quick job on a device: open the device, click Quick Jobs or the Run button, select the component, click Run.',
     'Alert bulk actions: check the checkboxes in the alert list, then use the toolbar (Acknowledge, Resolve, Create Ticket).',
@@ -111,6 +111,9 @@ export const dattoRmm = {
     'Autotask uses ASP.NET custom controls — click to open dropdowns, type to search in lookup fields.',
     'Time entries in Autotask are on the "Time & Expense" tab of each ticket.',
   ],
+
+  liveDataCaveats:
+    'Datto RMM device status may lag by 1-5 minutes behind real agent check-in. Quick Job output can take up to 30 seconds. Autotask and Datto RMM are separate products with separate logins.',
 
   mismatchHints: [
     { pattern: /autotask/i, onbox: 'Autotask PSA', nsm: 'Autotask is a different product from Datto RMM. They share Kaseya ownership but are separate UIs.' },
