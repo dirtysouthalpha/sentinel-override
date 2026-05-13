@@ -17,6 +17,8 @@ import { aruba } from './aruba.js';
 import { ambioViewlinc } from './ambio_viewlinc.js';
 import { screenconnect } from './screenconnect.js';
 import { ninjarmm } from './ninjarmm.js';
+import { connectwiseManage } from './connectwise_manage.js';
+import { dattoRmm } from './datto_rmm.js';
 
 const PROFILES = [
   // Most-specific first. NSM before on-box, ITG before generic. Aruba covers
@@ -25,6 +27,7 @@ const PROFILES = [
   // (3.36.0) ambioViewlinc detects on the specific 192.168.100.x server +
   // viewlinc/oq keyword combo, so it slots before the catch-alls.
   // (3.37.0) ScreenConnect and NinjaRMM added for run_remote_command support.
+  // (3.38.0) ConnectWise Manage and Datto RMM added.
   sonicwallNsm,
   sonicwallOnbox,
   m365Admin,
@@ -34,6 +37,8 @@ const PROFILES = [
   ambioViewlinc,
   screenconnect,
   ninjarmm,
+  connectwiseManage,
+  dattoRmm,
 ];
 
 /** Resolve the best-matching platform profile for the current goal+URL. Returns null if none match. */

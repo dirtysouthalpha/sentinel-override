@@ -53,9 +53,18 @@ let activeClientId = null;      // (3.12.0) currently-selected client (sentinelC
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
 let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this run; useCount bumps at run end
 let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
+let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
+let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 
 // Expose agentRunning for index.js
 export { agentRunning };
+
+/** Enqueue a user note to be injected into the LLM prompt on the next step. */
+export function injectContext(note) {
+  if (typeof note === 'string' && note.trim()) {
+    _pendingContextInjections.push(note.trim());
+  }
+}
 
 /** Compatibility accessor -- returns the current active tab ID from tab-context. */
 export function getAgentTabId() { return getActiveTabId(); }
@@ -271,6 +280,8 @@ export function resetAgentState() {
   failedSteps = 0;
   consecutiveFailureMax = 0;
   safetyBlocks = 0;
+  _pendingContextInjections.length = 0;
+  _pendingCommandQueue.length = 0;
   resetAllContexts();
 }
 
@@ -2102,6 +2113,16 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('▶ Agent resumed', stepCount);
       }
 
+      // Drain any mid-run context notes from the user and push them into history
+      // so the LLM sees them on the very next call.
+      if (_pendingContextInjections.length > 0) {
+        const notes = _pendingContextInjections.splice(0);
+        for (const n of notes) {
+          history.push({ role: 'user', content: '📌 Technician note (mid-run): ' + n });
+          sendSilentUpdate('📌 Context injected: ' + n, stepCount);
+        }
+      }
+
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
@@ -2696,10 +2717,17 @@ async function runAgentLoop(goal, workingTabId) {
         return cleaned;
       });
       let _aiCallError = null;
+      // Drain one sub-command from the repeat_for_each queue before consulting LLM
+      if (_pendingCommandQueue.length > 0) {
+        clearInterval(progressTimer);
+        base64Image = null;
+        command = _pendingCommandQueue.shift();
+        activityDone(stepCount, 'consult-ai', 'Queued sub-command: ' + command.type, null);
+        _lastAiCallMs = 0;
       // (3.21.0) If a recovery skill auto-applied, use that command and
       // skip the LLM consult entirely. Saves ~5-30s per recovery + an LLM
       // call's worth of cost.
-      if (_skillAutoCommand) {
+      } else if (_skillAutoCommand) {
         clearInterval(progressTimer);
         base64Image = null;
         command = _skillAutoCommand;
@@ -3091,7 +3119,13 @@ async function runAgentLoop(goal, workingTabId) {
           trustScore: _finalTrustScore,
           retrySuggestions: _retrySuggestions,
           // (3.31.0) Echo the goal so chat can re-fire it on one-click retry.
-          originalGoal: goal
+          originalGoal: goal,
+          // (3.38.0) Real token counts accumulated from API response.usage each step.
+          tokenUsage: {
+            input:  agentState.totalInputTokens  || 0,
+            output: agentState.totalOutputTokens || 0,
+            total:  (agentState.totalInputTokens || 0) + (agentState.totalOutputTokens || 0),
+          }
         }).catch(() => {});
         sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
@@ -3099,6 +3133,35 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Handle note
+      // repeat_for_each: iterate over a memory array and run sub-actions for each item.
+      // Sub-commands are pushed to _pendingCommandQueue and drained before LLM consults.
+      if (command.type === 'repeat_for_each') {
+        const itemsKey = command.items_key;
+        const items = itemsKey && Array.isArray(agentMemory[itemsKey]) ? agentMemory[itemsKey] : (Array.isArray(command.items) ? command.items : []);
+        const doActions = Array.isArray(command.do) ? command.do : [];
+        if (items.length === 0 || doActions.length === 0) {
+          history.push({ step: stepCount, action: command, result: 'repeat_for_each: nothing to iterate (items=' + items.length + ', actions=' + doActions.length + ')' });
+          await persistHistory();
+          continue;
+        }
+        sendSilentUpdate(`repeat_for_each: ${items.length} items × ${doActions.length} actions`, stepCount);
+        const iterVar = command.item_var || 'item';
+        for (const _item of items) {
+          for (const _act of doActions) {
+            // Substitute {{item}} / {{item.field}} placeholders in the serialised action
+            const _resolved = JSON.parse(JSON.stringify(_act).replace(
+              new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g'),
+              (_, field) => field ? (typeof _item === 'object' && _item !== null ? String(_item[field] ?? '') : '') : String(_item)
+            ));
+            _pendingCommandQueue.push(_resolved);
+          }
+        }
+        history.push({ step: stepCount, action: command, result: 'repeat_for_each queued ' + _pendingCommandQueue.length + ' sub-actions for ' + items.length + ' items' });
+        productiveSteps++;
+        await persistHistory();
+        continue;
+      }
+
       if (command.type === 'note') {
         const noteText = command.text || command.summary || 'No note text';
         sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
@@ -3175,9 +3238,22 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // (3.37.0) DNS-over-HTTPS lookup — no page interaction, pure background fetch
+      // (3.39.0) preset: 'spf' | 'dmarc' | 'dkim' expand to the correct query target.
       if (command.type === 'lookup') {
-        const _domain = String(command.domain || command.host || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
-        const _type = String(command.record_type || command.type_field || 'A').toUpperCase();
+        let _domain = String(command.domain || command.host || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+        let _type = String(command.record_type || command.type_field || 'A').toUpperCase();
+        const _preset = String(command.preset || '').toLowerCase();
+        // Expand preset shortcuts into canonical DNS query parameters
+        if (_preset === 'spf') {
+          _type = 'TXT';  // SPF lives in TXT at the root domain
+        } else if (_preset === 'dmarc') {
+          _type = 'TXT';
+          _domain = '_dmarc.' + _domain.replace(/^_dmarc\./i, '');
+        } else if (_preset === 'dkim') {
+          const _sel = String(command.selector || 'default').trim().replace(/\._domainkey.*$/i, '');
+          _type = 'TXT';
+          _domain = `${_sel}._domainkey.${_domain.replace(new RegExp('\\.' + _sel + '\\._domainkey\\.', 'i'), '.')}`;
+        }
         if (!_domain) {
           const _r = 'lookup: domain is required';
           sendActionResult(stepCount, _r, true);
@@ -3185,7 +3261,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           continue;
         }
-        sendSilentUpdate(`DNS lookup: ${_domain} (${_type})`, stepCount);
+        sendSilentUpdate(`DNS lookup: ${_domain} (${_type})${_preset ? ' [' + _preset + ']' : ''}`, stepCount);
         sendActionMessage(command, stepCount, observation);
         try {
           const _dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(_domain)}&type=${encodeURIComponent(_type)}`;
@@ -3194,7 +3270,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _dohJson = await _dohResp.json();
           const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
           const _status = _dohJson.Status === 0 ? 'NOERROR' : `RCODE ${_dohJson.Status}`;
-          const _result = JSON.stringify({ domain: _domain, recordType: _type, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
+          const _result = JSON.stringify({ domain: _domain, recordType: _type, preset: _preset || null, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
           if (_answers.length > 0) productiveSteps++;
           sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
           history.push({ step: stepCount, action: command, result: _result });
@@ -3250,19 +3326,23 @@ async function runAgentLoop(goal, workingTabId) {
           // Submit
           await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _submitSel } }).catch(() => {});
 
-          // Wait for output
-          if (_readyText) {
-            await sendMessageWithRetry(tab, { action: 'wait_for', condition: { type: 'wait_for_text', text: _readyText, timeout: _outputMs } }).catch(() => {});
-          } else {
-            await sleep(_outputMs > 5000 ? Math.min(_outputMs, 15000) : _outputMs);
+          // Wait for output — poll until readyText appears or timeout
+          const _outputJs = `(function(){var el=document.querySelector(${JSON.stringify(_outputSel)});return el?(el.innerText||el.value||el.textContent||'').trim():'';})()`;
+          const _pollInterval = 600;
+          const _pollDeadline = Date.now() + _outputMs;
+          let _output = '';
+          while (Date.now() < _pollDeadline) {
+            await sleep(_pollInterval);
+            const _poll = await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: _outputJs, key: '_rc_output' } }).catch(() => null);
+            const _pollText = typeof _poll === 'string' ? _poll : '';
+            if (_pollText) {
+              _output = _pollText;
+              if (!_readyText || _pollText.includes(_readyText)) break;
+            }
           }
-
-          // Read back output
-          const _outputJs = `(function(){var el=document.querySelector(${JSON.stringify(_outputSel)});return el?(el.innerText||el.value||el.textContent||'').trim():'(output element not found)';})()`;
-          const _outResp = await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: _outputJs, key: '_rc_output' } }).catch(() => null);
-          const _output = (_outResp && typeof _outResp === 'string') ? _outResp : '(could not read output — check page manually)';
+          if (!_output) _output = '(output element not found or timed out)';
           const _result = JSON.stringify({ command: _cmd, command_type: _cmdType, platform: _profile ? _profile.id : 'generic', output: _output });
-          if (_output && _output !== '(output element not found)' && _output !== '(could not read output — check page manually)') productiveSteps++;
+          if (_output && !_output.startsWith('(output element not found')) productiveSteps++;
           sendActionResult(stepCount, `Command ran on ${_profile ? _profile.label : 'remote machine'}`, false);
           history.push({ step: stepCount, action: command, result: _result });
           await persistHistory();
@@ -4138,10 +4218,13 @@ function sleep(ms) {
 // the activity stream label is always meaningful.
 function _describeTarget(cmd) {
   if (!cmd) return '(no target)';
+  // Prefer human-readable labels over raw CSS selectors for approval card readability
+  if (cmd.ariaLabel) return '"' + String(cmd.ariaLabel).slice(0, 80) + '"';
+  if (cmd.elementText) return '"' + String(cmd.elementText).slice(0, 80) + '"';
+  if (cmd.label) return '"' + String(cmd.label).slice(0, 80) + '"';
   if (cmd.selector) return cmd.selector;
   if (cmd.ref) return 'ref:' + cmd.ref;
   if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return '(' + cmd.x + ',' + cmd.y + ')';
-  if (cmd.label) return '"' + cmd.label + '"';
   return '(no target)';
 }
 function describeAction(command) {
@@ -4192,7 +4275,10 @@ async function requestApproval(command, stepNumber) {
     };
     chrome.runtime.sendMessage({
       action: 'request_approval',
-      payload: { action: command.type, description, stepNumber, requestId },
+      payload: { action: command.type, description, stepNumber, requestId,
+        ariaLabel: command.ariaLabel || null,
+        elementText: command.elementText || null,
+        selector: command.selector || null },
       requestId
     }).catch(() => {});
     const listener = (message) => {

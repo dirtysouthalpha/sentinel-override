@@ -258,6 +258,13 @@
       </div>
     </div>
     <div class="input-footer">Press Enter to send • Shift+Enter for new line • Cmd+K for commands</div>
+    <!-- Mid-run context injection bar — visible only while agent is running -->
+    <div id="injectContextBar" style="display:none; margin-top:6px; gap:6px; align-items:center;">
+      <input id="injectContextInput" type="text" placeholder="📌 Add a note for the running agent…"
+        style="flex:1; padding:5px 8px; border-radius:6px; border:1px solid var(--border-color); background:var(--input-bg,var(--bg-secondary)); color:var(--text-primary); font-size:12px;" />
+      <button id="injectContextBtn" title="Send note to agent"
+        style="padding:5px 10px; border-radius:6px; border:none; background:var(--accent-color,#3b82f6); color:#fff; font-size:12px; cursor:pointer; white-space:nowrap;">Send Note</button>
+    </div>
   </div>
 
   <!-- Markdown Preview Panel -->
@@ -542,6 +549,16 @@
         <input type="text" id="expectedTenantInput" placeholder="acme.onmicrosoft.com or Acme Corp" style="width:100%; padding:8px 10px; background: var(--bg-input, rgba(255,255,255,0.04)); border:1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius:6px; color: var(--text-primary, #fff); font-size:13px; box-sizing: border-box;">
         <div style="font-size:11px; color: var(--text-secondary, #aaa); margin-top:4px; line-height:1.4;">
           Cross-client safety: when set, the tenant chip in the header turns green when the detected tenant matches and red when it doesn't. Leave blank to skip the check. Detected from the page tenant chip, the <code>tid=</code> URL param, or any <code>*.onmicrosoft.com</code> reference.
+        </div>
+      </div>
+      <!-- Learned Patterns Viewer -->
+      <div class="form-row" style="margin-top:20px;">
+        <label style="display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:13px; margin-bottom:6px;">
+          <span>Learned Patterns</span>
+          <button id="clearAllPatternsBtn" style="font-size:11px; padding:2px 8px; border-radius:5px; border:1px solid var(--error-color,#ef4444); background:transparent; color:var(--error-color,#ef4444); cursor:pointer;">Clear All</button>
+        </label>
+        <div id="learnedPatternsList" style="max-height:180px; overflow-y:auto; font-size:12px; color:var(--text-secondary); border:1px solid var(--border-color); border-radius:6px; padding:6px;">
+          <em>Loading…</em>
         </div>
       </div>
       <div class="modal-actions">

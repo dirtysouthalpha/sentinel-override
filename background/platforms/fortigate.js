@@ -126,6 +126,17 @@ export const fortigate = {
     'Some pages (Log viewer, Sessions) use virtual scrolling — DOM only contains visible rows. Use read_network_requests to capture the underlying API or scroll to load more.',
   ].join(' '),
 
+  // run_remote_command: FortiGate CLI via web console (Dashboard > CLI Console widget)
+  commandInterface: {
+    inputSelector:   '.cli-console input, .console-input, textarea[class*="cli" i], #cli-input',
+    typeSelect:      null,
+    submitSelector:  null,  // FortiGate CLI console submits on Enter
+    outputSelector:  '.cli-output, .console-output, [class*="cliOutput"]',
+    outputReadyText: null,
+    outputTimeoutMs: 8000,
+    commandTypes: { cmd: 'cmd', powershell: 'cmd', bash: 'cmd' },
+  },
+
   rewriteInstructions: `When rewriting goals for FortiGate / FortiManager:
 - Detect if user is on FortiGate direct (single device) or FortiManager (multi-tenant). Each has a different mental model.
 - If FortiManager: insert Phase 0 to pick the right ADOM, then drill into Device Manager > [target device].
