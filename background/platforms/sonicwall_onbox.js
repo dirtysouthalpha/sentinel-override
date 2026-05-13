@@ -161,5 +161,28 @@ export const sonicwallOnbox = {
 - Memory keys must begin with 'sonicwall_'.
 - Detect firmware version on System > Status BEFORE navigating to version-renamed menus (VPN > Settings vs VPN > Base Settings).
 - Wait_for_text on dashboard or page-loaded signals after navigations to handle the XHR rendering pattern.
-- Preserve the user's deliverable structure exactly.`
+- Preserve the user's deliverable structure exactly.`,
+
+  workflowHints: [
+    {
+      match: /vpn.*tunnel|tunnel.*status|vpn.*up|vpn.*down|site.to.site|ipsec.*status/i,
+      hint: 'Phase 1: Navigate to VPN > Status (firmware 7.x) or VPN > Currently Active VPN Tunnels (firmware 6.5+). Wait for the tunnel table to load. Extract each tunnel name, remote peer IP, and Up/Down status — save to memory key sonicwall_vpn_tunnels. Phase 2: If a specific tunnel is Down, navigate to VPN > Settings and locate the matching policy to check its Phase 1/Phase 2 configuration.',
+    },
+    {
+      match: /firewall.*rule|access.*rule|add.*rule|block.*traffic|allow.*traffic|new.*policy/i,
+      hint: 'Phase 1: Navigate to Firewall > Access Rules. Select the correct zone pair from the From/To matrix (e.g., WAN to LAN). Wait for the rules table to load. Phase 2: Click + to add a new rule, or click the pencil/edit icon on an existing row. Fill in Source, Destination, Service, and Action fields. Phase 3: Click OK/Accept to save. Confirm the success banner, then navigate away and back to verify the rule appears in the list.',
+    },
+    {
+      match: /license|gvc.*seat|vpn.*seat|seat.*count|ssl.*vpn.*user/i,
+      hint: 'Navigate to System > Licenses. Locate the "Global VPN Client" row (for GVC/IPsec) or "SSL VPN" row. Extract the licensed seat count, current active sessions, and expiry date — save to memory key sonicwall_license_info.',
+    },
+    {
+      match: /active.*session|current.*session|who.*connected|connection.*monitor/i,
+      hint: 'Navigate to Monitor > Connection Monitor (or Dashboard > Active Connections widget). Set filters for the relevant IP range or user. Extract the source IP, destination, protocol, and session count. Use execute_js for a bulk table dump rather than reading row by row.',
+    },
+    {
+      match: /log|event.*log|security.*event|blocked.*traffic/i,
+      hint: 'Navigate to Log > View. Set Category and Severity filters BEFORE reading — empty filters return nothing on most firmware versions. Set the time range to the relevant window. Wait 30 seconds for the log to populate (use wait_for_text with a known log entry pattern). Use the Export button to get a CSV if more than 100 entries are needed.',
+    },
+  ],
 };

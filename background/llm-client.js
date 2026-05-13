@@ -685,6 +685,16 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
     parts.push('');
   }
 
+  if (profile.liveDataCaveats) {
+    parts.push('LIVE DATA NOTE: ' + profile.liveDataCaveats);
+    parts.push('');
+  }
+
+  if (Array.isArray(profile.commitFlow) && profile.commitFlow.length) {
+    parts.push('COMMIT SEQUENCE: After any config change, click in order: ' + profile.commitFlow.join(' → ') + '. Do not skip steps — each platform requires this exact sequence to persist changes.');
+    parts.push('');
+  }
+
   return parts.join('\n');
 }
 
@@ -1473,7 +1483,9 @@ Actions:
 - { "type": "read_console_messages", "filter": "errors|warning|null", "limit": 50 }  -- (3.7.0) returns buffered browser console entries (level, text, url, line, timestamp). Use to diagnose JS errors, failed AJAX, broken scripts on M365/Exchange/Entra/etc.
 - { "type": "read_network_requests", "filter": "failed|4xx|5xx|null", "url_includes": "graph.microsoft.com", "limit": 30 }  -- (3.7.0) returns buffered network requests (method, url, status, duration, failed). Use to diagnose API errors that don't surface in the UI.
 - { "type": "lookup", "domain": "HOSTNAME_OR_IP", "record_type": "A|AAAA|MX|TXT|CNAME|NS|PTR" }  -- (3.37.0) DNS-over-HTTPS lookup via Cloudflare (1.1.1.1). No page interaction needed. Use to resolve hostnames, verify MX/SPF records, check PTR/reverse DNS. Default record_type is A.
+  PRESET shorthand (auto-selects domain + record_type): { "type": "lookup", "domain": "example.com", "preset": "spf" } | { "preset": "dmarc" } | { "preset": "dkim", "selector": "google" }  -- (3.39.0) spf→TXT@domain, dmarc→TXT@_dmarc.domain, dkim→TXT@selector._domainkey.domain.
 - { "type": "run_remote_command", "command": "COMMAND_STRING", "command_type": "powershell|cmd|bash" }  -- (3.37.0) Drives the active ScreenConnect or NinjaOne command interface to run a shell command on the remote machine. Automatically detects the platform and uses the correct command runner UI. Returns the command output. Use for ping, nslookup, ipconfig, Get-EventLog, Test-NetConnection, etc.
+- { "type": "repeat_for_each", "items_key": "MEMORY_KEY", "item_var": "item", "do": [ACTIONS] }  -- (3.39.0) Iterate over a memory array and run sub-actions for each item. Use {{item}} or {{item.field}} in sub-action fields for substitution. Example: iterate a list of usernames and click each one.
 
 ${base64Image ? (function() {
   // (#11) DPR-aware coordinate guidance. Coordinates the model emits in click_at
