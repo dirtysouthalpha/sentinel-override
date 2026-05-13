@@ -1648,7 +1648,8 @@ export function extractFirstJsonObject(str) {
     'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
     'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
     'dismiss_overlay', 'switch_to_frame', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
-    'read_console_messages', 'read_network_requests']);
+    'read_console_messages', 'read_network_requests',
+    'lookup', 'run_remote_command', 'verify', 'repeat_for_each']);
 
   let searchFrom = 0;
   while (searchFrom < str.length) {
@@ -1778,7 +1779,8 @@ export function parseLLMResponse(content) {
       'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
       'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
       'dismiss_overlay', 'switch_to_frame', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
-      'read_console_messages', 'read_network_requests'];
+      'read_console_messages', 'read_network_requests',
+      'lookup', 'run_remote_command', 'verify', 'repeat_for_each'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     return parsed;
   } catch (err) {
