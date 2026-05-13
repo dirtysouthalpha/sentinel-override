@@ -193,6 +193,14 @@ if (window.__sentinelInitialized) {
         if (!__sentinelHasPositiveModalSignal(el)) continue;
         if (!__sentinelWasInsertedRecently(el)) continue;
 
+        // Safe-list: skip dialogs that contain active input/textarea/contenteditable
+        // elements (Gmail compose, Linear drawers, Figma panels, form dialogs).
+        // These are content the user or agent is actively filling out — dismissing
+        // them would destroy in-progress work.
+        if (el.querySelector('input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]')) continue;
+        // Also skip elements with known composer/drawer class markers.
+        if (/compose|drawer|figma|sheet|panel/i.test(el.className + (el.id || ''))) continue;
+
         // Prefer clicking a close button if available; otherwise hide.
         const closeBtn = el.querySelector('button, [role="button"], [class*="close" i], [aria-label="Close"]');
         if (closeBtn) {

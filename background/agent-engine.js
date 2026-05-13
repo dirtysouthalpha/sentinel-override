@@ -12,6 +12,7 @@ import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKee
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
+import { appendAuditEntry, getAuditLog, auditLogToCsv } from './audit-log.js';
 import { runRecoverySkills } from './skills/index.js';
 import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side
@@ -900,6 +901,12 @@ export function isAgentAttachedTab(tabId) {
 export function getAttachedTabIds() {
   return Array.from(agentAttachedTabs);
 }
+
+// (3.40.0) Audit log access — delegated from background/index.js message handler.
+export async function fetchAuditLog(id) {
+  return getAuditLog(id || runLogId);
+}
+export { auditLogToCsv };
 
 // ========== Configuration Verification Gate (3.7.0) ==========
 // Prevents the agent from declaring "done" on a configuration-change task
@@ -3162,6 +3169,38 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
+      if (command.type === 'verify') {
+        // (3.40.0) Read back an element to confirm a config change persisted.
+        const _verifySelector = command.selector || command.ref || null;
+        const _verifyExpected = typeof command.expected === 'string' ? command.expected.trim() : '';
+        let _verifyActual = '';
+        try {
+          const _verifyResult = await sendMessageWithRetry(tab, {
+            action: 'dispatch_command',
+            command: { type: 'execute_js', key: '_verify_val', code:
+              `(function(){const el=document.querySelector(${JSON.stringify(_verifySelector)});if(!el)return'';return(el.value!==undefined&&el.tagName!=='SELECT'?el.value:(el.innerText||el.textContent||'')).trim();})()` }
+          }, 3, 1200).catch(() => null);
+          _verifyActual = typeof _verifyResult === 'string' ? _verifyResult.trim() : '';
+        } catch (e) {}
+        let _verifyOutcome;
+        if (!_verifyActual) {
+          _verifyOutcome = 'verify: element not found or empty (' + (_verifySelector || 'no selector') + ')';
+        } else if (!_verifyExpected) {
+          _verifyOutcome = 'verified (read-back): ' + _verifyActual.slice(0, 200);
+        } else if (_verifyActual.toLowerCase().includes(_verifyExpected.toLowerCase())) {
+          _verifyOutcome = 'verified: "' + _verifyActual.slice(0, 100) + '" contains expected "' + _verifyExpected + '"';
+        } else {
+          _verifyOutcome = 'MISMATCH: expected "' + _verifyExpected + '", got "' + _verifyActual.slice(0, 100) + '"';
+        }
+        sendSilentUpdate(_verifyOutcome.slice(0, 120), stepCount);
+        activityDone(stepCount, 'verify', _verifyOutcome.slice(0, 100), null);
+        history.push({ step: stepCount, action: command, result: _verifyOutcome });
+        productiveSteps++;
+        await persistHistory();
+        await sleep(400);
+        continue;
+      }
+
       if (command.type === 'note') {
         const noteText = command.text || command.summary || 'No note text';
         sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
@@ -4013,6 +4052,17 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (e) {}
       history.push({ step: stepCount, action: command, result });
+
+      // (3.40.0) Audit log: append a structured entry for MSP compliance.
+      try {
+        appendAuditEntry(runLogId, {
+          ts:      Date.now(),
+          step:    stepCount,
+          type:    command.type || 'unknown',
+          target:  _describeTarget(command),
+          outcome: typeof result === 'string' ? result.slice(0, 200) : (actionFailed ? 'failed' : 'ok'),
+        });
+      } catch (e) {}
 
       // (3.12.0) Vision-based action verification flag. After every modifying
       // action that didn't fail outright, mark the next observation cycle to

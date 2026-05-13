@@ -512,6 +512,36 @@ if (clearAllPatternsBtn) {
   });
 }
 
+const downloadAuditLogBtn = document.getElementById('downloadAuditLogBtn');
+if (downloadAuditLogBtn) {
+  downloadAuditLogBtn.addEventListener('click', async () => {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'get_audit_log' });
+      if (!resp || !resp.ok) {
+        downloadAuditLogBtn.textContent = 'No log available';
+        setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 2000);
+        return;
+      }
+      const csv = resp.csv || '';
+      if (!csv || csv.split('\n').length <= 1) {
+        downloadAuditLogBtn.textContent = 'Log is empty';
+        setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 2000);
+        return;
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sentinel-audit-log.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      downloadAuditLogBtn.textContent = 'Error: ' + (e.message || 'unknown');
+      setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
+    }
+  });
+}
+
 settingsBtn.addEventListener('click', async () => {
   const state = getState();
   // Load provider settings from storage

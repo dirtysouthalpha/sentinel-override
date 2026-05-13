@@ -115,4 +115,27 @@ export const dattoRmm = {
   mismatchHints: [
     { pattern: /autotask/i, onbox: 'Autotask PSA', nsm: 'Autotask is a different product from Datto RMM. They share Kaseya ownership but are separate UIs.' },
   ],
+
+  workflowHints: [
+    {
+      match: /device.*overview|device.*status|endpoint.*status|agent.*status|device.*health/i,
+      hint: 'Phase 1: Navigate to the target site (Account > Sites > [client site]). Phase 2: Click Devices in the site context. Search for the device by name. Phase 3: Click the device to open its overview: OS, agent version, last-seen, CPU, memory, disk. Wait for the overview to load (wait_for_text "Last Seen"). Save key fields to memory key datto_device_<name>.',
+    },
+    {
+      match: /deploy.*script|run.*script|execute.*script|quick.*job|run.*job|comstore/i,
+      hint: 'Phase 1: Navigate to the target device in Datto RMM. Phase 2: Click the Quick Job button (or navigate to Jobs tab > New Job). Phase 3: Select the component from the ComStore or enter a script. Configure parameters if needed. Phase 4: Click Run. Monitor the Job History tab for completion. Extract job output from the result details. Save to memory key datto_job_output.',
+    },
+    {
+      match: /alert.*triage|alert.*review|active.*alert|open.*alert|resolve.*alert/i,
+      hint: 'Phase 1: Navigate to Account > Alerts (or the Alerts view in the site). Phase 2: Filter by site, device, or category (Connectivity, Performance, etc.). Phase 3: For each alert: note device name, alert type, severity, created time, and alert message. Phase 4: Use bulk actions (checkboxes + toolbar) to acknowledge or resolve multiple alerts. Save to memory key datto_alerts.',
+    },
+    {
+      match: /backup.*status|continuity.*backup|backup.*failed|datto.*backup|BCDR/i,
+      hint: 'Phase 1: Navigate to the Backup (BCDR) section for the target site/device. Phase 2: Review the backup job list for status: Success, Warning, Failed, or Missed. Phase 3: Click a failed job to see the failure reason and screenshot verification status. Phase 4: Note the last successful backup timestamp and protected data size. Save to memory key datto_backup_status.',
+    },
+    {
+      match: /patch.*status|patch.*compliance|missing.*patch|windows.*update|patch.*policy/i,
+      hint: 'Phase 1: Navigate to the target site > Devices and select the device. Phase 2: Click the Patches tab. Phase 3: Filter for Missing or Failed patches. Phase 4: Extract patch KB number, severity, and installation status. Check the patch policy assigned to the device to understand why patches may be excluded. Save to memory key datto_patch_status.',
+    },
+  ],
 };
