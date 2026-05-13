@@ -209,5 +209,28 @@ export const sonicwallNsm = {
 - Note that for live data (active sessions, current seat usage), the per-device console is canonical; NSM-root analytics views lag 5-15 minutes.
 - If the goal asks for active VPN sessions, point to Device > VPN > Active VPN Sessions (sometimes "Currently Active VPN Tunnels") and fall through to direct firewall admin if absent.
 - Tell the agent to dismiss onboarding overlays ONCE and not write overlay_dismiss_count or similar engine metadata to memory.
-- Preserve the user's deliverable structure, output style, and phase boundaries exactly. Only menu paths, memory-key prefix, and Phase 0 (if needed) may be added/changed.`
+- Preserve the user's deliverable structure, output style, and phase boundaries exactly. Only menu paths, memory-key prefix, and Phase 0 (if needed) may be added/changed.`,
+
+  workflowHints: [
+    {
+      match: /policy.*push|push.*policy|deploy.*config|install.*config|sync.*device/i,
+      hint: 'Phase 0: Navigate to MANAGE > FIREWALLS and click the target firewall row. Phase 1: Navigate to MANAGE > POLICIES and locate the policy to push. Phase 2: Click Push/Deploy (or Actions > Push to Devices). Phase 3: Monitor via MANAGE > TASKS — wait_for_text "Success". Save push status to memory key sonicwall_policy_push_result.',
+    },
+    {
+      match: /device.*health|firewall.*health|system.*status|cpu.*usage|memory.*usage|uptime/i,
+      hint: 'Phase 0: Navigate to MANAGE > FIREWALLS and click the target device row. Phase 1: The device summary panel shows CPU, memory, active connections, and uptime. Wait for the panel (wait_for_text "CPU Usage"). Phase 2: Extract CPU %, memory %, connection count, uptime, and firmware version. Save to memory key sonicwall_device_health.',
+    },
+    {
+      match: /firmware.*update|firmware.*upgrade|update.*firewall|upgrade.*os/i,
+      hint: 'Phase 0: Navigate to MANAGE > FIREWALLS and click the target firewall. Phase 1: Navigate to the Firmware tab in the device panel. Phase 2: Check current vs. available firmware version. Phase 3: Schedule the update window — firmware updates reboot the device. Save current and target version to memory key sonicwall_firmware_info.',
+    },
+    {
+      match: /vpn.*tunnel|active.*vpn|vpn.*session|site.to.site/i,
+      hint: 'Phase 0: Navigate to MANAGE > FIREWALLS and click the target device. Phase 1: Navigate to MONITOR > VPN or the device VPN Status tab. Phase 2: Extract tunnel name, remote peer, and status (Up/Down). Note NSM VPN data lags 5-15 min — for live data use direct on-box admin. Save to memory key sonicwall_vpn_tunnels.',
+    },
+    {
+      match: /license|seat.*count|vpn.*seat|gvc.*seat|support.*expir/i,
+      hint: 'Phase 0: Navigate to MANAGE > FIREWALLS and click the target device. Phase 1: Open the Licensing tab in the device panel. Phase 2: Find Global VPN Client and SSL VPN rows. Extract seat count, current usage, and expiry date. Save to memory key sonicwall_license_info.',
+    },
+  ],
 };
