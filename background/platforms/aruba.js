@@ -154,5 +154,24 @@ export const aruba = {
 - Memory keys must begin with 'aruba_'.
 - For configuration CHANGES on Central, the workflow is edit → save (deploys to group). For instant changes, edit → apply. For OS-CX, edit → save running config + commit-changes to startup config.
 - Wait_for_text on devicesPopulated or clientsPopulated signals before scraping lists.
-- Preserve the user's deliverable structure exactly.`
+- Preserve the user's deliverable structure exactly.`,
+
+  workflowHints: [
+    {
+      match: /ap.*status|access.*point.*status|ap.*down|ap.*offline|wireless.*status/i,
+      hint: 'Phase 0 (Central only): Navigate to MANAGE > Access Points and select the correct Group and Site from the filter dropdowns. Phase 1: The AP list shows each AP name, IP, status (Up/Down), and connected clients. Wait for the list to populate (wait_for_text "Access Points"). Phase 2: Filter by Status = Down if checking for failures. Phase 3: Click an AP to see its detail: radio bands, channels, tx power, and client count. Save to memory key aruba_ap_status.',
+    },
+    {
+      match: /client.*connection|client.*troubleshoot|wifi.*client|wireless.*client|client.*disconnect/i,
+      hint: 'Phase 0 (Central only): Navigate to ANALYZE > Clients and set the correct Group/Site filter. Phase 1: Search for the client by MAC address or username. Phase 2: Click the client row to open the Client 360 view — shows association history, SSID, AP name, RSSI, SNR, and roaming events. Phase 3: Check the Connectivity Score and any error events in the timeline. Save findings to memory key aruba_client_<mac>.',
+    },
+    {
+      match: /ssid.*policy|ssid.*config|wireless.*policy|vlan.*assignment|ssid.*review/i,
+      hint: 'Phase 0 (Central only): Navigate to CONFIGURE > WLANs and select the correct Group. Phase 1: The WLAN list shows each SSID with its security type, VLAN, and status. Phase 2: Click an SSID to review its configuration: authentication (WPA3/WPA2/Open), VLAN assignment, bandwidth limits, and client isolation. Phase 3: Save SSID name, VLAN, security type, and any noted issues to memory key aruba_ssid_<name>.',
+    },
+    {
+      match: /rogue.*ap|rogue.*device|containment|intrusion.*detection/i,
+      hint: 'Navigate to SECURITY > Rogue APs (on Central) or the Intrusion Detection section. Phase 1: Review the list of detected rogue BSSIDs, their channels, and containment status. Phase 2: Identify which rogues are classified as Interfering vs. Rogue (different threat levels). Phase 3: Extract rogue BSSID, SSID, channel, and classification. Save to memory key aruba_rogues.',
+    },
+  ],
 };

@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
@@ -277,6 +277,19 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return resumeAgent();
     }
 
+    case 'inject_context': {
+      if (!agentRunning) return { ok: false, error: 'No agent running' };
+      const note = typeof request.note === 'string' ? request.note.trim() : '';
+      if (!note) return { ok: false, error: 'Empty note' };
+      injectContext(note);
+      return { ok: true };
+    }
+
+    case 'get_audit_log': {
+      const log = await fetchAuditLog(request.runId || null);
+      return { ok: true, log, csv: auditLogToCsv(log) };
+    }
+
     // (3.14.1) Used by the sign-in wall banner's "Focus tab" button: switch
     // the active Chrome tab+window to the URL whose auth wall caused the pause.
     case 'focus_tab_by_url': {
@@ -504,6 +517,22 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 }));
 
 // ========== Tab Event Listeners ==========
+
+// SSO / OAuth popup detection: when a new window opens during an agent run
+// and its first tab matches a known auth host, bring it to focus and notify
+// the technician so they can complete sign-in without hunting for the window.
+const _SSO_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|accounts\.google\.com|login\.okta\.com|[^.]+\.okta\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|login\.duosecurity\.com)/i;
+chrome.windows.onCreated.addListener(async (win) => {
+  if (!agentRunning) return;
+  try {
+    const tabs = await chrome.tabs.query({ windowId: win.id });
+    const ssoTab = tabs.find(t => t.url && _SSO_HOSTS_RE.test(t.url));
+    if (ssoTab) {
+      await chrome.windows.update(win.id, { focused: true });
+      sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
+    }
+  } catch (e) { /* non-fatal — window may have closed before query ran */ }
+});
 
 // Detect externally-closed tabs and clean up context
 chrome.tabs.onRemoved.addListener((tabId) => {

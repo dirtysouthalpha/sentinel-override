@@ -9,6 +9,9 @@ const chatContainer = document.getElementById('chat-container');
 const goalInput = document.getElementById('goalInput');
 const sendBtn = document.getElementById('sendBtn');
 const stopBtn = document.getElementById('stopBtn');
+const injectContextBar = document.getElementById('injectContextBar');
+const injectContextInput = document.getElementById('injectContextInput');
+const injectContextBtn = document.getElementById('injectContextBtn');
 const voiceBtn = document.getElementById('voiceBtn');
 const status = document.getElementById('status');
 const statusText = document.getElementById('status-text');
@@ -31,6 +34,13 @@ const approvalModeLabel = document.getElementById('approvalModeLabel');
 const modeBadge = document.getElementById('modeBadge');
 const approvalCardContainer = document.getElementById('approvalCardContainer');
 const activeIndicator = document.getElementById('activeIndicator');
+
+// ========== Paste Ticket Modal Elements ==========
+const pasteTicketBtn = document.getElementById('pasteTicketBtn');
+const pasteTicketModal = document.getElementById('paste-ticket-modal');
+const closePasteTicketBtn = document.getElementById('closePasteTicketBtn');
+const closePasteTicketBtnCancel = document.getElementById('closePasteTicketBtnCancel');
+const usePasteTicketBtn = document.getElementById('usePasteTicketBtn');
 
 // ========== Report Modal Elements ==========
 const reportModal = document.getElementById('report-modal');
@@ -426,6 +436,8 @@ function showApprovalCard(payload) {
   const stepNumber = (payload && payload.stepNumber) || '?';
   const requestId = payload && payload.requestId;
   const actionType = payload && payload.type;
+  // Prefer human-readable target label over raw CSS selector in the card subtitle
+  const targetLabel = (payload && (payload.ariaLabel || payload.elementText || payload.selector)) || null;
   // Code body for execute_js / run_js -style actions. Several historical field
   // names are tolerated so this card stays compatible regardless of which one
   // the background sends.
@@ -461,7 +473,7 @@ function showApprovalCard(payload) {
       </svg>
       <span>Agent requests approval${isRisky ? ' — risky' : ''}</span>
     </div>
-    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ' &middot; ' + escapeHtml(String(actionType)) : ''}</div>
+    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ' &middot; ' + escapeHtml(String(actionType)) : ''}${targetLabel ? ' &middot; <em>' + escapeHtml(String(targetLabel).slice(0, 80)) + '</em>' : ''}</div>
     ${bodyHtml}
     <div class="approval-card-buttons">
       <button class="approval-btn approve" id="approvalApprove">Approve</button>
@@ -847,9 +859,30 @@ sendBtn.addEventListener('click', sendMessage);
 function setAgentActive(isActive) {
   if (isActive) {
     activeIndicator.classList.add('active');
+    if (injectContextBar) injectContextBar.style.display = 'flex';
   } else {
     activeIndicator.classList.remove('active');
+    if (injectContextBar) injectContextBar.style.display = 'none';
+    if (injectContextInput) injectContextInput.value = '';
   }
+}
+
+// Mid-run context injection
+function sendInjectedContext() {
+  if (!injectContextInput) return;
+  const note = injectContextInput.value.trim();
+  if (!note) return;
+  chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
+    if (chrome.runtime.lastError || (resp && resp.ok === false)) return;
+    injectContextInput.value = '';
+    addMessage('📌 Note sent to agent: ' + note, 'user');
+  });
+}
+if (injectContextBtn) injectContextBtn.addEventListener('click', sendInjectedContext);
+if (injectContextInput) {
+  injectContextInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); sendInjectedContext(); }
+  });
 }
 
 function sendMessage() {
@@ -1371,31 +1404,61 @@ window.executeCommand = (action) => {
 };
 
 // ========== Agent Tab Bar ==========
+// Keyed cache of the last-rendered tab row content: tabId -> { text, title, isActive }
+const _tabBarCache = new Map();
+
 function renderTabBar(tabs) {
   const tabBar = document.getElementById('agent-tab-bar');
   if (!tabBar) return;
   if (!tabs || tabs.length === 0) {
     tabBar.style.display = 'none';
+    tabBar.innerHTML = '';
+    _tabBarCache.clear();
     return;
   }
   tabBar.style.display = 'block';
-  tabBar.innerHTML = '';
-  tabs.forEach(ctx => {
-    const tab = document.createElement('div');
-    tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
-    // Show hostname and label
+
+  const incomingIds = new Set(tabs.map(t => t.tabId));
+
+  // Remove stale rows
+  for (const [id] of _tabBarCache) {
+    if (!incomingIds.has(id)) {
+      const stale = tabBar.querySelector('[data-tab-id="' + id + '"]');
+      if (stale) stale.remove();
+      _tabBarCache.delete(id);
+    }
+  }
+
+  // Update or insert each tab row in order
+  tabs.forEach((ctx, i) => {
     let hostname = '';
     try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch (e) {}
-    const displayText = ctx.label ? `${ctx.label} (${hostname})` : hostname || ctx.url;
+    const displayText = ctx.label ? ctx.label + ' (' + hostname + ')' : hostname || ctx.url;
+    const cached = _tabBarCache.get(ctx.tabId);
+
+    if (cached && cached.text === displayText && cached.title === ctx.url && cached.isActive === !!ctx.isActive) {
+      // Row unchanged — only reorder if needed
+      const existing = tabBar.querySelector('[data-tab-id="' + ctx.tabId + '"]');
+      const nthChild = tabBar.children[i];
+      if (existing && nthChild !== existing) tabBar.insertBefore(existing, nthChild || null);
+      return;
+    }
+
+    let tab = tabBar.querySelector('[data-tab-id="' + ctx.tabId + '"]');
+    if (!tab) {
+      tab = document.createElement('div');
+      tab.dataset.tabId = String(ctx.tabId);
+      tab.addEventListener('click', () => {
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true });
+      });
+    }
+    tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
     tab.textContent = displayText;
     tab.title = ctx.url;
-    tab.addEventListener('click', () => {
-      // User observation: switch their VIEW but do NOT change agent's active tab
-      if (ctx.tabId) {
-        chrome.tabs.update(ctx.tabId, { active: true });
-      }
-    });
-    tabBar.appendChild(tab);
+    _tabBarCache.set(ctx.tabId, { text: displayText, title: ctx.url, isActive: !!ctx.isActive });
+
+    const nthChild = tabBar.children[i];
+    if (nthChild !== tab) tabBar.insertBefore(tab, nthChild || null);
   });
 }
 
@@ -2606,8 +2669,68 @@ function showTenantOverrideCard(payload) {
 
 
 
+// ========== Paste Ticket Modal ==========
+if (pasteTicketBtn && pasteTicketModal) {
+  pasteTicketBtn.addEventListener('click', () => {
+    pasteTicketModal.style.display = 'flex';
+    const ptIssue = document.getElementById('ptIssue');
+    if (ptIssue) ptIssue.focus();
+  });
+
+  const _closePasteTicket = () => { pasteTicketModal.style.display = 'none'; };
+  if (closePasteTicketBtn) closePasteTicketBtn.addEventListener('click', _closePasteTicket);
+  if (closePasteTicketBtnCancel) closePasteTicketBtnCancel.addEventListener('click', _closePasteTicket);
+
+  pasteTicketModal.addEventListener('click', (e) => {
+    if (e.target === pasteTicketModal) _closePasteTicket();
+  });
+
+  if (usePasteTicketBtn) {
+    usePasteTicketBtn.addEventListener('click', () => {
+      const ticketNum  = (document.getElementById('ptTicketNumber')?.value || '').trim();
+      const client     = (document.getElementById('ptClient')?.value || '').trim();
+      const issue      = (document.getElementById('ptIssue')?.value || '').trim();
+      const prior      = (document.getElementById('ptPriorAttempts')?.value || '').trim();
+      const target     = (document.getElementById('ptTargetSystem')?.value || '').trim();
+      const success    = (document.getElementById('ptSuccessCriteria')?.value || '').trim();
+
+      if (!issue) {
+        const issueEl = document.getElementById('ptIssue');
+        if (issueEl) { issueEl.focus(); issueEl.style.outline = '2px solid var(--accent-red, #f44)'; }
+        return;
+      }
+
+      const parts = [];
+      if (ticketNum) parts.push('Ticket: ' + ticketNum);
+      if (client)    parts.push('Client: ' + client);
+      parts.push('Issue: ' + issue);
+      if (prior)     parts.push('Prior attempts: ' + prior);
+      if (target)    parts.push('Target: ' + target);
+      if (success)   parts.push('Success criteria: ' + success);
+
+      if (goalInput) {
+        goalInput.value = parts.join('\n');
+        goalInput.dispatchEvent(new Event('input'));
+        goalInput.focus();
+      }
+
+      _closePasteTicket();
+
+      // Reset outline if it was highlighted
+      const issueEl = document.getElementById('ptIssue');
+      if (issueEl) issueEl.style.outline = '';
+    });
+  }
+}
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === 'cdp_reattach_warning') {
+    updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
+  }
+  if (message.action === 'tab_state_update') {
+    renderTabBar(message.tabs || []);
+  }
   if (message.action === 'agent_update') {
     if (message.stepNumber && message.stepNumber > 0) {
       appendLogLine(message.stepNumber, message.text);

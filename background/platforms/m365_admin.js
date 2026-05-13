@@ -192,5 +192,28 @@ export const m365Admin = {
 - Memory keys must begin with 'm365_' (or the more specific 'entra_', 'exchange_', 'purview_', 'defender_' as appropriate).
 - When the goal asks for audit/sign-in/log data, prefer read_network_requests with graph.microsoft.com filter as a fallback for cross-origin iframe blockage.
 - Wait_for_text on the tenant-loaded signal after navigation to avoid scraping a still-loading page.
-- Preserve the user's deliverable structure exactly.`
+- Preserve the user's deliverable structure exactly.`,
+
+  workflowHints: [
+    {
+      match: /mfa|multi.factor|authenticator|conditional.*access|sign.in.*policy/i,
+      hint: 'Phase 1: Navigate to Entra ID (entra.microsoft.com) > Users > All Users. Search for the target user. Phase 2: Open the user profile. Check the Authentication Methods tab for registered MFA methods. Phase 3: If checking Conditional Access policies, navigate to Protection > Conditional Access > Policies and filter for policies that apply to this user or group.',
+    },
+    {
+      match: /license.*assign|assign.*license|user.*license|remove.*license/i,
+      hint: 'Phase 1: Navigate to Microsoft 365 Admin Center (admin.microsoft.com) > Users > Active Users. Search for the target user. Phase 2: Click the user row to open the details panel. Click "Licenses and apps". Phase 3: Check or uncheck the required license. Click Save changes. Confirm the success banner.',
+    },
+    {
+      match: /message.*trace|email.*trace|mail.*trace|track.*email|email.*delivery/i,
+      hint: 'Phase 1: Navigate to Exchange Admin Center (admin.exchange.microsoft.com) > Mail Flow > Message Trace. Phase 2: Set Sender, Recipient, and Date Range. Click Search. Wait up to 30 seconds for results (older than 2 days requires "Start a trace"). Phase 3: Click a result row to see the full delivery hop sequence and final outcome.',
+    },
+    {
+      match: /shared.*mailbox|create.*mailbox|convert.*mailbox/i,
+      hint: 'Phase 1: Navigate to Exchange Admin Center > Recipients > Mailboxes. Phase 2: Click + Add a shared mailbox. Enter display name and email address. Phase 3: After creation, open the mailbox row > Delegation > Manage mailbox delegation. Add users with Full Access or Send As permissions.',
+    },
+    {
+      match: /group|distribution.*list|security.*group|m365.*group/i,
+      hint: 'Phase 1: Navigate to Microsoft 365 Admin Center > Teams & Groups (or Entra ID > Groups for security groups). Phase 2: Search for the target group, or click + Add a group to create one. Phase 3: Open the group, navigate to the Members tab, and add or remove members. Note: security groups are managed in Entra; distribution lists in Exchange Admin Center.',
+    },
+  ],
 };

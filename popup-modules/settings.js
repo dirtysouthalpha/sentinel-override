@@ -476,6 +476,72 @@ if (expectedTenantInput) {
 themeToggle.addEventListener('click', toggleTheme);
 
 // ========== Settings Modal ==========
+// ========== Learned Patterns Viewer ==========
+function _renderLearnedPatterns(patterns) {
+  const list = document.getElementById('learnedPatternsList');
+  if (!list) return;
+  if (!patterns || patterns.length === 0) {
+    list.innerHTML = '<em style="color:var(--text-tertiary,#666);">No patterns saved yet.</em>';
+    return;
+  }
+  list.innerHTML = patterns.map((p, i) => {
+    const date = p.timestamp ? new Date(p.timestamp).toLocaleDateString() : '';
+    const steps = Array.isArray(p.steps) ? p.steps.length : '?';
+    return `<div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border-color);">
+      <span title="${p.goal || ''}" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:8px;">${i + 1}. ${p.goal || '(no goal)'} <span style="color:var(--text-tertiary,#666);">(${steps} steps, ${date})</span></span>
+      <button data-idx="${i}" class="delete-pattern-btn" style="font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--error-color,#ef4444); background:transparent; color:var(--error-color,#ef4444); cursor:pointer; flex-shrink:0;">✕</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.delete-pattern-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const s = await chrome.storage.local.get(['learned_patterns']);
+      const arr = s.learned_patterns || [];
+      arr.splice(idx, 1);
+      await chrome.storage.local.set({ learned_patterns: arr });
+      _renderLearnedPatterns(arr);
+    });
+  });
+}
+
+const clearAllPatternsBtn = document.getElementById('clearAllPatternsBtn');
+if (clearAllPatternsBtn) {
+  clearAllPatternsBtn.addEventListener('click', async () => {
+    await chrome.storage.local.set({ learned_patterns: [] });
+    _renderLearnedPatterns([]);
+  });
+}
+
+const downloadAuditLogBtn = document.getElementById('downloadAuditLogBtn');
+if (downloadAuditLogBtn) {
+  downloadAuditLogBtn.addEventListener('click', async () => {
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: 'get_audit_log' });
+      if (!resp || !resp.ok) {
+        downloadAuditLogBtn.textContent = 'No log available';
+        setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 2000);
+        return;
+      }
+      const csv = resp.csv || '';
+      if (!csv || csv.split('\n').length <= 1) {
+        downloadAuditLogBtn.textContent = 'Log is empty';
+        setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 2000);
+        return;
+      }
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'sentinel-audit-log.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      downloadAuditLogBtn.textContent = 'Error: ' + (e.message || 'unknown');
+      setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
+    }
+  });
+}
+
 settingsBtn.addEventListener('click', async () => {
   const state = getState();
   // Load provider settings from storage
@@ -496,6 +562,10 @@ settingsBtn.addEventListener('click', async () => {
 
   switchProviderCard(state.activeProviderId);
   settingsModal.classList.add('show');
+  // Load and render learned patterns
+  chrome.storage.local.get(['learned_patterns'], (s) => {
+    _renderLearnedPatterns(s.learned_patterns || []);
+  });
 });
 
 closeSettingsBtn.addEventListener('click', () => {
