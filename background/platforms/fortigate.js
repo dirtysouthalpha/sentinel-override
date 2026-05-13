@@ -143,5 +143,28 @@ export const fortigate = {
 - For any policy/config CHANGE on FortiManager, the workflow is edit → save (stages) → Install Wizard → verify on device. Don't skip the install step.
 - Memory keys must begin with 'fortigate_'.
 - Wait_for_text on dashboard or policy-saved signals after navigations/saves.
-- Preserve the user's deliverable structure exactly.`
+- Preserve the user's deliverable structure exactly.`,
+
+  workflowHints: [
+    {
+      match: /ipsec.*tunnel|vpn.*tunnel|tunnel.*status|vpn.*up|vpn.*down/i,
+      hint: 'Phase 1: Navigate to VPN > IPsec Tunnels. Wait 2 seconds for the Vue SPA to render (wait_for_text "Phase 2 selectors" or "UP"). Extract each tunnel name, remote gateway, and status (UP/DOWN) — save to fortigate_ipsec_tunnels. Phase 2: For any DOWN tunnel, click the row to open Phase 1 / Phase 2 detail and note the failure reason.',
+    },
+    {
+      match: /firewall.*policy|add.*policy|new.*rule|create.*policy|edit.*policy/i,
+      hint: 'Phase 1: Navigate to Policy & Objects > IPv4 Policy (or IPv6 Policy). Wait 2 seconds for the ag-grid to render. Phase 2: Click "Create New" (+ button) to add, or click the pencil icon on an existing row to edit. Fill in Name, Incoming Interface, Outgoing Interface, Source, Destination, Service, and Action. Phase 3: Click OK. Wait for the policy-saved signal ("saved" or "created"). Verify the policy appears in the list.',
+    },
+    {
+      match: /ssl.*vpn|web.*portal|vpn.*portal|remote.*user.*vpn/i,
+      hint: 'Phase 1: Navigate to VPN > SSL-VPN Settings. Check the Listen on Interface and port. Phase 2: Navigate to VPN > SSL-VPN Portals to verify the portal configuration. Phase 3: Navigate to VPN > SSL-VPN Realms or Authentication > User Groups to check which users have access.',
+    },
+    {
+      match: /fortimanager.*install|install.*config|push.*config|deploy.*config/i,
+      hint: 'Phase 0 (FortiManager only): Select the correct ADOM from the top-bar dropdown. Phase 1: Navigate to Device Manager and select the target FortiGate. Make the required config changes — remember these are STAGED in FortiManager, not yet on the device. Phase 2: Click Install Wizard. Select the target device checkbox. Click Next, then Install. Phase 3: Monitor Task Manager (top-right) for completion (30-90 seconds). Verify the change on the actual device afterward.',
+    },
+    {
+      match: /log|event.*log|security.*event|traffic.*log/i,
+      hint: 'Navigate to Log & Report > Forward Traffic (or Security Events or System Events). Set the Category dropdown and Time Range FIRST — empty filter shows nothing. Wait for the virtual-scroll table to load. For large result sets, use read_network_requests to capture the underlying API response rather than DOM extraction.',
+    },
+  ],
 };

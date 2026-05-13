@@ -92,4 +92,27 @@ export const connectwiseManage = {
   mismatchHints: [
     { pattern: /automate|labtech/i, onbox: 'ConnectWise Automate (RMM)', nsm: 'This is Manage (PSA), not Automate (RMM). Navigate to a separate CW Automate instance for RMM tasks.' },
   ],
+
+  workflowHints: [
+    {
+      match: /create.*ticket|new.*ticket|open.*ticket|add.*ticket|log.*ticket/i,
+      hint: 'Phase 1: Navigate to Service Desk > New Ticket (or click the + button in the Service Desk queue). Phase 2: Fill in Summary, Company (type to autocomplete, then click the suggestion), Contact, Status, Priority, Type, and Subtype. Add internal notes in the Notes tab if needed. Phase 3: Click Save in the header toolbar. Wait for "Record Saved" confirmation. Copy the ticket number from the page title or header and save to memory key cwm_new_ticket_number.',
+    },
+    {
+      match: /time.*entry|log.*time|add.*time|enter.*hours|bill.*time/i,
+      hint: 'Phase 1: Navigate to the target service ticket (Service Desk > search by ticket # or company). Phase 2: Click the Time tab on the ticket. Click "Enter Time" or the + icon. Phase 3: Fill in Start time, End time (or Hours Actual), Work Type, and Notes describing the work done. Phase 4: Click Save. Wait for "Record Saved". Verify the time entry appears in the Time tab grid.',
+    },
+    {
+      match: /company.*config|configuration.*lookup|find.*device|asset.*lookup|configuration.*record/i,
+      hint: 'Phase 1: Navigate to Companies and search for the client by name. Click the company row to open the company record. Phase 2: Click the Configurations tab on the company record. Phase 3: In the configurations grid, filter by device name, type, or status to locate the asset. Click the configuration row to view the full configuration record (serial number, IP, warranty expiry, linked ticket history). Save key fields to memory key cwm_config_<device_name>.',
+    },
+    {
+      match: /ticket.*status|update.*ticket|change.*ticket.*status|ticket.*priority|escalat/i,
+      hint: 'Phase 1: Navigate to the target ticket (Service Desk > search or open by ticket #). Wait for "Service Desk" to appear in the page. Phase 2: Locate the Status and/or Priority dropdowns in the ticket header — these are Kendo UI custom dropdowns, click to open then click to select. Phase 3: Update the Summary or add an internal note on the Notes tab to document the change. Phase 4: Click Save. Wait for "Record Saved".',
+    },
+    {
+      match: /contact.*lookup|find.*contact|contact.*email|contact.*phone/i,
+      hint: 'Phase 1: Navigate to Companies > search for the client company. Open the company record. Phase 2: Click the Contacts tab. Phase 3: Locate the contact by name. Click the contact row to open their record — extract name, email, phone, and title. Save to memory key cwm_contact_<last_name>. Alternatively, use the global search (top search bar) and type the contact\'s name directly for a faster lookup.',
+    },
+  ],
 };

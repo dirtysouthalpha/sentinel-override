@@ -40,6 +40,44 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
       '\nReplace each occurrence in the rewritten goal.'
     : '';
 
+  // Build NAVIGATION SIGNALS block from profile.waitStrings
+  let navSignalsBlock = '';
+  try {
+    const ws = profile.waitStrings;
+    if (ws && typeof ws === 'object') {
+      const lines = Object.entries(ws).map(([k, v]) =>
+        Array.isArray(v) && v.length ? `  ${k}: any of [${v.map(s => '"' + s + '"').join(', ')}]` : null
+      ).filter(Boolean);
+      if (lines.length) {
+        navSignalsBlock = '\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n' + lines.join('\n');
+      }
+    }
+  } catch (e) {}
+
+  // Build KNOWN SUB-PAGES block from profile.pageTypes
+  let subPagesBlock = '';
+  try {
+    if (Array.isArray(profile.pageTypes) && profile.pageTypes.length) {
+      const lines = profile.pageTypes.map(pt => pt && pt.name && pt.hint ? `  ${pt.name}: ${pt.hint}` : null).filter(Boolean);
+      if (lines.length) {
+        subPagesBlock = '\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n' + lines.join('\n');
+      }
+    }
+  } catch (e) {}
+
+  // Build WORKFLOW SCAFFOLD block from profile.workflowHints if goal matches
+  let workflowScaffold = '';
+  try {
+    if (Array.isArray(profile.workflowHints)) {
+      for (const wh of profile.workflowHints) {
+        if (wh && wh.match instanceof RegExp && wh.hint && wh.match.test(rawGoal)) {
+          workflowScaffold = '\nWORKFLOW SCAFFOLD (goal matches a known task pattern — use as the phase structure unless the user already provided one):\n' + wh.hint;
+          break;
+        }
+      }
+    }
+  } catch (e) {}
+
   const profileBlock = `
 DETECTED PLATFORM: ${profile.label} (id: ${profile.id})
 CURRENT URL: ${currentUrl || '(unknown)'}
@@ -54,6 +92,9 @@ ${profile.knownGotchas || '(none)'}
 ${profile.needsTargetSelection ? 'PRE-FLIGHT (Phase 0) — REQUIRED:\n' + profile.preflightInstructions + '\n' : ''}
 PLATFORM-SPECIFIC INSTRUCTIONS:
 ${profile.rewriteInstructions || '(none)'}
+${navSignalsBlock}
+${subPagesBlock}
+${workflowScaffold}
 ${mismatchLines}
 `.trim();
 
@@ -69,6 +110,8 @@ CORE RULES — follow EXACTLY:
 7. Do NOT change the user's deliverable section, output style rules, or technician details.
 8. ${expansionLine}
 9. ${techLine}
+10. If NAVIGATION SIGNALS are provided, weave wait_for_text directives (using those signal strings) after each navigation step so the agent waits for the page to fully load before proceeding.
+11. If a WORKFLOW SCAFFOLD is provided and the user's goal doesn't already have a phase structure, use that scaffold as the phase skeleton — fill in the user's specific details (client name, device, ticket number, etc.) while keeping the navigation steps.
 
 If the user's goal is ALREADY correctly written for this platform with no mismatches detected, respond with the special marker:
 {"no_adaptation_needed": true, "reason": "<short reason>"}
@@ -164,10 +207,14 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     const mismatchHints = findMismatchHints(profile, rawGoal);
     result.mismatchHints = mismatchHints;
 
-    // Short-circuit: if there are no mismatches AND no Phase 0 requirement,
-    // and the goal looks well-structured, skip the LLM call entirely.
-    if (!profile.needsTargetSelection && mismatchHints.length === 0 && rawGoal.length < 300) {
-      result.error = 'no adaptation needed (short goal, no mismatches, no Phase 0 required)';
+    // Resolve expansion mode before the short-circuit check so we can use it.
+    const expMode = (expansionMode || 'light').toString().toLowerCase();
+
+    // Short-circuit: only skip when adaptation is explicitly disabled AND there
+    // are no structural mismatches to fix. When a platform profile matched, even
+    // short goals benefit from workflow scaffolding and wait-string injection.
+    if (expMode === 'off' && mismatchHints.length === 0 && !profile.needsTargetSelection) {
+      result.error = 'adaptation disabled (expansionMode=off, no mismatches, no Phase 0)';
       return result;
     }
 
@@ -177,7 +224,6 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
       return result;
     }
 
-    const expMode = (expansionMode || 'light').toString().toLowerCase();
     const { system, user } = buildRewriterPrompt(rawGoal, currentUrl, profile, expMode, technicianInfo, mismatchHints);
 
     const controller = new AbortController();
