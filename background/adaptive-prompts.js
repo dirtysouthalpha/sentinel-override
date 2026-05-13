@@ -230,10 +230,11 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     const timer = setTimeout(() => controller.abort(), REWRITER_TIMEOUT_MS);
     let response;
     try {
-      const body = JSON.stringify(provider.buildBody(provider.model, system, user, {
-        maxTokens: REWRITER_MAX_TOKENS,
-        temperature: 0.2
-      }));
+      const isComplex = rawGoal.length > 200;
+      const useThinking = isComplex && provider.supportsToolUse && provider.buildBodyTextWithThinking;
+      const body = useThinking
+        ? JSON.stringify(provider.buildBodyTextWithThinking(provider.model, system, user, 5000, { maxTokens: REWRITER_MAX_TOKENS }))
+        : JSON.stringify(provider.buildBody(provider.model, system, user, { maxTokens: REWRITER_MAX_TOKENS, temperature: 0.2 }));
       const headers = provider.buildHeaders(provider.apiKey);
       response = await fetch(provider.endpoint, {
         method: 'POST',
