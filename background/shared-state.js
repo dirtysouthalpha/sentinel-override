@@ -90,9 +90,9 @@ export async function notifyIfEnabled(idOrOpts, optsIfId) {
     const { sentinelSoundEnabled } = await chrome.storage.local.get({ sentinelSoundEnabled: false });
     if (!sentinelSoundEnabled) return;
     if (typeof idOrOpts === 'string') {
-      chrome.notifications.create(idOrOpts, optsIfId);
+      await chrome.notifications.create(idOrOpts, optsIfId);
     } else {
-      chrome.notifications.create(idOrOpts);
+      await chrome.notifications.create(idOrOpts);
     }
   } catch (e) { /* notifications permission optional / storage unavailable */ }
 }

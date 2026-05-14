@@ -3,8 +3,8 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { sendSilentUpdate } from './message-protocol.js';
-import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
-import { resolveProvider, getActiveProvider, getModelSupportsVision, detectProviderFromEndpoint } from './provider-registry.js';
+import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
+import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
@@ -270,6 +270,14 @@ export function getPlatformContext(currentUrl, goal) {
   const _cacheKey = (currentUrl || '') + '||' + (goal || '').slice(0, 50);
   const _cached = _platformContextCache.get(_cacheKey);
   if (_cached && Date.now() - _cached.ts < _PLATFORM_CTX_TTL_MS) return _cached.ctx;
+
+  // Evict expired entries to prevent unbounded growth
+  if (_platformContextCache.size > 50) {
+    const now = Date.now();
+    for (const [k, v] of _platformContextCache) {
+      if (now - v.ts >= _PLATFORM_CTX_TTL_MS) _platformContextCache.delete(k);
+    }
+  }
 
   let ctx = '';
   try {
@@ -563,10 +571,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const noteCount = history.filter(h => h.action.type === 'note').length;
 
   const finishCtx = isRunbook ? '' :
-    (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
-    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
-    : (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
+    (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
     ? `\nFINISH NOW -- ${navigateCount} navigates with nothing recorded. Use your memory and finish with a comprehensive answer. Include ACTUAL content.\n`
+    : (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
+    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
     : '';
 
   // Platform-specific UI guidance
@@ -1118,7 +1126,7 @@ export function parseLLMResponse(content) {
     if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
     if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
     if (!parsed.type) throw new Error('Missing type field');
-    if (!VALID_ACTION_TYPES.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
+    if (!VALID_ACTION_SET.has(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     return parsed;
   } catch (err) {
     console.error('Failed to parse LLM response:', err, 'Content:', content);

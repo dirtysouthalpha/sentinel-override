@@ -91,7 +91,7 @@ export function sendSilentUpdate(text, stepNumber) {
     text,
     stepNumber: stepNumber || 0,
     silent: true
-  }).catch(() => { console.log(text); });
+  }).catch(() => {});
 }
 
 export function sendPageContext(url, pageTitle, stepNumber, tabId) {

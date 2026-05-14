@@ -3,7 +3,7 @@
 // format versioning for forward compatibility.
 // Layer 2 module -- imports only from template-manager.js.
 
-import { listTemplates, getTemplate, saveTemplate, loadTemplates, saveTemplates, extractParameters } from './template-manager.js';
+import { listTemplates, getTemplate, loadTemplates, saveTemplates, extractParameters } from './template-manager.js';
 
 // ========== Format Version ==========
 const FORMAT_VERSION = '1.0.0';

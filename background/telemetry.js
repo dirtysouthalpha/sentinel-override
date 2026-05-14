@@ -208,13 +208,13 @@ async function _flushRunBuffer() {
     const stored = await chrome.storage.local.get(key);
     const existing = Array.isArray(stored[key]) ? stored[key] : [];
     const merged = existing.concat(_runBuffer);
-    _runBuffer = [];
     const capped = merged.length > PERSIST_MAX_EVENTS_PER_RUN
       ? merged.slice(-PERSIST_MAX_EVENTS_PER_RUN)
       : merged;
     await chrome.storage.local.set({ [key]: capped });
-  } catch (e) {
     _runBuffer = [];
+  } catch (e) {
+    // Preserve buffer on error — retry on next flush cycle
   }
 }
 
