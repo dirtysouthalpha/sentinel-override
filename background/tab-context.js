@@ -57,7 +57,7 @@ export async function openTab(url, label) {
       .filter(([id]) => id !== activeTabId)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
     if (entries.length > 0) {
-      await closeTab(entries[0][0]);
+      try { await closeTab(entries[0][0]); } catch (e) { /* eviction failure is non-fatal */ }
     }
   }
 

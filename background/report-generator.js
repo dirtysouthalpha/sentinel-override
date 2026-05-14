@@ -208,6 +208,7 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
  */
 async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const providerConfig = await getActiveProvider();
+  if (!providerConfig) throw new Error('No active provider configured');
   const { endpoint, apiKey, model } = providerConfig;
 
   if (!apiKey) throw new Error('API key not configured');
@@ -218,8 +219,14 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
 
   const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
 
-  const requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
-  const requestHeaders = provider.buildHeaders(apiKey);
+  let requestBody, requestHeaders;
+  try {
+    requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
+    requestHeaders = provider.buildHeaders(apiKey);
+  } catch (err) {
+    clearTimeout(timeout);
+    throw new Error('Failed to build report request: ' + err.message);
+  }
 
   let response;
   try {
@@ -237,11 +244,16 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   clearTimeout(timeout);
 
   if (!response.ok) {
-    const errorData = await response.text();
+    const errorData = await response.text().catch(() => 'unknown error');
     throw new Error(`Report LLM call failed: ${response.status} - ${errorData}`);
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new Error('Report LLM returned invalid JSON');
+  }
   const responseText = provider.parseResponse(data);
 
   // Strip code fences if present

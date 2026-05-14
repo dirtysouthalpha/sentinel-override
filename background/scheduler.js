@@ -522,7 +522,12 @@ export async function executeScheduledTask(alarmName) {
   }
 
   // Set up tab context
-  const tabInfo = await getTabInfo(tabId);
+  let tabInfo;
+  try {
+    tabInfo = await getTabInfo(tabId);
+  } catch (e) {
+    tabInfo = null;
+  }
   registerInitialTab(tabId, tabInfo?.url || '');
 
   // Start the agent
@@ -580,8 +585,12 @@ export async function executeScheduledTask(alarmName) {
     error: completionResult.error,
   };
 
-  // Store result
-  await storeResult(schedule, finalResult);
+  // Store result — wrap to prevent silent data loss on storage errors
+  try {
+    await storeResult(schedule, finalResult);
+  } catch (e) {
+    console.error('Failed to store scheduled task result:', e);
+  }
 
   // Update schedule -- consolidate all mutations into a single save
   schedule.lastRunAt = completedAt;
@@ -599,7 +608,11 @@ export async function executeScheduledTask(alarmName) {
   }
 
   schedules[scheduleId] = schedule;
-  await saveSchedules(schedules);
+  try {
+    await saveSchedules(schedules);
+  } catch (e) {
+    console.error('Failed to save schedule state after execution:', e);
+  }
 
   // Send notification
   sendNotification(schedule, finalResult);
