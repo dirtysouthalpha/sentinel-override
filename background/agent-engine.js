@@ -3041,6 +3041,25 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (e) { console.warn('[Sentinel] ticket formatter failed:', e && e.message); }
 
+        // (3.30.0) Trust score — compute once, use for both run-log index and agent_finished payload.
+        let _trustScore = null;
+        try {
+          _trustScore = computeTrustScore({
+            totalSteps: stepCount,
+            failedSteps,
+            productiveSteps,
+            consecutiveFailureMax,
+            skillStats: getSkillStats(),
+            apiCallCount,
+            planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
+            planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
+            safetyBlocks
+          });
+          tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
+            score: _trustScore.score, band: _trustScore.band, breakdown: _trustScore.breakdown, runLogId
+          });
+        } catch (e) { /* non-fatal */ }
+
         // (3.9.0) Final run-log entry + broadcast runLogId so the popup can offer Export.
         try {
           if (runLogId) {
@@ -3064,29 +3083,8 @@ async function runAgentLoop(goal, workingTabId) {
             // suspends after agent_finished fires.
             try { await telEndRun(runLogId); } catch (e) {}
             // (3.14.0) Stamp the index entry as completed with final step count.
-            // (3.30.0) Compute the trust score and attach it to the index entry
+            // (3.30.0) Trust score already computed above — persist on the index
             // so the popup-side Run Log list can render it without recomputing.
-            let _trustScore = null;
-            try {
-              const _skillStats = getSkillStats();
-              _trustScore = computeTrustScore({
-                totalSteps: stepCount,
-                failedSteps,
-                productiveSteps,
-                consecutiveFailureMax,
-                skillStats: _skillStats,
-                apiCallCount,
-                planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
-                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
-                safetyBlocks
-              });
-              tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
-                score: _trustScore.score,
-                band: _trustScore.band,
-                breakdown: _trustScore.breakdown,
-                runLogId
-              });
-            } catch (e) { /* non-fatal */ }
             try {
               await _updateRunLogIndex(runLogId, {
                 completed: true,
@@ -3111,27 +3109,9 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_e) {}
 
-        // (3.31.0) Compute trust score for the agent_finished payload.
-        // We recompute here rather than reaching into the run-log block's
-        // scope (where _trustScore is declared) — keeps the dependency
-        // explicit and the cost is one cheap pure-function call.
-        const _finalTrustScore = (function () {
-          try {
-            return computeTrustScore({
-              totalSteps: stepCount,
-              failedSteps,
-              productiveSteps,
-              consecutiveFailureMax,
-              skillStats: getSkillStats(),
-              apiCallCount,
-              planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
-              planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
-              safetyBlocks
-            });
-          } catch (e) { return null; }
-        })();
+        // (3.31.0) Trust score is already computed above (_trustScore). Reuse it.
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_finalTrustScore); } catch (e) { return []; }
+          try { return suggestRetryActions(_trustScore); } catch (e) { return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -3141,7 +3121,7 @@ async function runAgentLoop(goal, workingTabId) {
             tel.info('lifecycle', 'Retry suggestions: ' + _retrySuggestions.length + ' (' + _retrySuggestions.map(s => s.id).join(', ') + ')', {
               count: _retrySuggestions.length,
               suggestions: _retrySuggestions.map(s => ({ id: s.id, severity: s.severity, applyKeys: s.applyKeys })),
-              scoreBand: _finalTrustScore ? _finalTrustScore.band : null
+              scoreBand: _trustScore ? _trustScore.band : null
             });
           }
         } catch (e) {}
@@ -3149,7 +3129,7 @@ async function runAgentLoop(goal, workingTabId) {
           action: 'agent_finished',
           summary: finalSummary,
           // (3.30.0) Trust score and (3.31.0) retry suggestions in one payload.
-          trustScore: _finalTrustScore,
+          trustScore: _trustScore,
           retrySuggestions: _retrySuggestions,
           // (3.31.0) Echo the goal so chat can re-fire it on one-click retry.
           originalGoal: goal,
@@ -4399,18 +4379,19 @@ async function requestApproval(command, stepNumber) {
       // If the user responds before the hard wall, clear the hard-reject timer.
       const origListener = listener;
       chrome.runtime.onMessage.removeListener(origListener);
-      chrome.runtime.onMessage.addListener((message) => {
+      const timeoutListener = (message) => {
         if (message && message.action === 'approval_response' && message.requestId === requestId) {
           clearTimeout(hardRejectId);
           agentPaused = false;
-          chrome.runtime.onMessage.removeListener(arguments.callee);
+          chrome.runtime.onMessage.removeListener(timeoutListener);
           finish({
             approved: message.approved === true,
             skipped: message.skipped === true,
             rejected: message.rejected === true
           });
         }
-      });
+      };
+      chrome.runtime.onMessage.addListener(timeoutListener);
     }, 60000);
   });
 }

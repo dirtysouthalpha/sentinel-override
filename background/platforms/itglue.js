@@ -147,6 +147,7 @@ export const itglue = {
 
   knownGotchas: [
     'IT Glue is an Ember.js SPA — URL paths use hash routing (#/...). After clicking a nav item, wait 1-2s for the route + data to load before scraping.',
+    'IT Glue uses standard HTML forms — type, click, and select all work natively. No custom dropdowns or widgets to handle.',
     'Passwords category is SENSITIVE. NEVER click Reveal or Copy buttons; never extract password values. Record only metadata (name, username, category, last_updated). The sensitive-field block in content/index.js further protects against accidental typing into password fields.',
     'Asset relationships are bidirectional — modifying one configuration\'s relationships affects the related asset. Read-only investigation should not trigger save buttons.',
     'Global search returns top hits from ALL asset types (configurations, contacts, docs, etc.). Narrow by setting the type filter before reading.',

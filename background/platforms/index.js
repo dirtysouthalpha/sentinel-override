@@ -19,6 +19,13 @@ import { screenconnect } from './screenconnect.js';
 import { ninjarmm } from './ninjarmm.js';
 import { connectwiseManage } from './connectwise_manage.js';
 import { dattoRmm } from './datto_rmm.js';
+import { cisco } from './cisco.js';
+import { paloalto } from './paloalto.js';
+import { sentinelone } from './sentinelone.js';
+import { nvd } from './nvd.js';
+import { virustotal } from './virustotal.js';
+import { huntress } from './huntress.js';
+import { networkDevice } from './network_device.js';
 
 const PROFILES = [
   // Most-specific first. NSM before on-box, ITG before generic. Aruba covers
@@ -28,6 +35,8 @@ const PROFILES = [
   // viewlinc/oq keyword combo, so it slots before the catch-alls.
   // (3.37.0) ScreenConnect and NinjaRMM added for run_remote_command support.
   // (3.38.0) ConnectWise Manage and Datto RMM added.
+  // (3.44.0) Cisco, Palo Alto, SentinelOne, NVD, VirusTotal, Huntress profiles.
+  //   networkDevice is catch-all on goal keywords — MUST be last.
   sonicwallNsm,
   sonicwallOnbox,
   m365Admin,
@@ -39,6 +48,13 @@ const PROFILES = [
   ninjarmm,
   connectwiseManage,
   dattoRmm,
+  cisco,
+  paloalto,
+  sentinelone,
+  nvd,
+  virustotal,
+  huntress,
+  networkDevice,
 ];
 
 /** Resolve the best-matching platform profile for the current goal+URL. Returns null if none match. */

@@ -9,6 +9,7 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
 /**
  * Generate a structured investigation report from agent execution data.
  * Uses callLLMWithRetry for reliable LLM calls with automatic retry.
+ * Returns both human-readable markdown and machine-readable structured JSON.
  *
  * @param {object} executionData - Snapshot of agent execution state
  * @param {string} executionData.goal - The original user goal
@@ -19,7 +20,7 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
  * @param {number} executionData.apiCallCount - Total API calls made
  * @param {Array} executionData.tabContexts - Tab contexts with label, url, hasScreenshot
  * @param {object} CONFIG - Agent configuration object
- * @returns {Promise<{summary: string, fullReport: string, goal: string, timestamp: string}>}
+ * @returns {Promise<{summary: string, fullReport: string, structuredData: object, goal: string, timestamp: string}>}
  */
 export async function generateReport(executionData, CONFIG) {
   const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
@@ -176,10 +177,11 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
 
   const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
 
+  // Build machine-readable structured data from raw execution data.
+  const structuredData = buildStructuredData(executionData, timestamp);
+
   try {
     // Make the LLM call for report generation
-    // We reuse callLLMWithRetry but need a minimal call setup
-    // Build a minimal call that uses the retry infrastructure
     const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
 
     const fullReport = typeof reportResult === 'string' ? reportResult.trim() : String(reportResult).trim();
@@ -190,12 +192,12 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
       ? firstParagraph.substring(0, 297) + '...'
       : firstParagraph;
 
-    return { summary, fullReport, goal, timestamp };
+    return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
     console.error('Report generation failed:', err);
     // Return a fallback report from the raw data
     const fallbackReport = buildFallbackReport(executionData);
-    return { summary: fallbackReport.split('\n\n')[0], fullReport: fallbackReport, goal, timestamp };
+    return { summary: fallbackReport.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
 
@@ -249,6 +251,108 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   }
 
   return cleaned;
+}
+
+// ========== Structured Data Builder ==========
+/**
+ * Builds a machine-readable JSON object from raw execution data.
+ * This provides programmatic access to findings for automation, scheduling, and API consumers.
+ *
+ * @param {object} executionData - Same data passed to generateReport
+ * @param {string} timestamp - ISO timestamp for the report
+ * @returns {object} Structured report data
+ */
+function buildStructuredData(executionData, timestamp) {
+  const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+
+  // Classify action types for the action breakdown
+  const actionCounts = {};
+  const actionTypes = ['navigate', 'click', 'type', 'extract', 'extract_list', 'execute_js',
+    'read_page', 'note', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+    'select', 'check', 'hover', 'press_key', 'finish', 'open_tab', 'switch_tab', 'close_tab',
+    'dismiss_overlay', 'click_at', 'scroll_to', 'verify', 'lookup', 'read_console_messages',
+    'read_network_requests', 'run_remote_command', 'repeat_for_each'];
+  for (const t of actionTypes) actionCounts[t] = 0;
+  let failedActions = 0;
+  let successfulActions = 0;
+
+  for (const h of history) {
+    const t = (h.action && h.action.type) || 'unknown';
+    if (actionCounts[t] !== undefined) actionCounts[t]++;
+    const result = String(h.result || '');
+    if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
+      failedActions++;
+    } else {
+      successfulActions++;
+    }
+  }
+
+  // Extract findings from agent memory — separate by type
+  const findings = {};
+  const memoryKeys = Object.keys(agentMemory || {});
+  for (const key of memoryKeys) {
+    const val = agentMemory[key];
+    // Truncate large values for structured output
+    if (Array.isArray(val)) {
+      findings[key] = val.slice(0, 50);
+    } else if (typeof val === 'object' && val !== null) {
+      try {
+        const str = JSON.stringify(val);
+        findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : val;
+      } catch (e) {
+        findings[key] = String(val).substring(0, 2000);
+      }
+    } else {
+      const str = String(val || '');
+      findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : str;
+    }
+  }
+
+  // URLs visited
+  const urlsVisited = [];
+  const seenUrls = new Set();
+  for (const h of history) {
+    if (h.action && h.action.type === 'navigate' && h.action.url) {
+      const u = h.action.url;
+      if (!seenUrls.has(u)) { urlsVisited.push(u); seenUrls.add(u); }
+    }
+    if (h.url && !seenUrls.has(h.url)) {
+      urlsVisited.push(h.url);
+      seenUrls.add(h.url);
+    }
+  }
+
+  // Determine task type from goal text
+  let taskType = 'general';
+  const goalLower = (goal || '').toLowerCase();
+  if (/top \d|briefing|latest|recent|news|articles/i.test(goalLower)) taskType = 'briefing';
+  else if (/compar|vs\.|versus|better|which/i.test(goalLower)) taskType = 'comparison';
+  else if (/extract|pull|scrape|list|inventory|export|gather/i.test(goalLower)) taskType = 'extraction';
+  else if (/investigat|analyz|audit|review|check|look into|diagnos|troubleshoot/i.test(goalLower)) taskType = 'investigation';
+  else if (/config|setup|install|deploy|create|add|enable|configure/i.test(goalLower)) taskType = 'configuration';
+
+  return {
+    meta: {
+      version: '4.0',
+      timestamp,
+      goal,
+      taskType,
+      planSteps: agentPlan ? agentPlan.length : 0,
+      totalSteps: stepCount,
+      apiCallCount,
+      successRate: stepCount > 0 ? Math.round((successfulActions / stepCount) * 100) : 0,
+      failedActions,
+      urlsVisited: urlsVisited.slice(0, 50),
+      tabsUsed: tabContexts ? tabContexts.length : 0
+    },
+    actionBreakdown: actionCounts,
+    findings,
+    tabs: (tabContexts || []).map(tc => ({
+      label: tc.label,
+      url: tc.url,
+      hasScreenshot: !!tc.hasScreenshot
+    }))
+  };
 }
 
 // ========== Fallback Report ==========

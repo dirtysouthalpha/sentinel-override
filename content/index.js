@@ -800,7 +800,11 @@ if (window.__sentinelInitialized) {
   // Per-character key event dispatch helpers (#8). Resolves keyCode/which from
   // the character so React/Lexical/Slate/ProseMirror autocomplete reacts.
   function __sentinelKeyEventForChar(type, char) {
-    const code = char === ' ' ? 'Space' : ('Key' + (char.toUpperCase().match(/[A-Z]/) ? char.toUpperCase() : ''));
+    let code;
+    if (char === ' ') { code = 'Space'; }
+    else if (/^[a-zA-Z]$/.test(char)) { code = 'Key' + char.toUpperCase(); }
+    else if (/^[0-9]$/.test(char)) { code = 'Digit' + char; }
+    else { code = char; }
     const keyCode = char.length === 1 ? char.charCodeAt(0) : 0;
     return new KeyboardEvent(type, {
       key: char,
@@ -990,7 +994,39 @@ if (window.__sentinelInitialized) {
           if (byText) return { el: byText, viaRef: false, staleRef: true };
         } catch (e) {}
       }
-      // 4. nth-of-type selector as last resort
+      // 4. XPath text search — find any visible element containing the text
+      if (cmd.elementText) {
+        try {
+          const needle = String(cmd.elementText).trim().substring(0, 60);
+          const byXPath = targetDoc.evaluate(
+            "//*[not(self::script or self::style or self::noscript)]" +
+            "[normalize-space(text())=" + JSON.stringify(needle) + "]",
+            targetDoc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null
+          ).singleNodeValue;
+          if (byXPath) return { el: byXPath, viaRef: false, staleRef: true };
+        } catch (e) {}
+      }
+      // 5. aria-label partial / case-insensitive match (label may have changed slightly)
+      if (cmd.elementText) {
+        try {
+          const needle = String(cmd.elementText).trim().substring(0, 40).toLowerCase();
+          const candidates = targetDoc.querySelectorAll('[aria-label]');
+          for (const c of candidates) {
+            if ((c.getAttribute('aria-label') || '').toLowerCase().includes(needle)) {
+              return { el: c, viaRef: false, staleRef: true };
+            }
+          }
+        } catch (e) {}
+      }
+      // 6. data-testid / data-id partial match
+      if (cmd.elementText) {
+        try {
+          const needle = String(cmd.elementText).trim().substring(0, 30).toLowerCase().replace(/\s+/g, '-');
+          const byTestId = targetDoc.querySelector('[data-testid*="' + needle + '" i], [data-id*="' + needle + '" i]');
+          if (byTestId) return { el: byTestId, viaRef: false, staleRef: true };
+        } catch (e) {}
+      }
+      // 7. nth-of-type selector as last resort
       if (cmd.selector) {
         const fallback = dom.findElementBySelector(targetDoc, cmd.selector);
         return { el: fallback, viaRef: false, staleRef: true };
@@ -1016,6 +1052,18 @@ if (window.__sentinelInitialized) {
   }
 
   // ========== Command Execution ==========
+  // Shared overlay-blocking guard. Returns null if clear, or an error string if
+  // the element is blocked by an overlay that couldn't be dismissed.
+  async function guardOverlayBlocking(targetDoc, el, cmd) {
+    if (!ov || !ov.isOverlayBlocking) return null;
+    const blocking = ov.isOverlayBlocking(targetDoc, el);
+    if (!blocking) return null;
+    const dismissed = ov.dismissOverlay(targetDoc, blocking);
+    if (!dismissed) return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
+    await wait.sleep(300);
+    return null;
+  }
+
   async function executeCommand(cmd) {
     let targetDoc = document;
     let selector = cmd.selector;
@@ -1111,20 +1159,11 @@ if (window.__sentinelInitialized) {
         }
 
         // Visual feedback: show banner and highlight
-        const ov = window.__sentinelOverlay;
-        if (ov) ov.showActionBanner('click', `Clicking: ${(el.innerText || el.tagName || '').substring(0, 60)}`);
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('click', `Clicking: ${(el.innerText || el.tagName || '').substring(0, 60)}`);
 
         // Reactive overlay check: is the target element blocked?
-        if (ov && ov.isOverlayBlocking) {
-          const blocking = ov.isOverlayBlocking(targetDoc, el);
-          if (blocking) {
-            const dismissed = ov.dismissOverlay(targetDoc, blocking);
-            if (!dismissed) {
-              return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
-            }
-            await wait.sleep(300);
-          }
-        }
+        const overlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
+        if (overlayBlock) return overlayBlock;
 
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1295,16 +1334,8 @@ if (window.__sentinelInitialized) {
         if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('type', `Typing "${(cmd.text || '').substring(0, 50)}" into ${(el.innerText || el.tagName || '').substring(0, 40)}`);
 
         // Reactive overlay check: is the target element blocked?
-        if (ov && ov.isOverlayBlocking) {
-          const blocking = ov.isOverlayBlocking(targetDoc, el);
-          if (blocking) {
-            const dismissed = ov.dismissOverlay(targetDoc, blocking);
-            if (!dismissed) {
-              return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
-            }
-            await wait.sleep(300);
-          }
-        }
+        const typeOverlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
+        if (typeOverlayBlock) return typeOverlayBlock;
 
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1413,14 +1444,15 @@ if (window.__sentinelInitialized) {
       }
 
       case 'upload_file': {
-        const el = dom.findElementBySelector(targetDoc, selector);
-        if (!el) return 'Element not found: ' + cmd.selector;
-        if (el.type !== 'file') return 'Element is not a file input: ' + cmd.selector;
+        const resolvedUpload = resolveCommandTarget(cmd, targetDoc);
+        const el = resolvedUpload.el;
+        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (el.type !== 'file') return 'Element is not a file input: ' + describeTarget(cmd);
         hl.highlightElement(el);
         const uploaded = si && si.uploadFile && si.uploadFile(el, cmd.file_name || 'file.txt', cmd.mime_type || 'text/plain', cmd.content || '');
         hl.removeHighlight(el);
-        if (uploaded) return 'Uploaded file ' + (cmd.file_name || 'file.txt') + ' to ' + cmd.selector;
-        return 'Failed to upload file to ' + cmd.selector;
+        if (uploaded) return 'Uploaded file ' + (cmd.file_name || 'file.txt') + ' to ' + describeTarget(cmd);
+        return 'Failed to upload file to ' + describeTarget(cmd);
       }
 
       case 'scroll': {
@@ -1435,16 +1467,8 @@ if (window.__sentinelInitialized) {
         if (!el) return 'Element not found: ' + describeTarget(cmd);
 
         // Reactive overlay check: is the target element blocked?
-        if (ov && ov.isOverlayBlocking) {
-          const blocking = ov.isOverlayBlocking(targetDoc, el);
-          if (blocking) {
-            const dismissed = ov.dismissOverlay(targetDoc, blocking);
-            if (!dismissed) {
-              return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
-            }
-            await wait.sleep(300);
-          }
-        }
+        const selOverlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
+        if (selOverlayBlock) return selOverlayBlock;
 
         // Check for custom dropdown (non-native <select>)
         if (dd && dd.isCustomDropdown && dd.isCustomDropdown(el)) {
@@ -1595,9 +1619,9 @@ if (window.__sentinelInitialized) {
           if (cb.type === 'checkbox' && cb.checked !== desiredState) {
             hl.highlightElement(cb);
             await humanDelay(50, 150);
-            cb.checked = desiredState;
-            cb.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-            cb.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+            // Use .click() so React Hook Form / Formik / native form handlers
+            // see a real click + change pair — same as the 'check' case above.
+            cb.click();
             hl.removeHighlight(cb);
             count++;
           }
@@ -1611,16 +1635,8 @@ if (window.__sentinelInitialized) {
         if (!el) return 'Element not found: ' + describeTarget(cmd);
 
         // Reactive overlay check: is the target element blocked?
-        if (ov && ov.isOverlayBlocking) {
-          const blocking = ov.isOverlayBlocking(targetDoc, el);
-          if (blocking) {
-            const dismissed = ov.dismissOverlay(targetDoc, blocking);
-            if (!dismissed) {
-              return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
-            }
-            await wait.sleep(300);
-          }
-        }
+        const hoverOverlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
+        if (hoverOverlayBlock) return hoverOverlayBlock;
 
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'instant', block: 'center' });
@@ -1970,8 +1986,9 @@ if (window.__sentinelInitialized) {
       }
 
       case 'open_dropdown': {
-        const el = dom.findElementBySelector(targetDoc, selector);
-        if (!el) return 'Element not found: ' + cmd.selector;
+        const resolvedDD = resolveCommandTarget(cmd, targetDoc);
+        const el = resolvedDD.el;
+        if (!el) return 'Element not found: ' + describeTarget(cmd);
         hl.highlightElement(el);
         // (G3) Cursor travels to the dropdown trigger before opening.
         try {
@@ -1983,7 +2000,7 @@ if (window.__sentinelInitialized) {
           const options = await dd.openDropdown(targetDoc, el);
           if (!options || options.length === 0) {
             hl.removeHighlight(el);
-            return 'Failed to open dropdown or no options found: ' + cmd.selector;
+            return 'Failed to open dropdown or no options found: ' + describeTarget(cmd);
           }
           const optionTexts = options
             .map(o => (o.innerText || o.textContent || '').trim())
