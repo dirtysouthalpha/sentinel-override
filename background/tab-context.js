@@ -61,7 +61,12 @@ export async function openTab(url, label) {
     }
   }
 
-  const tab = await chrome.tabs.create({ url, active: false }); // Don't steal focus
+  let tab;
+  try {
+    tab = await chrome.tabs.create({ url, active: false }); // Don't steal focus
+  } catch (e) {
+    return null;
+  }
   const ctx = {
     tabId: tab.id,
     label: label || url,
@@ -78,14 +83,16 @@ export async function openTab(url, label) {
   tabContexts.set(tab.id, ctx);
 
   // Wait for the page to load before returning
-  await waitForPageLoad(tab.id);
+  try { await waitForPageLoad(tab.id); } catch (e) {}
 
   // Update URL/title from the actual loaded page
-  const info = await getTabInfo(tab.id);
-  if (info) {
-    ctx.url = info.url || url;
-    ctx.title = info.title || '';
-  }
+  try {
+    const info = await getTabInfo(tab.id);
+    if (info) {
+      ctx.url = info.url || url;
+      ctx.title = info.title || '';
+    }
+  } catch (e) {}
 
   setActiveTab(ctx.tabId);
   return ctx;
@@ -98,7 +105,7 @@ export async function openTab(url, label) {
  */
 export async function switchToTab(tabId) {
   if (!tabContexts.has(tabId)) return false;
-  await chrome.tabs.update(tabId, { active: true }); // Make it the visible tab
+  try { await chrome.tabs.update(tabId, { active: true }); } catch (e) { return false; }
   return setActiveTab(tabId);
 }
 
@@ -244,5 +251,5 @@ export function handleTabRemoved(tabId) {
 
 /** Notify the popup of tab state changes. */
 function notifyStateChange() {
-  sendTabStateUpdate(getAllTabContexts());
+  try { sendTabStateUpdate(getAllTabContexts()); } catch (e) {}
 }

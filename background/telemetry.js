@@ -58,10 +58,10 @@ let _redactEnabled = true;
 // API key / secret patterns. Anchored conservatively so we don't false-positive
 // on URLs that legitimately contain hex/base64.
 const REDACT_PATTERNS = [
-  // OpenAI: sk-proj-* / sk-* (40+ chars after prefix)
-  { re: /\b(sk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,})\b/g, label: 'openai-key' },
-  // Anthropic: sk-ant-* (api key prefix)
+  // Anthropic: sk-ant-* (must run before the broader OpenAI sk-* pattern)
   { re: /\b(sk-ant-[A-Za-z0-9_-]{20,})\b/g, label: 'anthropic-key' },
+  // OpenAI: sk-proj-* / sk-* (40+ chars after prefix, excludes sk-ant-)
+  { re: /\b(sk-(?!ant-)(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,})\b/g, label: 'openai-key' },
   // GitHub: ghp_*, gho_*, ghu_*, ghs_*, ghr_*
   { re: /\b(gh[pousr]_[A-Za-z0-9]{20,})\b/g, label: 'github-token' },
   // AWS access key id
