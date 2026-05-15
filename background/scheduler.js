@@ -8,6 +8,7 @@ import { resolveTemplateGoal } from './template-manager.js';
 import { getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
+import { tel } from './telemetry.js';
 
 // ========== Storage Constants ==========
 const SCHEDULES_KEY = 'sentinel_schedules';
@@ -92,7 +93,7 @@ function registerAlarm(schedule) {
   }
 
   chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
-  console.log(`Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
+  tel.debug('scheduler', `Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
 }
 
 /**
@@ -101,7 +102,7 @@ function registerAlarm(schedule) {
  */
 function clearAlarm(scheduleId) {
   chrome.alarms.clear(`schedule-${scheduleId}`);
-  console.log(`Alarm cleared: schedule-${scheduleId}`);
+  tel.debug('scheduler', `Alarm cleared: schedule-${scheduleId}`);
 }
 
 // ========== Time Computation ==========
@@ -438,13 +439,13 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
   if (!schedule.enabled) {
-    console.log(`Schedule ${schedule.name} is disabled, skipping`);
+    tel.debug('scheduler', `Schedule ${schedule.name} is disabled, skipping`);
     return;
   }
 
   // Check if agent is already running
   if (agentRunning) {
-    console.log(`Agent busy, skipping schedule ${schedule.name}`);
+    tel.info('scheduler', `Agent busy, skipping schedule ${schedule.name}`);
     schedule.lastRunStatus = 'skipped';
     schedule.lastRunAt = Date.now();
     schedules[scheduleId] = schedule;
@@ -490,7 +491,7 @@ export async function executeScheduledTask(alarmName) {
   const resultId = crypto.randomUUID();
   const startedAt = Date.now();
 
-  console.log(`Executing scheduled task: ${schedule.name} (goal: ${goal.substring(0, 80)})`);
+  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });
 
   // Find or open a tab
   let tabId;
@@ -620,7 +621,7 @@ export async function executeScheduledTask(alarmName) {
   // Set badge
   setBadge(finalResult.status);
 
-  console.log(`Scheduled task ${schedule.name} completed: ${finalResult.status}`);
+  tel.info('scheduler', `Scheduled task ${schedule.name} completed`, { status: finalResult.status });
 }
 
 /**
@@ -750,7 +751,7 @@ export async function clearScheduleResults(scheduleId) {
  * This handles browser restart alarm loss.
  */
 export async function initScheduler() {
-  console.log('Initializing scheduler...');
+  tel.info('scheduler', 'Initializing scheduler...');
   const schedules = await loadSchedules();
 
   for (const [id, schedule] of Object.entries(schedules)) {
@@ -772,7 +773,7 @@ export async function initScheduler() {
           schedules[id] = schedule;
         }
         registerAlarm(schedule);
-        console.log(`Re-registered alarm for schedule: ${schedule.name}`);
+        tel.debug('scheduler', `Re-registered alarm for schedule: ${schedule.name}`);
       }
     } catch (err) {
       console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, err);
@@ -781,5 +782,5 @@ export async function initScheduler() {
 
   // Save any updated schedules
   await saveSchedules(schedules);
-  console.log(`Scheduler initialized. ${Object.values(schedules).filter(s => s.enabled).length} enabled schedules.`);
+  tel.info('scheduler', `Scheduler initialized. ${Object.values(schedules).filter(s => s.enabled).length} enabled schedules.`);
 }

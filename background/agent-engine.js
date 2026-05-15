@@ -2047,7 +2047,7 @@ function generateHeuristicPlan(goal, currentUrl) {
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
-  console.log('Agent starting loop for goal:', goal);
+  tel.info('agent', 'Agent starting loop', { goal: (goal || '').substring(0, 100) });
   _lastGoal = goal || '';
   let finished = false;
   // (3.15.1) `history` is module-level — see declaration near agentMemory.
@@ -3765,7 +3765,7 @@ async function runAgentLoop(goal, workingTabId) {
         //   strategy: 'all_failed'            -> surface error to LLM
         const ladder = await _runExecuteJsWithRetryLadder(tab, command.code || '', command.timeout);
         if (ladder.strategy !== 'original') {
-          console.log('[Sentinel] execute_js auto-recovered via:', ladder.strategy);
+          tel.info('agent', 'execute_js auto-recovered', { strategy: ladder.strategy });
           // Append a hint to the result so the LLM knows which strategy
           // succeeded. Helps it adapt subsequent extractions on this page.
           ladder.raw = ladder.raw + '\n\n[ENGINE NOTE: original execute_js was unproductive; auto-recovered via ' + ladder.strategy + ' strategy. The data above is from ' + (ladder.strategy === 'body_text_fallback' ? 'document.body.innerText' : 'aggregated visible-element text') + '. Parse it with regex/string ops in your finish summary.]';
@@ -4217,7 +4217,7 @@ async function runAgentLoop(goal, workingTabId) {
   try { await detachAllSentinelTabs(); } catch (e) { /* non-fatal */ }
 
   agentRunning = false;
-  console.log(`Agent completed. Total API calls: ${apiCallCount}`);
+  tel.info('agent', 'Agent completed', { apiCallCount });
 
   // (3.12.0) Tally client-knowledge entries used and bump the client's runCount.
   // Quiet, non-fatal — never let knowledge bookkeeping break the run finish path.
