@@ -70,7 +70,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
       }
       try {
         return !!document.querySelector(condition.selector);
-      } catch (e) {
+      } catch {
         return false;
       }
     } else if (condition.type === 'wait_for_navigation') {

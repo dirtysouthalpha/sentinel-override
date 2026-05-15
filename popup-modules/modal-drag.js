@@ -37,7 +37,7 @@
       initialPos = POSITIONS.get(modalContent) || { tx: 0, ty: 0 };
       modalContent.classList.add('dragging');
       titleBar.classList.add('dragging');
-      try { titleBar.setPointerCapture(e.pointerId); } catch (err) { /* pointer capture may fail */ }
+      try { titleBar.setPointerCapture(e.pointerId); } catch { /* pointer capture may fail */ }
     });
 
     titleBar.addEventListener('pointermove', (e) => {
@@ -64,7 +64,7 @@
         if (tx > maxTx) tx = maxTx;
         if (ty < minTy) ty = minTy;
         if (ty > maxTy) ty = maxTy;
-      } catch (err) { /* bounds calc failed — let the transform through */ }
+      } catch { /* bounds calc failed — let the transform through */ }
 
       modalContent.style.transform = 'translate(' + tx + 'px, ' + ty + 'px)';
       POSITIONS.set(modalContent, { tx, ty });
@@ -75,7 +75,7 @@
       dragStart = null;
       modalContent.classList.remove('dragging');
       titleBar.classList.remove('dragging');
-      try { titleBar.releasePointerCapture(e.pointerId); } catch (err) { /* pointer capture release may fail */ }
+      try { titleBar.releasePointerCapture(e.pointerId); } catch { /* pointer capture release may fail */ }
     }
     titleBar.addEventListener('pointerup', endDrag);
     titleBar.addEventListener('pointercancel', endDrag);

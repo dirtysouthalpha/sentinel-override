@@ -31,7 +31,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     try {
       const rootNode = el.getRootNode();
       return rootNode !== null && rootNode.host !== undefined;
-    } catch (e) {
+    } catch {
       return false;
     }
   };
@@ -89,7 +89,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     try {
       const direct = root.querySelectorAll(selector);
       direct.forEach(function(el) { results.push(el); });
-    } catch (e) { /* invalid selector */ }
+    } catch { /* invalid selector */ }
 
     // Walk the tree looking for shadow roots
     shadow.walkShadowTree(root, function(el) {
@@ -103,7 +103,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
             results.push(el);
           }
         }
-      } catch (e) { /* matches() not supported or invalid selector */ }
+      } catch { /* matches() not supported or invalid selector */ }
 
       // If this element has a shadow root, query inside it
       const sr = shadow.getShadowRoot(el);
@@ -115,7 +115,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
               results.push(matchEl);
             }
           });
-        } catch (e) { /* invalid selector in shadow context */ }
+        } catch { /* invalid selector in shadow context */ }
       }
     });
 
@@ -131,7 +131,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     try {
       const direct = root.querySelector(selector);
       if (direct) return direct;
-    } catch (e) { /* invalid selector */ }
+    } catch { /* invalid selector */ }
 
     // Walk the tree looking for shadow roots
     let found = null;
@@ -144,7 +144,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
           found = el;
           return;
         }
-      } catch (e) { /* matches() not supported */ }
+      } catch { /* matches() not supported */ }
 
       // If this element has a shadow root, query inside it
       const sr = shadow.getShadowRoot(el);
@@ -154,7 +154,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
           if (shadowMatch) {
             found = shadowMatch;
           }
-        } catch (e) { /* invalid selector in shadow context */ }
+        } catch { /* invalid selector in shadow context */ }
       }
     });
 

@@ -61,6 +61,7 @@ if (SpeechRecognition) {
 
 
 // ========== Tenant Chip (3.7.0) ==========
+// eslint-disable-next-line no-unused-vars
 function renderTenantChip(tenant, expected) {
   const chip = document.getElementById('tenantChip');
   if (!chip) return;
@@ -130,7 +131,7 @@ function hideActiveTabStrip() {
 function updateActiveTabPage(url, title) {
   if (!url) return;
   let host = url;
-  try { host = new URL(url).hostname; } catch (e) { /* URL parse failure is non-critical */ }
+  try { host = new URL(url).hostname; } catch { /* URL parse failure is non-critical */ }
   __atsStripState.url = url;
   __atsStripState.title = title || '';
   __atsStripState.hostname = host;
@@ -145,7 +146,7 @@ function updateActiveTabPage(url, title) {
     // tiny blank if we can't compute a clean URL.
     try {
       elFav.src = 'https://www.google.com/s2/favicons?sz=32&domain_url=' + encodeURIComponent(host);
-    } catch (e) { elFav.src = ''; }
+    } catch { elFav.src = ''; }
   }
   showActiveTabStrip();
 }
@@ -208,6 +209,7 @@ function describeActionPlain(payload) {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 function updateActiveTabAction(payload) {
   const elAction = document.getElementById('ats-action');
   if (!elAction) return;
@@ -237,7 +239,7 @@ function updateActiveTabAction(payload) {
       try {
         const tabs = await chrome.tabs.query({ url: __atsStripState.url });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch (e) { /* extension API may fail */ }
+      } catch { /* extension API may fail */ }
     }
     // Fallback 2: query by hostname pattern
     if (!tabId && __atsStripState.hostname) {
@@ -245,7 +247,7 @@ function updateActiveTabAction(payload) {
         const pattern = '*://*.' + __atsStripState.hostname.replace(/^www\./, '') + '/*';
         const tabs = await chrome.tabs.query({ url: pattern });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch (e) { /* extension API may fail */ }
+      } catch { /* extension API may fail */ }
     }
     // Fallback 3: bare hostname in URL string match across all tabs
     if (!tabId && __atsStripState.hostname) {
@@ -253,20 +255,20 @@ function updateActiveTabAction(payload) {
         const all = await chrome.tabs.query({});
         const match = (all || []).find(t => t.url && t.url.includes(__atsStripState.hostname));
         if (match) tabId = match.id;
-      } catch (e) { /* extension API may fail */ }
+      } catch { /* extension API may fail */ }
     }
     if (!tabId) {
-      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
+      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch { /* showToast may fail in detached popup */ }
       return;
     }
-    try { await chrome.tabs.update(tabId, { active: true }); } catch (e) { /* extension API may fail */ }
+    try { await chrome.tabs.update(tabId, { active: true }); } catch { /* extension API may fail */ }
     try {
       chrome.tabs.get(tabId, (info) => {
         if (info && typeof info.windowId === 'number') {
-          try { chrome.windows.update(info.windowId, { focused: true }); } catch (e) { /* extension API may fail */ }
+          try { chrome.windows.update(info.windowId, { focused: true }); } catch { /* extension API may fail */ }
         }
       });
-    } catch (e) { /* chrome.tabs.get callback may fail */ }
+    } catch { /* chrome.tabs.get callback may fail */ }
   });
 })();
 
@@ -306,6 +308,7 @@ function ensureMiniShotPanel() {
   return wrap;
 }
 
+// eslint-disable-next-line no-unused-vars
 function updateMiniShot(base64Image) {
   if (!base64Image) return;
   const panel = ensureMiniShotPanel();
@@ -316,6 +319,7 @@ function updateMiniShot(base64Image) {
 function hideMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = 'none';
 }
+// eslint-disable-next-line no-unused-vars
 function showMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = '';
 }
@@ -323,6 +327,7 @@ function showMiniShot() {
 // ========== Approval Mode ==========
 // On first run (when `approvalMode` has never been written), default to ON
 // for safety. Users must explicitly opt out via a confirmation dialog.
+// eslint-disable-next-line no-unused-vars
 function loadApprovalMode() {
   chrome.storage.local.get(['approvalMode'], (result) => {
     let isApprovalMode;
@@ -341,6 +346,7 @@ function loadApprovalMode() {
   });
 }
 
+// eslint-disable-next-line no-unused-vars
 function setupApprovalModeToggle() {
   approvalModeToggle.addEventListener('change', () => {
     const isApprovalMode = approvalModeToggle.checked;
@@ -429,6 +435,7 @@ function maybeShowSafetyBanner() {
 // Words that indicate a high-risk action — used to highlight the approval card.
 const RISKY_ACTION_PATTERN = /\b(submit|buy|send|transfer|wire|delete|publish|purchase|checkout|post|confirm|accept terms)\b/i;
 
+// eslint-disable-next-line no-unused-vars
 function showApprovalCard(payload) {
   removeApprovalCard();
 
@@ -540,6 +547,7 @@ function appendSkipRejectionNote(decision, description) {
 }
 
 // ========== Claude-style Action Cards ==========
+// eslint-disable-next-line no-unused-vars
 function addActionCard(payload) {
   const state = getState();
   const welcome = chatContainer.querySelector('.welcome-message');
@@ -641,6 +649,7 @@ function appendLogLine(stepNumber, text) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+// eslint-disable-next-line no-unused-vars
 function updateActionCardResult(stepNumber, resultText, isError) {
   const card = document.getElementById(`agent-action-${stepNumber}`);
   if (!card) return;
@@ -672,6 +681,7 @@ function updateActionCardResult(stepNumber, resultText, isError) {
 }
 
 // ========== Chat History ==========
+// eslint-disable-next-line no-unused-vars
 function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
@@ -998,7 +1008,7 @@ newChatBtn.addEventListener('click', () => {
       if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
         window.__sentinelRecentChats.archive({ reason: 'new-chat' });
       }
-    } catch (e) { /* recentChats archive is non-critical */ }
+    } catch { /* recentChats archive is non-critical */ }
     chrome.storage.local.set({ chat_history: [] }, () => {
       const state = getState();
       state.conversationHistory = [];
@@ -1078,7 +1088,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch (e) { /* DOM may be detached */ }
+    try { previewBtn.classList.remove('active'); } catch { /* DOM may be detached */ }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1119,7 +1129,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal-overlay.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch (err) { /* DOM may be detached */ }
+  try { top.classList.remove('show'); } catch { /* DOM may be detached */ }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1132,7 +1142,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch (err) { /* DOM may be detached */ }
+  try { target.classList.remove('show'); } catch { /* DOM may be detached */ }
 }, true);
 
 function updateMarkdownPreview() {
@@ -1182,6 +1192,7 @@ function updateAttachmentPreview() {
 }
 
 // ========== Voice Input ==========
+// eslint-disable-next-line no-unused-vars
 function setupVoiceInput() {
   if (!recognition) {
     voiceBtn.style.opacity = '0.5';
@@ -1396,7 +1407,7 @@ window.executeCommand = (action) => {
       themeModal.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -1433,7 +1444,7 @@ function renderTabBar(tabs) {
   // Update or insert each tab row in order
   tabs.forEach((ctx, i) => {
     let hostname = '';
-    try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch (e) { /* URL parse failure is non-critical */ }
+    try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch { /* URL parse failure is non-critical */ }
     const displayText = ctx.label ? ctx.label + ' (' + hostname + ')' : hostname || ctx.url;
     const cached = _tabBarCache.get(ctx.tabId);
 
@@ -1468,6 +1479,7 @@ function renderTabBar(tabs) {
 /**
  * Adds a "Generating report..." indicator in the chat feed.
  */
+// eslint-disable-next-line no-unused-vars
 function addReportGeneratingIndicator() {
   // Remove existing indicator if any
   removeReportGeneratingIndicator();
@@ -1499,12 +1511,13 @@ function removeReportGeneratingIndicator() {
  *
  * @param {object} report - Report object with summary, fullReport, goal, timestamp
  */
+// eslint-disable-next-line no-unused-vars
 function addReportCard(report) {
   // (3.19.1) Defensive guard — some report-generation failure paths can call
   // this with undefined/null. Don't crash the popup; surface a non-blocking
   // toast and bail. The user can re-run the report from the modal.
   if (!report || typeof report !== 'object') {
-    try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
+    try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch { /* showToast may fail in detached popup */ }
     console.warn('[Sentinel] addReportCard called without a report object; ignoring.');
     return;
   }
@@ -1528,7 +1541,7 @@ function addReportCard(report) {
   time.className = 'report-card-time';
   try {
     time.textContent = new Date(report.timestamp).toLocaleTimeString();
-  } catch (e) {
+  } catch {
     time.textContent = '';
   }
 
@@ -1619,8 +1632,8 @@ function openReportModalInline(markdown) {
   try {
     reportContent.innerHTML = sanitizeHtml(marked.parse(markdown));
     addCodeCopyButtons(reportContent);
-    try { renderSourceChipsIn(reportContent); } catch (e) { /* non-fatal */ }
-  } catch (err) {
+    try { renderSourceChipsIn(reportContent); } catch { /* non-fatal */ }
+  } catch {
     reportContent.textContent = markdown;
   }
 
@@ -1734,13 +1747,14 @@ copyReportTextBtn.addEventListener('click', () => {
 });
 
 // ========== MFA Pause Banner (3.7.0) ==========
-function showMfaBanner(url, hint, stepNumber) {
+// eslint-disable-next-line no-unused-vars
+function showMfaBanner(url, hint, _stepNumber) {
   // Remove any existing MFA banner first so we don't stack them.
   const existing = document.getElementById('mfa-banner');
   if (existing) existing.remove();
 
   let host = '';
-  try { host = new URL(url || '').hostname; } catch (e) { host = url || 'the page'; }
+  try { host = new URL(url || '').hostname; } catch { host = url || 'the page'; }
 
   const banner = document.createElement('div');
   banner.id = 'mfa-banner';
@@ -1781,12 +1795,13 @@ function showMfaBanner(url, hint, stepNumber) {
 // Surfaced when the agent hits a login page on a known auth host and can't
 // auto-fill credentials. User signs in manually in the affected tab, then
 // clicks Resume. Re-uses the existing pause/resume_agent_loop infra.
-function showSignInWallBanner(url, host, evidence, stepNumber) {
+// eslint-disable-next-line no-unused-vars
+function showSignInWallBanner(url, host, evidence, _stepNumber) {
   const existing = document.getElementById('sign-in-wall-banner');
   if (existing) existing.remove();
 
   let hostname = host || '';
-  try { if (!hostname) hostname = new URL(url || '').hostname; } catch (e) { hostname = url || 'the page'; }
+  try { if (!hostname) hostname = new URL(url || '').hostname; } catch { hostname = url || 'the page'; }
 
   const banner = document.createElement('div');
   banner.id = 'sign-in-wall-banner';
@@ -1914,6 +1929,7 @@ function _ensureActivityStream(stepNumber) {
 }
 
 /** Upsert an activity item in the step's stream. */
+// eslint-disable-next-line no-unused-vars
 function showAgentActivity(stepNumber, key, label, status, detail) {
   if (!stepNumber || stepNumber < 1) return;
   const stream = _ensureActivityStream(stepNumber);
@@ -1982,6 +1998,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
 }
 
 /** Update the step card's headline action label (called when agent_action arrives). */
+// eslint-disable-next-line no-unused-vars
 function updateStepCardAction(stepNumber, actionDescription) {
   if (!stepNumber || stepNumber < 1) return;
   const state = __activityState.get(stepNumber);
@@ -2000,6 +2017,7 @@ function clearActivityState() {
 // Surfaced when the goal text contains a "Mode: APPROVAL" / "Mode: AUTONOMOUS"
 // directive that disagrees with the current Approval Mode setting. Prevents
 // the user-wrote-APPROVAL-but-toggle-was-AUTONOMOUS disaster on live changes.
+// eslint-disable-next-line no-unused-vars
 function showModeMismatchCard(payload) {
   if (!payload) return;
   const existing = document.getElementById('mode-mismatch-card');
@@ -2055,7 +2073,7 @@ function showModeMismatchCard(payload) {
         action: 'mode_mismatch_response',
         requestId
       }, payload)).catch(() => {});
-    } catch (e) { /* message may fail if background not ready */ }
+    } catch { /* message may fail if background not ready */ }
   };
 
   document.getElementById('modeMismatchFlipBtn').addEventListener('click', () => {
@@ -2070,7 +2088,7 @@ function showModeMismatchCard(payload) {
         if (typeof updateApprovalModeUI === 'function') {
           updateApprovalModeUI(wantsApproval);
         }
-      } catch (e) { /* DOM may be detached */ }
+      } catch { /* DOM may be detached */ }
       sendResponse({ flip: true });
       card.remove();
     });
@@ -2091,6 +2109,7 @@ function showModeMismatchCard(payload) {
 // by default and informational only. In 'approval' mode the card has three
 // buttons (Use Adapted / Use Original / Edit) and the agent is paused until
 // the user decides.
+// eslint-disable-next-line no-unused-vars
 function showAdaptedGoalCard(payload) {
   if (!payload) return;
   // Remove any prior card so we don't stack on repeated agent starts
@@ -2183,7 +2202,7 @@ function showAdaptedGoalCard(payload) {
           action: 'adapted_goal_response',
           requestId
         }, payload)).catch(() => {});
-      } catch (e) { /* message may fail if background not ready */ }
+      } catch { /* message may fail if background not ready */ }
     };
     document.getElementById('adaptedGoalAcceptBtn').addEventListener('click', () => {
       sendResponse({ approved: true });
@@ -2224,6 +2243,7 @@ function showAdaptedGoalCard(payload) {
 }
 
 // ========== Download Capture (3.9.0) ==========
+// eslint-disable-next-line no-unused-vars
 function showDownloadCaptured(dl) {
   if (!dl) return;
   const filename = (dl.filename || '').split(/[\\/]/).pop() || 'file';
@@ -2249,6 +2269,7 @@ function showDownloadCaptured(dl) {
 
 // ========== Run Log Export (3.9.0) ==========
 let __lastRunLogId = null;
+// eslint-disable-next-line no-unused-vars
 function showRunLogExportButton(runLogId, entryCount) {
   __lastRunLogId = runLogId;
   // Remove any prior export banner
@@ -2316,7 +2337,7 @@ async function renderRunLogHistoryList() {
     }
     const fmtDate = (ts) => {
       if (!ts) return '—';
-      try { return new Date(ts).toLocaleString(); } catch (e) { return '—'; }
+      try { return new Date(ts).toLocaleString(); } catch { return '—'; }
     };
     const fmtDuration = (start, end) => {
       if (!start || !end) return '';
@@ -2325,7 +2346,7 @@ async function renderRunLogHistoryList() {
       const m = Math.floor(sec / 60), s = sec % 60;
       return m + 'm ' + s + 's';
     };
-    const rowsHtml = list.map((entry, i) => {
+    const rowsHtml = list.map((entry) => {
       const id = entry.runLogId || '';
       const goalShort = (entry.goal || '(no goal)').replace(/</g, '&lt;').slice(0, 140);
       const statusChip = entry.completed
@@ -2387,10 +2408,10 @@ async function deleteRunLogById(runLogId) {
     const next = list.filter(e => e && e.runLogId !== runLogId);
     await chrome.storage.local.set({ run_log_index: next });
     await chrome.storage.local.remove('run_log_' + runLogId);
-    try { showToast('Run log deleted', 'info'); } catch (e) { /* showToast may fail in detached popup */ }
+    try { showToast('Run log deleted', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
+    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2401,13 +2422,13 @@ async function clearAllRunLogs() {
     const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
     const keys = list.map(e => 'run_log_' + e.runLogId).filter(Boolean);
     if (keys.length) {
-      try { await chrome.storage.local.remove(keys); } catch (e) { /* storage write may fail */ }
+      try { await chrome.storage.local.remove(keys); } catch { /* storage write may fail */ }
     }
     await chrome.storage.local.set({ run_log_index: [] });
-    try { showToast('All run logs cleared', 'info'); } catch (e) { /* showToast may fail in detached popup */ }
+    try { showToast('All run logs cleared', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
+    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2422,10 +2443,10 @@ async function clearAllRunLogs() {
   // (3.17.0) Wire the new left-action-rail Run Log button to the same modal.
   const railBtn = document.getElementById('runLogHistoryRailBtn');
   if (railBtn) railBtn.addEventListener('click', () => {
-    try { openRunLogHistoryModal(); } catch (e) { /* modal may not be initialized yet */ }
+    try { openRunLogHistoryModal(); } catch { /* modal may not be initialized yet */ }
   });
   // Expose for command-palette / other entry points.
-  try { window.__openRunLogHistory = openRunLogHistoryModal; } catch (e) { /* window assignment may fail in some contexts */ }
+  try { window.__openRunLogHistory = openRunLogHistoryModal; } catch { /* window assignment may fail in some contexts */ }
 })();
 
 async function exportRunLog(format) {
@@ -2434,7 +2455,7 @@ async function exportRunLog(format) {
     const stored = await chrome.storage.local.get('run_log_' + __lastRunLogId);
     const log = stored['run_log_' + __lastRunLogId];
     if (!log) {
-      try { showToast('Run log not found in storage', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
+      try { showToast('Run log not found in storage', 'error'); } catch { /* showToast may fail in detached popup */ }
       return;
     }
     let content, mime, ext;
@@ -2469,7 +2490,7 @@ async function exportRunLog(format) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
-    try { showToast('Export failed: ' + e.message, 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
+    try { showToast('Export failed: ' + e.message, 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2480,7 +2501,7 @@ async function checkResumeOnLoad() {
     const data = (resp && resp.data) ? resp.data : resp;
     if (!data || !data.available) return;
     showResumeBanner(data.goal, data.stepCount, data.ageSeconds);
-  } catch (e) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 function showResumeBanner(goal, stepCount, ageSeconds) {
@@ -2602,6 +2623,7 @@ async function toggleSourceChipExpansion(chip) {
 }
 
 // Hook: render chips after addMessage paints content. Patch addMessage.
+// eslint-disable-next-line no-unused-vars
 const __originalAddMessage = (typeof addMessage === 'function') ? addMessage : null;
 
 // ========== Tenant Override Card (3.11.0) ==========
@@ -2610,6 +2632,7 @@ const __originalAddMessage = (typeof addMessage === 'function') ? addMessage : n
 // Career-risk gate: forces an explicit "yes, intentional cross-tenant work"
 // click before dispatching. Forensic log captures the timestamped decision.
 
+// eslint-disable-next-line no-unused-vars
 function showTenantOverrideCard(payload) {
   if (!payload) return;
   const requestId = payload.requestId;
@@ -2744,7 +2767,7 @@ chrome.runtime.onMessage.addListener((message) => {
       try {
         const hostname = new URL(message.url).hostname;
         updateStatus(`On: ${hostname}${message.title ? ' — ' + message.title.substring(0, 50) : ''}`);
-      } catch (e) {
+      } catch {
         updateStatus('On: ' + message.url.substring(0, 60));
       }
       updateActiveTabPage(message.url, message.title || '');
@@ -2760,7 +2783,7 @@ chrome.runtime.onMessage.addListener((message) => {
     renderTabBar([]);
     hideActiveTabStrip();
     hideMiniShot();
-    try { clearActivityState(); } catch (e) { /* activity state may not be initialized */ }
+    try { clearActivityState(); } catch { /* activity state may not be initialized */ }
     try {
       const summary = message.summary || 'Done';
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
@@ -2768,7 +2791,7 @@ chrome.runtime.onMessage.addListener((message) => {
       try {
         const lastMsg = chatContainer.querySelector('.message-group:last-child .message.assistant-msg, .message-group:last-child .assistant-wrapper');
         if (lastMsg) renderSourceChipsIn(lastMsg);
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
       // (3.30.0) Trust score badge — inline render so we don't add a new
       // top-level helper to this file (chat.js has had recurring truncation
       // issues during large edits). All UI for the score is contained here.
@@ -2839,15 +2862,15 @@ chrome.runtime.onMessage.addListener((message) => {
             }
             // Persist the pruned map back if anything changed (lazy cleanup).
             if (Object.keys(dismissedMap).length !== Object.keys(raw).length) {
-              try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch (e) { /* storage write may fail */ }
+              try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch { /* storage write may fail */ }
             }
             const suggestions = rawSuggestions.filter(s => s && s.id && !dismissedMap[s.id]);
             _renderSuggestionsList(suggestions, originalGoal, dismissedMap);
           });
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
         // Helper closures live inside the try-catch above so they can see
         // _trustRow without polluting the chat.js namespace.
-        function _renderSuggestionsList(suggestions, originalGoal, dismissedMap) {
+        function _renderSuggestionsList(suggestions, originalGoal, _dismissedMap) {
           for (const sug of suggestions) {
             if (!sug || !sug.id) continue;
             const sevColor = sug.severity === 'high' ? '#f44'
@@ -2906,11 +2929,11 @@ chrome.runtime.onMessage.addListener((message) => {
                       }
                       if (typeof sendGoal === 'function') sendGoal();
                       else chrome.runtime.sendMessage({ action: 'start_agent', goal: originalGoal });
-                    } catch (e) { /* DOM write or message may fail */ }
+                    } catch { /* DOM write or message may fail */ }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
-                } catch (e) {
+                } catch {
                   applyBtn.disabled = false;
                   applyBtn.textContent = sug.label && sug.label.startsWith('Reset') ? 'Reset & retry' : 'Apply & retry';
                 }
@@ -2928,10 +2951,10 @@ chrome.runtime.onMessage.addListener((message) => {
                     const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
-                    try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch (e2) { /* storage write may fail */ }
+                    try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }
                   });
                 }
-              } catch (e) { /* DOM removal or storage write may fail */ }
+              } catch { /* DOM removal or storage write may fail */ }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);
@@ -2957,7 +2980,7 @@ chrome.runtime.onMessage.addListener((message) => {
                    '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
                  '</div>';
         }
-      } catch (e) { /* trust-score render non-fatal */ }
+      } catch { /* trust-score render non-fatal */ }
     } catch (err) {
       console.error('Error displaying completion message:', err);
     }

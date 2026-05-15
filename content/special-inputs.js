@@ -107,7 +107,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         el.dispatchEvent(new Event('input', eventOpts));
         el.dispatchEvent(new Event('change', eventOpts));
         return { success: true, method: 'native-setter' };
-      } catch (e) {
+      } catch {
         // Fall through to next strategy
       }
     }
@@ -123,7 +123,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         childInput.dispatchEvent(new Event('input', eventOpts));
         childInput.dispatchEvent(new Event('change', eventOpts));
         return { success: true, method: 'framework-child-input' };
-      } catch (e) {
+      } catch {
         // Fall through to next strategy
       }
     }
@@ -158,7 +158,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
       inputEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
 
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   };
@@ -177,7 +177,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         el.dispatchEvent(new Event('input', eventOpts));
         el.dispatchEvent(new Event('change', eventOpts));
         return { success: true, method: 'quill-api' };
-      } catch (e) {
+      } catch {
         // Fall through
       }
     }
@@ -191,7 +191,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         el.dispatchEvent(new Event('change', eventOpts));
         return { success: true, method: 'tinymce-api' };
       }
-    } catch (e) {
+    } catch {
       // tinymce not defined or error
     }
 
@@ -204,7 +204,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         el.dispatchEvent(new Event('change', eventOpts));
         return { success: true, method: 'ckeditor-api' };
       }
-    } catch (e) {
+    } catch {
       // CKEDITOR not defined or error
     }
     // Also check CKEditor 5 (namespace: window.CKEDITOR with .instances)
@@ -218,7 +218,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
           return { success: true, method: 'ckeditor5-api' };
         }
       }
-    } catch (e) {
+    } catch {
       // CKEDITOR not available
     }
 
@@ -237,7 +237,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
       el.dispatchEvent(new Event('change', eventOpts));
       el.dispatchEvent(new Event('blur', eventOpts));
       return { success: true, method: 'execCommand' };
-    } catch (e) {
+    } catch {
       // execCommand not available or failed
     }
 

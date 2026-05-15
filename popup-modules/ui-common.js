@@ -5,6 +5,7 @@
 // ========== Shared Helpers ==========
 // getState is defined in popup-state.js (loaded before this file).
 
+// eslint-disable-next-line no-unused-vars
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text || '';
@@ -12,6 +13,7 @@ function escapeHtml(text) {
 }
 
 // ========== HTML Sanitization ==========
+// eslint-disable-next-line no-unused-vars
 function sanitizeHtml(dirtyHtml) {
   const doc = new DOMParser().parseFromString(dirtyHtml, 'text/html');
   // Remove dangerous elements (includes SVG/MathML foreign content vectors)
@@ -43,6 +45,7 @@ function sanitizeHtml(dirtyHtml) {
 }
 
 // ========== Utility Functions ==========
+// eslint-disable-next-line no-unused-vars
 function isValidUrl(url) {
   try {
     new URL(url);
@@ -52,6 +55,7 @@ function isValidUrl(url) {
   }
 }
 
+// eslint-disable-next-line no-unused-vars
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;

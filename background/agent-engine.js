@@ -9,6 +9,7 @@ import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
+// eslint-disable-next-line no-unused-vars
 import { getActiveTabId, setActiveTab, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, handleTabRemoved, getTabCount } from './tab-context.js';
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
@@ -90,7 +91,7 @@ try {
       }
     });
   }
-} catch (e) { /* non-fatal: chrome API may be unavailable in some contexts */ }
+} catch { /* non-fatal: chrome API may be unavailable in some contexts */ }
 
 // ========== Service Worker Persistence Checkpoint (#16, lite) ==========
 // Module-level snapshot of the most recent loop state so onSuspend can flush it.
@@ -115,7 +116,7 @@ async function writeCheckpoint(stepCount) {
     if (chrome.storage && chrome.storage.session && chrome.storage.session.set) {
       await chrome.storage.session.set({ agent_checkpoint: _lastCheckpoint });
     }
-  } catch (e) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 try {
@@ -128,10 +129,10 @@ try {
         if (chrome.storage && chrome.storage.session && chrome.storage.session.set) {
           chrome.storage.session.set({ agent_checkpoint: snap });
         }
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
     });
   }
-} catch (e) { /* non-fatal */ }
+} catch { /* non-fatal */ }
 
 // ========== Run Log Index Helper (3.14.0) ==========
 // Maintains an ordered list of recent runIds so the popup can browse and
@@ -159,7 +160,7 @@ async function _updateRunLogIndex(runLogId, fields) {
       try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.warn('[Sentinel] run-log eviction failed:', e && e.message); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
-  } catch (e) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 // ========== Activity Phase Tracking (3.16.0) ==========
@@ -179,7 +180,7 @@ function activityStart(stepNumber, key, label) {
   try {
     _activityStartedAt.set(_activityKey(stepNumber, key), Date.now());
     sendAgentActivity(stepNumber, key, label, 'in_progress', null);
-  } catch (e) { /* never crash the loop on telemetry */ }
+  } catch { /* never crash the loop on telemetry */ }
 }
 
 /** Mark a sub-action as done. Computes duration if start was recorded. */
@@ -321,7 +322,7 @@ export async function startAgent(goal, sender) {
   try {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
     agentSpeed = speedSettings.agentSpeedMode || 'normal';
-  } catch (e) { agentSpeed = 'normal'; }
+  } catch { agentSpeed = 'normal'; }
 
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
@@ -343,7 +344,7 @@ export async function startAgent(goal, sender) {
       clientKnowledgeText = '';
       clientKnowledgeUsedIds = [];
     }
-  } catch (e) {
+  } catch {
     activeClientId = null;
     clientKnowledgeText = '';
     clientKnowledgeUsedIds = [];
@@ -371,7 +372,7 @@ export async function startAgent(goal, sender) {
         stepCount: 0,
         startUrl: tabInfo?.url || ''
       });
-    } catch (e) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
     // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
     // for matching telemetry events to forensic log entries during postmortems.
     try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.warn('[Sentinel] run-log telemetry failed:', e && e.message); }
@@ -379,11 +380,11 @@ export async function startAgent(goal, sender) {
     // user has telemetryPersist enabled in settings, events start streaming
     // to chrome.storage.local from this point onward.
     try { telStartRun(runLogId, goal); } catch (e) { console.warn('[Sentinel] telemetry run start failed:', e && e.message); }
-  } catch (e) { runLogId = null; runLogBuffer = []; }
+  } catch { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
   // Subsequent open_tab handlers add their tabs to the same group.
-  try { await attachTabToSentinelGroup(startTabId); } catch (e) { /* non-fatal */ }
+  try { await attachTabToSentinelGroup(startTabId); } catch { /* non-fatal */ }
 
   // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
   // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
@@ -411,7 +412,7 @@ export async function startAgent(goal, sender) {
             });
             chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
           }
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
 
         const decision = await _waitForModeMismatchDecision({
           goalWants: modeDirective.wants,
@@ -480,7 +481,7 @@ export async function startAgent(goal, sender) {
             });
             chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
           }
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
 
         if (apMode === 'approval') {
           // Pause until user clicks Accept / Use Original / Edit on the popup card
@@ -522,7 +523,7 @@ export async function startAgent(goal, sender) {
 // (3.15.0) Approval flow for Adaptive Prompts. Broadcasts the rewritten goal
 // to the popup, waits for the user's decision via adapted_goal_response, and
 // keeps the SW alive during the wait.
-async function _waitForAdaptedGoalDecision(rewriteResult, startTabId) {
+async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
   const requestId = crypto.randomUUID();
   const kaName = 'adaptive_prompt_' + requestId;
   try { startSwKeepalive(kaName); } catch (e) { console.warn('[Sentinel] keepalive start failed:', e && e.message); }
@@ -675,9 +676,9 @@ export async function stopAgent() {
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
-  try { await detachAllDebuggees(); } catch (e) { /* non-fatal */ }
+  try { await detachAllDebuggees(); } catch { /* non-fatal */ }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
-  try { await detachAllSentinelTabs(); } catch (e) { /* non-fatal */ }
+  try { await detachAllSentinelTabs(); } catch { /* non-fatal */ }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -790,11 +791,11 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       'Recent action: ' + (history.length > 0 ? (history[history.length - 1].action.type) : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
-  } catch (e) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 }
 
 // ========== Stall Detection ==========
-function detectStall(history, consecutiveFailures, currentStrategies) {
+function detectStall(history, consecutiveFailures, _currentStrategies) {
   const recent = history.slice(-CONFIG.stallConfig.similarityWindow);
 
   // Check 1: All recent actions are the same type with the same failure result
@@ -854,12 +855,12 @@ async function attachTabToSentinelGroup(tabId) {
           color: SENTINEL_GROUP_COLOR,
           collapsed: false
         });
-      } catch (e) { /* tabGroups permission may be missing; non-fatal */ }
+      } catch { /* tabGroups permission may be missing; non-fatal */ }
     } else {
       // Add to the existing group. tabs.group with groupId moves them in.
       try {
         await chrome.tabs.group({ tabIds: [tabId], groupId: agentTabGroupId });
-      } catch (e) {
+      } catch {
         // Group may have been dissolved by the user — recreate.
         const groupId = await chrome.tabs.group({ tabIds: [tabId] });
         agentTabGroupId = groupId;
@@ -890,10 +891,10 @@ async function detachAllSentinelTabs() {
   if (ids.length === 0) return;
   try {
     await chrome.tabs.ungroup(ids);
-  } catch (e) {
+  } catch {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (e2) { /* tab may have closed */ }
+      try { await chrome.tabs.ungroup([id]); } catch { /* tab may have closed */ }
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
@@ -1110,8 +1111,8 @@ function _splitTriedSection(summary) {
   return matches.length ? matches : [(lines[0] || '').slice(0, 200)];
 }
 
-function formatTicketKickoff(summary, goal, tech, options) {
-  const opts = options || {};
+function formatTicketKickoff(summary, goal, tech, _options) {
+  const _opts = _options || {};  // eslint-disable-line no-unused-vars
   const ticketNum = extractTicketNumber(goal);
   const tried = _splitTriedSection(summary).map(s => '- ' + s).join('\n');
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
@@ -1149,8 +1150,8 @@ function formatTicketKickoff(summary, goal, tech, options) {
   return lines.join('\n');
 }
 
-function formatWaitingOnClient(summary, goal, tech, options) {
-  const opts = options || {};
+function formatWaitingOnClient(summary, goal, tech, _options) {
+  const _opts = _options || {};  // eslint-disable-line no-unused-vars
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
@@ -1184,8 +1185,8 @@ function formatWaitingOnClient(summary, goal, tech, options) {
   return lines.join('\n');
 }
 
-function formatWaitingOnVendor(summary, goal, tech, options) {
-  const opts = options || {};
+function formatWaitingOnVendor(summary, goal, tech, _options) {
+  const _opts = _options || {};  // eslint-disable-line no-unused-vars
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
@@ -1219,8 +1220,8 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
   return lines.join('\n');
 }
 
-function formatItGlueKb(summary, goal, tech, options) {
-  const opts = options || {};
+function formatItGlueKb(summary, goal, tech, _options) {
+  const _opts = _options || {};  // eslint-disable-line no-unused-vars
   const goalShort = ((goal || '').split(/\n/)[0] || '').slice(0, 100);
   const ticketNum = extractTicketNumber(goal);
   const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
@@ -1274,8 +1275,8 @@ function formatItGlueKb(summary, goal, tech, options) {
   return out.join('\n');
 }
 
-function formatClientEmail(summary, goal, tech, options) {
-  const opts = options || {};
+function formatClientEmail(summary, goal, tech, _options) {
+  const _opts = _options || {};  // eslint-disable-line no-unused-vars
   const ticketNum = extractTicketNumber(goal);
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
@@ -1355,7 +1356,7 @@ const TENANT_LOCKED_HOSTS_RE = /(microsoft\.com|microsoftonline\.com|azure\.com|
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 function _hostnameOf(url) {
-  try { return new URL(url).hostname; } catch (e) { return ''; }
+  try { return new URL(url).hostname; } catch { return ''; }
 }
 
 function _tenantsMatch(detected, expected) {
@@ -1623,6 +1624,7 @@ function detectMfaInText(text, currentUrl) {
 }
 
 // Legacy alias kept for any external callers expecting the old name.
+// eslint-disable-next-line no-unused-vars
 function _legacyDetectMfaInText(text) {
   // Original flat-regex behavior preserved internally if anything
   // imports the old patterns directly.
@@ -1659,7 +1661,7 @@ const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|e
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
   let host;
-  try { host = new URL(currentUrl).host; } catch (e) { return null; }
+  try { host = new URL(currentUrl).host; } catch { return null; }
   if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
 
   // Signal 1: a password input is present in the observed elements
@@ -1733,7 +1735,7 @@ function _isUnproductiveJsResult(raw) {
     if (p === null) return true;
     if (Array.isArray(p) && p.length === 0) return true;
     if (typeof p === 'object' && Object.keys(p).length === 0) return true;
-  } catch (e) { /* not JSON, that's fine */ }
+  } catch { /* not JSON, that's fine */ }
 
   return false;
 }
@@ -1759,7 +1761,7 @@ async function _runExecuteJsOnce(tabId, code, timeout) {
     } else if (cdpResult && cdpResult.error) {
       // Fall through too -- content script may succeed where CDP errored
     }
-  } catch (e) { /* fall through */ }
+  } catch { /* fall through */ }
 
   // Content-script path (fallback for chrome:// or CDP-failed sites)
   try {
@@ -1874,7 +1876,8 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   if (!goal || typeof goal !== 'string') return null;
   if (!agentMemory || typeof agentMemory !== 'object') return null;
 
-  const goalLower = goal.toLowerCase();
+  // eslint-disable-next-line no-unused-vars
+  const _goalLower = goal.toLowerCase();
   const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
   const noteText = history
     .filter(h => h && h.action && h.action.type === 'note' && h.action.text)
@@ -1930,7 +1933,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
  * Returns { isLoop: bool, type: string, count: number } so the caller can
  * inject a context-specific directive.
  */
-function _detectActionTypeLoop(history, agentMemory) {
+function _detectActionTypeLoop(history, _agentMemory) {
   if (!Array.isArray(history) || history.length < 4) return { isLoop: false };
   const recent = history.slice(-4);
   const types = recent.map(h => (h && h.action && h.action.type) || '');
@@ -2284,7 +2287,7 @@ async function runAgentLoop(goal, workingTabId) {
               continue;
             }
             // Already on the right page - skip navigation
-          } catch (e) { /* URL parse error, skip auto-navigate */ }
+          } catch { /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -2310,7 +2313,7 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (e) { console.warn('[Sentinel] tenant detected broadcast failed:', e && e.message); }
           }
         }
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
 
       // Send tab state to popup so user can see all managed tabs
       const allTabContexts = getAllTabContexts();
@@ -2329,7 +2332,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
           await sleep(800); // let overlay close animate
         }
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
 
       // Get page data — skip re-observation when the previous action was
       // non-mutating (note/extract/scroll/wait) AND no SPA transition occurred
@@ -2486,7 +2489,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate('▶ Resumed after sign-in', stepCount);
           continue; // re-observe — the page should be past the wall now
         }
-      } catch (_e) { /* never crash the loop on detection issues */ }
+      } catch { /* never crash the loop on detection issues */ }
 
       // (3.7.0) MFA challenge detection. If the freshly observed page text
       // matches a known MFA cue and we haven't already acknowledged this URL,
@@ -2518,7 +2521,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate('▶ Resumed after MFA', stepCount);
           continue; // re-observe the page now that MFA is presumably handled
         }
-      } catch (_e) { /* never crash the loop on detection issues */ }
+      } catch { /* never crash the loop on detection issues */ }
 
       // Rate limiting
       await enforceRateLimit();
@@ -2691,7 +2694,7 @@ async function runAgentLoop(goal, workingTabId) {
           loopDirective += _recovery.promptInjection;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (ee) { /* console unavailable */ }
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch { /* console unavailable */ }
       }
 
       // Progress indicator
@@ -2874,7 +2877,7 @@ async function runAgentLoop(goal, workingTabId) {
             await sleep(800);
             continue;
           }
-        } catch (e) { /* completeness check failure is non-fatal */ }
+        } catch { /* completeness check failure is non-fatal */ }
 
         const memCount = Object.keys(agentMemory).length;
         const noteCount = history.filter(h => h.action.type === 'note').length;
@@ -2929,7 +2932,7 @@ async function runAgentLoop(goal, workingTabId) {
               continue;
             }
           }
-        } catch (_e) { /* non-fatal: never let the gate itself crash the loop */ }
+        } catch { /* non-fatal: never let the gate itself crash the loop */ }
 
         // (3.8.3) Don't-give-up-early guard for multi-portal investigations.
         // If the agent calls finish before step 40 with "incomplete" markers
@@ -2943,7 +2946,7 @@ async function runAgentLoop(goal, workingTabId) {
               const RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|m365|admin\.microsoft|portal\.azure|sentinelone|virustotal)\b/gi;
               const matches = String(goal || '').match(RE) || [];
               return matches.length >= 2;
-            } catch (e) { return false; }
+            } catch { return false; }
           })();
           const _hasIncompleteMarker = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i.test(_summary);
           if (_isMultiPortal && stepCount < 80 && _hasIncompleteMarker) {
@@ -2959,7 +2962,7 @@ async function runAgentLoop(goal, workingTabId) {
             await sleep(1000);
             continue;
           }
-        } catch (_e) { /* never let the guard itself crash the loop */ }
+        } catch { /* never let the guard itself crash the loop */ }
 
         finished = true;
         consecutiveFailures = 0;
@@ -3019,7 +3022,7 @@ async function runAgentLoop(goal, workingTabId) {
               continue;
             }
           }
-        } catch (_e) { /* never crash the loop on hallucination check */ }
+        } catch { /* never crash the loop on hallucination check */ }
 
         // (3.14.0) Ticket-mode output formatting. Dispatches to one of six
         // MSP-aware templates based on settings:
@@ -3058,7 +3061,7 @@ async function runAgentLoop(goal, workingTabId) {
           tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
             score: _trustScore.score, band: _trustScore.band, breakdown: _trustScore.breakdown, runLogId
           });
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
 
         // (3.9.0) Final run-log entry + broadcast runLogId so the popup can offer Export.
         try {
@@ -3111,7 +3114,7 @@ async function runAgentLoop(goal, workingTabId) {
 
         // (3.31.0) Trust score is already computed above (_trustScore). Reuse it.
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_trustScore); } catch (e) { return []; }
+          try { return suggestRetryActions(_trustScore); } catch { return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -3255,7 +3258,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (te) { /* telemetry unavailable */ }
+          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch { /* telemetry unavailable */ }
           sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3281,7 +3284,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (te) { /* telemetry unavailable */ }
+          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch { /* telemetry unavailable */ }
           sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3493,7 +3496,7 @@ async function runAgentLoop(goal, workingTabId) {
             continue;
           }
         }
-      } catch (_e) { /* never crash the loop on lockdown check */ }
+      } catch { /* never crash the loop on lockdown check */ }
 
       // Approval gate + CDP trusted input flag (#9)
       // (3.41.0) Read from run-stable settings cache instead of per-step storage fetch.
@@ -3677,7 +3680,7 @@ async function runAgentLoop(goal, workingTabId) {
                 result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
                 actionFailed = true;
               }
-            } catch (e) {
+            } catch {
               result = 'Navigated to ' + arrivedUrl;
             }
           }
@@ -3687,7 +3690,7 @@ async function runAgentLoop(goal, workingTabId) {
           const freshContent = await sendMessageWithRetry(tab, { action: 'read_page' });
           result = freshContent ? 'Page content re-read' : 'Failed to re-read page';
           actionFailed = !freshContent;
-        } catch (err) { result = 'Could not re-read page'; actionFailed = true; }
+        } catch { result = 'Could not re-read page'; actionFailed = true; }
       } else if (command.type === 'extract' || command.type === 'extract_list') {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
         result = res || 'Done';
@@ -3749,7 +3752,7 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (e) { console.warn('[Sentinel] extract activity stream failed:', e && e.message); }
             } // close else (error-string guard)
           }
-        } catch (e) {
+        } catch {
           // extract result wasn't JSON -- treat as failure
         }
         if (!extractSucceeded) actionFailed = true;
@@ -3813,7 +3816,7 @@ async function runAgentLoop(goal, workingTabId) {
               } else {
                 savedValue = parsed;
               }
-            } catch (e) { /* not JSON — keep the raw string */ }
+            } catch { /* not JSON — keep the raw string */ }
             // (3.13.0) Memory hygiene at write time -- reject garbage values
             // BEFORE they pollute future prompts. Single source of truth via
             // _shouldAcceptMemoryWrite. Cleaner state means cleaner subsequent
@@ -3876,13 +3879,13 @@ async function runAgentLoop(goal, workingTabId) {
               const bbox = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
               if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
                 // Make sure the element is in view, then click via CDP at its center.
-                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { /* non-fatal */ }
+                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch { /* non-fatal */ }
                 // Re-query bbox after scroll
                 let cx = bbox.x, cy = bbox.y;
                 try {
                   const bbox2 = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
                   if (bbox2 && typeof bbox2.x === 'number') { cx = bbox2.x; cy = bbox2.y; }
-                } catch (e) { /* keep original */ }
+                } catch { /* keep original */ }
                 const targetLabel = command.ref || command.selector || 'element';
                 const r = await cdpDispatchClick(tab, cx, cy, {
                   description: 'Clicking ' + targetLabel
@@ -3896,7 +3899,7 @@ async function runAgentLoop(goal, workingTabId) {
             // resolution rules), then dispatch trusted text via CDP.
             try {
               await sendMessageWithRetry(tab, { action: 'focus_element', ref: command.ref, selector: command.selector }, 1);
-            } catch (e) { /* non-fatal: insertText may still hit the active element */ }
+            } catch { /* non-fatal: insertText may still hit the active element */ }
             const r = await cdpDispatchType(tab, command.text || '');
             if (r.ok) { result = 'Typed ' + (command.text ? command.text.length : 0) + ' chars via CDP'; cdpDone = true; }
             else { console.warn('[CDP] dispatchType failed, falling back:', r.error); }
@@ -3991,7 +3994,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (updatedTab && updatedTab.url !== urlBeforeCommand) {
               await waitForPageLoad(tab);
               await sleep(500);
-              try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch (e) { result = 'Clicked -> page navigated'; }
+              try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch { result = 'Clicked -> page navigated'; }
             }
           }
         } catch (e) { console.warn('[Sentinel] click execution failed:', e && e.message); }
@@ -4093,7 +4096,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Non-modifying action consumes any pending flag implicitly.
           pendingVerification = null;
         }
-      } catch (e) { pendingVerification = null; }
+      } catch { pendingVerification = null; }
 
       // (3.9.0) Forensic run log: persist a structured record per step.
       try {
@@ -4125,7 +4128,7 @@ async function runAgentLoop(goal, workingTabId) {
             ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
           }).catch(() => {});
         }
-      } catch (_e) { /* never crash the loop on logging */ }
+      } catch { /* never crash the loop on logging */ }
 
       // Consecutive navigate tracking
       if (command.type === 'navigate') {
@@ -4143,7 +4146,7 @@ async function runAgentLoop(goal, workingTabId) {
             const forcedText = (forcedRead.content || '').substring(0, 8000);
             historyPush({ step: stepCount, action: { type: 'read_page' }, result: `Auto-read: ${forcedText.substring(0, 500)}` });
           }
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
         consecutiveNavigates = 0;
       }
       // (3.8.2) Roll up old history into a single summary entry so the
@@ -4209,13 +4212,13 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   // Release any CDP debugger attachments held during the run.
-  try { await detachAllDebuggees(); } catch (e) { /* non-fatal */ }
+  try { await detachAllDebuggees(); } catch { /* non-fatal */ }
 
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
 
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs(); } catch (e) { /* non-fatal */ }
+  try { await detachAllSentinelTabs(); } catch { /* non-fatal */ }
 
   agentRunning = false;
   tel.info('agent', 'Agent completed', { apiCallCount });
@@ -4226,7 +4229,7 @@ async function runAgentLoop(goal, workingTabId) {
     if (activeClientId) {
       await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
     }
-  } catch (e) { /* non-fatal */ }
+  } catch { /* non-fatal */ }
 
   // Signal completion via messaging (replaces polling for scheduler)
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch(() => {});

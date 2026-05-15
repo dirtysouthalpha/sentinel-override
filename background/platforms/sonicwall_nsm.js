@@ -18,7 +18,7 @@ export const sonicwallNsm = {
       const host = new URL(url).host;
       if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$/i.test(host)) return true;
       if (/(^|\.)cloud\.sonicwall\.com$/i.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch { /* fall through */ }
     return /\bsonicwall\s+nsm|network\s+security\s+manager\b/i.test(String(goal || ''));
   },
 
@@ -143,7 +143,7 @@ export const sonicwallNsm = {
     // VPN policy edit dialog
     policyDialog:             'div[role="dialog"], .policy-dialog, .mat-dialog-container, [class*="policy-edit"]',
     policyDialogTabBar:       '[role="tablist"], .tab-bar, .nav-tabs',
-    policyDialogTab:          (name) => 'button[role="tab"]:not([disabled]), .tab-btn',  // filter by visible text matching `name` in JS
+    policyDialogTab:          (_name) => 'button[role="tab"]:not([disabled]), .tab-btn',  // filter by visible text matching `name` in JS
     policyTabClientText:      ['Client', 'Client Connections', 'Virtual Adapter'],
     policyTabGeneralText:     ['General'],
     policyTabNetworkText:     ['Network', 'Networks'],
@@ -152,7 +152,7 @@ export const sonicwallNsm = {
 
     // Client tab — Virtual Adapter Settings
     virtualAdapterDropdown:   'select[name*="virtualAdapter" i], [data-field*="virtual-adapter"], [aria-label*="Virtual Adapter" i]',
-    virtualAdapterOption:     (opt) => '[role="option"], li.dropdown-item, option',  // filter by text match in JS
+    virtualAdapterOption:     (_opt) => '[role="option"], li.dropdown-item, option',  // filter by text match in JS
     virtualAdapterOptions:    ['None', 'DHCP Lease', 'Internal DHCP Server', 'External DHCP Server'],
 
     // Client tab — IP Address Pool fields (appear once DHCP Lease is selected)

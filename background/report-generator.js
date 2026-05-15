@@ -59,7 +59,7 @@ export async function generateReport(executionData, CONFIG) {
     if (Array.isArray(val)) {
       valStr = val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
     } else if (typeof val === 'object') {
-      try { valStr = JSON.stringify(val); } catch (e) { valStr = String(val); }
+      try { valStr = JSON.stringify(val); } catch { valStr = String(val); }
     } else {
       valStr = String(val);
     }
@@ -251,7 +251,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   let data;
   try {
     data = await response.json();
-  } catch (err) {
+  } catch {
     throw new Error('Report LLM returned invalid JSON');
   }
   const responseText = provider.parseResponse(data);
@@ -312,7 +312,7 @@ function buildStructuredData(executionData, timestamp) {
       try {
         const str = JSON.stringify(val);
         findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : val;
-      } catch (e) {
+      } catch {
         findings[key] = String(val).substring(0, 2000);
       }
     } else {

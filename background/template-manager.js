@@ -48,7 +48,7 @@ export async function loadTemplates() {
   try {
     const result = await chrome.storage.local.get([STORAGE_KEY]);
     return result[STORAGE_KEY] || {};
-  } catch (e) {
+  } catch {
     return {};
   }
 }

@@ -1,13 +1,19 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
+// eslint-disable-next-line no-unused-vars
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+// eslint-disable-next-line no-unused-vars
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
+// eslint-disable-next-line no-unused-vars
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
+// eslint-disable-next-line no-unused-vars
 import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
+// eslint-disable-next-line no-unused-vars
 import { generateReport } from './report-generator.js';
+// eslint-disable-next-line no-unused-vars
 import { migrateLegacySettings } from './provider-registry.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
@@ -88,10 +94,10 @@ try {
             totalBytes: dl.totalBytes || 0
           }
         }).catch(() => {});
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
     });
   }
-} catch (e) { /* downloads API may be unavailable */ }
+} catch { /* downloads API may be unavailable */ }
 
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -107,7 +113,7 @@ try {
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', e && e.message));
-} catch (e) { /* non-fatal on older Chrome */ }
+} catch { /* non-fatal on older Chrome */ }
 
 // ========== Unified Message Handler ==========
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
@@ -135,7 +141,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
         if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);
         tel[lvl](cat, msg, payload);
-      } catch (e) { /* never throw on telemetry */ }
+      } catch { /* never throw on telemetry */ }
       return { ok: true };
     }
 
@@ -143,10 +149,10 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // panel context and can't import telemetry.js directly — these handlers
     // expose the persistence read/delete API.
     case 'list_persisted_telemetry_runs': {
-      try { return await listPersistedRuns(); } catch (e) { return []; }
+      try { return await listPersistedRuns(); } catch { return []; }
     }
     case 'load_persisted_telemetry_run': {
-      try { return await loadPersistedRun(request.runId); } catch (e) { return []; }
+      try { return await loadPersistedRun(request.runId); } catch { return []; }
     }
     case 'delete_persisted_telemetry_run': {
       try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
@@ -156,10 +162,10 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // to render the per-skill success-rate table, then optionally resets via
     // reset_skill_stats. Both are popup-initiated, no side effects on the agent loop.
     case 'list_skills_with_stats': {
-      try { return listSkills(); } catch (e) { return []; }
+      try { return listSkills(); } catch { return []; }
     }
     case 'get_skill_stats': {
-      try { return getSkillStats(); } catch (e) { return {}; }
+      try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
       try { await resetSkillStats(); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
@@ -176,7 +182,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           auth: p.auth,
           docsUrl: p.docsUrl
         }));
-      } catch (e) { return []; }
+      } catch { return []; }
     }
     case 'fetch_provider_models': {
       // (3.10.0) Auto-detect models for the selected provider. Caller passes
@@ -223,7 +229,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           stepCount: cp.stepCount || 0,
           ageSeconds: Math.floor(age / 1000)
         };
-      } catch (e) {
+      } catch {
         return { available: false };
       }
     }
@@ -297,19 +303,19 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const target = String(request.url || '');
         if (!target) return { ok: false, error: 'focus_tab_by_url: missing url' };
         let targetHost;
-        try { targetHost = new URL(target).host; } catch (e) { targetHost = ''; }
+        try { targetHost = new URL(target).host; } catch { targetHost = ''; }
         const tabs = await chrome.tabs.query({});
         // Prefer exact URL match, fall back to host match (Microsoft sign-in
         // walks the user through multiple URLs on the same host).
         let match = tabs.find(t => t && t.url === target);
         if (!match && targetHost) {
           match = tabs.find(t => {
-            try { return t && t.url && new URL(t.url).host === targetHost; } catch (e) { return false; }
+            try { return t && t.url && new URL(t.url).host === targetHost; } catch { return false; }
           });
         }
         if (!match) return { ok: false, error: 'no matching tab' };
-        try { await chrome.tabs.update(match.id, { active: true }); } catch (e) { /* tab may have closed */ }
-        try { await chrome.windows.update(match.windowId, { focused: true }); } catch (e) { /* window may have closed */ }
+        try { await chrome.tabs.update(match.id, { active: true }); } catch { /* tab may have closed */ }
+        try { await chrome.windows.update(match.windowId, { focused: true }); } catch { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
         return { ok: false, error: e && e.message ? e.message : 'unknown' };
@@ -529,7 +535,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       await chrome.windows.update(win.id, { focused: true });
       sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch (e) { /* non-fatal — window may have closed before query ran */ }
+  } catch { /* non-fatal — window may have closed before query ran */ }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -563,7 +569,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch (e) { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
+  } catch { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
 });
 
 // ========== Keyboard Shortcut Commands ==========
@@ -583,13 +589,13 @@ chrome.commands.onCommand.addListener(async (command) => {
             if (activeTab && typeof activeTab.id === 'number') {
               await chrome.sidePanel.open({ tabId: activeTab.id }).catch(() => {});
             }
-          } catch (e) { /* no active tab — silently ignore */ }
+          } catch { /* no active tab — silently ignore */ }
         }
         break;
       }
       case 'pause-agent': {
         if (agentRunning) {
-          const { pauseAgent, resumeAgent } = await import('./agent-engine.js');
+          const { pauseAgent } = await import('./agent-engine.js');
           // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
           // Instead, just send both and let the engine decide
           await pauseAgent(); // Will set agentPaused = true

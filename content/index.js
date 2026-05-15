@@ -22,7 +22,7 @@ if (!window.__sentinelContentTel) {
         message: String(message || '').substring(0, 500),
         payload: payload || null
       }).catch(() => {});
-    } catch (e) { /* chrome.runtime gone during shutdown */ }
+    } catch { /* chrome.runtime gone during shutdown */ }
   };
   // Per-level shorthands so call sites stay terse.
   window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
@@ -45,7 +45,8 @@ if (window.__sentinelInitialized) {
   // Sandbox is disabled by default — the Proxy-based sandbox was blocking
   // legitimate agent operations (document.documentElement.outerHTML, etc.)
   // Re-enable after tuning the allowlist/blocklist for real-world usage.
-  const EXECUTE_JS_SANDBOX_ENABLED = false;
+  // eslint-disable-next-line no-unused-vars
+  const _EXECUTE_JS_SANDBOX_ENABLED = false;
 
   // Shorthand references to utility modules
   const dom = window.__sentinelUtils.dom;
@@ -92,7 +93,7 @@ if (window.__sentinelInitialized) {
       }
     };
     startObserving();
-  } catch (e) { /* observer unavailable, fall back to time-of-check only */ }
+  } catch { /* observer unavailable, fall back to time-of-check only */ }
 
   function __sentinelHasPositiveModalSignal(el) {
     try {
@@ -164,7 +165,7 @@ if (window.__sentinelInitialized) {
             dismissed.push(btn.textContent.trim().substring(0, 40) || sel);
           }
         }
-      } catch (e) { /* invalid selector, skip */ }
+      } catch { /* invalid selector, skip */ }
     }
 
     // Remove blocking overlays that cover the viewport — but only with strong
@@ -222,7 +223,7 @@ if (window.__sentinelInitialized) {
           const backdrop = document.querySelector('[class*="backdrop" i], [class*="scrim" i]');
           if (backdrop) backdrop.style.display = 'none';
         }
-      } catch (e) { /* skip */ }
+      } catch { /* skip */ }
     }
 
     return { dismissed, count: dismissed.length };
@@ -310,7 +311,8 @@ if (window.__sentinelInitialized) {
     /check\s+your\s+phone/i
   ];
 
-  function __sentinelDetectMFA(text) {
+  // eslint-disable-next-line no-unused-vars
+  function _unused__sentinelDetectMFA(text) {
     if (!text || typeof text !== 'string') return null;
     const sample = text.substring(0, 4000);
     for (const re of __SENTINEL_MFA_PATTERNS) {
@@ -340,7 +342,7 @@ if (window.__sentinelInitialized) {
                 if (iframeResult.elements) {
                   iframeResult.elements.forEach(el => interactiveElements.push(el));
                 }
-              } catch (e) { /* fallback: no iframe scanning */ }
+              } catch { /* fallback: no iframe scanning */ }
             }
             // If we found elements, stop retrying
             if (interactiveElements.length >= 5) break;
@@ -410,7 +412,7 @@ if (window.__sentinelInitialized) {
             await new Promise(r => setTimeout(r, 1000));
             const bodyText = (document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             if (bodyText.length > content.length) content = bodyText;
-          } catch (e) { /* page may have navigated away */ }
+          } catch { /* page may have navigated away */ }
         }
 
         return { content: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
@@ -451,7 +453,7 @@ if (window.__sentinelInitialized) {
             content = (iframeDoc.body ? iframeDoc.body.innerText : '').replace(/\n{3,}/g, '\n\n').trim();
           }
           return { content: 'Iframe Title: ' + title + '\nURL: ' + url + '\n\n' + content };
-        } catch (e) {
+        } catch {
           throw new Error('Cross-origin iframe -- use background routing');
         }
       }
@@ -544,7 +546,7 @@ if (window.__sentinelInitialized) {
             url: window.location.href,
             hostname: window.location.hostname
           };
-        } catch (e) {
+        } catch {
           return { tid: null, onmicrosoft: null, chipText: null };
         }
       }
@@ -652,7 +654,7 @@ if (window.__sentinelInitialized) {
         if (__sensitiveMatch) {
           throw new Error('BLOCKED: cannot focus sensitive field (matched "' + __sensitiveMatch + '"). Sensitive fields require manual entry.');
         }
-        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
+        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message); }
         // Clear existing value so CDP insertText replaces rather than appends,
         // matching the synthetic-path behavior. Only for inputs/textareas.
@@ -666,7 +668,7 @@ if (window.__sentinelInitialized) {
           } else if (el.isContentEditable) {
             el.textContent = '';
           }
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
         return { focused: true };
       }
 
@@ -716,7 +718,7 @@ if (window.__sentinelInitialized) {
       overlay.textContent = 'Sentinel Override';
       document.body.appendChild(overlay);
       return overlay;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -728,7 +730,7 @@ if (window.__sentinelInitialized) {
       const label = description || actionType;
       overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
       overlay.style.opacity = '1';
-    } catch (e) { /* extension context may be invalidated */ }
+    } catch { /* extension context may be invalidated */ }
   }
 
   function hideActionBanner() {
@@ -748,7 +750,7 @@ if (window.__sentinelInitialized) {
       indicator.style.top = y + 'px';
       document.body.appendChild(indicator);
       setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', e && e.message); } }, 700);
-    } catch (e) { /* extension context may be invalidated */ }
+    } catch { /* extension context may be invalidated */ }
   }
 
   // Make overlay functions available for the execute_command handler
@@ -789,7 +791,7 @@ if (window.__sentinelInitialized) {
           if (stableCount >= (frames - 1)) { resolve(true); return; }
           if (performance.now() - start >= maxMs) { resolve(false); return; }
           requestAnimationFrame(tick);
-        } catch (e) {
+        } catch {
           resolve(false);
         }
       };
@@ -847,7 +849,8 @@ if (window.__sentinelInitialized) {
 
   // ========== execute_js Sandbox Helpers ==========
   // API allowlist for execute_js sandboxing
-  const EXECUTE_JS_ALLOWED_GLOBALS = new Set([
+  // eslint-disable-next-line no-unused-vars
+  const _EXECUTE_JS_ALLOWED_GLOBALS = new Set([
     'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
     'getElementsByTagName', 'getElementsByName', 'createElement', 'createTextNode',
     'getAttribute', 'setAttribute', 'removeAttribute', 'hasAttribute',
@@ -887,9 +890,10 @@ if (window.__sentinelInitialized) {
   // Creates a Proxy wrapping the document that blocks sensitive properties
   // but allows all normal DOM read/write operations.
   // sandboxedWin is the already-proxied window, returned when code accesses document.defaultView.
-  function createSandboxedDocument(doc, sandboxedWin) {
+  // eslint-disable-next-line no-unused-vars
+  function _createSandboxedDocument(doc, sandboxedWin) {
     return new Proxy(doc, {
-      get(target, prop, receiver) {
+      get(target, prop, _receiver) {
         // Block sensitive document properties (cookie, domain, referrer, location, write, writeln)
         if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) {
           console.warn(`[Sentinel Sandbox] Blocked access to document.${String(prop)} in execute_js`);
@@ -923,9 +927,10 @@ if (window.__sentinelInitialized) {
 
   // Creates a Proxy wrapping the window that blocks dangerous APIs
   // while allowing safe properties (console, Math, setTimeout, etc.) through.
-  function createSandboxedWindow(win) {
+  // eslint-disable-next-line no-unused-vars
+  function _createSandboxedWindow(win) {
     return new Proxy(win, {
-      get(target, prop, receiver) {
+      get(target, prop, _receiver) {
         // Block all dangerous window APIs
         if (EXECUTE_JS_BLOCKED_APIS.has(prop)) {
           console.warn(`[Sentinel Sandbox] Blocked access to window.${String(prop)} in execute_js`);
@@ -1091,7 +1096,7 @@ if (window.__sentinelInitialized) {
                   resolve('Cross-origin iframe error: ' + (response ? response.error : 'Unknown error'));
                 }
               });
-            } catch (e) {
+            } catch {
               resolve('Extension context error during iframe operation');
             }
           });
@@ -1110,7 +1115,7 @@ if (window.__sentinelInitialized) {
           try {
             targetDoc = iframes[frameIndex].contentWindow.document;
             selector = iframeSelector;
-          } catch (e) {
+          } catch {
             return 'Cannot access iframe (cross-origin)';
           }
         } else {
@@ -1223,7 +1228,7 @@ if (window.__sentinelInitialized) {
           if (typeof cmd.dpr === 'number' && Math.abs(cmd.dpr - liveDpr) > 0.01) {
             console.warn('[sentinel] click_at dpr mismatch: cmd.dpr=' + cmd.dpr + ' live=' + liveDpr + ' (still treating x,y as CSS pixels)');
           }
-        } catch (e) { /* non-fatal */ }
+        } catch { /* non-fatal */ }
 
         // (#11) Defensive viewport clamp. If coordinates land outside the
         // visible viewport, refuse rather than silently clicking on nothing.
@@ -1547,7 +1552,7 @@ if (window.__sentinelInitialized) {
             targetDoc.defaultView.HTMLSelectElement.prototype, 'value'
           ).set;
           selectSetter.call(el, targetOpt.value);
-        } catch (e) {
+        } catch {
           // Fallback for any environment where the setter isn't accessible.
           el.value = targetOpt.value;
         }
@@ -1938,9 +1943,9 @@ if (window.__sentinelInitialized) {
               if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
                 try {
                   containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-                } catch (e) { /* non-fatal */ }
+                } catch { /* non-fatal */ }
               }
-            } catch (e) {
+            } catch {
               return 'Element not found: ' + describeTarget(cmd);
             }
           } else {
@@ -1955,9 +1960,9 @@ if (window.__sentinelInitialized) {
             if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
               try {
                 containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-              } catch (e) { /* non-fatal */ }
+              } catch { /* non-fatal */ }
             }
-          } catch (e) {
+          } catch {
             return 'Element not found: ' + cmd.selector;
           }
         }
@@ -1976,7 +1981,7 @@ if (window.__sentinelInitialized) {
               } else {
                 item[fieldName] = '';
               }
-            } catch (e) {
+            } catch {
               item[fieldName] = '';
             }
           }
@@ -2034,7 +2039,7 @@ if (window.__sentinelInitialized) {
         hl.highlightElement(el);
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (e) {
+        } catch {
           try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', ee && ee.message); }
         }
         await waitForStableRect(el, 2, 800);
@@ -2065,7 +2070,7 @@ if (window.__sentinelInitialized) {
           const title = iframeDoc.title || '';
           const url = iframes[frameIndex].src || '';
           return 'Switched to iframe ' + frameIndex + ': ' + title + ' (' + url + '). Use read_page to scan content.';
-        } catch (e) {
+        } catch {
           return 'Cannot access iframe ' + frameIndex + ' (cross-origin)';
         }
       }

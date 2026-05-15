@@ -40,7 +40,7 @@ export const emptyObservation = {
     return null;
   },
 
-  promptInjection(ctx) {
+  promptInjection(_ctx) {
     return `The page observation came back nearly empty (< 5 interactive elements, < 200 chars of text). The page is either still loading or its content is rendered by an SPA framework that the standard scanner can't see yet. Strategies:
 
 1. **Wait** — if you just navigated, give it more time: \`{type:'wait_for_text', text:'<expected loaded-state text>', timeout:10000}\` or \`{type:'wait_for_navigation', timeout:8000}\`.

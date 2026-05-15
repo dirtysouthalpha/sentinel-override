@@ -52,7 +52,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         navSignalsBlock = '\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n' + lines.join('\n');
       }
     }
-  } catch (e) { /* profile.waitStrings may be malformed — non-fatal */ }
+  } catch { /* profile.waitStrings may be malformed — non-fatal */ }
 
   // Build KNOWN SUB-PAGES block from profile.pageTypes
   let subPagesBlock = '';
@@ -63,7 +63,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         subPagesBlock = '\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n' + lines.join('\n');
       }
     }
-  } catch (e) { /* profile.pageTypes may be malformed — non-fatal */ }
+  } catch { /* profile.pageTypes may be malformed — non-fatal */ }
 
   // Build WORKFLOW SCAFFOLD block from profile.workflowHints if goal matches
   let workflowScaffold = '';
@@ -76,7 +76,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         }
       }
     }
-  } catch (e) { /* profile.workflowHints may be malformed — non-fatal */ }
+  } catch { /* profile.workflowHints may be malformed — non-fatal */ }
 
   const profileBlock = `
 DETECTED PLATFORM: ${profile.label} (id: ${profile.id})
@@ -149,7 +149,7 @@ function extractJsonObject(text) {
   }
   // eslint-disable-next-line no-control-regex
   s = s.replace(/[\x00-\x1f]/g, '');
-  try { return JSON.parse(s); } catch (e) { /* keep going */ }
+  try { return JSON.parse(s); } catch { /* keep going */ }
   // Find first { ... } balanced
   const start = s.indexOf('{');
   if (start < 0) return null;
@@ -161,7 +161,7 @@ function extractJsonObject(text) {
       depth--;
       if (depth === 0) {
         const candidate = s.substring(start, i + 1);
-        try { return JSON.parse(candidate); } catch (e) { return null; }
+        try { return JSON.parse(candidate); } catch { return null; }
       }
     }
   }

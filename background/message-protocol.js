@@ -122,7 +122,7 @@ export function sendActionMessage(command, stepNumber, observation) {
       description = `${command.type} element`;
     }
   } else if (command.type === 'navigate' && command.url) {
-    try { description = `Navigate to ${new URL(command.url).hostname}`; } catch (e) { description = `Navigate to ${command.url}`; }
+    try { description = `Navigate to ${new URL(command.url).hostname}`; } catch { description = `Navigate to ${command.url}`; }
   } else if (command.type === 'scroll') {
     description = `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
   } else if (command.type === 'execute_js') {
@@ -166,7 +166,7 @@ export function sendActionMessage(command, stepNumber, observation) {
       const el = observation.elements.find(e => e.selector === command.selector);
       if (el && el.text && el.text !== 'No label') resolvedText = el.text;
     }
-  } catch (e) { /* element lookup is best-effort */ }
+  } catch { /* element lookup is best-effort */ }
   chrome.runtime.sendMessage({
     action: 'agent_action',
     payload: {

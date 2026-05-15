@@ -62,7 +62,7 @@ export function getPlatformProfile(currentUrl, goal) {
   for (const p of PROFILES) {
     try {
       if (p && typeof p.detect === 'function' && p.detect(currentUrl, goal)) return p;
-    } catch (e) {
+    } catch {
       // Detection regex failed — skip this profile, don't crash the lookup.
       continue;
     }
@@ -79,7 +79,7 @@ export function findMismatchHints(profile, goal) {
       if (hint && hint.pattern && hint.pattern.test(goal)) {
         hits.push({ onbox: hint.onbox, target: hint.nsm });
       }
-    } catch (e) { /* skip bad pattern */ }
+    } catch { /* skip bad pattern */ }
   }
   return hits;
 }

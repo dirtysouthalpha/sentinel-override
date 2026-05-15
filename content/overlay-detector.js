@@ -75,7 +75,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
         if (rect.width >= viewportW * VIEWPORT_COVERAGE_THRESHOLD && rect.height >= viewportH * VIEWPORT_COVERAGE_THRESHOLD) {
           if (dom && dom.isVisible(el)) return el;
         }
-      } catch (e) {
+      } catch {
         continue;
       }
     }
@@ -87,7 +87,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
         for (let j = 0; j < cookieEls.length; j++) {
           if (dom && dom.isVisible(cookieEls[j])) return cookieEls[j];
         }
-      } catch (e) {
+      } catch {
         // Invalid selector, skip
       }
     }
@@ -112,8 +112,6 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   ov.dismissOverlay = function(doc, overlay) {
     if (!overlay) return false;
 
-    const eventOpts = { bubbles: true, composed: true };
-
     // 1. Close buttons (ARIA labels)
     const closeSelectors = [
       '[aria-label="Close" i]', '[aria-label="Dismiss" i]',
@@ -136,7 +134,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
             return true;
           }
         }
-      } catch (e) {
+      } catch {
         continue;
       }
     }
@@ -163,7 +161,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
             return true;
           }
         }
-      } catch (e) {
+      } catch {
         continue;
       }
     }
@@ -231,7 +229,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       }
 
       return null;
-    } catch (e) {
+    } catch {
       return null;
     }
   };

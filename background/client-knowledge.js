@@ -51,7 +51,7 @@ async function _read() {
     if (!state.clients || typeof state.clients !== 'object') state.clients = {};
     if (typeof state.activeClientId !== 'string' && state.activeClientId !== null) state.activeClientId = null;
     return state;
-  } catch (e) {
+  } catch {
     return { ...DEFAULT_STATE };
   }
 }
@@ -59,7 +59,7 @@ async function _read() {
 async function _write(state) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: state });
-  } catch (e) { /* storage unavailable -- non-fatal */ }
+  } catch { /* storage unavailable -- non-fatal */ }
 }
 
 function _slugify(name) {

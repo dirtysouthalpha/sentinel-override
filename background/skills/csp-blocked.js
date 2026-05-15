@@ -22,7 +22,7 @@ export const cspBlocked = {
   // Deterministic recovery: read the page so the agent sees what's actually
   // rendered without needing to inject JS. The next LLM call can then pick
   // a CSP-friendly action (extract, extract_list, read_network_requests).
-  autoApply(ctx) {
+  autoApply(_ctx) {
     return { type: 'read_page', _autoAppliedBy: 'csp-blocked' };
   },
 

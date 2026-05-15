@@ -283,7 +283,7 @@ export function getPlatformContext(currentUrl, goal) {
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     ctx = _formatProfileSelectorsBlock(profile, currentUrl);
-  } catch (e) { /* never crash prompt-building on profile lookup */ }
+  } catch { /* never crash prompt-building on profile lookup */ }
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
   return ctx;
 }
@@ -1025,7 +1025,7 @@ export function extractFirstJsonObject(str) {
       try {
         const parsed = JSON.parse(candidate);
         if (parsed.type && VALID_ACTION_SET.has(parsed.type)) return candidate;
-      } catch (e) { /* not valid JSON, try next */ }
+      } catch { /* not valid JSON, try next */ }
       searchFrom = end + 1;
     } else {
       break;
@@ -1140,14 +1140,14 @@ export function parseLLMResponse(content) {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);
         if (parsed && parsed.type) return parsed;
-      } catch (e) { /* try regex salvage */ }
+      } catch { /* try regex salvage */ }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         if (salvaged) {
           console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
           return salvaged;
         }
-      } catch (e) { /* fall through */ }
+      } catch { /* fall through */ }
     }
     return { type: 'note', text: `Parse error (will retry): ${err.message}` };
   }
@@ -1169,7 +1169,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     return scored.map(s => s.pattern);
-  } catch (e) { return []; }
+  } catch { return []; }
 }
 
 // ========== Utilities ==========

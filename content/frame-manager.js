@@ -22,7 +22,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch (e) {
+    } catch {
       return { elements, iframeCount: 0, crossOriginCount: 0 };
     }
 
@@ -46,7 +46,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
             elements.push(el);
           });
         }
-      } catch (e) {
+      } catch {
         // Cross-origin: add placeholder
         crossOriginCount++;
         elements.push({
@@ -82,7 +82,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch (e) {
+    } catch {
       return null;
     }
 
@@ -101,7 +101,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         }
         return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src };
       }
-    } catch (e) {
+    } catch {
       // Cross-origin
     }
 
@@ -124,7 +124,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch (e) {
+    } catch {
       return info;
     }
 
@@ -136,14 +136,14 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         if (iframe.contentWindow && iframe.contentWindow.document) {
           sameOrigin = true;
         }
-      } catch (e) {
+      } catch {
         sameOrigin = false;
       }
 
       let rect;
       try {
         rect = iframe.getBoundingClientRect();
-      } catch (e) {
+      } catch {
         rect = { width: 0, height: 0 };
       }
 

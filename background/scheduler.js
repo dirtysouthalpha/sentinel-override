@@ -5,7 +5,8 @@
 
 import { agentRunning, startAgent } from './agent-engine.js';
 import { resolveTemplateGoal } from './template-manager.js';
-import { getActiveTabId, registerInitialTab } from './tab-context.js';
+// eslint-disable-next-line no-unused-vars
+import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
 import { tel } from './telemetry.js';
@@ -31,7 +32,8 @@ export function onAgentComplete(callback) {
  * Fire all registered agent-complete callbacks.
  * Called from the polling loop in executeScheduledTask.
  */
-function fireAgentCompleteCallbacks() {
+// eslint-disable-next-line no-unused-vars
+function _fireAgentCompleteCallbacks() {
   const cbs = agentCompleteCallbacks.slice();
   agentCompleteCallbacks = [];
   cbs.forEach(cb => { try { cb(); } catch (e) { console.error('Agent complete callback error:', e); } });
@@ -526,7 +528,7 @@ export async function executeScheduledTask(alarmName) {
   let tabInfo;
   try {
     tabInfo = await getTabInfo(tabId);
-  } catch (e) {
+  } catch {
     tabInfo = null;
   }
   registerInitialTab(tabId, tabInfo?.url || '');
@@ -672,7 +674,8 @@ async function storeResult(schedule, result) {
  * @param {number} timeoutMs - Max time to wait for report
  * @returns {Promise<object|null>} Report object or null if unavailable
  */
-function waitForReport(timeoutMs) {
+// eslint-disable-next-line no-unused-vars
+function _waitForReport(timeoutMs) {
   return new Promise((resolve) => {
     const start = Date.now();
     const poll = setInterval(async () => {
@@ -688,7 +691,7 @@ function waitForReport(timeoutMs) {
           clearInterval(poll);
           resolve(null);
         }
-      } catch (e) {
+      } catch {
         clearInterval(poll);
         resolve(null);
       }

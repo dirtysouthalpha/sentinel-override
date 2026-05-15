@@ -25,7 +25,7 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
         '}';
       // Append to head if available, else documentElement
       (document.head || document.documentElement).appendChild(style);
-    } catch (e) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
   }
 
   hl.highlightElement = function(el) {

@@ -27,7 +27,7 @@ export const unproductiveExtract = {
     return UNPRODUCTIVE_PATTERNS.some(re => re.test(r));
   },
 
-  autoApply(ctx) {
+  autoApply(_ctx) {
     // Not deterministic — the LLM needs to choose between regex on body text,
     // network-request inspection, or fall-through to read_page. Let the
     // promptInjection guide it.

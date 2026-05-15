@@ -100,7 +100,9 @@ const REDACT_KEY_PATTERNS = [
 ];
 
 // URL query params to scrub. Other params pass through.
-const REDACT_QUERY_PARAMS = new Set([
+// (Note: param names are also hardcoded in _redactString's regex for perf.)
+// eslint-disable-next-line no-unused-vars
+const _REDACT_QUERY_PARAMS = new Set([
   'token', 'access_token', 'refresh_token', 'auth_token', 'id_token',
   'apikey', 'api_key', 'key', 'secret', 'password', 'pwd', 'sig', 'signature',
   'code', 'state'  // OAuth flow values
@@ -155,7 +157,7 @@ function _redactEvent(event) {
       message: _redactString(event.message),
       payload: _redactValue(event.payload, null)
     };
-  } catch (e) {
+  } catch {
     // If redaction throws, fail open with the original event rather than
     // dropping telemetry entirely — visibility is the whole point of the panel.
     return event;
@@ -272,7 +274,7 @@ export async function listPersistedRuns() {
   try {
     const stored = await chrome.storage.local.get('telemetry_runs_index');
     return Array.isArray(stored.telemetry_runs_index) ? stored.telemetry_runs_index : [];
-  } catch (e) { return []; }
+  } catch { return []; }
 }
 
 export async function loadPersistedRun(runId) {
@@ -280,7 +282,7 @@ export async function loadPersistedRun(runId) {
   try {
     const stored = await chrome.storage.local.get('telemetry_run_' + runId);
     return Array.isArray(stored['telemetry_run_' + runId]) ? stored['telemetry_run_' + runId] : [];
-  } catch (e) { return []; }
+  } catch { return []; }
 }
 
 export async function deletePersistedRun(runId) {
@@ -330,10 +332,10 @@ export function emit(category, level, message, payload) {
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
     else if (level === 'debug' || level === 'trace') console.debug.apply(console, consoleArgs);
     else console.log.apply(console, consoleArgs);
-  } catch (e) { /* console unavailable in some contexts */ }
+  } catch { /* console unavailable in some contexts */ }
   try {
     chrome.runtime.sendMessage(event).catch(() => {});
-  } catch (e) { /* extension context invalidated */ }
+  } catch { /* extension context invalidated */ }
   if (_currentRunId && _persistEnabled) {
     try {
       _runBuffer.push(event);
@@ -341,7 +343,7 @@ export function emit(category, level, message, payload) {
       if (_runBuffer.length >= 200) {
         _flushRunBuffer().catch(() => {});
       }
-    } catch (e) { /* buffer append is non-critical */ }
+    } catch { /* buffer append is non-critical */ }
   }
 }
 

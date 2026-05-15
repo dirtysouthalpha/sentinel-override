@@ -66,7 +66,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
           '[role="option"], [role="menuitem"], li, .option, .dropdown-item, .menu-item, .select-option'
         );
         items.forEach(addUnique);
-      } catch (e) { /* invalid selector */ }
+      } catch { /* invalid selector */ }
     }
 
     // ===== Scoped lookup (#22) =====
@@ -134,7 +134,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
       try {
         found = doc.querySelectorAll(sel);
         found.forEach(addAllFromContainer);
-      } catch (e) { /* invalid selector */ }
+      } catch { /* invalid selector */ }
     }
 
     // 4. Siblings/children of trigger

@@ -25,7 +25,7 @@
   }
 
   async function markDone() {
-    try { await chrome.storage.local.set({ sentinelOnboardingDone: true }); } catch (e) { /* storage may fail */ }
+    try { await chrome.storage.local.set({ sentinelOnboardingDone: true }); } catch { /* storage may fail */ }
     const modal = _qs('onboarding-modal');
     if (modal) modal.classList.remove('show');
   }
@@ -62,6 +62,6 @@
         showStep(1);
         modal.classList.add('show');
       }, 250);
-    } catch (e) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
   })();
 })();

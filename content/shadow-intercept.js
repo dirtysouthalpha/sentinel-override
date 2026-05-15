@@ -30,7 +30,7 @@
     try {
       window.__sentinelCapturedRoots.set(this, shadowRoot);
       window.__sentinelShadowRoots.add(shadowRoot);
-    } catch (e) {
+    } catch {
       // Fail-soft: never break the page if storage operations throw.
     }
     return shadowRoot;

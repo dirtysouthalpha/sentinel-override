@@ -51,6 +51,7 @@ function _createReactiveProxy(target) {
  * Sets window.__popupState to a new reactive proxy.
  * Safe to call once at startup.
  */
+// eslint-disable-next-line no-unused-vars
 function initPopupState() {
   // Deep-clone defaults so each init is independent
   const fresh = JSON.parse(JSON.stringify(_initialState));
@@ -60,6 +61,7 @@ function initPopupState() {
 /**
  * Returns the reactive state proxy (window.__popupState).
  */
+// eslint-disable-next-line no-unused-vars
 function getState() {
   return window.__popupState;
 }
@@ -70,6 +72,7 @@ function getState() {
  * @param {Function} callback - Called with (newValue, key, oldValue).
  * @returns {Function} Unsubscribe function.
  */
+// eslint-disable-next-line no-unused-vars
 function subscribe(key, callback) {
   if (!_subscribers[key]) {
     _subscribers[key] = new Set();

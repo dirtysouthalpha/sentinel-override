@@ -23,6 +23,7 @@ function _toggleClass(id, cls, on) {
   if (el) el.classList[on ? 'add' : 'remove'](cls);
 }
 
+// eslint-disable-next-line no-unused-vars
 function showTemplatesPanel() {
   _setDisplay('templates-panel', 'flex');
   _setDisplay('chat-container', 'none');

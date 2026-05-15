@@ -19,7 +19,7 @@ export const selectorMiss = {
            r.startsWith('error: element');
   },
 
-  autoApply(ctx) {
+  autoApply(_ctx) {
     // Deterministic re-observation. The next LLM call gets a fresh elements
     // array; the previous selector's failure is in history so the LLM won't
     // re-emit it.

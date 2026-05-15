@@ -64,7 +64,7 @@ export async function injectContentScript(tabId, maxAttempts = 3) {
       await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES });
       const scriptReady = await csListener.promise;
       if (scriptReady) return true;
-    } catch (err) { csListener.cancel(); }
+    } catch { csListener.cancel(); }
     await sleep(500);
   }
   return false;
@@ -90,7 +90,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
     } catch (err) {
       if (i < maxRetries - 1) {
         const csListener = createContentScriptListener(tabId, 2000);
-        try { await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES }); await csListener.promise; } catch (e) { csListener.cancel(); }
+        try { await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES }); await csListener.promise; } catch { csListener.cancel(); }
         await sleep(500 * (i + 1));
       } else { throw err; }
     }
@@ -173,13 +173,13 @@ async function ensureObservabilityListeners(tabId) {
   if (observabilityListenersInstalled.has(tabId)) return;
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Log.enable');
-  } catch (e) { /* may not be supported on this target */ }
+  } catch { /* may not be supported on this target */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Runtime.enable');
-  } catch (e) { /* Runtime domain may not be available */ }
+  } catch { /* Runtime domain may not be available */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
-  } catch (e) { /* Network domain may not be available */ }
+  } catch { /* Network domain may not be available */ }
   observabilityListenersInstalled.add(tabId);
 }
 
@@ -234,9 +234,9 @@ function installObservabilityEventHook() {
         } else if (method === 'Network.loadingFailed') {
           recordNetworkFailure(tabId, params);
         }
-      } catch (e) { /* swallow per-event errors so one bad event can't disable the hook */ }
+      } catch { /* swallow per-event errors so one bad event can't disable the hook */ }
     });
-  } catch (e) { /* chrome.debugger unavailable in some test contexts */ }
+  } catch { /* chrome.debugger unavailable in some test contexts */ }
 }
 
 // Public reads.
@@ -304,7 +304,7 @@ function installDetachListenerOnce() {
         userDetachedTabs.add(source.tabId);
       }
     });
-  } catch (e) { /* in non-extension contexts (tests) chrome.debugger may be absent */ }
+  } catch { /* in non-extension contexts (tests) chrome.debugger may be absent */ }
 }
 
 /**
@@ -315,7 +315,7 @@ export async function detachAllDebuggees() {
   const ids = Array.from(attachedDebuggees);
   attachedDebuggees.clear();
   for (const tabId of ids) {
-    try { await chrome.debugger.detach({ tabId }); } catch (e) { /* may already be gone */ }
+    try { await chrome.debugger.detach({ tabId }); } catch { /* may already be gone */ }
   }
 }
 
@@ -350,7 +350,7 @@ async function ensureDebuggerAttached(tabId) {
         tabId,
         message: 'Debugger re-attached after banner was dismissed. Trusted input is active. Dismiss this banner again to fall back to synthetic events.'
       }).catch(() => {});
-    } catch (e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', e.message); }
+    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', _e.message); }
   }
 }
 
@@ -386,7 +386,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           y: Number(y) || 0,
           description: options.description || ('Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')')
         });
-      } catch (e) { /* content script may not be ready on first frame */ }
+      } catch { /* content script may not be ready on first frame */ }
       // Brief pause so the user sees the cursor arrive + element light up
       // before the click actually fires.
       await sleep(220);
@@ -449,7 +449,7 @@ function cdpKeyParamsFor(key) {
  * @param {object} [options] - reserved for future modifiers support.
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-export async function cdpDispatchKey(tabId, key, options = {}) {
+export async function cdpDispatchKey(tabId, key, _options = {}) {
   const params = cdpKeyParamsFor(key);
   if (!params) return { ok: false, error: 'Unknown key: ' + key };
   try {
@@ -512,7 +512,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
               text,
               position: i + 1
             });
-          } catch (e) { /* non-fatal */ }
+          } catch { /* non-fatal */ }
         }
 
         if (ch === '\n' || ch === '\r') {
@@ -662,7 +662,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         scrollY: Number(vp.scrollY) || 0
       };
     }
-  } catch (e) { /* non-fatal: keep defaults */ }
+  } catch { /* non-fatal: keep defaults */ }
 
   let base64Image = null;
   try {
@@ -673,7 +673,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[tab-manager] ensureObservabilityListeners failed:', e.message); }
     const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: CONFIG.screenshotQuality });
     base64Image = screenshotResult.data;
-  } catch (debuggerErr) {
+  } catch {
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
     attachedDebuggees.delete(tabId);
@@ -686,7 +686,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         });
       });
       base64Image = screenshot_data_url.split(',')[1];
-    } catch (err) {
+    } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
       return null;
     }

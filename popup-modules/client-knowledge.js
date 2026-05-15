@@ -23,6 +23,7 @@ function _safeEsc(s) {
 
 // ---------- State ----------
 let _editingClientId = null;
+// eslint-disable-next-line no-unused-vars
 let _activeClientCache = null;
 
 // ---------- Backend calls ----------
@@ -139,7 +140,7 @@ async function refreshClientList() {
               await refreshClientPicker();
               await refreshClientList();
               await refreshHeaderChip();
-              try { window.showToast && showToast('Client deleted', 'success'); } catch (e) { /* showToast may fail in detached popup */ }
+              try { window.showToast && showToast('Client deleted', 'success'); } catch { /* showToast may fail in detached popup */ }
             } else {
               alert(res.error || 'Delete failed');
             }
@@ -275,7 +276,7 @@ function importClientFromFile() {
       if (res.ok) {
         await refreshClientPicker();
         await refreshClientList();
-        try { window.showToast && showToast('Client imported: ' + res.client.displayName, 'success'); } catch (e) { /* showToast may fail in detached popup */ }
+        try { window.showToast && showToast('Client imported: ' + res.client.displayName, 'success'); } catch { /* showToast may fail in detached popup */ }
       } else {
         alert(res.error || 'Import failed');
       }
@@ -309,7 +310,7 @@ _on('clientAddBtn', 'click', async () => {
     const inp = _get('clientNewNameInput');
     if (!inp) return;
     const name = inp.value.trim();
-    if (!name) { try { window.showToast && showToast('Enter a client name', 'error'); } catch (e) { /* showToast may fail in detached popup */ } return; }
+    if (!name) { try { window.showToast && showToast('Enter a client name', 'error'); } catch { /* showToast may fail in detached popup */ } return; }
     const res = await _send('client_create', { client: { displayName: name } });
     if (res.ok) {
       inp.value = '';
@@ -334,7 +335,7 @@ _on('clientDetailSaveBtn', 'click', async () => {
       _set('clientDetailTitle', 'textContent', name);
       await refreshClientList();
       await refreshHeaderChip();
-      try { window.showToast && showToast('Saved', 'success'); } catch (e) { /* showToast may fail in detached popup */ }
+      try { window.showToast && showToast('Saved', 'success'); } catch { /* showToast may fail in detached popup */ }
     } else {
       alert(res.error || 'Save failed');
     }
@@ -375,14 +376,14 @@ _on('clientEntryAddBtn', 'click', async () => {
     const wisdom = (_get('clientEntryWisdomInput') || {}).value || '';
     const scope = (_get('clientEntryScopeSelect') || {}).value || 'global';
     const urlPattern = (_get('clientEntryUrlPatternInput') || {}).value || '';
-    if (!wisdom.trim()) { try { window.showToast && showToast('Enter what you learned', 'error'); } catch (e) { /* showToast may fail in detached popup */ } return; }
+    if (!wisdom.trim()) { try { window.showToast && showToast('Enter what you learned', 'error'); } catch { /* showToast may fail in detached popup */ } return; }
     const res = await _send('client_entry_add', { clientId: _editingClientId, entry: { wisdom, scope, urlPattern } });
     if (res.ok) {
       _set('clientEntryWisdomInput', 'value', '');
       _set('clientEntryUrlPatternInput', 'value', '');
       await refreshEntriesList(_editingClientId);
       await refreshClientList();
-      try { window.showToast && showToast('Knowledge saved', 'success'); } catch (e) { /* showToast may fail in detached popup */ }
+      try { window.showToast && showToast('Knowledge saved', 'success'); } catch { /* showToast may fail in detached popup */ }
     } else {
       alert(res.error || 'Add failed');
     }

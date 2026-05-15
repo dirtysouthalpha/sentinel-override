@@ -15,7 +15,7 @@ export const consecutiveFailures = {
     return (ctx.consecutiveFailures || 0) >= 3;
   },
 
-  autoApply(ctx) {
+  autoApply(_ctx) {
     // Don't auto-apply at 3 failures — give the LLM one more chance with
     // the directive. If failures keep climbing past 5, the existing stall
     // detector takes over with RESCAN_AND_REPLAN.

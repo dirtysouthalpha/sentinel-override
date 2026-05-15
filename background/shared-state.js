@@ -48,7 +48,7 @@ export function startSwKeepalive(name) {
       } else if (chrome && chrome.runtime && chrome.runtime.getPlatformInfo) {
         chrome.runtime.getPlatformInfo(() => {});
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
   };
   tick();
   const handle = setInterval(tick, 20000);
@@ -65,7 +65,7 @@ export function stopSwKeepalive(name) {
   _keepaliveRefCounts.delete(name);
   const handle = _keepaliveHandles.get(name);
   if (handle) {
-    try { clearInterval(handle); } catch (e) { /* clearInterval is safe to ignore */ }
+    try { clearInterval(handle); } catch { /* clearInterval is safe to ignore */ }
     _keepaliveHandles.delete(name);
   }
   // Clean the session pulse key so it doesn't leak.
@@ -73,7 +73,7 @@ export function stopSwKeepalive(name) {
     if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.remove) {
       chrome.storage.session.remove('_sw_keepalive_' + name).catch(() => {});
     }
-  } catch (e) { /* session storage may not be available */ }
+  } catch { /* session storage may not be available */ }
 }
 
 // (3.11.3) Centralized "fire a desktop notification only if the user enabled
@@ -94,5 +94,5 @@ export async function notifyIfEnabled(idOrOpts, optsIfId) {
     } else {
       await chrome.notifications.create(idOrOpts);
     }
-  } catch (e) { /* notifications permission optional / storage unavailable */ }
+  } catch { /* notifications permission optional / storage unavailable */ }
 }

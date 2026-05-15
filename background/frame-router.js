@@ -57,7 +57,7 @@ export async function enumerateFrames(tabId) {
     if (mainFrame) {
       try {
         mainOrigin = new URL(mainFrame.url).origin;
-      } catch (e) {
+      } catch {
         /* URL parse failed — use raw URL as origin */
         mainOrigin = mainFrame.url;
       }
@@ -67,7 +67,7 @@ export async function enumerateFrames(tabId) {
       let frameOrigin = '';
       try {
         frameOrigin = new URL(f.url).origin;
-      } catch (e) {
+      } catch {
         /* URL parse failed — use raw URL as origin */
         frameOrigin = f.url;
       }
@@ -80,7 +80,7 @@ export async function enumerateFrames(tabId) {
         isCrossOrigin: f.frameId !== 0 && frameOrigin !== mainOrigin
       };
     });
-  } catch (e) {
+  } catch {
     /* getAllFrames failed (tab may have closed) — return empty */
     return [];
   }
@@ -164,9 +164,12 @@ function runCommandInFrame(command) {
 
   const dom = utils.dom;
   const hl = utils.highlight;
-  const shadow = utils.shadow;
-  const wait = utils.wait;
-  const dd = utils.dropdown;
+  // eslint-disable-next-line no-unused-vars
+  const _shadow = utils.shadow;
+  // eslint-disable-next-line no-unused-vars
+  const _wait = utils.wait;
+  // eslint-disable-next-line no-unused-vars
+  const _dd = utils.dropdown;
   const ov = utils.overlay;
   const si = utils.specialInputs;
   const doc = document;

@@ -18,7 +18,7 @@ export const clickNoTarget = {
 
   // Deterministic recovery: re-read the page so the LLM gets fresh element
   // refs/selectors on its next decision. Skips an LLM round-trip entirely.
-  autoApply(ctx) {
+  autoApply(_ctx) {
     return { type: 'read_page', _autoAppliedBy: 'click-no-target' };
   },
 

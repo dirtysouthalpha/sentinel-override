@@ -42,7 +42,7 @@
         tmp.innerHTML = fallbackHtml;
         const firstUserMsg = tmp.querySelector('.message-group .user-msg, .message-group [class*="user"]');
         if (firstUserMsg) return (firstUserMsg.innerText || '').trim().substring(0, 200);
-      } catch (e) { /* DOM may be detached */ }
+      } catch { /* DOM may be detached */ }
     }
     return '(no goal)';
   }
@@ -104,7 +104,7 @@
     try {
       const stored = await chrome.storage.local.get(STORAGE_KEY);
       return Array.isArray(stored[STORAGE_KEY]) ? stored[STORAGE_KEY] : [];
-    } catch (e) {
+    } catch {
       return [];
     }
   }
@@ -134,7 +134,7 @@
         // Save to chat_history so future loads keep it
         try {
           chrome.storage.local.set({ chat_history: state.conversationHistory });
-        } catch (e) { /* storage may fail */ }
+        } catch { /* storage may fail */ }
       }
 
       // Show restored banner at the top
@@ -157,7 +157,6 @@
       const banner = document.createElement('div');
       banner.className = 'restored-banner';
       banner.style.cssText = 'margin: 8px 14px 4px; padding: 8px 12px; background: rgba(120,180,255,0.08); border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; font-size: 11px; color: var(--text-secondary, #aaa); display: flex; align-items: center; justify-content: space-between; gap: 12px;';
-      const ts = new Date(entry.createdAt);
       const ageMin = Math.round((Date.now() - entry.createdAt) / 60000);
       const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? ageMin + ' min ago' : ageMin < 1440 ? Math.round(ageMin / 60) + 'h ago' : Math.round(ageMin / 1440) + 'd ago';
       banner.innerHTML =
@@ -166,7 +165,7 @@
       chatContainer.insertBefore(banner, chatContainer.firstChild);
       const dismissBtn = banner.querySelector('#dismissRestoredBanner');
       if (dismissBtn) dismissBtn.addEventListener('click', () => banner.remove());
-    } catch (e) { /* DOM may be detached */ }
+    } catch { /* DOM may be detached */ }
   }
 
   async function deleteRecentChat(id) {
@@ -175,14 +174,14 @@
       const next = list.filter(c => c && c.id !== id);
       await chrome.storage.local.set({ [STORAGE_KEY]: next });
       return true;
-    } catch (e) { return false; }
+    } catch { return false; }
   }
 
   async function clearAllRecent() {
     try {
       await chrome.storage.local.set({ [STORAGE_KEY]: [] });
       return true;
-    } catch (e) { return false; }
+    } catch { return false; }
   }
 
   // ========== Modal UI ==========
@@ -313,5 +312,5 @@
       clear: clearAllRecent,
       openModal: _openModal
     };
-  } catch (e) { /* module init may fail in detached popup */ }
+  } catch { /* module init may fail in detached popup */ }
 })();

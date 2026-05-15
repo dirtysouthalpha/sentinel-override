@@ -15,7 +15,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return false;
-    } catch (e) { /* non-fatal, assume visible */ }
+    } catch { /* non-fatal, assume visible */ }
     return true;
   };
 
@@ -31,7 +31,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (el.disabled === true) return 'Element is disabled';
       const ariaDisabled = el.getAttribute && el.getAttribute('aria-disabled');
       if (ariaDisabled === 'true') return 'Element is aria-disabled';
-    } catch (e) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
     return null;
   };
 
@@ -146,7 +146,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     try {
       const wr = (typeof WeakRef === 'function') ? new WeakRef(el) : { deref: () => el };
       __sentinelRefLookup.set(refId, wr);
-    } catch (e) {
+    } catch {
       __sentinelRefLookup.set(refId, { deref: () => el });
     }
     return refId;
@@ -157,11 +157,11 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     const wr = __sentinelRefLookup.get(refId);
     if (!wr) return null;
     let el = null;
-    try { el = wr.deref ? wr.deref() : null; } catch (e) { el = null; }
+    try { el = wr.deref ? wr.deref() : null; } catch { el = null; }
     if (!el) return null;
     try {
       if (!el.isConnected) return null;
-    } catch (e) { return null; }
+    } catch { return null; }
     return el;
   };
 

@@ -14,11 +14,11 @@ export const navigateLoop = {
     return typeof ctx.lastResult === 'string' && /^BLOCKED:\s*already navigated to/i.test(ctx.lastResult);
   },
 
-  autoApply(ctx) {
+  autoApply(_ctx) {
     return { type: 'read_page', _autoAppliedBy: 'navigate-loop' };
   },
 
-  promptInjection(ctx) {
+  promptInjection(_ctx) {
     return `You navigated to the same URL twice in a row. The page is already loaded — do NOT navigate to it again. Instead:
 1. Read the page (auto-applied this step) and look at the elements list.
 2. If the page is an SPA, the menu you want may already be clickable in-page (look for nav links, sidebars, tabs).

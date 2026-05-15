@@ -92,7 +92,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         '}';
       // (3.8.1) Append to documentElement so a body wipe doesn't kill us.
       (document.head || document.documentElement).appendChild(style);
-    } catch (e) { /* non-fatal */ }
+    } catch { /* non-fatal */ }
   }
 
   function ensureCursor() {
@@ -131,7 +131,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       const root = document.documentElement || document.body || document;
       const appendNow = () => {
         try { root.appendChild(c); }
-        catch (e) {
+        catch {
           // Fallback: try body
           try { (document.body || document).appendChild(c); } catch (e2) { console.warn('[Sentinel] cursor element append fallback failed:', e2 && e2.message); }
         }
@@ -148,14 +148,14 @@ window.__sentinelUtils = window.__sentinelUtils || {};
 
       installRemovalObserver();
       return c;
-    } catch (e) { return null; }
+    } catch { return null; }
   }
 
   // (3.8.1) Re-create the cursor immediately if a framework prunes it.
   function installRemovalObserver() {
     if (observer) return;
     try {
-      observer = new MutationObserver((mutations) => {
+      observer = new MutationObserver((_mutations) => {
         // Only act if the cursor was actually removed.
         const c = document.getElementById(CURSOR_ID);
         if (c && c.isConnected) return;
@@ -169,7 +169,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       if (target) {
         observer.observe(target, { childList: true, subtree: false });
       }
-    } catch (e) { /* MutationObserver unavailable in some test contexts */ }
+    } catch { /* MutationObserver unavailable in some test contexts */ }
   }
 
   function scheduleAutoHide() {
@@ -215,7 +215,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
           ? options.duration
           : DEFAULT_TRAVEL_MS;
         return new Promise(resolve => setTimeout(resolve, dur));
-      } catch (e) {
+      } catch {
         return Promise.resolve();
       }
     },
@@ -228,7 +228,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const r = el.getBoundingClientRect();
         if (!r || (r.width === 0 && r.height === 0)) return Promise.resolve();
         return this.moveTo(r.left + r.width / 2, r.top + r.height / 2, options);
-      } catch (e) {
+      } catch {
         return Promise.resolve();
       }
     },

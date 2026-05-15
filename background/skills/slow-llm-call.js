@@ -16,7 +16,7 @@ export const slowLlmCall = {
     return typeof ctx.lastAiCallMs === 'number' && ctx.lastAiCallMs >= 25000;
   },
 
-  autoApply(ctx) { return null; },
+  autoApply(_ctx) { return null; },
 
   promptInjection(ctx) {
     const sec = ctx.lastAiCallMs ? Math.round(ctx.lastAiCallMs / 1000) : '?';
