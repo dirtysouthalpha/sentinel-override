@@ -158,6 +158,48 @@ describe('SW keepalive', () => {
     expect(chrome.storage.session.remove).toHaveBeenCalledWith('_sw_keepalive_cleanup-test');
     jest.useRealTimers();
   });
+
+  test('stopSwKeepalive for never-started name is safe', () => {
+    jest.useFakeTimers();
+    expect(() => stopSwKeepalive('never-started')).not.toThrow();
+    // stopSwKeepalive still attempts session.remove for cleanup
+    expect(chrome.storage.session.remove).toHaveBeenCalledWith('_sw_keepalive_never-started');
+    jest.useRealTimers();
+  });
+
+  test('stopSwKeepalive handles session.remove rejection', () => {
+    chrome.storage.session.remove.mockRejectedValueOnce(new Error('session error'));
+    jest.useFakeTimers();
+    startSwKeepalive('remove-fail');
+    expect(() => stopSwKeepalive('remove-fail')).not.toThrow();
+    jest.useRealTimers();
+  });
+
+  test('different keepalive names are independent', () => {
+    jest.useFakeTimers();
+    startSwKeepalive('name-a');
+    startSwKeepalive('name-b');
+    jest.clearAllMocks();
+
+    // Stop name-a — name-b should still be ticking
+    stopSwKeepalive('name-a');
+    jest.advanceTimersByTime(20000);
+    // name-b should still fire (session.set called once for name-b)
+    expect(chrome.storage.session.set).toHaveBeenCalled();
+
+    stopSwKeepalive('name-b');
+    jest.useRealTimers();
+  });
+
+  test('startSwKeepalive with empty string defaults to "default"', () => {
+    jest.useFakeTimers();
+    startSwKeepalive('');
+    expect(chrome.storage.session.set).toHaveBeenCalledWith(
+      expect.objectContaining({ '_sw_keepalive_default': expect.any(Number) })
+    );
+    stopSwKeepalive('');
+    jest.useRealTimers();
+  });
 });
 
 describe('notifyIfEnabled', () => {
@@ -183,5 +225,22 @@ describe('notifyIfEnabled', () => {
     chrome.storage.local.get.mockRejectedValueOnce(new Error('storage error'));
     await expect(notifyIfEnabled({ type: 'basic', title: 'Test', message: 'Hi' })).resolves.toBeUndefined();
     expect(chrome.notifications.create).not.toHaveBeenCalled();
+  });
+
+  test('does not throw when notifications.create rejects', async () => {
+    storageData.sentinelSoundEnabled = true;
+    chrome.notifications.create.mockRejectedValueOnce(new Error('permission denied'));
+    await expect(notifyIfEnabled({ type: 'basic', title: 'Test', message: 'Hi' })).resolves.toBeUndefined();
+  });
+
+  test('does not throw when called with no arguments', async () => {
+    storageData.sentinelSoundEnabled = true;
+    await expect(notifyIfEnabled()).resolves.toBeUndefined();
+  });
+
+  test('does not throw when called with empty options', async () => {
+    storageData.sentinelSoundEnabled = true;
+    await expect(notifyIfEnabled({})).resolves.toBeUndefined();
+    expect(chrome.notifications.create).toHaveBeenCalledWith({});
   });
 });

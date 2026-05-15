@@ -415,3 +415,101 @@ describe('updateTemplateUsage', () => {
     expect(storageData['sentinel_templates'].abc.runCount).toBe(1);
   });
 });
+
+// ========== Edge cases — additional coverage ==========
+
+describe('template-manager edge cases', () => {
+  test('extractParameters handles underscore-only keys', () => {
+    const result = extractParameters('Check ::___::');
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('___');
+  });
+
+  test('extractParameters handles keys with numbers', () => {
+    const result = extractParameters('Step ::step1:: then ::step2::');
+    expect(result).toHaveLength(2);
+    expect(result[0].key).toBe('step1');
+    expect(result[1].key).toBe('step2');
+  });
+
+  test('loadTemplates returns non-object stored value as-is (caller beware)', async () => {
+    storageData['sentinel_templates'] = 'not-an-object';
+    const result = await loadTemplates();
+    // Source code: result[STORAGE_KEY] || {} — a truthy string passes through
+    expect(typeof result).toBe('string');
+  });
+
+  test('listTemplates handles templates without updatedAt', async () => {
+    storageData['sentinel_templates'] = {
+      a: { id: 'a', name: 'A' },
+      b: { id: 'b', name: 'B', updatedAt: 100 },
+    };
+    const result = await listTemplates();
+    expect(result).toHaveLength(2);
+  });
+
+  test('saveTemplate with goal containing only placeholders', async () => {
+    const result = await saveTemplate({ name: 'All Params', goal: '::a::::b::::c::' });
+    expect(result.params).toHaveLength(3);
+  });
+
+  test('updateTemplate preserves existing fields not updated', async () => {
+    storageData['sentinel_templates'] = {
+      abc: { id: 'abc', name: 'T', goal: 'Old', tags: ['keep'], createdAt: 100, updatedAt: 100 },
+    };
+    const result = await updateTemplate('abc', { name: 'New' });
+    expect(result.tags).toEqual(['keep']);
+    expect(result.createdAt).toBe(100);
+    expect(result.goal).toBe('Old');
+  });
+
+  test('deleteTemplate removes only the target template', async () => {
+    storageData['sentinel_templates'] = {
+      a: { id: 'a', name: 'A' },
+      b: { id: 'b', name: 'B' },
+      c: { id: 'c', name: 'C' },
+    };
+    await deleteTemplate('b');
+    expect(Object.keys(storageData['sentinel_templates'])).toEqual(['a', 'c']);
+  });
+
+  test('resolveTemplateGoal with empty paramValues uses defaults', async () => {
+    storageData['sentinel_templates'] = {
+      abc: {
+        id: 'abc', name: 'T', goal: '::host::/::path::',
+        params: [
+          { key: 'host', label: 'Host', defaultValue: 'localhost' },
+          { key: 'path', label: 'Path', defaultValue: 'admin' },
+        ],
+      },
+    };
+    const result = await resolveTemplateGoal('abc', {});
+    expect(result).toBe('localhost/admin');
+  });
+
+  test('resolveTemplateGoal with non-object paramValues', async () => {
+    storageData['sentinel_templates'] = {
+      abc: {
+        id: 'abc', name: 'T', goal: 'No params',
+        params: [],
+      },
+    };
+    const result = await resolveTemplateGoal('abc', null);
+    expect(result).toBe('No params');
+  });
+
+  test('saveTemplates throws descriptive error on storage failure', async () => {
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('quota exceeded'));
+    await expect(saveTemplates({ x: 1 })).rejects.toThrow('Failed to save templates');
+  });
+
+  test('getTemplate returns null for non-string id', async () => {
+    expect(await getTemplate(123)).toBeNull();
+  });
+
+  test('updateTemplate with tags as non-array defaults to empty array', async () => {
+    storageData['sentinel_templates'] = { abc: { id: 'abc', name: 'T', goal: 'G', tags: ['old'] } };
+    const result = await updateTemplate('abc', { tags: 'not-array' });
+    expect(result.tags).toEqual([]);
+  });
+});

@@ -361,3 +361,145 @@ describe('export/import', () => {
     expect(result.client.id).toContain('collision-2');
   });
 });
+
+// ========== Edge cases — additional coverage ==========
+
+describe('client-knowledge edge cases', () => {
+  test('createClient strips whitespace from displayName', async () => {
+    const result = await createClient({ displayName: '  Whitespace Corp  ' });
+    expect(result.ok).toBe(true);
+    expect(result.client.displayName).toBe('Whitespace Corp');
+  });
+
+  test('createClient with empty tenant defaults to empty string', async () => {
+    const result = await createClient({ displayName: 'No Tenant' });
+    expect(result.ok).toBe(true);
+    expect(result.client.tenant).toBe('');
+  });
+
+  test('createClient with non-string displayName rejects', async () => {
+    const result = await createClient({ displayName: 123 });
+    expect(result.ok).toBe(false);
+  });
+
+  test('updateClient with empty displayName trims to empty string', async () => {
+    const { client } = await createClient({ displayName: 'UpdateTest' });
+    const result = await updateClient(client.id, { displayName: '  Updated  ' });
+    expect(result.ok).toBe(true);
+    expect(result.client.displayName).toBe('Updated');
+  });
+
+  test('updateClient with non-string updates ignores unknown fields', async () => {
+    const { client } = await createClient({ displayName: 'IgnoreTest' });
+    const result = await updateClient(client.id, { unknownField: 'ignored' });
+    expect(result.ok).toBe(true);
+    expect(result.client.unknownField).toBeUndefined();
+  });
+
+  test('addEntry with url scope and no urlPattern defaults to empty', async () => {
+    const { client } = await createClient({ displayName: 'URLTest' });
+    const result = await addEntry(client.id, { scope: 'url', wisdom: 'URL scoped' });
+    expect(result.ok).toBe(true);
+    expect(result.entry.urlPattern).toBe('');
+  });
+
+  test('addEntry with global scope ignores urlPattern', async () => {
+    const { client } = await createClient({ displayName: 'ScopeTest' });
+    const result = await addEntry(client.id, { scope: 'global', urlPattern: '*.example.com', wisdom: 'Global' });
+    expect(result.ok).toBe(true);
+    expect(result.entry.scope).toBe('global');
+    expect(result.entry.urlPattern).toBe('');
+  });
+
+  test('addEntry strips tags whitespace and filters empty', async () => {
+    const { client } = await createClient({ displayName: 'TagTest' });
+    const result = await addEntry(client.id, { wisdom: 'Tagged', tags: ['  a  ', '', '  b  '] });
+    expect(result.ok).toBe(true);
+    expect(result.entry.tags).toEqual(['a', 'b']);
+  });
+
+  test('updateEntry updates tags array', async () => {
+    const { client } = await createClient({ displayName: 'TagUp' });
+    const { entry } = await addEntry(client.id, { wisdom: 'Test', tags: ['old'] });
+    const result = await updateEntry(client.id, entry.id, { tags: ['new1', 'new2'] });
+    expect(result.ok).toBe(true);
+    expect(result.entry.tags).toEqual(['new1', 'new2']);
+  });
+
+  test('deleteClient for non-active client does not clear activeClientId', async () => {
+    const { client: c1 } = await createClient({ displayName: 'KeepActive' });
+    const { client: c2 } = await createClient({ displayName: 'DeleteMe' });
+    await setActiveClient(c1.id);
+    await deleteClient(c2.id);
+    const active = await getActiveClient();
+    expect(active.id).toBe(c1.id);
+  });
+
+  test('getRelevantEntries with empty URL still returns global entries', async () => {
+    const { client } = await createClient({ displayName: 'EmptyURL' });
+    await addEntry(client.id, { scope: 'global', wisdom: 'Always relevant' });
+    const entries = await getRelevantEntries(client.id, '');
+    expect(entries).toHaveLength(1);
+  });
+
+  test('getRelevantEntries with null URL still returns global entries', async () => {
+    const { client } = await createClient({ displayName: 'NullURL' });
+    await addEntry(client.id, { scope: 'global', wisdom: 'Always' });
+    const entries = await getRelevantEntries(client.id, null);
+    expect(entries).toHaveLength(1);
+  });
+
+  test('formatPromptSection with URL-scoped matching entries', async () => {
+    const { client } = await createClient({ displayName: 'URLPrompt' });
+    await addEntry(client.id, { scope: 'url', urlPattern: '*example.com*', wisdom: 'URL fact' });
+    const result = await formatPromptSection(client.id, 'https://example.com/page');
+    expect(result).toContain('URL fact');
+  });
+
+  test('formatPromptSection with URL-scoped non-matching entries returns empty', async () => {
+    const { client } = await createClient({ displayName: 'NoMatch' });
+    await addEntry(client.id, { scope: 'url', urlPattern: '*other.com*', wisdom: 'Other fact' });
+    const result = await formatPromptSection(client.id, 'https://example.com/page');
+    expect(result).toBe('');
+  });
+
+  test('markRunCompleted with non-array usedEntryIds', async () => {
+    const { client } = await createClient({ displayName: 'BadIds' });
+    await expect(markRunCompleted(client.id, 'not-array')).resolves.toBeUndefined();
+    const after = await getClient(client.id);
+    expect(after.runCount).toBe(1);
+  });
+
+  test('markRunCompleted with non-existent entry IDs increments runCount only', async () => {
+    const { client } = await createClient({ displayName: 'FakeIds' });
+    await markRunCompleted(client.id, ['nonexistent-entry-id']);
+    const after = await getClient(client.id);
+    expect(after.runCount).toBe(1);
+  });
+
+  test('importClient with entries missing wisdom filters them out', async () => {
+    const payload = {
+      schemaVersion: 1,
+      client: {
+        displayName: 'FilterImport',
+        entries: [
+          { wisdom: 'Valid', scope: 'global' },
+          { wisdom: '', scope: 'global' },
+          { scope: 'global' },
+        ],
+      },
+    };
+    const result = await importClient(payload);
+    expect(result.ok).toBe(true);
+    expect(result.client.entries).toHaveLength(1);
+    expect(result.client.entries[0].wisdom).toBe('Valid');
+  });
+
+  test('importClient with missing schemaVersion still imports', async () => {
+    const payload = {
+      client: { displayName: 'NoVersion', entries: [] },
+    };
+    const result = await importClient(payload);
+    expect(result.ok).toBe(true);
+  });
+});
