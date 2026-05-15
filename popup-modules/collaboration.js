@@ -163,7 +163,8 @@ function showImportPreview(validationResult, warnings) {
   window.__importTemplates = templates;
   window.__importVersion = validationResult.version;
 
-  document.getElementById('import-modal').classList.add('show');
+  const importModal = document.getElementById('import-modal');
+  if (importModal) importModal.classList.add('show');
 }
 
 function showImportErrors(result) {
@@ -197,7 +198,8 @@ async function executeImport() {
     }
 
     const result = response.data;
-    document.getElementById('import-modal').classList.remove('show');
+    const importModal = document.getElementById('import-modal');
+    if (importModal) importModal.classList.remove('show');
     window.__importTemplates = null;
 
     const parts = [];

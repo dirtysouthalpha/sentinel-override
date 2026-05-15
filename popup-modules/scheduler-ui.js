@@ -270,35 +270,43 @@ function populateTemplateDropdown() {
 // ========== Form Field Toggling ==========
 
 // Source type: template vs goal
-document.getElementById('sch-source-type').addEventListener('change', (e) => {
+document.getElementById('sch-source-type')?.addEventListener('change', (e) => {
   const isTemplate = e.target.value === 'template';
-  document.getElementById('sch-template-field').style.display = isTemplate ? '' : 'none';
-  document.getElementById('sch-goal-field').style.display = isTemplate ? 'none' : '';
+  const tf = document.getElementById('sch-template-field');
+  const gf = document.getElementById('sch-goal-field');
+  if (tf) tf.style.display = isTemplate ? '' : 'none';
+  if (gf) gf.style.display = isTemplate ? 'none' : '';
 });
 
 // Schedule type: once vs recurring
-document.getElementById('sch-type').addEventListener('change', (e) => {
+document.getElementById('sch-type')?.addEventListener('change', (e) => {
   const isOnce = e.target.value === 'once';
-  document.getElementById('sch-once-fields').style.display = isOnce ? '' : 'none';
-  document.getElementById('sch-recurring-fields').style.display = isOnce ? 'none' : '';
+  const onceFields = document.getElementById('sch-once-fields');
+  const recFields = document.getElementById('sch-recurring-fields');
+  if (onceFields) onceFields.style.display = isOnce ? '' : 'none';
+  if (recFields) recFields.style.display = isOnce ? 'none' : '';
 
-  // Reset interval sub-fields
   if (!isOnce) {
-    document.getElementById('sch-weekly-days').style.display = 'none';
-    document.getElementById('sch-custom-interval').style.display = 'none';
-    document.getElementById('sch-interval').value = 'daily';
+    const weeklyDays = document.getElementById('sch-weekly-days');
+    const customInterval = document.getElementById('sch-custom-interval');
+    const intervalEl = document.getElementById('sch-interval');
+    if (weeklyDays) weeklyDays.style.display = 'none';
+    if (customInterval) customInterval.style.display = 'none';
+    if (intervalEl) intervalEl.value = 'daily';
   }
 });
 
 // Interval: daily vs weekly vs custom
-document.getElementById('sch-interval').addEventListener('change', (e) => {
+document.getElementById('sch-interval')?.addEventListener('change', (e) => {
   const interval = e.target.value;
-  document.getElementById('sch-weekly-days').style.display = interval === 'weekly' ? '' : 'none';
-  document.getElementById('sch-custom-interval').style.display = interval === 'custom' ? '' : 'none';
+  const weeklyDays = document.getElementById('sch-weekly-days');
+  const customInterval = document.getElementById('sch-custom-interval');
+  if (weeklyDays) weeklyDays.style.display = interval === 'weekly' ? '' : 'none';
+  if (customInterval) customInterval.style.display = interval === 'custom' ? '' : 'none';
 });
 
 // Template selection: load params
-document.getElementById('sch-template-id').addEventListener('change', (e) => {
+document.getElementById('sch-template-id')?.addEventListener('change', (e) => {
   const templateId = e.target.value;
   const container = document.getElementById('sch-template-params');
 
