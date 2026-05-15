@@ -433,8 +433,12 @@ Goal: "Check the SonicWall firewall for blocked connections"
       // Fallback: try extractFirstJsonObject for models that wrap the plan
       const firstObj = extractFirstJsonObject(content);
       if (firstObj) {
-        const parsed = JSON.parse(firstObj);
-        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+        try {
+          const parsed = JSON.parse(firstObj);
+          if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+        } catch (innerE) {
+          console.warn('Plan generation: inner JSON.parse failed:', innerE.message);
+        }
       }
       console.warn('Plan generation: could not parse response as plan JSON:', e.message, 'Content:', content.slice(0, 200));
     }

@@ -41,6 +41,7 @@ let _saveStatsTimer = null;
 (function loadAdaptiveState() {
   try {
     chrome.storage.local.get([STATS_KEY, ADAPT_ENABLED_KEY], (r) => {
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/skills] storage load error:', chrome.runtime.lastError.message); return; }
       if (r && r[STATS_KEY] && typeof r[STATS_KEY] === 'object') _stats = r[STATS_KEY];
       if (r && r[ADAPT_ENABLED_KEY] === false) _adaptEnabled = false;
     });

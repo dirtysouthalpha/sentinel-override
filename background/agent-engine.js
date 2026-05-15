@@ -2276,13 +2276,17 @@ async function runAgentLoop(goal, workingTabId) {
             if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
               sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
               sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
-              await chrome.tabs.update(tab, { url: goalUrl });
-              await waitForPageLoad(tab);
-              await sleep(1500);
-              const reinjected = await injectContentScript(tab);
-              if (reinjected) {
-                historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
-                await persistHistory();
+              try {
+                await chrome.tabs.update(tab, { url: goalUrl });
+                await waitForPageLoad(tab);
+                await sleep(1500);
+                const reinjected = await injectContentScript(tab);
+                if (reinjected) {
+                  historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
+                  await persistHistory();
+                }
+              } catch (navErr) {
+                console.warn('[Sentinel] Goal-URL navigation failed:', navErr && navErr.message);
               }
               continue;
             }
@@ -3656,7 +3660,14 @@ async function runAgentLoop(goal, workingTabId) {
           // below so operators can see latency + landing-URL mismatches.
           try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.warn('[Sentinel] navigate-start tel failed:', e && e.message); }
           const _navStart = Date.now();
-          await chrome.tabs.update(tab, { url: command.url });
+          try {
+            await chrome.tabs.update(tab, { url: command.url });
+          } catch (navErr) {
+            try { tel.warn('page', 'Navigate tabs.update failed', { stepCount, url: command.url, error: navErr && navErr.message }); } catch { /* noop */ }
+            result = 'Navigation failed: ' + (navErr && navErr.message);
+            actionFailed = true;
+            break;
+          }
           await waitForPageLoad(tab);
           await sleep(1500);
           // Re-inject content script on the new page
@@ -3983,10 +3994,12 @@ async function runAgentLoop(goal, workingTabId) {
               result = 'Clicked -> new tab opened: ' + (newUrl ? new URL(newUrl).hostname : 'new page');
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
-              chrome.tabs.remove(newTabs.map(t => t.id));
+              try { await chrome.tabs.remove(newTabs.map(t => t.id)); } catch { /* tabs may already be closed */ }
+              try {
               await chrome.tabs.update(tab, { url: newUrl });
               await waitForPageLoad(tab);
               await sleep(500);
+              } catch { /* tab may have been closed */ }
               result = 'Clicked -> navigated to ' + (newUrl ? new URL(newUrl).hostname : 'new page');
             }
           } else {

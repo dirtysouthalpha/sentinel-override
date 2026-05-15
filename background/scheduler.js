@@ -46,8 +46,13 @@ function _fireAgentCompleteCallbacks() {
  * @returns {Promise<Object<string, object>>}
  */
 async function loadSchedules() {
-  const result = await chrome.storage.local.get([SCHEDULES_KEY]);
-  return result[SCHEDULES_KEY] || {};
+  try {
+    const result = await chrome.storage.local.get([SCHEDULES_KEY]);
+    return result[SCHEDULES_KEY] || {};
+  } catch (e) {
+    console.warn('[Sentinel/scheduler] loadSchedules failed:', e && e.message);
+    return {};
+  }
 }
 
 /**
@@ -55,7 +60,11 @@ async function loadSchedules() {
  * @param {Object<string, object>} schedules
  */
 async function saveSchedules(schedules) {
-  await chrome.storage.local.set({ [SCHEDULES_KEY]: schedules });
+  try {
+    await chrome.storage.local.set({ [SCHEDULES_KEY]: schedules });
+  } catch (e) {
+    console.warn('[Sentinel/scheduler] saveSchedules failed:', e && e.message);
+  }
 }
 
 /**
@@ -63,8 +72,13 @@ async function saveSchedules(schedules) {
  * @returns {Promise<Object<string, object>>}
  */
 async function loadResults() {
-  const result = await chrome.storage.local.get([RESULTS_KEY]);
-  return result[RESULTS_KEY] || {};
+  try {
+    const result = await chrome.storage.local.get([RESULTS_KEY]);
+    return result[RESULTS_KEY] || {};
+  } catch (e) {
+    console.warn('[Sentinel/scheduler] loadResults failed:', e && e.message);
+    return {};
+  }
 }
 
 /**
@@ -72,7 +86,11 @@ async function loadResults() {
  * @param {Object<string, object>} results
  */
 async function saveResults(results) {
-  await chrome.storage.local.set({ [RESULTS_KEY]: results });
+  try {
+    await chrome.storage.local.set({ [RESULTS_KEY]: results });
+  } catch (e) {
+    console.warn('[Sentinel/scheduler] saveResults failed:', e && e.message);
+  }
 }
 
 // ========== Alarm Management ==========

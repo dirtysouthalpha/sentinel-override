@@ -301,7 +301,13 @@ export function detectProviderFromEndpoint(endpoint) {
  * @returns {Promise<object>} Provider config with id, endpoint, apiKey, model, etc.
  */
 export async function getActiveProvider() {
-  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (e) {
+    console.warn('[Sentinel/provider] storage read failed, using defaults:', e && e.message);
+    stored = {};
+  }
 
   // If new provider structure exists, use it
   if (stored.active_provider && stored.providers && stored.providers[stored.active_provider]) {
@@ -344,7 +350,13 @@ export async function getActiveProvider() {
  * This is idempotent: if the new structure already exists, it does nothing.
  */
 export async function migrateLegacySettings() {
-  const stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (e) {
+    console.warn('[Sentinel/provider] migration storage read failed:', e && e.message);
+    return;
+  }
   if (stored.providers) return; // already migrated
 
   const endpoint = stored.api_endpoint || '';
@@ -352,6 +364,7 @@ export async function migrateLegacySettings() {
   const model = stored.model || '';
   const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic' : 'openai';
 
+  try {
   await chrome.storage.local.set({
     active_provider: providerId,
     providers: {
@@ -375,6 +388,9 @@ export async function migrateLegacySettings() {
   // CRITICAL: Remove old keys so stale values cannot cause confusion
   // callLLM() and other readers now use getActiveProvider() which reads the new structure
   await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
+  } catch (e) {
+    console.warn('[Sentinel/provider] migration storage write failed:', e && e.message);
+  }
 }
 
 // ========== Provider Catalog (3.10.0) ==========

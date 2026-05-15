@@ -567,7 +567,13 @@ if (downloadAuditLogBtn) {
 settingsBtn.addEventListener('click', async () => {
   const state = getState();
   // Load provider settings from storage
-  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (e) {
+    console.warn('[Sentinel/settings] storage read failed:', e && e.message);
+    stored = {};
+  }
 
   if (stored.providers) {
     state.providerConfigs = stored.providers;
