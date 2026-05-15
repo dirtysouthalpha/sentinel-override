@@ -58,6 +58,7 @@ export async function enumerateFrames(tabId) {
       try {
         mainOrigin = new URL(mainFrame.url).origin;
       } catch (e) {
+        /* URL parse failed — use raw URL as origin */
         mainOrigin = mainFrame.url;
       }
     }
@@ -67,6 +68,7 @@ export async function enumerateFrames(tabId) {
       try {
         frameOrigin = new URL(f.url).origin;
       } catch (e) {
+        /* URL parse failed — use raw URL as origin */
         frameOrigin = f.url;
       }
 
@@ -79,6 +81,7 @@ export async function enumerateFrames(tabId) {
       };
     });
   } catch (e) {
+    /* getAllFrames failed (tab may have closed) — return empty */
     return [];
   }
 }

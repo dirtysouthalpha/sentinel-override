@@ -28,8 +28,8 @@ export async function appendAuditEntry(runId, entry) {
       outcome: String(entry.outcome || '').slice(0, 200),
     });
     if (log.length > MAX_ENTRIES_PER_RUN) log.splice(0, log.length - MAX_ENTRIES_PER_RUN);
-    await chrome.storage.local.set({ [key]: log }).catch(() => {});
-  } catch (e) {}
+    await chrome.storage.local.set({ [key]: log }).catch(() => { /* storage write failed — fire-and-forget */ });
+  } catch (e) { /* audit log append failed — never block the agent loop */ }
 }
 
 /**
@@ -43,6 +43,7 @@ export async function getAuditLog(runId) {
     const stored = await chrome.storage.local.get(key).catch(() => ({}));
     return Array.isArray(stored[key]) ? stored[key] : [];
   } catch (e) {
+    /* storage read failed — return empty log rather than crashing */
     return [];
   }
 }
@@ -68,6 +69,6 @@ export async function clearAuditLog(runId) {
   if (!runId) return;
   try {
     const key = STORAGE_KEY_PREFIX + String(runId).replace(/[^a-z0-9_-]/gi, '_');
-    await chrome.storage.local.remove(key).catch(() => {});
-  } catch (e) {}
+    await chrome.storage.local.remove(key).catch(() => { /* remove failed — non-fatal */ });
+  } catch (e) { /* clear audit log failed — non-fatal */ }
 }
