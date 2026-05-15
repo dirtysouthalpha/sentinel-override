@@ -21,6 +21,112 @@ export async function waitForPageLoad(tabId) {
   });
 }
 
+// ========== Dynamic Page-Ready Detection (replaces fixed 1500ms sleep) ==========
+// After waitForPageLoad resolves (tab status === 'complete'), the DOM may still
+// be rendering (SPAs, lazy-loaded content, loading spinners). This function polls
+// for actual content readiness using a combination of:
+//   1. DOM readiness via content script (readyState, body content, spinner check)
+//   2. Network idle detection via CDP (in-flight requests drop to 0 for 500ms)
+// Caps total wait at pageLoadTimeout to prevent infinite hangs.
+
+/**
+ * Count in-flight network requests for a tab using CDP Network domain.
+ * Returns the number of requests that have started but not yet completed or failed.
+ */
+function getInFlightRequestCount(tabId) {
+  const buf = networkBuffers.get(tabId);
+  if (!buf) return 0;
+  let count = 0;
+  for (const entry of buf.values()) {
+    // endTs === 0 means the request started but hasn't received a response or failure yet
+    if (entry.endTs === 0 && (Date.now() - entry.startTs) < pageLoadConfig.pageLoadTimeout) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Wait for a page to be truly ready after navigation. Combines DOM-ready polling
+ * with network-idle detection. Falls back to a fixed sleep if the content script
+ * isn't available.
+ *
+ * @param {number} tabId - The tab to check
+ * @param {number} [maxWaitMs=5000] - Maximum time to wait (capped by pageLoadTimeout)
+ * @returns {Promise<void>}
+ */
+export async function waitForPageReady(tabId, maxWaitMs = 5000) {
+  const cap = Math.min(maxWaitMs, pageLoadConfig.pageLoadTimeout);
+  const startTime = Date.now();
+  const pollInterval = 200; // poll every 200ms
+  const networkIdleMs = 500; // network must be idle for 500ms to count
+
+  let networkIdleSince = null; // timestamp when in-flight requests first hit 0
+
+  while (Date.now() - startTime < cap) {
+    // 1. Check DOM readiness via content script
+    let domReady = false;
+    try {
+      const result = await chrome.tabs.sendMessage(tabId, {
+        action: 'execute_command',
+        command: {
+          type: 'execute_js',
+          code: `(() => {
+            const rs = document.readyState;
+            const bodyLen = (document.body && document.body.innerText) ? document.body.innerText.length : 0;
+            const hasSpinner = !!document.querySelector('[class*="spinner"], [class*="loading"], [class*="loader"], [role="progressbar"]');
+            return JSON.stringify({ readyState: rs, bodyLen: bodyLen, hasSpinner: hasSpinner });
+          })()`
+        }
+      }).catch(() => null);
+      if (result) {
+        // Unwrap the content script envelope
+        let data = result;
+        if (typeof data === 'string') {
+          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (e) {}
+        }
+        if (data && typeof data === 'object') {
+          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data;
+          if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
+            domReady = true;
+          }
+        } else if (typeof data === 'string') {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
+              domReady = true;
+            }
+          } catch (e) {}
+        }
+      }
+    } catch (e) {
+      // Content script not yet injected — this is normal during page load
+    }
+
+    // 2. Check network idle
+    const inFlight = getInFlightRequestCount(tabId);
+    if (inFlight === 0) {
+      if (!networkIdleSince) networkIdleSince = Date.now();
+    } else {
+      networkIdleSince = null;
+    }
+    const networkIdle = networkIdleSince && (Date.now() - networkIdleSince >= networkIdleMs);
+
+    // 3. Both DOM ready and network idle → page is truly ready
+    if (domReady && networkIdle) return;
+
+    // 4. If DOM is ready and we've been waiting for network idle for a while,
+    //    don't block forever — proceed if we've waited at least 1s total
+    if (domReady && Date.now() - startTime >= 1000) return;
+
+    // 5. If no content script is available and we've waited 2s, proceed
+    if (Date.now() - startTime >= 2000 && !domReady) return;
+
+    await sleep(pollInterval);
+  }
+  // Timeout — proceed anyway (same behavior as the old fixed 1500ms sleep)
+}
+
 // ========== Content Script Injection ==========
 export function createContentScriptListener(tabId, timeout = 3000) {
   let timer, listener, resolved = false;
