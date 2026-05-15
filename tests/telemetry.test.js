@@ -8,20 +8,22 @@ const listeners = {};
 globalThis.chrome = {
   storage: {
     local: {
-      get: jest.fn(async (keys) => {
+      get: jest.fn(async (keys, callback) => {
+        let result;
         if (typeof keys === 'string') {
-          return { [keys]: storageData[keys] };
-        }
-        if (Array.isArray(keys)) {
-          const result = {};
+          result = { [keys]: storageData[keys] };
+        } else if (Array.isArray(keys)) {
+          result = {};
           for (const k of keys) result[k] = storageData[k];
-          return result;
+        } else {
+          // Object with defaults
+          result = {};
+          for (const k of Object.keys(keys)) {
+            result[k] = storageData[k] !== undefined ? storageData[k] : keys[k];
+          }
         }
-        // Object with defaults
-        const result = {};
-        for (const k of Object.keys(keys)) {
-          result[k] = storageData[k] !== undefined ? storageData[k] : keys[k];
-        }
+        // Support callback-style API used by the loadLevel IIFE
+        if (typeof callback === 'function') callback(result);
         return result;
       }),
       set: jest.fn(async (obj) => Object.assign(storageData, obj)),
@@ -52,6 +54,16 @@ const {
   loadPersistedRun,
   deletePersistedRun,
 } = await import('../background/telemetry.js');
+
+// Capture the loadLevel IIFE's init callback before clearAllMocks wipes the call history.
+// The IIFE called chrome.storage.local.get(['telemetryLevel', ...], <callback>) at module load.
+const _initGetCalls = globalThis.chrome.storage.local.get.mock.calls.slice();
+const _initGetCallback = _initGetCalls.find(c =>
+  Array.isArray(c[0]) &&
+  c[0].includes('telemetryLevel') &&
+  c[0].includes('telemetryPersist') &&
+  c[0].includes('telemetryRedact')
+)?.[1] || null;
 
 beforeEach(() => {
   storageData = {};
@@ -520,5 +532,235 @@ describe('additional redaction patterns', () => {
     expect(event.payload.count).toBe(42);
     expect(event.payload.ref).toBeNull();
     expect(event.payload.flag).toBe(true);
+  });
+});
+
+// ========== Coverage: line 146 — _redactValue fallback for unknown types ==========
+
+describe('redaction of unknown payload types', () => {
+  test('passes through function values in payload (line 146 fallback)', () => {
+    const fn = () => 'test';
+    emit('test', 'info', 'Function payload', { callback: fn });
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    // Functions fall through to the final `return value` at line 146
+    expect(event.payload.callback).toBe(fn);
+  });
+
+  test('passes through Symbol values in payload (line 146 fallback)', () => {
+    const sym = Symbol('test');
+    emit('test', 'info', 'Symbol payload', { key: sym });
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    expect(event.payload.key).toBe(sym);
+  });
+
+  test('passes through undefined values in payload (line 146 fallback)', () => {
+    emit('test', 'info', 'Undefined payload', { missing: undefined });
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    expect(event.payload.missing).toBeUndefined();
+  });
+});
+
+// ========== Coverage: line 163 — _redactEvent catch fallback ==========
+
+describe('redaction error fallback', () => {
+  test('returns unredacted event when _redactString throws', () => {
+    // To trigger the catch in _redactEvent, we need the message to be a type
+    // that causes _redactString to throw. We use an object with a toString
+    // that throws, passed via a crafted payload that hits _redactString.
+    // Since emit() calls String(message), we need to get creative.
+    // The _redactEvent function wraps in try/catch — if any redaction throws,
+    // the original event is returned.
+    // We'll test this by making a property getter throw during spread.
+    const throwingPayload = {};
+    Object.defineProperty(throwingPayload, 'password', {
+      get() { throw new Error('redaction explosion'); },
+      enumerable: true,
+    });
+    // emit calls _redactEvent on the rawEvent which spreads the payload.
+    // The spread {...event} in _redactEvent would trigger the getter.
+    // But actually _redactEvent constructs from rawEvent first, then calls
+    // _redactValue on event.payload. Let's use a Proxy approach.
+    const evilObj = new Proxy({ password: 'secret' }, {
+      get(target, prop) {
+        if (prop === 'password') throw new Error('getter boom');
+        return target[prop];
+      },
+      ownKeys() { return ['password']; },
+      getOwnPropertyDescriptor() { return { enumerable: true, configurable: true }; },
+    });
+    emit('test', 'info', 'Trigger redact crash', evilObj);
+    // The event should still be emitted (fail-open on redaction error)
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    expect(event.action).toBe('telemetry_event');
+  });
+});
+
+// ========== Coverage: lines 221, 247, 269, 278, 286, 297 — storage error catches ==========
+
+describe('storage error paths', () => {
+  test('listPersistedRuns returns [] when storage.get throws (line 278)', async () => {
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
+    const runs = await listPersistedRuns();
+    expect(runs).toEqual([]);
+    globalThis.chrome.storage.local.get = origGet;
+  });
+
+  test('loadPersistedRun returns [] when storage.get throws (line 286)', async () => {
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
+    const events = await loadPersistedRun('some-run');
+    expect(events).toEqual([]);
+    globalThis.chrome.storage.local.get = origGet;
+  });
+
+  test('deletePersistedRun catches storage error (line 297)', async () => {
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
+    // Should not throw — error is caught internally
+    await expect(deletePersistedRun('some-run')).resolves.toBeUndefined();
+    globalThis.chrome.storage.local.get = origGet;
+  });
+
+  test('startRun catches storage error (line 247)', async () => {
+    listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
+    // Should not throw — error is caught internally
+    await expect(startRun('run-err', 'Error test')).resolves.toBeUndefined();
+    globalThis.chrome.storage.local.get = origGet;
+  });
+
+  test('endRun catches storage error (line 269)', async () => {
+    listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
+    // Start a run normally first so we have a currentRunId
+    await startRun('run-end-err', 'End error test');
+    jest.clearAllMocks();
+
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
+    // Should not throw — error is caught internally
+    await expect(endRun('run-end-err')).resolves.toBeUndefined();
+    globalThis.chrome.storage.local.get = origGet;
+  });
+
+  test('_flushRunBuffer catches error and logs warning (line 221)', async () => {
+    listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
+    // Start a run and emit to buffer some events
+    await startRun('run-flush-err', 'Flush error test');
+    emit('test', 'info', 'Buffer this for flush error', {});
+
+    const origGet = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('flush boom'); });
+
+    // Force a flush by ending the run — endRun calls _flushRunBuffer
+    // But endRun also catches. Let's test flush directly by emitting 200+ events
+    // to trigger the inline flush path (line 345).
+    // Actually, let's just end the run and verify it doesn't throw.
+    await expect(endRun('run-flush-err')).resolves.toBeUndefined();
+    globalThis.chrome.storage.local.get = origGet;
+  });
+});
+
+// ========== Coverage: line 345 — inline flush when buffer >= 200 ==========
+
+describe('inline flush on buffer threshold', () => {
+  test('triggers inline flush when 200 events accumulate (line 345)', async () => {
+    listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
+    await startRun('run-buf200', 'Buffer 200 test');
+
+    // Emit 201 events to cross the 200 threshold and trigger the inline flush
+    for (let i = 0; i < 201; i++) {
+      emit('test', 'info', 'Event ' + i, {});
+    }
+
+    // The inline flush (_flushRunBuffer) is async — give it a tick to resolve
+    await new Promise(r => setTimeout(r, 50));
+
+    // The storage.local.set should have been called by the inline flush
+    // (startRun also calls set, so we just verify it was called at all)
+    expect(globalThis.chrome.storage.local.set).toHaveBeenCalled();
+
+    // Clean up
+    await endRun('run-buf200');
+  });
+});
+
+// ========== Coverage: line 202 — interval flush timer fires ==========
+
+describe('periodic flush timer', () => {
+  test('flush timer fires and flushes buffered events (line 202)', async () => {
+    listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
+    await startRun('run-timer', 'Timer flush test');
+
+    // Emit an event to buffer it and set _pendingPersistFlush = true
+    jest.clearAllMocks();
+    emit('test', 'info', 'Timer buffered event', { idx: 1 });
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
+
+    // The interval timer was set by startRun. Wait enough for the 5000ms interval
+    // to fire (we wait 5500ms to be safe). This exercises the setInterval callback
+    // at line 202: `if (_pendingPersistFlush) _flushRunBuffer().catch(() => {})`
+    await new Promise(r => setTimeout(r, 5500));
+
+    // The flush should have written to storage
+    expect(globalThis.chrome.storage.local.set).toHaveBeenCalled();
+
+    // Clean up
+    await endRun('run-timer');
+  }, 10000); // 10s timeout since we wait for the flush interval
+});
+
+// ========== Coverage: lines 170-174 — loadLevel IIFE callback ==========
+
+describe('loadLevel initialization', () => {
+  test('init callback was captured at module load (lines 170-174)', async () => {
+    // The callback was captured before clearAllMocks wiped mock history
+    expect(typeof _initGetCallback).toBe('function');
+  });
+
+  test('chrome.runtime.lastError check skips assignment (line 170)', async () => {
+    // Reset level to known state first
+    listeners.storageChanged({ telemetryLevel: { newValue: 'normal' } }, 'local');
+    const levelBefore = getLevel();
+    expect(levelBefore).toBe('normal');
+
+    // Set lastError before calling the IIFE's callback directly
+    Object.defineProperty(chrome.runtime, 'lastError', {
+      value: { message: 'Storage error' },
+      writable: true,
+      configurable: true,
+    });
+
+    // Call the init callback with lastError set — it should skip assignments
+    _initGetCallback({ telemetryLevel: 'debug', telemetryPersist: true, telemetryRedact: false });
+    // Level should NOT have changed to 'debug' because lastError was set
+    expect(getLevel()).toBe('normal');
+
+    // Restore
+    Object.defineProperty(chrome.runtime, 'lastError', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  test('init callback sets level from storage (lines 171-174)', async () => {
+    // Ensure no lastError
+    Object.defineProperty(chrome.runtime, 'lastError', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    // Call the init callback with debug level
+    _initGetCallback({ telemetryLevel: 'debug', telemetryPersist: true, telemetryRedact: false });
+    expect(getLevel()).toBe('debug');
+
+    // Reset to normal via storage change
+    listeners.storageChanged({ telemetryLevel: { newValue: 'normal' } }, 'local');
+    listeners.storageChanged({ telemetryPersist: { newValue: false } }, 'local');
+    listeners.storageChanged({ telemetryRedact: { newValue: true } }, 'local');
   });
 });

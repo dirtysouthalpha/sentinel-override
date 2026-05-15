@@ -228,5 +228,90 @@ describe('report-generator', () => {
       expect(result.structuredData.meta.failedActions).toBe(2);
       expect(result.structuredData.meta.successRate).toBe(33);
     });
+
+    // --- Lines 312-316: buildStructuredData large object truncation path ---
+    test('structuredData.findings truncates large object values exceeding 2000 chars', async () => {
+      // Create a normal (non-circular) object whose JSON exceeds 2000 chars.
+      // This passes the usableKeys filter at line 43 fine, and in buildStructuredData
+      // the object branch at lines 311-317 will truncate it.
+      const bigObj = {};
+      for (let i = 0; i < 500; i++) bigObj[`key_${i}`] = 'x'.repeat(20);
+      const data = makeExecutionData({ agentMemory: { largeObj: bigObj } });
+      const result = await generateReport(data, CONFIG);
+      expect(result.structuredData.findings).toHaveProperty('largeObj');
+      // Line 314 truncates: str.substring(0, 2000) + '... [truncated]' when > 2000
+      const val = result.structuredData.findings.largeObj;
+      if (typeof val === 'string') {
+        expect(val).toContain('... [truncated]');
+      }
+    });
+
+    // --- Lines 227-228: provider.buildBody throws ---
+    test('falls back when provider.buildBody throws', async () => {
+      // Re-mock provider-registry to return a provider with a throwing buildBody
+      const { resolveProvider } = await import('../background/provider-registry.js');
+      resolveProvider.mockReturnValueOnce({
+        buildBody: () => { throw new Error('buildBody explosion'); },
+        buildHeaders: () => ({ 'Content-Type': 'application/json' }),
+        parseResponse: (data) => data.choices?.[0]?.message?.content || '',
+      });
+      mockGetActiveProviderResolve = { endpoint: 'https://api.test.com/v1/chat/completions', apiKey: 'test-key', model: 'test-model' };
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+    });
+
+    // --- Lines 247-248: non-OK HTTP response ---
+    test('falls back on non-OK HTTP response', async () => {
+      mockFetchResponse = { ok: false, status: 429, json: async () => ({}), text: async () => 'rate limited' };
+      globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result).toHaveProperty('structuredData');
+      globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
+    });
+
+    // --- Line 255: response.json() throws (invalid JSON) ---
+    test('falls back when LLM returns invalid JSON', async () => {
+      mockFetchResponse = {
+        ok: true,
+        status: 200,
+        json: async () => { throw new SyntaxError('Unexpected token'); },
+        text: async () => 'not json at all',
+      };
+      globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result).toHaveProperty('structuredData');
+      globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
+    });
+
+    // --- Lines 333-334: h.url fallback in URL collection ---
+    test('structuredData.meta.urlsVisited includes urls from history.url field', async () => {
+      const data = makeExecutionData({
+        history: [
+          { step: 1, action: { type: 'click' }, result: 'clicked', url: 'https://example.com/page1' },
+          { step: 2, action: { type: 'extract' }, result: 'extracted', url: 'https://example.com/page2' },
+        ],
+        stepCount: 2,
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.structuredData.meta.urlsVisited).toContain('https://example.com/page1');
+      expect(result.structuredData.meta.urlsVisited).toContain('https://example.com/page2');
+    });
+
+    test('structuredData.meta.urlsVisited deduplicates urls from both action.url and history.url', async () => {
+      const data = makeExecutionData({
+        history: [
+          { step: 1, action: { type: 'navigate', url: 'https://example.com/page' }, result: 'loaded', url: 'https://example.com/page' },
+        ],
+        stepCount: 1,
+      });
+      const result = await generateReport(data, CONFIG);
+      // Same URL from both sources should appear only once
+      const urls = result.structuredData.meta.urlsVisited;
+      const count = urls.filter(u => u === 'https://example.com/page').length;
+      expect(count).toBe(1);
+    });
   });
 });

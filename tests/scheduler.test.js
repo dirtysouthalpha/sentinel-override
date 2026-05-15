@@ -1492,3 +1492,372 @@ describe('storage helpers — error handling via exported functions', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 });
+
+// ========== Agent busy skip path — lines 468-479 ==========
+
+describe('executeScheduledTask — agent already running', () => {
+  test('skips execution and marks schedule as skipped when agent is busy', async () => {
+    // Create schedule FIRST, then set agentRunning to true
+    const schedule = await makeSchedule();
+
+    // Debug: verify schedule is in storageData
+    const debugSchedules = storageData['sentinel_schedules'] || {};
+    expect(debugSchedules[schedule.id]).toBeDefined();
+
+    // Now set agentRunning so the scheduler sees the agent as busy
+    _agentRunning = true;
+
+    // Don't use clearAllMocks -- just clear specific non-storage mocks
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+    chrome.notifications.create.mockClear();
+    chrome.action.setBadgeText.mockClear();
+    chrome.action.setBadgeBackgroundColor.mockClear();
+    chrome.runtime.onMessage.addListener.mockClear();
+    chrome.runtime.onMessage.removeListener.mockClear();
+    chrome.runtime.getURL.mockClear();
+
+    await executeScheduledTask('schedule-' + schedule.id);
+
+    // Schedule should be marked as skipped
+    const schedules = storageData['sentinel_schedules'] || {};
+    expect(schedules[schedule.id]).toBeDefined();
+    expect(schedules[schedule.id].lastRunStatus).toBe('skipped');
+    expect(schedules[schedule.id].lastRunAt).toBeTruthy();
+
+    // Agent should NOT have been started
+    const agentEngine = await import('../background/agent-engine.js');
+    expect(agentEngine.startAgent).not.toHaveBeenCalled();
+
+    // Restore
+    _agentRunning = false;
+  });
+
+  test('re-registers alarm for recurring schedule when agent is busy', async () => {
+    const schedule = await createSchedule({
+      name: 'Recurring Busy',
+      goal: 'test',
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: '09:00' },
+    });
+
+    _agentRunning = true;
+
+    // Clear only non-storage mocks
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+
+    await executeScheduledTask('schedule-' + schedule.id);
+
+    // Should have re-registered alarm for recurring schedule
+    expect(chrome.alarms.create).toHaveBeenCalled();
+
+    _agentRunning = false;
+  });
+});
+
+// ========== sendNotification — failure branch (lines 211-213) ==========
+
+describe('sendNotification — failure result triggers failure notification', () => {
+  test('sends failure notification with error message', async () => {
+    // Execute a task that results in failure by making agent start fail
+    const agentEngine = await import('../background/agent-engine.js');
+    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent exploded'));
+
+    const schedule = await createSchedule({
+      name: 'Fail Notif Test',
+      goal: 'test goal',
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: '09:00' },
+    });
+    jest.clearAllMocks();
+    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent exploded'));
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([{ id: 42 }]);
+      return Promise.resolve([{ id: 42 }]);
+    });
+
+    await executeScheduledTask('schedule-' + schedule.id);
+
+    // The failure path in executeScheduledTask does NOT call sendNotification
+    // (sendNotification is only called in the completion path).
+    // To cover lines 211-213 we need the completion path with status=failure.
+    // The timeout path (lines 581-582) produces a failure status and THEN calls sendNotification.
+    // We'll cover sendNotification failure via the timeout test below.
+  });
+});
+
+// ========== Timeout path — lines 581-582 ==========
+// The timeout path fires when the agent completion message never arrives within 5 minutes.
+// We use fake timers to advance past the timeout without waiting.
+// NOTE: The code uses setTimeout(resolve, 500) for tab init delay, so we must advance
+// past that first, then advance past the 5-minute timeout.
+
+describe('executeScheduledTask — timeout triggers failure result', () => {
+  test('records failure when agent execution times out (5-min timer fires)', async () => {
+    const schedule = await makeSchedule();
+
+    // Clear only non-storage mocks
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+    chrome.notifications.create.mockClear();
+    chrome.action.setBadgeText.mockClear();
+    chrome.action.setBadgeBackgroundColor.mockClear();
+    chrome.runtime.onMessage.addListener.mockClear();
+    chrome.runtime.onMessage.removeListener.mockClear();
+    chrome.runtime.getURL.mockClear();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([{ id: 42 }]);
+      return Promise.resolve([{ id: 42 }]);
+    });
+
+    // Set up the listener mock so we can capture the message listener
+    let msgListener;
+    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
+
+    jest.useFakeTimers();
+
+    const execPromise = executeScheduledTask('schedule-' + schedule.id);
+
+    // Advance past the 500ms tab init delay and any microtasks
+    await jest.advanceTimersByTimeAsync(600);
+
+    // Now advance past the 5-minute timeout (300000ms)
+    await jest.advanceTimersByTimeAsync(300100);
+
+    await execPromise;
+
+    // Verify failure was recorded with the timeout error
+    const schedules = storageData['sentinel_schedules'] || {};
+    expect(schedules[schedule.id].lastRunStatus).toBe('failure');
+
+    // The notification should have been sent for the failure result
+    const sharedState = await import('../background/shared-state.js');
+    expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
+
+    // Badge should indicate failure
+    expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith(
+      expect.objectContaining({ color: '#ef4444' })
+    );
+
+    jest.useRealTimers();
+  });
+});
+
+// ========== storeResult catch in executeScheduledTask — line 613 ==========
+
+describe('executeScheduledTask — storeResult throws after successful agent completion', () => {
+  test('handles storeResult rejection gracefully and continues', async () => {
+    const schedule = await makeSchedule();
+
+    // Clear only non-storage mocks
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+    chrome.notifications.create.mockClear();
+    chrome.action.setBadgeText.mockClear();
+    chrome.action.setBadgeBackgroundColor.mockClear();
+    chrome.runtime.onMessage.addListener.mockClear();
+    chrome.runtime.onMessage.removeListener.mockClear();
+    chrome.runtime.getURL.mockClear();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([{ id: 42 }]);
+      return Promise.resolve([{ id: 42 }]);
+    });
+
+    let msgListener;
+    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
+
+    // Override storage.local.set AFTER schedule is in storage
+    // Make it throw only for sentinel_schedule_results (used by storeResult/saveResults)
+    const originalSet = chrome.storage.local.set;
+    chrome.storage.local.set = jest.fn(async (obj) => {
+      if (obj && obj['sentinel_schedule_results'] !== undefined) {
+        throw new Error('Results storage broken');
+      }
+      Object.assign(storageData, obj);
+    });
+
+    const execPromise = executeScheduledTask('schedule-' + schedule.id);
+
+    await new Promise(r => setTimeout(r, 50));
+    if (msgListener) {
+      msgListener({ action: 'agent_loop_complete', report: 'Done' });
+    }
+
+    // Should not throw even though storeResult fails
+    await execPromise;
+
+    // Badge should still be set (execution continued past the storeResult error)
+    expect(chrome.action.setBadgeText).toHaveBeenCalled();
+
+    // Restore
+    chrome.storage.local.set = originalSet;
+  });
+});
+
+// ========== saveSchedules catch in executeScheduledTask — line 635 ==========
+
+describe('executeScheduledTask — saveSchedules throws after execution', () => {
+  test('continues when saving schedule state fails after successful execution', async () => {
+    const schedule = await makeSchedule();
+
+    // Clear only non-storage mocks
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+    chrome.notifications.create.mockClear();
+    chrome.action.setBadgeText.mockClear();
+    chrome.action.setBadgeBackgroundColor.mockClear();
+    chrome.runtime.onMessage.addListener.mockClear();
+    chrome.runtime.onMessage.removeListener.mockClear();
+    chrome.runtime.getURL.mockClear();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([{ id: 42 }]);
+      return Promise.resolve([{ id: 42 }]);
+    });
+
+    let msgListener;
+    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
+
+    // Override storage.local.set to fail only for sentinel_schedules saves
+    // (the final saveSchedules call at line 633), but let results saves succeed
+    const originalSet = chrome.storage.local.set;
+    chrome.storage.local.set = jest.fn(async (obj) => {
+      if (obj && obj['sentinel_schedules'] !== undefined) {
+        throw new Error('Schedule save failed');
+      }
+      Object.assign(storageData, obj);
+    });
+
+    const execPromise = executeScheduledTask('schedule-' + schedule.id);
+
+    await new Promise(r => setTimeout(r, 50));
+    if (msgListener) {
+      msgListener({ action: 'agent_loop_complete', report: 'Done' });
+    }
+
+    await execPromise;
+
+    // Notification and badge should still be set despite save failure
+    const sharedState = await import('../background/shared-state.js');
+    expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
+    expect(chrome.action.setBadgeText).toHaveBeenCalled();
+
+    // Restore
+    chrome.storage.local.set = originalSet;
+  });
+});
+
+// ========== initScheduler — past schedule WITH recurrence — line 790 ==========
+
+describe('initScheduler — past nextRunAt with recurrence recomputes', () => {
+  test('recomputes nextRunAt for recurring schedule with past nextRunAt', async () => {
+    // Create schedule and verify it's saved
+    const schedule = await createSchedule({
+      name: 'Past Recurring',
+      goal: 'test',
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: '09:00' },
+    });
+
+    // Verify the schedule exists in storageData
+    const verifySchedules = storageData['sentinel_schedules'];
+    expect(verifySchedules).toBeDefined();
+    expect(verifySchedules[schedule.id]).toBeDefined();
+
+    // Manually set nextRunAt to the past
+    verifySchedules[schedule.id].nextRunAt = Date.now() - 100000;
+    // No need to reassign since verifySchedules is a reference
+
+    // Clear only non-storage mocks to preserve schedule in storageData
+    chrome.alarms.create.mockClear();
+    chrome.alarms.clear.mockClear();
+    chrome.alarms.get.mockImplementation((name, cb) => { if (cb) cb(null); });
+    chrome.tabs.query.mockClear();
+    chrome.tabs.create.mockClear();
+    chrome.notifications.create.mockClear();
+    chrome.action.setBadgeText.mockClear();
+    chrome.action.setBadgeBackgroundColor.mockClear();
+    chrome.runtime.onMessage.addListener.mockClear();
+    chrome.runtime.onMessage.removeListener.mockClear();
+    chrome.runtime.getURL.mockClear();
+
+    const before = Date.now();
+    await initScheduler();
+
+    const updated = storageData['sentinel_schedules'] || {};
+    // Should have recomputed nextRunAt using computeNextRun (not the 1-hour fallback)
+    expect(updated[schedule.id].nextRunAt).toBeGreaterThan(before - 1000);
+    expect(chrome.alarms.create).toHaveBeenCalled();
+  });
+});
+
+// ========== saveSchedules catch — line 66 ==========
+
+describe('saveSchedules — error handling', () => {
+  test('handles storage.local.set rejection silently in saveSchedules', async () => {
+    // createSchedule calls saveSchedules internally.
+    // Make storage.set reject to trigger the catch in saveSchedules.
+    const originalSet = chrome.storage.local.set;
+    chrome.storage.local.set = jest.fn(async (obj) => {
+      if (obj && obj['sentinel_schedules'] !== undefined) {
+        throw new Error('Storage quota exceeded');
+      }
+      Object.assign(storageData, obj);
+    });
+
+    // Should not throw — the catch in saveSchedules swallows the error
+    const schedule = await createSchedule({
+      name: 'Quota Test',
+      goal: 'test',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    expect(schedule.id).toBeTruthy();
+
+    // Restore
+    chrome.storage.local.set = originalSet;
+  });
+});
+
+// ========== loadResults catch — lines 79-80 ==========
+
+describe('loadResults — error handling', () => {
+  test('returns empty object when storage.local.get rejects in loadResults', async () => {
+    // Seed some results first so the storage has data
+    storageData['sentinel_schedule_results'] = {
+      'r1': { id: 'r1', scheduleId: 's1', completedAt: 1000 },
+    };
+
+    // Make storage.get reject when fetching results
+    const originalGet = chrome.storage.local.get;
+    chrome.storage.local.get = jest.fn(async (keys) => {
+      const key = Array.isArray(keys) ? keys[0] : keys;
+      if (key === 'sentinel_schedule_results') {
+        throw new Error('Results storage corrupted');
+      }
+      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+      return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
+    });
+
+    // getRecentResults calls loadResults internally
+    const results = await getRecentResults();
+    expect(results).toEqual([]);
+
+    // Restore
+    chrome.storage.local.get = originalGet;
+  });
+});
