@@ -576,7 +576,7 @@ function _detectGoalModeDirective(goal) {
   const text = goal.substring(0, 6000);
 
   // Tier 1: Explicit "Mode: APPROVAL" / "Mode: AUTONOMOUS" / "Mode: YOLO"
-  const tier1 = text.match(/\bMode\s*[:=\-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i);
+  const tier1 = text.match(/\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i);
   if (tier1) {
     const w = tier1[1].toUpperCase();
     return {
@@ -1228,9 +1228,9 @@ function formatItGlueKb(summary, goal, tech, options) {
   // Derive resolution steps from the summary's numbered/bulleted lines or
   // sentence breakdown.
   const lines = (summary || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
-  const stepCandidates = lines.filter(l => /^(\d+[\.\)]|\-|\*)\s+/.test(l)).slice(0, 8);
+  const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
   const steps = stepCandidates.length
-    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[\.\)]|\-|\*)\s+/, '')}`)
+    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[.)]|-|\*)\s+/, '')}`)
     : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
 
   const envBits = [];
@@ -1478,7 +1478,7 @@ function _countSpecificClaims(summary) {
 }
 function _countSourceTags(summary) {
   if (!summary) return 0;
-  const matches = summary.match(/\[src:[a-z0-9_\-]+\]/gi) || [];
+  const matches = summary.match(/\[src:[a-z0-9_-]+\]/gi) || [];
   const unverified = summary.match(/\[unverified\]/gi) || [];
   return matches.length + unverified.length;
 }
@@ -1562,7 +1562,7 @@ const MFA_AUTH_URL_PATTERNS = [
   /\.okta\.com\/(?:signin|verify|mfa)/i,
   /\.duosecurity\.com/i,
   /sts\.[a-z0-9.-]+\.(com|net|org)/i,
-  /\/(?:mfa|2fa|otp|challenge|verify|signin|sign-in)(?:[\/?#]|$)/i,
+  /\/(?:mfa|2fa|otp|challenge|verify|signin|sign-in)(?:[/?#]|$)/i,
   /auth\.[a-z0-9.-]+\.(com|net|org)/i
 ];
 
@@ -2258,7 +2258,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (stepCount === 1 && goal) {
         // Strip email addresses before URL extraction so "support@example.com" is
         // never mistaken for a navigation target.
-        const _goalForUrlExtract = goal.replace(/[\w.+\-]+@[\w.\-]+/g, '');
+        const _goalForUrlExtract = goal.replace(/[\w.+-]+@[\w.-]+/g, '');
         // Only auto-navigate when the goal starts with an explicit navigation
         // imperative OR contains a full https:// URL. Avoid triggering on ticket
         // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
@@ -4302,7 +4302,7 @@ async function saveLearnedPattern(goal, history, success) {
     // chrome.storage.local doesn't accumulate identifiable client data.
     const _scrubPii = (str) => String(str)
       .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, 'XXX.XXX.XXX.XXX')
-      .replace(/[\w.+\-]+@[\w.\-]+/g, '[email]')
+      .replace(/[\w.+-]+@[\w.-]+/g, '[email]')
       .replace(/\b(?:TKT|TICKET|INC|INCIDENT|SR|#)\s*\d+/gi, '[ticket]')
       .replace(/"[^"]{2,60}"/g, '"[client]"')
       .replace(/'[^']{2,60}'/g, "'[client]'");

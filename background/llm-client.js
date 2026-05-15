@@ -765,7 +765,7 @@ export function supportsVision(model, providerHint) {
     /\bclaude-(opus|sonnet|haiku|3|4|5)\b/i,
     /\bgpt-(4o|4\.1|4-vision|5|o\d)\b/i,
     /\bgemini\b/i,
-    /\bqwen[\w.\-]*-vl\b/i,
+    /\bqwen[\w.-]*-vl\b/i,
     /\bllava\b/i,
     /vision/i,
     /-vl-/i,
@@ -862,7 +862,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
       if (match && match[1]) jsonStr = match[1].trim();
     }
     // Strip control characters that break JSON.parse
-    jsonStr = jsonStr.replace(/[\x00-\x1f]/g, '');
+    jsonStr = jsonStr.replace(/[\x00-\x1f]/gu, '');  // eslint-disable-line no-control-regex
     try {
       const parsed = JSON.parse(jsonStr);
       if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
@@ -1452,7 +1452,7 @@ return document.body.innerText.substring(0, 5000);
 
 **Recovery when extraction fails:**
 
-If a previous \`execute_js\` step returned \"non-serializable value\" or \"empty result\":
+If a previous \`execute_js\` step returned "non-serializable value" or "empty result":
 
 1. **DON'T retry the same code.** It will fail the same way.
 2. **Switch to text-based extraction.** Return \`document.body.innerText.substring(0, 5000)\` and parse the text in your finish summary instead of relying on selectors.
@@ -1462,7 +1462,7 @@ If a previous \`execute_js\` step returned \"non-serializable value\" or \"empty
 
 **The pattern for spec/comparison goals (price, range, time, warranty):**
 
-For multi-spec extraction tasks, prefer ONE execute_js per page that returns an object with ALL fields, using regex on \`document.body.innerText\` rather than fragile selectors. Manufacturer sites change their CSS classes more often than they change the words \"Starting at $\" or \"EPA-rated range\".
+For multi-spec extraction tasks, prefer ONE execute_js per page that returns an object with ALL fields, using regex on \`document.body.innerText\` rather than fragile selectors. Manufacturer sites change their CSS classes more often than they change the words "Starting at $" or "EPA-rated range".
 
 ## ELEMENT REFERENCE IDS (forward-compatible)
 
@@ -1779,7 +1779,7 @@ function regexSalvageFinishOrNote(content) {
   if (!m) return null;
   let raw = m[1];
   // Soften common malformations the LLM emits: \\` -> \`, then unescape \n/\r/\t
-  raw = raw.replace(/\\([^\"\\\/bfnrtu])/g, '$1')
+  raw = raw.replace(/\\([^"\\/bfnrtu])/g, '$1')
            .replace(/\\n/g, '\n')
            .replace(/\\r/g, '\r')
            .replace(/\\t/g, '\t')
