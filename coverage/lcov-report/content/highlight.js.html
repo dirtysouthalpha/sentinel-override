@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">79.31% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>23/29</span>
+                <span class='fraction'>29/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">54.54% </span>
+                <span class="strong">90.9% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>12/22</span>
+                <span class='fraction'>20/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>4/5</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.5% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>21/24</span>
+                <span class='fraction'>24/24</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -125,11 +125,11 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -137,26 +137,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Sentinel Override v3 -- Highlight Utilities
@@ -174,7 +174,7 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || <span cla
 &nbsp;
   function ensureStyleInjected() {
     try {
-      <span class="missing-if-branch" title="if path not taken" >I</span>if (document.getElementById(STYLE_ID)) <span class="cstat-no" title="statement not covered" >return;</span>
+      if (document.getElementById(STYLE_ID)) return;
       const style = document.createElement('style');
       style.id = STYLE_ID;
       style.textContent =
@@ -185,7 +185,7 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || <span cla
           'transition: outline 0.15s ease !important;' +
         '}';
       // Append to head if available, else documentElement
-      (document.head || <span class="branch-1 cbranch-no" title="branch not covered" >document.documentElement)</span>.appendChild(style);
+      (document.head || document.documentElement).appendChild(style);
     } catch (e) { /* non-fatal */ }
   }
 &nbsp;
@@ -194,17 +194,17 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || <span cla
       if (!el || !el.classList) return;
       ensureStyleInjected();
       el.classList.add(HIGHLIGHT_CLASS);
-    } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] highlight element:', e &amp;&amp; e.message); </span>}
+    } catch (e) { console.warn('[Sentinel] highlight element:', e &amp;&amp; e.message); }
   };
 &nbsp;
   hl.removeHighlight = function(el) {
     try {
       if (!el || !el.classList) return;
       // Keep highlight visible briefly so the user can see what was acted upon.
-      setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; {
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >el.classList.remove(HIGHLIGHT_CLASS); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] remove highlight class:', e &amp;&amp; e.message); </span>}</span>
+      setTimeout(() =&gt; {
+        try { el.classList.remove(HIGHLIGHT_CLASS); } catch (e) { console.warn('[Sentinel] remove highlight class:', e &amp;&amp; e.message); }
       }, 500);
-    } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] removeHighlight:', e &amp;&amp; e.message); </span>}
+    } catch (e) { console.warn('[Sentinel] removeHighlight:', e &amp;&amp; e.message); }
   };
 })();
 &nbsp;</pre></td></tr></table></pre>
@@ -214,7 +214,7 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || <span cla
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T14:32:39.902Z
+                at 2026-05-15T15:50:35.569Z
             </div>
         <script src="../prettify.js"></script>
         <script>

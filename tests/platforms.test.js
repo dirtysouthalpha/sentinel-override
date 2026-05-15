@@ -38,6 +38,54 @@ describe('getPlatformProfile — SonicWall on-box', () => {
     expect(profile).not.toBeNull();
     expect(profile.id).toBe('sonicwall_onbox');
   });
+
+  test('detects from IP-based URL with /dashboard path', () => {
+    const profile = getPlatformProfile('https://192.168.1.1/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('detects from IP-based URL with /vpn path', () => {
+    const profile = getPlatformProfile('https://10.0.0.1/vpn', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('detects from IP-based URL with /system path', () => {
+    const profile = getPlatformProfile('https://10.0.0.1/system', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('detects from goal text mentioning SonicOS', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Check SonicOS settings');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('detects from goal text mentioning NSA', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Check NSA2600 firewall rules');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('detects from goal text mentioning TZ', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Configure TZ350 VPN');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
+
+  test('does not detect NSM URLs as on-box', () => {
+    const profile = getPlatformProfile('https://nsm.sonicwall.com/main.html', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).not.toBe('sonicwall_onbox');
+  });
+
+  test('detects from /auth.html path', () => {
+    const profile = getPlatformProfile('https://192.168.1.1/auth.html', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sonicwall_onbox');
+  });
 });
 
 describe('getPlatformProfile — M365 admin', () => {
@@ -232,6 +280,50 @@ describe('getPlatformProfile — Cisco', () => {
     expect(profile).not.toBeNull();
     expect(profile.id).toBe('cisco');
   });
+
+  test('detects from cisco.com URL', () => {
+    const profile = getPlatformProfile('https://app.cisco.com/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('cisco');
+  });
+
+  test('detects from /fmc path', () => {
+    const profile = getPlatformProfile('https://10.0.0.1/fmc/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('cisco');
+  });
+
+  test('detects from ISE hostname', () => {
+    const profile = getPlatformProfile('https://my.ise.local/admin', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('cisco');
+  });
+
+  test('detects from goal text mentioning Cisco ASA', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Check Cisco ASA firewall rules');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('cisco');
+  });
+
+  test('detects from goal text mentioning Cisco ISE', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Check Cisco ISE identity services');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('cisco');
+  });
+
+  test('inferSurface returns ise for ISE goals', () => {
+    const profile = getPlatformProfile('https://dashboard.meraki.com/', '');
+    if (typeof profile.inferSurface === 'function') {
+      expect(profile.inferSurface('Check ISE identity policy')).toBe('ise');
+    }
+  });
+
+  test('inferSurface returns asdm for ASA goals', () => {
+    const profile = getPlatformProfile('https://dashboard.meraki.com/', '');
+    if (typeof profile.inferSurface === 'function') {
+      expect(profile.inferSurface('Check ASA access rules via ASDM')).toBe('asdm');
+    }
+  });
 });
 
 describe('getPlatformProfile — Palo Alto', () => {
@@ -257,6 +349,24 @@ describe('getPlatformProfile — Palo Alto', () => {
 describe('getPlatformProfile — SentinelOne', () => {
   test('detects from sentinelone.net URL', () => {
     const profile = getPlatformProfile('https://usea1.sentinelone.net/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sentinelone');
+  });
+
+  test('detects from .sentinelone.com URL', () => {
+    const profile = getPlatformProfile('https://console.sentinelone.com/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sentinelone');
+  });
+
+  test('detects from s1.com URL', () => {
+    const profile = getPlatformProfile('https://usea1.s1.com/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sentinelone');
+  });
+
+  test('detects from goal text mentioning Singularity', () => {
+    const profile = getPlatformProfile('https://example.com/', 'Check Singularity console alerts');
     expect(profile).not.toBeNull();
     expect(profile.id).toBe('sentinelone');
   });
