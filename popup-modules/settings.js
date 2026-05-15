@@ -829,9 +829,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     const headers = isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
       : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
-    const body = isAnthropic
-      ? JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] })
-      : JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] });
+    const body = JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15000);

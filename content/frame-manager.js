@@ -13,30 +13,30 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
   // Enumerate all iframes in the document. For same-origin iframes,
   // recursively scan their contents. Cross-origin iframes get placeholders.
   fm.scanIframes = function(doc) {
-    var elements = [];
-    var iframeCount = 0;
-    var crossOriginCount = 0;
+    let elements = [];
+    let iframeCount = 0;
+    let crossOriginCount = 0;
 
-    if (!doc) return { elements: elements, iframeCount: iframeCount, crossOriginCount: crossOriginCount };
+    if (!doc) return { elements, iframeCount, crossOriginCount };
 
-    var iframes;
+    let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (e) {
-      return { elements: elements, iframeCount: 0, crossOriginCount: 0 };
+      return { elements, iframeCount: 0, crossOriginCount: 0 };
     }
 
     iframes.forEach(function(iframe, index) {
       iframeCount++;
-      var src = iframe.src || iframe.getAttribute('src') || 'about:blank';
+      const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
 
       try {
         // Same-origin check: try to access contentWindow.document
-        var iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
+        const iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
         if (iframeDoc) {
           // Same-origin: scan the iframe's document
-          var iframeElements = [];
-          var selectorMap = new Map();
+          const iframeElements = [];
+          const selectorMap = new Map();
           dom.scanDocument(iframeDoc, iframeElements, selectorMap, 'frame:' + index + ':');
           // Add each scanned element to the main elements array
           iframeElements.forEach(function(el) {
@@ -62,7 +62,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       }
     });
 
-    return { elements: elements, iframeCount: iframeCount, crossOriginCount: crossOriginCount };
+    return { elements, iframeCount, crossOriginCount };
   };
 
   // ========== Find In Iframe ==========
@@ -73,13 +73,13 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       return null;
     }
 
-    var parts = selector.split(':');
-    var frameIndex = parseInt(parts[1]);
-    var remainingSelector = parts.slice(2).join(':');
+    const parts = selector.split(':');
+    const frameIndex = parseInt(parts[1]);
+    const remainingSelector = parts.slice(2).join(':');
 
     if (isNaN(frameIndex)) return null;
 
-    var iframes;
+    let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (e) {
@@ -88,18 +88,18 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
 
     if (!iframes[frameIndex]) return null;
 
-    var iframe = iframes[frameIndex];
-    var src = iframe.src || iframe.getAttribute('src') || 'about:blank';
+    const iframe = iframes[frameIndex];
+    const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
 
     try {
       // Same-origin
-      var iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
+      const iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
       if (iframeDoc) {
-        var element = dom.findElementBySelector(iframeDoc, remainingSelector);
+        const element = dom.findElementBySelector(iframeDoc, remainingSelector);
         if (element) {
-          return { element: element, frameDoc: iframeDoc, frameIndex: frameIndex, frameUrl: src };
+          return { element, frameDoc: iframeDoc, frameIndex, frameUrl: src };
         }
-        return { element: null, frameDoc: iframeDoc, frameIndex: frameIndex, frameUrl: src };
+        return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src };
       }
     } catch (e) {
       // Cross-origin
@@ -108,20 +108,20 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     // Cross-origin iframe
     return {
       crossOrigin: true,
-      frameIndex: frameIndex,
+      frameIndex,
       frameUrl: src,
-      remainingSelector: remainingSelector
+      remainingSelector
     };
   };
 
   // ========== Get Iframe Info ==========
   // Return metadata about all iframes on the page.
   fm.getIframeInfo = function(doc) {
-    var info = [];
+    const info = [];
 
     if (!doc) return info;
 
-    var iframes;
+    let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (e) {
@@ -129,8 +129,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     }
 
     iframes.forEach(function(iframe, index) {
-      var src = iframe.src || iframe.getAttribute('src') || 'about:blank';
-      var sameOrigin = false;
+      const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
+      let sameOrigin = false;
 
       try {
         if (iframe.contentWindow && iframe.contentWindow.document) {
@@ -140,7 +140,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         sameOrigin = false;
       }
 
-      var rect;
+      let rect;
       try {
         rect = iframe.getBoundingClientRect();
       } catch (e) {
@@ -148,9 +148,9 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       }
 
       info.push({
-        index: index,
-        src: src,
-        sameOrigin: sameOrigin,
+        index,
+        src,
+        sameOrigin,
         width: Math.round(rect.width),
         height: Math.round(rect.height),
         visible: dom && dom.isVisible(iframe)
@@ -160,4 +160,3 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     return info;
   };
 })();
-

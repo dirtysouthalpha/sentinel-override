@@ -24,9 +24,9 @@
   // Set of all captured shadow roots (iterable for scanning)
   window.__sentinelShadowRoots = new Set();
 
-  var originalAttachShadow = Element.prototype.attachShadow;
+  const originalAttachShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(init) {
-    var shadowRoot = originalAttachShadow.call(this, init);
+    const shadowRoot = originalAttachShadow.call(this, init);
     try {
       window.__sentinelCapturedRoots.set(this, shadowRoot);
       window.__sentinelShadowRoots.add(shadowRoot);
