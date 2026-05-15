@@ -652,7 +652,7 @@ if (window.__sentinelInitialized) {
         if (__sensitiveMatch) {
           throw new Error('BLOCKED: cannot focus sensitive field (matched "' + __sensitiveMatch + '"). Sensitive fields require manual entry.');
         }
-        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
+        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message); }
         // Clear existing value so CDP insertText replaces rather than appends,
         // matching the synthetic-path behavior. Only for inputs/textareas.
@@ -747,7 +747,7 @@ if (window.__sentinelInitialized) {
       indicator.style.left = x + 'px';
       indicator.style.top = y + 'px';
       document.body.appendChild(indicator);
-      setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) {} }, 700);
+      setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', e && e.message); } }, 700);
     } catch (e) { /* extension context may be invalidated */ }
   }
 
@@ -1792,9 +1792,9 @@ if (window.__sentinelInitialized) {
                     sourceFile: (e && e.sourceFile) ? String(e.sourceFile).substring(0, 200) : '',
                     url: location.href.substring(0, 200)
                   });
-                } catch (te) {}
+                } catch (te) { console.warn('[Sentinel] CSP telemetry failed:', te && te.message); }
               }
-            } catch (err) {}
+            } catch (err) { console.warn('[Sentinel] CSP violation handler failed:', err && err.message); }
           };
           try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener add:', e && e.message); }
 
@@ -2035,7 +2035,7 @@ if (window.__sentinelInitialized) {
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } catch (e) {
-          try { el.scrollIntoView(); } catch (ee) {}
+          try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', ee && ee.message); }
         }
         await waitForStableRect(el, 2, 800);
 

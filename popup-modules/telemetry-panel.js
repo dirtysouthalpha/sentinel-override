@@ -113,7 +113,7 @@
     if (ev.payload) {
       try {
         if (JSON.stringify(ev.payload).toLowerCase().includes(q)) return true;
-      } catch (e) {}
+      } catch (e) { /* JSON parse failure is non-critical */ }
     }
     return false;
   }
@@ -312,7 +312,7 @@
           navigator.clipboard.writeText(text).catch(() => {});
           copyBtn.textContent = 'Copied!';
           setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
-        } catch (e) {}
+        } catch (e) { /* clipboard API may be restricted */ }
       });
     }
     const clearBtn = document.getElementById('telemClearBtn');
@@ -354,11 +354,11 @@
           document.body.appendChild(a);
           a.click();
           setTimeout(() => {
-            try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {}
+            try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) { /* DOM may be detached */ }
           }, 1500);
           exportBtn.textContent = 'Exported!';
           setTimeout(() => { exportBtn.textContent = 'Export'; }, 1200);
-        } catch (e) {}
+        } catch (e) { /* download/export may fail in restricted context */ }
       });
     }
 
@@ -399,7 +399,7 @@
           resolve(Array.isArray(response) ? response : []);
         });
       });
-    } catch (e) {}
+    } catch (e) { /* message may fail if background not ready */ }
     const btn = document.getElementById('telemPastRunsBtn');
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
@@ -442,7 +442,7 @@
             if (_viewingPastRun && _viewingPastRun.runId === run.runId) _loadLiveStream();
             menu.remove();
             _togglePastRunsMenu();
-          } catch (err) {}
+          } catch (err) { /* message may fail if background not ready */ }
         });
         item.appendChild(delBtn);
         item.addEventListener('click', () => { _loadPastRun(run); menu.remove(); });
@@ -479,7 +479,7 @@
       _viewingPastRun = runMeta;
       _renderAll();
       _renderViewingBanner();
-    } catch (e) {}
+    } catch (e) { /* loading past run may fail gracefully */ }
   }
 
   function _loadLiveStream() {
@@ -531,7 +531,7 @@
         _addEvent(message);
       }
     });
-  } catch (e) {}
+  } catch (e) { /* message listener registration may fail */ }
 
   function init() {
     const railBtn = document.getElementById('telemetryRailBtn');
@@ -545,5 +545,5 @@
 
   try {
     window.__sentinelTelemetry = { toggle: togglePanel, eventCount: () => events.length };
-  } catch (e) {}
+  } catch (e) { /* global assignment may fail in restricted context */ }
 })();

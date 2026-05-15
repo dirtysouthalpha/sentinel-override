@@ -37,7 +37,7 @@
       initialPos = POSITIONS.get(modalContent) || { tx: 0, ty: 0 };
       modalContent.classList.add('dragging');
       titleBar.classList.add('dragging');
-      try { titleBar.setPointerCapture(e.pointerId); } catch (err) {}
+      try { titleBar.setPointerCapture(e.pointerId); } catch (err) { /* pointer capture may fail */ }
     });
 
     titleBar.addEventListener('pointermove', (e) => {
@@ -75,7 +75,7 @@
       dragStart = null;
       modalContent.classList.remove('dragging');
       titleBar.classList.remove('dragging');
-      try { titleBar.releasePointerCapture(e.pointerId); } catch (err) {}
+      try { titleBar.releasePointerCapture(e.pointerId); } catch (err) { /* pointer capture release may fail */ }
     }
     titleBar.addEventListener('pointerup', endDrag);
     titleBar.addEventListener('pointercancel', endDrag);

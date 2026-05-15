@@ -307,7 +307,7 @@ function runCommandInFrame(command) {
         if (mainEl) {
           const clone = mainEl.cloneNode(true);
           const skip = ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript', 'svg'];
-          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) {} });
+          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel/frame-router] DOM cleanup failed for', s, ':', e && e.message); } });
           content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
         }
         if ((!content || content.length < 200) && doc.body) {

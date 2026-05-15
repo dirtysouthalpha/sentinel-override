@@ -152,7 +152,7 @@ if (soundEnabledToggle) {
             : 'Sound notifications OFF — silent mode',
           'info'
         );
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -177,7 +177,7 @@ if (adaptivePromptsModeSelect) {
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -199,7 +199,7 @@ if (telemetryLevelSelect) {
   });
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
-      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) {}
+      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -221,7 +221,7 @@ if (telemetryPersistToggle) {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
           : 'Telemetry persistence disabled', 'info');
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -244,7 +244,7 @@ if (telemetryRedactToggle) {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
           : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -266,7 +266,7 @@ if (telemetrySkillAdaptToggle) {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
           : 'Adaptive skill priority OFF — static priorities only', 'info');
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -279,7 +279,7 @@ if (skillStatsResetBtn) {
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -423,7 +423,7 @@ if (ticketModeToggle) {
             : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
           enabled ? 'success' : 'info'
         );
-      } catch (e) {}
+      } catch (e) { /* showToast may fail in detached popup */ }
     });
   });
 }
@@ -905,13 +905,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) {}
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { /* showToast may fail in detached popup */ }
   });
 
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
-      try { showToast('Pick a provider first', 'error'); } catch (e) {}
+      try { showToast('Pick a provider first', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
       return;
     }
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
@@ -932,14 +932,14 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) {}
+        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { /* showToast may fail in detached popup */ }
         modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
         modelsSel.innerHTML = '<option value="">(no models returned)</option>';
-        try { showToast('No models returned', 'error'); } catch (e) {}
+        try { showToast('No models returned', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
         return;
       }
       modelsSel.innerHTML = '';
@@ -955,9 +955,9 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       }
       modelsSel.disabled = false;
       useBtn.disabled = false;
-      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) {}
+      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { /* showToast may fail in detached popup */ }
     } catch (e) {
-      try { showToast('Error: ' + e.message, 'error'); } catch (ee) {}
+      try { showToast('Error: ' + e.message, 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
@@ -968,13 +968,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
   useBtn.addEventListener('click', () => {
     const value = modelsSel.value;
     if (!value) {
-      try { showToast('Pick a model from the list first', 'error'); } catch (e) {}
+      try { showToast('Pick a model from the list first', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
       return;
     }
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
-      try { showToast('Model set to ' + value, 'success'); } catch (e) {}
+      try { showToast('Model set to ' + value, 'success'); } catch (e) { /* showToast may fail in detached popup */ }
     }
   });
 })();
@@ -992,13 +992,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         document.head.appendChild(el);
       }
       el.textContent = css || '';
-    } catch (e) {}
+    } catch (e) { /* CSS application may fail */ }
   }
 
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) applyCustomCss(saved);
-  } catch (e) {}
+  } catch (e) { /* localStorage may be restricted */ }
 
   function wire() {
     const ta = document.getElementById('customCssTextarea');
@@ -1010,7 +1010,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) ta.value = saved;
-    } catch (e) {}
+    } catch (e) { /* localStorage may be restricted */ }
 
     let saveTimer = null;
     const setStatus = (text, color) => {
@@ -1028,7 +1028,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         const css = ta.value || '';
-        try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, css); } catch (e) { /* localStorage may be restricted */ }
         applyCustomCss(css);
         setStatus('saved', '#6fcf80');
       }, 350);
@@ -1036,13 +1036,13 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
 
     if (applyBtn) applyBtn.addEventListener('click', () => {
       const css = ta.value || '';
-      try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {}
+      try { localStorage.setItem(STORAGE_KEY, css); } catch (e) { /* localStorage may be restricted */ }
       applyCustomCss(css);
       setStatus('applied', '#6fcf80');
     });
     if (clearBtn) clearBtn.addEventListener('click', () => {
       ta.value = '';
-      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* localStorage may be restricted */ }
       applyCustomCss('');
       setStatus('cleared', 'var(--text-tertiary)');
     });
@@ -1067,9 +1067,9 @@ document.getElementById('testConnectionBtn').addEventListener('click', async () 
         }
         if (theme === 'dark') document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
-        try { localStorage.setItem('theme-named', theme); } catch (e) {}
+        try { localStorage.setItem('theme-named', theme); } catch (e) { /* localStorage may be restricted */ }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) {}
+        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { /* showToast may fail in detached popup */ }
       });
     });
   }

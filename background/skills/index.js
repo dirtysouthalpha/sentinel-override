@@ -150,7 +150,7 @@ export function runRecoverySkills(context) {
       }
     } catch (e) {
       try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e && e.message }); } catch (te) { /* telemetry unavailable */ }
-      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message); } catch (ee) {}
+      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message); } catch (ee) { /* console unavailable */ }
     }
   }
   if (matches.length === 0) return result;
@@ -167,7 +167,7 @@ export function runRecoverySkills(context) {
           break;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', e && e.message); } catch (ee) {}
+        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', e && e.message); } catch (ee) { /* console unavailable */ }
       }
     }
   }
@@ -184,7 +184,7 @@ export function runRecoverySkills(context) {
         }
       }
     } catch (e) {
-      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', e && e.message); } catch (ee) {}
+      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', e && e.message); } catch (ee) { /* console unavailable */ }
     }
   }
   if (injections.length > 0) {

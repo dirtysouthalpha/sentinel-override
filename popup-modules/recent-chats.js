@@ -42,7 +42,7 @@
         tmp.innerHTML = fallbackHtml;
         const firstUserMsg = tmp.querySelector('.message-group .user-msg, .message-group [class*="user"]');
         if (firstUserMsg) return (firstUserMsg.innerText || '').trim().substring(0, 200);
-      } catch (e) {}
+      } catch (e) { /* DOM may be detached */ }
     }
     return '(no goal)';
   }
@@ -134,7 +134,7 @@
         // Save to chat_history so future loads keep it
         try {
           chrome.storage.local.set({ chat_history: state.conversationHistory });
-        } catch (e) {}
+        } catch (e) { /* storage may fail */ }
       }
 
       // Show restored banner at the top
@@ -166,7 +166,7 @@
       chatContainer.insertBefore(banner, chatContainer.firstChild);
       const dismissBtn = banner.querySelector('#dismissRestoredBanner');
       if (dismissBtn) dismissBtn.addEventListener('click', () => banner.remove());
-    } catch (e) {}
+    } catch (e) { /* DOM may be detached */ }
   }
 
   async function deleteRecentChat(id) {
@@ -313,5 +313,5 @@
       clear: clearAllRecent,
       openModal: _openModal
     };
-  } catch (e) {}
+  } catch (e) { /* module init may fail in detached popup */ }
 })();

@@ -130,7 +130,7 @@ function hideActiveTabStrip() {
 function updateActiveTabPage(url, title) {
   if (!url) return;
   let host = url;
-  try { host = new URL(url).hostname; } catch (e) {}
+  try { host = new URL(url).hostname; } catch (e) { /* URL parse failure is non-critical */ }
   __atsStripState.url = url;
   __atsStripState.title = title || '';
   __atsStripState.hostname = host;
@@ -237,7 +237,7 @@ function updateActiveTabAction(payload) {
       try {
         const tabs = await chrome.tabs.query({ url: __atsStripState.url });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch (e) {}
+      } catch (e) { /* extension API may fail */ }
     }
     // Fallback 2: query by hostname pattern
     if (!tabId && __atsStripState.hostname) {
@@ -245,7 +245,7 @@ function updateActiveTabAction(payload) {
         const pattern = '*://*.' + __atsStripState.hostname.replace(/^www\./, '') + '/*';
         const tabs = await chrome.tabs.query({ url: pattern });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch (e) {}
+      } catch (e) { /* extension API may fail */ }
     }
     // Fallback 3: bare hostname in URL string match across all tabs
     if (!tabId && __atsStripState.hostname) {
@@ -253,20 +253,20 @@ function updateActiveTabAction(payload) {
         const all = await chrome.tabs.query({});
         const match = (all || []).find(t => t.url && t.url.includes(__atsStripState.hostname));
         if (match) tabId = match.id;
-      } catch (e) {}
+      } catch (e) { /* extension API may fail */ }
     }
     if (!tabId) {
-      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch (e) {}
+      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
       return;
     }
-    try { await chrome.tabs.update(tabId, { active: true }); } catch (e) {}
+    try { await chrome.tabs.update(tabId, { active: true }); } catch (e) { /* extension API may fail */ }
     try {
       chrome.tabs.get(tabId, (info) => {
         if (info && typeof info.windowId === 'number') {
-          try { chrome.windows.update(info.windowId, { focused: true }); } catch (e) {}
+          try { chrome.windows.update(info.windowId, { focused: true }); } catch (e) { /* extension API may fail */ }
         }
       });
-    } catch (e) {}
+    } catch (e) { /* chrome.tabs.get callback may fail */ }
   });
 })();
 
@@ -998,7 +998,7 @@ newChatBtn.addEventListener('click', () => {
       if (window.__sentinelRecentChats && typeof window.__sentinelRecentChats.archive === 'function') {
         window.__sentinelRecentChats.archive({ reason: 'new-chat' });
       }
-    } catch (e) {}
+    } catch (e) { /* recentChats archive is non-critical */ }
     chrome.storage.local.set({ chat_history: [] }, () => {
       const state = getState();
       state.conversationHistory = [];
@@ -1078,7 +1078,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch (e) {}
+    try { previewBtn.classList.remove('active'); } catch (e) { /* DOM may be detached */ }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1119,7 +1119,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal-overlay.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch (err) {}
+  try { top.classList.remove('show'); } catch (err) { /* DOM may be detached */ }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1132,7 +1132,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch (err) {}
+  try { target.classList.remove('show'); } catch (err) { /* DOM may be detached */ }
 }, true);
 
 function updateMarkdownPreview() {
@@ -1396,7 +1396,7 @@ window.executeCommand = (action) => {
       themeModal.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {} }
+      try { openRunLogHistoryModal(); } catch (e) { try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -1433,7 +1433,7 @@ function renderTabBar(tabs) {
   // Update or insert each tab row in order
   tabs.forEach((ctx, i) => {
     let hostname = '';
-    try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch (e) { /* URL parse failure is non-critical */ }
     const displayText = ctx.label ? ctx.label + ' (' + hostname + ')' : hostname || ctx.url;
     const cached = _tabBarCache.get(ctx.tabId);
 
@@ -1504,7 +1504,7 @@ function addReportCard(report) {
   // this with undefined/null. Don't crash the popup; surface a non-blocking
   // toast and bail. The user can re-run the report from the modal.
   if (!report || typeof report !== 'object') {
-    try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch (e) {}
+    try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
     console.warn('[Sentinel] addReportCard called without a report object; ignoring.');
     return;
   }
@@ -2055,7 +2055,7 @@ function showModeMismatchCard(payload) {
         action: 'mode_mismatch_response',
         requestId
       }, payload)).catch(() => {});
-    } catch (e) {}
+    } catch (e) { /* message may fail if background not ready */ }
   };
 
   document.getElementById('modeMismatchFlipBtn').addEventListener('click', () => {
@@ -2070,7 +2070,7 @@ function showModeMismatchCard(payload) {
         if (typeof updateApprovalModeUI === 'function') {
           updateApprovalModeUI(wantsApproval);
         }
-      } catch (e) {}
+      } catch (e) { /* DOM may be detached */ }
       sendResponse({ flip: true });
       card.remove();
     });
@@ -2183,7 +2183,7 @@ function showAdaptedGoalCard(payload) {
           action: 'adapted_goal_response',
           requestId
         }, payload)).catch(() => {});
-      } catch (e) {}
+      } catch (e) { /* message may fail if background not ready */ }
     };
     document.getElementById('adaptedGoalAcceptBtn').addEventListener('click', () => {
       sendResponse({ approved: true });
@@ -2387,10 +2387,10 @@ async function deleteRunLogById(runLogId) {
     const next = list.filter(e => e && e.runLogId !== runLogId);
     await chrome.storage.local.set({ run_log_index: next });
     await chrome.storage.local.remove('run_log_' + runLogId);
-    try { showToast('Run log deleted', 'info'); } catch (e) {}
+    try { showToast('Run log deleted', 'info'); } catch (e) { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {}
+    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2401,13 +2401,13 @@ async function clearAllRunLogs() {
     const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
     const keys = list.map(e => 'run_log_' + e.runLogId).filter(Boolean);
     if (keys.length) {
-      try { await chrome.storage.local.remove(keys); } catch (e) {}
+      try { await chrome.storage.local.remove(keys); } catch (e) { /* storage write may fail */ }
     }
     await chrome.storage.local.set({ run_log_index: [] });
-    try { showToast('All run logs cleared', 'info'); } catch (e) {}
+    try { showToast('All run logs cleared', 'info'); } catch (e) { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) {}
+    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2422,10 +2422,10 @@ async function clearAllRunLogs() {
   // (3.17.0) Wire the new left-action-rail Run Log button to the same modal.
   const railBtn = document.getElementById('runLogHistoryRailBtn');
   if (railBtn) railBtn.addEventListener('click', () => {
-    try { openRunLogHistoryModal(); } catch (e) {}
+    try { openRunLogHistoryModal(); } catch (e) { /* modal may not be initialized yet */ }
   });
   // Expose for command-palette / other entry points.
-  try { window.__openRunLogHistory = openRunLogHistoryModal; } catch (e) {}
+  try { window.__openRunLogHistory = openRunLogHistoryModal; } catch (e) { /* window assignment may fail in some contexts */ }
 })();
 
 async function exportRunLog(format) {
@@ -2434,7 +2434,7 @@ async function exportRunLog(format) {
     const stored = await chrome.storage.local.get('run_log_' + __lastRunLogId);
     const log = stored['run_log_' + __lastRunLogId];
     if (!log) {
-      try { showToast('Run log not found in storage', 'error'); } catch (e) {}
+      try { showToast('Run log not found in storage', 'error'); } catch (e) { /* showToast may fail in detached popup */ }
       return;
     }
     let content, mime, ext;
@@ -2469,7 +2469,7 @@ async function exportRunLog(format) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
-    try { showToast('Export failed: ' + e.message, 'error'); } catch (ee) {}
+    try { showToast('Export failed: ' + e.message, 'error'); } catch (ee) { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2760,7 +2760,7 @@ chrome.runtime.onMessage.addListener((message) => {
     renderTabBar([]);
     hideActiveTabStrip();
     hideMiniShot();
-    try { clearActivityState(); } catch (e) {}
+    try { clearActivityState(); } catch (e) { /* activity state may not be initialized */ }
     try {
       const summary = message.summary || 'Done';
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
@@ -2839,7 +2839,7 @@ chrome.runtime.onMessage.addListener((message) => {
             }
             // Persist the pruned map back if anything changed (lazy cleanup).
             if (Object.keys(dismissedMap).length !== Object.keys(raw).length) {
-              try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch (e) {}
+              try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch (e) { /* storage write may fail */ }
             }
             const suggestions = rawSuggestions.filter(s => s && s.id && !dismissedMap[s.id]);
             _renderSuggestionsList(suggestions, originalGoal, dismissedMap);
@@ -2906,7 +2906,7 @@ chrome.runtime.onMessage.addListener((message) => {
                       }
                       if (typeof sendGoal === 'function') sendGoal();
                       else chrome.runtime.sendMessage({ action: 'start_agent', goal: originalGoal });
-                    } catch (e) {}
+                    } catch (e) { /* DOM write or message may fail */ }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
@@ -2928,10 +2928,10 @@ chrome.runtime.onMessage.addListener((message) => {
                     const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
-                    try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch (e2) {}
+                    try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch (e2) { /* storage write may fail */ }
                   });
                 }
-              } catch (e) {}
+              } catch (e) { /* DOM removal or storage write may fail */ }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);

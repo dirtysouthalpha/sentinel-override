@@ -869,7 +869,7 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e2) {}
+        } catch (e2) { console.warn('[Sentinel] tab group update failed:', e2 && e2.message); }
       }
     }
     agentAttachedTabs.add(tabId);
@@ -893,7 +893,7 @@ async function detachAllSentinelTabs() {
   } catch (e) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (e2) {}
+      try { await chrome.tabs.ungroup([id]); } catch (e2) { /* tab may have closed */ }
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
@@ -2691,7 +2691,7 @@ async function runAgentLoop(goal, workingTabId) {
           loopDirective += _recovery.promptInjection;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (ee) {}
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (ee) { /* console unavailable */ }
       }
 
       // Progress indicator
@@ -3107,7 +3107,7 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch(() => {});
             } catch (e) { tel.warn('agent', 'run_log_available broadcast failed', { error: e.message }); }
           }
-        } catch (_e) {}
+        } catch (_e) { console.warn('[Sentinel] run_log_available broadcast failed:', _e && _e.message); }
 
         // (3.31.0) Trust score is already computed above (_trustScore). Reuse it.
         const _retrySuggestions = (function () {
@@ -3254,7 +3254,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (te) {}
+          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (te) { /* telemetry unavailable */ }
           sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3280,7 +3280,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (te) {}
+          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (te) { /* telemetry unavailable */ }
           sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);

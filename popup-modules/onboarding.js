@@ -25,7 +25,7 @@
   }
 
   async function markDone() {
-    try { await chrome.storage.local.set({ sentinelOnboardingDone: true }); } catch (e) {}
+    try { await chrome.storage.local.set({ sentinelOnboardingDone: true }); } catch (e) { /* storage may fail */ }
     const modal = _qs('onboarding-modal');
     if (modal) modal.classList.remove('show');
   }
