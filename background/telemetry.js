@@ -101,7 +101,7 @@ const REDACT_KEY_PATTERNS = [
 
 // URL query params to scrub. Other params pass through.
 // (Note: param names are also hardcoded in _redactString's regex for perf.)
-// eslint-disable-next-line no-unused-vars
+ 
 const _REDACT_QUERY_PARAMS = new Set([
   'token', 'access_token', 'refresh_token', 'auth_token', 'id_token',
   'apikey', 'api_key', 'key', 'secret', 'password', 'pwd', 'sig', 'signature',

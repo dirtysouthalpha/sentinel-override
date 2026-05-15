@@ -2642,7 +2642,7 @@ async function toggleSourceChipExpansion(chip) {
 }
 
 // Hook: render chips after addMessage paints content. Patch addMessage.
-// eslint-disable-next-line no-unused-vars
+ 
 const __originalAddMessage = (typeof addMessage === 'function') ? addMessage : null;
 
 // ========== Tenant Override Card (3.11.0) ==========

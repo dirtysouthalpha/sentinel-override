@@ -23,7 +23,7 @@ function _safeEsc(s) {
 
 // ---------- State ----------
 let _editingClientId = null;
-// eslint-disable-next-line no-unused-vars
+ 
 let _activeClientCache = null;
 
 // ---------- Backend calls ----------

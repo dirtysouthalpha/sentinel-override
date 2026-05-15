@@ -5,7 +5,7 @@
 
 import { agentRunning, startAgent } from './agent-engine.js';
 import { resolveTemplateGoal } from './template-manager.js';
-// eslint-disable-next-line no-unused-vars
+ 
 import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
@@ -32,7 +32,7 @@ export function onAgentComplete(callback) {
  * Fire all registered agent-complete callbacks.
  * Called from the polling loop in executeScheduledTask.
  */
-// eslint-disable-next-line no-unused-vars
+ 
 function _fireAgentCompleteCallbacks() {
   const cbs = agentCompleteCallbacks.slice();
   agentCompleteCallbacks = [];
@@ -692,7 +692,7 @@ async function storeResult(schedule, result) {
  * @param {number} timeoutMs - Max time to wait for report
  * @returns {Promise<object|null>} Report object or null if unavailable
  */
-// eslint-disable-next-line no-unused-vars
+ 
 function _waitForReport(timeoutMs) {
   return new Promise((resolve) => {
     const start = Date.now();

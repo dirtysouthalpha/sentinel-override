@@ -45,7 +45,7 @@ if (window.__sentinelInitialized) {
   // Sandbox is disabled by default — the Proxy-based sandbox was blocking
   // legitimate agent operations (document.documentElement.outerHTML, etc.)
   // Re-enable after tuning the allowlist/blocklist for real-world usage.
-  // eslint-disable-next-line no-unused-vars
+   
   const _EXECUTE_JS_SANDBOX_ENABLED = false;
 
   // Shorthand references to utility modules
@@ -311,7 +311,7 @@ if (window.__sentinelInitialized) {
     /check\s+your\s+phone/i
   ];
 
-  // eslint-disable-next-line no-unused-vars
+   
   function _unused__sentinelDetectMFA(text) {
     if (!text || typeof text !== 'string') return null;
     const sample = text.substring(0, 4000);
@@ -850,7 +850,7 @@ if (window.__sentinelInitialized) {
 
   // ========== execute_js Sandbox Helpers ==========
   // API allowlist for execute_js sandboxing
-  // eslint-disable-next-line no-unused-vars
+   
   const _EXECUTE_JS_ALLOWED_GLOBALS = new Set([
     'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
     'getElementsByTagName', 'getElementsByName', 'createElement', 'createTextNode',
@@ -891,7 +891,7 @@ if (window.__sentinelInitialized) {
   // Creates a Proxy wrapping the document that blocks sensitive properties
   // but allows all normal DOM read/write operations.
   // sandboxedWin is the already-proxied window, returned when code accesses document.defaultView.
-  // eslint-disable-next-line no-unused-vars
+   
   function _createSandboxedDocument(doc, sandboxedWin) {
     return new Proxy(doc, {
       get(target, prop, _receiver) {
@@ -928,7 +928,7 @@ if (window.__sentinelInitialized) {
 
   // Creates a Proxy wrapping the window that blocks dangerous APIs
   // while allowing safe properties (console, Math, setTimeout, etc.) through.
-  // eslint-disable-next-line no-unused-vars
+   
   function _createSandboxedWindow(win) {
     return new Proxy(win, {
       get(target, prop, _receiver) {
