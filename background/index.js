@@ -45,6 +45,7 @@ import {
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['api_endpoint', 'model'], (result) => {
+    if (chrome.runtime.lastError) return;
     const updates = {};
     if (result.api_endpoint && result.api_endpoint.includes('bigmodel.cn')) updates.api_endpoint = '';
     if (result.model && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';

@@ -86,6 +86,7 @@ document.querySelectorAll('.provider-btn').forEach(btn => {
 function loadSettings() {
   const state = getState();
   chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
+    if (chrome.runtime.lastError) return;
     // Handle both new provider structure and legacy keys
     if (result.providers) {
       state.providerConfigs = result.providers;
@@ -99,7 +100,7 @@ function loadSettings() {
       };
       state.activeProviderId = providerId;
     }
-    if (result.export_format) exportFormatSelect.value = result.export_format;
+    if (result.export_format && exportFormatSelect) exportFormatSelect.value = result.export_format;
     if (result.agent_context) {
       const el = document.getElementById('set-agent-context');
       if (el) el.value = result.agent_context;
@@ -115,6 +116,7 @@ function loadSettings() {
 const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
 if (useTrustedInputToggle) {
   chrome.storage.local.get(['useTrustedInput'], (result) => {
+    if (chrome.runtime.lastError) return;
     useTrustedInputToggle.checked = result.useTrustedInput === true;
   });
   useTrustedInputToggle.addEventListener('change', () => {
@@ -142,6 +144,7 @@ if (useTrustedInputToggle) {
 const soundEnabledToggle = document.getElementById('soundEnabledToggle');
 if (soundEnabledToggle) {
   chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
+    if (chrome.runtime.lastError) return;
     soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
   });
   soundEnabledToggle.addEventListener('change', () => {
@@ -168,6 +171,7 @@ const adaptiveExpansionModeSelect = document.getElementById('adaptiveExpansionMo
 
 if (adaptivePromptsModeSelect) {
   chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode'], (result) => {
+    if (chrome.runtime.lastError) return;
     adaptivePromptsModeSelect.value = result.adaptivePromptsMode || 'auto';
     if (adaptiveExpansionModeSelect) {
       adaptiveExpansionModeSelect.value = result.adaptiveExpansionMode || 'light';
@@ -197,6 +201,7 @@ if (adaptiveExpansionModeSelect) {
 const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
 if (telemetryLevelSelect) {
   chrome.storage.local.get(['telemetryLevel'], (result) => {
+    if (chrome.runtime.lastError) return;
     telemetryLevelSelect.value = result.telemetryLevel || 'normal';
   });
   telemetryLevelSelect.addEventListener('change', () => {
@@ -215,6 +220,7 @@ if (telemetryLevelSelect) {
 const telemetryPersistToggle = document.getElementById('telemetryPersistToggle');
 if (telemetryPersistToggle) {
   chrome.storage.local.get(['telemetryPersist'], (result) => {
+    if (chrome.runtime.lastError) return;
     telemetryPersistToggle.checked = !!result.telemetryPersist;
   });
   telemetryPersistToggle.addEventListener('change', () => {
@@ -237,6 +243,7 @@ if (telemetryPersistToggle) {
 const telemetryRedactToggle = document.getElementById('telemetryRedactToggle');
 if (telemetryRedactToggle) {
   chrome.storage.local.get(['telemetryRedact'], (result) => {
+    if (chrome.runtime.lastError) return;
     // Default ON: only set false if explicitly stored as false.
     telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
   });
@@ -260,6 +267,7 @@ if (telemetryRedactToggle) {
 const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptToggle');
 if (telemetrySkillAdaptToggle) {
   chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
+    if (chrome.runtime.lastError) return;
     telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
@@ -278,6 +286,7 @@ if (skillStatsResetBtn) {
   skillStatsResetBtn.addEventListener('click', () => {
     if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
     chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
+      if (chrome.runtime.lastError && !resp) return;
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
@@ -290,6 +299,7 @@ const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
 if (skillStatsViewBtn) {
   skillStatsViewBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (skills) => {
+      if (chrome.runtime.lastError) return;
       if (!Array.isArray(skills)) skills = [];
       _renderSkillStatsModal(skills);
     });
@@ -401,6 +411,7 @@ function __setTicketFormatRowVisible(visible) {
 if (ticketModeToggle) {
   // Load saved state and prefill technician fields.
   chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
+    if (chrome.runtime.lastError) return;
     const enabled = result.ticketMode === true;
     ticketModeToggle.checked = enabled;
     __setTicketFormatRowVisible(enabled);
@@ -462,6 +473,7 @@ if (ticketFormatSelect) {
 const expectedTenantInput = document.getElementById('expectedTenantInput');
 if (expectedTenantInput) {
   chrome.storage.local.get(['expectedTenant'], (result) => {
+    if (chrome.runtime.lastError) return;
     if (typeof result.expectedTenant === 'string') {
       expectedTenantInput.value = result.expectedTenant;
     }
@@ -574,6 +586,7 @@ settingsBtn.addEventListener('click', async () => {
   settingsModal.classList.add('show');
   // Load and render learned patterns
   chrome.storage.local.get(['learned_patterns'], (s) => {
+    if (chrome.runtime.lastError) return;
     _renderLearnedPatterns(s.learned_patterns || []);
   });
 });
@@ -616,6 +629,7 @@ saveSettingsBtn.addEventListener('click', () => {
     export_format: format,
     agent_context: agentContext
   }, () => {
+    if (chrome.runtime.lastError) return;
     settingsModal.classList.remove('show');
     showToast(`Settings saved (${state.activeProviderId})`, 'success');
   });
@@ -821,7 +835,8 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 });
 
 // ========== Test Connection Button ==========
-document.getElementById('testConnectionBtn').addEventListener('click', async () => {
+const testConnectionBtn = document.getElementById('testConnectionBtn');
+if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   const endpoint = setProviderEndpoint.value.trim();
   const apiKey = setProviderKey.value.trim();
   const model = setProviderModel.value.trim();

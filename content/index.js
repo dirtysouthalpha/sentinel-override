@@ -841,6 +841,7 @@ if (window.__sentinelInitialized) {
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (chrome.runtime.lastError) { sendResponse({ ok: false, error: chrome.runtime.lastError.message }); return; }
     handleMessage(request)
       .then(data => sendResponse({ ok: true, data }))
       .catch(err => sendResponse({ ok: false, error: err.message }));
@@ -1411,7 +1412,9 @@ if (window.__sentinelInitialized) {
           const proto = el.tagName === 'TEXTAREA'
             ? targetDoc.defaultView.HTMLTextAreaElement.prototype
             : targetDoc.defaultView.HTMLInputElement.prototype;
-          const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+          const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+          const nativeSetter = desc && desc.set;
+          if (!nativeSetter) return 'Error: unable to access native value setter';
 
           nativeSetter.call(el, '');
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
@@ -1548,10 +1551,15 @@ if (window.__sentinelInitialized) {
         // (#24) Use the native HTMLSelectElement value setter so React-controlled
         // selects don't revert to their previous value on the synthetic change.
         try {
-          const selectSetter = Object.getOwnPropertyDescriptor(
+          const selDesc = Object.getOwnPropertyDescriptor(
             targetDoc.defaultView.HTMLSelectElement.prototype, 'value'
-          ).set;
-          selectSetter.call(el, targetOpt.value);
+          );
+          const selectSetter = selDesc && selDesc.set;
+          if (selectSetter) {
+            selectSetter.call(el, targetOpt.value);
+          } else {
+            el.value = targetOpt.value;
+          }
         } catch {
           // Fallback for any environment where the setter isn't accessible.
           el.value = targetOpt.value;
