@@ -94,7 +94,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     try {
       const el = doc.querySelector(selector);
       if (el) return el;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] selector query fallback:', e && e.message); }
 
     const testIdMatch = selector.match(/^\[data-testid="(.+)"\]$/);
     if (testIdMatch) {
@@ -199,7 +199,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
               dom._addElement(el, interactiveElements, selectorMap, prefix, shadow.isInShadowDOM(el));
             }
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] shadow element scan:', e && e.message); }
       });
     }
   };
@@ -225,7 +225,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
         w: Math.round(r.width),
         h: Math.round(r.height)
       };
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] bbox getBoundingClientRect:', e && e.message); }
 
     const elementData = {
       index: interactiveElements.length,

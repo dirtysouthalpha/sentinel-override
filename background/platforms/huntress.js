@@ -14,7 +14,7 @@ export const huntress = {
     try {
       const host = new URL(url).host.toLowerCase();
       if (/huntress/i.test(host)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\bhuntress\b/i.test(String(goal || ''));
   },
 

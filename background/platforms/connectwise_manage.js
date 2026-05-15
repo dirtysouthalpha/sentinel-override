@@ -19,7 +19,7 @@ export const connectwiseManage = {
       if (/my\.connectwise\.com|connectwise\.net|cw\.local/i.test(host)) return true;
       if (/cw\.manage|connectwisemanage/i.test(host)) return true;
       if (/\/v4_6_release\/services\/system_io\/router\/api\.rails/i.test(u.pathname)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(?:connectwise\s+manage|cw\s+manage|cwmanage|connectwise\s+psa)\b/i.test(String(goal || ''));
   },
 

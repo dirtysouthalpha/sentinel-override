@@ -37,7 +37,7 @@ const ctel = window.__sentinelContentTel;
 // This prevents duplicate message listeners and duplicate MutationObservers
 // when content/index.js is injected multiple times (e.g., on page navigation).
 if (window.__sentinelInitialized) {
-  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', e && e.message); }
 } else {
   window.__sentinelInitialized = true;
 
@@ -86,7 +86,7 @@ if (window.__sentinelInitialized) {
     // Wait until body exists, then start observing.
     const startObserving = () => {
       if (document.body) {
-        try { insertionObserver.observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+        try { insertionObserver.observe(document.body, { childList: true, subtree: true }); } catch (e) { console.warn('[Sentinel] insertion observer start:', e && e.message); }
       } else {
         setTimeout(startObserving, 50);
       }
@@ -101,7 +101,7 @@ if (window.__sentinelInitialized) {
       if (el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
       const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 200);
       if (/\b(modal|dialog|sign in|subscribe)\b/.test(text)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] modal signal check:', e && e.message); }
     return false;
   }
 
@@ -122,7 +122,7 @@ if (window.__sentinelInitialized) {
         __sentinelDismissalCount = 0;
         __sentinelLastDismissRoute = _route;
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] route change reset:', e && e.message); }
 
     if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) {
       return { dismissed: [], count: 0, capped: true };
@@ -256,7 +256,7 @@ if (window.__sentinelInitialized) {
         try {
           const lbl = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', e && e.message); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -272,11 +272,11 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', e && e.message); }
         p = p.parentElement;
         depth++;
       }
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', e && e.message); }
     return parts.join(' ').toLowerCase();
   }
 
@@ -380,7 +380,7 @@ if (window.__sentinelInitialized) {
               const skip = ['nav', 'header', 'footer', 'aside', '[role="navigation"]', '[role="banner"]',
                 '.cookie-notice', '.cookie-banner', '#cookie', '.ad', '.advertisement', '[aria-hidden="true"]',
                 'script', 'style', 'noscript', 'svg'];
-              skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) {} });
+              skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel] skip selector remove:', e && e.message); } });
               content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
             }
 
@@ -510,13 +510,13 @@ if (window.__sentinelInitialized) {
           try {
             const u = new URL(window.location.href);
             tid = u.searchParams.get('tid') || null;
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] tid URL parse:', e && e.message); }
 
           try {
             const bodyText = (document.body && document.body.innerText) || '';
             const m = bodyText.match(/[a-z0-9-]+\.onmicrosoft\.com/i);
             if (m) onmicrosoft = m[0];
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] onmicrosoft scan:', e && e.message); }
 
           // Common chip selectors across admin.microsoft.com / entra.microsoft.com / portal.azure.com
           const chipSelectors = [
@@ -534,7 +534,7 @@ if (window.__sentinelInitialized) {
                 const t = (el.innerText || el.textContent || '').trim();
                 if (t && t.length < 120) { chipText = t; break; }
               }
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] tenant chip lookup:', e && e.message); }
           }
 
           return {
@@ -565,7 +565,7 @@ if (window.__sentinelInitialized) {
           // mid-click — that's fine, the pulse will draw on top).
           if (window.__sentinelCursor && window.__sentinelCursor.moveTo) {
             // Fire-and-forget: don't block the click on the full travel time.
-            try { window.__sentinelCursor.moveTo(x, y); } catch (e) {}
+            try { window.__sentinelCursor.moveTo(x, y); } catch (e) { console.warn('[Sentinel] cursor moveTo:', e && e.message); }
           }
 
           // Highlight whatever's at (x, y). Use elementFromPoint with a tiny
@@ -577,18 +577,18 @@ if (window.__sentinelInitialized) {
               window.__sentinelUtils.highlight.highlightElement(highlighted);
               // Auto-clear after 1.5s so the visual doesn't linger forever.
               setTimeout(() => {
-                try { window.__sentinelUtils.highlight.removeHighlight(highlighted); } catch (e) {}
+                try { window.__sentinelUtils.highlight.removeHighlight(highlighted); } catch (e) { console.warn('[Sentinel] highlight auto-clear:', e && e.message); }
               }, 1500);
             }
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] cdp highlight from point:', e && e.message); }
 
           // Banner + pulse + cursor press
           if (window.__sentinelOverlay) {
-            try { window.__sentinelOverlay.showActionBanner('click', desc); } catch (e) {}
-            try { window.__sentinelOverlay.showClickIndicator(x, y); } catch (e) {}
+            try { window.__sentinelOverlay.showActionBanner('click', desc); } catch (e) { console.warn('[Sentinel] action banner show:', e && e.message); }
+            try { window.__sentinelOverlay.showClickIndicator(x, y); } catch (e) { console.warn('[Sentinel] click indicator show:', e && e.message); }
           }
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
-            try { window.__sentinelCursor.press(); } catch (e) {}
+            try { window.__sentinelCursor.press(); } catch (e) { console.warn('[Sentinel] cursor press:', e && e.message); }
           }
 
           return { ok: true };
@@ -653,7 +653,7 @@ if (window.__sentinelInitialized) {
           throw new Error('BLOCKED: cannot focus sensitive field (matched "' + __sensitiveMatch + '"). Sensitive fields require manual entry.');
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch (e) { try { el.scrollIntoView(); } catch (e2) {} }
-        try { el.focus({ preventScroll: false }); } catch (e) {}
+        try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message); }
         // Clear existing value so CDP insertText replaces rather than appends,
         // matching the synthetic-path behavior. Only for inputs/textareas.
         try {
@@ -735,7 +735,7 @@ if (window.__sentinelInitialized) {
     try {
       const overlay = document.getElementById(SENTINEL_OVERLAY_ID);
       if (overlay) overlay.style.opacity = '0';
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] hide action banner:', e && e.message); }
   }
 
   function showClickIndicator(x, y) {
@@ -835,7 +835,7 @@ if (window.__sentinelInitialized) {
       const progress = position !== undefined ? ` (${position}/${total})` : '';
       overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${preview}"</span>${progress}`;
       overlay.style.opacity = '1';
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] typing banner show:', e && e.message); }
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -969,20 +969,20 @@ if (window.__sentinelInitialized) {
       // brittle nth-of-type selector chain, which breaks on SPA re-renders.
       try {
         console.warn('[Sentinel Override] ' + cmd.ref + ' stale, attempting semantic fallback');
-      } catch (e) {}
+      } catch (e) { console.warn('[Sentinel] stale ref log:', e && e.message); }
       // 1. aria-label match (most reliable stable identifier)
       if (cmd.ariaLabel) {
         try {
           const byAria = targetDoc.querySelector('[aria-label="' + cmd.ariaLabel.replace(/"/g, '\\"') + '"]');
           if (byAria) return { el: byAria, viaRef: false, staleRef: true };
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] aria-label fallback:', e && e.message); }
       }
       // 2. id match
       if (cmd.elementId) {
         try {
           const byId = targetDoc.getElementById(cmd.elementId);
           if (byId) return { el: byId, viaRef: false, staleRef: true };
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] id fallback:', e && e.message); }
       }
       // 3. visible text + tag match (e.g. a button that always says "Save")
       if (cmd.elementText && cmd.tag) {
@@ -992,7 +992,7 @@ if (window.__sentinelInitialized) {
           const byText = Array.from(targetDoc.querySelectorAll(tag))
             .find(el => (el.innerText || el.textContent || '').trim() === needle);
           if (byText) return { el: byText, viaRef: false, staleRef: true };
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] text+tag fallback:', e && e.message); }
       }
       // 4. XPath text search — find any visible element containing the text
       if (cmd.elementText) {
@@ -1004,7 +1004,7 @@ if (window.__sentinelInitialized) {
             targetDoc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null
           ).singleNodeValue;
           if (byXPath) return { el: byXPath, viaRef: false, staleRef: true };
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] XPath fallback:', e && e.message); }
       }
       // 5. aria-label partial / case-insensitive match (label may have changed slightly)
       if (cmd.elementText) {
@@ -1016,7 +1016,7 @@ if (window.__sentinelInitialized) {
               return { el: c, viaRef: false, staleRef: true };
             }
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] aria partial fallback:', e && e.message); }
       }
       // 6. data-testid / data-id partial match
       if (cmd.elementText) {
@@ -1024,7 +1024,7 @@ if (window.__sentinelInitialized) {
           const needle = String(cmd.elementText).trim().substring(0, 30).toLowerCase().replace(/\s+/g, '-');
           const byTestId = targetDoc.querySelector('[data-testid*="' + needle + '" i], [data-id*="' + needle + '" i]');
           if (byTestId) return { el: byTestId, viaRef: false, staleRef: true };
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] testid fallback:', e && e.message); }
       }
       // 7. nth-of-type selector as last resort
       if (cmd.selector) {
@@ -1136,7 +1136,7 @@ if (window.__sentinelInitialized) {
               staleRef: !!resolved.staleRef,
               url: location.href.substring(0, 200)
             });
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] click not found tel:', e && e.message); }
           return 'Element not found: ' + describeTarget(cmd);
         }
 
@@ -1153,7 +1153,7 @@ if (window.__sentinelInitialized) {
                 tag: (el.tagName || '').toLowerCase(),
                 url: location.href.substring(0, 200)
               });
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] click rejected tel:', e && e.message); }
             return 'Cannot click ' + describeTarget(cmd) + ': ' + reason;
           }
         }
@@ -1178,20 +1178,20 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveToElement:', e && e.message); }
 
         // Get element center for click indicator
         try {
           const rect = el.getBoundingClientRect();
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] click indicator rect:', e && e.message); }
 
         // (G3) Cursor press animation, fired at the same moment as the pulse.
         try {
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
             window.__sentinelCursor.press();
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor press click:', e && e.message); }
 
         // Short settle pause — the cursor.moveToElement above already provided
         // the visible "operator looking" travel time, so this is just a brief
@@ -1255,14 +1255,14 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveTo) {
             await window.__sentinelCursor.moveTo(x, y);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveTo click_at:', e && e.message); }
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(x, y);
         try {
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
             window.__sentinelCursor.press();
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor press click_at:', e && e.message); }
 
         // Short settle (cursor travel already provided the visible pause)
         await humanDelay(60, 140);
@@ -1289,7 +1289,7 @@ if (window.__sentinelInitialized) {
               textLen: (cmd.text || '').length,
               url: location.href.substring(0, 200)
             });
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] type not found tel:', e && e.message); }
           return 'Element not found: ' + describeTarget(cmd);
         }
 
@@ -1310,7 +1310,7 @@ if (window.__sentinelInitialized) {
               id: (el.id || '').substring(0, 60),
               url: location.href.substring(0, 200)
             });
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] sensitive block tel:', e && e.message); }
           return 'BLOCKED: target field appears sensitive (matched "' + __sensitiveMatch + '"). Sentinel does not auto-fill credentials, secrets, recovery codes, or PII. Have the user enter this value manually.';
         }
 
@@ -1326,7 +1326,7 @@ if (window.__sentinelInitialized) {
                 tag: (el.tagName || '').toLowerCase(),
                 url: location.href.substring(0, 200)
               });
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] type rejected tel:', e && e.message); }
             return 'Cannot type into ' + describeTarget(cmd) + ': ' + reason;
           }
         }
@@ -1346,7 +1346,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveTo type:', e && e.message); }
 
         el.focus();
         const text = cmd.text || '';
@@ -1372,8 +1372,8 @@ if (window.__sentinelInitialized) {
           el.textContent = '';
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
           // Use execCommand for broadest compatibility with SPA frameworks
-          try { targetDoc.execCommand('selectAll', false, null); } catch (e) {}
-          try { targetDoc.execCommand('delete', false, null); } catch (e) {}
+          try { targetDoc.execCommand('selectAll', false, null); } catch (e) { console.warn('[Sentinel] execCommand selectAll:', e && e.message); }
+          try { targetDoc.execCommand('delete', false, null); } catch (e) { console.warn('[Sentinel] execCommand delete:', e && e.message); }
           for (let i = 0; i < text.length; i++) {
             const char = text[i];
             el.dispatchEvent(__sentinelKeyEventForChar('keydown', char));
@@ -1386,7 +1386,7 @@ if (window.__sentinelInitialized) {
             // Insert the character. Frameworks that intercept beforeinput may
             // already have updated content, but we still call execCommand for
             // editors that don't.
-            try { targetDoc.execCommand('insertText', false, char); } catch (e) {}
+            try { targetDoc.execCommand('insertText', false, char); } catch (e) { console.warn('[Sentinel] execCommand insertText:', e && e.message); }
             el.dispatchEvent(new InputEvent('input', {
               inputType: 'insertText', data: char,
               bubbles: true, cancelable: true, composed: true
@@ -1577,13 +1577,13 @@ if (window.__sentinelInitialized) {
               if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
                 await window.__sentinelCursor.moveToElement(checkEl);
               }
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] cursor moveTo check:', e && e.message); }
             checkEl.focus();
             try {
               if (window.__sentinelCursor && window.__sentinelCursor.press) {
                 window.__sentinelCursor.press();
               }
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] cursor press check:', e && e.message); }
             await humanDelay(80, 180);
             checkEl.click();
             hl.removeHighlight(checkEl);
@@ -1647,7 +1647,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveTo hover:', e && e.message); }
 
         // (#21) Full pointer + mouse hover sequence so Radix / Headless UI /
         // Tailwind UI menus react. Use PointerEvent where available.
@@ -1746,7 +1746,7 @@ if (window.__sentinelInitialized) {
 
         try {
           console.warn('[Sentinel Override] execute_js running with full page privileges:', code.slice(0, 200));
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] exec_js warn log:', e && e.message); }
 
         // (#26) Honor cmd.timeout: default 8000ms, max 30000ms; clamp.
         // Hotfix 2026-05-06: bumped default from 3000 -> 8000. The 3s
@@ -1796,12 +1796,12 @@ if (window.__sentinelInitialized) {
               }
             } catch (err) {}
           };
-          try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) {}
+          try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener add:', e && e.message); }
 
           const execResult = await new Promise((resolve) => {
             const timeout = setTimeout(() => {
               window.removeEventListener('message', handler);
-              try { scriptEl.remove(); } catch (e) {}
+              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove timeout:', e && e.message); }
               // (3.21.1) Distinguish CSP block from a true timeout. If a CSP
               // violation fired in this window, the script never executed.
               if (__cspBlocked) {
@@ -1815,7 +1815,7 @@ if (window.__sentinelInitialized) {
               if (event.source !== window || !event.data || event.data.__sentinelEventId !== eventId) return;
               clearTimeout(timeout);
               window.removeEventListener('message', handler);
-              try { scriptEl.remove(); } catch (e) {}
+              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove handler:', e && e.message); }
               resolve(event.data);
             };
 
@@ -1847,7 +1847,7 @@ if (window.__sentinelInitialized) {
           });
 
           // (3.21.1) Clean up CSP listener regardless of which path we returned through.
-          try { document.removeEventListener('securitypolicyviolation', __cspListener); } catch (e) {}
+          try { document.removeEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener remove:', e && e.message); }
 
           if (execResult.__cspBlocked) {
             // Clear, actionable error that the agent-engine's recovery skills
@@ -1865,7 +1865,7 @@ if (window.__sentinelInitialized) {
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] exec_js timeout tel:', e && e.message); }
             return 'Code execution timed out (' + execTimeout + 'ms)';
           }
           if (execResult.__error) {
@@ -1876,12 +1876,12 @@ if (window.__sentinelInitialized) {
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] exec_js error tel:', e && e.message); }
             return 'Execution error: ' + execResult.__error;
           }
           return 'JS Result: ' + (execResult.__value || '');
         } catch (err) {
-          try { ctel.error('page', 'execute_js outer failure', { error: err.message || String(err), url: location.href.substring(0, 200) }); } catch (e) {}
+          try { ctel.error('page', 'execute_js outer failure', { error: err.message || String(err), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', e && e.message); }
           return 'JS Error: ' + err.message;
         }
       }
@@ -1901,7 +1901,7 @@ if (window.__sentinelInitialized) {
               staleRef: !!resolvedEx.staleRef,
               url: location.href.substring(0, 200)
             });
-          } catch (e) {}
+          } catch (e) { console.warn('[Sentinel] extract not found tel:', e && e.message); }
           return 'Element not found: ' + describeTarget(cmd);
         }
         let value;
@@ -1931,7 +1931,7 @@ if (window.__sentinelInitialized) {
           } else if (cmd.selector) {
             try {
               console.warn('[Sentinel Override] ' + cmd.ref + ' stale, falling back to selector');
-            } catch (e) {}
+            } catch (e) { console.warn('[Sentinel] extract_list stale log:', e && e.message); }
             try {
               containers = Array.from(targetDoc.querySelectorAll(cmd.selector));
               // (3.8.0) Auto-fall-through to shadow.queryDeep on empty results.
@@ -1995,7 +1995,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveTo dropdown:', e && e.message); }
         if (dd) {
           const options = await dd.openDropdown(targetDoc, el);
           if (!options || options.length === 0) {
@@ -2045,12 +2045,12 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el, { duration: 250 });
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] cursor moveTo scroll_to:', e && e.message); }
 
         try {
           const r = el.getBoundingClientRect();
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] scroll_to indicator:', e && e.message); }
         setTimeout(() => hl.removeHighlight(el), 1500);
         const note = resolvedScroll.staleRef ? ' (selector fallback after stale ref)' : '';
         return 'Scrolled to ' + describeTarget(cmd) + note;
@@ -2076,7 +2076,7 @@ if (window.__sentinelInitialized) {
   }
 
   function safeSendMessage(msg) {
-    try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch (e) {}
+    try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch (e) { console.warn('[Sentinel] safe send msg:', e && e.message); }
   }
 
   function setupSPAObservers() {
@@ -2143,6 +2143,6 @@ if (window.__sentinelInitialized) {
 
   setupSPAObservers();
 
-  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) {}
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) { console.warn('[Sentinel] init ready signal:', e && e.message); }
 }
 // (3.26.0) End-of-file marker — sync flush. (v3.36.3 dedupe applied)

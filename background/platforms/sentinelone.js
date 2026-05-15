@@ -18,7 +18,7 @@ export const sentinelone = {
       if (/sentinelone\.net/i.test(host)) return true;
       if (/\.sentinelone\.com$/i.test(host)) return true;
       if (/s1\.com$/i.test(host)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(sentinelone|singularity)\b/i.test(String(goal || ''));
   },
 

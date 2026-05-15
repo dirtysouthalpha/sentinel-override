@@ -17,7 +17,7 @@ export const paloalto = {
       if (/paloalto/i.test(u.hostname)) return true;
       if (/panorama/i.test(u.hostname)) return true;
       if (/\/php\/rest\/pan/i.test(u.href)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     const t = String(goal || '').toLowerCase();
     return /\b(palo\s*alto|pan-os|panorama)\b/i.test(t);
   },

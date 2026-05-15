@@ -20,7 +20,7 @@ export const dattoRmm = {
       const host = u.hostname;
       if (/centrastage\.net|dattormm\.com|datto\.com\/rmm/i.test(host)) return true;
       if (/autotask\.net|atask\.net/i.test(host)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(?:datto\s+rmm|autotask|centrastage)\b/i.test(String(goal || ''));
   },
 

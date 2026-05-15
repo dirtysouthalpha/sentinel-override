@@ -78,14 +78,14 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         try {
           const controlled = doc.getElementById(controlsId);
           if (controlled) addAllFromContainer(controlled);
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] aria-controls lookup:', e && e.message); }
       }
       const ownsId = triggerEl.getAttribute('aria-owns');
       if (ownsId) {
         try {
           const owned = doc.getElementById(ownsId);
           if (owned) addAllFromContainer(owned);
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] aria-owns lookup:', e && e.message); }
       }
 
       // 1b. If we got nothing yet, climb the DOM looking for a parent that contains
@@ -105,7 +105,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
             cursor = cursor.parentElement;
             depth++;
           }
-        } catch (e) {}
+        } catch (e) { console.warn('[Sentinel] parent container climb:', e && e.message); }
       }
     }
 
@@ -341,7 +341,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     let className = '';
     try {
       className = (typeof el.className === 'string') ? el.className : (el.className && el.className.baseVal) || '';
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] className access:', e && e.message); }
     className = className.toLowerCase();
     if (className.includes('dropdown') || className.includes('combobox') ||
         className.includes('select') || className.includes('picker')) {

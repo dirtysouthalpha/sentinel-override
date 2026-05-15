@@ -101,7 +101,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       // (3.8.1) Element might exist but be detached (React reconciliation).
       // If it's not currently in the document, drop it and rebuild.
       if (c && !c.isConnected) {
-        try { c.remove(); } catch (e) {}
+        try { c.remove(); } catch (e) { console.warn('[Sentinel] cursor remove detached:', e && e.message); }
         c = null;
       }
       if (c) return c;
@@ -162,7 +162,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         // Re-create on next animation frame so we don't fight an ongoing
         // reconciliation pass.
         requestAnimationFrame(() => {
-          try { ensureCursor(); } catch (e) {}
+          try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor recreate on mutation:', e && e.message); }
         });
       });
       const target = document.documentElement || document.body;
@@ -179,7 +179,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       try {
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
-      } catch (e) {}
+      } catch (e) { console.warn('[Sentinel] cursor auto-hide dim:', e && e.message); }
     }, HIDE_AFTER_MS);
   }
 
@@ -239,9 +239,9 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         if (!c) return;
         c.classList.add('pressing');
         setTimeout(() => {
-          try { c.classList.remove('pressing'); } catch (e) {}
+          try { c.classList.remove('pressing'); } catch (e) { console.warn('[Sentinel] cursor press cleanup:', e && e.message); }
         }, 240);
-      } catch (e) {}
+      } catch (e) { console.warn('[Sentinel] cursor press:', e && e.message); }
     },
 
     show() {
@@ -249,7 +249,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = ensureCursor();
         if (c) c.classList.remove('dimmed');
         scheduleAutoHide();
-      } catch (e) {}
+      } catch (e) { console.warn('[Sentinel] cursor show:', e && e.message); }
     },
 
     hide() {
@@ -257,13 +257,13 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      } catch (e) {}
+      } catch (e) { console.warn('[Sentinel] cursor hide:', e && e.message); }
     },
 
     setKeepVisible(on) {
       keepVisibleMode = !!on;
       if (on) {
-        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) {}
+        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', e && e.message); }
       }
     },
 
@@ -275,5 +275,5 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   window.__sentinelUtils.cursor = window.__sentinelCursor;
 
   // (3.8.1) Make the cursor visible immediately on script load.
-  try { ensureCursor(); } catch (e) {}
+  try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor init:', e && e.message); }
 })();

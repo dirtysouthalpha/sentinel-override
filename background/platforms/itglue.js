@@ -25,7 +25,7 @@ export const itglue = {
       const host = new URL(url).host.toLowerCase();
       if (/(^|\.)itglue\.com$/i.test(host)) return true;
       if (/(^|\.)partner\.itglue\.com$/i.test(host)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\bit\s*glue\b/i.test(String(goal || ''));
   },
 

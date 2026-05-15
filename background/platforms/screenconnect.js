@@ -18,7 +18,7 @@ export const screenconnect = {
       const host = u.hostname;
       if (/screenconnect\.com|connectwise\.com/i.test(host)) return true;
       if (/\/Host#Access|\/Host#Support|\/Backstage|\/Host#Join/i.test(u.href)) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(?:screenconnect|control\.connectwise|sc\.local|schost)\b/i.test(String(goal || ''));
   },
 
