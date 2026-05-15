@@ -122,7 +122,7 @@ export function computeTrustScore(m) {
   };
 
   // Sum and clamp.
-  let raw = failurePts + productivityPts + recoveryPts + planPts + efficiencyPts - safetyPenalty;
+  const raw = failurePts + productivityPts + recoveryPts + planPts + efficiencyPts - safetyPenalty;
   const score = Math.max(0, Math.min(100, Math.round(raw)));
 
   return { score, band: trustBand(score), breakdown };
