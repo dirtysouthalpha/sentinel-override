@@ -539,3 +539,225 @@ describe('overlay-detector — isOverlayBlocking', () => {
     expect(ov.isOverlayBlocking(doc, target)).toBeNull();
   });
 });
+
+// ========== Shadow DOM detection ==========
+
+describe('overlay-detector — shadow DOM detection', () => {
+  let sandbox, ov;
+  let shadowResults;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    shadowResults = {};
+    sandbox.window.__sentinelUtils.shadow = {
+      queryDeep(doc, sel) { return shadowResults[sel] || []; },
+    };
+    loadOverlayModule(sandbox);
+    ov = sandbox.window.__sentinelUtils.overlay;
+  });
+
+  test('detects visible aria-modal inside shadow DOM', () => {
+    const modal = makeElement('div', { 'aria-modal': 'true' });
+    _isVisibleResults.set(modal, true);
+    shadowResults['[aria-modal="true"]'] = [modal];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(modal);
+  });
+
+  test('skips invisible aria-modal inside shadow DOM', () => {
+    const modal = makeElement('div', { 'aria-modal': 'true' });
+    _isVisibleResults.set(modal, false);
+    shadowResults['[aria-modal="true"]'] = [modal];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+  });
+
+  test('detects visible role=dialog inside shadow DOM', () => {
+    const dialog = makeElement('div');
+    _isVisibleResults.set(dialog, true);
+    shadowResults['[role="dialog"], [role="alertdialog"]'] = [dialog];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(dialog);
+  });
+
+  test('detects cookie banner inside shadow DOM', () => {
+    const banner = makeElement('div');
+    _isVisibleResults.set(banner, true);
+    shadowResults['.cookie-banner'] = [banner];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(banner);
+  });
+
+  test('skips invisible cookie banner inside shadow DOM', () => {
+    const banner = makeElement('div');
+    _isVisibleResults.set(banner, false);
+    shadowResults['.cookie-banner'] = [banner];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+  });
+});
+
+// ========== Additional detectOverlay edge cases ==========
+
+describe('overlay-detector — detectOverlay edge cases', () => {
+  let sandbox, ov;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    loadOverlayModule(sandbox);
+    ov = sandbox.window.__sentinelUtils.overlay;
+  });
+
+  test('detects high z-index absolute-position overlay', () => {
+    const overlay = makeElement('div');
+    _isVisibleResults.set(overlay, true);
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === 'div, section') return [overlay];
+        return [];
+      },
+      defaultView: {
+        innerWidth: 1200, innerHeight: 800,
+        getComputedStyle() { return { position: 'absolute', zIndex: '5000', pointerEvents: 'auto' }; },
+      },
+    };
+    overlay.getBoundingClientRect = () => ({ width: 1200, height: 800, left: 0, top: 0 });
+    expect(ov.detectOverlay(doc)).toBe(overlay);
+  });
+
+  test('uses clientWidth fallback when innerWidth is 0', () => {
+    const overlay = makeElement('div');
+    _isVisibleResults.set(overlay, true);
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === 'div, section') return [overlay];
+        return [];
+      },
+      defaultView: {
+        innerWidth: 0, innerHeight: 0,
+        getComputedStyle() { return { position: 'fixed', zIndex: '9999', pointerEvents: 'auto' }; },
+      },
+      documentElement: { clientWidth: 1200, clientHeight: 800 },
+    };
+    overlay.getBoundingClientRect = () => ({ width: 1200, height: 800, left: 0, top: 0 });
+    expect(ov.detectOverlay(doc)).toBe(overlay);
+  });
+
+  test('skips non-fixed non-absolute positioned elements', () => {
+    const el = makeElement('div');
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === 'div, section') return [el];
+        return [];
+      },
+      defaultView: {
+        innerWidth: 1200, innerHeight: 800,
+        getComputedStyle() { return { position: 'static', zIndex: '9999', pointerEvents: 'auto' }; },
+      },
+    };
+    el.getBoundingClientRect = () => ({ width: 1200, height: 800, left: 0, top: 0 });
+    expect(ov.detectOverlay(doc)).toBeNull();
+  });
+});
+
+// ========== Additional dismissOverlay tests ==========
+
+describe('overlay-detector — dismissOverlay accept buttons and edge cases', () => {
+  let sandbox, ov;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    loadOverlayModule(sandbox);
+    ov = sandbox.window.__sentinelUtils.overlay;
+  });
+
+  test('dismisses via cookie accept button', () => {
+    const overlay = makeElement('div');
+    const acceptBtn = makeElement('button');
+    _isVisibleResults.set(acceptBtn, true);
+    _isVisibleResults.set(overlay, true);
+    let dismissed = false;
+    acceptBtn.click = () => { dismissed = true; };
+    acceptBtn.dispatchEvent = () => { dismissed = true; };
+    overlay.querySelectorAll = (sel) => {
+      if (sel.includes('close') || sel.includes('Close') || sel.includes('dismiss') || sel.includes('Dismiss')) return [];
+      if (sel.includes('accept')) return [acceptBtn];
+      return [];
+    };
+    const doc = {
+      body: { contains: () => !dismissed },
+      activeElement: overlay,
+    };
+    expect(ov.dismissOverlay(doc, overlay)).toBe(true);
+  });
+
+  test('skips invisible accept button and continues', () => {
+    const overlay = makeElement('div');
+    const acceptBtn = makeElement('button');
+    _isVisibleResults.set(acceptBtn, false);
+    _isVisibleResults.set(overlay, true);
+    let clicked = false;
+    acceptBtn.click = () => { clicked = true; };
+    acceptBtn.dispatchEvent = () => {};
+    overlay.querySelectorAll = (sel) => {
+      if (sel.includes('close') || sel.includes('Close') || sel.includes('dismiss') || sel.includes('Dismiss')) return [];
+      if (sel.includes('accept')) return [acceptBtn];
+      return [];
+    };
+    const doc = {
+      body: { contains: () => true },
+      activeElement: { dispatchEvent: () => {} },
+    };
+    // Invisible accept button should be skipped; Escape key tried but fails
+    expect(ov.dismissOverlay(doc, overlay)).toBe(false);
+    expect(clicked).toBe(false);
+  });
+
+  test('skips invisible text-match button and falls through to Escape', () => {
+    const overlay = makeElement('div');
+    const invisibleBtn = makeElement('button');
+    invisibleBtn.innerText = 'Close';
+    _isVisibleResults.set(invisibleBtn, false);
+    _isVisibleResults.set(overlay, true);
+    overlay.querySelectorAll = (sel) => {
+      if (sel === 'button, a, [role="button"]') return [invisibleBtn];
+      return [];
+    };
+    let escapeAttempted = false;
+    const doc = {
+      body: { contains: () => true },
+      activeElement: { dispatchEvent: () => { escapeAttempted = true; } },
+    };
+    expect(ov.dismissOverlay(doc, overlay)).toBe(false);
+    expect(escapeAttempted).toBe(true);
+  });
+
+  test('uses doc.body when activeElement is null for Escape key', () => {
+    const overlay = makeElement('div');
+    overlay.querySelectorAll = () => [];
+    let dismissed = false;
+    const body = {
+      contains: () => !dismissed,
+      dispatchEvent(e) {
+        if (e.type === 'keyup') dismissed = true;
+      },
+    };
+    const doc = { body, activeElement: null };
+    expect(ov.dismissOverlay(doc, overlay)).toBe(true);
+  });
+});

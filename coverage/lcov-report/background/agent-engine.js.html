@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">3.94% </span>
+                <span class="strong">3.93% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>92/2335</span>
+                <span class='fraction'>92/2337</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0.69% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>15/2148</span>
+                <span class='fraction'>15/2152</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">4.6% </span>
+                <span class="strong">4.59% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>92/1999</span>
+                <span class='fraction'>92/2001</span>
             </div>
         
             
@@ -5331,7 +5331,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -7569,7 +7569,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -9728,7 +9728,7 @@ async function <span class="fstat-no" title="function not covered" >attachTabToS
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e2) {}
+        } catch (e2) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] tab group update failed:', e2 &amp;&amp; e2.message); </span>}
       }
     }
 <span class="cstat-no" title="statement not covered" >    agentAttachedTabs.add(tabId);</span>
@@ -9752,7 +9752,7 @@ async function <span class="fstat-no" title="function not covered" >detachAllSen
   } catch (e) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
 <span class="cstat-no" title="statement not covered" >    for (const id of ids) {</span>
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >await chrome.tabs.ungroup([id]); </span>} catch (e2) {}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >await chrome.tabs.ungroup([id]); </span>} catch (e2) { /* tab may have closed */ }</span>
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
@@ -11550,7 +11550,7 @@ async function <span class="fstat-no" title="function not covered" >runAgentLoop
 <span class="cstat-no" title="statement not covered" >          loopDirective += _recovery.promptInjection;</span>
         }
       } catch (e) {
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel/skills] consultation failed (non-fatal):', e &amp;&amp; e.message); </span>} catch (ee) {}</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel/skills] consultation failed (non-fatal):', e &amp;&amp; e.message); </span>} catch (ee) { /* console unavailable */ }</span>
       }
 &nbsp;
       // Progress indicator
@@ -11966,7 +11966,7 @@ async function <span class="fstat-no" title="function not covered" >runAgentLoop
               }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});
             } catch (e) { <span class="cstat-no" title="statement not covered" >tel.warn('agent', 'run_log_available broadcast failed', { error: e.message }); </span>}
           }
-        } catch (_e) {}
+        } catch (_e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] run_log_available broadcast failed:', _e &amp;&amp; _e.message); </span>}
 &nbsp;
         // (3.31.0) Trust score is already computed above (_trustScore). Reuse it.
         const _retrySuggestions = <span class="cstat-no" title="statement not covered" >(<span class="fstat-no" title="function not covered" >fu</span>nction () {</span>
@@ -12113,7 +12113,7 @@ async function <span class="fstat-no" title="function not covered" >runAgentLoop
 <span class="cstat-no" title="statement not covered" >          historyPush({ step: stepCount, action: command, result });</span>
 <span class="cstat-no" title="statement not covered" >          await persistHistory();</span>
         } catch (e) {
-<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); </span>} catch (te) {}</span>
+<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); </span>} catch (te) { /* telemetry unavailable */ }</span>
 <span class="cstat-no" title="statement not covered" >          sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);</span>
         }
 <span class="cstat-no" title="statement not covered" >        await sleep(300);</span>
@@ -12139,7 +12139,7 @@ async function <span class="fstat-no" title="function not covered" >runAgentLoop
 <span class="cstat-no" title="statement not covered" >          historyPush({ step: stepCount, action: command, result });</span>
 <span class="cstat-no" title="statement not covered" >          await persistHistory();</span>
         } catch (e) {
-<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); </span>} catch (te) {}</span>
+<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); </span>} catch (te) { /* telemetry unavailable */ }</span>
 <span class="cstat-no" title="statement not covered" >          sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);</span>
         }
 <span class="cstat-no" title="statement not covered" >        await sleep(300);</span>
@@ -13261,7 +13261,7 @@ async function <span class="fstat-no" title="function not covered" >requestAppro
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T12:52:30.037Z
+                at 2026-05-15T14:32:39.902Z
             </div>
         <script src="../prettify.js"></script>
         <script>
