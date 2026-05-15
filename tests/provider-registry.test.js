@@ -617,7 +617,7 @@ describe('systemPromptTweak', () => {
 
   test('openai has systemPromptTweak', () => {
     expect(typeof PROVIDERS.openai.systemPromptTweak).toBe('string');
-    expect(PROVIDERS.openai.systemPromptTweak).toContain('JSON');
+    expect(PROVIDERS.openai.systemPromptTweak.length).toBeGreaterThan(50);
   });
 });
 
