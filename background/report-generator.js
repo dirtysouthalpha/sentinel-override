@@ -275,6 +275,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
  * @returns {object} Structured report data
  */
 function buildStructuredData(executionData, timestamp) {
+  if (!executionData) return {};
   const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
 
   // Classify action types for the action breakdown
@@ -384,7 +385,7 @@ function buildFallbackReport(executionData) {
   });
 
   const stepsTaken = history
-    .filter(h => !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
+    .filter(h => h.action && h.action.type && !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
     .map(h => `${h.step}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
     .join('\n');
 
