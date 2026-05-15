@@ -166,7 +166,7 @@ export function sendActionMessage(command, stepNumber, observation) {
       const el = observation.elements.find(e => e.selector === command.selector);
       if (el && el.text && el.text !== 'No label') resolvedText = el.text;
     }
-  } catch (e) {}
+  } catch (e) { /* element lookup is best-effort */ }
   chrome.runtime.sendMessage({
     action: 'agent_action',
     payload: {

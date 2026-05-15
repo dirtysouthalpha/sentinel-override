@@ -190,7 +190,7 @@ function _redactEvent(event) {
         _redactEnabled = (v === undefined || v === null) ? true : !!v;
       }
     });
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/telemetry] init error:', e && e.message); }
 })();
 
 function _scheduleFlush() {
@@ -215,6 +215,7 @@ async function _flushRunBuffer() {
     _runBuffer = [];
   } catch (e) {
     // Preserve buffer on error — retry on next flush cycle
+    console.warn('[Sentinel/telemetry] flush error:', e && e.message);
   }
 }
 
@@ -236,11 +237,11 @@ export async function startRun(runId, goal) {
     });
     const toEvict = index.splice(MAX_PERSISTED_RUNS);
     for (const old of toEvict) {
-      try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) {}
+      try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', e && e.message); }
     }
     await chrome.storage.local.set({ telemetry_runs_index: index });
     _scheduleFlush();
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/telemetry] startRun error:', e && e.message); }
 }
 
 export async function endRun(runId) {
@@ -262,7 +263,7 @@ export async function endRun(runId) {
       entry.count = events.length;
       await chrome.storage.local.set({ telemetry_runs_index: index });
     }
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/telemetry] endRun error:', e && e.message); }
   _currentRunId = null;
   _runBuffer = [];
 }
@@ -290,7 +291,7 @@ export async function deletePersistedRun(runId) {
     const filtered = index.filter(e => e.runId !== runId);
     await chrome.storage.local.set({ telemetry_runs_index: filtered });
     await chrome.storage.local.remove('telemetry_run_' + runId);
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/telemetry] deletePersistedRun error:', e && e.message); }
 }
 
 function _shouldEmit(level) {
@@ -329,10 +330,10 @@ export function emit(category, level, message, payload) {
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
     else if (level === 'debug' || level === 'trace') console.debug.apply(console, consoleArgs);
     else console.log.apply(console, consoleArgs);
-  } catch (e) {}
+  } catch (e) { /* console unavailable in some contexts */ }
   try {
     chrome.runtime.sendMessage(event).catch(() => {});
-  } catch (e) {}
+  } catch (e) { /* extension context invalidated */ }
   if (_currentRunId && _persistEnabled) {
     try {
       _runBuffer.push(event);
@@ -340,7 +341,7 @@ export function emit(category, level, message, payload) {
       if (_runBuffer.length >= 200) {
         _flushRunBuffer().catch(() => {});
       }
-    } catch (e) {}
+    } catch (e) { /* buffer append is non-critical */ }
   }
 }
 

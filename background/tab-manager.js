@@ -176,10 +176,10 @@ async function ensureObservabilityListeners(tabId) {
   } catch (e) { /* may not be supported on this target */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Runtime.enable');
-  } catch (e) {}
+  } catch (e) { /* Runtime domain may not be available */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
-  } catch (e) {}
+  } catch (e) { /* Network domain may not be available */ }
   observabilityListenersInstalled.add(tabId);
 }
 

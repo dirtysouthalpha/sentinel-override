@@ -83,7 +83,7 @@ export async function openTab(url, label) {
   tabContexts.set(tab.id, ctx);
 
   // Wait for the page to load before returning
-  try { await waitForPageLoad(tab.id); } catch (e) {}
+  try { await waitForPageLoad(tab.id); } catch (e) { console.warn('[Sentinel/tab-context] waitForPageLoad error:', e && e.message); }
 
   // Update URL/title from the actual loaded page
   try {
@@ -92,7 +92,7 @@ export async function openTab(url, label) {
       ctx.url = info.url || url;
       ctx.title = info.title || '';
     }
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/tab-context] getTabInfo error:', e && e.message); }
 
   setActiveTab(ctx.tabId);
   return ctx;
@@ -142,7 +142,7 @@ export async function closeAllAgentTabs() {
   const closable = Array.from(tabContexts.entries())
     .filter(([, ctx]) => ctx.isAgentCreated);
   for (const [tabId] of closable) {
-    try { await chrome.tabs.remove(tabId); } catch (e) {}
+    try { await chrome.tabs.remove(tabId); } catch (e) { console.warn('[Sentinel/tab-context] close tab error:', e && e.message); }
   }
   tabContexts.clear();
   activeTabId = null;
@@ -251,5 +251,5 @@ export function handleTabRemoved(tabId) {
 
 /** Notify the popup of tab state changes. */
 function notifyStateChange() {
-  try { sendTabStateUpdate(getAllTabContexts()); } catch (e) {}
+  try { sendTabStateUpdate(getAllTabContexts()); } catch (e) { /* popup may be closed */ }
 }

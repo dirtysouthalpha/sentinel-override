@@ -65,7 +65,7 @@ export function stopSwKeepalive(name) {
   _keepaliveRefCounts.delete(name);
   const handle = _keepaliveHandles.get(name);
   if (handle) {
-    try { clearInterval(handle); } catch (e) {}
+    try { clearInterval(handle); } catch (e) { /* clearInterval is safe to ignore */ }
     _keepaliveHandles.delete(name);
   }
   // Clean the session pulse key so it doesn't leak.
@@ -73,7 +73,7 @@ export function stopSwKeepalive(name) {
     if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.remove) {
       chrome.storage.session.remove('_sw_keepalive_' + name).catch(() => {});
     }
-  } catch (e) {}
+  } catch (e) { /* session storage may not be available */ }
 }
 
 // (3.11.3) Centralized "fire a desktop notification only if the user enabled

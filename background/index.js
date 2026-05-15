@@ -308,8 +308,8 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           });
         }
         if (!match) return { ok: false, error: 'no matching tab' };
-        try { await chrome.tabs.update(match.id, { active: true }); } catch (e) {}
-        try { await chrome.windows.update(match.windowId, { focused: true }); } catch (e) {}
+        try { await chrome.tabs.update(match.id, { active: true }); } catch (e) { /* tab may have closed */ }
+        try { await chrome.windows.update(match.windowId, { focused: true }); } catch (e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
         return { ok: false, error: e && e.message ? e.message : 'unknown' };

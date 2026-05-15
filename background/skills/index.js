@@ -55,14 +55,14 @@ let _saveStatsTimer = null;
         _stats = (v && typeof v === 'object') ? v : {};
       }
     });
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/skills] init error:', e && e.message); }
 })();
 
 function _scheduleSaveStats() {
   if (_saveStatsTimer) return;
   _saveStatsTimer = setTimeout(() => {
     _saveStatsTimer = null;
-    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) {}
+    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', e && e.message); }
   }, 1500);
 }
 
@@ -100,7 +100,7 @@ function _recordPendingOutcomes(context) {
         successRate: _stats[skillId].successes / _stats[skillId].fires,
         adjustedPriority: _effectivePriority({ id: skillId, priority: (SKILLS.find(s => s.id === skillId) || {}).priority })
       });
-    } catch (te) {}
+    } catch (te) { /* telemetry logging failure is non-critical */ }
   }
   _pendingOutcomeSkillIds = [];
   _scheduleSaveStats();
@@ -109,8 +109,8 @@ function _recordPendingOutcomes(context) {
 export async function resetSkillStats() {
   _stats = {};
   _pendingOutcomeSkillIds = [];
-  try { await chrome.storage.local.remove(STATS_KEY); } catch (e) {}
-  try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (e) {}
+  try { await chrome.storage.local.remove(STATS_KEY); } catch (e) { console.warn('[Sentinel/skills] stats clear error:', e && e.message); }
+  try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (e) { /* telemetry unavailable */ }
 }
 
 export function getSkillStats() {
@@ -146,10 +146,10 @@ export function runRecoverySkills(context) {
             lastActionFailed: !!context.lastActionFailed,
             lastCommandType: context.lastCommand ? context.lastCommand.type : null
           });
-        } catch (te) {}
+        } catch (te) { /* telemetry failure is non-critical */ }
       }
     } catch (e) {
-      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e && e.message }); } catch (te) {}
+      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e && e.message }); } catch (te) { /* telemetry unavailable */ }
       try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message); } catch (ee) {}
     }
   }
