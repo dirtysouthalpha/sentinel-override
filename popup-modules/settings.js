@@ -184,7 +184,7 @@ if (adaptivePromptsModeSelect) {
 
 if (adaptiveExpansionModeSelect) {
   adaptiveExpansionModeSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value });
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch(() => {});
   });
 }
 
@@ -445,7 +445,7 @@ if (ticketFormatSelect) {
         const el = __TECH_INPUTS[key];
         if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
       }
-      chrome.storage.local.set({ technicianInfo: tech });
+      chrome.storage.local.set({ technicianInfo: tech }).catch(() => {});
     }, 400);
   };
   for (const key of Object.keys(__TECH_INPUTS)) {
@@ -470,7 +470,7 @@ if (expectedTenantInput) {
     if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
     __tenantSaveTimer = setTimeout(() => {
       const v = (expectedTenantInput.value || '').trim();
-      chrome.storage.local.set({ expectedTenant: v });
+      chrome.storage.local.set({ expectedTenant: v }).catch(() => {});
     }, 350);
   });
 }
@@ -498,12 +498,14 @@ function _renderLearnedPatterns(patterns) {
   }).join('');
   list.querySelectorAll('.delete-pattern-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const idx = parseInt(btn.dataset.idx, 10);
-      const s = await chrome.storage.local.get(['learned_patterns']);
-      const arr = s.learned_patterns || [];
-      arr.splice(idx, 1);
-      await chrome.storage.local.set({ learned_patterns: arr });
-      _renderLearnedPatterns(arr);
+      try {
+        const idx = parseInt(btn.dataset.idx, 10);
+        const s = await chrome.storage.local.get(['learned_patterns']);
+        const arr = s.learned_patterns || [];
+        arr.splice(idx, 1);
+        await chrome.storage.local.set({ learned_patterns: arr });
+        _renderLearnedPatterns(arr);
+      } catch (e) { console.warn('[Sentinel] delete pattern failed:', e && e.message); }
     });
   });
 }
@@ -511,8 +513,10 @@ function _renderLearnedPatterns(patterns) {
 const clearAllPatternsBtn = document.getElementById('clearAllPatternsBtn');
 if (clearAllPatternsBtn) {
   clearAllPatternsBtn.addEventListener('click', async () => {
-    await chrome.storage.local.set({ learned_patterns: [] });
-    _renderLearnedPatterns([]);
+    try {
+      await chrome.storage.local.set({ learned_patterns: [] });
+      _renderLearnedPatterns([]);
+    } catch (e) { console.warn('[Sentinel] clear patterns failed:', e && e.message); }
   });
 }
 

@@ -1450,7 +1450,7 @@ function renderTabBar(tabs) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
       tab.addEventListener('click', () => {
-        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true });
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch(() => {});
       });
     }
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');

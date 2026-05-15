@@ -303,7 +303,7 @@ export async function startAgent(goal, sender) {
   // Determine which tab to operate on
   let startTabId;
   if (!sender.tab || !sender.tab.id) {
-    const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t)); });
+    const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t || [])); });
     if (tabs && tabs.length > 0) {
       startTabId = tabs[0].id;
     } else {
@@ -2220,7 +2220,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
-        const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
+        const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
         const lostTab = allTabs.find(t => t.id === tab);
         if (lostTab) { tabInfo = lostTab; }
         else {
@@ -3170,7 +3170,8 @@ async function runAgentLoop(goal, workingTabId) {
               new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g'),
               (_, field) => field ? (typeof _item === 'object' && _item !== null ? String(_item[field] ?? '') : '') : String(_item)
             );
-            const _resolved = JSON.parse(_resolvedStr);
+            let _resolved;
+            try { _resolved = JSON.parse(_resolvedStr); } catch (e) { console.warn('[Sentinel] repeat_for_each JSON parse failed:', e && e.message); continue; }
             _pendingCommandQueue.push(_resolved);
           }
         }
@@ -3963,7 +3964,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'click' || command.type === 'click_at') {
         await sleep(1000);
         try {
-          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
+          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
           const newTabs = allTabs.filter(t => t.openerTabId === tab && t.id !== tab);
           if (newTabs.length > 0) {
             const newTab = newTabs[0];
