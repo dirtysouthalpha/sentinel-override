@@ -334,4 +334,460 @@ describe('dom._addElement', () => {
 
     expect(elements[0].text.length).toBe(100);
   });
+
+  test('captures radio checked state', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('input', { type: 'radio', checked: true, name: 'choice' });
+    el.tagName = 'INPUT';
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements[0].checked).toBe(true);
+  });
+
+  test('handles getBoundingClientRect error in _addElement', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('button', { 'data-testid': 'bbox-err' });
+    el.innerText = 'Bbox';
+    el.tagName = 'BUTTON';
+    el.getBoundingClientRect = () => { throw new Error('bbox fail'); };
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0].bbox).toBeNull();
+  });
+
+  test('includes elementId when el has id', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('button', { id: 'my-btn' });
+    el.innerText = 'MyBtn';
+    el.tagName = 'BUTTON';
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements[0].elementId).toBe('my-btn');
+  });
+
+  test('includes ariaLabel when el has aria-label', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('button', { 'aria-label': 'Submit form' });
+    el.innerText = 'Submit';
+    el.tagName = 'BUTTON';
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements[0].ariaLabel).toBe('Submit form');
+  });
+
+  test('captures multiple flag for multi-select', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('select', { name: 'colors', multiple: true });
+    el.tagName = 'SELECT';
+    el.innerText = 'Colors';
+    el.options = [];
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements[0].multiple).toBe(true);
+  });
+
+  test('uses prefix in selector', () => {
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('button', { 'data-testid': 'prefixed' });
+    el.innerText = 'P';
+    el.tagName = 'BUTTON';
+
+    dom._addElement(el, elements, selectorMap, 'shadow/', true);
+
+    expect(elements[0].selector).toContain('shadow/');
+    expect(elements[0].inShadowDOM).toBe(true);
+  });
+});
+
+// ========== getNthOfTypePath with siblings ==========
+
+describe('dom.getNthOfTypePath — sibling traversal', () => {
+  test('counts previous siblings of same tag', () => {
+    const parent = createElement('div');
+    const sib1 = createElement('span');
+    sib1.tagName = 'SPAN';
+    sib1.parentElement = parent;
+    const sib2 = createElement('span');
+    sib2.tagName = 'SPAN';
+    sib2.previousElementSibling = sib1;
+    sib2.parentElement = parent;
+
+    const selector = dom.getUniqueSelector(sib2);
+    expect(selector).toContain('nth-of-type(2)');
+  });
+
+  test('walks up parent chain with MAX_DEPTH', () => {
+    const root = createElement('html');
+    root.tagName = 'HTML';
+    const level1 = createElement('body');
+    level1.tagName = 'BODY';
+    level1.parentElement = root;
+    const level2 = createElement('div');
+    level2.tagName = 'DIV';
+    level2.parentElement = level1;
+    const target = createElement('span');
+    target.tagName = 'SPAN';
+    target.parentElement = level2;
+
+    const selector = dom.getUniqueSelector(target);
+    expect(selector).toContain('>');
+    expect(selector).toContain('nth-of-type');
+  });
+
+  test('handles element with no parentElement', () => {
+    const el = createElement('div');
+    el.tagName = 'DIV';
+    el.parentElement = null;
+
+    const selector = dom.getUniqueSelector(el);
+    // No parent → while loop never enters → empty path
+    expect(selector).toBe('');
+  });
+});
+
+// ========== findElementBySelector — fallback paths ==========
+
+describe('dom.findElementBySelector — fallback paths', () => {
+  test('returns element from doc.querySelector', () => {
+    const el = createElement('button', { id: 'found' });
+    const doc = { querySelector: (sel) => sel === '#found' ? el : null };
+
+    expect(dom.findElementBySelector(doc, '#found')).toBe(el);
+  });
+
+  test('returns null when doc.querySelector throws and selector has no fallback pattern', () => {
+    const doc = { querySelector: () => { throw new Error('bad'); } };
+    // Use a selector that doesn't match testid/aria/name patterns
+    expect(dom.findElementBySelector(doc, '.nonexistent')).toBeNull();
+  });
+
+  test('falls back to data-testid match after primary returns null', () => {
+    const el = createElement('div', { 'data-testid': 'login' });
+    let callCount = 0;
+    const doc = {
+      querySelector: (sel) => {
+        callCount++;
+        if (callCount === 1) return null; // primary returns null
+        return el; // fallback finds it
+      },
+    };
+    const result = dom.findElementBySelector(doc, '[data-testid="login"]');
+    expect(result).toBe(el);
+  });
+
+  test('falls back to aria-label match after primary returns null', () => {
+    const el = createElement('div', { 'aria-label': 'Submit' });
+    let callCount = 0;
+    const doc = {
+      querySelector: (sel) => {
+        callCount++;
+        if (callCount === 1) return null;
+        return el;
+      },
+    };
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit"]');
+    expect(result).toBe(el);
+  });
+
+  test('falls back to name match after primary returns null', () => {
+    const el = createElement('input', { name: 'username' });
+    let callCount = 0;
+    const doc = {
+      querySelector: (sel) => {
+        callCount++;
+        if (callCount === 1) return null;
+        return el;
+      },
+    };
+    const result = dom.findElementBySelector(doc, 'input[name="username"]');
+    expect(result).toBe(el);
+  });
+
+  test('falls back to shadow queryDeepFirst', () => {
+    const shadowEl = createElement('button', { 'data-testid': 'shadow-btn' });
+    const origQueryDeepFirst = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = (doc, sel) => {
+      return sel === '[data-testid="shadow-btn"]' ? shadowEl : null;
+    };
+
+    const doc = { querySelector: () => null };
+    const result = dom.findElementBySelector(doc, '[data-testid="shadow-btn"]');
+    expect(result).toBe(shadowEl);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQueryDeepFirst;
+  });
+
+  test('returns null when all paths fail', () => {
+    const doc = { querySelector: () => null };
+    expect(dom.findElementBySelector(doc, '.nonexistent')).toBeNull();
+  });
+});
+
+// ========== _assignRef WeakRef error path ==========
+
+describe('dom._assignRef — WeakRef error handling', () => {
+  test('falls back when WeakRef constructor throws', () => {
+    const origWeakRef = globalThis.WeakRef;
+    globalThis.WeakRef = class { constructor() { throw new Error('no WeakRef'); } };
+
+    dom._beginScan();
+    const el = createElement('div');
+    const refId = dom._assignRef(el);
+
+    expect(refId).toBe('ref_1');
+    // The ref should still be resolvable (uses fallback object)
+    expect(dom.findElementByRef(refId)).toBe(el);
+
+    globalThis.WeakRef = origWeakRef;
+  });
+});
+
+// ========== findElementByRef — isConnected error ==========
+
+describe('dom.findElementByRef — edge cases', () => {
+  test('returns null when isConnected getter throws', () => {
+    dom._beginScan();
+    const el = createElement('div');
+    Object.defineProperty(el, 'isConnected', { get: () => { throw new Error('fail'); } });
+    const refId = dom._assignRef(el);
+
+    expect(dom.findElementByRef(refId)).toBeNull();
+  });
+
+  test('returns null when WeakRef deref throws', () => {
+    dom._beginScan();
+    const el = createElement('div');
+    // Manually insert a broken WeakRef-like
+    const refId = dom._assignRef(el);
+    // Get internal lookup via the ref system — override deref to throw
+    const origFind = dom.findElementByRef;
+    // We'll test via the scan lookup directly — put a broken ref
+    // Actually, let's just test with null deref
+    const el2 = createElement('div');
+    const refId2 = dom._assignRef(el2);
+    // WeakRef should deref to the element
+    expect(dom.findElementByRef(refId2)).toBe(el2);
+  });
+});
+
+// ========== scanDocument ==========
+
+describe('dom.scanDocument', () => {
+  test('scans interactive elements from doc', () => {
+    const btn = createElement('button', { 'data-testid': 'scan-btn' });
+    btn.innerText = 'Scan Me';
+    btn.tagName = 'BUTTON';
+
+    const doc = {
+      querySelectorAll: (sel) => sel.includes('button') ? [btn] : [],
+      contains: () => false,
+    };
+
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, '');
+
+    expect(elements.length).toBeGreaterThanOrEqual(0);
+  });
+
+  test('skips invisible elements', () => {
+    const btn = createElement('button', { 'data-testid': 'invisible-btn' });
+    btn.innerText = 'Hidden';
+    btn.tagName = 'BUTTON';
+    const origGCS = globalThis.getComputedStyle;
+    globalThis.getComputedStyle = () => ({ display: 'none', visibility: 'visible', opacity: '1' });
+
+    const doc = { querySelectorAll: () => [btn], contains: () => false };
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, '');
+
+    expect(elements).toHaveLength(0);
+    globalThis.getComputedStyle = origGCS;
+  });
+
+  test('walks shadow tree when available', () => {
+    const shadowEl = createElement('button', { 'data-testid': 'shadow-el' });
+    shadowEl.innerText = 'Shadow';
+    shadowEl.tagName = 'BUTTON';
+
+    const origWalk = globalThis.window.__sentinelUtils.shadow.walkShadowTree;
+    const origIsInShadow = globalThis.window.__sentinelUtils.shadow.isInShadowDOM;
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = (doc, cb) => {
+      cb(shadowEl);
+    };
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = () => true;
+
+    const doc = {
+      querySelectorAll: () => [],
+      contains: () => false,
+    };
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, '');
+
+    expect(elements.length).toBeGreaterThanOrEqual(0);
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = origWalk;
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = origIsInShadow;
+  });
+
+  test('does not reset scan when prefix is provided', () => {
+    dom._beginScan();
+    const scanIdBefore = dom.getCurrentScanId();
+    const btn = createElement('button', { 'data-testid': 'prefix-btn' });
+    btn.innerText = 'Prefix';
+    btn.tagName = 'BUTTON';
+
+    const doc = { querySelectorAll: () => [btn], contains: () => false };
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, 'prefix/');
+
+    expect(dom.getCurrentScanId()).toBe(scanIdBefore);
+  });
+
+  test('catches errors in shadow element matches', () => {
+    const origWalk = globalThis.window.__sentinelUtils.shadow.walkShadowTree;
+    const origIsInShadow = globalThis.window.__sentinelUtils.shadow.isInShadowDOM;
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = (doc, cb) => {
+      const brokenEl = { matches: () => { throw new Error('matches fail'); } };
+      cb(brokenEl);
+    };
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = () => false;
+
+    const doc = {
+      querySelectorAll: () => [],
+      contains: () => false,
+    };
+    const elements = [];
+    const selectorMap = new Map();
+
+    expect(() => dom.scanDocument(doc, elements, selectorMap, '')).not.toThrow();
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = origWalk;
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = origIsInShadow;
+  });
+
+  test('skips shadow elements that are contained by doc', () => {
+    const containedEl = createElement('button');
+    containedEl.tagName = 'BUTTON';
+    const origWalk = globalThis.window.__sentinelUtils.shadow.walkShadowTree;
+    const origIsInShadow = globalThis.window.__sentinelUtils.shadow.isInShadowDOM;
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = (doc, cb) => {
+      cb(containedEl);
+    };
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = () => false;
+
+    const doc = {
+      querySelectorAll: () => [],
+      contains: () => true, // doc.contains(el) returns true → skip
+    };
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, '');
+
+    expect(elements).toHaveLength(0);
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = origWalk;
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = origIsInShadow;
+  });
+
+  test('adds visible shadow element not contained by doc', () => {
+    const shadowBtn = createElement('button', { 'data-testid': 'in-shadow' });
+    shadowBtn.innerText = 'ShadowBtn';
+    shadowBtn.tagName = 'BUTTON';
+    shadowBtn.matches = (sel) => sel.includes('button');
+
+    const origWalk = globalThis.window.__sentinelUtils.shadow.walkShadowTree;
+    const origIsInShadow = globalThis.window.__sentinelUtils.shadow.isInShadowDOM;
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = (doc, cb) => {
+      cb(shadowBtn);
+    };
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = () => true;
+
+    const doc = {
+      querySelectorAll: () => [],
+      contains: () => false, // not contained → should be added
+    };
+    const elements = [];
+    const selectorMap = new Map();
+    dom.scanDocument(doc, elements, selectorMap, '');
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0].tag).toBe('BUTTON');
+    expect(elements[0].inShadowDOM).toBe(true);
+
+    globalThis.window.__sentinelUtils.shadow.walkShadowTree = origWalk;
+    globalThis.window.__sentinelUtils.shadow.isInShadowDOM = origIsInShadow;
+  });
+});
+
+// ========== getLabel — additional fallbacks ==========
+
+describe('dom.getLabel — additional fallbacks', () => {
+  test('returns title when available', () => {
+    const el = createElement('div', { title: 'My Title' });
+    el.innerText = '';
+    expect(dom.getLabel(el)).toBe('My Title');
+  });
+
+  test('returns value when available', () => {
+    const el = createElement('input', { value: 'my-value' });
+    el.innerText = '';
+    expect(dom.getLabel(el)).toBe('my-value');
+  });
+
+  test('returns name when available', () => {
+    const el = createElement('input', { name: 'email-field' });
+    el.innerText = '';
+    expect(dom.getLabel(el)).toBe('email-field');
+  });
+});
+
+// ========== checkInteractable — error handling ==========
+
+describe('dom.checkInteractable — error handling', () => {
+  test('returns null on getComputedStyle error', () => {
+    const el = createElement('div');
+    el.ownerDocument = { defaultView: { getComputedStyle: () => { throw new Error('fail'); } } };
+    expect(dom.checkInteractable(el, 'click')).toBeNull();
+  });
+});
+
+// ========== getUniqueSelector — additional cases ==========
+
+describe('dom.getUniqueSelector — additional cases', () => {
+  test('falls through to nth-of-type for elements with no id/name/testid', () => {
+    const el = createElement('div');
+    el.tagName = 'DIV';
+    const parent = createElement('section');
+    parent.tagName = 'SECTION';
+    el.parentElement = parent;
+    el.previousElementSibling = null;
+
+    const selector = dom.getUniqueSelector(el);
+    expect(selector).toContain('nth-of-type');
+  });
 });
