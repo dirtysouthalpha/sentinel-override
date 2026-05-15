@@ -147,7 +147,7 @@ function extractJsonObject(text) {
     const m = s.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
     if (m && m[1]) s = m[1].trim();
   }
-  // Strip control characters
+  // eslint-disable-next-line no-control-regex
   s = s.replace(/[\x00-\x1f]/g, '');
   try { return JSON.parse(s); } catch (e) { /* keep going */ }
   // Find first { ... } balanced

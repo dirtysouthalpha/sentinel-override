@@ -327,7 +327,7 @@ export function supportsVision(model, providerHint) {
     /\bclaude-(opus|sonnet|haiku|3|4|5)\b/i,
     /\bgpt-(4o|4\.1|4-vision|5|o\d)\b/i,
     /\bgemini\b/i,
-    /\bqwen[\w.\-]*-vl\b/i,
+    /\bqwen[\w.]*-vl\b/i,
     /\bllava\b/i,
     /vision/i,
     /-vl-/i,
@@ -424,6 +424,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
       if (match && match[1]) jsonStr = match[1].trim();
     }
     // Strip control characters that break JSON.parse
+    // eslint-disable-next-line no-control-regex
     jsonStr = jsonStr.replace(/[\x00-\x1f]/g, '');
     try {
       const parsed = JSON.parse(jsonStr);
@@ -1096,7 +1097,7 @@ function regexSalvageFinishOrNote(content) {
   if (!m) return null;
   let raw = m[1];
   // Soften common malformations the LLM emits: \\` -> \`, then unescape \n/\r/\t
-  raw = raw.replace(/\\([^\"\\\/bfnrtu])/g, '$1')
+  raw = raw.replace(/\\([^"\\/bfnrtu])/g, '$1')
            .replace(/\\n/g, '\n')
            .replace(/\\r/g, '\r')
            .replace(/\\t/g, '\t')

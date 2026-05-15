@@ -507,8 +507,6 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     // Fire-and-forget messages from content script — acknowledge silently
     case 'content_script_ready':
-    case 'spa_navigation':
-    case 'spa_content_changed':
       return null;
 
     default:
