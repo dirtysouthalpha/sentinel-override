@@ -2536,7 +2536,7 @@ function renderSourceChipsIn(rootEl) {
   const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
   const texts = [];
   let n; while ((n = walker.nextNode())) texts.push(n);
-  const re = /\[src:([a-z0-9_\-]+)\]|\[unverified\]/gi;
+  const re = /\[src:([a-z0-9_-]+)\]|\[unverified\]/gi;
   for (const tn of texts) {
     if (!re.test(tn.textContent)) continue;
     re.lastIndex = 0;
