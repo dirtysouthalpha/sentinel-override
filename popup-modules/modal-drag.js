@@ -137,7 +137,7 @@
         }
       }
     });
-    bodyObserver.observe(document.body, { childList: true, subtree: true });
+    if (document.body) bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   if (document.readyState === 'loading') {

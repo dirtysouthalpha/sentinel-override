@@ -31,11 +31,12 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
         }
       });
 
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
+      const observeTarget = document.body || document.documentElement;
+      if (!observeTarget) {
+        resolve('No document body to observe');
+        return;
+      }
+      observer.observe(observeTarget, { childList: true, subtree: true });
 
       const pollInterval = setInterval(() => {
         if (wait.checkCondition(condition)) {
@@ -56,7 +57,8 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
 
   wait.checkCondition = function(condition) {
     if (condition.type === 'wait_for_text') {
-      return document.body.innerText.includes(condition.text);
+      const body = document.body;
+      return body ? body.innerText.includes(condition.text) : false;
     } else if (condition.type === 'wait_for_element') {
       // (#10) Prefer ref when provided. A ref that resolves means the element
       // is still in the live DOM. If the ref is stale, fall through to selector.

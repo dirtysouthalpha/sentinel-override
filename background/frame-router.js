@@ -167,7 +167,7 @@ function runCommandInFrame(command) {
   const ov = utils.overlay;
   const si = utils.specialInputs;
   const doc = document;
-  const view = doc.defaultView;
+  const view = doc.defaultView || window;
   const eventOpts = { bubbles: true, composed: true };
 
   try {
@@ -251,17 +251,24 @@ function runCommandInFrame(command) {
 
         // Standard INPUT/TEXTAREA
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-          const nativeSetter = Object.getOwnPropertyDescriptor(
-            el.tagName === 'TEXTAREA'
-              ? view.HTMLTextAreaElement.prototype
-              : view.HTMLInputElement.prototype,
-            'value'
-          ).set;
-          nativeSetter.call(el, '');
+          const proto = el.tagName === 'TEXTAREA'
+            ? (view.HTMLTextAreaElement && view.HTMLTextAreaElement.prototype)
+            : (view.HTMLInputElement && view.HTMLInputElement.prototype);
+          const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
+          const nativeSetter = descriptor && descriptor.set;
+          if (nativeSetter) {
+            nativeSetter.call(el, '');
+          } else {
+            el.value = '';
+          }
           el.dispatchEvent(new Event('input', eventOpts));
           for (const char of text) {
             const currentVal = el.value;
-            nativeSetter.call(el, currentVal + char);
+            if (nativeSetter) {
+              nativeSetter.call(el, currentVal + char);
+            } else {
+              el.value = currentVal + char;
+            }
             el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
           }
           el.dispatchEvent(new Event('change', eventOpts));
@@ -300,7 +307,7 @@ function runCommandInFrame(command) {
           skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) {} });
           content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
         }
-        if (!content || content.length < 200) {
+        if ((!content || content.length < 200) && doc.body) {
           const bodyClone = doc.body.cloneNode(true);
           ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
             bodyClone.querySelectorAll(tag).forEach(el => el.remove());

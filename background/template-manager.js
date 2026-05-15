@@ -45,8 +45,12 @@ export function extractParameters(goalText) {
  * @returns {Promise<Object<string, object>>}
  */
 export async function loadTemplates() {
-  const result = await chrome.storage.local.get([STORAGE_KEY]);
-  return result[STORAGE_KEY] || {};
+  try {
+    const result = await chrome.storage.local.get([STORAGE_KEY]);
+    return result[STORAGE_KEY] || {};
+  } catch (e) {
+    return {};
+  }
 }
 
 /**
@@ -54,7 +58,12 @@ export async function loadTemplates() {
  * @param {Object<string, object>} templates
  */
 export async function saveTemplates(templates) {
-  await chrome.storage.local.set({ [STORAGE_KEY]: templates });
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEY]: templates });
+  } catch (e) {
+    // Storage quota or unavailable — callers should handle
+    throw new Error('Failed to save templates: ' + (e.message || e));
+  }
 }
 
 // ========== CRUD Operations ==========

@@ -40,8 +40,10 @@ function hideTemplatesPanel() {
 
 // ========== Template List ==========
 function loadTemplates() {
-  const searchTerm = document.getElementById('templateSearchInput').value.toLowerCase().trim();
-  const tagFilter = document.getElementById('templateTagFilter').value.toLowerCase().trim();
+  const searchEl = document.getElementById('templateSearchInput');
+  const tagEl = document.getElementById('templateTagFilter');
+  const searchTerm = searchEl ? searchEl.value.toLowerCase().trim() : '';
+  const tagFilter = tagEl ? tagEl.value.toLowerCase().trim() : '';
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
     if (chrome.runtime.lastError) {
@@ -77,6 +79,7 @@ function filterTemplates(templates, searchTerm, tagFilter) {
 
 function renderTemplateList(templates) {
   const container = document.getElementById('template-list');
+  if (!container) return;
 
   if (!templates || templates.length === 0) {
     container.innerHTML = '<div class="template-empty">No templates yet. Create one from a completed task or build one from scratch.</div>';
@@ -140,19 +143,27 @@ _on('templateTagFilter', 'input', () => loadTemplates());
 // ========== Create Template ==========
 function openCreateTemplateModal(goalText) {
   editingTemplateId = null;
-  document.getElementById('template-modal-title').textContent = 'New Template';
-  document.getElementById('tmpl-name').value = '';
-  document.getElementById('tmpl-goal').value = goalText || '';
-  document.getElementById('tmpl-tags').value = '';
-  document.getElementById('tmpl-params-container').innerHTML = '';
-  document.getElementById('template-modal').classList.add('show');
+  const title = document.getElementById('template-modal-title');
+  if (title) title.textContent = 'New Template';
+  const nameInput = document.getElementById('tmpl-name');
+  if (nameInput) nameInput.value = '';
+  const goalInput = document.getElementById('tmpl-goal');
+  if (goalInput) goalInput.value = goalText || '';
+  const tagsInput = document.getElementById('tmpl-tags');
+  if (tagsInput) tagsInput.value = '';
+  const paramsContainer = document.getElementById('tmpl-params-container');
+  if (paramsContainer) paramsContainer.innerHTML = '';
+  document.getElementById('template-modal')?.classList.add('show');
   updateParamEditor();
 }
 
 function saveNewTemplate() {
-  const name = document.getElementById('tmpl-name').value.trim();
-  const goal = document.getElementById('tmpl-goal').value.trim();
-  const tagsStr = document.getElementById('tmpl-tags').value.trim();
+  const nameEl = document.getElementById('tmpl-name');
+  const goalEl = document.getElementById('tmpl-goal');
+  const tagsEl = document.getElementById('tmpl-tags');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const goal = goalEl ? goalEl.value.trim() : '';
+  const tagsStr = tagsEl ? tagsEl.value.trim() : '';
 
   if (!name) {
     showToast('Template name is required', 'error');
@@ -177,7 +188,7 @@ function saveNewTemplate() {
       showToast(response.error, 'error');
       return;
     }
-    document.getElementById('template-modal').classList.remove('show');
+    document.getElementById('template-modal')?.classList.remove('show');
     loadTemplates();
     showToast('Template saved', 'success');
   });
@@ -204,19 +215,26 @@ function openEditTemplateModal(templateId) {
 
     const template = response.data;
     editingTemplateId = templateId;
-    document.getElementById('template-modal-title').textContent = 'Edit Template';
-    document.getElementById('tmpl-name').value = template.name || '';
-    document.getElementById('tmpl-goal').value = template.goal || '';
-    document.getElementById('tmpl-tags').value = (template.tags || []).join(', ');
-    document.getElementById('template-modal').classList.add('show');
+    const title = document.getElementById('template-modal-title');
+    if (title) title.textContent = 'Edit Template';
+    const nameEl = document.getElementById('tmpl-name');
+    if (nameEl) nameEl.value = template.name || '';
+    const goalEl = document.getElementById('tmpl-goal');
+    if (goalEl) goalEl.value = template.goal || '';
+    const tagsEl = document.getElementById('tmpl-tags');
+    if (tagsEl) tagsEl.value = (template.tags || []).join(', ');
+    document.getElementById('template-modal')?.classList.add('show');
     updateParamEditor(template.params);
   });
 }
 
 function saveEditedTemplate() {
-  const name = document.getElementById('tmpl-name').value.trim();
-  const goal = document.getElementById('tmpl-goal').value.trim();
-  const tagsStr = document.getElementById('tmpl-tags').value.trim();
+  const nameEl = document.getElementById('tmpl-name');
+  const goalEl = document.getElementById('tmpl-goal');
+  const tagsEl = document.getElementById('tmpl-tags');
+  const name = nameEl ? nameEl.value.trim() : '';
+  const goal = goalEl ? goalEl.value.trim() : '';
+  const tagsStr = tagsEl ? tagsEl.value.trim() : '';
 
   if (!name) {
     showToast('Template name is required', 'error');
@@ -243,7 +261,7 @@ function saveEditedTemplate() {
       return;
     }
     editingTemplateId = null;
-    document.getElementById('template-modal').classList.remove('show');
+    document.getElementById('template-modal')?.classList.remove('show');
     loadTemplates();
     showToast('Template updated', 'success');
   });
@@ -251,8 +269,10 @@ function saveEditedTemplate() {
 
 // ========== Parameter Editor (create/edit modal) ==========
 function updateParamEditor(existingParams) {
-  const goalText = document.getElementById('tmpl-goal').value;
+  const goalEl = document.getElementById('tmpl-goal');
   const container = document.getElementById('tmpl-params-container');
+  const goalText = goalEl ? goalEl.value : '';
+  if (!container) return;
   const regex = /:{2}(\w+):{2}/g;
 
   const seen = new Set();
@@ -306,10 +326,13 @@ function openRunModal(templateId) {
 
     const template = response.data;
     runningTemplateId = templateId;
-    document.getElementById('template-run-title').textContent = 'Run: ' + template.name;
-    document.getElementById('template-run-goal-preview').textContent = template.goal;
+    const runTitle = document.getElementById('template-run-title');
+    if (runTitle) runTitle.textContent = 'Run: ' + template.name;
+    const goalPreview = document.getElementById('template-run-goal-preview');
+    if (goalPreview) goalPreview.textContent = template.goal;
 
     const container = document.getElementById('tmpl-run-params-container');
+    if (!container) return;
     container.innerHTML = '';
 
     const params = template.params || [];
@@ -327,7 +350,7 @@ function openRunModal(templateId) {
       });
     }
 
-    document.getElementById('template-run-modal').classList.add('show');
+    document.getElementById('template-run-modal')?.classList.add('show');
   });
 }
 
@@ -355,7 +378,7 @@ function executeTemplate() {
       return;
     }
     runningTemplateId = null;
-    document.getElementById('template-run-modal').classList.remove('show');
+    document.getElementById('template-run-modal')?.classList.remove('show');
     hideTemplatesPanel();
     showToast('Template running...', 'success');
   });

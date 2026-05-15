@@ -7,9 +7,9 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
 (function() {
   const dd = window.__sentinelUtils.dropdown;
-  const dom = window.__sentinelUtils.dom;
-  const wait = window.__sentinelUtils.wait;
-  const shadow = window.__sentinelUtils.shadow;
+  const dom = window.__sentinelUtils.dom || {};
+  const wait = window.__sentinelUtils.wait || {};
+  const shadow = window.__sentinelUtils.shadow || {};
 
   // ========== Open Dropdown ==========
   // Opens a custom dropdown by clicking the trigger, then polls for option elements.
@@ -218,13 +218,16 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         searchInput.value = '';
         searchInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         for (const char of value) {
-          const nativeSetter = Object.getOwnPropertyDescriptor(
-            searchInput.tagName === 'TEXTAREA'
-              ? doc.defaultView.HTMLTextAreaElement.prototype
-              : doc.defaultView.HTMLInputElement.prototype,
-            'value'
-          ).set;
-          nativeSetter.call(searchInput, searchInput.value + char);
+          const proto = searchInput.tagName === 'TEXTAREA'
+            ? (doc.defaultView && doc.defaultView.HTMLTextAreaElement && doc.defaultView.HTMLTextAreaElement.prototype)
+            : (doc.defaultView && doc.defaultView.HTMLInputElement && doc.defaultView.HTMLInputElement.prototype);
+          const descriptor = proto ? Object.getOwnPropertyDescriptor(proto, 'value') : null;
+          const nativeSetter = descriptor && descriptor.set;
+          if (nativeSetter) {
+            nativeSetter.call(searchInput, searchInput.value + char);
+          } else {
+            searchInput.value = searchInput.value + char;
+          }
           searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
         }
         // Wait for filtered results
@@ -334,7 +337,12 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     if (el.getAttribute('aria-haspopup') === 'listbox' || el.getAttribute('aria-haspopup') === 'menu') return true;
 
     // Check class names for common dropdown patterns
-    const className = (el.className || '').toLowerCase();
+    // SVG elements have SVGAnimatedString for className, not a plain string
+    let className = '';
+    try {
+      className = (typeof el.className === 'string') ? el.className : (el.className && el.className.baseVal) || '';
+    } catch (e) {}
+    className = className.toLowerCase();
     if (className.includes('dropdown') || className.includes('combobox') ||
         className.includes('select') || className.includes('picker')) {
       return true;

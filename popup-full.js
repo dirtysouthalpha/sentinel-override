@@ -16,14 +16,17 @@ window.addEventListener('DOMContentLoaded', () => {
   setupApprovalModeToggle();
 
   // Templates button toggle
-  document.getElementById('templatesBtn').addEventListener('click', () => {
-    const panel = document.getElementById('templates-panel');
-    if (panel.style.display === 'none' || !panel.style.display) {
-      showTemplatesPanel();
-    } else {
-      hideTemplatesPanel();
-    }
-  });
+  const templatesBtn = document.getElementById('templatesBtn');
+  if (templatesBtn) {
+    templatesBtn.addEventListener('click', () => {
+      const panel = document.getElementById('templates-panel');
+      if (panel && (panel.style.display === 'none' || !panel.style.display)) {
+        showTemplatesPanel();
+      } else {
+        hideTemplatesPanel();
+      }
+    });
+  }
 
   // Scheduler panel toggle
   const schedulerBtn = document.getElementById('schedulerBtn');
@@ -43,10 +46,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Schedule modal close handlers
   document.getElementById('closeScheduleModalBtn')?.addEventListener('click', () => {
-    document.getElementById('schedule-modal').classList.remove('show');
+    document.getElementById('schedule-modal')?.classList.remove('show');
   });
   document.getElementById('closeHistoryModalBtn')?.addEventListener('click', () => {
-    document.getElementById('schedule-history-modal').classList.remove('show');
+    document.getElementById('schedule-history-modal')?.classList.remove('show');
   });
 
   // Schedule create/save buttons
@@ -69,11 +72,11 @@ window.addEventListener('DOMContentLoaded', () => {
 // ========== Close Modals on Escape ==========
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    document.getElementById('settings-modal').classList.remove('show');
-    document.getElementById('theme-modal').classList.remove('show');
-    document.getElementById('report-modal').classList.remove('show');
-    document.getElementById('template-modal').classList.remove('show');
-    document.getElementById('template-run-modal').classList.remove('show');
+    document.getElementById('settings-modal')?.classList.remove('show');
+    document.getElementById('theme-modal')?.classList.remove('show');
+    document.getElementById('report-modal')?.classList.remove('show');
+    document.getElementById('template-modal')?.classList.remove('show');
+    document.getElementById('template-run-modal')?.classList.remove('show');
     document.getElementById('schedule-modal')?.classList.remove('show');
     document.getElementById('schedule-history-modal')?.classList.remove('show');
     document.getElementById('import-modal')?.classList.remove('show');
@@ -84,27 +87,27 @@ document.addEventListener('keydown', (e) => {
 // ========== Click outside modal to close ==========
 window.addEventListener('click', (e) => {
   if (e.target === document.getElementById('settings-modal')) {
-    document.getElementById('settings-modal').classList.remove('show');
+    document.getElementById('settings-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('theme-modal')) {
-    document.getElementById('theme-modal').classList.remove('show');
+    document.getElementById('theme-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('report-modal')) {
     closeReportModal();
   }
   if (e.target === document.getElementById('template-modal')) {
-    document.getElementById('template-modal').classList.remove('show');
+    document.getElementById('template-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('template-run-modal')) {
-    document.getElementById('template-run-modal').classList.remove('show');
+    document.getElementById('template-run-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('schedule-modal')) {
-    document.getElementById('schedule-modal').classList.remove('show');
+    document.getElementById('schedule-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('schedule-history-modal')) {
-    document.getElementById('schedule-history-modal').classList.remove('show');
+    document.getElementById('schedule-history-modal')?.classList.remove('show');
   }
   if (e.target === document.getElementById('import-modal')) {
-    document.getElementById('import-modal').classList.remove('show');
+    document.getElementById('import-modal')?.classList.remove('show');
   }
 });
