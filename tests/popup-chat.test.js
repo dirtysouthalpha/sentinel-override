@@ -386,3 +386,136 @@ describe('chat.js — renderTenantChip', () => {
     expect(chipEl.classList.contains('mismatch')).toBe(false);
   });
 });
+
+describe('chat.js — updateActiveTabPage', () => {
+  let sandbox;
+  let hostEl, titleEl, favEl, stripEl;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    hostEl = makeElement('span');
+    titleEl = makeElement('span');
+    favEl = makeElement('img');
+    stripEl = makeElement('div');
+    stripEl.style.display = 'none';
+    const origGetById = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => {
+      if (id === 'ats-host') return hostEl;
+      if (id === 'ats-title') return titleEl;
+      if (id === 'ats-favicon') return favEl;
+      if (id === 'active-tab-strip') return stripEl;
+      return origGetById.call(sandbox.document, id);
+    };
+    loadModule(sandbox);
+  });
+
+  test('sets hostname and shows strip', () => {
+    sandbox.updateActiveTabPage('https://example.com/page', 'Example Page');
+    // URL constructor is mocked, falls back to raw url string
+    expect(hostEl.textContent).toBe('https://example.com/page');
+    expect(titleEl.textContent).toBe('Example Page');
+    expect(stripEl.style.display).toBe('flex');
+  });
+
+  test('handles malformed URL gracefully', () => {
+    sandbox.updateActiveTabPage('not-a-url', '');
+    expect(hostEl.textContent).toBe('not-a-url');
+  });
+
+  test('does nothing when url is empty', () => {
+    sandbox.updateActiveTabPage('', 'Title');
+    expect(stripEl.style.display).toBe('none');
+  });
+
+  test('does nothing when url is null', () => {
+    sandbox.updateActiveTabPage(null, 'Title');
+    expect(stripEl.style.display).toBe('none');
+  });
+
+  test('sets favicon src to Google service', () => {
+    sandbox.updateActiveTabPage('https://portal.contoso.com/admin', 'Admin');
+    expect(favEl.src).toContain('google.com/s2/favicons');
+    expect(favEl.src).toContain('portal.contoso.com');
+  });
+});
+
+describe('chat.js — updateActiveTabStep', () => {
+  let sandbox;
+  let stepEl;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    stepEl = makeElement('span');
+    const origGetById = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => {
+      if (id === 'ats-step') return stepEl;
+      return origGetById.call(sandbox.document, id);
+    };
+    loadModule(sandbox);
+  });
+
+  test('shows step number with total', () => {
+    sandbox.updateActiveTabStep(3, 10);
+    expect(stepEl.textContent).toBe('STEP 3/10');
+  });
+
+  test('shows step number without total', () => {
+    sandbox.updateActiveTabStep(5);
+    expect(stepEl.textContent).toBe('STEP 5');
+  });
+
+  test('shows empty when step is 0 and no total', () => {
+    sandbox.updateActiveTabStep(0);
+    expect(stepEl.textContent).toBe('');
+  });
+
+  test('shows empty when step is null', () => {
+    sandbox.updateActiveTabStep(null);
+    expect(stepEl.textContent).toBe('');
+  });
+});
+
+describe('chat.js — updateActiveTabAction', () => {
+  let sandbox;
+  let actionEl;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    actionEl = makeElement('span');
+    const origGetById = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => {
+      if (id === 'ats-action') return actionEl;
+      return origGetById.call(sandbox.document, id);
+    };
+    loadModule(sandbox);
+  });
+
+  test('sets click action text and class', () => {
+    sandbox.updateActiveTabAction({ type: 'click', targetText: 'Submit' });
+    expect(actionEl.textContent).toContain('Submit');
+    expect(actionEl.classList.contains('is-clicking')).toBe(true);
+  });
+
+  test('sets type action text and class', () => {
+    sandbox.updateActiveTabAction({ type: 'type', text: 'hello' });
+    expect(actionEl.textContent).toContain('hello');
+    expect(actionEl.classList.contains('is-typing')).toBe(true);
+  });
+
+  test('clears click/type classes for other actions', () => {
+    actionEl.classList.add('is-clicking', 'is-typing');
+    sandbox.updateActiveTabAction({ type: 'navigate', url: 'https://example.com' });
+    expect(actionEl.classList.contains('is-clicking')).toBe(false);
+    expect(actionEl.classList.contains('is-typing')).toBe(false);
+  });
+
+  test('handles null payload', () => {
+    sandbox.updateActiveTabAction(null);
+    expect(actionEl.textContent).toBe('');
+  });
+
+  test('handles undefined payload', () => {
+    sandbox.updateActiveTabAction(undefined);
+    expect(actionEl.textContent).toBe('');
+  });
+});
