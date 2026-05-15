@@ -1057,7 +1057,8 @@ function clearSearchHighlights() {
   document.querySelectorAll('.message-group.highlighted').forEach(group => {
     group.classList.remove('highlighted');
   });
-  document.getElementById('searchCount').style.display = 'none';
+  const searchCount = document.getElementById('searchCount');
+  if (searchCount) searchCount.style.display = 'none';
 }
 
 // ========== Markdown Preview ==========

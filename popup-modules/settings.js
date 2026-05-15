@@ -98,7 +98,10 @@ function loadSettings() {
       state.activeProviderId = providerId;
     }
     if (result.export_format) exportFormatSelect.value = result.export_format;
-    if (result.agent_context) document.getElementById('set-agent-context').value = result.agent_context;
+    if (result.agent_context) {
+      const el = document.getElementById('set-agent-context');
+      if (el) el.value = result.agent_context;
+    }
   });
 }
 
@@ -579,7 +582,8 @@ saveSettingsBtn.addEventListener('click', () => {
   const apiKey = setProviderKey.value.trim();
   const model = setProviderModel.value.trim();
   const format = exportFormatSelect.value;
-  const agentContext = document.getElementById('set-agent-context').value.trim();
+  const agentContextEl = document.getElementById('set-agent-context');
+  const agentContext = agentContextEl ? agentContextEl.value.trim() : '';
 
   if (!apiKey) {
     showToast('API key is required', 'error');
@@ -779,9 +783,12 @@ function applyThemePreset(theme) {
 }
 
 saveThemeBtn.addEventListener('click', () => {
-  const primary = document.getElementById('colorPrimary').value;
-  const bg = document.getElementById('colorBg').value;
-  const text = document.getElementById('colorText').value;
+  const primaryEl = document.getElementById('colorPrimary');
+  const bgEl = document.getElementById('colorBg');
+  const textEl = document.getElementById('colorText');
+  const primary = primaryEl ? primaryEl.value : '';
+  const bg = bgEl ? bgEl.value : '';
+  const text = textEl ? textEl.value : '';
 
   document.documentElement.style.setProperty('--accent-primary', primary);
   document.documentElement.style.setProperty('--bg-primary', bg);

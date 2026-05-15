@@ -309,7 +309,7 @@
           (e.payload ? '  ' + JSON.stringify(e.payload) : '')
         ).join('\n');
         try {
-          navigator.clipboard.writeText(text);
+          navigator.clipboard.writeText(text).catch(() => {});
           copyBtn.textContent = 'Copied!';
           setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
         } catch (e) {}
