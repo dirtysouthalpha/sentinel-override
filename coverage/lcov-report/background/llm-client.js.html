@@ -3796,8 +3796,8 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 &nbsp;
 import { sendSilentUpdate } from './message-protocol.js';
-import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
-import { resolveProvider, getActiveProvider, getModelSupportsVision, detectProviderFromEndpoint } from './provider-registry.js';
+import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
+import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 &nbsp;
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
@@ -4439,7 +4439,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
   if (Array.isArray(pageTypes) &amp;&amp; pageTypes.length &amp;&amp; currentUrl) {
     let detected = null;
     for (const pt of pageTypes) {
-      try { <span class="missing-if-branch" title="if path not taken" >I</span>if (pt &amp;&amp; pt.urlMatch &amp;&amp; pt.urlMatch.test(currentUrl)) { <span class="cstat-no" title="statement not covered" >detected = pt; <span class="cstat-no" title="statement not covered" ></span>break; </span>} } catch (e) {}
+      try { <span class="missing-if-branch" title="if path not taken" >I</span>if (pt &amp;&amp; pt.urlMatch &amp;&amp; pt.urlMatch.test(currentUrl)) { <span class="cstat-no" title="statement not covered" >detected = pt; <span class="cstat-no" title="statement not covered" ></span>break; </span>} } catch (_) {}
     }
     <span class="missing-if-branch" title="if path not taken" >I</span>if (detected) {
 <span class="cstat-no" title="statement not covered" >      parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));</span>
@@ -4513,7 +4513,7 @@ export function getPlatformContext(currentUrl, goal) {
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
-  } catch (e) { /* never crash prompt-building on profile lookup */ }
+  } catch (_) { /* never crash prompt-building on profile lookup */ }
   const ctx = prose + selectorBlock;
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
   return ctx;
@@ -5446,7 +5446,7 @@ ${provider.supportsToolUse ? '' : <span class="branch-1 cbranch-no" title="branc
     try {
       const responseText = provider.parseResponse(data);
       <span class="missing-if-branch" title="else path not taken" >E</span>if (responseText) return parseLLMResponse(responseText);
-    } catch (e) {
+    } catch (_) {
       // parseResponse failed (e.g. null content with tool_calls we already tried)
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
@@ -5457,7 +5457,7 @@ ${provider.supportsToolUse ? '' : <span class="branch-1 cbranch-no" title="branc
 <span class="cstat-no" title="statement not covered" >        try {</span>
           const input = <span class="cstat-no" title="statement not covered" >JSON.parse(tc.function.arguments || '{}');</span>
 <span class="cstat-no" title="statement not covered" >          return { type: tc.function.name, ...input };</span>
-        } catch (e) { /* give up */ }
+        } catch (_) { /* give up */ }
       }
     }
 <span class="cstat-no" title="statement not covered" >    return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };</span>
@@ -5500,7 +5500,7 @@ export function extractFirstJsonObject(str) {
       try {
         const parsed = JSON.parse(candidate);
         if (parsed.type &amp;&amp; validTypes.has(parsed.type)) return candidate;
-      } catch (e) { /* not valid JSON, try next */ }
+      } catch (_) { /* not valid JSON, try next */ }
       searchFrom = end + 1;
     } else {
       break;
@@ -5621,14 +5621,14 @@ export function parseLLMResponse(content) {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);
 <span class="cstat-no" title="statement not covered" >        if (parsed &amp;&amp; parsed.type) <span class="cstat-no" title="statement not covered" >return parsed;</span></span>
-      } catch (e) { /* try regex salvage */ }
+      } catch (_) { /* try regex salvage */ }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         <span class="missing-if-branch" title="else path not taken" >E</span>if (salvaged) {
           console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
           return salvaged;
         }
-      } catch (e) { /* fall through */ }
+      } catch (_) { /* fall through */ }
     }
     return { type: 'note', text: `Parse error (will retry): ${err.message}` };
   }
@@ -5650,7 +5650,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) =&gt; b.score - a.score)
       .slice(0, 3);
     return scored.map(s =&gt; s.pattern);
-  } catch (e) { return []; }
+  } catch (_) { return []; }
 }
 &nbsp;
 // ========== Utilities ==========
@@ -5662,7 +5662,7 @@ function sleep(ms) { return new Promise(resolve =&gt; setTimeout(resolve, ms)); 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T22:42:27.972Z
+                at 2026-05-15T23:32:25.625Z
             </div>
         <script src="../prettify.js"></script>
         <script>

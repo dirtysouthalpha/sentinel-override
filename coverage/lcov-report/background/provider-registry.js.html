@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">90.37% </span>
+                <span class="strong">90.84% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>122/135</span>
+                <span class='fraction'>129/142</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.49% </span>
+                <span class="strong">89.16% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>100/113</span>
+                <span class='fraction'>107/120</span>
             </div>
         
             
@@ -696,7 +696,18 @@
 <a name='L631'></a><a href='#L631'>631</a>
 <a name='L632'></a><a href='#L632'>632</a>
 <a name='L633'></a><a href='#L633'>633</a>
-<a name='L634'></a><a href='#L634'>634</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L634'></a><a href='#L634'>634</a>
+<a name='L635'></a><a href='#L635'>635</a>
+<a name='L636'></a><a href='#L636'>636</a>
+<a name='L637'></a><a href='#L637'>637</a>
+<a name='L638'></a><a href='#L638'>638</a>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a>
+<a name='L643'></a><a href='#L643'>643</a>
+<a name='L644'></a><a href='#L644'>644</a>
+<a name='L645'></a><a href='#L645'>645</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1054,7 +1065,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">56x</span>
+<span class="cline-any cline-yes">56x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">55x</span>
@@ -1097,7 +1114,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
@@ -1105,7 +1125,6 @@
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1125,10 +1144,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1515,7 +1537,7 @@ export const PROVIDERS = {
           let input = <span class="cstat-no" title="statement not covered" >{};</span>
 <span class="cstat-no" title="statement not covered" >          try {</span>
 <span class="cstat-no" title="statement not covered" >            input = JSON.parse(tc.function.arguments || '{}');</span>
-          } catch (e) {
+          } catch {
             // If arguments aren't valid JSON, treat the whole string as a note
 <span class="cstat-no" title="statement not covered" >            input = { text: tc.function.arguments };</span>
           }
@@ -1687,7 +1709,13 @@ export function detectProviderFromEndpoint(endpoint) {
  * @returns {Promise&lt;object&gt;} Provider config with id, endpoint, apiKey, model, etc.
  */
 export async function getActiveProvider() {
-  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (_) {
+    const provider = PROVIDERS.openai;
+    return { id: 'openai', ...provider, endpoint: provider.defaultEndpoint, apiKey: '', model: provider.defaultModel, maxTokens: 8000, temperature: 0.3 };
+  }
 &nbsp;
   // If new provider structure exists, use it
   if (stored.active_provider &amp;&amp; stored.providers &amp;&amp; stored.providers[stored.active_provider]) {
@@ -1730,38 +1758,43 @@ export async function getActiveProvider() {
  * This is idempotent: if the new structure already exists, it does nothing.
  */
 export async function migrateLegacySettings() {
-  const stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (_) { return; }
   if (stored.providers) return; // already migrated
 &nbsp;
   const endpoint = stored.api_endpoint || '';
   const apiKey = stored.api_key || '';
   const model = stored.model || '';
   const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic' : 'openai';
-  const providerDefaults = PROVIDERS[providerId];
-&nbsp;
-  await chrome.storage.local.set({
-    active_provider: providerId,
-    providers: {
-      anthropic: {
-        api_key: providerId === 'anthropic' ? apiKey : '',
-        model: 'claude-sonnet-4-6',
-        endpoint: 'https://api.anthropic.com/v1/messages',
-        max_tokens: 8000,
-        temperature: 0.3
-      },
-      openai: {
-        api_key: providerId === 'openai' ? apiKey : '',
-        model: model || 'gpt-4o',
-        endpoint: endpoint || 'https://api.openai.com/v1/chat/completions',
-        max_tokens: 8000,
-        temperature: 0.3
+  try {
+    await chrome.storage.local.set({
+      active_provider: providerId,
+      providers: {
+        anthropic: {
+          api_key: providerId === 'anthropic' ? apiKey : '',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages',
+          max_tokens: 8000,
+          temperature: 0.3
+        },
+        openai: {
+          api_key: providerId === 'openai' ? apiKey : '',
+          model: model || 'gpt-4o',
+          endpoint: endpoint || 'https://api.openai.com/v1/chat/completions',
+          max_tokens: 8000,
+          temperature: 0.3
+        }
       }
-    }
-  });
+    });
+  } catch (_) { return; }
 &nbsp;
   // CRITICAL: Remove old keys so stale values cannot cause confusion
   // callLLM() and other readers now use getActiveProvider() which reads the new structure
-  await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
+  try {
+    await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
+  } catch (_) {}
 }
 &nbsp;
 // ========== Provider Catalog (3.10.0) ==========
@@ -1969,7 +2002,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T22:42:27.972Z
+                at 2026-05-15T23:32:25.625Z
             </div>
         <script src="../prettify.js"></script>
         <script>
