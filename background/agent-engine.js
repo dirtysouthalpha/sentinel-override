@@ -869,7 +869,7 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e2) {}
+        } catch (_e2) {}
       }
     }
     agentAttachedTabs.add(tabId);
@@ -893,7 +893,7 @@ async function detachAllSentinelTabs() {
   } catch (_) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (e2) {}
+      try { await chrome.tabs.ungroup([id]); } catch (_e2) {}
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
@@ -1111,7 +1111,7 @@ function _splitTriedSection(summary) {
 }
 
 function formatTicketKickoff(summary, goal, tech, options) {
-  const _opts = options || {};
+  const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const tried = _splitTriedSection(summary).map(s => '- ' + s).join('\n');
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
@@ -1150,7 +1150,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
 }
 
 function formatWaitingOnClient(summary, goal, tech, options) {
-  const _opts = options || {};
+  const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
@@ -1185,7 +1185,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
 }
 
 function formatWaitingOnVendor(summary, goal, tech, options) {
-  const _opts = options || {};
+  const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
@@ -1220,7 +1220,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
 }
 
 function formatItGlueKb(summary, goal, tech, options) {
-  const _opts = options || {};
+  const _opts = options || {}; // reserved for future template options
   const goalShort = ((goal || '').split(/\n/)[0] || '').slice(0, 100);
   const ticketNum = extractTicketNumber(goal);
   const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
@@ -1275,7 +1275,7 @@ function formatItGlueKb(summary, goal, tech, options) {
 }
 
 function formatClientEmail(summary, goal, tech, options) {
-  const _opts = options || {};
+  const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
@@ -2802,9 +2802,9 @@ async function runAgentLoop(goal, workingTabId) {
             CONFIG,
             agentState
           );
-        } catch (_) {
-          _aiCallError = _e;
-          throw _e;
+        } catch (e) {
+          _aiCallError = e;
+          throw e;
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
@@ -3371,7 +3371,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
-        } catch (_) {
+        } catch (e) {
           const _r = 'lookup failed: ' + (e.message || String(e));
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
@@ -3442,7 +3442,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionResult(stepCount, `Command ran on ${_profile ? _profile.label : 'remote machine'}`, false);
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
-        } catch (_) {
+        } catch (e) {
           const _r = 'run_remote_command failed: ' + (e.message || String(e));
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
@@ -3732,7 +3732,7 @@ async function runAgentLoop(goal, workingTabId) {
           const freshContent = await sendMessageWithRetry(tab, { action: 'read_page' });
           result = freshContent ? 'Page content re-read' : 'Failed to re-read page';
           actionFailed = !freshContent;
-        } catch (err) { result = 'Could not re-read page'; actionFailed = true; }
+        } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (command.type === 'extract' || command.type === 'extract_list') {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
         result = res || 'Done';
@@ -3935,7 +3935,7 @@ async function runAgentLoop(goal, workingTabId) {
                 if (r.ok) { result = 'Clicked ' + targetLabel + ' via CDP'; cdpDone = true; }
                 else { console.warn('[CDP] dispatchClick failed, falling back:', r.error); }
               }
-            } catch (_) { console.warn('[CDP] get_bbox failed, falling back:', e && e.message); }
+            } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', e && e.message); }
           } else if (command.type === 'type') {
             // Focus the target via the content script (it knows the ref/selector
             // resolution rules), then dispatch trusted text via CDP.
@@ -3986,7 +3986,7 @@ async function runAgentLoop(goal, workingTabId) {
               } else if (cdpResult && !cdpResult.attachDenied && cdpResult.error) {
                 console.warn('[CDP] execute_js failed, falling back:', cdpResult.error);
               }
-            } catch (_) {
+            } catch (e) {
               console.warn('[CDP] execute_js threw, falling back:', e && e.message);
             }
             if (!cdpUsed) {
@@ -4299,7 +4299,7 @@ async function saveLearnedPattern(goal, history, success) {
     });
     if (patterns.length > CONFIG.maxLearnedPatterns) patterns.splice(0, patterns.length - CONFIG.maxLearnedPatterns);
     await chrome.storage.local.set({ learned_patterns: patterns });
-  } catch (_) { console.warn('Failed to save pattern:', e); }
+  } catch (e) { console.warn('Failed to save pattern:', e); }
 }
 
 // ========== Utilities ==========

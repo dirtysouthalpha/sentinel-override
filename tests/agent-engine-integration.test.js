@@ -72,6 +72,7 @@ jest.unstable_mockModule('../background/platforms/index.js', () => ({
 
 jest.unstable_mockModule('../background/tab-manager.js', () => ({
   waitForPageLoad: jest.fn(async () => {}),
+  waitForPageReady: jest.fn(async () => {}),
   injectContentScript: jest.fn(async () => {}),
   sendMessageWithRetry: jest.fn(async () => ({})),
   takeScreenshot: jest.fn(async () => 'data:image/png;base64,abc'),

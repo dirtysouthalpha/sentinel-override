@@ -356,7 +356,13 @@ export function detectProviderFromEndpoint(endpoint) {
  * @returns {Promise<object>} Provider config with id, endpoint, apiKey, model, etc.
  */
 export async function getActiveProvider() {
-  const stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (_) {
+    const provider = PROVIDERS.openai;
+    return { id: 'openai', ...provider, endpoint: provider.defaultEndpoint, apiKey: '', model: provider.defaultModel, maxTokens: 8000, temperature: 0.3 };
+  }
 
   // If new provider structure exists, use it
   if (stored.active_provider && stored.providers && stored.providers[stored.active_provider]) {
@@ -399,36 +405,43 @@ export async function getActiveProvider() {
  * This is idempotent: if the new structure already exists, it does nothing.
  */
 export async function migrateLegacySettings() {
-  const stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
+  } catch (_) { return; }
   if (stored.providers) return; // already migrated
 
   const endpoint = stored.api_endpoint || '';
   const apiKey = stored.api_key || '';
   const model = stored.model || '';
   const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic' : 'openai';
-  await chrome.storage.local.set({
-    active_provider: providerId,
-    providers: {
-      anthropic: {
-        api_key: providerId === 'anthropic' ? apiKey : '',
-        model: 'claude-sonnet-4-6',
-        endpoint: 'https://api.anthropic.com/v1/messages',
-        max_tokens: 8000,
-        temperature: 0.3
-      },
-      openai: {
-        api_key: providerId === 'openai' ? apiKey : '',
-        model: model || 'gpt-4o',
-        endpoint: endpoint || 'https://api.openai.com/v1/chat/completions',
-        max_tokens: 8000,
-        temperature: 0.3
+  try {
+    await chrome.storage.local.set({
+      active_provider: providerId,
+      providers: {
+        anthropic: {
+          api_key: providerId === 'anthropic' ? apiKey : '',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages',
+          max_tokens: 8000,
+          temperature: 0.3
+        },
+        openai: {
+          api_key: providerId === 'openai' ? apiKey : '',
+          model: model || 'gpt-4o',
+          endpoint: endpoint || 'https://api.openai.com/v1/chat/completions',
+          max_tokens: 8000,
+          temperature: 0.3
+        }
       }
-    }
-  });
+    });
+  } catch (_) { return; }
 
   // CRITICAL: Remove old keys so stale values cannot cause confusion
   // callLLM() and other readers now use getActiveProvider() which reads the new structure
-  await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
+  try {
+    await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
+  } catch (_) {}
 }
 
 // ========== Provider Catalog (3.10.0) ==========
