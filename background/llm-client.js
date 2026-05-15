@@ -202,7 +202,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
   if (Array.isArray(pageTypes) && pageTypes.length && currentUrl) {
     let detected = null;
     for (const pt of pageTypes) {
-      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) {}
+      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) { console.warn('[llm-client] pageType urlMatch failed:', e.message); }
     }
     if (detected) {
       parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));
