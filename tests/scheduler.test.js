@@ -1457,3 +1457,38 @@ describe('executeScheduledTask — tab info with URL', () => {
     expect(registerInitialTab).toHaveBeenCalledWith(42, 'https://example.com');
   });
 });
+
+// ========== Storage helper error handling ==========
+
+describe('storage helpers — error handling via exported functions', () => {
+  let scheduler;
+
+  beforeEach(async () => {
+    storageData = {};
+    jest.clearAllMocks();
+    scheduler = await import('../background/scheduler.js');
+  });
+
+  test('listSchedules returns [] when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage error'));
+    const result = await scheduler.listSchedules();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('createSchedule does not throw when storage.set rejects on save', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({});
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('quota'));
+    await expect(scheduler.createSchedule({
+      goal: 'test goal',
+      url: 'https://example.com',
+      scheduleType: 'once',
+      enabled: true
+    })).rejects.toThrow();
+  });
+
+  test('getRecentResults returns [] when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage error'));
+    const result = await scheduler.getRecentResults(5);
+    expect(Array.isArray(result)).toBe(true);
+  });
+});

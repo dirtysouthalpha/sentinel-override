@@ -790,6 +790,42 @@ describe('generatePlan', () => {
     expect(result).toBeNull();
   });
 
+  test('returns plan via extractFirstJsonObject fallback', async () => {
+    // extractFirstJsonObject only matches objects with a valid action "type" field.
+    // Use a valid type like "note" that also carries a "plan" array.
+    const payload = 'Some reasoning text before {"type":"note","plan":["Step A","Step B"]} and after';
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: payload } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', openaiSettings);
+    expect(result).toEqual(['Step A', 'Step B']);
+  });
+
+  test('returns null when extractFirstJsonObject returns malformed JSON', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Result: {not valid json} end' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', openaiSettings);
+    expect(result).toBeNull();
+  });
+
+  test('returns null when extractFirstJsonObject finds JSON without plan key', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Result: {"type":"click","selector":"#btn"} done' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', openaiSettings);
+    expect(result).toBeNull();
+  });
+
   test('uses context.currentUrl in prompt when provided', async () => {
     const mockFn = jest.fn(() => Promise.resolve({
       ok: true,

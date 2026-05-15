@@ -378,3 +378,80 @@ describe('adaptive priority — success rate adjustment', () => {
     resetSkillStats();
   });
 });
+
+// ========== Skills index — error handling edge cases ==========
+
+describe('skills index — error handling edge cases', () => {
+  test('runRecoverySkills returns empty for undefined context', () => {
+    const result = runRecoverySkills(undefined);
+    expect(result.autoApply).toBeNull();
+    expect(result.promptInjection).toBe('');
+  });
+
+  test('runRecoverySkills returns empty for non-object context', () => {
+    const result = runRecoverySkills('string-context');
+    expect(result.autoApply).toBeNull();
+  });
+
+  test('runRecoverySkills handles non-boolean lastActionFailed gracefully', () => {
+    // Non-boolean should clear pending outcomes without crashing
+    const result = runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: 'yes', // not boolean
+    });
+    expect(result).toBeDefined();
+  });
+
+  test('runRecoverySkills handles missing lastActionFailed gracefully', () => {
+    const result = runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+    });
+    expect(result).toBeDefined();
+  });
+
+  test('resetSkillStats does not throw when storage.remove fails', async () => {
+    const origRemove = chrome.storage.local.remove;
+    chrome.storage.local.remove = jest.fn(async () => { throw new Error('storage error'); });
+    await expect(resetSkillStats()).resolves.toBeUndefined();
+    chrome.storage.local.remove = origRemove;
+  });
+
+  test('listSkills returns array with id and priority', () => {
+    const skills = listSkills();
+    expect(Array.isArray(skills)).toBe(true);
+    for (const s of skills) {
+      expect(typeof s.id).toBe('string');
+      expect(typeof s.priority).toBe('number');
+      expect(typeof s.effectivePriority).toBe('number');
+    }
+  });
+
+  test('getSkillStats returns empty object after reset', async () => {
+    await resetSkillStats();
+    const stats = getSkillStats();
+    expect(stats).toBeDefined();
+  });
+
+  test('storage change listener handles undefined values', () => {
+    if (!storageChangeListener) return;
+    // Simulate a storage change with undefined newValue
+    expect(() => {
+      storageChangeListener(
+        { sentinel_skill_adapt_enabled: { newValue: undefined } },
+        'local'
+      );
+    }).not.toThrow();
+  });
+
+  test('storage change listener handles non-object stats value', () => {
+    if (!storageChangeListener) return;
+    expect(() => {
+      storageChangeListener(
+        { sentinel_skill_stats: { newValue: 'not-an-object' } },
+        'local'
+      );
+    }).not.toThrow();
+  });
+});

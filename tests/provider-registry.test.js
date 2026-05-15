@@ -1139,3 +1139,101 @@ describe('fetchModelsList', () => {
     jest.useRealTimers();
   });
 });
+
+// ========== getActiveProvider — error handling ==========
+
+describe('getActiveProvider — storage failure handling', () => {
+  beforeEach(() => {
+    global.chrome = {
+      storage: {
+        local: {
+          get: jest.fn(() => Promise.reject(new Error('storage unavailable')))
+        }
+      }
+    };
+  });
+
+  afterEach(() => {
+    delete global.chrome;
+  });
+
+  test('returns defaults when storage.get rejects', async () => {
+    const result = await getActiveProvider();
+    expect(result).toBeDefined();
+    expect(result.id).toBe('openai');
+    expect(result.maxTokens).toBe(8000);
+    expect(result.temperature).toBe(0.3);
+  });
+});
+
+// ========== migrateLegacySettings — error handling ==========
+
+describe('migrateLegacySettings — error handling', () => {
+  let setCalls;
+  let removeCalls;
+
+  afterEach(() => {
+    delete global.chrome;
+  });
+
+  test('returns early when storage.get rejects', async () => {
+    setCalls = [];
+    removeCalls = [];
+    global.chrome = {
+      storage: {
+        local: {
+          get: jest.fn(() => Promise.reject(new Error('storage unavailable'))),
+          set: jest.fn((obj) => { setCalls.push(obj); return Promise.resolve(); }),
+          remove: jest.fn((keys) => { removeCalls.push(keys); return Promise.resolve(); })
+        }
+      }
+    };
+    await migrateLegacySettings();
+    expect(setCalls).toHaveLength(0);
+    expect(removeCalls).toHaveLength(0);
+  });
+
+  test('catches storage.set rejection during migration', async () => {
+    const storageData = {
+      api_endpoint: 'https://api.openai.com/v1/chat/completions',
+      api_key: 'sk-test',
+      model: 'gpt-4o'
+    };
+    setCalls = [];
+    removeCalls = [];
+    global.chrome = {
+      storage: {
+        local: {
+          get: jest.fn((keys) => Promise.resolve(
+            keys.reduce((acc, k) => { if (storageData[k] !== undefined) acc[k] = storageData[k]; return acc; }, {})
+          )),
+          set: jest.fn(() => Promise.reject(new Error('quota exceeded'))),
+          remove: jest.fn((keys) => { removeCalls.push(keys); return Promise.resolve(); })
+        }
+      }
+    };
+    await expect(migrateLegacySettings()).resolves.toBeUndefined();
+  });
+
+  test('catches storage.remove rejection during migration', async () => {
+    const storageData = {
+      api_endpoint: 'https://api.openai.com/v1/chat/completions',
+      api_key: 'sk-test',
+      model: 'gpt-4o'
+    };
+    setCalls = [];
+    removeCalls = [];
+    global.chrome = {
+      storage: {
+        local: {
+          get: jest.fn((keys) => Promise.resolve(
+            keys.reduce((acc, k) => { if (storageData[k] !== undefined) acc[k] = storageData[k]; return acc; }, {})
+          )),
+          set: jest.fn((obj) => { setCalls.push(obj); return Promise.resolve(); }),
+          remove: jest.fn(() => Promise.reject(new Error('remove failed')))
+        }
+      }
+    };
+    await expect(migrateLegacySettings()).resolves.toBeUndefined();
+  });
+});
