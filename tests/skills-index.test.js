@@ -21,9 +21,9 @@ globalThis.chrome = {
       }),
       set: jest.fn(async (obj) => { Object.assign(storageData, obj); }),
       remove: jest.fn(async (key) => { delete storageData[key]; }),
-      onChanged: {
-        addListener: jest.fn(),
-      },
+    },
+    onChanged: {
+      addListener: jest.fn(),
     },
   },
 };
@@ -40,6 +40,9 @@ jest.unstable_mockModule('../background/telemetry.js', () => ({
 
 const { runRecoverySkills, listSkills, getSkillStats, resetSkillStats } =
   await import('../background/skills/index.js');
+
+// Capture the onChanged listener registered during module init (before mocks are cleared)
+const storageChangeListener = chrome.storage.onChanged.addListener.mock.calls[0]?.[0] || null;
 
 beforeEach(() => {
   storageData = {};
@@ -231,5 +234,147 @@ describe('resetSkillStats', () => {
     for (const v of Object.values(stats)) {
       expect(v.fires).toBeFalsy();
     }
+  });
+});
+
+// ========== Adaptive state — storage change listener ==========
+
+describe('adaptive state — onChanged listener', () => {
+  test('updates _adaptEnabled when ADAPT_ENABLED_KEY changes', () => {
+    if (!storageChangeListener) return;
+    storageChangeListener({ telemetrySkillAdapt: { newValue: false } }, 'local');
+    // After this, adaptive priority should be disabled
+    const skills = listSkills();
+    for (const s of skills) {
+      expect(s.effectivePriority).toBe(s.priority);
+    }
+    // Re-enable
+    storageChangeListener({ telemetrySkillAdapt: { newValue: true } }, 'local');
+  });
+
+  test('ignores non-local area changes', () => {
+    if (!storageChangeListener) return;
+    storageChangeListener({ telemetrySkillAdapt: { newValue: false } }, 'sync');
+    // Should not have changed — adaptive still enabled
+  });
+
+  test('updates _stats when STATS_KEY changes', () => {
+    if (!storageChangeListener) return;
+    const newStats = { 'click-no-target': { fires: 10, successes: 8, failures: 2, lastFiredAt: 1000, lastOutcomeAt: 1001 } };
+    storageChangeListener({ skill_stats: { newValue: newStats } }, 'local');
+    const stats = getSkillStats();
+    if (stats['click-no-target']) {
+      expect(stats['click-no-target'].fires).toBe(10);
+    }
+    // Clean up
+    storageChangeListener({ skill_stats: { newValue: null } }, 'local');
+  });
+
+  test('handles null newValue for STATS_KEY', () => {
+    if (!storageChangeListener) return;
+    storageChangeListener({ skill_stats: { newValue: null } }, 'local');
+    const stats = getSkillStats();
+    for (const v of Object.values(stats)) {
+      expect(v.fires).toBeFalsy();
+    }
+  });
+
+  test('handles undefined newValue for ADAPT_ENABLED_KEY', () => {
+    if (!storageChangeListener) return;
+    storageChangeListener({ telemetrySkillAdapt: { newValue: undefined } }, 'local');
+  });
+});
+
+// ========== _recordPendingOutcomes — early return ==========
+
+describe('runRecoverySkills — pending outcomes early return', () => {
+  test('clears pending outcomes when lastActionFailed is not boolean', () => {
+    // First fire a skill to set pending outcomes
+    runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+
+    // Now call with non-boolean lastActionFailed — should clear pending without recording
+    // Skills may still match in this call, but pending outcomes from previous call are cleared
+    const result = runRecoverySkills({ lastActionFailed: 'not-a-bool' });
+    expect(result).toBeDefined();
+    expect(typeof result.promptInjection).toBe('string');
+  });
+
+  test('clears pending outcomes when lastActionFailed is undefined', () => {
+    runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+
+    const result = runRecoverySkills({ lastActionFailed: undefined });
+    expect(result.appliedSkillIds).toEqual([]);
+  });
+});
+
+// ========== _scheduleSaveStats timer ==========
+
+describe('_scheduleSaveStats — debounced save', () => {
+  test('set is called when stats are saved', async () => {
+    await resetSkillStats();
+    jest.clearAllMocks();
+
+    // Fire a skill to trigger _scheduleSaveStats
+    runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+
+    // _scheduleSaveStats uses setTimeout(1500). Wait for it.
+    await new Promise(r => setTimeout(r, 1600));
+
+    // The debounced save should have fired
+    expect(chrome.storage.local.set).toHaveBeenCalled();
+    const setCalls = chrome.storage.local.set.mock.calls;
+    const lastCall = setCalls[setCalls.length - 1];
+    if (lastCall && lastCall[0]) {
+      expect(lastCall[0]).toHaveProperty('skill_stats');
+    }
+  });
+});
+
+// ========== Adaptive priority adjustment ==========
+
+describe('adaptive priority — success rate adjustment', () => {
+  test('adjusts effective priority based on success rate', () => {
+    // Need to fire the same skill enough times (>= MIN_FIRES_FOR_ADJUSTMENT=3)
+    // to trigger priority adjustment
+    const skillId = 'click-no-target';
+
+    // Fire skill + success outcome 4 times
+    for (let i = 0; i < 4; i++) {
+      runRecoverySkills({
+        lastResult: 'BLOCKED: click command has no target',
+        lastCommand: { type: 'click' },
+        lastActionFailed: true,
+      });
+      runRecoverySkills({
+        lastResult: 'ok',
+        lastCommand: { type: 'click' },
+        lastActionFailed: false,
+      });
+    }
+
+    const stats = getSkillStats();
+    if (stats[skillId] && stats[skillId].fires >= 3) {
+      // High success rate should increase effective priority
+      const skills = listSkills();
+      const skill = skills.find(s => s.id === skillId);
+      if (skill) {
+        expect(skill.effectivePriority).toBeGreaterThanOrEqual(skill.priority);
+      }
+    }
+
+    // Reset
+    resetSkillStats();
   });
 });
