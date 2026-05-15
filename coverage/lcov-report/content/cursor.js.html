@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">79.41% </span>
+                <span class="strong">74.48% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>108/136</span>
+                <span class='fraction'>108/145</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.27% </span>
+                <span class="strong">54.8% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>57/86</span>
+                <span class='fraction'>57/104</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.11% </span>
+                <span class="strong">83.03% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>93/108</span>
+                <span class='fraction'>93/112</span>
             </div>
         
             
@@ -523,7 +523,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -585,15 +585,7 @@
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -601,7 +593,15 @@
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -724,7 +724,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
       // (3.8.1) Element might exist but be detached (React reconciliation).
       // If it's not currently in the document, drop it and rebuild.
       <span class="missing-if-branch" title="if path not taken" >I</span>if (c &amp;&amp; !c.isConnected) {
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >c.remove(); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >c.remove(); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor remove detached:', e &amp;&amp; e.message); </span>}</span>
 <span class="cstat-no" title="statement not covered" >        c = null;</span>
       }
       if (c) return c;
@@ -785,7 +785,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
         // Re-create on next animation frame so we don't fight an ongoing
         // reconciliation pass.
 <span class="cstat-no" title="statement not covered" >        requestAnimationFrame(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >ensureCursor(); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >          try { <span class="cstat-no" title="statement not covered" >ensureCursor(); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor recreate on mutation:', e &amp;&amp; e.message); </span>}</span>
         });
       });
       const target = document.documentElement || <span class="branch-1 cbranch-no" title="branch not covered" >document.body;</span>
@@ -802,7 +802,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
 <span class="cstat-no" title="statement not covered" >      try {</span>
         const c = <span class="cstat-no" title="statement not covered" >document.getElementById(CURSOR_ID);</span>
 <span class="cstat-no" title="statement not covered" >        if (c) <span class="cstat-no" title="statement not covered" >c.classList.add('dimmed');</span></span>
-      } catch (e) {}
+      } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor auto-hide dim:', e &amp;&amp; e.message); </span>}
     }, HIDE_AFTER_MS);
   }
 &nbsp;
@@ -862,9 +862,9 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
         <span class="missing-if-branch" title="if path not taken" >I</span>if (!c) <span class="cstat-no" title="statement not covered" >return;</span>
         c.classList.add('pressing');
         setTimeout(() =&gt; {
-          try { c.classList.remove('pressing'); } catch (e) {}
+          try { c.classList.remove('pressing'); } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor press cleanup:', e &amp;&amp; e.message); </span>}
         }, 240);
-      } catch (e) {}
+      } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor press:', e &amp;&amp; e.message); </span>}
     },
 &nbsp;
     show() {
@@ -872,7 +872,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
         const c = ensureCursor();
         <span class="missing-if-branch" title="else path not taken" >E</span>if (c) c.classList.remove('dimmed');
         scheduleAutoHide();
-      } catch (e) {}
+      } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor show:', e &amp;&amp; e.message); </span>}
     },
 &nbsp;
     hide() {
@@ -880,13 +880,13 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      } catch (e) {}
+      } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor hide:', e &amp;&amp; e.message); </span>}
     },
 &nbsp;
     setKeepVisible(on) {
       keepVisibleMode = !!on;
       if (on) {
-        try { const c = document.getElementById(CURSOR_ID); <span class="missing-if-branch" title="if path not taken" >I</span>if (c) <span class="cstat-no" title="statement not covered" >c.classList.remove('dimmed'); </span>} catch (e) {}
+        try { const c = document.getElementById(CURSOR_ID); <span class="missing-if-branch" title="if path not taken" >I</span>if (c) <span class="cstat-no" title="statement not covered" >c.classList.remove('dimmed'); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor keepVisible un-dim:', e &amp;&amp; e.message); </span>}
       }
     },
 &nbsp;
@@ -898,7 +898,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
   window.__sentinelUtils.cursor = window.__sentinelCursor;
 &nbsp;
   // (3.8.1) Make the cursor visible immediately on script load.
-  try { ensureCursor(); } catch (e) {}
+  try { ensureCursor(); } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] cursor init:', e &amp;&amp; e.message); </span>}
 })();
 &nbsp;</pre></td></tr></table></pre>
 
@@ -907,7 +907,7 @@ window.__sentinelUtils = window.__sentinelUtils || <span class="branch-1 cbranch
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:24:06.314Z
+                at 2026-05-15T12:52:30.037Z
             </div>
         <script src="../prettify.js"></script>
         <script>

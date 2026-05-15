@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.86% </span>
+                <span class="strong">76.86% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>102/131</span>
+                <span class='fraction'>103/134</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">55.23% </span>
+                <span class="strong">54.05% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>58/105</span>
+                <span class='fraction'>60/111</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.11% </span>
+                <span class="strong">84.25% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>90/107</span>
+                <span class='fraction'>91/108</span>
             </div>
         
             
@@ -335,7 +335,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -550,14 +550,14 @@ let _saveStatsTimer = null;
 <span class="cstat-no" title="statement not covered" >        _stats = (v &amp;&amp; typeof v === 'object') ? v : {};</span>
       }
     });
-  } catch (e) {}
+  } catch (e) { console.warn('[Sentinel/skills] init error:', e &amp;&amp; e.message); }
 })();
 &nbsp;
 function _scheduleSaveStats() {
   if (_saveStatsTimer) return;
   _saveStatsTimer = setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; {
 <span class="cstat-no" title="statement not covered" >    _saveStatsTimer = null;</span>
-<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >chrome.storage.local.set({ [STATS_KEY]: _stats }); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >chrome.storage.local.set({ [STATS_KEY]: _stats }); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel/skills] stats save error:', e &amp;&amp; e.message); </span>}</span>
   }, 1500);
 }
 &nbsp;
@@ -595,7 +595,7 @@ function _recordPendingOutcomes(context) {
         successRate: _stats[skillId].successes / _stats[skillId].fires,
         adjustedPriority: _effectivePriority({ id: skillId, priority: (SKILLS.find(s =&gt; s.id === skillId) || <span class="branch-1 cbranch-no" title="branch not covered" >{})</span>.priority })
       });
-    } catch (te) {}
+    } catch (te) { /* telemetry logging failure is non-critical */ }
   }
   _pendingOutcomeSkillIds = [];
   _scheduleSaveStats();
@@ -604,8 +604,8 @@ function _recordPendingOutcomes(context) {
 export async function resetSkillStats() {
   _stats = {};
   _pendingOutcomeSkillIds = [];
-  try { await chrome.storage.local.remove(STATS_KEY); } catch (e) {}
-  try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (e) {}
+  try { await chrome.storage.local.remove(STATS_KEY); } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel/skills] stats clear error:', e &amp;&amp; e.message); </span>}
+  try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (e) { /* telemetry unavailable */ }
 }
 &nbsp;
 export function getSkillStats() {
@@ -641,10 +641,10 @@ export function runRecoverySkills(context) {
             lastActionFailed: !!context.lastActionFailed,
             lastCommandType: context.lastCommand ? context.lastCommand.type : null
           });
-        } catch (te) {}
+        } catch (te) { /* telemetry failure is non-critical */ }
       }
     } catch (e) {
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e &amp;&amp; e.message }); </span>} catch (te) {}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e &amp;&amp; e.message }); </span>} catch (te) { /* telemetry unavailable */ }</span>
 <span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e &amp;&amp; e.message); </span>} catch (ee) {}</span>
     }
   }
@@ -715,7 +715,7 @@ export function listSkills() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:36:08.392Z
+                at 2026-05-15T12:52:30.037Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

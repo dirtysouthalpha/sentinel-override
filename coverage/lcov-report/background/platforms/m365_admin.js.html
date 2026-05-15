@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">45.45% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/22</span>
+                <span class='fraction'>23/23</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40% </span>
+                <span class="strong">95.45% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/20</span>
+                <span class='fraction'>21/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/14</span>
+                <span class='fraction'>15/15</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -313,10 +313,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">28x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">119x</span>
+<span class="cline-any cline-yes">96x</span>
+<span class="cline-any cline-yes">96x</span>
+<span class="cline-any cline-yes">95x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -325,19 +325,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">100x</span>
+<span class="cline-any cline-yes">1155x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">81x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -555,18 +555,18 @@ export const m365Admin = {
         'portal.azure.com', 'login.microsoftonline.com'
       ];
       if (m365Hosts.some(h =&gt; host === h || host.endsWith('.' + h))) return true;
-    } catch (e) {}
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e &amp;&amp; e.message); }
     return /\b(m365|microsoft\s*365|entra|exchange\s+admin|purview|defender|intune)\b/i.test(String(goal || ''));
   },
 &nbsp;
-<span class="fstat-no" title="function not covered" >  in</span>ferSurface(goal) {
-    const t = <span class="cstat-no" title="statement not covered" >String(goal || '').toLowerCase();</span>
-<span class="cstat-no" title="statement not covered" >    if (/(message\s+trace|mail\s+flow|shared\s+mailbox|exchange|smtp|connector|transport\s+rule|distribution\s+(?:list|group))/i.test(t)) <span class="cstat-no" title="statement not covered" >return 'exchange';</span></span>
-<span class="cstat-no" title="statement not covered" >    if (/(sign.?in\s+log|conditional\s+access|app\s+password|service\s+principal|enterprise\s+app|entra|aad|azure\s+ad|named\s+location|mfa\s+enforcement)/i.test(t)) <span class="cstat-no" title="statement not covered" >return 'entra';</span></span>
-<span class="cstat-no" title="statement not covered" >    if (/(audit\s+log|purview|ediscovery|retention\s+policy|data\s+loss|dlp|sensitivity\s+label)/i.test(t)) <span class="cstat-no" title="statement not covered" >return 'purview';</span></span>
-<span class="cstat-no" title="statement not covered" >    if (/(defender|threat\s+hunt|incident|alert|kql|advanced\s+hunting|secure\s+score)/i.test(t)) <span class="cstat-no" title="statement not covered" >return 'defender';</span></span>
-<span class="cstat-no" title="statement not covered" >    if (/(intune|endpoint|device\s+config|compliance\s+policy|app\s+protection)/i.test(t)) <span class="cstat-no" title="statement not covered" >return 'intune';</span></span>
-<span class="cstat-no" title="statement not covered" >    return 'admin';</span>
+  inferSurface(goal) {
+    const t = String(goal || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>.toLowerCase();
+    if (/(message\s+trace|mail\s+flow|shared\s+mailbox|exchange|smtp|connector|transport\s+rule|distribution\s+(?:list|group))/i.test(t)) return 'exchange';
+    if (/(sign.?in\s+log|conditional\s+access|app\s+password|service\s+principal|enterprise\s+app|entra|aad|azure\s+ad|named\s+location|mfa\s+enforcement)/i.test(t)) return 'entra';
+    if (/(audit\s+log|purview|ediscovery|retention\s+policy|data\s+loss|dlp|sensitivity\s+label)/i.test(t)) return 'purview';
+    if (/(defender|threat\s+hunt|incident|alert|kql|advanced\s+hunting|secure\s+score)/i.test(t)) return 'defender';
+    if (/(intune|endpoint|device\s+config|compliance\s+policy|app\s+protection)/i.test(t)) return 'intune';
+    return 'admin';
   },
 &nbsp;
   surfaceUrls: {
@@ -757,7 +757,7 @@ export const m365Admin = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:36:08.392Z
+                at 2026-05-15T12:52:30.037Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
