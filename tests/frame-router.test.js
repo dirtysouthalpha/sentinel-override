@@ -24,8 +24,10 @@ const {
   addFrameRouterListeners,
 } = await import('../background/frame-router.js');
 
+// resetAllMocks clears mock.calls AND the mockResolvedValueOnce queue,
+// preventing stale mock data from leaking between tests.
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.resetAllMocks();
 });
 
 // ========== enumerateFrames ==========
@@ -171,8 +173,8 @@ describe('resolveFrameForSelector', () => {
       { frameId: 5, parentId: 0, url: 'https://example.com/iframe' },
       { frameId: 10, parentId: 0, url: 'https://example.com/iframe2' },
     ]);
-    // Index 0 = first iframe = frameId 5
-    const result = await resolveFrameForSelector(99, 0);
+    // Index 0 = first iframe (sorted by frameId) = frameId 5
+    const result = await resolveFrameForSelector(5001, 0);
     expect(result).toBe(5);
   });
 
@@ -182,7 +184,7 @@ describe('resolveFrameForSelector', () => {
       { frameId: 5, parentId: 0, url: 'https://example.com/iframe' },
     ]);
     // Only 1 iframe (index 0), index 5 doesn't exist
-    const result = await resolveFrameForSelector(99, 5);
+    const result = await resolveFrameForSelector(5002, 5);
     expect(result).toBeNull();
   });
 
@@ -192,7 +194,7 @@ describe('resolveFrameForSelector', () => {
       { frameId: 5, parentId: 0, url: 'https://example.com/iframe' },
       { frameId: 10, parentId: 0, url: 'https://example.com/iframe2' },
     ]);
-    const result = await resolveFrameForSelector(99, 1);
+    const result = await resolveFrameForSelector(5003, 1);
     expect(result).toBe(10);
   });
 
@@ -202,11 +204,11 @@ describe('resolveFrameForSelector', () => {
       { frameId: 7, parentId: 0, url: 'https://example.com/iframe' },
     ]);
     // First call populates cache
-    const r1 = await resolveFrameForSelector(50, 0);
+    const r1 = await resolveFrameForSelector(5010, 0);
     expect(r1).toBe(7);
 
     // Second call should use cache (no more getAllFrames calls)
-    const r2 = await resolveFrameForSelector(50, 0);
+    const r2 = await resolveFrameForSelector(5010, 0);
     expect(r2).toBe(7);
     // Only called once — second resolve uses cache
     expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledTimes(1);
@@ -216,7 +218,7 @@ describe('resolveFrameForSelector', () => {
     chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
       { frameId: 0, parentId: -1, url: 'https://example.com' },
     ]);
-    const result = await resolveFrameForSelector(99, 0);
+    const result = await resolveFrameForSelector(5020, 0);
     expect(result).toBeNull();
   });
 });
@@ -355,32 +357,44 @@ describe('executeInFrame', () => {
 });
 
 // ========== addFrameRouterListeners ==========
+// The module uses a flag (__frameRouterListenersInstalled) that prevents re-registration.
+// We capture the listeners in beforeAll and reuse them across tests.
 
 describe('addFrameRouterListeners', () => {
-  test('registers webNavigation and tabs listeners', () => {
+  let committedListener, errorListener, removedListener;
+
+  beforeAll(() => {
     addFrameRouterListeners();
-    expect(chrome.webNavigation.onCommitted.addListener).toHaveBeenCalled();
-    expect(chrome.webNavigation.onErrorOccurred.addListener).toHaveBeenCalled();
-    expect(chrome.tabs.onRemoved.addListener).toHaveBeenCalled();
+    committedListener = chrome.webNavigation.onCommitted.addListener.mock.calls[0]?.[0];
+    errorListener = chrome.webNavigation.onErrorOccurred.addListener.mock.calls[0]?.[0];
+    removedListener = chrome.tabs.onRemoved.addListener.mock.calls[0]?.[0];
+  });
+
+  test('registers webNavigation and tabs listeners', () => {
+    expect(committedListener).toBeDefined();
+    expect(typeof committedListener).toBe('function');
+    expect(errorListener).toBeDefined();
+    expect(typeof errorListener).toBe('function');
+    expect(removedListener).toBeDefined();
+    expect(typeof removedListener).toBe('function');
   });
 
   test('idempotent — does not double-register on second call', () => {
-    const committedCount = chrome.webNavigation.onCommitted.addListener.mock.calls.length;
     addFrameRouterListeners();
     addFrameRouterListeners();
-    expect(chrome.webNavigation.onCommitted.addListener.mock.calls.length).toBe(committedCount);
+    // After resetAllMocks, call count starts at 0. Idempotent means no new calls.
+    expect(chrome.webNavigation.onCommitted.addListener).not.toHaveBeenCalled();
+    expect(chrome.webNavigation.onErrorOccurred.addListener).not.toHaveBeenCalled();
+    expect(chrome.tabs.onRemoved.addListener).not.toHaveBeenCalled();
   });
 
   test('onCommitted listener triggers frame rebuild', async () => {
-    addFrameRouterListeners();
-    const listener = chrome.webNavigation.onCommitted.addListener.mock.calls[0][0];
-
     chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
       { frameId: 0, parentId: -1, url: 'https://example.com' },
       { frameId: 3, parentId: 0, url: 'https://example.com/iframe' },
     ]);
 
-    listener({ tabId: 42, frameId: 0, url: 'https://example.com' });
+    committedListener({ tabId: 42, frameId: 0, url: 'https://example.com' });
 
     // Wait for async rebuildFrameMap
     await new Promise(r => setTimeout(r, 50));
@@ -392,56 +406,44 @@ describe('addFrameRouterListeners', () => {
   });
 
   test('onCommitted ignores negative tabId', async () => {
-    addFrameRouterListeners();
-    const listener = chrome.webNavigation.onCommitted.addListener.mock.calls[0][0];
-
-    listener({ tabId: -1 });
+    committedListener({ tabId: -1 });
     await new Promise(r => setTimeout(r, 50));
     expect(chrome.webNavigation.getAllFrames).not.toHaveBeenCalled();
   });
 
   test('onErrorOccurred listener triggers frame rebuild', async () => {
-    addFrameRouterListeners();
-    const listener = chrome.webNavigation.onErrorOccurred.addListener.mock.calls[0][0];
-
     chrome.webNavigation.getAllFrames.mockResolvedValueOnce([]);
-    listener({ tabId: 10 });
+    errorListener({ tabId: 10 });
     await new Promise(r => setTimeout(r, 50));
     expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
   });
 
   test('onRemoved listener clears frame map', async () => {
-    addFrameRouterListeners();
-
-    // First populate cache for tab 100
+    // First populate cache for tab 1100
     chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
       { frameId: 0, parentId: -1, url: 'https://example.com' },
       { frameId: 5, parentId: 0, url: 'https://example.com/iframe' },
     ]);
-    await resolveFrameForSelector(100, 0);
+    await resolveFrameForSelector(1100, 0);
 
     // Now simulate tab removal
-    const removeListener = chrome.tabs.onRemoved.addListener.mock.calls[0][0];
-    removeListener(100);
+    removedListener(1100);
 
     // Cache should be cleared — next resolve should call getAllFrames again
     chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
       { frameId: 0, parentId: -1, url: 'https://example.com' },
     ]);
-    const result = await resolveFrameForSelector(100, 0);
+    const result = await resolveFrameForSelector(1100, 0);
     expect(result).toBeNull();
-    // getAllFrames called again (not cached)
-    expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledTimes(2);
+    // getAllFrames called for this tab (not cached)
+    expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 1100 });
   });
 
   test('onCommitted handles getAllFrames rejection gracefully', async () => {
-    addFrameRouterListeners();
-    const listener = chrome.webNavigation.onCommitted.addListener.mock.calls[0][0];
-
     chrome.webNavigation.getAllFrames.mockRejectedValueOnce(new Error('tab gone'));
 
     // Should not throw
-    listener({ tabId: 55 });
+    committedListener({ tabId: 55 });
     await new Promise(r => setTimeout(r, 50));
   });
 });
@@ -450,21 +452,21 @@ describe('addFrameRouterListeners', () => {
 
 describe('resolveFrameForSelector — cache scenarios', () => {
   test('uses cached map after first resolve', async () => {
-    chrome.webNavigation.getAllFrames.mockResolvedValue([
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
       { frameId: 0, parentId: -1, url: 'https://example.com' },
       { frameId: 2, parentId: 0, url: 'https://example.com/iframe' },
       { frameId: 5, parentId: 0, url: 'https://example.com/iframe2' },
     ]);
 
     // First call populates cache
-    const r1 = await resolveFrameForSelector(200, 0);
+    const r1 = await resolveFrameForSelector(6001, 0);
     expect(r1).toBe(2);
 
-    // Second call uses cache
-    const r2 = await resolveFrameForSelector(200, 1);
+    // Second call uses cache (no additional getAllFrames call)
+    const r2 = await resolveFrameForSelector(6001, 1);
     expect(r2).toBe(5);
 
-    // Only one getAllFrames call
+    // Only one getAllFrames call total
     expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledTimes(1);
   });
 
@@ -479,8 +481,8 @@ describe('resolveFrameForSelector — cache scenarios', () => {
         { frameId: 7, parentId: 0, url: 'https://other.com/iframe' },
       ]);
 
-    const r1 = await resolveFrameForSelector(300, 0);
-    const r2 = await resolveFrameForSelector(301, 0);
+    const r1 = await resolveFrameForSelector(6002, 0);
+    const r2 = await resolveFrameForSelector(6003, 0);
     expect(r1).toBe(3);
     expect(r2).toBe(7);
     expect(chrome.webNavigation.getAllFrames).toHaveBeenCalledTimes(2);
@@ -494,11 +496,11 @@ describe('resolveFrameForSelector — cache scenarios', () => {
     ]);
 
     // Positional index 0 = lowest frameId = 3
-    const r0 = await resolveFrameForSelector(400, 0);
+    const r0 = await resolveFrameForSelector(6004, 0);
     expect(r0).toBe(3);
 
     // Positional index 1 = next frameId = 10
-    const r1 = await resolveFrameForSelector(400, 1);
+    const r1 = await resolveFrameForSelector(6004, 1);
     expect(r1).toBe(10);
   });
 });
