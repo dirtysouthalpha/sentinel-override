@@ -83,7 +83,7 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
         // Unwrap the content script envelope
         let data = result;
         if (typeof data === 'string') {
-          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (e) {}
+          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch {}
         }
         if (data && typeof data === 'object') {
           const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data;
@@ -96,10 +96,10 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
             if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
               domReady = true;
             }
-          } catch (e) {}
+          } catch {}
         }
       }
-    } catch (e) {
+    } catch {
       // Content script not yet injected — this is normal during page load
     }
 

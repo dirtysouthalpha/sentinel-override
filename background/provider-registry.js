@@ -184,7 +184,7 @@ export const PROVIDERS = {
           let input = {};
           try {
             input = JSON.parse(tc.function.arguments || '{}');
-          } catch (e) {
+          } catch {
             // If arguments aren't valid JSON, treat the whole string as a note
             input = { text: tc.function.arguments };
           }
@@ -406,8 +406,6 @@ export async function migrateLegacySettings() {
   const apiKey = stored.api_key || '';
   const model = stored.model || '';
   const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic' : 'openai';
-  const providerDefaults = PROVIDERS[providerId];
-
   await chrome.storage.local.set({
     active_provider: providerId,
     providers: {

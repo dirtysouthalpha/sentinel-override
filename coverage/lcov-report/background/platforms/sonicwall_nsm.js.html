@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">84.61% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>10/12</span>
+                <span class='fraction'>11/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.77% </span>
+                <span class="strong">80% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/9</span>
+                <span class='fraction'>8/10</span>
             </div>
         
             
@@ -306,7 +306,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -314,13 +314,13 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">135x</span>
-<span class="cline-any cline-yes">112x</span>
-<span class="cline-any cline-yes">112x</span>
-<span class="cline-any cline-yes">111x</span>
-<span class="cline-any cline-yes">103x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">103x</span>
+<span class="cline-any cline-yes">235x</span>
+<span class="cline-any cline-yes">208x</span>
+<span class="cline-any cline-yes">208x</span>
+<span class="cline-any cline-yes">205x</span>
+<span class="cline-any cline-yes">195x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">196x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -555,7 +555,7 @@ export const sonicwallNsm = {
       const host = new URL(url).host;
       if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$/i.test(host)) return true;
       if (/(^|\.)cloud\.sonicwall\.com$/i.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (e) { console.warn('[Sentinel] NSM detect URL parse failed:', e &amp;&amp; e.message); }
     return /\bsonicwall\s+nsm|network\s+security\s+manager\b/i.test(String(goal || ''));
   },
 &nbsp;
@@ -680,7 +680,7 @@ export const sonicwallNsm = {
     // VPN policy edit dialog
     policyDialog:             'div[role="dialog"], .policy-dialog, .mat-dialog-container, [class*="policy-edit"]',
     policyDialogTabBar:       '[role="tablist"], .tab-bar, .nav-tabs',
-    policyDialogTab:          <span class="fstat-no" title="function not covered" >(n</span>ame) =&gt; <span class="cstat-no" title="statement not covered" >'button[role="tab"]:not([disabled]), .tab-btn',</span>  // filter by visible text matching `name` in JS
+    policyDialogTab:          <span class="fstat-no" title="function not covered" >(_</span>name) =&gt; <span class="cstat-no" title="statement not covered" >'button[role="tab"]:not([disabled]), .tab-btn',</span>  // filter by visible text matching `name` in JS
     policyTabClientText:      ['Client', 'Client Connections', 'Virtual Adapter'],
     policyTabGeneralText:     ['General'],
     policyTabNetworkText:     ['Network', 'Networks'],
@@ -689,7 +689,7 @@ export const sonicwallNsm = {
 &nbsp;
     // Client tab — Virtual Adapter Settings
     virtualAdapterDropdown:   'select[name*="virtualAdapter" i], [data-field*="virtual-adapter"], [aria-label*="Virtual Adapter" i]',
-    virtualAdapterOption:     <span class="fstat-no" title="function not covered" >(o</span>pt) =&gt; <span class="cstat-no" title="statement not covered" >'[role="option"], li.dropdown-item, option',</span>  // filter by text match in JS
+    virtualAdapterOption:     <span class="fstat-no" title="function not covered" >(_</span>opt) =&gt; <span class="cstat-no" title="statement not covered" >'[role="option"], li.dropdown-item, option',</span>  // filter by text match in JS
     virtualAdapterOptions:    ['None', 'DHCP Lease', 'Internal DHCP Server', 'External DHCP Server'],
 &nbsp;
     // Client tab — IP Address Pool fields (appear once DHCP Lease is selected)
@@ -778,7 +778,7 @@ export const sonicwallNsm = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T15:50:35.569Z
+                at 2026-05-15T22:42:27.972Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

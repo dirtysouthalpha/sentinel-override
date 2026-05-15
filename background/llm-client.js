@@ -3,8 +3,8 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { sendSilentUpdate } from './message-protocol.js';
-import { getAllTabContexts, getActiveTabId, getTabContext, TAB_LIMIT } from './tab-context.js';
-import { resolveProvider, getActiveProvider, getModelSupportsVision, detectProviderFromEndpoint } from './provider-registry.js';
+import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
+import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
@@ -646,7 +646,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
   if (Array.isArray(pageTypes) && pageTypes.length && currentUrl) {
     let detected = null;
     for (const pt of pageTypes) {
-      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) {}
+      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (_) {}
     }
     if (detected) {
       parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));
@@ -720,7 +720,7 @@ export function getPlatformContext(currentUrl, goal) {
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
-  } catch (e) { /* never crash prompt-building on profile lookup */ }
+  } catch (_) { /* never crash prompt-building on profile lookup */ }
   const ctx = prose + selectorBlock;
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
   return ctx;
@@ -1653,7 +1653,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
     try {
       const responseText = provider.parseResponse(data);
       if (responseText) return parseLLMResponse(responseText);
-    } catch (e) {
+    } catch (_) {
       // parseResponse failed (e.g. null content with tool_calls we already tried)
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
@@ -1664,7 +1664,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
         try {
           const input = JSON.parse(tc.function.arguments || '{}');
           return { type: tc.function.name, ...input };
-        } catch (e) { /* give up */ }
+        } catch (_) { /* give up */ }
       }
     }
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
@@ -1707,7 +1707,7 @@ export function extractFirstJsonObject(str) {
       try {
         const parsed = JSON.parse(candidate);
         if (parsed.type && validTypes.has(parsed.type)) return candidate;
-      } catch (e) { /* not valid JSON, try next */ }
+      } catch (_) { /* not valid JSON, try next */ }
       searchFrom = end + 1;
     } else {
       break;
@@ -1828,14 +1828,14 @@ export function parseLLMResponse(content) {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);
         if (parsed && parsed.type) return parsed;
-      } catch (e) { /* try regex salvage */ }
+      } catch (_) { /* try regex salvage */ }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         if (salvaged) {
           console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
           return salvaged;
         }
-      } catch (e) { /* fall through */ }
+      } catch (_) { /* fall through */ }
     }
     return { type: 'note', text: `Parse error (will retry): ${err.message}` };
   }
@@ -1857,7 +1857,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     return scored.map(s => s.pattern);
-  } catch (e) { return []; }
+  } catch (_) { return []; }
 }
 
 // ========== Utilities ==========
