@@ -26,7 +26,9 @@ export const sonicwallOnbox = {
       // SonicOS URL patterns
       if (/\/sonicui\/|\/main\.html|\/auth\.html|\/getsystem|\/getlogout/i.test(u.pathname + u.search)) return true;
       // IP-based on-box: typical paths during admin sessions
-      if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host) && /\/(?:main|dashboard|policy|network|vpn|users|log|system)/i.test(u.pathname)) return true;
+      // Exclude /fmc (Cisco Firepower Management Center) and /asdm (Cisco ASA) paths
+      // that also match the dashboard/system patterns on IP hosts.
+      if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host) && /\/(?:main|dashboard|policy|network|vpn|users|log|system)/i.test(u.pathname) && !/\/(?:fmc|asdm)/i.test(u.pathname)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(?:sonicwall|sonicos|tz\d+|nsa\d+|soho|gen[57]\b)/i.test(String(goal || ''));
   },
