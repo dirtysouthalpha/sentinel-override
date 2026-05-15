@@ -255,8 +255,12 @@ async function persistHistory() {
   if (!_historyDirty) return;
   trimHistory();
   const slice = history.slice(-CONFIG.maxStoredHistory);
-  await chrome.storage.local.set({ agent_history: slice });
-  _historyDirty = false;
+  try {
+    await chrome.storage.local.set({ agent_history: slice });
+    _historyDirty = false;
+  } catch (e) {
+    console.warn('[Sentinel] persistHistory storage write failed:', e && e.message);
+  }
   try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.warn('[Sentinel] history persist telemetry failed:', e && e.message); }
 }
 
@@ -412,7 +416,7 @@ export async function startAgent(goal, sender) {
             });
             chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
           }
-        } catch { /* non-fatal */ }
+        } catch (e) { console.warn('[Sentinel] mode-mismatch log write failed:', e && e.message); }
 
         const decision = await _waitForModeMismatchDecision({
           goalWants: modeDirective.wants,
@@ -2068,10 +2072,15 @@ async function runAgentLoop(goal, workingTabId) {
   // (3.41.0) Batch all run-stable settings in one storage read.
   // ticketMode/ticketFormat/approvalMode/useTrustedInput never change mid-run;
   // reading them from _runSettings avoids per-step storage round-trips.
-  const stored = await chrome.storage.local.get([
-    'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
-    'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
-  ]);
+  let stored = {};
+  try {
+    stored = await chrome.storage.local.get([
+      'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
+      'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
+    ]);
+  } catch (e) {
+    console.warn('[Sentinel] Batch settings read failed, using defaults:', e && e.message);
+  }
   _runSettings = {
     ticketMode:     stored.ticketMode    ?? false,
     ticketFormat:   stored.ticketFormat  ?? 'standard',
@@ -2087,7 +2096,7 @@ async function runAgentLoop(goal, workingTabId) {
   // Memory is still persisted per-step so it survives unexpected SW termination
   // within a run; it's deliberately discarded between runs.
   agentMemory = {};
-  await chrome.storage.local.set({ agent_history: [] });
+  try { await chrome.storage.local.set({ agent_history: [] }); } catch (e) { console.warn('[Sentinel] History clear failed:', e && e.message); }
 
   if (stored.agent_context && stored.agent_context.trim()) {
     goal = `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
@@ -2317,7 +2326,7 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (e) { console.warn('[Sentinel] tenant detected broadcast failed:', e && e.message); }
           }
         }
-      } catch { /* non-fatal */ }
+      } catch (e) { console.warn('[Sentinel] tenant detection failed:', e && e.message); }
 
       // Send tab state to popup so user can see all managed tabs
       const allTabContexts = getAllTabContexts();
@@ -3691,7 +3700,8 @@ async function runAgentLoop(goal, workingTabId) {
                 result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
                 actionFailed = true;
               }
-            } catch {
+            } catch (e) {
+              console.warn('[Sentinel] Navigate verification URL parse failed:', e && e.message);
               result = 'Navigated to ' + arrivedUrl;
             }
           }
@@ -3742,7 +3752,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (memKeys.length > CONFIG.maxMemoryEntries) {
               delete agentMemory[memKeys[0]];
             }
-            await chrome.storage.local.set({ agent_memory: agentMemory });
+            try { await chrome.storage.local.set({ agent_memory: agentMemory }); } catch (e) { console.warn('[Sentinel] agent_memory write failed (extract):', e && e.message); }
             // (3.25.1) Telemetry: memory write from extract/extract_list. Lets
             // the operator watch memory grow in real time and catch keys that
             // are repeatedly overwritten or empty.
@@ -3844,7 +3854,7 @@ async function runAgentLoop(goal, workingTabId) {
               agentMemory[savedKey] = savedValue;
               const memKeys = Object.keys(agentMemory);
               if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
-              await chrome.storage.local.set({ agent_memory: agentMemory });
+              try { await chrome.storage.local.set({ agent_memory: agentMemory }); } catch (e) { console.warn('[Sentinel] agent_memory write failed (execute_js):', e && e.message); }
               // (3.25.1) Telemetry: memory write from execute_js. Tagged with
               // the recovery ladder strategy so operators can see when an
               // execute_js fell back to body_text / visible_text.
@@ -4201,7 +4211,7 @@ async function runAgentLoop(goal, workingTabId) {
     }
   }
 
-  if (finished) await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
+  if (finished) { try { await chrome.storage.local.set({ agent_history: [], agent_memory: {} }); } catch (e) { console.warn('[Sentinel] Run cleanup storage write failed:', e && e.message); } }
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // In MV3, closing all agent tabs can create a window where the service worker
