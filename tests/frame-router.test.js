@@ -541,3 +541,447 @@ describe('executeInFrame — utility injection', () => {
     expect(utilityCall.files).not.toContain('content/index.js');
   });
 });
+
+// ========== runCommandInFrame (injected function) ==========
+// Extract the function from executeScript mock and test it directly.
+
+describe('runCommandInFrame', () => {
+  let runCmd;
+  let mockDom, mockHl, mockShadow, mockWait, mockDd, mockOv, mockSi;
+  let mockDoc, mockView;
+
+  beforeAll(async () => {
+    // Extract runCommandInFrame by triggering executeInFrame once
+    chrome.scripting.executeScript
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ result: { ok: true } }]);
+    await executeInFrame(9999, 99, { type: 'click', selector: 'x' });
+    const secondCall = chrome.scripting.executeScript.mock.calls[1][0];
+    runCmd = secondCall.func;
+    expect(typeof runCmd).toBe('function');
+  });
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockDom = {
+      findElementBySelector: jest.fn(),
+      scanDocument: jest.fn(),
+    };
+    mockHl = {
+      highlightElement: jest.fn(),
+      removeHighlight: jest.fn(),
+    };
+    mockOv = {
+      isOverlayBlocking: jest.fn(),
+      dismissOverlay: jest.fn(),
+    };
+    mockSi = {
+      isRichTextEditor: jest.fn(),
+      isDateInput: jest.fn(),
+      setRichTextValue: jest.fn(),
+      setDatePickerValue: jest.fn(),
+    };
+
+    const events = [];
+    const makeElement = (tagName, extra = {}) => ({
+      tagName,
+      isContentEditable: false,
+      value: '',
+      textContent: '',
+      classList: { add: jest.fn(), remove: jest.fn() },
+      style: {},
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      click: jest.fn(),
+      dispatchEvent: jest.fn((e) => events.push(e)),
+      cloneNode: jest.fn(() => ({
+        innerText: '',
+        textContent: '',
+        querySelectorAll: jest.fn(() => []),
+        remove: jest.fn(),
+      })),
+      ...extra,
+    });
+
+    mockDoc = {
+      title: 'Test Page',
+      querySelector: jest.fn(),
+      execCommand: jest.fn(),
+      createElement: jest.fn(() => makeElement('div')),
+      body: makeElement('body', {
+        cloneNode: jest.fn(() => ({
+          querySelectorAll: jest.fn(() => []),
+          innerText: 'Body content',
+          remove: jest.fn(),
+        })),
+      }),
+    };
+
+    mockView = {
+      location: { href: 'https://example.com/page' },
+      HTMLInputElement: { prototype: {} },
+      HTMLTextAreaElement: { prototype: {} },
+    };
+
+    mockDoc.defaultView = mockView;
+
+    // Set up globals that runCommandInFrame reads
+    const MockMouseEvent = class MockMouseEvent { constructor(t, o) { this.type = t; Object.assign(this, o); } };
+    const MockInputEvent = class MockInputEvent { constructor(t, o) { this.type = t; Object.assign(this, o); } };
+    const MockEvent = class MockEvent { constructor(t, o) { this.type = t; Object.assign(this, o); } };
+
+    globalThis.window = {
+      __sentinelUtils: {
+        dom: mockDom,
+        highlight: mockHl,
+        shadow: mockShadow,
+        wait: mockWait,
+        dropdown: mockDd,
+        overlay: mockOv,
+        specialInputs: mockSi,
+      },
+      MouseEvent: MockMouseEvent,
+      InputEvent: MockInputEvent,
+      Event: MockEvent,
+    };
+    globalThis.document = mockDoc;
+    globalThis.MouseEvent = MockMouseEvent;
+    globalThis.InputEvent = MockInputEvent;
+    globalThis.Event = MockEvent;
+    globalThis.console = globalThis.console || { warn: jest.fn() };
+  });
+
+  // --- Error cases ---
+
+  test('returns error when utils not loaded', () => {
+    globalThis.window.__sentinelUtils = null;
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('utilities not loaded');
+  });
+
+  test('returns error when utils.dom not present', () => {
+    globalThis.window.__sentinelUtils = {};
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('utilities not loaded');
+  });
+
+  // --- click command ---
+
+  test('click returns error when element not found', () => {
+    mockDom.findElementBySelector.mockReturnValue(null);
+    const result = runCmd({ type: 'click', selector: '#missing' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Element not found');
+  });
+
+  test('click succeeds on found element', () => {
+    const el = {
+      scrollIntoView: jest.fn(),
+      click: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Clicked');
+    expect(el.click).toHaveBeenCalled();
+    expect(mockHl.highlightElement).toHaveBeenCalledWith(el);
+    expect(mockHl.removeHighlight).toHaveBeenCalledWith(el);
+  });
+
+  test('click blocked by dismissible overlay', () => {
+    const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
+    mockOv.dismissOverlay.mockReturnValue(true);
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(true);
+  });
+
+  test('click blocked by non-dismissible overlay returns error', () => {
+    const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
+    mockOv.dismissOverlay.mockReturnValue(false);
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('blocked by overlay');
+  });
+
+  test('click skips overlay check when ov is null', () => {
+    globalThis.window.__sentinelUtils.overlay = null;
+    const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(true);
+  });
+
+  // --- type command ---
+
+  test('type returns error when element not found', () => {
+    mockDom.findElementBySelector.mockReturnValue(null);
+    const result = runCmd({ type: 'type', selector: '#input', text: 'hello' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Element not found');
+  });
+
+  test('type into INPUT element', () => {
+    const el = {
+      tagName: 'INPUT',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#input', text: 'hi' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Typed into');
+    expect(mockHl.removeHighlight).toHaveBeenCalledWith(el);
+  });
+
+  test('type into TEXTAREA element', () => {
+    const el = {
+      tagName: 'TEXTAREA',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#textarea', text: 'hello world' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Typed into');
+  });
+
+  test('type into contenteditable element', () => {
+    const el = {
+      tagName: 'DIV',
+      isContentEditable: true,
+      textContent: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#editor', text: 'abc' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('contenteditable');
+  });
+
+  test('type into rich text editor', () => {
+    const el = {
+      tagName: 'DIV',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockSi.isRichTextEditor.mockReturnValue(true);
+    mockSi.setRichTextValue.mockReturnValue({ success: true, value: 'hello' });
+    const result = runCmd({ type: 'type', selector: '#rte', text: 'hello' });
+    expect(result.ok).toBe(true);
+    expect(mockSi.setRichTextValue).toHaveBeenCalledWith(el, 'hello');
+  });
+
+  test('type into rich text editor with failure', () => {
+    const el = {
+      tagName: 'DIV',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockSi.isRichTextEditor.mockReturnValue(true);
+    mockSi.setRichTextValue.mockReturnValue({ success: false, error: 'unsupported' });
+    const result = runCmd({ type: 'type', selector: '#rte', text: 'hello' });
+    expect(result.ok).toBe(false);
+  });
+
+  test('type into date input', () => {
+    const el = {
+      tagName: 'INPUT',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockSi.isDateInput.mockReturnValue(true);
+    mockSi.setDatePickerValue.mockReturnValue({ success: true, value: '2024-01-15' });
+    const result = runCmd({ type: 'type', selector: '#date', text: '2024-01-15' });
+    expect(result.ok).toBe(true);
+    expect(mockSi.setDatePickerValue).toHaveBeenCalledWith(el, '2024-01-15');
+  });
+
+  test('type fallback for non-input element', () => {
+    const el = {
+      tagName: 'SPAN',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#span', text: 'val' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Typed into');
+  });
+
+  test('type with empty text defaults to empty string', () => {
+    const el = {
+      tagName: 'INPUT',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#input' });
+    expect(result.ok).toBe(true);
+  });
+
+  test('type blocked by non-dismissible overlay returns error', () => {
+    const el = {
+      tagName: 'INPUT',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
+    mockOv.dismissOverlay.mockReturnValue(false);
+    const result = runCmd({ type: 'type', selector: '#input', text: 'hi' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('blocked by overlay');
+  });
+
+  test('type uses native setter when available', () => {
+    const setter = jest.fn();
+    const proto = {};
+    Object.defineProperty(proto, 'value', { set: setter, configurable: true });
+    mockView.HTMLInputElement = { prototype: proto };
+    const el = {
+      tagName: 'INPUT',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    const result = runCmd({ type: 'type', selector: '#input', text: 'ab' });
+    expect(result.ok).toBe(true);
+  });
+
+  // --- observe_page command ---
+
+  test('observe_page returns scanned elements', () => {
+    mockDom.scanDocument.mockImplementation((doc, arr, map, prefix) => {
+      arr.push({ ref: 'ref_1', tag: 'button' });
+    });
+    const result = runCmd({ type: 'observe_page' });
+    expect(result.ok).toBe(true);
+    expect(result.data.elements).toHaveLength(1);
+    expect(result.data.elements[0].ref).toBe('ref_1');
+  });
+
+  test('observe_page returns empty when no elements', () => {
+    mockDom.scanDocument.mockImplementation(() => {});
+    const result = runCmd({ type: 'observe_page' });
+    expect(result.ok).toBe(true);
+    expect(result.data.elements).toEqual([]);
+  });
+
+  // --- read_page command ---
+
+  test('read_page returns title, URL, and body content', () => {
+    const result = runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Test Page');
+    expect(result.data).toContain('https://example.com/page');
+  });
+
+  test('read_page uses main element when available', () => {
+    const mainEl = {
+      cloneNode: jest.fn(() => ({
+        innerText: 'Main content area text '.repeat(10),
+        textContent: '',
+        querySelectorAll: jest.fn(() => []),
+        remove: jest.fn(),
+      })),
+    };
+    mockDoc.querySelector.mockImplementation((sel) => {
+      if (sel === 'main') return mainEl;
+      return null;
+    });
+    const result = runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+    expect(result.data).toContain('Main content');
+  });
+
+  test('read_page falls back to body when main has short content', () => {
+    const mainEl = {
+      cloneNode: jest.fn(() => ({
+        innerText: 'short',
+        textContent: '',
+        querySelectorAll: jest.fn(() => []),
+        remove: jest.fn(),
+      })),
+    };
+    mockDoc.querySelector.mockImplementation((sel) => {
+      if (sel === 'main') return mainEl;
+      return null;
+    });
+    mockDoc.body = {
+      cloneNode: jest.fn(() => ({
+        querySelectorAll: jest.fn(() => []),
+        innerText: 'Body content that is long enough to pass the threshold check for read_page fallback',
+        remove: jest.fn(),
+      })),
+    };
+    const result = runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+  });
+
+  test('read_page skips nav/header/footer from content', () => {
+    const navEl = { remove: jest.fn() };
+    const scriptEl = { remove: jest.fn() };
+    const mainEl = {
+      cloneNode: jest.fn(() => ({
+        innerText: 'Main content '.repeat(20),
+        textContent: '',
+        querySelectorAll: jest.fn((sel) => {
+          if (sel === 'nav' || sel === 'script') return [navEl, scriptEl];
+          return [];
+        }),
+        remove: jest.fn(),
+      })),
+    };
+    mockDoc.querySelector.mockImplementation((sel) => {
+      if (sel === 'main') return mainEl;
+      return null;
+    });
+    const result = runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+  });
+
+  // --- unknown command ---
+
+  test('unknown command type returns error', () => {
+    const result = runCmd({ type: 'scroll_to_bottom' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Unknown command type');
+  });
+
+  // --- exception handling ---
+
+  test('catches exception during command execution', () => {
+    mockDom.findElementBySelector.mockImplementation(() => { throw new Error('DOM crash'); });
+    const result = runCmd({ type: 'click', selector: '#btn' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Frame command error');
+    expect(result.error).toContain('DOM crash');
+  });
+});
