@@ -1389,10 +1389,10 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
   // MV3 idle limit. Without this, the listener gets GC'd before the user even
   // sees the prompt.
   const kaName = 'tenant_override_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) {}
+  try { startSwKeepalive(kaName); } catch (e) { tel.warn('agent', 'SW keepalive start failed for tenant override', { error: e.message }); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) {}
+      try { stopSwKeepalive(kaName); } catch (e) { tel.warn('agent', 'SW keepalive stop failed', { error: e.message }); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -2463,7 +2463,7 @@ async function runAgentLoop(goal, workingTabId) {
               evidence: _wallHit.evidence,
               stepNumber: stepCount
             }).catch(() => {});
-          } catch (e) {}
+          } catch (e) { tel.warn('agent', 'Sign-in wall pause broadcast failed', { error: e.message }); }
           // Log to forensic run log so HR/compliance reviews see when the agent
           // paused for credentials.
           try {
@@ -2510,7 +2510,7 @@ async function runAgentLoop(goal, workingTabId) {
               hint: _mfaHit,
               stepNumber: stepCount
             }).catch(() => {});
-          } catch (e) {}
+          } catch (e) { tel.warn('agent', 'MFA pause broadcast failed', { error: e.message }); }
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -3076,12 +3076,12 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
             // full slice between them.
-            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) {}
+            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { tel.warn('agent', 'Telemetry log finalize failed', { error: e.message }); }
             // (3.27.0) Tell the persistence layer this run is done. Flushes
             // the buffer one last time and stamps finishedAt on the index.
             // Awaited so the storage write completes before the SW potentially
             // suspends after agent_finished fires.
-            try { await telEndRun(runLogId); } catch (e) {}
+            try { await telEndRun(runLogId); } catch (e) { tel.warn('agent', 'telEndRun failed', { runLogId, error: e.message }); }
             // (3.14.0) Stamp the index entry as completed with final step count.
             // (3.30.0) Trust score already computed above — persist on the index
             // so the popup-side Run Log list can render it without recomputing.
@@ -3096,7 +3096,7 @@ async function runAgentLoop(goal, workingTabId) {
                 trustBand: _trustScore ? _trustScore.band : null,
                 trustBreakdown: _trustScore ? _trustScore.breakdown : null
               });
-            } catch (e) { /* non-fatal */ }
+            } catch (e) { tel.warn('agent', 'Run log index update failed', { runLogId, error: e.message }); }
             try {
               chrome.runtime.sendMessage({
                 action: 'run_log_available',
@@ -3105,7 +3105,7 @@ async function runAgentLoop(goal, workingTabId) {
                 trustScore: _trustScore ? _trustScore.score : null,
                 trustBand: _trustScore ? _trustScore.band : null
               }).catch(() => {});
-            } catch (e) {}
+            } catch (e) { tel.warn('agent', 'run_log_available broadcast failed', { error: e.message }); }
           }
         } catch (_e) {}
 

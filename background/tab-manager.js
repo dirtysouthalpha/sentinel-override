@@ -350,7 +350,7 @@ async function ensureDebuggerAttached(tabId) {
         tabId,
         message: 'Debugger re-attached after banner was dismissed. Trusted input is active. Dismiss this banner again to fall back to synthetic events.'
       }).catch(() => {});
-    } catch (e) {}
+    } catch (e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', e.message); }
   }
 }
 
@@ -677,7 +677,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
     attachedDebuggees.delete(tabId);
-    try { await chrome.debugger.detach({ tabId }); } catch(e) {}
+    try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[tab-manager] Debugger detach failed in error path:', e.message); }
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {
