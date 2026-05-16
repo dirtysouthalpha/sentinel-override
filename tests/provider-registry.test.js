@@ -1237,3 +1237,152 @@ describe('migrateLegacySettings — error handling', () => {
     await expect(migrateLegacySettings()).resolves.toBeUndefined();
   });
 });
+
+// ========== OpenAI parseToolUseResponse ==========
+
+describe('OpenAI parseToolUseResponse', () => {
+  const provider = PROVIDERS.openai;
+
+  test('extracts tool_call function name and parsed arguments', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'click',
+              arguments: '{"selector": "#btn", "x": 100}'
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('click');
+    expect(result.selector).toBe('#btn');
+    expect(result.x).toBe(100);
+  });
+
+  test('extracts type command with text argument', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'type',
+              arguments: '{"selector": "input.email", "text": "hello"}'
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('type');
+    expect(result.text).toBe('hello');
+  });
+
+  test('handles empty arguments string as empty object', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'read_page',
+              arguments: ''
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('read_page');
+  });
+
+  test('handles missing arguments as empty object', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'finish',
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('finish');
+  });
+
+  test('handles invalid JSON arguments by treating as text', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'note',
+              arguments: 'this is not json'
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('note');
+    expect(result.text).toBe('this is not json');
+  });
+
+  test('throws when no choices array', () => {
+    expect(() => provider.parseToolUseResponse({})).toThrow(/no valid choice/);
+  });
+
+  test('throws when choices is empty', () => {
+    expect(() => provider.parseToolUseResponse({ choices: [] })).toThrow(/no valid choice/);
+  });
+
+  test('throws when no message in choice', () => {
+    expect(() => provider.parseToolUseResponse({ choices: [{}] })).toThrow(/no valid choice/);
+  });
+
+  test('throws when no tool_calls in message', () => {
+    const data = {
+      choices: [{ message: { content: 'no tools here' } }]
+    };
+    expect(() => provider.parseToolUseResponse(data)).toThrow(/no tool_calls/);
+  });
+
+  test('throws when tool_calls array is empty', () => {
+    const data = {
+      choices: [{ message: { tool_calls: [] } }]
+    };
+    expect(() => provider.parseToolUseResponse(data)).toThrow(/no tool_calls/);
+  });
+
+  test('throws when tool_call has no function name', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{ function: { arguments: '{}' } }]
+        }
+      }]
+    };
+    expect(() => provider.parseToolUseResponse(data)).toThrow(/no tool_calls/);
+  });
+
+  test('handles navigate command with URL argument', () => {
+    const data = {
+      choices: [{
+        message: {
+          tool_calls: [{
+            function: {
+              name: 'navigate',
+              arguments: '{"url": "https://example.com/page"}'
+            }
+          }]
+        }
+      }]
+    };
+    const result = provider.parseToolUseResponse(data);
+    expect(result.type).toBe('navigate');
+    expect(result.url).toBe('https://example.com/page');
+  });
+});
