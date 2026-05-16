@@ -204,6 +204,7 @@ const {
   startAgent, stopAgent, pauseAgent, resumeAgent, resetAgentState,
   setAgentSpeed, injectContext, getAgentTabId,
   isAgentAttachedTab, getAttachedTabIds, fetchAuditLog,
+  attachTabToSentinelGroup, detachAllSentinelTabs,
 } = await import('../background/agent-engine.js');
 
 const { getTabContext } = await import('../background/tab-context.js');
@@ -212,10 +213,21 @@ const { generateReport } = await import('../background/report-generator.js');
 const { generatePlan } = await import('../background/llm-client.js');
 const { tel } = await import('../background/telemetry.js');
 
+// Record the addListener calls that fire at module-import time so we can
+// verify them without being affected by clearAllMocks().
+const _onUpdatedCalled = chrome.tabs.onUpdated.addListener.mock.calls.length > 0;
+const _onSuspendCalled = chrome.runtime.onSuspend.addListener.mock.calls.length > 0;
+
 // ── Helpers ──
 function makeSender(tabId = 1) {
   return { tab: { id: tabId, url: 'https://example.com', windowId: 1 } };
 }
+
+afterEach(async () => {
+  // Force agent to fully stop between tests — resetAgentState does NOT reset
+  // agentRunning / agentAttachedTabs, so we must call stopAgent first.
+  try { await stopAgent(); } catch (_) {}
+});
 
 beforeEach(() => {
   // Reset storage
@@ -231,7 +243,7 @@ beforeEach(() => {
 // ==========================
 describe('tab URL change listener', () => {
   test('fires onUpdated listener registered at module load', () => {
-    expect(chrome.tabs.onUpdated.addListener).toHaveBeenCalled();
+    expect(_onUpdatedCalled).toBe(true);
   });
 
   test('updates tab context url when tab URL changes', () => {
@@ -282,7 +294,7 @@ describe('tab URL change listener', () => {
 // ==========================
 describe('onSuspend checkpoint listener', () => {
   test('registers onSuspend listener at module load', () => {
-    expect(chrome.runtime.onSuspend.addListener).toHaveBeenCalled();
+    expect(_onSuspendCalled).toBe(true);
   });
 
   test('flushes checkpoint to session storage on suspend', async () => {
@@ -676,8 +688,8 @@ describe('setAgentSpeed', () => {
 // resumeAgent when not paused
 // ==========================
 describe('resumeAgent', () => {
-  test('returns message when agent not running', () => {
-    expect(resumeAgent()).toBe('Agent not running');
+  test('returns message when agent not running', async () => {
+    await expect(resumeAgent()).resolves.toBe('Agent not running');
   });
 });
 
