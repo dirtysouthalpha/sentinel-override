@@ -760,4 +760,48 @@ describe('overlay-detector — dismissOverlay accept buttons and edge cases', ()
     const doc = { body, activeElement: null };
     expect(ov.dismissOverlay(doc, overlay)).toBe(true);
   });
+
+  // --- Line 164-166: catch block in accept button click loop ---
+  test('catches error when accept button click throws and continues', () => {
+    const overlay = makeElement('div');
+    const brokenBtn = makeElement('button');
+    _isVisibleResults.set(brokenBtn, true);
+    _isVisibleResults.set(overlay, true);
+    // First selector: brokenBtn.click() throws
+    brokenBtn.click = () => { throw new Error('Element detached'); };
+    brokenBtn.dispatchEvent = () => { throw new Error('Element detached'); };
+    // Second pass with Escape key succeeds
+    let escapeAttempted = false;
+    overlay.querySelectorAll = (sel) => {
+      if (sel.includes('accept')) return [brokenBtn];
+      return [];
+    };
+    const doc = {
+      body: { contains: () => true },
+      activeElement: { dispatchEvent: () => { escapeAttempted = true; } },
+    };
+    // Should NOT throw — the catch block at line 164 swallows the error
+    const result = ov.dismissOverlay(doc, overlay);
+    expect(escapeAttempted).toBe(true);
+    expect(result).toBe(false);
+  });
+
+  test('catches error when querySelectorAll throws for an accept selector', () => {
+    const overlay = makeElement('div');
+    _isVisibleResults.set(overlay, true);
+    let callCount = 0;
+    overlay.querySelectorAll = (sel) => {
+      callCount++;
+      // Throw for accept selectors, return empty for others
+      if (sel.includes('accept')) throw new Error('Permission denied');
+      return [];
+    };
+    const doc = {
+      body: { contains: () => true },
+      activeElement: { dispatchEvent: () => {} },
+    };
+    // Should NOT throw — the catch at line 164 handles it
+    expect(() => ov.dismissOverlay(doc, overlay)).not.toThrow();
+    expect(callCount).toBeGreaterThan(0);
+  });
 });

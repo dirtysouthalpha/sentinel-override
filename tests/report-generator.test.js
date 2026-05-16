@@ -313,5 +313,26 @@ describe('report-generator', () => {
       const count = urls.filter(u => u === 'https://example.com/page').length;
       expect(count).toBe(1);
     });
+
+    // --- Line 318: buildStructuredData circular reference catch block ---
+    test('structuredData.findings handles circular reference objects gracefully', async () => {
+      const circular = { name: 'test' };
+      circular.self = circular; // Creates circular reference
+      const data = makeExecutionData({ agentMemory: { circularObj: circular } });
+      const result = await generateReport(data, CONFIG);
+      // Should not throw — circular JSON.stringify catch at line 318 converts to String()
+      expect(result.structuredData.findings).toHaveProperty('circularObj');
+      expect(typeof result.structuredData.findings.circularObj).toBe('string');
+    });
+
+    // --- Line 354: fallback report with empty memory ---
+    test('fallback report handles agentMemory with array values', async () => {
+      mockGetActiveProviderResolve = { endpoint: '', apiKey: '', model: '' };
+      const data = makeExecutionData({
+        agentMemory: { items: ['a', 'b', 'c', 'd', 'e', 'f'] },
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.fullReport).toContain('items');
+    });
   });
 });
