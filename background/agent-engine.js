@@ -713,6 +713,9 @@ const HISTORY_SUMMARIZE_BATCH = 15;
 
 function summarizeHistoryBatch(batch) {
   if (!batch || batch.length === 0) return null;
+  const firstValid = batch.find(h => h && h.step !== undefined);
+  const lastValid = [...batch].reverse().find(h => h && h.step !== undefined);
+  if (!firstValid || !lastValid) return null;
   const counts = {};
   const navUrls = [];
   const extractedKeys = [];
@@ -736,9 +739,9 @@ function summarizeHistoryBatch(batch) {
   if (notes.length) summaryParts.push('Notes recorded: ' + notes.slice(0, 3).join(' || '));
   if (failures.length) summaryParts.push('Failures: ' + failures.slice(0, 3).join(' || '));
   return {
-    step: batch[0].step + '-' + batch[batch.length - 1].step,
+    step: firstValid.step + '-' + lastValid.step,
     action: { type: 'history_summary' },
-    result: '[ROLLED-UP SUMMARY of steps ' + batch[0].step + '-' + batch[batch.length - 1].step + '] ' + summaryParts.join(' • ')
+    result: '[ROLLED-UP SUMMARY of steps ' + firstValid.step + '-' + lastValid.step + '] ' + summaryParts.join(' • ')
   };
 }
 
