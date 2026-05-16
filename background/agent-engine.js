@@ -4440,3 +4440,39 @@ async function requestApproval(command, stepNumber) {
     }, 60000);
   });
 }
+
+// ========== Test-Only Exports ==========
+// Internal pure helpers exported for unit testing. Not part of the public API.
+export {
+  detectMfaInText,
+  detectSignInWall,
+  shouldLockoutCrossTenantAction,
+  evaluateHallucinationRisk,
+  _isUnproductiveJsResult,
+  _shouldAcceptMemoryWrite,
+  _checkPreFinishCompleteness,
+  _detectActionTypeLoop,
+  generateHeuristicPlan,
+  formatTicketOutput,
+  formatTicketFinalNotes,
+  formatTicketKickoff,
+  formatWaitingOnClient,
+  formatWaitingOnVendor,
+  formatItGlueKb,
+  formatClientEmail,
+  summarizeHistoryBatch,
+  maybeRollupHistory,
+  detectStall,
+  isConfigChangeGoal,
+  hasRecentCommitClick,
+  hasPostCommitVerification,
+  _detectGoalModeDirective,
+  _autoPickFormat,
+  extractTicketNumber,
+  isTicketInvestigationGoal,
+  captureReportData,
+  _countSummaryClaims,
+  _countSpecificClaims,
+  _countSourceTags,
+  _tenantsMatch,
+};
