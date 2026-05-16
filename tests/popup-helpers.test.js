@@ -18,7 +18,7 @@ describe('Helpers.formatCountdown', () => {
   });
 
   test('returns minutes format for <60 minutes away', () => {
-    const ts = Date.now() + 5 * 60 * 1000; // 5 minutes from now
+    const ts = Date.now() + 5 * 60 * 1000 + 500; // 5 minutes from now + buffer for Date.now drift
     expect(Helpers.formatCountdown(ts)).toBe('5m away');
   });
 
