@@ -4478,4 +4478,6 @@ export {
   _countSpecificClaims,
   _countSourceTags,
   _tenantsMatch,
+  describeAction,
+  _describeTarget,
 };
