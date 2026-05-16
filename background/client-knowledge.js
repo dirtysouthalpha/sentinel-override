@@ -194,7 +194,8 @@ export async function updateEntry(clientId, entryId, updates) {
   if (updates.scope === 'global' || updates.scope === 'url') e.scope = updates.scope;
   if (typeof updates.urlPattern === 'string') e.urlPattern = updates.urlPattern.trim();
   if (Array.isArray(updates.tags)) e.tags = updates.tags.slice(0, 8).map(t => String(t).trim()).filter(Boolean);
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, entry: e };
 }
 
@@ -205,7 +206,8 @@ export async function deleteEntry(clientId, entryId) {
   const before = c.entries.length;
   c.entries = c.entries.filter(x => x.id !== entryId);
   if (c.entries.length === before) return { ok: false, error: 'Entry not found' };
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true };
 }
 

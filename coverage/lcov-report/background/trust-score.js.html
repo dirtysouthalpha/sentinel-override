@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">98.97% </span>
+                <span class="strong">99% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>97/98</span>
+                <span class='fraction'>99/100</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.79% </span>
+                <span class="strong">93.84% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>114/119</span>
+                <span class='fraction'>122/130</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>84/84</span>
+                <span class='fraction'>85/85</span>
             </div>
         
             
@@ -354,7 +354,8 @@
 <a name='L289'></a><a href='#L289'>289</a>
 <a name='L290'></a><a href='#L290'>290</a>
 <a name='L291'></a><a href='#L291'>291</a>
-<a name='L292'></a><a href='#L292'>292</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -506,6 +507,7 @@
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -795,19 +797,20 @@ export function trustBand(score) {
  */
 export function describeTrustScore(scoreResult) {
   if (!scoreResult || typeof scoreResult.score !== 'number') return 'Trust score unavailable';
-  const { score, band, breakdown } = scoreResult;
+  const { score, band, breakdown = <span class="branch-0 cbranch-no" title="branch not covered" >{} </span>} = scoreResult;
   const parts = [];
+  const safeDelta = (comp) =&gt; (comp &amp;&amp; typeof comp.max === 'number' &amp;&amp; typeof comp.points === 'number') ? comp.max - comp.points : <span class="branch-1 cbranch-no" title="branch not covered" >0;</span>
   // Lead with the dominant factor (largest gap from max).
   const components = [
-    { name: 'failure',      delta: breakdown.failure.max - breakdown.failure.points },
-    { name: 'productivity', delta: breakdown.productivity.max - breakdown.productivity.points },
-    { name: 'recovery',     delta: breakdown.recovery.max - breakdown.recovery.points },
-    { name: 'plan',         delta: breakdown.plan.max - breakdown.plan.points },
-    { name: 'efficiency',   delta: breakdown.efficiency.max - breakdown.efficiency.points },
+    { name: 'failure',      delta: safeDelta(breakdown.failure) },
+    { name: 'productivity', delta: safeDelta(breakdown.productivity) },
+    { name: 'recovery',     delta: safeDelta(breakdown.recovery) },
+    { name: 'plan',         delta: safeDelta(breakdown.plan) },
+    { name: 'efficiency',   delta: safeDelta(breakdown.efficiency) },
   ];
   components.sort((a, b) =&gt; b.delta - a.delta);
   if (components[0].delta &gt; 5) parts.push('weak ' + components[0].name);
-  if (breakdown.safety.blocks &gt; 0) parts.push(breakdown.safety.blocks + ' safety block' + (breakdown.safety.blocks &gt; 1 ? 's' : <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>);
+  if (breakdown.safety &amp;&amp; breakdown.safety.blocks &gt; 0) parts.push(breakdown.safety.blocks + ' safety block' + (breakdown.safety.blocks &gt; 1 ? 's' : <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>);
   const suffix = parts.length &gt; 0 ? ' (' + parts.join(', ') + ')' : '';
   return 'Trust ' + score + '/100 · ' + band + suffix;
 }
@@ -879,11 +882,11 @@ export function suggestRetryActions(scoreResult) {
     });
   }
 &nbsp;
-  if (recoveryGap &gt; 0.5 &amp;&amp; bd.recovery &amp;&amp; bd.recovery.fires &gt;= 3) {
+  if (recoveryGap &gt; 0.5 &amp;&amp; bd.recovery &amp;&amp; typeof bd.recovery.fires === 'number' &amp;&amp; bd.recovery.fires &gt;= 3) {
     suggestions.push({
       id: 'reset-skills-and-retry',
       label: 'Reset skill stats and retry',
-      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + bd.recovery.successes + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
+      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + (bd.recovery.successes || <span class="branch-1 cbranch-no" title="branch not covered" >0)</span> + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
       severity,
       applyKeys: [],
       applyValues: []
@@ -943,7 +946,7 @@ export function suggestRetryActions(scoreResult) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T16:09:46.870Z
+                at 2026-05-16T16:52:20.153Z
             </div>
         <script src="../prettify.js"></script>
         <script>
