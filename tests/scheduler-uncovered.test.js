@@ -95,6 +95,12 @@ jest.unstable_mockModule('../background/shared-state.js', () => ({
   notifyIfEnabled: jest.fn(),
 }));
 
+const _mockModules = await Promise.all([
+  import('../background/agent-engine.js'),
+  import('../background/template-manager.js'),
+  import('../background/shared-state.js'),
+]);
+
 const {
   createSchedule,
   listSchedules,
@@ -143,7 +149,7 @@ function clearChromeMocks() {
   _msgListeners = [];
 }
 
-// Reset chrome mocks AND restore their implementations
+// Reset chrome mocks AND restore their implementations + clear mock module fns
 function resetChromeMocks() {
   clearChromeMocks();
   // Restore storage mock implementations
@@ -162,6 +168,15 @@ function resetChromeMocks() {
   chrome.storage.local.remove.mockImplementation(async () => {});
   chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
   chrome.runtime.onMessage.addListener.mockImplementation((fn) => { _msgListeners.push(fn); });
+
+  // Clear mock module function calls (preserves getter mocks like agentRunning)
+  for (const mod of _mockModules) {
+    for (const val of Object.values(mod)) {
+      if (val && typeof val === 'function' && typeof val.mockClear === 'function') {
+        val.mockClear();
+      }
+    }
+  }
 }
 
 // Helper: set up chrome mocks for a full execution with tab + agent completion
