@@ -489,7 +489,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return { cleared: true };
 
     case 'schedule_clear_badge':
-      chrome.action.setBadgeText({ text: '' });
+      { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch(() => {}); }
       return { cleared: true };
 
     // Collaboration: export/import

@@ -86,8 +86,9 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
           try { data = JSON.parse(data.replace('JS Result: ', '')); } catch {}
         }
         if (data && typeof data === 'object') {
-          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data;
-          if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
+          let parsed;
+          try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch { parsed = null; }
+          if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
             domReady = true;
           }
         } else if (typeof data === 'string') {

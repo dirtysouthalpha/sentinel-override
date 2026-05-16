@@ -3219,7 +3219,11 @@ async function runAgentLoop(goal, workingTabId) {
               new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g'),
               (_, field) => field ? (typeof _item === 'object' && _item !== null ? String(_item[field] ?? '') : '') : String(_item)
             );
-            const _resolved = JSON.parse(_resolvedStr);
+            let _resolved;
+            try { _resolved = JSON.parse(_resolvedStr); } catch (e) {
+              historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${e.message}` });
+              continue;
+            }
             _pendingCommandQueue.push(_resolved);
           }
         }
@@ -4025,14 +4029,18 @@ async function runAgentLoop(goal, workingTabId) {
               if (newCtx) newCtx.isAgentCreated = true;
               // (3.7.2) Attach the click-opened new tab to the Sentinel group.
               try { await attachTabToSentinelGroup(newTab.id); } catch (_) {}
-              result = 'Clicked -> new tab opened: ' + (newUrl ? new URL(newUrl).hostname : 'new page');
+              let _host;
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (_) { _host = newUrl || 'new page'; }
+              result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
               chrome.tabs.remove(newTabs.map(t => t.id));
               await chrome.tabs.update(tab, { url: newUrl });
               await waitForPageLoad(tab);
               await sleep(500);
-              result = 'Clicked -> navigated to ' + (newUrl ? new URL(newUrl).hostname : 'new page');
+              let _host;
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (_) { _host = newUrl || 'new page'; }
+              result = 'Clicked -> navigated to ' + _host;
             }
           } else {
             const updatedTab = await getTabInfo(tab);

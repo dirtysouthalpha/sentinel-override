@@ -112,7 +112,8 @@ function registerAlarm(schedule) {
     alarmInfo.periodInMinutes = schedule.recurrence.periodInMinutes;
   }
 
-  chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
+  const _alarmPromise = chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
+  if (_alarmPromise && typeof _alarmPromise.catch === 'function') _alarmPromise.catch(() => {});
   tel.debug('scheduler', `Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
 }
 
@@ -135,7 +136,9 @@ function clearAlarm(scheduleId) {
 function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
-  const [hours, minutes] = (recurrence.time || '09:00').split(':').map(Number);
+  const timeParts = (recurrence.time || '09:00').split(':').map(Number);
+  const hours = (Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
+  const minutes = (Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
   const now = new Date();
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 
@@ -230,10 +233,12 @@ function sendNotification(schedule, result) {
  * @param {string} status - 'success' or 'failure'
  */
 function setBadge(status) {
-  chrome.action.setBadgeText({ text: '1' });
-  chrome.action.setBadgeBackgroundColor({
+  const _t = chrome.action.setBadgeText({ text: '1' });
+  if (_t && typeof _t.catch === 'function') _t.catch(() => {});
+  const _b = chrome.action.setBadgeBackgroundColor({
     color: status === 'success' ? '#22c55e' : '#ef4444',
   });
+  if (_b && typeof _b.catch === 'function') _b.catch(() => {});
 }
 
 // ========== CRUD Operations ==========

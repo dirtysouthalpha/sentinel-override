@@ -23,7 +23,8 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
  * @returns {Promise<{summary: string, fullReport: string, structuredData: object, goal: string, timestamp: string}>}
  */
 export async function generateReport(executionData, CONFIG) {
-  const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const agentMemory = executionData.agentMemory || {};
   const timestamp = new Date().toISOString();
 
   sendSilentUpdate('Generating investigation report...');
@@ -276,7 +277,8 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
  */
 function buildStructuredData(executionData, timestamp) {
   if (!executionData) return {};
-  const { goal, history, agentMemory, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const agentMemory = executionData.agentMemory || {};
 
   // Classify action types for the action breakdown
   const actionCounts = {};
