@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1778935528429" clover="3.2.0">
-  <project timestamp="1778935528430" name="All files">
-    <metrics statements="5447" coveredstatements="4209" conditionals="5882" coveredconditionals="4156" methods="751" coveredmethods="644" elements="12080" coveredelements="9009" complexity="0" loc="5447" ncloc="5447" packages="5" files="53" classes="53"/>
+<coverage generated="1778936542566" clover="3.2.0">
+  <project timestamp="1778936542566" name="All files">
+    <metrics statements="5447" coveredstatements="4209" conditionals="5882" coveredconditionals="4157" methods="751" coveredmethods="644" elements="12080" coveredelements="9010" complexity="0" loc="5447" ncloc="5447" packages="5" files="53" classes="53"/>
     <package name="background">
-      <metrics statements="4398" coveredstatements="3170" conditionals="4777" coveredconditionals="3155" methods="604" coveredmethods="498"/>
+      <metrics statements="4398" coveredstatements="3170" conditionals="4777" coveredconditionals="3156" methods="604" coveredmethods="498"/>
       <file name="adaptive-prompts.js" path="C:\Users\Administrator\Downloads\sentinel-override\background\adaptive-prompts.js">
         <metrics statements="107" coveredstatements="106" conditionals="123" coveredconditionals="106" methods="8" coveredmethods="7"/>
         <line num="18" count="1" type="stmt"/>
@@ -2152,7 +2152,7 @@
         <line num="75" count="33" type="stmt"/>
         <line num="81" count="1" type="stmt"/>
         <line num="82" count="1" type="stmt"/>
-        <line num="83" count="9" type="cond" truecount="2" falsecount="2"/>
+        <line num="83" count="4" type="cond" truecount="2" falsecount="2"/>
         <line num="88" count="11" type="cond" truecount="2" falsecount="0"/>
         <line num="89" count="9" type="stmt"/>
         <line num="90" count="9" type="cond" truecount="2" falsecount="0"/>
@@ -3336,7 +3336,7 @@
         <line num="400" count="6" type="stmt"/>
       </file>
       <file name="scheduler.js" path="C:\Users\Administrator\Downloads\sentinel-override\background\scheduler.js">
-        <metrics statements="312" coveredstatements="275" conditionals="257" coveredconditionals="211" methods="50" coveredmethods="40"/>
+        <metrics statements="312" coveredstatements="275" conditionals="257" coveredconditionals="212" methods="50" coveredmethods="40"/>
         <line num="15" count="3" type="stmt"/>
         <line num="16" count="3" type="stmt"/>
         <line num="17" count="3" type="stmt"/>
@@ -3378,7 +3378,7 @@
         <line num="143" count="30" type="stmt"/>
         <line num="145" count="30" type="cond" truecount="2" falsecount="0"/>
         <line num="147" count="19" type="cond" truecount="2" falsecount="0"/>
-        <line num="148" count="1" type="stmt"/>
+        <line num="148" count="18" type="stmt"/>
         <line num="150" count="19" type="stmt"/>
         <line num="153" count="11" type="cond" truecount="5" falsecount="0"/>
         <line num="155" count="5" type="stmt"/>
@@ -3387,9 +3387,9 @@
         <line num="162" count="5" type="stmt"/>
         <line num="163" count="15" type="stmt"/>
         <line num="164" count="15" type="cond" truecount="2" falsecount="0"/>
-        <line num="165" count="15" type="cond" truecount="3" falsecount="1"/>
+        <line num="165" count="15" type="cond" truecount="4" falsecount="0"/>
         <line num="166" count="15" type="cond" truecount="4" falsecount="0"/>
-        <line num="167" count="6" type="stmt"/>
+        <line num="167" count="5" type="stmt"/>
         <line num="171" count="5" type="stmt"/>
         <line num="172" count="5" type="stmt"/>
         <line num="175" count="6" type="cond" truecount="2" falsecount="0"/>
@@ -3949,7 +3949,7 @@
         <line num="376" count="13" type="cond" truecount="4" falsecount="0"/>
         <line num="377" count="1" type="stmt"/>
         <line num="378" count="2" type="cond" truecount="1" falsecount="1"/>
-        <line num="381" count="410" type="stmt"/>
+        <line num="381" count="227" type="stmt"/>
         <line num="382" count="213" type="stmt"/>
         <line num="394" count="442" type="stmt"/>
         <line num="395" count="442" type="stmt"/>

@@ -163,9 +163,9 @@ describe('callLLMWithRetry — non-tool-use provider fallback', () => {
       [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
       0, defaultConfig, makeAgentState()
     );
-    // Empty string from provider parseResponse falls to line 1682
+    // OpenAI provider has supportsToolUse:true, so empty content hits the tool-use fallback path (line 1678)
     expect(result.type).toBe('note');
-    expect(result.text).toContain('Empty LLM response');
+    expect(result.text).toContain('unparseable response');
   });
 
   test('non-tool-use provider returns note for null response text', async () => {
