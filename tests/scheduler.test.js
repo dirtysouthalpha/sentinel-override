@@ -77,6 +77,14 @@ const {
 beforeEach(() => {
   storageData = {};
   jest.clearAllMocks();
+  // Restore storage mock implementations after clearAllMocks resets them
+  chrome.storage.local.get.mockImplementation(async (keys) => {
+    const key = Array.isArray(keys) ? keys[0] : keys;
+    const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+    return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
+  });
+  chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
+  chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
 });
 
 // Helper: create a valid schedule
