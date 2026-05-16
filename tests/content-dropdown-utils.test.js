@@ -1,5 +1,6 @@
 // tests/content-dropdown-utils.test.js
-// Unit tests for content/dropdown-utils.js — isCustomDropdown (pure heuristic).
+// Unit tests for content/dropdown-utils.js — dropdown detection, opening,
+// option selection, nested menu traversal, search input finding, dismissal.
 // Uses VM sandbox with mocked DOM utilities.
 
 import { readFileSync } from 'fs';
@@ -234,5 +235,256 @@ describe('dismissDropdown', () => {
       body: { dispatchEvent: () => {} },
     };
     expect(dd.dismissDropdown(doc)).toBe(false);
+  });
+});
+
+describe('openDropdown', () => {
+  let dd;
+  beforeEach(() => { dd = getDd(loadModule(createSandbox())); });
+
+  test('returns null for null trigger', async () => {
+    const result = await dd.openDropdown({}, null);
+    expect(result).toBeNull();
+  });
+
+  test('clicks trigger and returns options when found', async () => {
+    const clicked = [];
+    const trigger = {
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => { clicked.push('click'); },
+    };
+    const optionEl = { tagName: 'DIV', _visible: true, getAttribute: () => null, innerText: 'Opt1' };
+    const doc = {
+      querySelectorAll: (sel) => {
+        if (sel.includes('[role="option"]')) return [optionEl];
+        return [];
+      },
+      getElementById: () => null,
+      defaultView: {},
+    };
+    // Override findDropdownOptions to return immediately
+    const origFind = dd.findDropdownOptions;
+    dd.findDropdownOptions = () => [optionEl];
+    const result = await dd.openDropdown(doc, trigger);
+    expect(result).toHaveLength(1);
+    expect(clicked).toHaveLength(1);
+    dd.findDropdownOptions = origFind;
+  });
+
+  test('returns null when no options appear after polling', async () => {
+    let sleepCount = 0;
+    const sandbox = createSandbox();
+    sandbox.window.__sentinelUtils.wait.sleep = () => { sleepCount++; return Promise.resolve(); };
+    sandbox.window.__sentinelUtils.dropdown = {};
+    dd = getDd(loadModule(sandbox));
+    // Override findDropdownOptions to always return empty
+    dd.findDropdownOptions = () => [];
+    // Force Date.now to advance past timeout
+    const realDateNow = Date.now;
+    let fakeTime = 0;
+    Date.now = () => { fakeTime += 3100; return fakeTime; };
+    try {
+      const trigger = { scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+      const result = await dd.openDropdown({ defaultView: {}, querySelectorAll: () => [], getElementById: () => null }, trigger);
+      expect(result).toBeNull();
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+});
+
+describe('selectDropdownOption', () => {
+  let dd;
+  beforeEach(() => { dd = getDd(loadModule(createSandbox())); });
+
+  test('returns null for empty options array', async () => {
+    const result = await dd.selectDropdownOption({}, [], 'test');
+    expect(result).toBeNull();
+  });
+
+  test('returns null for null options', async () => {
+    const result = await dd.selectDropdownOption({}, null, 'test');
+    expect(result).toBeNull();
+  });
+
+  test('returns null for null value', async () => {
+    const opts = [{ innerText: 'Option A', textContent: 'Option A' }];
+    const result = await dd.selectDropdownOption({}, opts, null);
+    expect(result).toBeNull();
+  });
+
+  test('returns null for undefined value', async () => {
+    const opts = [{ innerText: 'Option A', textContent: 'Option A' }];
+    const result = await dd.selectDropdownOption({}, opts, undefined);
+    expect(result).toBeNull();
+  });
+
+  test('matches exact text case-insensitively', async () => {
+    const opt1 = { innerText: 'United States', textContent: 'United States', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const opt2 = { innerText: 'Canada', textContent: 'Canada', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const result = await dd.selectDropdownOption({ defaultView: {} }, [opt1, opt2], 'united states');
+    expect(result).toBe(opt1);
+  });
+
+  test('matches value attribute', async () => {
+    const opt1 = { innerText: 'United States', textContent: 'United States', value: 'US', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const result = await dd.selectDropdownOption({ defaultView: {} }, [opt1], 'us');
+    expect(result).toBe(opt1);
+  });
+
+  test('matches starts-with as fallback', async () => {
+    const opt1 = { innerText: 'United States of America', textContent: 'United States of America', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const result = await dd.selectDropdownOption({ defaultView: {} }, [opt1], 'United States');
+    expect(result).toBe(opt1);
+  });
+
+  test('matches partial contains as last resort', async () => {
+    const opt1 = { innerText: 'The United Kingdom of Great Britain', textContent: 'The United Kingdom of Great Britain', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const result = await dd.selectDropdownOption({ defaultView: {} }, [opt1], 'kingdom');
+    expect(result).toBe(opt1);
+  });
+
+  test('returns null when no match found', async () => {
+    const opts = [{ innerText: 'Option A', textContent: 'Option A' }];
+    const result = await dd.selectDropdownOption({}, opts, 'nonexistent');
+    expect(result).toBeNull();
+  });
+
+  test('clicks the matched option', async () => {
+    const clicks = [];
+    const opt = {
+      innerText: 'Click Me', textContent: 'Click Me',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => { clicks.push('clicked'); },
+    };
+    await dd.selectDropdownOption({ defaultView: {} }, [opt], 'Click Me');
+    expect(clicks).toHaveLength(1);
+  });
+
+  test('matches empty string value exactly', async () => {
+    const opt1 = { innerText: '', textContent: '', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const opt2 = { innerText: 'Other', textContent: 'Other', scrollIntoView: () => {}, dispatchEvent: () => {}, click: () => {} };
+    const result = await dd.selectDropdownOption({ defaultView: {} }, [opt1, opt2], '');
+    expect(result).toBe(opt1);
+  });
+});
+
+describe('traverseNestedMenu', () => {
+  let dd;
+  beforeEach(() => { dd = getDd(loadModule(createSandbox())); });
+
+  test('returns null for null path', async () => {
+    const result = await dd.traverseNestedMenu({}, null);
+    expect(result).toBeNull();
+  });
+
+  test('returns null for empty path', async () => {
+    const result = await dd.traverseNestedMenu({}, []);
+    expect(result).toBeNull();
+  });
+
+  test('returns null when no menu items match', async () => {
+    dd.findDropdownOptions = () => [{ innerText: 'Other', textContent: 'Other' }];
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings']);
+    expect(result).toBeNull();
+  });
+
+  test('clicks the single-level menu item and returns it', async () => {
+    const item = {
+      innerText: 'Settings', textContent: 'Settings',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    dd.findDropdownOptions = () => [item];
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings']);
+    expect(result).toBe(item);
+  });
+
+  test('hovers intermediate level and clicks final level', async () => {
+    const level1Item = {
+      innerText: 'Settings', textContent: 'Settings',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    const level2Item = {
+      innerText: 'Security', textContent: 'Security',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    let callCount = 0;
+    dd.findDropdownOptions = () => {
+      callCount++;
+      return callCount <= 1 ? [level1Item] : [level2Item];
+    };
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings', 'Security']);
+    expect(result).toBe(level2Item);
+  });
+
+  test('returns null when submenu never appears', async () => {
+    const level1Item = {
+      innerText: 'Settings', textContent: 'Settings',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    let callCount = 0;
+    dd.findDropdownOptions = () => {
+      callCount++;
+      return callCount <= 1 ? [level1Item] : [];
+    };
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings', 'Security']);
+    expect(result).toBeNull();
+  });
+});
+
+describe('_findSearchInput', () => {
+  let dd;
+  beforeEach(() => { dd = getDd(loadModule(createSandbox())); });
+
+  test('returns null for empty options', () => {
+    expect(dd._findSearchInput({ querySelectorAll: () => [] }, [])).toBeNull();
+  });
+
+  test('returns null for null options', () => {
+    expect(dd._findSearchInput({ querySelectorAll: () => [] }, null)).toBeNull();
+  });
+
+  test('finds search input inside container via closest', () => {
+    const searchInput = { tagName: 'INPUT' };
+    const container = {
+      querySelector: (sel) => {
+        if (sel.includes('input')) return searchInput;
+        return null;
+      },
+    };
+    const opt = {
+      closest: () => container,
+    };
+    const result = dd._findSearchInput({}, [opt]);
+    expect(result).toBe(searchInput);
+  });
+
+  test('finds visible search input doc-wide', () => {
+    const searchInput = { tagName: 'INPUT' };
+    const doc = {
+      querySelectorAll: (sel) => {
+        if (sel.includes('input')) return [searchInput];
+        return [];
+      },
+    };
+    const opt = { closest: () => null };
+    const result = dd._findSearchInput(doc, [opt]);
+    expect(result).toBe(searchInput);
+  });
+
+  test('returns null when no search inputs exist', () => {
+    const doc = { querySelectorAll: () => [] };
+    const opt = { closest: () => null };
+    expect(dd._findSearchInput(doc, [opt])).toBeNull();
   });
 });
