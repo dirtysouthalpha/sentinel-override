@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.25% </span>
+                <span class="strong">96.01% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>385/400</span>
+                <span class='fraction'>386/402</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">83.37% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>300/360</span>
+                <span class='fraction'>301/361</span>
             </div>
         
             
@@ -900,12 +900,13 @@
 <a name='L835'></a><a href='#L835'>835</a>
 <a name='L836'></a><a href='#L836'>836</a>
 <a name='L837'></a><a href='#L837'>837</a>
-<a name='L838'></a><a href='#L838'>838</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L838'></a><a href='#L838'>838</a>
+<a name='L839'></a><a href='#L839'>839</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -988,6 +989,7 @@
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">42x</span>
 <span class="cline-any cline-yes">42x</span>
 <span class="cline-any cline-yes">35x</span>
@@ -1052,7 +1054,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1109,19 +1111,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">225x</span>
@@ -1193,7 +1195,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">47x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -1280,7 +1282,7 @@
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">227x</span>
+<span class="cline-any cline-yes">337x</span>
 <span class="cline-any cline-yes">213x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1825,8 +1827,9 @@ export async function waitForPageReady(tabId, maxWaitMs = <span class="branch-0 
           try { data = JSON.parse(data.replace('JS Result: ', '')); } catch {}
         }
         if (data &amp;&amp; typeof data === 'object') {
-          const parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data;
-          if (parsed.readyState === 'complete' &amp;&amp; parsed.bodyLen &gt; 50 &amp;&amp; !parsed.hasSpinner) {
+          let parsed;
+          try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch { <span class="cstat-no" title="statement not covered" >parsed = null; </span>}
+          if (parsed &amp;&amp; parsed.readyState === 'complete' &amp;&amp; parsed.bodyLen &gt; 50 &amp;&amp; !parsed.hasSpinner) {
             domReady = true;
           }
         } else <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="else path not taken" >E</span>if (typeof data === 'string') {</span>
@@ -2581,7 +2584,7 @@ function sleep(ms) { return new Promise(resolve =&gt; setTimeout(resolve, ms)); 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T07:12:55.924Z
+                at 2026-05-16T09:09:06.879Z
             </div>
         <script src="../prettify.js"></script>
         <script>
