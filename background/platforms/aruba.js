@@ -18,11 +18,12 @@ export const aruba = {
   memoryKeyPrefix: 'aruba_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const u = new URL(url);
       const host = u.host.toLowerCase();
       const path = u.pathname.toLowerCase();
+      if (/aruba/i.test(host)) return true;
       // Aruba Central cloud
       if (/(^|\.)central\.arubanetworks\.com$/i.test(host)) return true;
       if (/(^|\.)portal\.central\.arubanetworks\.com$/i.test(host)) return true;

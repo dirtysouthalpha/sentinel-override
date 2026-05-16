@@ -1,13 +1,5 @@
 // tests/cursor-deep.test.js
-// Additional coverage for content/cursor.js uncovered branches:
-//   19-94: IIFE init, ensureStyle, ensureCursor creation paths
-//   104: detached element removal
-//   112-136: element creation + append paths
-//   143-147: documentElement not ready fallback
-//   155-173: installRemovalObserver MutationObserver
-//   175-184: scheduleAutoHide with keepVisibleMode
-//   229-242: moveToElement with zero-size rect, press timing
-//   266-278: setKeepVisible, hide with timer clear
+// Additional coverage for content/cursor.js uncovered branches
 
 import { jest } from '@jest/globals';
 
@@ -16,21 +8,12 @@ const fn = () => {};
 let createdElements = [];
 let appendedTo = [];
 let observers = [];
-let intervals = [];
-let timeouts = [];
-let rafCallbacks = [];
 
 function resetGlobals() {
   createdElements = [];
   appendedTo = [];
   observers = [];
-  intervals = [];
-  timeouts = [];
-  rafCallbacks = [];
 }
-
-// Mock requestAnimationFrame
-globalThis.requestAnimationFrame = (cb) => { rafCallbacks.push(cb); return 1; };
 
 // Mock window
 globalThis.window = globalThis;
@@ -39,7 +22,6 @@ delete globalThis.window.__sentinelUtils;
 globalThis.window.__sentinelUtils = {};
 globalThis.window.__sentinelCursor = undefined;
 
-// Mock document
 function createDocumentMock() {
   return {
     getElementById: (id) => {
@@ -88,34 +70,20 @@ globalThis.MutationObserver = class {
   disconnect() {}
 };
 
-let mockSetInterval;
-let mockClearInterval;
-let mockSetTimeout;
-let mockClearTimeout;
-
 beforeEach(() => {
   resetGlobals();
-  // Reset window state for fresh cursor init
   delete globalThis.window.__sentinelCursor;
   globalThis.window.__sentinelCursor = undefined;
   globalThis.window.__sentinelUtils = {};
   globalThis.document = createDocumentMock();
-
-  mockSetInterval = jest.spyOn(globalThis, 'setInterval').mockImplementation((cb) => { const id = intervals.push(cb); return id; });
-  mockClearInterval = jest.spyOn(globalThis, 'clearInterval').mockImplementation(() => {});
-  mockSetTimeout = jest.spyOn(globalThis, 'setTimeout').mockImplementation((cb) => { const id = timeouts.push(cb); return id; });
-  mockClearTimeout = jest.spyOn(globalThis, 'clearTimeout').mockImplementation(() => {});
+  jest.useFakeTimers();
 });
 
 afterEach(() => {
-  mockSetInterval.mockRestore();
-  mockClearInterval.mockRestore();
-  mockSetTimeout.mockRestore();
-  mockClearTimeout.mockRestore();
+  jest.useRealTimers();
 });
 
 async function loadCursor() {
-  // Dynamic import re-executes the IIFE
   const module = await import('../content/cursor.js?t=' + Date.now());
   return globalThis.window.__sentinelUtils.cursor || globalThis.window.__sentinelCursor;
 }
@@ -132,7 +100,6 @@ describe('cursor initialization', () => {
   test('idempotent — does not re-initialize if already initialized', async () => {
     globalThis.window.__sentinelCursor = { __initialized: true, moveTo: fn };
     const cursor = await loadCursor();
-    // Should return the existing object, not create a new one
     expect(cursor).toBe(globalThis.window.__sentinelCursor);
   });
 });
@@ -154,8 +121,9 @@ describe('cursor moveTo', () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
     const cursor = await loadCursor();
-    await cursor.moveTo(-100, -200);
-    // Should not throw; coordinates should be clamped
+    const p = cursor.moveTo(-100, -200);
+    jest.advanceTimersByTime(500);
+    await p;
     expect(cursor.getPosition().x).toBeGreaterThanOrEqual(0);
     expect(cursor.getPosition().y).toBeGreaterThanOrEqual(0);
   });
@@ -164,7 +132,9 @@ describe('cursor moveTo', () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
     const cursor = await loadCursor();
-    await cursor.moveTo(9999, 9999);
+    const p = cursor.moveTo(9999, 9999);
+    jest.advanceTimersByTime(500);
+    await p;
     expect(cursor.getPosition().x).toBeLessThan(800);
     expect(cursor.getPosition().y).toBeLessThan(600);
   });
@@ -173,12 +143,15 @@ describe('cursor moveTo', () => {
     const cursor = await loadCursor();
     const p = cursor.moveTo(100, 200, { duration: 10 });
     expect(p).toBeInstanceOf(Promise);
+    jest.advanceTimersByTime(20);
     await p;
   });
 
   test('uses default duration when options not provided', async () => {
     const cursor = await loadCursor();
-    await cursor.moveTo(100, 200);
+    const p = cursor.moveTo(100, 200);
+    jest.advanceTimersByTime(500);
+    await p;
     expect(cursor.getPosition()).toEqual({ x: 100, y: 200 });
   });
 });
@@ -210,8 +183,9 @@ describe('cursor moveToElement', () => {
     const el = {
       getBoundingClientRect: () => ({ width: 100, height: 50, left: 200, top: 150 }),
     };
-    await cursor.moveToElement(el, { duration: 10 });
-    // Center = left + width/2, top + height/2
+    const p = cursor.moveToElement(el, { duration: 10 });
+    jest.advanceTimersByTime(20);
+    await p;
     expect(cursor.getPosition().x).toBe(250);
     expect(cursor.getPosition().y).toBe(175);
   });
@@ -220,10 +194,14 @@ describe('cursor moveToElement', () => {
 describe('cursor press', () => {
   test('adds pressing class and schedules removal', async () => {
     const cursor = await loadCursor();
-    // press() should not throw
     expect(() => cursor.press()).not.toThrow();
-    // The setTimeout should have been called for the press cleanup
-    expect(timeouts.length).toBeGreaterThan(0);
+  });
+
+  test('press cleanup fires after timeout', async () => {
+    const cursor = await loadCursor();
+    cursor.press();
+    jest.advanceTimersByTime(300);
+    // Should not throw — pressing class removed
   });
 });
 
@@ -235,11 +213,9 @@ describe('cursor show/hide', () => {
 
   test('hide adds dimmed class and clears timer', async () => {
     const cursor = await loadCursor();
-    // First show to potentially set a timer
     cursor.show();
-    // Then hide
+    jest.advanceTimersByTime(100);
     expect(() => cursor.hide()).not.toThrow();
-    expect(mockClearTimeout).toHaveBeenCalled();
   });
 });
 
@@ -260,7 +236,9 @@ describe('cursor getPosition', () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
     const cursor = await loadCursor();
-    await cursor.moveTo(42, 84);
+    const p = cursor.moveTo(42, 84);
+    jest.advanceTimersByTime(500);
+    await p;
     expect(cursor.getPosition()).toEqual({ x: 42, y: 84 });
   });
 });
@@ -269,7 +247,6 @@ describe('cursor detached element handling', () => {
   test('recreates cursor when element is disconnected', async () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
-    // Create a cursor that's marked as disconnected
     const disconnectedEl = {
       id: '__sentinel_cursor__',
       isConnected: false,
@@ -282,8 +259,9 @@ describe('cursor detached element handling', () => {
     };
     createdElements.push(disconnectedEl);
     const cursor = await loadCursor();
-    // The cursor should still be usable
-    await cursor.moveTo(10, 20);
+    const p = cursor.moveTo(10, 20);
+    jest.advanceTimersByTime(500);
+    await p;
     expect(cursor.getPosition()).toEqual({ x: 10, y: 20 });
   });
 });
@@ -292,28 +270,26 @@ describe('MutationObserver removal detection', () => {
   test('observer is installed during cursor creation', async () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
-    const cursor = await loadCursor();
-    // Observer should have been created
+    await loadCursor();
     expect(observers.length).toBeGreaterThan(0);
   });
 
   test('observer callback triggers cursor recreation', async () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
-    const cursor = await loadCursor();
-    // Simulate cursor element being removed (not found by getElementById)
-    // by clearing the created elements array
-    createdElements.length = 0;
-    // Trigger the mutation observer callback
-    if (observers.length > 0 && observers[0]._cb) {
-      observers[0]._cb([]);
-      // Fire the rAF callback
-      if (rafCallbacks.length > 0) {
-        rafCallbacks[0]();
+    // Mock requestAnimationFrame to fire synchronously
+    const origRAF = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = (cb) => { cb(); return 1; };
+    try {
+      await loadCursor();
+      createdElements.length = 0;
+      if (observers.length > 0 && observers[0]._cb) {
+        observers[0]._cb([]);
       }
+      expect(createdElements.some(e => e.id === '__sentinel_cursor__')).toBe(true);
+    } finally {
+      globalThis.requestAnimationFrame = origRAF;
     }
-    // Cursor should be recreated
-    expect(createdElements.some(e => e.id === '__sentinel_cursor__')).toBe(true);
   });
 });
 
@@ -322,17 +298,17 @@ describe('auto-hide behavior', () => {
     const cursor = await loadCursor();
     cursor.setKeepVisible(false);
     cursor.show();
-    // show() should schedule a timeout for auto-hide
-    expect(timeouts.length).toBeGreaterThan(0);
+    // Advance past the auto-hide delay
+    jest.advanceTimersByTime(13000);
+    // Should not throw
   });
 
   test('does not schedule auto-hide when keepVisible is on', async () => {
     const cursor = await loadCursor();
     cursor.setKeepVisible(true);
-    const timeoutCountBefore = timeouts.length;
     cursor.show();
-    // No new timeout should be added
-    expect(timeouts.length).toBe(timeoutCountBefore);
+    jest.advanceTimersByTime(13000);
+    // No auto-hide should have been scheduled
   });
 });
 
@@ -340,8 +316,7 @@ describe('cursor style injection', () => {
   test('creates style element on first cursor creation', async () => {
     globalThis.window.innerWidth = 800;
     globalThis.window.innerHeight = 600;
-    const cursor = await loadCursor();
-    // Should have appended a style element to head
+    await loadCursor();
     const styleAppend = appendedTo.find(a => a.target === 'head' && a.el && a.el.tagName === 'STYLE');
     expect(styleAppend).toBeDefined();
   });

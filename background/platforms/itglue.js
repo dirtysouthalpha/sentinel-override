@@ -20,7 +20,7 @@ export const itglue = {
   memoryKeyPrefix: 'itglue_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
       if (/(^|\.)itglue\.com$/i.test(host)) return true;

@@ -5,15 +5,25 @@
 //   153-154 (skill.matches() throws -> tel.error + console.warn)
 //   171 (skill.autoApply() throws -> console.warn)
 //   188 (skill.promptInjection() throws -> console.warn)
+//
+// Strategy:
+//   - Lines 45-46: covered at primary import by pre-loading getCallbackResult with
+//     stats data and telemetrySkillAdapt=false. The IIFE callback runs synchronously.
+//   - Line 44: covered via jest.isolateModules() which re-imports index.js with
+//     lastErrorValue set, so the IIFE callback hits the lastError guard.
+//   - Lines 153-154, 171, 188: covered by mocking click-no-target skill to throw
+//     from matches(), autoApply(), and promptInjection() respectively.
 
 import { jest } from '@jest/globals';
 
 // ---------- chrome mock ----------
-// For lines 44-46: the IIFE calls chrome.storage.local.get(keys, callback).
-// The callback must be invoked synchronously so lines 44-46 execute at import.
-let storageData = {};
+// The IIFE calls chrome.storage.local.get(keys, callback). Our mock invokes the
+// callback synchronously so lines 44-46 execute at import time.
 let lastErrorValue = undefined;
-let getCallbackResult = {};
+const getCallbackResult = {
+  skill_stats: { 'test-skill': { fires: 5, successes: 3, failures: 2, lastFiredAt: 1, lastOutcomeAt: 2 } },
+  telemetrySkillAdapt: false,
+};
 
 globalThis.chrome = {
   runtime: {
@@ -22,7 +32,6 @@ globalThis.chrome = {
   storage: {
     local: {
       get: jest.fn((_keys, callback) => {
-        // Invoke the callback synchronously with the result + lastError state
         if (typeof callback === 'function') {
           callback(getCallbackResult);
         }
@@ -62,7 +71,7 @@ jest.unstable_mockModule('../background/skills/click-no-target.js', () => ({
   clickNoTarget: throwingSkill,
 }));
 
-// No-op skills for all other slots — they never match, so only throwingSkill is active.
+// No-op skills for all other slots — they never match, so only throwingSkill runs.
 const noopSkill = (id) => ({
   id,
   description: `noop ${id}`,
@@ -96,12 +105,10 @@ jest.unstable_mockModule('../background/skills/csp-blocked.js', () => ({
 
 // ---------- Import module under test ----------
 // The IIFE in index.js runs now. Our chrome.storage.local.get mock invokes the
-// callback synchronously. At this point:
-//   - lastErrorValue = undefined  (no error -> line 44 skipped)
-//   - getCallbackResult = {}      (no stats -> line 45 skipped)
-//   - adapt key absent            (line 46 skipped)
-// We'll re-exercise the IIFE paths through the onChanged listener below.
-
+// callback synchronously with:
+//   - lastErrorValue = undefined              -> line 44 NOT hit (no lastError)
+//   - getCallbackResult.skill_stats is set     -> line 45 HIT  (_stats loaded)
+//   - getCallbackResult.telemetrySkillAdapt = false -> line 46 HIT (_adaptEnabled = false)
 const { runRecoverySkills, listSkills, getSkillStats } =
   await import('../background/skills/index.js');
 
@@ -109,32 +116,64 @@ const { runRecoverySkills, listSkills, getSkillStats } =
 const storageChangeListener = chrome.storage.onChanged.addListener.mock.calls[0]?.[0] || null;
 
 beforeEach(() => {
-  storageData = {};
   lastErrorValue = undefined;
-  getCallbackResult = {};
   jest.clearAllMocks();
 });
 
-// ========== Lines 44-46: IIFE loadAdaptiveState — storage.get callback ==========
+// ========== Lines 45-46: IIFE loadAdaptiveState — loaded at import ==========
 
-describe('IIFE loadAdaptiveState — lines 44-46', () => {
-  test('line 44: lastError guard triggers console.warn and returns early', () => {
-    // The IIFE already ran at import. We exercise line 44 by calling
-    // chrome.storage.local.get directly with lastError set, mimicking what
-    // the IIFE does internally.
+describe('IIFE loadAdaptiveState — lines 45-46 (loaded at import time)', () => {
+  test('line 45: _stats loaded from storage result at import', () => {
+    const stats = getSkillStats();
+    expect(stats['test-skill']).toBeDefined();
+    expect(stats['test-skill'].fires).toBe(5);
+    expect(stats['test-skill'].successes).toBe(3);
+  });
+
+  test('line 46: _adaptEnabled set to false at import — effectivePriority equals base', () => {
+    const skills = listSkills();
+    for (const s of skills) {
+      expect(s.effectivePriority).toBe(s.priority);
+    }
+    // Re-enable adapt for subsequent tests
+    if (storageChangeListener) {
+      storageChangeListener({ telemetrySkillAdapt: { newValue: true } }, 'local');
+    }
+  });
+});
+
+// ========== Line 44: chrome.runtime.lastError guard ==========
+
+describe('IIFE loadAdaptiveState — line 44 (lastError guard)', () => {
+  test('line 44: lastError causes console.warn and early return in IIFE callback', async () => {
+    // Use jest.isolateModules to re-import index.js with lastErrorValue set.
+    // This causes the IIFE callback to hit line 44 (lastError guard) and return early.
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     lastErrorValue = { message: 'storage read failed' };
 
-    // Simulate the IIFE's get call with the lastError set
-    chrome.storage.local.get(['skill_stats', 'telemetrySkillAdapt'], (r) => {
-      // This is the same callback body as lines 43-47 in index.js
-      if (chrome.runtime.lastError) {
-        console.warn('[Sentinel/skills] storage load error:', chrome.runtime.lastError.message);
-        return;
-      }
-      // Lines 45-46 would run here if no lastError
+    await jest.isolateModulesAsync(async () => {
+      // Re-register mocks inside the isolated module context
+      jest.unstable_mockModule('../background/telemetry.js', () => ({
+        tel: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+      }));
+      const noop = (id) => ({
+        id, description: `noop ${id}`, priority: 50,
+        matches: () => false, autoApply: () => null, promptInjection: () => '',
+      });
+      jest.unstable_mockModule('../background/skills/click-no-target.js', () => ({ clickNoTarget: noop('click-no-target') }));
+      jest.unstable_mockModule('../background/skills/navigate-loop.js', () => ({ navigateLoop: noop('navigate-loop') }));
+      jest.unstable_mockModule('../background/skills/unproductive-extract.js', () => ({ unproductiveExtract: noop('unproductive-extract') }));
+      jest.unstable_mockModule('../background/skills/selector-miss.js', () => ({ selectorMiss: noop('selector-miss') }));
+      jest.unstable_mockModule('../background/skills/consecutive-failures.js', () => ({ consecutiveFailures: noop('consecutive-failures') }));
+      jest.unstable_mockModule('../background/skills/empty-observation.js', () => ({ emptyObservation: noop('empty-observation') }));
+      jest.unstable_mockModule('../background/skills/slow-llm-call.js', () => ({ slowLlmCall: noop('slow-llm-call') }));
+      jest.unstable_mockModule('../background/skills/csp-blocked.js', () => ({ cspBlocked: noop('csp-blocked') }));
+
+      // Import triggers IIFE — with lastErrorValue set, line 44 executes
+      await import('../background/skills/index.js');
     });
 
+    // The IIFE callback should have logged the lastError warning
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       '[Sentinel/skills] storage load error:',
       'storage read failed'
@@ -143,70 +182,44 @@ describe('IIFE loadAdaptiveState — lines 44-46', () => {
     lastErrorValue = undefined;
     consoleWarnSpy.mockRestore();
   });
-
-  test('line 45: _stats loaded from storage via onChanged', () => {
-    if (!storageChangeListener) return;
-
-    // Exercise line 45 indirectly: the onChanged listener sets _stats when
-    // skill_stats key changes. This mirrors what line 45 does (loading _stats
-    // from storage).
-    const newStats = {
-      'throwing-skill': { fires: 3, successes: 2, failures: 1, lastFiredAt: 1000, lastOutcomeAt: 1001 }
-    };
-    storageChangeListener({ skill_stats: { newValue: newStats } }, 'local');
-
-    const stats = getSkillStats();
-    expect(stats['throwing-skill']).toBeDefined();
-    expect(stats['throwing-skill'].fires).toBe(3);
-
-    // Clean up
-    storageChangeListener({ skill_stats: { newValue: null } }, 'local');
-  });
-
-  test('line 46: _adaptEnabled set to false via onChanged', () => {
-    if (!storageChangeListener) return;
-
-    // Exercise line 46 indirectly: the onChanged listener sets _adaptEnabled
-    // when telemetrySkillAdapt changes to false.
-    storageChangeListener({ telemetrySkillAdapt: { newValue: false } }, 'local');
-
-    // When adapt is disabled, effectivePriority should equal base priority
-    const skills = listSkills();
-    for (const s of skills) {
-      expect(s.effectivePriority).toBe(s.priority);
-    }
-
-    // Re-enable for subsequent tests
-    storageChangeListener({ telemetrySkillAdapt: { newValue: true } }, 'local');
-  });
 });
 
 // ========== Line 59: IIFE catch block ==========
 
 describe('IIFE catch block — line 59', () => {
-  test('catch block fires when chrome.storage.local.get throws synchronously', () => {
-    // The IIFE ran at import time without errors. To exercise line 59 directly,
-    // we simulate the scenario by wrapping a chrome.storage.local.get call
-    // that throws in a try/catch (same structure as the IIFE).
+  test('catch block fires when chrome.storage.local.get throws synchronously', async () => {
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // Temporarily make get throw
+    // Use isolateModules to re-import with a get that throws, covering line 59
     const origGet = chrome.storage.local.get;
     chrome.storage.local.get = jest.fn(() => { throw new Error('init catastrophe'); });
 
-    // Execute the same pattern as the IIFE
-    try {
-      chrome.storage.local.get(['skill_stats'], (_r) => {});
-    } catch (e) {
-      console.warn('[Sentinel/skills] init error:', e && e.message);
-    }
+    await jest.isolateModulesAsync(async () => {
+      jest.unstable_mockModule('../background/telemetry.js', () => ({
+        tel: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+      }));
+      const noop = (id) => ({
+        id, description: `noop ${id}`, priority: 50,
+        matches: () => false, autoApply: () => null, promptInjection: () => '',
+      });
+      jest.unstable_mockModule('../background/skills/click-no-target.js', () => ({ clickNoTarget: noop('click-no-target') }));
+      jest.unstable_mockModule('../background/skills/navigate-loop.js', () => ({ navigateLoop: noop('navigate-loop') }));
+      jest.unstable_mockModule('../background/skills/unproductive-extract.js', () => ({ unproductiveExtract: noop('unproductive-extract') }));
+      jest.unstable_mockModule('../background/skills/selector-miss.js', () => ({ selectorMiss: noop('selector-miss') }));
+      jest.unstable_mockModule('../background/skills/consecutive-failures.js', () => ({ consecutiveFailures: noop('consecutive-failures') }));
+      jest.unstable_mockModule('../background/skills/empty-observation.js', () => ({ emptyObservation: noop('empty-observation') }));
+      jest.unstable_mockModule('../background/skills/slow-llm-call.js', () => ({ slowLlmCall: noop('slow-llm-call') }));
+      jest.unstable_mockModule('../background/skills/csp-blocked.js', () => ({ cspBlocked: noop('csp-blocked') }));
+
+      // Import triggers IIFE — get throws, catch on line 59 executes
+      await import('../background/skills/index.js');
+    });
 
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       '[Sentinel/skills] init error:',
       'init catastrophe'
     );
 
-    // Restore
     chrome.storage.local.get = origGet;
     consoleWarnSpy.mockRestore();
   });
@@ -225,26 +238,25 @@ describe('skill.matches() throws — lines 153-154', () => {
       lastActionFailed: true,
     };
 
-    // throwingSkill.matches() always throws
     const result = runRecoverySkills(ctx);
 
-    // No crash — error is caught
     expect(result).toBeDefined();
     expect(result.autoApply).toBeNull();
     expect(result.appliedSkillIds).toEqual([]);
     expect(result.promptInjection).toBe('');
 
-    // Line 153: tel.error called for predicate throw
+    // Line 153: tel.error
     expect(tel.error).toHaveBeenCalledWith(
       'skill',
       expect.stringContaining('Skill predicate threw: throwing-skill'),
       expect.objectContaining({ skillId: 'throwing-skill' })
     );
 
-    // Line 154: console.warn called for predicate throw
+    // Line 154: console.warn
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('predicate error in'),
       'throwing-skill',
+      ':',
       'matches-boom'
     );
 
@@ -255,10 +267,9 @@ describe('skill.matches() throws — lines 153-154', () => {
 // ========== Line 171: skill.autoApply() throws ==========
 
 describe('skill.autoApply() throws — line 171', () => {
-  test('console.warn is called when autoApply() throws', async () => {
+  test('console.warn is called when autoApply() throws', () => {
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // Temporarily make matches() return true so we reach autoApply
     const origMatches = throwingSkill.matches;
     throwingSkill.matches = jest.fn(() => true);
 
@@ -271,17 +282,16 @@ describe('skill.autoApply() throws — line 171', () => {
     const result = runRecoverySkills(ctx);
 
     expect(result).toBeDefined();
-    // autoApply threw, so result.autoApply stays null
     expect(result.autoApply).toBeNull();
 
-    // Line 171: console.warn called for autoApply error
+    // Line 171: console.warn
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('autoApply error in'),
       'throwing-skill',
+      ':',
       'autoApply-boom'
     );
 
-    // Restore
     throwingSkill.matches = origMatches;
     consoleWarnSpy.mockRestore();
   });
@@ -290,10 +300,9 @@ describe('skill.autoApply() throws — line 171', () => {
 // ========== Line 188: skill.promptInjection() throws ==========
 
 describe('skill.promptInjection() throws — line 188', () => {
-  test('console.warn is called when promptInjection() throws', async () => {
+  test('console.warn is called when promptInjection() throws', () => {
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
-    // Make matches return true and autoApply return null so we reach promptInjection
     const origMatches = throwingSkill.matches;
     const origAutoApply = throwingSkill.autoApply;
     throwingSkill.matches = jest.fn(() => true);
@@ -309,14 +318,14 @@ describe('skill.promptInjection() throws — line 188', () => {
 
     expect(result).toBeDefined();
 
-    // Line 188: console.warn called for promptInjection error
+    // Line 188: console.warn
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('promptInjection error in'),
       'throwing-skill',
+      ':',
       'promptInjection-boom'
     );
 
-    // Restore
     throwingSkill.matches = origMatches;
     throwingSkill.autoApply = origAutoApply;
     consoleWarnSpy.mockRestore();

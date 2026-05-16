@@ -4291,7 +4291,7 @@ async function saveLearnedPattern(goal, history, success) {
     const _scrubPii = (str) => String(str)
       .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, 'XXX.XXX.XXX.XXX')
       .replace(/[\w.+-]+@[\w.-]+/g, '[email]')
-      .replace(/\b(?:TKT|TICKET|INC|INCIDENT|SR|#)\s*\d+/gi, '[ticket]')
+      .replace(/(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi, '[ticket]')
       .replace(/"[^"]{2,60}"/g, '"[client]"')
       .replace(/'[^']{2,60}'/g, "'[client]'");
     patterns.push({
@@ -4428,18 +4428,19 @@ async function requestApproval(command, stepNumber) {
       // If the user responds before the hard wall, clear the hard-reject timer.
       const origListener = listener;
       chrome.runtime.onMessage.removeListener(origListener);
-      chrome.runtime.onMessage.addListener((message) => {
+      const hardTimeoutListener = (message) => {
         if (message && message.action === 'approval_response' && message.requestId === requestId) {
           clearTimeout(hardRejectId);
           agentPaused = false;
-          chrome.runtime.onMessage.removeListener(arguments.callee);
+          chrome.runtime.onMessage.removeListener(hardTimeoutListener);
           finish({
             approved: message.approved === true,
             skipped: message.skipped === true,
             rejected: message.rejected === true
           });
         }
-      });
+      };
+      chrome.runtime.onMessage.addListener(hardTimeoutListener);
     }, 60000);
   });
 }
