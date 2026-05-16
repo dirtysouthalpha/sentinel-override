@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for sentinel-override/background/skills/selector-miss.js</title>
+    <title>Code coverage report for sentinel-override/content/shadow-intercept.js</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../../../prettify.css" />
-    <link rel="stylesheet" href="../../../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../../../sort-arrow-sprite.png);
+            background-image: url(../../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../../index.html">All files</a> / <a href="index.html">sentinel-override/background/skills</a> selector-miss.js</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">sentinel-override/content</a> shadow-intercept.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>8/8</span>
+                <span class='fraction'>0/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>13/13</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>0/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/7</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line high'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -100,22 +100,8 @@
 <a name='L35'></a><a href='#L35'>35</a>
 <a name='L36'></a><a href='#L36'>36</a>
 <a name='L37'></a><a href='#L37'>37</a>
-<a name='L38'></a><a href='#L38'>38</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">63x</span>
-<span class="cline-any cline-yes">33x</span>
-<span class="cline-any cline-yes">33x</span>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -125,55 +111,72 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">4x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// background/skills/selector-miss.js
-// Fires when a click/type/hover result is "Element not found" — the LLM's
-// chosen selector didn't resolve to anything. Common on SPAs where the DOM
-// changes between observation and dispatch.
-// Recovery: re-read the page (deterministic). The element list will be
-// fresh and the LLM can pick a target that actually exists.
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Sentinel Override v3 -- Shadow Root Interception (MAIN world, document_start)
+// Patches Element.prototype.attachShadow as early as possible so that closed
+// shadow roots created by inline &lt;head&gt; scripts are still captured.
+//
+// Runs in MAIN world (see manifest.json content_scripts entry) so the patch
+// is visible to page scripts that create shadow roots before any ISOLATED-world
+// content script could install hooks.
+//
+// Exposes captured roots via:
+//   window.__sentinelCapturedRoots  -- WeakMap&lt;Element, ShadowRoot&gt;
+//   window.__sentinelShadowRoots    -- Set&lt;ShadowRoot&gt; (iterable, for ISOLATED world)
+//
+// Contains NO chrome.* API access -- MAIN world has no access to extension APIs.
+// ISOLATED-world content scripts read the stashed roots from these globals.
 &nbsp;
-export const selectorMiss = {
-  id: 'selector-miss',
-  description: 'Recovery when click/type/hover hit a selector that does not resolve',
-  priority: 70,
+<span class="cstat-no" title="statement not covered" >(<span class="fstat-no" title="function not covered" >fu</span>nction() {</span>
+  'use strict';
 &nbsp;
-  matches(ctx) {
-    if (!ctx || !ctx.lastResult || !ctx.lastActionFailed) return false;
-    const r = String(ctx.lastResult).toLowerCase();
-    return r.includes('element not found') ||
-           r.includes('no element') ||
-           r.includes('not in element list') ||
-           r.startsWith('error: element');
-  },
+<span class="cstat-no" title="statement not covered" >  if (window.__sentinelShadowIntercepted) <span class="cstat-no" title="statement not covered" >return;</span></span>
+<span class="cstat-no" title="statement not covered" >  window.__sentinelShadowIntercepted = true;</span>
 &nbsp;
-  autoApply(_ctx) {
-    // Deterministic re-observation. The next LLM call gets a fresh elements
-    // array; the previous selector's failure is in history so the LLM won't
-    // re-emit it.
-    return { type: 'read_page', _autoAppliedBy: 'selector-miss' };
-  },
+  // WeakMap: host element -&gt; shadowRoot (preferred lookup)
+<span class="cstat-no" title="statement not covered" >  window.__sentinelCapturedRoots = new WeakMap();</span>
+  // Set of all captured shadow roots (iterable for scanning)
+<span class="cstat-no" title="statement not covered" >  window.__sentinelShadowRoots = new Set();</span>
 &nbsp;
-  promptInjection(ctx) {
-    const lastSel = (ctx.lastCommand &amp;&amp; (ctx.lastCommand.selector || ctx.lastCommand.ref)) || '(unknown)';
-    return `The selector / ref you used (\`${lastSel}\`) didn't resolve to a visible element. The page may have changed under you (SPA re-renders, lazy-loaded panels, async loading). Strategies, in order:
-1. Re-read the page (auto-applied) and pick a NEW target from the fresh element list — do NOT re-emit the same selector.
-2. If you see the element you wanted but a different selector, use its \`ref:\` from the observation instead of the old CSS selector — refs survive DOM shuffles.
-3. If the element doesn't appear at all, it may need: a scroll to bring it into view, a wait_for_text for a known loading-complete signal, or a click on a parent menu/tab to reveal it.
-4. If you're confident the element should exist, try \`execute_js\` with \`document.querySelector('your-pattern')\` to inspect directly — sometimes the DOM has the element but the observer skipped it.`;
-  }
-};
+  const originalAttachShadow = <span class="cstat-no" title="statement not covered" >Element.prototype.attachShadow;</span>
+<span class="cstat-no" title="statement not covered" >  Element.prototype.attachShadow = <span class="fstat-no" title="function not covered" >fu</span>nction(init) {</span>
+    const shadowRoot = <span class="cstat-no" title="statement not covered" >originalAttachShadow.call(this, init);</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      window.__sentinelCapturedRoots.set(this, shadowRoot);</span>
+<span class="cstat-no" title="statement not covered" >      window.__sentinelShadowRoots.add(shadowRoot);</span>
+    } catch {
+      // Fail-soft: never break the page if storage operations throw.
+    }
+<span class="cstat-no" title="statement not covered" >    return shadowRoot;</span>
+  };
+})();
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -183,14 +186,14 @@ export const selectorMiss = {
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
                 at 2026-05-16T11:18:40.276Z
             </div>
-        <script src="../../../prettify.js"></script>
+        <script src="../../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../../../sorter.js"></script>
-        <script src="../../../block-navigation.js"></script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
     </body>
 </html>
     

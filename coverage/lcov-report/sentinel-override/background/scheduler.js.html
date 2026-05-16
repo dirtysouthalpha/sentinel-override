@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.38% </span>
+                <span class="strong">85.5% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>284/325</span>
+                <span class='fraction'>289/338</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">85.15% </span>
+                <span class="strong">81.32% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>195/229</span>
+                <span class='fraction'>209/257</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">85.1% </span>
+                <span class="strong">80% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>40/47</span>
+                <span class='fraction'>40/50</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.81% </span>
+                <span class="strong">88.14% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>270/304</span>
+                <span class='fraction'>275/312</span>
             </div>
         
             
@@ -870,7 +870,15 @@
 <a name='L805'></a><a href='#L805'>805</a>
 <a name='L806'></a><a href='#L806'>806</a>
 <a name='L807'></a><a href='#L807'>807</a>
-<a name='L808'></a><a href='#L808'>808</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L808'></a><a href='#L808'>808</a>
+<a name='L809'></a><a href='#L809'>809</a>
+<a name='L810'></a><a href='#L810'>810</a>
+<a name='L811'></a><a href='#L811'>811</a>
+<a name='L812'></a><a href='#L812'>812</a>
+<a name='L813'></a><a href='#L813'>813</a>
+<a name='L814'></a><a href='#L814'>814</a>
+<a name='L815'></a><a href='#L815'>815</a>
+<a name='L816'></a><a href='#L816'>816</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -986,6 +994,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">71x</span>
 <span class="cline-any cline-yes">71x</span>
+<span class="cline-any cline-yes">71x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1007,6 +1016,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">25x</span>
+<span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">25x</span>
 <span class="cline-any cline-yes">25x</span>
@@ -1104,8 +1115,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1483,6 +1496,7 @@
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1504,6 +1518,7 @@
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1582,6 +1597,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1791,7 +1807,8 @@ function registerAlarm(schedule) {
     alarmInfo.periodInMinutes = schedule.recurrence.periodInMinutes;
   }
 &nbsp;
-  chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
+  const _alarmPromise = chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (_alarmPromise &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >typeof _alarmPromise.catch === 'function')</span> <span class="cstat-no" title="statement not covered" >_alarmPromise.catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
   tel.debug('scheduler', `Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
 }
 &nbsp;
@@ -1814,7 +1831,9 @@ function clearAlarm(scheduleId) {
 function computeNextRun(recurrence) {
   <span class="missing-if-branch" title="if path not taken" >I</span>if (!recurrence) <span class="cstat-no" title="statement not covered" >return Date.now();</span>
 &nbsp;
-  const [hours, minutes] = (recurrence.time || '09:00').split(':').map(Number);
+  const timeParts = (recurrence.time || '09:00').split(':').map(Number);
+  const hours = (Number.isFinite(timeParts[0]) &amp;&amp; timeParts[0] &gt;= 0 &amp;&amp; timeParts[0] &lt; 24) ? timeParts[0] : <span class="branch-1 cbranch-no" title="branch not covered" >9;</span>
+  const minutes = (Number.isFinite(timeParts[1]) &amp;&amp; timeParts[1] &gt;= 0 &amp;&amp; timeParts[1] &lt; 60) ? timeParts[1] : <span class="branch-1 cbranch-no" title="branch not covered" >0;</span>
   const now = new Date();
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 &nbsp;
@@ -1909,10 +1928,12 @@ function sendNotification(schedule, result) {
  * @param {string} status - 'success' or 'failure'
  */
 function setBadge(status) {
-  chrome.action.setBadgeText({ text: '1' });
-  chrome.action.setBadgeBackgroundColor({
+  const _t = chrome.action.setBadgeText({ text: '1' });
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (_t &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >typeof _t.catch === 'function')</span> <span class="cstat-no" title="statement not covered" >_t.catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
+  const _b = chrome.action.setBadgeBackgroundColor({
     color: status === 'success' ? '#22c55e' : <span class="branch-1 cbranch-no" title="branch not covered" >'#ef4444',</span>
   });
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (_b &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >typeof _b.catch === 'function')</span> <span class="cstat-no" title="statement not covered" >_b.catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
 }
 &nbsp;
 // ========== CRUD Operations ==========
@@ -2290,6 +2311,7 @@ export async function executeScheduledTask(alarmName) {
     await storeResult(schedule, finalResult);
   } catch (e) {
 <span class="cstat-no" title="statement not covered" >    console.error('Failed to store scheduled task result:', e);</span>
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >tel.error('scheduler', 'Failed to store result', { error: e &amp;&amp; e.message }); </span>} catch (_) {}</span>
   }
 &nbsp;
   // Update schedule -- consolidate all mutations into a single save
@@ -2312,6 +2334,7 @@ export async function executeScheduledTask(alarmName) {
     await saveSchedules(schedules);
   } catch (e) {
 <span class="cstat-no" title="statement not covered" >    console.error('Failed to save schedule state after execution:', e);</span>
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >tel.error('scheduler', 'Failed to save schedule state', { error: e &amp;&amp; e.message }); </span>} catch (_) {}</span>
   }
 &nbsp;
   // Send notification
@@ -2388,7 +2411,8 @@ function <span class="fstat-no" title="function not covered" >_waitForReport(</s
 <span class="cstat-no" title="statement not covered" >          clearInterval(poll);</span>
 <span class="cstat-no" title="statement not covered" >          resolve(null);</span>
         }
-      } catch {
+      } catch (e) {
+<span class="cstat-no" title="statement not covered" >        console.warn('[Sentinel] _waitForReport poll error:', e &amp;&amp; e.message);</span>
 <span class="cstat-no" title="statement not covered" >        clearInterval(poll);</span>
 <span class="cstat-no" title="statement not covered" >        resolve(null);</span>
       }
@@ -2491,7 +2515,7 @@ export async function initScheduler() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T05:04:05.228Z
+                at 2026-05-16T11:18:40.276Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

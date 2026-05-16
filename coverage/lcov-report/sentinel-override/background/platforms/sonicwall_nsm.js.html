@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">84.61% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/13</span>
+                <span class='fraction'>13/13</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">33.33% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/3</span>
+                <span class='fraction'>3/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">80% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>8/10</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
@@ -306,7 +306,21 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">271x</span>
+<span class="cline-any cline-yes">243x</span>
+<span class="cline-any cline-yes">243x</span>
+<span class="cline-any cline-yes">240x</span>
+<span class="cline-any cline-yes">230x</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">231x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -314,13 +328,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">235x</span>
-<span class="cline-any cline-yes">208x</span>
-<span class="cline-any cline-yes">208x</span>
-<span class="cline-any cline-yes">205x</span>
-<span class="cline-any cline-yes">195x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">196x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -437,6 +444,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -444,16 +452,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -680,7 +680,7 @@ export const sonicwallNsm = {
     // VPN policy edit dialog
     policyDialog:             'div[role="dialog"], .policy-dialog, .mat-dialog-container, [class*="policy-edit"]',
     policyDialogTabBar:       '[role="tablist"], .tab-bar, .nav-tabs',
-    policyDialogTab:          <span class="fstat-no" title="function not covered" >(_</span>name) =&gt; <span class="cstat-no" title="statement not covered" >'button[role="tab"]:not([disabled]), .tab-btn',</span>  // filter by visible text matching `name` in JS
+    policyDialogTab:          (_name) =&gt; 'button[role="tab"]:not([disabled]), .tab-btn',  // filter by visible text matching `name` in JS
     policyTabClientText:      ['Client', 'Client Connections', 'Virtual Adapter'],
     policyTabGeneralText:     ['General'],
     policyTabNetworkText:     ['Network', 'Networks'],
@@ -689,7 +689,7 @@ export const sonicwallNsm = {
 &nbsp;
     // Client tab — Virtual Adapter Settings
     virtualAdapterDropdown:   'select[name*="virtualAdapter" i], [data-field*="virtual-adapter"], [aria-label*="Virtual Adapter" i]',
-    virtualAdapterOption:     <span class="fstat-no" title="function not covered" >(_</span>opt) =&gt; <span class="cstat-no" title="statement not covered" >'[role="option"], li.dropdown-item, option',</span>  // filter by text match in JS
+    virtualAdapterOption:     (_opt) =&gt; '[role="option"], li.dropdown-item, option',  // filter by text match in JS
     virtualAdapterOptions:    ['None', 'DHCP Lease', 'Internal DHCP Server', 'External DHCP Server'],
 &nbsp;
     // Client tab — IP Address Pool fields (appear once DHCP Lease is selected)
@@ -778,7 +778,7 @@ export const sonicwallNsm = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T05:04:05.228Z
+                at 2026-05-16T11:18:40.276Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
