@@ -147,13 +147,18 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         rect = { width: 0, height: 0 };
       }
 
+      let visible = false;
+      try {
+        visible = dom && dom.isVisible(iframe);
+      } catch { /* isVisible may fail on detached elements */ }
+
       info.push({
         index,
         src,
         sameOrigin,
         width: Math.round(rect.width),
         height: Math.round(rect.height),
-        visible: dom && dom.isVisible(iframe)
+        visible,
       });
     });
 
