@@ -122,7 +122,8 @@ function registerAlarm(schedule) {
  * @param {string} scheduleId
  */
 function clearAlarm(scheduleId) {
-  chrome.alarms.clear(`schedule-${scheduleId}`);
+  const _p = chrome.alarms.clear(`schedule-${scheduleId}`);
+  if (_p && typeof _p.catch === 'function') _p.catch(() => {});
   tel.debug('scheduler', `Alarm cleared: schedule-${scheduleId}`);
 }
 
@@ -494,13 +495,17 @@ export async function executeScheduledTask(alarmName) {
     }
   } catch (err) {
     console.error(`Failed to resolve goal for schedule ${schedule.name}:`, err);
-    await storeResult(schedule, {
-      status: 'failure',
-      startedAt: Date.now(),
-      completedAt: Date.now(),
-      report: null,
-      error: `Goal resolution failed: ${err.message}`,
-    });
+    try {
+      await storeResult(schedule, {
+        status: 'failure',
+        startedAt: Date.now(),
+        completedAt: Date.now(),
+        report: null,
+        error: `Goal resolution failed: ${err.message}`,
+      });
+    } catch (storeErr) {
+      console.error('Failed to store result for goal resolution failure:', storeErr);
+    }
     schedule.lastRunStatus = 'failure';
     schedule.lastRunAt = Date.now();
     schedules[scheduleId] = schedule;
@@ -536,14 +541,18 @@ export async function executeScheduledTask(alarmName) {
     }
   } catch (err) {
     console.error('Failed to get/create tab:', err);
-    await storeResult(schedule, {
-      id: resultId,
-      status: 'failure',
-      startedAt,
-      completedAt: Date.now(),
-      report: null,
-      error: `Tab creation failed: ${err.message}`,
-    });
+    try {
+      await storeResult(schedule, {
+        id: resultId,
+        status: 'failure',
+        startedAt,
+        completedAt: Date.now(),
+        report: null,
+        error: `Tab creation failed: ${err.message}`,
+      });
+    } catch (storeErr) {
+      console.error('Failed to store result for tab creation failure:', storeErr);
+    }
     return;
   }
 
