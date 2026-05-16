@@ -4511,4 +4511,7 @@ export {
   writeCheckpoint,
   attachTabToSentinelGroup,
   detachAllSentinelTabs,
+  maybePostProgressUpdate,
+  _hostnameOf,
+  _updateRunLogIndex,
 };

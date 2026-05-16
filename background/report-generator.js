@@ -23,6 +23,9 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
  * @returns {Promise<{summary: string, fullReport: string, structuredData: object, goal: string, timestamp: string}>}
  */
 export async function generateReport(executionData, CONFIG) {
+  if (!executionData || typeof executionData !== 'object') {
+    throw new Error('generateReport: executionData is required');
+  }
   const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
   const agentMemory = executionData.agentMemory || {};
   const timestamp = new Date().toISOString();
@@ -293,7 +296,8 @@ function buildStructuredData(executionData, timestamp) {
   let successfulActions = 0;
 
   for (const h of history) {
-    const t = (h.action && h.action.type) || 'unknown';
+    if (!h || !h.action) continue;
+    const t = h.action.type || 'unknown';
     if (actionCounts[t] !== undefined) actionCounts[t]++;
     const result = String(h.result || '');
     if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
@@ -377,9 +381,10 @@ function buildStructuredData(executionData, timestamp) {
  * Ensures the user always gets something useful even if report generation errors out.
  */
 function buildFallbackReport(executionData) {
+  if (!executionData) return 'Report generation failed: no execution data available.';
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 
-  const memoryLines = Object.keys(agentMemory).map(k => {
+  const memoryLines = Object.keys(agentMemory || {}).map(k => {
     const val = agentMemory[k];
     const valStr = Array.isArray(val)
       ? `${val.length} items: ${val.slice(0, 5).map(v => String(v).substring(0, 100)).join(', ')}`
@@ -387,9 +392,9 @@ function buildFallbackReport(executionData) {
     return `- **${k}**: ${valStr}`;
   });
 
-  const stepsTaken = history
-    .filter(h => h.action && h.action.type && !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
-    .map(h => `${h.step}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
+  const stepsTaken = (history || [])
+    .filter(h => h && h.action && h.action.type && !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
+    .map(h => `${h.step || '?'}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
     .join('\n');
 
   return `### Goal

@@ -206,14 +206,16 @@ export async function deleteEntry(clientId, entryId) {
 // Match a urlPattern (glob with *) against a URL. Simple substring + wildcard.
 function _urlMatches(pattern, url) {
   if (!pattern || !url) return false;
-  if (!pattern.includes('*')) return url.toLowerCase().includes(pattern.toLowerCase());
-  const re = new RegExp(
-    '^' + pattern
-      .toLowerCase()
-      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*/g, '.*') + '$'
-  );
-  return re.test(url.toLowerCase());
+  try {
+    if (!pattern.includes('*')) return url.toLowerCase().includes(pattern.toLowerCase());
+    const re = new RegExp(
+      '^' + pattern
+        .toLowerCase()
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*') + '$'
+    );
+    return re.test(url.toLowerCase());
+  } catch { return false; }
 }
 
 /**
