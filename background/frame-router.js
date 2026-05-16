@@ -94,15 +94,16 @@ export async function enumerateFrames(tabId) {
 export async function resolveFrameForSelector(tabId, frameIndex) {
   if (tabId == null || frameIndex == null || frameIndex < 0) return null;
 
-  const cached = frameIdsByTab.get(tabId);
-  if (cached && cached.has(frameIndex)) {
-    return cached.get(frameIndex);
-  }
+  try {
+    const cached = frameIdsByTab.get(tabId);
+    if (cached && cached.has(frameIndex)) {
+      return cached.get(frameIndex);
+    }
 
-  // Fallback: live enumeration (also refreshes the cache for next time).
-  const frames = await enumerateFrames(tabId);
-  const iframes = frames.filter(f => f.isIframe);
-  if (frameIndex >= iframes.length) return null;
+    // Fallback: live enumeration (also refreshes the cache for next time).
+    const frames = await enumerateFrames(tabId);
+    const iframes = frames.filter(f => f.isIframe);
+    if (frameIndex >= iframes.length) return null;
 
   // Refresh cache from live data using the same positional convention.
   const positional = new Map();
@@ -113,6 +114,7 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
   frameIdsByTab.set(tabId, positional);
 
   return positional.has(frameIndex) ? positional.get(frameIndex) : null;
+  } catch { return null; }
 }
 
 // ========== Execute In Frame ==========

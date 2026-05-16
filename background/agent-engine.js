@@ -260,6 +260,8 @@ async function persistHistory() {
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
+  let tabCtxData = [];
+  try { tabCtxData = getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (_) {}
   return {
     goal,
     history: history.slice(),
@@ -267,7 +269,7 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
     agentPlan: agentPlan ? agentPlan.slice() : null,
     stepCount,
     apiCallCount,
-    tabContexts: getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot }))
+    tabContexts: tabCtxData
   };
 }
 

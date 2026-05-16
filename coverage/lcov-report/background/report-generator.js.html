@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">95.27% </span>
+                <span class="strong">93.5% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>141/148</span>
+                <span class='fraction'>144/154</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">78.83% </span>
+                <span class="strong">77.12% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>108/137</span>
+                <span class='fraction'>118/153</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">99.23% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>126/126</span>
+                <span class='fraction'>129/130</span>
             </div>
         
             
@@ -472,7 +472,12 @@
 <a name='L407'></a><a href='#L407'>407</a>
 <a name='L408'></a><a href='#L408'>408</a>
 <a name='L409'></a><a href='#L409'>409</a>
-<a name='L410'></a><a href='#L410'>410</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -496,6 +501,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
@@ -771,6 +779,7 @@
 <span class="cline-any cline-yes">81x</span>
 <span class="cline-any cline-yes">81x</span>
 <span class="cline-any cline-yes">81x</span>
+<span class="cline-any cline-yes">81x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">79x</span>
@@ -852,6 +861,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">11x</span>
@@ -906,6 +916,9 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
  * @returns {Promise&lt;{summary: string, fullReport: string, structuredData: object, goal: string, timestamp: string}&gt;}
  */
 export async function generateReport(executionData, CONFIG) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!executionData || typeof executionData !== 'object') {
+<span class="cstat-no" title="statement not covered" >    throw new Error('generateReport: executionData is required');</span>
+  }
   const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
   const agentMemory = executionData.agentMemory || <span class="branch-1 cbranch-no" title="branch not covered" >{};</span>
   const timestamp = new Date().toISOString();
@@ -1176,7 +1189,8 @@ function buildStructuredData(executionData, timestamp) {
   let successfulActions = 0;
 &nbsp;
   for (const h of history) {
-    const t = (h.action &amp;&amp; h.action.type) || <span class="branch-2 cbranch-no" title="branch not covered" >'unknown';</span>
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!h || !h.action) <span class="cstat-no" title="statement not covered" >continue;</span>
+    const t = h.action.type || <span class="branch-1 cbranch-no" title="branch not covered" >'unknown';</span>
     <span class="missing-if-branch" title="else path not taken" >E</span>if (actionCounts[t] !== undefined) actionCounts[t]++;
     const result = String(h.result || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>;
     if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
@@ -1260,9 +1274,10 @@ function buildStructuredData(executionData, timestamp) {
  * Ensures the user always gets something useful even if report generation errors out.
  */
 function buildFallbackReport(executionData) {
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!executionData) <span class="cstat-no" title="statement not covered" >return 'Report generation failed: no execution data available.';</span>
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 &nbsp;
-  const memoryLines = Object.keys(agentMemory).map(k =&gt; {
+  const memoryLines = Object.keys(agentMemory || <span class="branch-1 cbranch-no" title="branch not covered" >{})</span>.map(k =&gt; {
     const val = agentMemory[k];
     const valStr = Array.isArray(val)
       ? `${val.length} items: ${val.slice(0, 5).map(v =&gt; String(v).substring(0, 100)).join(', ')}`
@@ -1270,9 +1285,9 @@ function buildFallbackReport(executionData) {
     return `- **${k}**: ${valStr}`;
   });
 &nbsp;
-  const stepsTaken = history
-    .filter(h =&gt; h.action &amp;&amp; h.action.type &amp;&amp; !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
-    .map(h =&gt; `${h.step}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : <span class="branch-1 cbranch-no" title="branch not covered" >''}</span>`)
+  const stepsTaken = (history || <span class="branch-1 cbranch-no" title="branch not covered" >[])</span>
+    .filter(h =&gt; h &amp;&amp; h.action &amp;&amp; h.action.type &amp;&amp; !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
+    .map(h =&gt; `${h.step || <span class="branch-1 cbranch-no" title="branch not covered" >'?'}</span>. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : <span class="branch-1 cbranch-no" title="branch not covered" >''}</span>`)
     .join('\n');
 &nbsp;
   return `### Goal
@@ -1297,7 +1312,7 @@ Investigation completed in ${stepCount} steps (${apiCallCount} API calls). For a
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T11:14:08.366Z
+                at 2026-05-16T11:43:05.941Z
             </div>
         <script src="../prettify.js"></script>
         <script>
