@@ -3,7 +3,7 @@
 // result storage, completion notifications, service worker restart recovery.
 // Layer 3 module -- imports from agent-engine.js, template-manager.js, tab-context.js, tab-manager.js.
 
-import { agentRunning, startAgent } from './agent-engine.js';
+import * as AgentEngine from './agent-engine.js';
 import { resolveTemplateGoal } from './template-manager.js';
  
 import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
@@ -464,7 +464,7 @@ export async function executeScheduledTask(alarmName) {
   }
 
   // Check if agent is already running
-  if (agentRunning) {
+  if (AgentEngine.agentRunning) {
     tel.info('scheduler', `Agent busy, skipping schedule ${schedule.name}`);
     schedule.lastRunStatus = 'skipped';
     schedule.lastRunAt = Date.now();
