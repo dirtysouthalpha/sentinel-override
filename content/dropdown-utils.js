@@ -18,15 +18,17 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     if (!triggerEl) return null;
 
     // Scroll trigger into view before clicking
-    triggerEl.scrollIntoView({ behavior: 'instant', block: 'center' });
+    try { triggerEl.scrollIntoView({ behavior: 'instant', block: 'center' }); } catch { /* detached node */ }
 
     // Dispatch full mouse sequence consistent with existing click pattern
     const view = doc.defaultView;
     const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: view };
-    triggerEl.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-    triggerEl.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-    triggerEl.click();
-    triggerEl.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+    try {
+      triggerEl.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+      triggerEl.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+      triggerEl.click();
+      triggerEl.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+    } catch { /* dispatch may fail on detached elements */ }
 
     // Poll for option elements to appear (100ms interval, 3s timeout)
     const POLL_INTERVAL = 100;
@@ -246,13 +248,15 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     if (!matchedEl) return null;
 
     // Scroll option into view and click
-    matchedEl.scrollIntoView({ behavior: 'instant', block: 'center' });
+    try { matchedEl.scrollIntoView({ behavior: 'instant', block: 'center' }); } catch { /* detached */ }
     const view = doc.defaultView;
     const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: view };
-    matchedEl.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-    matchedEl.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-    matchedEl.click();
-    matchedEl.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+    try {
+      matchedEl.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+      matchedEl.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+      matchedEl.click();
+      matchedEl.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+    } catch { /* dispatch may fail on detached elements */ }
 
     return matchedEl;
   };
@@ -288,19 +292,23 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
       if (isLastLevel) {
         // Final item: click it
-        matchedItem.scrollIntoView({ behavior: 'instant', block: 'center' });
+        try { matchedItem.scrollIntoView({ behavior: 'instant', block: 'center' }); } catch { /* detached */ }
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: view };
-        matchedItem.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-        matchedItem.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-        matchedItem.click();
-        matchedItem.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+        try {
+          matchedItem.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+          matchedItem.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+          matchedItem.click();
+          matchedItem.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
+        } catch { /* dispatch may fail */ }
         return matchedItem;
       }
 
       // Not the last level: hover to reveal submenu
-      matchedItem.scrollIntoView({ behavior: 'instant', block: 'center' });
-      matchedItem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, composed: true, view: view }));
-      matchedItem.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, composed: true }));
+      try { matchedItem.scrollIntoView({ behavior: 'instant', block: 'center' }); } catch { /* detached */ }
+      try {
+        matchedItem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, composed: true, view: view }));
+        matchedItem.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, composed: true }));
+      } catch { /* dispatch may fail */ }
 
       // Wait for submenu to appear (300ms hover delay, up to 500ms total)
       await wait.sleep(300);
@@ -309,9 +317,11 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
       const subItems = dd.findDropdownOptions(doc, matchedItem);
       if (subItems.length === 0) {
         // Fallback: try clicking instead of hovering
-        matchedItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true, view: view }));
-        matchedItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true, view: view }));
-        matchedItem.click();
+        try {
+          matchedItem.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true, view: view }));
+          matchedItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true, view: view }));
+          matchedItem.click();
+        } catch { /* dispatch may fail */ }
         await wait.sleep(200);
 
         // Check again after click
@@ -349,20 +359,22 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     }
 
     // Check for nearby dropdown containers
-    const parent = el.parentElement;
-    if (parent) {
-      // Check siblings for dropdown menu containers
-      const siblingContainers = parent.querySelectorAll(
-        '[role="listbox"], [role="option"], .dropdown-menu, .select-options, .menu'
-      );
-      if (siblingContainers.length > 0) return true;
+    try {
+      const parent = el.parentElement;
+      if (parent) {
+        // Check siblings for dropdown menu containers
+        const siblingContainers = parent.querySelectorAll(
+          '[role="listbox"], [role="option"], .dropdown-menu, .select-options, .menu'
+        );
+        if (siblingContainers.length > 0) return true;
 
-      // Check children
-      const childContainers = el.querySelectorAll(
-        '.dropdown-menu, .select-options'
-      );
-      if (childContainers.length > 0) return true;
-    }
+        // Check children
+        const childContainers = el.querySelectorAll(
+          '.dropdown-menu, .select-options'
+        );
+        if (childContainers.length > 0) return true;
+      }
+    } catch { /* querySelectorAll may fail on detached elements */ }
 
     return false;
   };
@@ -370,11 +382,16 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   // ========== Dismiss Dropdown ==========
   // Closes any open dropdown by pressing Escape or clicking outside.
   dd.dismissDropdown = function(doc) {
+    if (!doc) return false;
+
     // Check if a dropdown is visibly open
-    const openDropdowns = doc.querySelectorAll(
+    let openDropdowns;
+    try {
+      openDropdowns = doc.querySelectorAll(
       '.dropdown-menu:not([style*="display: none"]), .select-options:not([style*="display: none"]), ' +
       '[role="listbox"]:not([style*="display: none"]), [role="menu"]:not([style*="display: none"])'
     );
+    } catch { return false; }
 
     let wasOpen = false;
     openDropdowns.forEach(function(dropdown) {
@@ -384,14 +401,16 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     });
 
     // Press Escape to dismiss — full keydown + keypress + keyup sequence (#23)
-    const activeEl = doc.activeElement || doc.body;
-    const escOpts = {
-      key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-      bubbles: true, cancelable: true, composed: true
-    };
-    activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
-    activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
-    activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
+    try {
+      const activeEl = doc.activeElement || doc.body;
+      const escOpts = {
+        key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
+        bubbles: true, cancelable: true, composed: true
+      };
+      activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
+      activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
+      activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
+    } catch { /* dispatch may fail */ }
 
     return wasOpen;
   };
@@ -402,11 +421,13 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     // Look for an input near the first option
     if (optionEls && optionEls.length > 0) {
       const firstOption = optionEls[0];
-      const container = firstOption.closest('[role="listbox"], .dropdown-menu, .select-options, .menu, .autocomplete-list');
-      if (container) {
-        const searchInput = container.querySelector('input[type="text"], input[type="search"], input[placeholder*="search" i], input[placeholder*="filter" i]');
-        if (searchInput) return searchInput;
-      }
+      try {
+        const container = firstOption.closest('[role="listbox"], .dropdown-menu, .select-options, .menu, .autocomplete-list');
+        if (container) {
+          const searchInput = container.querySelector('input[type="text"], input[type="search"], input[placeholder*="search" i], input[placeholder*="filter" i]');
+          if (searchInput) return searchInput;
+        }
+      } catch { /* closest may fail on detached elements */ }
     }
 
     // Look for any visible search input that appeared recently
