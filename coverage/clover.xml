@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1778931786329" clover="3.2.0">
-  <project timestamp="1778931786329" name="All files">
-    <metrics statements="5447" coveredstatements="4206" conditionals="5882" coveredconditionals="4151" methods="751" coveredmethods="642" elements="12080" coveredelements="8999" complexity="0" loc="5447" ncloc="5447" packages="5" files="53" classes="53"/>
+<coverage generated="1778935528429" clover="3.2.0">
+  <project timestamp="1778935528430" name="All files">
+    <metrics statements="5447" coveredstatements="4209" conditionals="5882" coveredconditionals="4156" methods="751" coveredmethods="644" elements="12080" coveredelements="9009" complexity="0" loc="5447" ncloc="5447" packages="5" files="53" classes="53"/>
     <package name="background">
-      <metrics statements="4398" coveredstatements="3167" conditionals="4777" coveredconditionals="3150" methods="604" coveredmethods="496"/>
+      <metrics statements="4398" coveredstatements="3170" conditionals="4777" coveredconditionals="3155" methods="604" coveredmethods="498"/>
       <file name="adaptive-prompts.js" path="C:\Users\Administrator\Downloads\sentinel-override\background\adaptive-prompts.js">
         <metrics statements="107" coveredstatements="106" conditionals="123" coveredconditionals="106" methods="8" coveredmethods="7"/>
         <line num="18" count="1" type="stmt"/>
@@ -115,7 +115,7 @@
         <line num="286" count="44" type="stmt"/>
       </file>
       <file name="agent-engine.js" path="C:\Users\Administrator\Downloads\sentinel-override\background\agent-engine.js">
-        <metrics statements="1988" coveredstatements="828" conditionals="2076" coveredconditionals="798" methods="207" coveredmethods="130"/>
+        <metrics statements="1988" coveredstatements="831" conditionals="2076" coveredconditionals="803" methods="207" coveredmethods="132"/>
         <line num="26" count="7" type="stmt"/>
         <line num="27" count="7" type="stmt"/>
         <line num="28" count="7" type="stmt"/>
@@ -182,15 +182,15 @@
         <line num="145" count="31" type="cond" truecount="2" falsecount="0"/>
         <line num="146" count="29" type="stmt"/>
         <line num="147" count="29" type="stmt"/>
-        <line num="148" count="29" type="cond" truecount="1" falsecount="1"/>
-        <line num="149" count="29" type="cond" truecount="0" falsecount="2"/>
-        <line num="150" count="29" type="cond" truecount="1" falsecount="1"/>
-        <line num="151" count="0" type="stmt"/>
-        <line num="153" count="29" type="stmt"/>
+        <line num="148" count="29" type="cond" truecount="2" falsecount="0"/>
+        <line num="149" count="29" type="cond" truecount="2" falsecount="0"/>
+        <line num="150" count="29" type="cond" truecount="2" falsecount="0"/>
+        <line num="151" count="1" type="stmt"/>
+        <line num="153" count="28" type="stmt"/>
         <line num="156" count="29" type="stmt"/>
-        <line num="157" count="29" type="cond" truecount="1" falsecount="1"/>
-        <line num="158" count="0" type="stmt"/>
-        <line num="159" count="0" type="stmt"/>
+        <line num="157" count="29" type="cond" truecount="2" falsecount="0"/>
+        <line num="158" count="1" type="stmt"/>
+        <line num="159" count="1" type="stmt"/>
         <line num="161" count="29" type="stmt"/>
         <line num="173" count="7" type="stmt"/>
         <line num="175" count="22" type="cond" truecount="2" falsecount="2"/>
@@ -3352,7 +3352,7 @@
         <line num="54" count="1" type="stmt"/>
         <line num="63" count="147" type="stmt"/>
         <line num="64" count="147" type="stmt"/>
-        <line num="66" count="3" type="cond" truecount="2" falsecount="0"/>
+        <line num="66" count="4" type="cond" truecount="2" falsecount="0"/>
         <line num="75" count="55" type="stmt"/>
         <line num="76" count="55" type="stmt"/>
         <line num="77" count="53" type="cond" truecount="2" falsecount="0"/>
@@ -3949,7 +3949,7 @@
         <line num="376" count="13" type="cond" truecount="4" falsecount="0"/>
         <line num="377" count="1" type="stmt"/>
         <line num="378" count="2" type="cond" truecount="1" falsecount="1"/>
-        <line num="381" count="340" type="stmt"/>
+        <line num="381" count="410" type="stmt"/>
         <line num="382" count="213" type="stmt"/>
         <line num="394" count="442" type="stmt"/>
         <line num="395" count="442" type="stmt"/>
