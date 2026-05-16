@@ -2059,10 +2059,16 @@ async function runAgentLoop(goal, workingTabId) {
   // (3.41.0) Batch all run-stable settings in one storage read.
   // ticketMode/ticketFormat/approvalMode/useTrustedInput never change mid-run;
   // reading them from _runSettings avoids per-step storage round-trips.
-  const stored = await chrome.storage.local.get([
-    'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
-    'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
-  ]);
+  let stored;
+  try {
+    stored = await chrome.storage.local.get([
+      'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
+      'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
+    ]);
+  } catch (e) {
+    console.warn('[Sentinel] runAgentLoop settings load failed:', e && e.message);
+    stored = {};
+  }
   _runSettings = {
     ticketMode:     stored.ticketMode    ?? false,
     ticketFormat:   stored.ticketFormat  ?? 'standard',
@@ -2078,7 +2084,11 @@ async function runAgentLoop(goal, workingTabId) {
   // Memory is still persisted per-step so it survives unexpected SW termination
   // within a run; it's deliberately discarded between runs.
   agentMemory = {};
-  await chrome.storage.local.set({ agent_history: [] });
+  try {
+    await chrome.storage.local.set({ agent_history: [] });
+  } catch (e) {
+    console.warn('[Sentinel] agent_history clear failed:', e && e.message);
+  }
 
   if (stored.agent_context && stored.agent_context.trim()) {
     goal = `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
@@ -4255,7 +4265,13 @@ async function runAgentLoop(goal, workingTabId) {
     }
   }
 
-  if (finished) await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
+  if (finished) {
+    try {
+      await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
+    } catch (e) {
+      console.warn('[Sentinel] post-loop history/memory clear failed:', e && e.message);
+    }
+  }
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // In MV3, closing all agent tabs can create a window where the service worker
@@ -4271,7 +4287,11 @@ async function runAgentLoop(goal, workingTabId) {
     } catch (err) {
       console.error('Report generation failed:', err);
       sendReportUpdate('error', null, err.message);
-      await chrome.storage.local.set({ last_agent_report_error: err.message });
+      try {
+        await chrome.storage.local.set({ last_agent_report_error: err.message });
+      } catch (e) {
+        console.warn('[Sentinel] report error storage write failed:', e && e.message);
+      }
     }
   } else {
     console.warn('Agent finished without reportData — skipping report generation');
