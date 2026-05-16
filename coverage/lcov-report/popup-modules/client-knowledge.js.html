@@ -459,7 +459,8 @@
 <a name='L394'></a><a href='#L394'>394</a>
 <a name='L395'></a><a href='#L395'>395</a>
 <a name='L396'></a><a href='#L396'>396</a>
-<a name='L397'></a><a href='#L397'>397</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -484,6 +485,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -880,6 +882,7 @@ function <span class="fstat-no" title="function not covered" >_safeEsc(</span>s)
 &nbsp;
 // ---------- State ----------
 let _editingClientId = <span class="cstat-no" title="statement not covered" >null;</span>
+ 
 let _activeClientCache = <span class="cstat-no" title="statement not covered" >null;</span>
 &nbsp;
 // ---------- Backend calls ----------
@@ -996,7 +999,7 @@ async function <span class="fstat-no" title="function not covered" >refreshClien
 <span class="cstat-no" title="statement not covered" >              await refreshClientPicker();</span>
 <span class="cstat-no" title="statement not covered" >              await refreshClientList();</span>
 <span class="cstat-no" title="statement not covered" >              await refreshHeaderChip();</span>
-<span class="cstat-no" title="statement not covered" >              try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Client deleted', 'success'); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >              try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Client deleted', 'success'); </span>} catch { /* showToast may fail in detached popup */ }</span>
             } else {
 <span class="cstat-no" title="statement not covered" >              alert(res.error || 'Delete failed');</span>
             }
@@ -1132,7 +1135,7 @@ function <span class="fstat-no" title="function not covered" >importClientFromFi
 <span class="cstat-no" title="statement not covered" >      if (res.ok) {</span>
 <span class="cstat-no" title="statement not covered" >        await refreshClientPicker();</span>
 <span class="cstat-no" title="statement not covered" >        await refreshClientList();</span>
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Client imported: ' + res.client.displayName, 'success'); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Client imported: ' + res.client.displayName, 'success'); </span>} catch { /* showToast may fail in detached popup */ }</span>
       } else {
 <span class="cstat-no" title="statement not covered" >        alert(res.error || 'Import failed');</span>
       }
@@ -1166,7 +1169,7 @@ function <span class="fstat-no" title="function not covered" >importClientFromFi
     const inp = <span class="cstat-no" title="statement not covered" >_get('clientNewNameInput');</span>
 <span class="cstat-no" title="statement not covered" >    if (!inp) <span class="cstat-no" title="statement not covered" >return;</span></span>
     const name = <span class="cstat-no" title="statement not covered" >inp.value.trim();</span>
-<span class="cstat-no" title="statement not covered" >    if (!name) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Enter a client name', 'error'); </span>} catch (e) {} <span class="cstat-no" title="statement not covered" ></span>return; </span>}</span>
+<span class="cstat-no" title="statement not covered" >    if (!name) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Enter a client name', 'error'); </span>} catch { /* showToast may fail in detached popup */ } <span class="cstat-no" title="statement not covered" ></span>return; </span>}</span>
     const res = <span class="cstat-no" title="statement not covered" >await _send('client_create', { client: { displayName: name } });</span>
 <span class="cstat-no" title="statement not covered" >    if (res.ok) {</span>
 <span class="cstat-no" title="statement not covered" >      inp.value = '';</span>
@@ -1191,7 +1194,7 @@ function <span class="fstat-no" title="function not covered" >importClientFromFi
 <span class="cstat-no" title="statement not covered" >      _set('clientDetailTitle', 'textContent', name);</span>
 <span class="cstat-no" title="statement not covered" >      await refreshClientList();</span>
 <span class="cstat-no" title="statement not covered" >      await refreshHeaderChip();</span>
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Saved', 'success'); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Saved', 'success'); </span>} catch { /* showToast may fail in detached popup */ }</span>
     } else {
 <span class="cstat-no" title="statement not covered" >      alert(res.error || 'Save failed');</span>
     }
@@ -1232,14 +1235,14 @@ function <span class="fstat-no" title="function not covered" >importClientFromFi
     const wisdom = <span class="cstat-no" title="statement not covered" >(_get('clientEntryWisdomInput') || {}).value || '';</span>
     const scope = <span class="cstat-no" title="statement not covered" >(_get('clientEntryScopeSelect') || {}).value || 'global';</span>
     const urlPattern = <span class="cstat-no" title="statement not covered" >(_get('clientEntryUrlPatternInput') || {}).value || '';</span>
-<span class="cstat-no" title="statement not covered" >    if (!wisdom.trim()) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Enter what you learned', 'error'); </span>} catch (e) {} <span class="cstat-no" title="statement not covered" ></span>return; </span>}</span>
+<span class="cstat-no" title="statement not covered" >    if (!wisdom.trim()) { <span class="cstat-no" title="statement not covered" >try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Enter what you learned', 'error'); </span>} catch { /* showToast may fail in detached popup */ } <span class="cstat-no" title="statement not covered" ></span>return; </span>}</span>
     const res = <span class="cstat-no" title="statement not covered" >await _send('client_entry_add', { clientId: _editingClientId, entry: { wisdom, scope, urlPattern } });</span>
 <span class="cstat-no" title="statement not covered" >    if (res.ok) {</span>
 <span class="cstat-no" title="statement not covered" >      _set('clientEntryWisdomInput', 'value', '');</span>
 <span class="cstat-no" title="statement not covered" >      _set('clientEntryUrlPatternInput', 'value', '');</span>
 <span class="cstat-no" title="statement not covered" >      await refreshEntriesList(_editingClientId);</span>
 <span class="cstat-no" title="statement not covered" >      await refreshClientList();</span>
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Knowledge saved', 'success'); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >window.showToast &amp;&amp; showToast('Knowledge saved', 'success'); </span>} catch { /* showToast may fail in detached popup */ }</span>
     } else {
 <span class="cstat-no" title="statement not covered" >      alert(res.error || 'Add failed');</span>
     }
@@ -1258,7 +1261,7 @@ function <span class="fstat-no" title="function not covered" >importClientFromFi
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:24:06.314Z
+                at 2026-05-16T06:44:33.114Z
             </div>
         <script src="../prettify.js"></script>
         <script>

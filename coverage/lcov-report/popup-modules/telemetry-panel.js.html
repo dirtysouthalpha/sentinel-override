@@ -1276,7 +1276,7 @@
 <span class="cstat-no" title="statement not covered" >    if (ev.payload) {</span>
 <span class="cstat-no" title="statement not covered" >      try {</span>
 <span class="cstat-no" title="statement not covered" >        if (JSON.stringify(ev.payload).toLowerCase().includes(q)) <span class="cstat-no" title="statement not covered" >return true;</span></span>
-      } catch (e) {}
+      } catch { /* JSON parse failure is non-critical */ }
     }
 <span class="cstat-no" title="statement not covered" >    return false;</span>
   }
@@ -1310,7 +1310,7 @@
 <span class="cstat-no" title="statement not covered" >    if (ev.payload) {</span>
       const expandable = <span class="cstat-no" title="statement not covered" >document.createElement('pre');</span>
 <span class="cstat-no" title="statement not covered" >      expandable.style.cssText = 'display:none; flex-basis:100%; margin:4px 0 4px 90px; padding:6px 8px; background:rgba(0,0,0,0.25); border-radius:3px; font-family:monospace; font-size:10px; line-height:1.4; color:var(--text-secondary, #aaa); white-space:pre-wrap; word-break:break-word; max-height:200px; overflow:auto;';</span>
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >expandable.textContent = JSON.stringify(ev.payload, null, 2); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >expandable.textContent = String(ev.payload); </span>}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >expandable.textContent = JSON.stringify(ev.payload, null, 2); </span>} catch { <span class="cstat-no" title="statement not covered" >expandable.textContent = String(ev.payload); </span>}</span>
 <span class="cstat-no" title="statement not covered" >      div.appendChild(expandable);</span>
 <span class="cstat-no" title="statement not covered" >      div.addEventListener('click', <span class="fstat-no" title="function not covered" >(e</span>) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >        if (e.target.tagName === 'PRE') <span class="cstat-no" title="statement not covered" >return;</span></span>
@@ -1475,7 +1475,7 @@
 <span class="cstat-no" title="statement not covered" >          navigator.clipboard.writeText(text).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
 <span class="cstat-no" title="statement not covered" >          copyBtn.textContent = 'Copied!';</span>
 <span class="cstat-no" title="statement not covered" >          setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; { <span class="cstat-no" title="statement not covered" >copyBtn.textContent = 'Copy'; </span>}, 1200);</span>
-        } catch (e) {}
+        } catch { /* clipboard API may be restricted */ }
       });
     }
     const clearBtn = <span class="cstat-no" title="statement not covered" >document.getElementById('telemClearBtn');</span>
@@ -1517,11 +1517,11 @@
 <span class="cstat-no" title="statement not covered" >          document.body.appendChild(a);</span>
 <span class="cstat-no" title="statement not covered" >          a.click();</span>
 <span class="cstat-no" title="statement not covered" >          setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >            try { <span class="cstat-no" title="statement not covered" >document.body.removeChild(a); <span class="cstat-no" title="statement not covered" ></span>URL.revokeObjectURL(url); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >            try { <span class="cstat-no" title="statement not covered" >document.body.removeChild(a); <span class="cstat-no" title="statement not covered" ></span>URL.revokeObjectURL(url); </span>} catch { /* DOM may be detached */ }</span>
           }, 1500);
 <span class="cstat-no" title="statement not covered" >          exportBtn.textContent = 'Exported!';</span>
 <span class="cstat-no" title="statement not covered" >          setTimeout(<span class="fstat-no" title="function not covered" >()</span> =&gt; { <span class="cstat-no" title="statement not covered" >exportBtn.textContent = 'Export'; </span>}, 1200);</span>
-        } catch (e) {}
+        } catch { /* download/export may fail in restricted context */ }
       });
     }
 &nbsp;
@@ -1562,7 +1562,7 @@
 <span class="cstat-no" title="statement not covered" >          resolve(Array.isArray(response) ? response : []);</span>
         });
       });
-    } catch (e) {}
+    } catch { /* message may fail if background not ready */ }
     const btn = <span class="cstat-no" title="statement not covered" >document.getElementById('telemPastRunsBtn');</span>
 <span class="cstat-no" title="statement not covered" >    if (!btn) <span class="cstat-no" title="statement not covered" >return;</span></span>
     const rect = <span class="cstat-no" title="statement not covered" >btn.getBoundingClientRect();</span>
@@ -1605,7 +1605,7 @@
 <span class="cstat-no" title="statement not covered" >            if (_viewingPastRun &amp;&amp; _viewingPastRun.runId === run.runId) <span class="cstat-no" title="statement not covered" >_loadLiveStream();</span></span>
 <span class="cstat-no" title="statement not covered" >            menu.remove();</span>
 <span class="cstat-no" title="statement not covered" >            _togglePastRunsMenu();</span>
-          } catch (err) {}
+          } catch { /* message may fail if background not ready */ }
         });
 <span class="cstat-no" title="statement not covered" >        item.appendChild(delBtn);</span>
 <span class="cstat-no" title="statement not covered" >        item.addEventListener('click', <span class="fstat-no" title="function not covered" >()</span> =&gt; { <span class="cstat-no" title="statement not covered" >_loadPastRun(run); <span class="cstat-no" title="statement not covered" ></span>menu.remove(); </span>});</span>
@@ -1642,7 +1642,7 @@
 <span class="cstat-no" title="statement not covered" >      _viewingPastRun = runMeta;</span>
 <span class="cstat-no" title="statement not covered" >      _renderAll();</span>
 <span class="cstat-no" title="statement not covered" >      _renderViewingBanner();</span>
-    } catch (e) {}
+    } catch { /* loading past run may fail gracefully */ }
   }
 &nbsp;
   function <span class="fstat-no" title="function not covered" >_loadLiveStream(</span>) {
@@ -1694,7 +1694,7 @@
 <span class="cstat-no" title="statement not covered" >        _addEvent(message);</span>
       }
     });
-  } catch (e) {}
+  } catch { /* message listener registration may fail */ }
 &nbsp;
   function <span class="fstat-no" title="function not covered" >init(</span>) {
     const railBtn = <span class="cstat-no" title="statement not covered" >document.getElementById('telemetryRailBtn');</span>
@@ -1708,7 +1708,7 @@
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  try {</span>
 <span class="cstat-no" title="statement not covered" >    window.__sentinelTelemetry = { toggle: togglePanel, eventCount: <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >events.length </span>};</span>
-  } catch (e) {}
+  } catch { /* window assignment may fail in restricted context */ }
 })();
 &nbsp;</pre></td></tr></table></pre>
 
@@ -1717,7 +1717,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:24:06.314Z
+                at 2026-05-16T06:44:33.114Z
             </div>
         <script src="../prettify.js"></script>
         <script>

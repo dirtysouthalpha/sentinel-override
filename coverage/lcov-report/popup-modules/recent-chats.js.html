@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/163</span>
+                <span class='fraction'>0/162</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/139</span>
+                <span class='fraction'>0/138</span>
             </div>
         
             
@@ -379,8 +379,7 @@
 <a name='L314'></a><a href='#L314'>314</a>
 <a name='L315'></a><a href='#L315'>315</a>
 <a name='L316'></a><a href='#L316'>316</a>
-<a name='L317'></a><a href='#L317'>317</a>
-<a name='L318'></a><a href='#L318'>318</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L317'></a><a href='#L317'>317</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -533,7 +532,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -741,7 +739,7 @@
 <span class="cstat-no" title="statement not covered" >        tmp.innerHTML = fallbackHtml;</span>
         const firstUserMsg = <span class="cstat-no" title="statement not covered" >tmp.querySelector('.message-group .user-msg, .message-group [class*="user"]');</span>
 <span class="cstat-no" title="statement not covered" >        if (firstUserMsg) <span class="cstat-no" title="statement not covered" >return (firstUserMsg.innerText || '').trim().substring(0, 200);</span></span>
-      } catch (e) {}
+      } catch { /* DOM may be detached */ }
     }
 <span class="cstat-no" title="statement not covered" >    return '(no goal)';</span>
   }
@@ -803,7 +801,7 @@
 <span class="cstat-no" title="statement not covered" >    try {</span>
       const stored = <span class="cstat-no" title="statement not covered" >await chrome.storage.local.get(STORAGE_KEY);</span>
 <span class="cstat-no" title="statement not covered" >      return Array.isArray(stored[STORAGE_KEY]) ? stored[STORAGE_KEY] : [];</span>
-    } catch (e) {
+    } catch {
 <span class="cstat-no" title="statement not covered" >      return [];</span>
     }
   }
@@ -833,7 +831,7 @@
         // Save to chat_history so future loads keep it
 <span class="cstat-no" title="statement not covered" >        try {</span>
 <span class="cstat-no" title="statement not covered" >          chrome.storage.local.set({ chat_history: state.conversationHistory });</span>
-        } catch (e) {}
+        } catch { /* storage may fail */ }
       }
 &nbsp;
       // Show restored banner at the top
@@ -856,7 +854,6 @@
       const banner = <span class="cstat-no" title="statement not covered" >document.createElement('div');</span>
 <span class="cstat-no" title="statement not covered" >      banner.className = 'restored-banner';</span>
 <span class="cstat-no" title="statement not covered" >      banner.style.cssText = 'margin: 8px 14px 4px; padding: 8px 12px; background: rgba(120,180,255,0.08); border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; font-size: 11px; color: var(--text-secondary, #aaa); display: flex; align-items: center; justify-content: space-between; gap: 12px;';</span>
-      const ts = <span class="cstat-no" title="statement not covered" >new Date(entry.createdAt);</span>
       const ageMin = <span class="cstat-no" title="statement not covered" >Math.round((Date.now() - entry.createdAt) / 60000);</span>
       const ageStr = <span class="cstat-no" title="statement not covered" >ageMin &lt; 1 ? 'just now' : ageMin &lt; 60 ? ageMin + ' min ago' : ageMin &lt; 1440 ? Math.round(ageMin / 60) + 'h ago' : Math.round(ageMin / 1440) + 'd ago';</span>
 <span class="cstat-no" title="statement not covered" >      banner.innerHTML =</span>
@@ -865,7 +862,7 @@
 <span class="cstat-no" title="statement not covered" >      chatContainer.insertBefore(banner, chatContainer.firstChild);</span>
       const dismissBtn = <span class="cstat-no" title="statement not covered" >banner.querySelector('#dismissRestoredBanner');</span>
 <span class="cstat-no" title="statement not covered" >      if (dismissBtn) <span class="cstat-no" title="statement not covered" >dismissBtn.addEventListener('click', <span class="fstat-no" title="function not covered" >()</span> =&gt; <span class="cstat-no" title="statement not covered" >banner.remove())</span>;</span></span>
-    } catch (e) {}
+    } catch { /* DOM may be detached */ }
   }
 &nbsp;
   async function <span class="fstat-no" title="function not covered" >deleteRecentChat(</span>id) {
@@ -874,14 +871,14 @@
       const next = <span class="cstat-no" title="statement not covered" >list.filter(<span class="fstat-no" title="function not covered" >c </span>=&gt; <span class="cstat-no" title="statement not covered" >c &amp;&amp; c.id !== id)</span>;</span>
 <span class="cstat-no" title="statement not covered" >      await chrome.storage.local.set({ [STORAGE_KEY]: next });</span>
 <span class="cstat-no" title="statement not covered" >      return true;</span>
-    } catch (e) { <span class="cstat-no" title="statement not covered" >return false; </span>}
+    } catch { <span class="cstat-no" title="statement not covered" >return false; </span>}
   }
 &nbsp;
   async function <span class="fstat-no" title="function not covered" >clearAllRecent(</span>) {
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >      await chrome.storage.local.set({ [STORAGE_KEY]: [] });</span>
 <span class="cstat-no" title="statement not covered" >      return true;</span>
-    } catch (e) { <span class="cstat-no" title="statement not covered" >return false; </span>}
+    } catch { <span class="cstat-no" title="statement not covered" >return false; </span>}
   }
 &nbsp;
   // ========== Modal UI ==========
@@ -1012,7 +1009,7 @@
       clear: clearAllRecent,
       openModal: _openModal
     };
-  } catch (e) {}
+  } catch { /* module init may fail in detached popup */ }
 })();
 &nbsp;</pre></td></tr></table></pre>
 
@@ -1021,7 +1018,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:24:06.314Z
+                at 2026-05-16T06:44:33.114Z
             </div>
         <script src="../prettify.js"></script>
         <script>

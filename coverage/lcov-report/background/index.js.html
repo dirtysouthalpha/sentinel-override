@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/331</span>
+                <span class='fraction'>0/333</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/254</span>
+                <span class='fraction'>0/255</span>
             </div>
         
             
@@ -684,7 +684,12 @@
 <a name='L619'></a><a href='#L619'>619</a>
 <a name='L620'></a><a href='#L620'>620</a>
 <a name='L621'></a><a href='#L621'>621</a>
-<a name='L622'></a><a href='#L622'>622</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L622'></a><a href='#L622'>622</a>
+<a name='L623'></a><a href='#L623'>623</a>
+<a name='L624'></a><a href='#L624'>624</a>
+<a name='L625'></a><a href='#L625'>625</a>
+<a name='L626'></a><a href='#L626'>626</a>
+<a name='L627'></a><a href='#L627'>627</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -723,12 +728,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1190,8 +1202,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1308,13 +1318,19 @@
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 &nbsp;
+// eslint-disable-next-line no-unused-vars
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+// eslint-disable-next-line no-unused-vars
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
+// eslint-disable-next-line no-unused-vars
 import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
+// eslint-disable-next-line no-unused-vars
 import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
+// eslint-disable-next-line no-unused-vars
 import { generateReport } from './report-generator.js';
+// eslint-disable-next-line no-unused-vars
 import { migrateLegacySettings } from './provider-registry.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
@@ -1346,6 +1362,7 @@ import {
 // ========== One-time migration ==========
 <span class="cstat-no" title="statement not covered" >chrome.runtime.onInstalled.addListener(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >  chrome.storage.local.get(['api_endpoint', 'model'], <span class="fstat-no" title="function not covered" >(r</span>esult) =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    if (chrome.runtime.lastError) <span class="cstat-no" title="statement not covered" >return;</span></span>
     const updates = <span class="cstat-no" title="statement not covered" >{};</span>
 <span class="cstat-no" title="statement not covered" >    if (result.api_endpoint &amp;&amp; result.api_endpoint.includes('bigmodel.cn')) <span class="cstat-no" title="statement not covered" >updates.api_endpoint = '';</span></span>
 <span class="cstat-no" title="statement not covered" >    if (result.model &amp;&amp; (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) <span class="cstat-no" title="statement not covered" >updates.model = '';</span></span>
@@ -1395,10 +1412,10 @@ import {
             totalBytes: dl.totalBytes || 0
           }
         }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});
-      } catch (e) { /* non-fatal */ }
+      } catch { /* non-fatal */ }
     });
   }
-} catch (e) { /* downloads API may be unavailable */ }
+} catch { /* downloads API may be unavailable */ }
 &nbsp;
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -1414,7 +1431,7 @@ import {
 <span class="cstat-no" title="statement not covered" >try {</span>
 <span class="cstat-no" title="statement not covered" >  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })</span>
     .catch(<span class="fstat-no" title="function not covered" >(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] setPanelBehavior failed:', e &amp;&amp; e.message))</span>;
-} catch (e) { /* non-fatal on older Chrome */ }
+} catch { /* non-fatal on older Chrome */ }
 &nbsp;
 // ========== Unified Message Handler ==========
 <span class="cstat-no" title="statement not covered" >chrome.runtime.onMessage.addListener(wrapMessageHandler(<span class="fstat-no" title="function not covered" >as</span>ync (request, sender) =&gt; {</span>
@@ -1442,7 +1459,7 @@ import {
 <span class="cstat-no" title="statement not covered" >        if (sender &amp;&amp; sender.tab &amp;&amp; typeof sender.tab.id === 'number') <span class="cstat-no" title="statement not covered" >payload.tabId = sender.tab.id;</span></span>
 <span class="cstat-no" title="statement not covered" >        if (sender &amp;&amp; sender.url) <span class="cstat-no" title="statement not covered" >payload.frameUrl = String(sender.url).substring(0, 200);</span></span>
 <span class="cstat-no" title="statement not covered" >        tel[lvl](cat, msg, payload);</span>
-      } catch (e) { /* never throw on telemetry */ }
+      } catch { /* never throw on telemetry */ }
 <span class="cstat-no" title="statement not covered" >      return { ok: true };</span>
     }
 &nbsp;
@@ -1450,10 +1467,10 @@ import {
     // panel context and can't import telemetry.js directly — these handlers
     // expose the persistence read/delete API.
     case 'list_persisted_telemetry_runs': {
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return await listPersistedRuns(); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return await listPersistedRuns(); </span>} catch { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
     }
     case 'load_persisted_telemetry_run': {
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return await loadPersistedRun(request.runId); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return await loadPersistedRun(request.runId); </span>} catch { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
     }
     case 'delete_persisted_telemetry_run': {
 <span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >await deletePersistedRun(request.runId); <span class="cstat-no" title="statement not covered" ></span>return { ok: true }; </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return { ok: false, error: e.message }; </span>}</span>
@@ -1463,10 +1480,10 @@ import {
     // to render the per-skill success-rate table, then optionally resets via
     // reset_skill_stats. Both are popup-initiated, no side effects on the agent loop.
     case 'list_skills_with_stats': {
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return listSkills(); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return listSkills(); </span>} catch { <span class="cstat-no" title="statement not covered" >return []; </span>}</span>
     }
     case 'get_skill_stats': {
-<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return getSkillStats(); </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return {}; </span>}</span>
+<span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >return getSkillStats(); </span>} catch { <span class="cstat-no" title="statement not covered" >return {}; </span>}</span>
     }
     case 'reset_skill_stats': {
 <span class="cstat-no" title="statement not covered" >      try { <span class="cstat-no" title="statement not covered" >await resetSkillStats(); <span class="cstat-no" title="statement not covered" ></span>return { ok: true }; </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return { ok: false, error: e.message }; </span>}</span>
@@ -1483,7 +1500,7 @@ import {
           auth: p.auth,
           docsUrl: p.docsUrl
         }));
-      } catch (e) { <span class="cstat-no" title="statement not covered" >return []; </span>}
+      } catch { <span class="cstat-no" title="statement not covered" >return []; </span>}
     }
     case 'fetch_provider_models': {
       // (3.10.0) Auto-detect models for the selected provider. Caller passes
@@ -1530,7 +1547,7 @@ import {
           stepCount: cp.stepCount || 0,
           ageSeconds: Math.floor(age / 1000)
         };
-      } catch (e) {
+      } catch {
 <span class="cstat-no" title="statement not covered" >        return { available: false };</span>
       }
     }
@@ -1604,19 +1621,19 @@ import {
         const target = <span class="cstat-no" title="statement not covered" >String(request.url || '');</span>
 <span class="cstat-no" title="statement not covered" >        if (!target) <span class="cstat-no" title="statement not covered" >return { ok: false, error: 'focus_tab_by_url: missing url' };</span></span>
         let targetHost;
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >targetHost = new URL(target).host; </span>} catch (e) { <span class="cstat-no" title="statement not covered" >targetHost = ''; </span>}</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >targetHost = new URL(target).host; </span>} catch { <span class="cstat-no" title="statement not covered" >targetHost = ''; </span>}</span>
         const tabs = <span class="cstat-no" title="statement not covered" >await chrome.tabs.query({});</span>
         // Prefer exact URL match, fall back to host match (Microsoft sign-in
         // walks the user through multiple URLs on the same host).
         let match = <span class="cstat-no" title="statement not covered" >tabs.find(<span class="fstat-no" title="function not covered" >t </span>=&gt; <span class="cstat-no" title="statement not covered" >t &amp;&amp; t.url === target)</span>;</span>
 <span class="cstat-no" title="statement not covered" >        if (!match &amp;&amp; targetHost) {</span>
 <span class="cstat-no" title="statement not covered" >          match = tabs.find(<span class="fstat-no" title="function not covered" >t </span>=&gt; {</span>
-<span class="cstat-no" title="statement not covered" >            try { <span class="cstat-no" title="statement not covered" >return t &amp;&amp; t.url &amp;&amp; new URL(t.url).host === targetHost; </span>} catch (e) { <span class="cstat-no" title="statement not covered" >return false; </span>}</span>
+<span class="cstat-no" title="statement not covered" >            try { <span class="cstat-no" title="statement not covered" >return t &amp;&amp; t.url &amp;&amp; new URL(t.url).host === targetHost; </span>} catch { <span class="cstat-no" title="statement not covered" >return false; </span>}</span>
           });
         }
 <span class="cstat-no" title="statement not covered" >        if (!match) <span class="cstat-no" title="statement not covered" >return { ok: false, error: 'no matching tab' };</span></span>
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >await chrome.tabs.update(match.id, { active: true }); </span>} catch (e) {}</span>
-<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >await chrome.windows.update(match.windowId, { focused: true }); </span>} catch (e) {}</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >await chrome.tabs.update(match.id, { active: true }); </span>} catch { /* tab may have closed */ }</span>
+<span class="cstat-no" title="statement not covered" >        try { <span class="cstat-no" title="statement not covered" >await chrome.windows.update(match.windowId, { focused: true }); </span>} catch { /* window may have closed */ }</span>
 <span class="cstat-no" title="statement not covered" >        return { ok: true, tabId: match.id };</span>
       } catch (e) {
 <span class="cstat-no" title="statement not covered" >        return { ok: false, error: e &amp;&amp; e.message ? e.message : 'unknown' };</span>
@@ -1814,8 +1831,6 @@ import {
 &nbsp;
     // Fire-and-forget messages from content script — acknowledge silently
     case 'content_script_ready':
-    case 'spa_navigation':
-    case 'spa_content_changed':
 <span class="cstat-no" title="statement not covered" >      return null;</span>
 &nbsp;
     default:
@@ -1838,7 +1853,7 @@ const _SSO_HOSTS_RE = <span class="cstat-no" title="statement not covered" >/(lo
 <span class="cstat-no" title="statement not covered" >      await chrome.windows.update(win.id, { focused: true });</span>
 <span class="cstat-no" title="statement not covered" >      sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');</span>
     }
-  } catch (e) { /* non-fatal — window may have closed before query ran */ }
+  } catch { /* non-fatal — window may have closed before query ran */ }
 });
 &nbsp;
 // Detect externally-closed tabs and clean up context
@@ -1872,7 +1887,7 @@ const _SSO_HOSTS_RE = <span class="cstat-no" title="statement not covered" >/(lo
         path: 'popup.html'
       });
     }
-  } catch (e) { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
+  } catch { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
 });
 &nbsp;
 // ========== Keyboard Shortcut Commands ==========
@@ -1892,13 +1907,13 @@ const _SSO_HOSTS_RE = <span class="cstat-no" title="statement not covered" >/(lo
 <span class="cstat-no" title="statement not covered" >            if (activeTab &amp;&amp; typeof activeTab.id === 'number') {</span>
 <span class="cstat-no" title="statement not covered" >              await chrome.sidePanel.open({ tabId: activeTab.id }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
             }
-          } catch (e) { /* no active tab — silently ignore */ }
+          } catch { /* no active tab — silently ignore */ }
         }
 <span class="cstat-no" title="statement not covered" >        break;</span>
       }
       case 'pause-agent': {
 <span class="cstat-no" title="statement not covered" >        if (agentRunning) {</span>
-          const { pauseAgent, resumeAgent } = <span class="cstat-no" title="statement not covered" >await import('./agent-engine.js');</span>
+          const { pauseAgent } = <span class="cstat-no" title="statement not covered" >await import('./agent-engine.js');</span>
           // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
           // Instead, just send both and let the engine decide
 <span class="cstat-no" title="statement not covered" >          await pauseAgent(); </span>// Will set agentPaused = true
@@ -1933,7 +1948,7 @@ const _SSO_HOSTS_RE = <span class="cstat-no" title="statement not covered" >/(lo
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:36:08.392Z
+                at 2026-05-16T06:44:33.114Z
             </div>
         <script src="../prettify.js"></script>
         <script>

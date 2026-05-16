@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/245</span>
+                <span class='fraction'>0/249</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/191</span>
+                <span class='fraction'>0/199</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/214</span>
+                <span class='fraction'>0/218</span>
             </div>
         
             
@@ -566,14 +566,14 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -593,7 +593,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -829,7 +829,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -977,7 +977,7 @@
           '[role="option"], [role="menuitem"], li, .option, .dropdown-item, .menu-item, .select-option'
         );
 <span class="cstat-no" title="statement not covered" >        items.forEach(addUnique);</span>
-      } catch (e) { /* invalid selector */ }
+      } catch { /* invalid selector */ }
     }
 &nbsp;
     // ===== Scoped lookup (#22) =====
@@ -989,14 +989,14 @@
 <span class="cstat-no" title="statement not covered" >        try {</span>
           const controlled = <span class="cstat-no" title="statement not covered" >doc.getElementById(controlsId);</span>
 <span class="cstat-no" title="statement not covered" >          if (controlled) <span class="cstat-no" title="statement not covered" >addAllFromContainer(controlled);</span></span>
-        } catch (e) {}
+        } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] aria-controls lookup:', e &amp;&amp; e.message); </span>}
       }
       const ownsId = <span class="cstat-no" title="statement not covered" >triggerEl.getAttribute('aria-owns');</span>
 <span class="cstat-no" title="statement not covered" >      if (ownsId) {</span>
 <span class="cstat-no" title="statement not covered" >        try {</span>
           const owned = <span class="cstat-no" title="statement not covered" >doc.getElementById(ownsId);</span>
 <span class="cstat-no" title="statement not covered" >          if (owned) <span class="cstat-no" title="statement not covered" >addAllFromContainer(owned);</span></span>
-        } catch (e) {}
+        } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] aria-owns lookup:', e &amp;&amp; e.message); </span>}
       }
 &nbsp;
       // 1b. If we got nothing yet, climb the DOM looking for a parent that contains
@@ -1016,7 +1016,7 @@
 <span class="cstat-no" title="statement not covered" >            cursor = cursor.parentElement;</span>
 <span class="cstat-no" title="statement not covered" >            depth++;</span>
           }
-        } catch (e) {}
+        } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] parent container climb:', e &amp;&amp; e.message); </span>}
       }
     }
 &nbsp;
@@ -1045,7 +1045,7 @@
 <span class="cstat-no" title="statement not covered" >      try {</span>
 <span class="cstat-no" title="statement not covered" >        found = doc.querySelectorAll(sel);</span>
 <span class="cstat-no" title="statement not covered" >        found.forEach(addAllFromContainer);</span>
-      } catch (e) { /* invalid selector */ }
+      } catch { /* invalid selector */ }
     }
 &nbsp;
     // 4. Siblings/children of trigger
@@ -1252,7 +1252,7 @@
     let className = <span class="cstat-no" title="statement not covered" >'';</span>
 <span class="cstat-no" title="statement not covered" >    try {</span>
 <span class="cstat-no" title="statement not covered" >      className = (typeof el.className === 'string') ? el.className : (el.className &amp;&amp; el.className.baseVal) || '';</span>
-    } catch (e) {}
+    } catch (e) { <span class="cstat-no" title="statement not covered" >console.warn('[Sentinel] className access:', e &amp;&amp; e.message); </span>}
 <span class="cstat-no" title="statement not covered" >    className = className.toLowerCase();</span>
 <span class="cstat-no" title="statement not covered" >    if (className.includes('dropdown') || className.includes('combobox') ||</span>
         className.includes('select') || className.includes('picker')) {
@@ -1339,7 +1339,7 @@
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-15T10:24:06.314Z
+                at 2026-05-16T06:44:33.114Z
             </div>
         <script src="../prettify.js"></script>
         <script>
