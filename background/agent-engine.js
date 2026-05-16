@@ -926,7 +926,7 @@ export { auditLogToCsv };
 // common reason a ticket gets reopened.
 
 const CHANGE_VERBS_RE = /\b(add|create|delete|modify|update|enable|disable|block|allow|configure|grant|revoke|assign|remove|change|deploy|push)\b/i;
-const COMMIT_TARGET_RE = /\b(apply|save|commit|deploy|accept|update|create|delete|publish|submit|confirm|ok)\b/i;
+const COMMIT_TARGET_RE = /\b(apply|applied|save|saved|commit|committed|deploy|deployed|accept|accepted|update|updated|create|created|delete|deleted|publish|published|submit|submitted|confirm|confirmed|ok)\b/i;
 const CONFIG_PLATFORM_RE = /(sonicwall|sonicos|fortinet|fortigate|cisco|paloalto|pan-os|panorama|admin\.microsoft|admin\.exchange|entra\.microsoft|portal\.azure|connectwise|ninjaone|ninja\.io|ninjarmm|datto|autotask|itglue|it-glue|huntress|screenconnect)/i;
 
 function isConfigChangeGoal(goal, currentUrl) {
@@ -1965,9 +1965,9 @@ function generateHeuristicPlan(goal, currentUrl) {
   const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch { return ''; } })();
 
   // Detect multi-page research patterns
-  const isMultiPage = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(article|page|site|link|url|result|source)\b/i.test(g)
+  const isMultiPage = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i.test(g)
     || /\b(open|visit|browse|check)\b.*\b(each|and|then)\b/i.test(g)
-    || /\b(summar|brief|report)\b.*\b(all|each|every)\b/i.test(g);
+    || /\b(summarize?|brief|report)\b.*\b(all|each|every)\b/i.test(g);
 
   // Extract target URL from goal
   const urlMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i)
