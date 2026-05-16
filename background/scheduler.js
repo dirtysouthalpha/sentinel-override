@@ -553,7 +553,7 @@ export async function executeScheduledTask(alarmName) {
 
   // Start the agent
   try {
-    await startAgent(goal, { tab: { id: tabId } });
+    await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
     console.error('Failed to start agent:', err);
     await storeResult(schedule, {
