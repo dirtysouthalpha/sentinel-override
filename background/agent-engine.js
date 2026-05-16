@@ -2181,7 +2181,7 @@ async function runAgentLoop(goal, workingTabId) {
         clearSPATransition();
         // Invalidate screenshot cache for current active tab
         const spaCtx = getTabContext(getActiveTabId());
-        if (spaCtx) {
+        if (spaCtx && spaCtx.screenshotCache) {
           spaCtx.screenshotCache.cachedSnapshot = null;
           spaCtx.screenshotCache.cachedBase64Image = null;
           spaCtx.screenshotCache.lastScreenshotUrl = null;
@@ -2211,7 +2211,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
-        const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
+        const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
         const lostTab = allTabs.find(t => t.id === tab);
         if (lostTab) { tabInfo = lostTab; }
         else {

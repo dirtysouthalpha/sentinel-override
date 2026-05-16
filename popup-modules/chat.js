@@ -335,7 +335,7 @@ function loadApprovalMode() {
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
-      chrome.storage.local.set({ approvalMode: true });
+      chrome.storage.local.set({ approvalMode: true }).catch(() => {});
     } else {
       isApprovalMode = result.approvalMode === true;
     }
@@ -369,13 +369,13 @@ function setupApprovalModeToggle() {
       chrome.storage.local.set({
         approvalMode: false,
         approvalModeAcknowledged: true
-      });
+      }).catch(() => {});
       updateApprovalModeUI(false);
       return;
     }
 
     // Re-enabling approvals is always safe; persist immediately.
-    chrome.storage.local.set({ approvalMode: true });
+    chrome.storage.local.set({ approvalMode: true }).catch(() => {});
     updateApprovalModeUI(true);
   });
 }
@@ -427,7 +427,7 @@ function maybeShowSafetyBanner() {
     }
 
     document.getElementById('dismissSafetyBanner').addEventListener('click', () => {
-      chrome.storage.local.set({ seenSafetyBanner: true });
+      chrome.storage.local.set({ seenSafetyBanner: true }).catch(() => {});
       banner.remove();
     });
   });
@@ -699,8 +699,10 @@ function loadChatHistory() {
 }
 
 function saveChatHistory() {
-  const state = getState();
-  chrome.storage.local.set({ chat_history: state.conversationHistory });
+  try {
+    const state = getState();
+    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch(() => {});
+  } catch (_e) { /* storage unavailable */ }
 }
 
 // ========== Message Handling ==========
@@ -938,7 +940,7 @@ function sendMessage() {
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal });
+    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch(() => {});
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
@@ -1622,7 +1624,10 @@ function openReportModal(markdown) {
       }
       try {
         const url = chrome.runtime.getURL('report-view.html');
-        chrome.tabs.create({ url });
+        chrome.tabs.create({ url }).catch(() => {
+          console.warn('[Sentinel] report-view tab creation failed');
+          openReportModalInline(markdown);
+        });
       } catch (e) {
         // Tab creation failed — fall back to the in-panel modal.
         console.warn('[Sentinel] report-view tab failed, falling back to modal:', e && e.message);
