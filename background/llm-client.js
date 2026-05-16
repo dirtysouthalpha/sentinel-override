@@ -955,9 +955,11 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
 // totalElementCount: the raw count before trimming (for the prompt header)
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   const providerConfig = await getActiveProvider();
+  if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
   const { endpoint, apiKey, model } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
+  if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
   agentState.apiCallCount++;
 
   const last_action = history.length > 0 ? history[history.length - 1].action : null;
@@ -1584,7 +1586,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
 
-  const useThinking = provider.supportsToolUse && provider.id === 'anthropic' && (agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold);
+  const useThinking = provider.supportsToolUse && provider.id === 'anthropic' && typeof provider.buildBodyWithThinking === 'function' && (agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold);
   let requestBody;
   if (useThinking) {
     requestBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));
@@ -1610,13 +1612,19 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
   clearTimeout(fetchTimeout);
 
   if (!response.ok) {
-    const errorData = await response.text();
+    let errorData;
+    try { errorData = await response.text(); } catch { errorData = 'unable to read error body'; }
     if (response.status === 429) throw new Error(`429 Rate limited. ${errorData}`);
     if (response.status === 400 && errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
     throw new Error(`API Error: ${response.status} - ${errorData}`);
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('API returned invalid JSON');
+  }
 
   // Extract real token usage (provider-normalised).
   // Anthropic: { input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens }

@@ -295,7 +295,6 @@ async function ensureObservabilityListeners(tabId) {
 let __obsEventHookInstalled = false;
 function installObservabilityEventHook() {
   if (__obsEventHookInstalled) return;
-  __obsEventHookInstalled = true;
   try {
     chrome.debugger.onEvent.addListener((source, method, params) => {
       if (!source || typeof source.tabId !== 'number') return;
