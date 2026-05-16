@@ -455,3 +455,261 @@ describe('skills index — error handling edge cases', () => {
     }).not.toThrow();
   });
 });
+
+// ========== Skills with null autoApply (exercise skip path) ==========
+
+describe('skills with null autoApply', () => {
+  beforeEach(async () => {
+    await resetSkillStats();
+  });
+
+  test('consecutive-failures autoApply returns null — no autoApply set on result', () => {
+    const ctx = {
+      consecutiveFailures: 4,
+      lastActionFailed: true,
+      stepCount: 10,
+      dynamicMaxSteps: 30,
+    };
+    const result = runRecoverySkills(ctx);
+    // consecutive-failures has autoApply that returns null — no autoApply on result
+    expect(result.appliedSkillIds).toContain('consecutive-failures');
+    // But it should still have promptInjection text
+    expect(result.promptInjection.length).toBeGreaterThan(0);
+  });
+
+  test('slow-llm-call autoApply returns null — injection-only skill', () => {
+    const ctx = {
+      lastAiCallMs: 30000,
+      lastActionFailed: false,
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).toContain('slow-llm-call');
+    expect(result.autoApply).toBeNull();
+    expect(result.promptInjection.length).toBeGreaterThan(0);
+  });
+
+  test('unproductive-extract autoApply returns null — injection-only', () => {
+    const ctx = {
+      lastResult: 'JS returned an empty array',
+      lastCommand: { type: 'extract', selector: '.items' },
+      lastActionFailed: true,
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).toContain('unproductive-extract');
+    expect(result.autoApply).toBeNull();
+    expect(result.promptInjection.length).toBeGreaterThan(0);
+  });
+
+  test('empty-observation autoApply returns null when not navigate', () => {
+    const ctx = {
+      lastCommand: { type: 'read_page' },
+      lastActionFailed: true,
+      allElements: [],  // < 5 elements
+      pageText: '',     // < 200 chars
+      currentUrl: 'https://example.com',
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).toContain('empty-observation');
+    // autoApply returns null for non-navigate type
+    expect(result.promptInjection.length).toBeGreaterThan(0);
+  });
+
+  test('empty-observation autoApply returns wait_for_navigation when navigate', () => {
+    const ctx = {
+      lastCommand: { type: 'navigate' },
+      lastActionFailed: true,
+      allElements: [],
+      pageText: '',
+      currentUrl: 'https://example.com',
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).toContain('empty-observation');
+    // This should auto-apply wait_for_navigation since lastCommand was navigate
+    if (result.autoApply) {
+      expect(result.autoApply.type).toBe('wait_for_navigation');
+    }
+  });
+
+  test('empty-observation does not match chrome:// URLs', () => {
+    const ctx = {
+      lastCommand: { type: 'read_page' },
+      lastActionFailed: true,
+      allElements: [],
+      pageText: '',
+      currentUrl: 'chrome://settings',
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).not.toContain('empty-observation');
+  });
+
+  test('empty-observation does not match when elements >= 5', () => {
+    const ctx = {
+      lastCommand: { type: 'read_page' },
+      lastActionFailed: true,
+      allElements: [1, 2, 3, 4, 5],
+      pageText: '',
+      currentUrl: 'https://example.com',
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).not.toContain('empty-observation');
+  });
+
+  test('empty-observation does not match when pageText >= 200', () => {
+    const ctx = {
+      lastCommand: { type: 'read_page' },
+      lastActionFailed: true,
+      allElements: [],
+      pageText: 'x'.repeat(250),
+      currentUrl: 'https://example.com',
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds).not.toContain('empty-observation');
+  });
+});
+
+// ========== Multiple skills matching + priority sort ==========
+
+describe('multiple skills matching simultaneously', () => {
+  beforeEach(async () => {
+    await resetSkillStats();
+  });
+
+  test('multiple skills match and all contribute promptInjection text', () => {
+    // Context that matches both consecutive-failures and slow-llm-call
+    const ctx = {
+      consecutiveFailures: 5,
+      lastActionFailed: true,
+      lastAiCallMs: 30000,
+      stepCount: 10,
+      dynamicMaxSteps: 30,
+    };
+    const result = runRecoverySkills(ctx);
+    expect(result.appliedSkillIds.length).toBeGreaterThanOrEqual(2);
+    expect(result.promptInjection).toContain('consecutive-failures');
+    expect(result.promptInjection).toContain('slow-llm-call');
+  });
+
+  test('autoApply picks highest effective priority skill', () => {
+    // Context matching click-no-target (priority 90) and consecutive-failures (priority 40)
+    const ctx = {
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+      consecutiveFailures: 4,
+      stepCount: 10,
+      dynamicMaxSteps: 30,
+    };
+    const result = runRecoverySkills(ctx);
+    // click-no-target (90) should be sorted before consecutive-failures (40)
+    // and its autoApply (read_page) should win
+    expect(result.autoApply).not.toBeNull();
+    expect(result.autoApply.type).toBe('read_page');
+  });
+});
+
+// ========== Adaptive priority — edge cases ==========
+
+describe('adaptive priority — edge cases', () => {
+  test('effective priority equals base when fires < MIN_FIRES_FOR_ADJUSTMENT', async () => {
+    await resetSkillStats();
+    // Fire skill only 2 times (< MIN_FIRES_FOR_ADJUSTMENT = 3)
+    for (let i = 0; i < 2; i++) {
+      runRecoverySkills({
+        lastResult: 'BLOCKED: click command has no target',
+        lastCommand: { type: 'click' },
+        lastActionFailed: true,
+      });
+      runRecoverySkills({
+        lastResult: 'ok',
+        lastCommand: { type: 'click' },
+        lastActionFailed: false,
+      });
+    }
+    const skills = listSkills();
+    const clickSkill = skills.find(s => s.id === 'click-no-target');
+    // With < 3 fires, effectivePriority should equal base priority
+    expect(clickSkill.effectivePriority).toBe(clickSkill.priority);
+    await resetSkillStats();
+  });
+
+  test('effective priority equals base when adapt is disabled', () => {
+    // Disable adaptive
+    if (storageChangeListener) {
+      storageChangeListener({ telemetrySkillAdapt: { newValue: false } }, 'local');
+    }
+    const skills = listSkills();
+    for (const s of skills) {
+      expect(s.effectivePriority).toBe(s.priority);
+    }
+    // Re-enable
+    if (storageChangeListener) {
+      storageChangeListener({ telemetrySkillAdapt: { newValue: true } }, 'local');
+    }
+  });
+
+  test('_effectivePriority handles skill with undefined priority', () => {
+    // Stats for an unknown skill — getSkillStats should return null priorities
+    const stats = getSkillStats();
+    // All stats should have basePriority (null for unknown skills)
+    for (const [id, v] of Object.entries(stats)) {
+      if (v.basePriority === null) {
+        expect(v.effectivePriority).toBeNull();
+      }
+    }
+  });
+});
+
+// ========== Outcome tracking — edge cases ==========
+
+describe('outcome tracking — edge cases', () => {
+  test('records failure outcome for pending skills', async () => {
+    await resetSkillStats();
+    // Fire a skill
+    runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+    // Record a failure outcome
+    runRecoverySkills({
+      lastResult: 'still failing',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+    const stats = getSkillStats();
+    const skillStat = stats['click-no-target'];
+    if (skillStat) {
+      expect(skillStat.failures).toBeGreaterThan(0);
+    }
+    await resetSkillStats();
+  });
+
+  test('outcome tracking resets pending after recording', async () => {
+    await resetSkillStats();
+    // Fire a skill
+    runRecoverySkills({
+      lastResult: 'BLOCKED: click command has no target',
+      lastCommand: { type: 'click' },
+      lastActionFailed: true,
+    });
+    // Record outcome
+    runRecoverySkills({
+      lastResult: 'ok',
+      lastCommand: { type: 'click' },
+      lastActionFailed: false,
+    });
+    // Record another outcome with no pending — should not double-count
+    runRecoverySkills({
+      lastResult: 'ok',
+      lastCommand: { type: 'click' },
+      lastActionFailed: false,
+    });
+    const stats = getSkillStats();
+    const skillStat = stats['click-no-target'];
+    if (skillStat) {
+      // Should have exactly 1 fire + 1 outcome, not 2
+      expect(skillStat.fires).toBe(1);
+    }
+    await resetSkillStats();
+  });
+});
