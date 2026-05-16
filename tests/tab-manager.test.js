@@ -70,6 +70,7 @@ const {
   cdpDispatchKey,
   cdpDispatchType,
   cdpExecuteJs,
+  waitForPageReady,
 } = await import('../background/tab-manager.js');
 
 beforeEach(async () => {
@@ -538,19 +539,18 @@ describe('takeScreenshot', () => {
 // ========== Observability Event Hook ==========
 // The global debugger.onEvent hook is installed the first time a CDP operation
 // triggers ensureDebuggerAttached. We test by firing events into the listener.
-describe('Observability event hook — console and network buffers', () => {
-  // The hook is installed on the first CDP call in the test suite (cdpDispatchClick).
-  // We grab it from the listeners array — it persists since we don't clear debuggerOnEvent.
-  function getDebugEventListener() {
-    // Find the most recently added debugger.onEvent listener
-    for (let i = listeners.debuggerOnEvent.length - 1; i >= 0; i--) {
-      if (typeof listeners.debuggerOnEvent[i] === 'function') {
-        return listeners.debuggerOnEvent[i];
-      }
-    }
-    return null;
-  }
 
+function getDebugEventListener() {
+  // Find the most recently added debugger.onEvent listener
+  for (let i = listeners.debuggerOnEvent.length - 1; i >= 0; i--) {
+    if (typeof listeners.debuggerOnEvent[i] === 'function') {
+      return listeners.debuggerOnEvent[i];
+    }
+  }
+  return null;
+}
+
+describe('Observability event hook — console and network buffers', () => {
   test('Log.entryAdded events populate console buffer', () => {
     const listener = getDebugEventListener();
     expect(listener).toBeTruthy();
@@ -1162,5 +1162,260 @@ describe('ensureObservabilityListeners — already installed', () => {
       c => c[1] === 'Log.enable' || c[1] === 'Runtime.enable' || c[1] === 'Network.enable'
     );
     expect(domainEnableCalls.length).toBe(0);
+  });
+});
+
+// ========== waitForPageReady ==========
+
+describe('waitForPageReady', () => {
+  let origSendMessage;
+
+  beforeEach(() => {
+    origSendMessage = chrome.tabs.sendMessage;
+  });
+
+  afterEach(() => {
+    chrome.tabs.sendMessage = origSendMessage;
+  });
+
+  test('returns immediately when DOM ready and network idle', async () => {
+    // Mock sendMessage to return a DOM-ready response
+    chrome.tabs.sendMessage = jest.fn(async () => ({
+      ok: true,
+      value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+    }));
+
+    // No network in-flight (networkBuffers has no entry for this tab)
+    await waitForPageReady(900, 5000);
+    // Should have polled at least once
+    expect(chrome.tabs.sendMessage).toHaveBeenCalled();
+  });
+
+  test('proceeds after 1s when DOM ready but network not idle long enough', async () => {
+    let callCount = 0;
+    // Return DOM ready after first poll
+    chrome.tabs.sendMessage = jest.fn(async () => ({
+      ok: true,
+      value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+    }));
+
+    // Set pageLoadTimeout high so the cap doesn't interfere
+    setPageLoadConfig({ pageLoadTimeout: 30000 });
+
+    // Fire network requests that prevent idle
+    const listener = getDebugEventListener();
+    // Continuously add in-flight requests to prevent network idle
+    const start = Date.now();
+    const origImpl = chrome.tabs.sendMessage;
+    chrome.tabs.sendMessage = jest.fn(async (tabId, msg) => {
+      // Every time we poll, add a new in-flight request to keep network non-idle
+      if (listener) {
+        listener({ tabId }, 'Network.requestWillBeSent', {
+          requestId: 'keepalive-' + callCount,
+          request: { method: 'GET', url: 'https://example.com/poll' },
+          type: 'XHR'
+        });
+      }
+      callCount++;
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+      };
+    });
+
+    // maxWaitMs=8000 but the 1s DOM-ready fallback should kick in
+    const t0 = Date.now();
+    await waitForPageReady(901, 8000);
+    const elapsed = Date.now() - t0;
+    // Should have resolved via the 1s fallback, not the full 8s timeout
+    expect(elapsed).toBeLessThan(5000);
+    // Clean up
+    clearObservabilityBuffers(901);
+    setPageLoadConfig({ pageLoadTimeout: 25000 });
+  });
+
+  test('proceeds after 2s fallback when no content script available', async () => {
+    // sendMessage throws (content script not injected)
+    chrome.tabs.sendMessage = jest.fn(async () => { throw new Error('Could not establish connection'); });
+
+    setPageLoadConfig({ pageLoadTimeout: 30000 });
+    const t0 = Date.now();
+    await waitForPageReady(902, 10000);
+    const elapsed = Date.now() - t0;
+    // Should have resolved via the 2s no-content-script fallback
+    expect(elapsed).toBeLessThan(6000);
+    setPageLoadConfig({ pageLoadTimeout: 25000 });
+  });
+
+  test('times out and proceeds when maxWaitMs is reached', async () => {
+    // sendMessage throws (no content script) and very short maxWaitMs
+    chrome.tabs.sendMessage = jest.fn(async () => { throw new Error('No connection'); });
+
+    setPageLoadConfig({ pageLoadTimeout: 30000 });
+    const t0 = Date.now();
+    await waitForPageReady(903, 300);
+    const elapsed = Date.now() - t0;
+    // Should have resolved quickly via the 300ms cap
+    expect(elapsed).toBeLessThan(2000);
+    setPageLoadConfig({ pageLoadTimeout: 25000 });
+  });
+
+  test('handles string response from content script', async () => {
+    // Content script returns a plain string with JSON data
+    chrome.tabs.sendMessage = jest.fn(async () =>
+      JSON.stringify({ readyState: 'complete', bodyLen: 150, hasSpinner: false })
+    );
+
+    await waitForPageReady(904, 5000);
+    expect(chrome.tabs.sendMessage).toHaveBeenCalled();
+  });
+
+  test('handles JS Result: prefixed string response', async () => {
+    chrome.tabs.sendMessage = jest.fn(async () =>
+      'JS Result: ' + JSON.stringify({ readyState: 'complete', bodyLen: 150, hasSpinner: false })
+    );
+
+    await waitForPageReady(905, 5000);
+    expect(chrome.tabs.sendMessage).toHaveBeenCalled();
+  });
+
+  test('handles null result from sendMessage', async () => {
+    let callCount = 0;
+    chrome.tabs.sendMessage = jest.fn(async () => {
+      callCount++;
+      // Return null first time, then DOM-ready on subsequent calls
+      if (callCount <= 2) return null;
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+      };
+    });
+
+    await waitForPageReady(906, 5000);
+    expect(chrome.tabs.sendMessage).toHaveBeenCalled();
+  });
+
+  test('does not set domReady when body is too short', async () => {
+    let callCount = 0;
+    chrome.tabs.sendMessage = jest.fn(async () => {
+      callCount++;
+      // Body too short — domReady should be false
+      if (callCount <= 3) {
+        return {
+          ok: true,
+          value: JSON.stringify({ readyState: 'complete', bodyLen: 10, hasSpinner: false })
+        };
+      }
+      // Eventually return proper content
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+      };
+    });
+
+    await waitForPageReady(907, 5000);
+    // Should have needed multiple polls because body was too short initially
+    expect(callCount).toBeGreaterThan(1);
+  });
+
+  test('does not set domReady when spinner is present', async () => {
+    let callCount = 0;
+    chrome.tabs.sendMessage = jest.fn(async () => {
+      callCount++;
+      if (callCount <= 2) {
+        return {
+          ok: true,
+          value: JSON.stringify({ readyState: 'complete', bodyLen: 500, hasSpinner: true })
+        };
+      }
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 500, hasSpinner: false })
+      };
+    });
+
+    await waitForPageReady(908, 5000);
+    expect(callCount).toBeGreaterThan(1);
+  });
+
+  test('does not set domReady when readyState is loading', async () => {
+    let callCount = 0;
+    chrome.tabs.sendMessage = jest.fn(async () => {
+      callCount++;
+      if (callCount <= 2) {
+        return {
+          ok: true,
+          value: JSON.stringify({ readyState: 'loading', bodyLen: 500, hasSpinner: false })
+        };
+      }
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 500, hasSpinner: false })
+      };
+    });
+
+    await waitForPageReady(909, 5000);
+    expect(callCount).toBeGreaterThan(1);
+  });
+
+  test('caps maxWaitMs to pageLoadTimeout', async () => {
+    setPageLoadConfig({ pageLoadTimeout: 200 });
+    chrome.tabs.sendMessage = jest.fn(async () => { throw new Error('No connection'); });
+
+    const t0 = Date.now();
+    await waitForPageReady(910, 60000);
+    const elapsed = Date.now() - t0;
+    // Should have timed out quickly since cap is 200ms
+    expect(elapsed).toBeLessThan(2000);
+    setPageLoadConfig({ pageLoadTimeout: 25000 });
+  });
+});
+
+// ========== getInFlightRequestCount (tested via network buffers) ==========
+
+describe('getInFlightRequestCount (via waitForPageReady network idle)', () => {
+  test('counts in-flight requests from networkBuffers', async () => {
+    const listener = getDebugEventListener();
+    expect(listener).toBeTruthy();
+
+    // Add an in-flight request that won't expire
+    listener({ tabId: 920 }, 'Network.requestWillBeSent', {
+      requestId: 'inflight-1',
+      request: { method: 'GET', url: 'https://example.com/slow' },
+      type: 'XHR'
+    });
+
+    // DOM is ready but network is NOT idle (1 request in-flight)
+    let pollCount = 0;
+    const origSend = chrome.tabs.sendMessage;
+    chrome.tabs.sendMessage = jest.fn(async () => {
+      pollCount++;
+      // Complete the request after a couple of polls so the function can resolve
+      if (pollCount === 3) {
+        listener({ tabId: 920 }, 'Network.responseReceived', {
+          requestId: 'inflight-1',
+          response: { status: 200 }
+        });
+      }
+      return {
+        ok: true,
+        value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+      };
+    });
+
+    await waitForPageReady(920, 5000);
+    expect(pollCount).toBeGreaterThanOrEqual(3);
+    clearObservabilityBuffers(920);
+  });
+
+  test('returns 0 when no network buffer exists for tab', async () => {
+    // Tab 999 has no network buffer entries — getInFlightRequestCount returns 0
+    chrome.tabs.sendMessage = jest.fn(async () => ({
+      ok: true,
+      value: JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+    }));
+
+    await waitForPageReady(999, 5000);
+    expect(chrome.tabs.sendMessage).toHaveBeenCalled();
   });
 });
