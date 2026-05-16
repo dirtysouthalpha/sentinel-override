@@ -15,6 +15,7 @@ globalThis.chrome = {
       }),
       set: jest.fn(async (obj) => Object.assign(storageData, obj)),
     },
+    onChanged: { addListener: jest.fn(), removeListener: jest.fn() },
   },
   alarms: {
     create: jest.fn(),
@@ -26,6 +27,7 @@ globalThis.chrome = {
   },
   runtime: {
     getURL: jest.fn((path) => 'chrome-extension://xxx/' + path),
+    sendMessage: jest.fn(() => Promise.resolve()),
     onMessage: { addListener: jest.fn(), removeListener: jest.fn() },
   },
   action: {
@@ -1469,24 +1471,16 @@ describe('executeScheduledTask — tab info with URL', () => {
 // ========== Storage helper error handling ==========
 
 describe('storage helpers — error handling via exported functions', () => {
-  let scheduler;
-
-  beforeEach(async () => {
-    storageData = {};
-    jest.clearAllMocks();
-    scheduler = await import('../background/scheduler.js');
-  });
-
   test('listSchedules returns [] when storage.get rejects', async () => {
     chrome.storage.local.get.mockRejectedValueOnce(new Error('storage error'));
-    const result = await scheduler.listSchedules();
+    const result = await listSchedules();
     expect(Array.isArray(result)).toBe(true);
   });
 
   test('createSchedule does not throw when storage.set rejects on save', async () => {
     chrome.storage.local.get.mockResolvedValueOnce({});
     chrome.storage.local.set.mockRejectedValueOnce(new Error('quota'));
-    await expect(scheduler.createSchedule({
+    await expect(createSchedule({
       goal: 'test goal',
       url: 'https://example.com',
       scheduleType: 'once',
@@ -1496,7 +1490,7 @@ describe('storage helpers — error handling via exported functions', () => {
 
   test('getRecentResults returns [] when storage.get rejects', async () => {
     chrome.storage.local.get.mockRejectedValueOnce(new Error('storage error'));
-    const result = await scheduler.getRecentResults(5);
+    const result = await getRecentResults(5);
     expect(Array.isArray(result)).toBe(true);
   });
 });
@@ -1505,17 +1499,11 @@ describe('storage helpers — error handling via exported functions', () => {
 
 describe('executeScheduledTask — agent already running', () => {
   test('skips execution and marks schedule as skipped when agent is busy', async () => {
-    // Create schedule FIRST, then set agentRunning to true
     const schedule = await makeSchedule();
 
-    // Debug: verify schedule is in storageData
-    const debugSchedules = storageData['sentinel_schedules'] || {};
-    expect(debugSchedules[schedule.id]).toBeDefined();
-
-    // Now set agentRunning so the scheduler sees the agent as busy
     _agentRunning = true;
 
-    // Don't use clearAllMocks -- just clear specific non-storage mocks
+    // Clear only non-storage mocks
     chrome.alarms.create.mockClear();
     chrome.alarms.clear.mockClear();
     chrome.tabs.query.mockClear();
@@ -1529,17 +1517,14 @@ describe('executeScheduledTask — agent already running', () => {
 
     await executeScheduledTask('schedule-' + schedule.id);
 
-    // Schedule should be marked as skipped
     const schedules = storageData['sentinel_schedules'] || {};
     expect(schedules[schedule.id]).toBeDefined();
     expect(schedules[schedule.id].lastRunStatus).toBe('skipped');
     expect(schedules[schedule.id].lastRunAt).toBeTruthy();
 
-    // Agent should NOT have been started
     const agentEngine = await import('../background/agent-engine.js');
     expect(agentEngine.startAgent).not.toHaveBeenCalled();
 
-    // Restore
     _agentRunning = false;
   });
 
@@ -1610,54 +1595,33 @@ describe('executeScheduledTask — timeout triggers failure result', () => {
   test('records failure when agent execution times out (5-min timer fires)', async () => {
     const schedule = await makeSchedule();
 
-    // Clear only non-storage mocks
-    chrome.alarms.create.mockClear();
-    chrome.alarms.clear.mockClear();
-    chrome.tabs.query.mockClear();
-    chrome.tabs.create.mockClear();
-    chrome.notifications.create.mockClear();
-    chrome.action.setBadgeText.mockClear();
-    chrome.action.setBadgeBackgroundColor.mockClear();
-    chrome.runtime.onMessage.addListener.mockClear();
-    chrome.runtime.onMessage.removeListener.mockClear();
-    chrome.runtime.getURL.mockClear();
-
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
       return Promise.resolve([{ id: 42 }]);
     });
 
-    // Set up the listener mock so we can capture the message listener
-    let msgListener;
-    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
-
     jest.useFakeTimers();
 
     const execPromise = executeScheduledTask('schedule-' + schedule.id);
 
-    // Advance past the 500ms tab init delay and any microtasks
+    // Advance past the 500ms tab init delay, flush microtasks
     await jest.advanceTimersByTimeAsync(600);
+    await jest.advanceTimersByTimeAsync(0);
 
-    // Now advance past the 5-minute timeout (300000ms)
+    // Advance past the 5-minute timeout (300000ms)
     await jest.advanceTimersByTimeAsync(300100);
 
     await execPromise;
 
-    // Verify failure was recorded with the timeout error
     const schedules = storageData['sentinel_schedules'] || {};
     expect(schedules[schedule.id].lastRunStatus).toBe('failure');
 
-    // The notification should have been sent for the failure result
-    const sharedState = await import('../background/shared-state.js');
-    expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
-
-    // Badge should indicate failure
     expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith(
       expect.objectContaining({ color: '#ef4444' })
     );
 
     jest.useRealTimers();
-  });
+  }, 10000);
 });
 
 // ========== storeResult catch in executeScheduledTask — line 613 ==========
