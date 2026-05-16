@@ -148,19 +148,20 @@ export function trustBand(score) {
  */
 export function describeTrustScore(scoreResult) {
   if (!scoreResult || typeof scoreResult.score !== 'number') return 'Trust score unavailable';
-  const { score, band, breakdown } = scoreResult;
+  const { score, band, breakdown = {} } = scoreResult;
   const parts = [];
+  const safeDelta = (comp) => (comp && typeof comp.max === 'number' && typeof comp.points === 'number') ? comp.max - comp.points : 0;
   // Lead with the dominant factor (largest gap from max).
   const components = [
-    { name: 'failure',      delta: breakdown.failure.max - breakdown.failure.points },
-    { name: 'productivity', delta: breakdown.productivity.max - breakdown.productivity.points },
-    { name: 'recovery',     delta: breakdown.recovery.max - breakdown.recovery.points },
-    { name: 'plan',         delta: breakdown.plan.max - breakdown.plan.points },
-    { name: 'efficiency',   delta: breakdown.efficiency.max - breakdown.efficiency.points },
+    { name: 'failure',      delta: safeDelta(breakdown.failure) },
+    { name: 'productivity', delta: safeDelta(breakdown.productivity) },
+    { name: 'recovery',     delta: safeDelta(breakdown.recovery) },
+    { name: 'plan',         delta: safeDelta(breakdown.plan) },
+    { name: 'efficiency',   delta: safeDelta(breakdown.efficiency) },
   ];
   components.sort((a, b) => b.delta - a.delta);
   if (components[0].delta > 5) parts.push('weak ' + components[0].name);
-  if (breakdown.safety.blocks > 0) parts.push(breakdown.safety.blocks + ' safety block' + (breakdown.safety.blocks > 1 ? 's' : ''));
+  if (breakdown.safety && breakdown.safety.blocks > 0) parts.push(breakdown.safety.blocks + ' safety block' + (breakdown.safety.blocks > 1 ? 's' : ''));
   const suffix = parts.length > 0 ? ' (' + parts.join(', ') + ')' : '';
   return 'Trust ' + score + '/100 · ' + band + suffix;
 }
@@ -232,11 +233,11 @@ export function suggestRetryActions(scoreResult) {
     });
   }
 
-  if (recoveryGap > 0.5 && bd.recovery && bd.recovery.fires >= 3) {
+  if (recoveryGap > 0.5 && bd.recovery && typeof bd.recovery.fires === 'number' && bd.recovery.fires >= 3) {
     suggestions.push({
       id: 'reset-skills-and-retry',
       label: 'Reset skill stats and retry',
-      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + bd.recovery.successes + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
+      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + (bd.recovery.successes || 0) + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
       severity,
       applyKeys: [],
       applyValues: []

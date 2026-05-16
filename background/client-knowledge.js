@@ -59,7 +59,10 @@ async function _read() {
 async function _write(state) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: state });
-  } catch { /* storage unavailable -- non-fatal */ }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function _slugify(name) {
@@ -100,7 +103,8 @@ export async function setActiveClient(id) {
   const state = await _read();
   if (id && !state.clients[id]) return { ok: false, error: 'Unknown client id' };
   state.activeClientId = id || null;
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true };
 }
 
@@ -127,7 +131,8 @@ export async function createClient({ displayName, tenant }) {
     runCount: 0,
     entries: []
   };
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, client: state.clients[id] };
 }
 
@@ -138,7 +143,8 @@ export async function updateClient(id, updates) {
   if (!c) return { ok: false, error: 'Client not found' };
   if (typeof updates.displayName === 'string') c.displayName = updates.displayName.trim();
   if (typeof updates.tenant === 'string') c.tenant = updates.tenant.trim();
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, client: c };
 }
 
@@ -148,7 +154,8 @@ export async function deleteClient(id) {
   if (!state.clients[id]) return { ok: false, error: 'Client not found' };
   delete state.clients[id];
   if (state.activeClientId === id) state.activeClientId = null;
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true };
 }
 
@@ -172,7 +179,8 @@ export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
     useCount: 0
   };
   c.entries.push(entry);
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, entry };
 }
 

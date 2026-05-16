@@ -26,7 +26,9 @@ export async function generateReport(executionData, CONFIG) {
   if (!executionData || typeof executionData !== 'object') {
     throw new Error('generateReport: executionData is required');
   }
-  const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const { goal = '', agentPlan, stepCount = 0, apiCallCount = 0 } = executionData;
+  const history = Array.isArray(executionData.history) ? executionData.history : [];
+  const tabContexts = Array.isArray(executionData.tabContexts) ? executionData.tabContexts : [];
   const agentMemory = executionData.agentMemory || {};
   const timestamp = new Date().toISOString();
 
