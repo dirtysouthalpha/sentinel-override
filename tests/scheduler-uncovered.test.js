@@ -112,24 +112,7 @@ beforeEach(() => {
   storageData = {};
   _agentRunning = false;
   _msgListeners = [];
-  jest.clearAllMocks();
-
-  // Restore storage mock implementations after clearAllMocks
-  chrome.storage.local.get.mockImplementation(async (keys) => {
-    if (typeof keys === 'object' && !Array.isArray(keys)) {
-      const result = {};
-      for (const k of Object.keys(keys)) {
-        result[k] = storageData[k] !== undefined ? storageData[k] : keys[k];
-      }
-      return result;
-    }
-    const key = Array.isArray(keys) ? keys[0] : keys;
-    return { [key]: storageData[key] !== undefined ? storageData[key] : undefined };
-  });
-  chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
-  chrome.storage.local.remove.mockImplementation(async () => {});
-  chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
-  chrome.runtime.onMessage.addListener.mockImplementation((fn) => { _msgListeners.push(fn); });
+  resetChromeMocks();
 });
 
 // Helper: create a valid schedule
@@ -143,9 +126,27 @@ async function makeSchedule(overrides = {}) {
   });
 }
 
-// Helper: set up chrome mocks for a full execution with tab + agent completion
-function setupExecutionMocks({ tabId = 42, agentComplete = true } = {}) {
-  // Restore storage mocks after clearAllMocks
+// Clear only chrome API mocks without resetting unstable_mockModule getters
+function clearChromeMocks() {
+  for (const mock of [
+    chrome.storage.local.get, chrome.storage.local.set, chrome.storage.local.remove,
+    chrome.storage.onChanged.addListener, chrome.storage.onChanged.removeListener,
+    chrome.alarms.create, chrome.alarms.clear, chrome.alarms.get,
+    chrome.notifications.create,
+    chrome.runtime.getURL, chrome.runtime.sendMessage,
+    chrome.runtime.onMessage.addListener, chrome.runtime.onMessage.removeListener,
+    chrome.action.setBadgeText, chrome.action.setBadgeBackgroundColor,
+    chrome.tabs.query, chrome.tabs.create,
+  ]) {
+    if (mock && typeof mock.mockClear === 'function') mock.mockClear();
+  }
+  _msgListeners = [];
+}
+
+// Reset chrome mocks AND restore their implementations
+function resetChromeMocks() {
+  clearChromeMocks();
+  // Restore storage mock implementations
   chrome.storage.local.get.mockImplementation(async (keys) => {
     if (typeof keys === 'object' && !Array.isArray(keys)) {
       const result = {};
@@ -161,16 +162,16 @@ function setupExecutionMocks({ tabId = 42, agentComplete = true } = {}) {
   chrome.storage.local.remove.mockImplementation(async () => {});
   chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
   chrome.runtime.onMessage.addListener.mockImplementation((fn) => { _msgListeners.push(fn); });
+}
+
+// Helper: set up chrome mocks for a full execution with tab + agent completion
+function setupExecutionMocks({ tabId = 42, agentComplete = true } = {}) {
+  resetChromeMocks();
 
   chrome.tabs.query.mockImplementation((opts, cb) => {
     if (cb) cb([{ id: tabId }]);
     return Promise.resolve([{ id: tabId }]);
   });
-
-  if (agentComplete) {
-    // Capture the message listener so we can fire agent_loop_complete
-    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { _msgListeners.push(fn); });
-  }
 }
 
 // Helper: fire agent_loop_complete to the registered listener after a delay
@@ -200,7 +201,7 @@ describe('_fireAgentCompleteCallbacks — error handling (lines 37-39)', () => {
 
     // Run a full execution to trigger _fireAgentCompleteCallbacks
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     // Re-register because clearAllMocks wiped the mock impl
     setupExecutionMocks();
 
@@ -232,7 +233,7 @@ describe('sendNotification — failure status path (lines 213-217)', () => {
     const sharedState = await import('../background/shared-state.js');
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -281,7 +282,7 @@ describe('sendNotification — failure status path (lines 213-217)', () => {
       type: 'once',
       runAt: Date.now() + 3600000,
     });
-    jest.clearAllMocks();
+    resetChromeMocks();
     templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template corrupted'));
 
     await executeScheduledTask('schedule-' + schedule.id);
@@ -311,7 +312,7 @@ describe('executeScheduledTask — agent busy skip (lines 472-484)', () => {
     _agentRunning = true;
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     await executeScheduledTask('schedule-' + schedule.id);
@@ -335,7 +336,7 @@ describe('executeScheduledTask — agent busy skip (lines 472-484)', () => {
       type: 'recurring',
       recurrence: { interval: 'daily', time: '09:00' },
     });
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     await executeScheduledTask('schedule-' + schedule.id);
@@ -352,7 +353,7 @@ describe('executeScheduledTask — agent busy skip (lines 472-484)', () => {
     _agentRunning = true;
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     await executeScheduledTask('schedule-' + schedule.id);
@@ -371,7 +372,7 @@ describe('executeScheduledTask — agent busy skip (lines 472-484)', () => {
 describe('executeScheduledTask — timeout path (lines 584-588)', () => {
   test('timeout listener is registered and removable', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks({ agentComplete: false });
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -395,7 +396,7 @@ describe('executeScheduledTask — timeout path (lines 584-588)', () => {
 
   test('non-matching messages are ignored by the completion listener', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks({ agentComplete: false });
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -431,7 +432,7 @@ describe('storeResult catch inside executeScheduledTask (lines 614-620)', () => 
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -471,7 +472,7 @@ describe('saveSchedules catch after execution (lines 638-643)', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -525,7 +526,7 @@ describe('storeResult — MAX_RESULTS cap (lines 678-688)', () => {
     }
     storageData['sentinel_schedule_results'] = resultsData;
 
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -567,7 +568,7 @@ describe('storeResult — MAX_RESULTS cap (lines 678-688)', () => {
     };
     storageData['sentinel_schedule_results'] = resultsData;
 
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -591,7 +592,7 @@ describe('storeResult — MAX_RESULTS cap (lines 678-688)', () => {
 describe('setBadge — color settings (lines 235-242)', () => {
   test('sets green badge for success', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -627,7 +628,7 @@ describe('sendNotification — success path with report truncation', () => {
     const sharedState = await import('../background/shared-state.js');
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -672,7 +673,7 @@ describe('sendNotification — failure result stored correctly', () => {
       type: 'once',
       runAt: Date.now() + 3600000,
     });
-    jest.clearAllMocks();
+    resetChromeMocks();
     templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template corrupted'));
 
     await executeScheduledTask('schedule-' + schedule.id);
@@ -698,7 +699,7 @@ describe('executeScheduledTask — agent start failure (lines 560-581)', () => {
     agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent initialization failed'));
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent initialization failed'));
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
@@ -731,7 +732,7 @@ describe('executeScheduledTask — agent start failure (lines 560-581)', () => {
       type: 'recurring',
       recurrence: { interval: 'daily', time: '09:00' },
     });
-    jest.clearAllMocks();
+    resetChromeMocks();
     agentEngine.startAgent.mockRejectedValueOnce(new Error('Crash'));
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
@@ -753,7 +754,7 @@ describe('executeScheduledTask — agent start failure (lines 560-581)', () => {
 describe('executeScheduledTask — tab creation failure', () => {
   test('stores failure result when tab creation fails', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([]);
@@ -784,7 +785,7 @@ describe('executeScheduledTask — recurring schedule behavior', () => {
       type: 'recurring',
       recurrence: { interval: 'daily', time: '09:00' },
     });
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -809,7 +810,7 @@ describe('executeScheduledTask — recurring schedule behavior', () => {
 describe('executeScheduledTask — once schedule auto-disable', () => {
   test('once schedule is disabled after successful execution', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -832,7 +833,7 @@ describe('executeScheduledTask — once schedule auto-disable', () => {
 describe('executeScheduledTask — completion without report', () => {
   test('handles agent_loop_complete message with no report field', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -863,7 +864,7 @@ describe('registerAlarm — no nextRunAt guard', () => {
     const schedules = storageData['sentinel_schedules'] || {};
     schedules[schedule.id].nextRunAt = null;
     storageData['sentinel_schedules'] = schedules;
-    jest.clearAllMocks();
+    resetChromeMocks();
 
     chrome.alarms.get.mockImplementation((name, cb) => { if (cb) cb(null); });
 
@@ -908,7 +909,7 @@ describe('_waitForReport — storage operations', () => {
 describe('executeScheduledTask — final result structure', () => {
   test('stores complete result with all expected fields', async () => {
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -941,7 +942,7 @@ describe('sendNotification — priority levels', () => {
     const sharedState = await import('../background/shared-state.js');
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
 
     const agentEngine = await import('../background/agent-engine.js');
@@ -966,7 +967,7 @@ describe('executeScheduledTask — direct goal used when no templateId', () => {
     const agentEngine = await import('../background/agent-engine.js');
 
     const schedule = await makeSchedule({ goal: 'My direct goal text' });
-    jest.clearAllMocks();
+    resetChromeMocks();
     setupExecutionMocks();
     agentEngine.startAgent.mockResolvedValue(undefined);
 
@@ -991,7 +992,7 @@ describe('executeScheduledTask — getTabInfo returns null on error', () => {
     const tabContext = await import('../background/tab-context.js');
 
     const schedule = await makeSchedule();
-    jest.clearAllMocks();
+    resetChromeMocks();
     tabManager.getTabInfo.mockRejectedValueOnce(new Error('Tab info error'));
 
     setupExecutionMocks();
