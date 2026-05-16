@@ -175,7 +175,7 @@ function setupExecutionMocks({ tabId = 42, agentComplete = true } = {}) {
 
 // Helper: fire agent_loop_complete to the registered listener after a delay
 async function fireAgentComplete(report = 'Done') {
-  await new Promise(r => setTimeout(r, 50));
+  await new Promise(r => setTimeout(r, 200));
   for (const listener of _msgListeners) {
     listener({ action: 'agent_loop_complete', report });
   }
