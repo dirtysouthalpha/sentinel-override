@@ -17,7 +17,7 @@ export const sonicwallOnbox = {
   memoryKeyPrefix: 'sonicwall_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const u = new URL(url);
       const host = u.host;

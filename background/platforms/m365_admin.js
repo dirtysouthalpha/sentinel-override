@@ -19,7 +19,7 @@ export const m365Admin = {
   memoryKeyPrefix: 'm365_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
       const m365Hosts = [

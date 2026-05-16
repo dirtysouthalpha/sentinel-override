@@ -10,7 +10,7 @@ export const huntress = {
   memoryKeyPrefix: 'huntress_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
       if (/huntress/i.test(host)) return true;

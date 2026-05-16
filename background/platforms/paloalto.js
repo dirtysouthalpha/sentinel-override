@@ -11,7 +11,7 @@ export const paloalto = {
   memoryKeyPrefix: 'pa_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const u = new URL(url);
       if (/paloalto/i.test(u.hostname)) return true;

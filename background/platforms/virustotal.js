@@ -11,7 +11,7 @@ export const virustotal = {
   memoryKeyPrefix: 'vt_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
       if (host.includes('virustotal.com')) return true;

@@ -12,7 +12,7 @@ export const sentinelone = {
   memoryKeyPrefix: 's1_',
 
   detect(url, goal) {
-    if (!url) return false;
+    if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
       if (/sentinelone\.net/i.test(host)) return true;
