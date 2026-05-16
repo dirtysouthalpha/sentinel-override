@@ -41,7 +41,8 @@ export async function generateReport(executionData, CONFIG) {
   const memoryKeys = Object.keys(agentMemory);
   const usableKeys = memoryKeys.filter(k => {
     const v = agentMemory[k];
-    const s = typeof v === 'string' ? v : JSON.stringify(v);
+    let s;
+    try { s = typeof v === 'string' ? v : JSON.stringify(v); } catch { s = String(v); }
     return s && s.length > 3 && s !== 'Done'
       && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
       && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
