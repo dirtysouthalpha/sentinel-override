@@ -570,14 +570,18 @@ export async function executeScheduledTask(alarmName) {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
     console.error('Failed to start agent:', err);
-    await storeResult(schedule, {
-      id: resultId,
-      status: 'failure',
-      startedAt,
-      completedAt: Date.now(),
-      report: null,
-      error: `Agent start failed: ${err.message}`,
-    });
+    try {
+      await storeResult(schedule, {
+        id: resultId,
+        status: 'failure',
+        startedAt,
+        completedAt: Date.now(),
+        report: null,
+        error: `Agent start failed: ${err.message}`,
+      });
+    } catch (storeErr) {
+      console.error('Failed to store result for agent start failure:', storeErr);
+    }
     schedule.lastRunStatus = 'failure';
     schedule.lastRunAt = Date.now();
     schedules[scheduleId] = schedule;

@@ -254,8 +254,12 @@ async function persistHistory() {
   if (!_historyDirty) return;
   trimHistory();
   const slice = history.slice(-CONFIG.maxStoredHistory);
-  await chrome.storage.local.set({ agent_history: slice });
-  _historyDirty = false;
+  try {
+    await chrome.storage.local.set({ agent_history: slice });
+    _historyDirty = false;
+  } catch (e) {
+    console.warn('[Sentinel] persistHistory storage write failed:', e && e.message);
+  }
   try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (_) {}
 }
 
@@ -3782,7 +3786,11 @@ async function runAgentLoop(goal, workingTabId) {
             if (memKeys.length > CONFIG.maxMemoryEntries) {
               delete agentMemory[memKeys[0]];
             }
-            await chrome.storage.local.set({ agent_memory: agentMemory });
+            try {
+              await chrome.storage.local.set({ agent_memory: agentMemory });
+            } catch (e) {
+              console.warn('[Sentinel] agent_memory storage write failed (extract):', e && e.message);
+            }
             // (3.25.1) Telemetry: memory write from extract/extract_list. Lets
             // the operator watch memory grow in real time and catch keys that
             // are repeatedly overwritten or empty.
@@ -3884,7 +3892,11 @@ async function runAgentLoop(goal, workingTabId) {
               agentMemory[savedKey] = savedValue;
               const memKeys = Object.keys(agentMemory);
               if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
-              await chrome.storage.local.set({ agent_memory: agentMemory });
+              try {
+                await chrome.storage.local.set({ agent_memory: agentMemory });
+              } catch (e) {
+                console.warn('[Sentinel] agent_memory storage write failed (execute_js):', e && e.message);
+              }
               // (3.25.1) Telemetry: memory write from execute_js. Tagged with
               // the recovery ladder strategy so operators can see when an
               // execute_js fell back to body_text / visible_text.
@@ -4036,7 +4048,7 @@ async function runAgentLoop(goal, workingTabId) {
               result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
-              chrome.tabs.remove(newTabs.map(t => t.id));
+              chrome.tabs.remove(newTabs.map(t => t.id)).catch(() => {});
               await chrome.tabs.update(tab, { url: newUrl });
               await waitForPageLoad(tab);
               await sleep(500);

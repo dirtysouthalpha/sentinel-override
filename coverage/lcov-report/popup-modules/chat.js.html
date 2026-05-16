@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/1761</span>
+                <span class='fraction'>0/1764</span>
             </div>
         
             
@@ -39,14 +39,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/232</span>
+                <span class='fraction'>0/239</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/1553</span>
+                <span class='fraction'>0/1556</span>
             </div>
         
             
@@ -3073,7 +3073,12 @@
 <a name='L3008'></a><a href='#L3008'>3008</a>
 <a name='L3009'></a><a href='#L3009'>3009</a>
 <a name='L3010'></a><a href='#L3010'>3010</a>
-<a name='L3011'></a><a href='#L3011'>3011</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L3011'></a><a href='#L3011'>3011</a>
+<a name='L3012'></a><a href='#L3012'>3012</a>
+<a name='L3013'></a><a href='#L3013'>3013</a>
+<a name='L3014'></a><a href='#L3014'>3014</a>
+<a name='L3015'></a><a href='#L3015'>3015</a>
+<a name='L3016'></a><a href='#L3016'>3016</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -3776,6 +3781,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -4698,6 +4705,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -6420,7 +6430,7 @@ function <span class="fstat-no" title="function not covered" >loadApprovalMode(<
 <span class="cstat-no" title="statement not covered" >    if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {</span>
       // First run -- default to ON and persist so subsequent reads are deterministic.
 <span class="cstat-no" title="statement not covered" >      isApprovalMode = true;</span>
-<span class="cstat-no" title="statement not covered" >      chrome.storage.local.set({ approvalMode: true });</span>
+<span class="cstat-no" title="statement not covered" >      chrome.storage.local.set({ approvalMode: true }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
     } else {
 <span class="cstat-no" title="statement not covered" >      isApprovalMode = result.approvalMode === true;</span>
     }
@@ -6454,13 +6464,13 @@ function <span class="fstat-no" title="function not covered" >setupApprovalModeT
 <span class="cstat-no" title="statement not covered" >      chrome.storage.local.set({</span>
         approvalMode: false,
         approvalModeAcknowledged: true
-      });
+      }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});
 <span class="cstat-no" title="statement not covered" >      updateApprovalModeUI(false);</span>
 <span class="cstat-no" title="statement not covered" >      return;</span>
     }
 &nbsp;
     // Re-enabling approvals is always safe; persist immediately.
-<span class="cstat-no" title="statement not covered" >    chrome.storage.local.set({ approvalMode: true });</span>
+<span class="cstat-no" title="statement not covered" >    chrome.storage.local.set({ approvalMode: true }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
 <span class="cstat-no" title="statement not covered" >    updateApprovalModeUI(true);</span>
   });
 }
@@ -6512,7 +6522,7 @@ function <span class="fstat-no" title="function not covered" >maybeShowSafetyBan
     }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >    document.getElementById('dismissSafetyBanner').addEventListener('click', <span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >      chrome.storage.local.set({ seenSafetyBanner: true });</span>
+<span class="cstat-no" title="statement not covered" >      chrome.storage.local.set({ seenSafetyBanner: true }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
 <span class="cstat-no" title="statement not covered" >      banner.remove();</span>
     });
   });
@@ -6784,8 +6794,10 @@ function <span class="fstat-no" title="function not covered" >loadChatHistory(</
 }
 &nbsp;
 function <span class="fstat-no" title="function not covered" >saveChatHistory(</span>) {
-  const state = <span class="cstat-no" title="statement not covered" >getState();</span>
-<span class="cstat-no" title="statement not covered" >  chrome.storage.local.set({ chat_history: state.conversationHistory });</span>
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const state = <span class="cstat-no" title="statement not covered" >getState();</span>
+<span class="cstat-no" title="statement not covered" >    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
+  } catch (_e) { /* storage unavailable */ }
 }
 &nbsp;
 // ========== Message Handling ==========
@@ -7023,7 +7035,7 @@ function <span class="fstat-no" title="function not covered" >sendMessage(</span
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-<span class="cstat-no" title="statement not covered" >    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal });</span>
+<span class="cstat-no" title="statement not covered" >    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {});</span>
 <span class="cstat-no" title="statement not covered" >    chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, <span class="fstat-no" title="function not covered" >(r</span>esponse) =&gt; {</span>
 <span class="cstat-no" title="statement not covered" >      if (chrome.runtime.lastError) {</span>
 <span class="cstat-no" title="statement not covered" >        removeTypingIndicator();</span>
@@ -7707,7 +7719,10 @@ function <span class="fstat-no" title="function not covered" >openReportModal(</
       }
 <span class="cstat-no" title="statement not covered" >      try {</span>
         const url = <span class="cstat-no" title="statement not covered" >chrome.runtime.getURL('report-view.html');</span>
-<span class="cstat-no" title="statement not covered" >        chrome.tabs.create({ url });</span>
+<span class="cstat-no" title="statement not covered" >        chrome.tabs.create({ url }).catch(<span class="fstat-no" title="function not covered" >()</span> =&gt; {</span>
+<span class="cstat-no" title="statement not covered" >          console.warn('[Sentinel] report-view tab creation failed');</span>
+<span class="cstat-no" title="statement not covered" >          openReportModalInline(markdown);</span>
+        });
       } catch (e) {
         // Tab creation failed — fall back to the in-panel modal.
 <span class="cstat-no" title="statement not covered" >        console.warn('[Sentinel] report-view tab failed, falling back to modal:', e &amp;&amp; e.message);</span>
@@ -9100,7 +9115,7 @@ function <span class="fstat-no" title="function not covered" >showTenantOverride
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T06:44:33.114Z
+                at 2026-05-16T15:25:29.856Z
             </div>
         <script src="../prettify.js"></script>
         <script>
