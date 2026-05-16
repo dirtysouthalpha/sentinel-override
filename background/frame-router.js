@@ -69,7 +69,7 @@ export async function enumerateFrames(tabId) {
         frameOrigin = new URL(f.url).origin;
       } catch {
         /* URL parse failed — use raw URL as origin */
-        frameOrigin = f.url;
+        frameOrigin = f.url || '';
       }
 
       return {

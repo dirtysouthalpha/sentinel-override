@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">92.64% </span>
+                <span class="strong">92% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>491/530</span>
+                <span class='fraction'>495/538</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">87.54% </span>
+                <span class="strong">87.3% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>499/570</span>
+                <span class='fraction'>502/575</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.39% </span>
+                <span class="strong">97.18% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>411/422</span>
+                <span class='fraction'>414/426</span>
             </div>
         
             
@@ -1927,7 +1927,15 @@
 <a name='L1862'></a><a href='#L1862'>1862</a>
 <a name='L1863'></a><a href='#L1863'>1863</a>
 <a name='L1864'></a><a href='#L1864'>1864</a>
-<a name='L1865'></a><a href='#L1865'>1865</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L1865'></a><a href='#L1865'>1865</a>
+<a name='L1866'></a><a href='#L1866'>1866</a>
+<a name='L1867'></a><a href='#L1867'>1867</a>
+<a name='L1868'></a><a href='#L1868'>1868</a>
+<a name='L1869'></a><a href='#L1869'>1869</a>
+<a name='L1870'></a><a href='#L1870'>1870</a>
+<a name='L1871'></a><a href='#L1871'>1871</a>
+<a name='L1872'></a><a href='#L1872'>1872</a>
+<a name='L1873'></a><a href='#L1873'>1873</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -2886,6 +2894,8 @@
 <span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">62x</span>
 <span class="cline-any cline-yes">62x</span>
 <span class="cline-any cline-yes">62x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -3539,13 +3549,19 @@
 <span class="cline-any cline-yes">51x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">47x</span>
+<span class="cline-any cline-yes">47x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -4748,9 +4764,11 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
 // totalElementCount: the raw count before trimming (for the prompt header)
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   const providerConfig = await getActiveProvider();
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!providerConfig) <span class="cstat-no" title="statement not covered" >throw new Error('No active provider configured. Set one in extension settings.');</span>
   const { endpoint, apiKey, model } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!provider) <span class="cstat-no" title="statement not covered" >throw new Error('Unknown provider for endpoint: ' + endpoint);</span>
   agentState.apiCallCount++;
 &nbsp;
   const last_action = history.length &gt; 0 ? history[history.length - 1].action : null;
@@ -5377,7 +5395,7 @@ ${provider.supportsToolUse ? '' : <span class="branch-1 cbranch-no" title="branc
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
 &nbsp;
-  const useThinking = provider.supportsToolUse &amp;&amp; provider.id === 'anthropic' &amp;&amp; (agentState.consecutiveFailures &gt;= CONFIG.strategyShiftThreshold);
+  const useThinking = provider.supportsToolUse &amp;&amp; provider.id === 'anthropic' &amp;&amp; typeof provider.buildBodyWithThinking === 'function' &amp;&amp; (agentState.consecutiveFailures &gt;= CONFIG.strategyShiftThreshold);
   let requestBody;
   if (useThinking) {
     requestBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));
@@ -5403,13 +5421,19 @@ ${provider.supportsToolUse ? '' : <span class="branch-1 cbranch-no" title="branc
   clearTimeout(fetchTimeout);
 &nbsp;
   if (!response.ok) {
-    const errorData = await response.text();
+    let errorData;
+    try { errorData = await response.text(); } catch { <span class="cstat-no" title="statement not covered" >errorData = 'unable to read error body'; </span>}
     if (response.status === 429) throw new Error(`429 Rate limited. ${errorData}`);
     if (response.status === 400 &amp;&amp; errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
     throw new Error(`API Error: ${response.status} - ${errorData}`);
   }
 &nbsp;
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+<span class="cstat-no" title="statement not covered" >    throw new Error('API returned invalid JSON');</span>
+  }
 &nbsp;
   // Extract real token usage (provider-normalised).
   // Anthropic: { input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens }
@@ -5662,7 +5686,7 @@ function sleep(ms) { return new Promise(resolve =&gt; setTimeout(resolve, ms)); 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-05-16T09:09:06.879Z
+                at 2026-05-16T09:23:28.496Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -616,6 +616,7 @@ export async function executeScheduledTask(alarmName) {
     await storeResult(schedule, finalResult);
   } catch (e) {
     console.error('Failed to store scheduled task result:', e);
+    try { tel.error('scheduler', 'Failed to store result', { error: e && e.message }); } catch (_) {}
   }
 
   // Update schedule -- consolidate all mutations into a single save
@@ -638,6 +639,7 @@ export async function executeScheduledTask(alarmName) {
     await saveSchedules(schedules);
   } catch (e) {
     console.error('Failed to save schedule state after execution:', e);
+    try { tel.error('scheduler', 'Failed to save schedule state', { error: e && e.message }); } catch (_) {}
   }
 
   // Send notification
@@ -714,7 +716,8 @@ function _waitForReport(timeoutMs) {
           clearInterval(poll);
           resolve(null);
         }
-      } catch {
+      } catch (e) {
+        console.warn('[Sentinel] _waitForReport poll error:', e && e.message);
         clearInterval(poll);
         resolve(null);
       }

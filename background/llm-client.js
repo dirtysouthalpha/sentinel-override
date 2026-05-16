@@ -1622,8 +1622,8 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
   let data;
   try {
     data = await response.json();
-  } catch {
-    throw new Error('API returned invalid JSON');
+  } catch (e) {
+    throw new Error('API returned invalid JSON: ' + (e && e.message ? e.message : String(e)));
   }
 
   // Extract real token usage (provider-normalised).
@@ -1679,6 +1679,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
   }
   // Fallback: text-JSON parsing (non-tool-use providers)
   const responseText = provider.parseResponse(data);
+  if (!responseText) return { type: 'note', text: 'Empty LLM response — will retry on next step.' };
   return parseLLMResponse(responseText);
 }
 
@@ -1793,6 +1794,7 @@ function regexSalvageFinishOrNote(content) {
            .replace(/\\t/g, '\t')
            .replace(/\\"/g, '"');
   if (useFinish) return { type: 'finish', summary: raw };
+  if (!raw) return null;
   return { type: 'note', text: raw };
 }
 
