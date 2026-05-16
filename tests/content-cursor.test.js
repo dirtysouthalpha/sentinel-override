@@ -646,3 +646,55 @@ describe('cursor — scheduleAutoHide error', () => {
     cursor.setKeepVisible(true);
   });
 });
+
+// ========== setInterval fallback when documentElement is unavailable (line 143-144) ==========
+
+describe('cursor — setInterval fallback when documentElement unavailable', () => {
+  test('uses setInterval when documentElement is null, then appends when available', () => {
+    jest.useFakeTimers();
+
+    const origDocEl = globalThis.document.documentElement;
+    const origBody = globalThis.document.body;
+
+    // Remove documentElement to trigger the setInterval fallback path
+    globalThis.document.documentElement = null;
+
+    // Call show() — should set up the interval instead of appending directly
+    cursor.show();
+
+    // No elements appended yet because documentElement was null
+    const appendedBefore = appendedTo.length;
+
+    // Restore documentElement so the interval callback can succeed
+    globalThis.document.documentElement = origDocEl;
+
+    // Advance by 30ms to let the interval fire and find documentElement
+    jest.advanceTimersByTime(50);
+
+    // Now the interval should have fired and appended the cursor
+    expect(appendedTo.length).toBeGreaterThanOrEqual(appendedBefore);
+
+    // Restore and clean up
+    globalThis.document.body = origBody;
+    jest.useRealTimers();
+  });
+
+  test('setInterval clears itself after 5s timeout', () => {
+    jest.useFakeTimers();
+
+    const origDocEl = globalThis.document.documentElement;
+
+    // Remove documentElement permanently — interval should give up after 5s
+    globalThis.document.documentElement = null;
+
+    cursor.show();
+
+    // Advance past the 5000ms setTimeout
+    jest.advanceTimersByTime(5100);
+
+    // Should not have appended anything since documentElement stayed null
+    // (the clearInterval in the setTimeout callback fires)
+    globalThis.document.documentElement = origDocEl;
+    jest.useRealTimers();
+  });
+});
