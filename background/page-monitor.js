@@ -4,7 +4,7 @@
  */
 
 const MONITOR_STORAGE_KEY = 'sentinel_monitors';
-const CHECK_INTERVAL_MS = 30_000; // 30 seconds
+const _CHECK_INTERVAL_MS = 30_000; // 30 seconds (reserved for future use)
 
 /**
  * @typedef {Object} PageMonitor
@@ -127,7 +127,8 @@ export async function checkMonitor(monitor) {
     }
 
     return { changed, content };
-  } catch {
+  } catch (e) {
+    console.error('[Sentinel/page-monitor] checkMonitor failed:', e && e.message);
     return { changed: false, content: '' };
   }
 }

@@ -51,7 +51,8 @@ async function _read() {
     if (!state.clients || typeof state.clients !== 'object') state.clients = {};
     if (typeof state.activeClientId !== 'string' && state.activeClientId !== null) state.activeClientId = null;
     return state;
-  } catch {
+  } catch (e) {
+    console.error('[Sentinel/client-knowledge] _read failed:', e && e.message);
     return { ...DEFAULT_STATE };
   }
 }
@@ -60,7 +61,8 @@ async function _write(state) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: state });
     return true;
-  } catch {
+  } catch (e) {
+    console.error('[Sentinel/client-knowledge] _write failed:', e && e.message);
     return false;
   }
 }
@@ -225,7 +227,10 @@ function _urlMatches(pattern, url) {
         .replace(/\*/g, '.*') + '$'
     );
     return re.test(url.toLowerCase());
-  } catch { return false; }
+  } catch (e) {
+    console.error('[Sentinel/client-knowledge] _matchesPattern failed:', e && e.message);
+    return false;
+  }
 }
 
 /**

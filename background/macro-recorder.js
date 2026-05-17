@@ -36,7 +36,8 @@ export async function loadMacros() {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return result[STORAGE_KEY] || [];
-  } catch {
+  } catch (e) {
+    console.error('[Sentinel/macro-recorder] loadMacros failed:', e && e.message);
     return [];
   }
 }

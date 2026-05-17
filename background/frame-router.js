@@ -57,8 +57,8 @@ export async function enumerateFrames(tabId) {
     if (mainFrame) {
       try {
         mainOrigin = new URL(mainFrame.url).origin;
-      } catch {
-        /* URL parse failed — use raw URL as origin */
+      } catch (e) {
+        console.warn('[Sentinel/frame-router] URL parse failed for main frame:', e && e.message);
         mainOrigin = mainFrame.url;
       }
     }
@@ -67,8 +67,8 @@ export async function enumerateFrames(tabId) {
       let frameOrigin = '';
       try {
         frameOrigin = new URL(f.url).origin;
-      } catch {
-        /* URL parse failed — use raw URL as origin */
+      } catch (e) {
+        console.warn('[Sentinel/frame-router] URL parse failed for frame:', e && e.message);
         frameOrigin = f.url || '';
       }
 
@@ -80,8 +80,8 @@ export async function enumerateFrames(tabId) {
         isCrossOrigin: f.frameId !== 0 && frameOrigin !== mainOrigin
       };
     });
-  } catch {
-    /* getAllFrames failed (tab may have closed) — return empty */
+  } catch (e) {
+    console.error('[Sentinel/frame-router] enumerateFrames failed:', e && e.message);
     return [];
   }
 }
@@ -114,7 +114,10 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
   frameIdsByTab.set(tabId, positional);
 
   return positional.has(frameIndex) ? positional.get(frameIndex) : null;
-  } catch { return null; }
+  } catch (e) {
+    console.error('[Sentinel/frame-router] resolveFrameForSelector failed:', e && e.message);
+    return null;
+  }
 }
 
 // ========== Execute In Frame ==========
