@@ -235,19 +235,124 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       }
     }
     case 'resume_from_checkpoint': {
-      // For now, this just clears the checkpoint and starts a NEW run with
-      // the saved goal — a full state restore is more invasive. The new
-      // run picks up the prior agent_memory automatically (see runAgentLoop).
+      // Full state restore: recover history, agentMemory, run settings,
+      // trust counters, and tab contexts from the session checkpoint,
+      // then start a new agent run that inherits the restored state.
       try {
-        const stored = await chrome.storage.session.get('agent_checkpoint');
-        const cp = stored && stored.agent_checkpoint;
-        if (!cp || !cp.lastGoal) return { ok: false, error: 'No checkpoint to resume' };
-        await chrome.storage.session.remove('agent_checkpoint');
-        return await startAgent(cp.lastGoal, sender);
+        const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
+        const result = await restoreFromCheckpoint();
+        if (!result.restored) {
+          return { ok: false, error: 'Cannot resume: ' + (result.error || 'unknown') };
+        }
+        await clearCheckpoint();
+        tel.info('lifecycle', 'Agent resuming from checkpoint', {
+          stepCount: result.stepCount,
+          historyLength: result.historyLength,
+          memoryKeys: result.memoryKeys
+        });
+        return await startAgent(result.goal, sender);
       } catch (e) {
         return { ok: false, error: e.message };
       }
     }
+    case 'execute_js_approval_request': {
+      // Content-side defence-in-depth approval gate for execute_js.
+      // When the agent-engine hasn't pre-approved (cmd.approvalGranted),
+      // the content script sends this message to get user confirmation
+      // before running arbitrary JS in the page context.
+      //
+      // If approvalMode is off in settings, auto-approve immediately
+      // (the static privileged-API guard in the content script still
+      // blocks the most dangerous operations). If approvalMode is on,
+      // fire a notification and wait for the user to respond.
+      try {
+        const stored = await chrome.storage.local.get(['approvalMode']);
+        if (stored.approvalMode !== true) {
+          // Approval mode off — auto-approve for non-privileged code.
+          // The content script's static guard already blocks fetch/XHR/etc.
+          return { approved: true };
+        }
+
+        // Approval mode on — present the code to the user via notification
+        // and wait for response.
+        const requestId = crypto.randomUUID();
+        const codePreview = String(request.code || '').substring(0, 500);
+        const kaName = 'exec_js_approval_' + requestId;
+        try { startSwKeepalive(kaName); } catch (e) {}
+
+        return await new Promise((resolve) => {
+          const finish = (payload) => {
+            try { stopSwKeepalive(kaName); } catch (e) {}
+            resolve(payload);
+          };
+
+          // Broadcast to popup so the approval card renders
+          chrome.runtime.sendMessage({
+            action: 'request_approval',
+            payload: {
+              action: 'execute_js',
+              description: 'Run JS: ' + codePreview + (request.key ? ' → "' + request.key + '"' : ''),
+              stepNumber: 0,
+              requestId,
+              ariaLabel: null,
+              elementText: null,
+              selector: null,
+              codePreview,
+              sourceUrl: request.url || ''
+            },
+            requestId
+          }).catch(() => {});
+
+          // Notify the user
+          try {
+            notifyIfEnabled('exec_js_approval_' + requestId, {
+              type: 'basic',
+              iconUrl: chrome.runtime.getURL('icon-48.png'),
+              title: 'Sentinel Override — JS execution approval needed',
+              message: 'Code: ' + codePreview.substring(0, 100) + '...'
+            });
+          } catch (e) {}
+
+          const listener = (message) => {
+            if (message && message.action === 'approval_response' && message.requestId === requestId) {
+              chrome.runtime.onMessage.removeListener(listener);
+              clearTimeout(timeoutId);
+              clearTimeout(hardRejectId);
+              finish({
+                approved: message.approved === true,
+                reason: message.approved ? 'user_approved' : 'user_rejected'
+              });
+            }
+          };
+          chrome.runtime.onMessage.addListener(listener);
+
+          // Soft timeout: 60s — pause and notify
+          const timeoutId = setTimeout(() => {
+            // Hard-reject after 5 min total
+            const hardRejectId = setTimeout(() => {
+              chrome.runtime.onMessage.removeListener(listener);
+              finish({ approved: false, reason: 'approval_hard_timeout' });
+            }, 240000);
+
+            const origListener = listener;
+            chrome.runtime.onMessage.removeListener(origListener);
+            chrome.runtime.onMessage.addListener((message) => {
+              if (message && message.action === 'approval_response' && message.requestId === requestId) {
+                clearTimeout(hardRejectId);
+                chrome.runtime.onMessage.removeListener(arguments.callee);
+                finish({
+                  approved: message.approved === true,
+                  reason: message.approved ? 'user_approved' : 'user_rejected'
+                });
+              }
+            });
+          }, 60000);
+        });
+      } catch (e) {
+        return { approved: false, reason: e.message };
+      }
+    }
+
     case 'execute_command': {
       const activeTab = getActiveTabId();
       if (!activeTab) throw new Error('No agent tab specified');

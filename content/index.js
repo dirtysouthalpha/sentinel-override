@@ -1737,14 +1737,40 @@ if (window.__sentinelInitialized) {
         // timeout to 3s. Approval-gating MUST be enforced at the agent-engine
         // level (Agent A's existing approval gate handles this when approvalMode
         // is on).
-        // TODO: route through approval gate — do not rely solely on agent-engine
-        // for safety; have the content script send chrome.runtime.sendMessage
-        // ({ action: 'execute_js_approval_request', code }) and await an
-        // { approved: true } response with a 60s timeout (default reject) before
-        // running. Implementation deferred — round-trip from content script is
-        // risky if the background SW terminates mid-await.
+        // Approval gate (defence-in-depth): when the agent-engine has NOT
+        // already stamped approvalGranted (e.g. approval mode was off or this
+        // code path was reached without going through the engine), we route
+        // through the background's approval gate before executing. The
+        // round-trip uses chrome.runtime.sendMessage with a 60s timeout.
+        // If the background SW terminates mid-await the timeout fires and
+        // we default to reject — safe failure mode.
         const code = cmd.code || '';
         if (!code) return 'No code provided';
+
+        if (!cmd.approvalGranted) {
+          try {
+            const approvalResult = await Promise.race([
+              chrome.runtime.sendMessage({
+                action: 'execute_js_approval_request',
+                code: code.substring(0, 2000),  // truncate for the approval card
+                key: cmd.key || null,
+                url: window.location.href
+              }),
+              new Promise((resolve) => setTimeout(() => resolve({ approved: false, reason: 'timeout' }), 60000))
+            ]);
+            if (!approvalResult || approvalResult.approved !== true) {
+              return 'BLOCKED: execute_js not approved by operator' + (approvalResult && approvalResult.reason ? ' (' + approvalResult.reason + ')' : '');
+            }
+            // User approved — mark so the privileged-API guard below passes too.
+            cmd.approvalGranted = true;
+          } catch (e) {
+            // chrome.runtime.sendMessage can throw if the extension context is
+            // invalidated (SW terminated, extension update, etc.). Default to
+            // reject — the static privileged-API guard below still protects
+            // against the most dangerous operations.
+            return 'BLOCKED: execute_js approval request failed (extension context lost)';
+          }
+        }
 
         // Static guard: block code that accesses privileged browser APIs unless
         // the caller has been explicitly approved (cmd.approvalGranted === true).

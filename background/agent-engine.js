@@ -92,9 +92,10 @@ try {
   }
 } catch (_) { /* non-fatal: chrome API may be unavailable in some contexts */ }
 
-// ========== Service Worker Persistence Checkpoint (#16, lite) ==========
+// ========== Service Worker Persistence Checkpoint (#16, lite → full) ==========
 // Module-level snapshot of the most recent loop state so onSuspend can flush it.
-// Resume is intentionally NOT implemented yet — this only persists the state.
+// Supports full state resume: history, agentMemory, runSettings, tab contexts
+// are all persisted and restored when the SW restarts after an interruption.
 let _lastCheckpoint = null;
 let _lastGoal = '';
 
@@ -106,6 +107,21 @@ function buildCheckpoint(stepCount) {
     lastGoal: _lastGoal,
     agentMemorySnapshot: { ...agentMemory },
     lastUpdate: Date.now(),
+    // Full resume fields — allow the agent to pick up exactly where it left off
+    historySnapshot: history.map(h => ({ ...h })),
+    productiveSteps,
+    consecutiveFailures,
+    apiCallCount,
+    runLogId,
+    agentSpeed,
+    expectedTenant,
+    activeClientId,
+    runSettingsSnapshot: { ..._runSettings },
+    trustCounters: { failedSteps, consecutiveFailureMax, safetyBlocks },
+    // Tab context URLs for re-registration after SW restart
+    tabContextUrls: Object.fromEntries(
+      getAllTabContexts().map(([id, ctx]) => [id, ctx.url || ''])
+    ),
   };
 }
 
@@ -116,6 +132,93 @@ async function writeCheckpoint(stepCount) {
       await chrome.storage.session.set({ agent_checkpoint: _lastCheckpoint });
     }
   } catch (_) { /* non-fatal */ }
+}
+
+/**
+ * Restore agent state from a checkpoint after a service worker restart.
+ * Returns { restored: true, goal, stepCount, tabContextUrls } on success,
+ * or { restored: false, error } if the checkpoint is missing/stale.
+ *
+ * This is called from `resume_from_checkpoint` in index.js BEFORE
+ * startAgent so the fresh run inherits the prior memory and history.
+ */
+export async function restoreFromCheckpoint() {
+  try {
+    if (!chrome.storage || !chrome.storage.session || !chrome.storage.session.get) {
+      return { restored: false, error: 'session storage unavailable' };
+    }
+    const stored = await chrome.storage.session.get('agent_checkpoint');
+    const cp = stored && stored.agent_checkpoint;
+    if (!cp) return { restored: false, error: 'no checkpoint' };
+    const age = Date.now() - (cp.lastUpdate || 0);
+    if (age > 60 * 60 * 1000) return { restored: false, error: 'checkpoint too old (>' + Math.floor(age / 60000) + ' min)' };
+    if (!cp.lastGoal) return { restored: false, error: 'no goal in checkpoint' };
+
+    // Restore in-memory state
+    if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object') {
+      Object.assign(agentMemory, cp.agentMemorySnapshot);
+    }
+    if (Array.isArray(cp.historySnapshot)) {
+      history.length = 0;
+      cp.historySnapshot.forEach(h => { if (h) history.push(h); });
+    }
+    if (typeof cp.productiveSteps === 'number') productiveSteps = cp.productiveSteps;
+    if (typeof cp.consecutiveFailures === 'number') consecutiveFailures = cp.consecutiveFailures;
+    if (typeof cp.apiCallCount === 'number') apiCallCount = cp.apiCallCount;
+    if (cp.runLogId) runLogId = cp.runLogId;
+    if (cp.agentSpeed && ['turbo', 'normal', 'stealth'].includes(cp.agentSpeed)) agentSpeed = cp.agentSpeed;
+    if (cp.expectedTenant) expectedTenant = cp.expectedTenant;
+    if (cp.activeClientId) activeClientId = cp.activeClientId;
+    if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
+      Object.assign(_runSettings, cp.runSettingsSnapshot);
+    }
+    if (cp.trustCounters && typeof cp.trustCounters === 'object') {
+      if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
+      if (typeof cp.trustCounters.consecutiveFailureMax === 'number') consecutiveFailureMax = cp.trustCounters.consecutiveFailureMax;
+      if (typeof cp.trustCounters.safetyBlocks === 'number') safetyBlocks = cp.trustCounters.safetyBlocks;
+    }
+
+    // Re-register tab contexts from URLs. After SW restart we don't have the
+    // full context objects, just URLs, but that's enough for the tab manager
+    // to re-initialize when the agent re-opens tabs.
+    if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object') {
+      for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
+        const tabId = parseInt(tabIdStr, 10);
+        if (tabId && typeof url === 'string') {
+          try { registerInitialTab(tabId, url); } catch (e) { /* tab may be gone */ }
+        }
+      }
+    }
+
+    _lastGoal = cp.lastGoal;
+
+    // Persist restored history to chrome.storage.local so it survives across
+    // the boundary. The run loop reads it from there on the first step.
+    try { await persistHistory(); } catch (e) {}
+
+    return {
+      restored: true,
+      goal: cp.lastGoal,
+      stepCount: cp.stepCount || 0,
+      ageSeconds: Math.floor(age / 1000),
+      historyLength: history.length,
+      memoryKeys: Object.keys(agentMemory)
+    };
+  } catch (e) {
+    return { restored: false, error: e.message };
+  }
+}
+
+/**
+ * Clear the persisted checkpoint after a successful resume or run finish.
+ */
+export async function clearCheckpoint() {
+  try {
+    if (chrome.storage && chrome.storage.session && chrome.storage.session.remove) {
+      await chrome.storage.session.remove('agent_checkpoint');
+    }
+    _lastCheckpoint = null;
+  } catch (e) { /* non-fatal */ }
 }
 
 try {
@@ -4238,7 +4341,9 @@ async function runAgentLoop(goal, workingTabId) {
         history.splice(0, history.length - CONFIG.maxHistoryEntries);
       }
       await persistHistory();
-      // Service-worker resilience checkpoint (#16, lite). Resume is TODO.
+      // Service-worker resilience checkpoint (#16, full). State is persisted
+      // to chrome.storage.session every step; restoreFromCheckpoint() in
+      // index.js can reconstruct the full in-memory state on SW restart.
       await writeCheckpoint(stepCount);
       // Human-like pacing between steps — variable delays so it feels like an operator working
       // Respects speed mode: turbo (0.2x), normal (1x), stealth (2x)
