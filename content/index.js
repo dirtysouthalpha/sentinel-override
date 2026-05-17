@@ -21,7 +21,9 @@ if (!window.__sentinelContentTel) {
         level: String(level || 'info'),
         message: String(message || '').substring(0, 500),
         payload: payload || null
-      }).catch(() => {});
+      }).catch((e) => {
+        console.error('[_ctel] Unhandled rejection:', e);
+      });
     } catch { /* chrome.runtime gone during shutdown */ }
   };
   // Per-level shorthands so call sites stay terse.

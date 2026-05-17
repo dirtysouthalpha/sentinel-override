@@ -94,7 +94,9 @@ try {
             startTime: dl.startTime || new Date().toISOString(),
             totalBytes: dl.totalBytes || 0
           }
-        }).catch(() => {});
+        }).catch((e) => {
+          console.error('[scheduleId] Unhandled rejection:', e);
+        });
       } catch { /* non-fatal */ }
     });
   }
@@ -301,7 +303,9 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
               sourceUrl: request.url || ''
             },
             requestId
-          }).catch(() => {});
+          }).catch((e) => {
+            console.error('[finish] Unhandled rejection:', e);
+          });
 
           // Notify the user
           try {
@@ -594,7 +598,9 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return { cleared: true };
 
     case 'schedule_clear_badge':
-      { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch(() => {}); }
+      { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
+        console.error('[_p] Unhandled rejection:', e);
+      }); }
       return { cleared: true };
 
     // Collaboration: export/import
@@ -693,7 +699,9 @@ chrome.commands.onCommand.addListener(async (command) => {
           try {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab && typeof activeTab.id === 'number') {
-              await chrome.sidePanel.open({ tabId: activeTab.id }).catch(() => {});
+              await chrome.sidePanel.open({ tabId: activeTab.id }).catch((e) => {
+                console.error('[attached] Unhandled rejection:', e);
+              });
             }
           } catch { /* no active tab — silently ignore */ }
         }

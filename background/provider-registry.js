@@ -620,7 +620,10 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   }
   let data;
   try { data = await resp.json(); }
-  catch (e) { throw new Error('Models endpoint did not return JSON: ' + e.message); }
+  catch (e) {
+    console.error('[errText] Error:', e);
+    throw new Error('Models endpoint did not return JSON: ' + e.message);
+  }
 
   // Normalize across the common response shapes.
   let ids = [];

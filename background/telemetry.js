@@ -199,7 +199,9 @@ function _redactEvent(event) {
 function _scheduleFlush() {
   if (_persistFlushTimer) return;
   _persistFlushTimer = setInterval(() => {
-    if (_pendingPersistFlush) _flushRunBuffer().catch(() => {});
+    if (_pendingPersistFlush) _flushRunBuffer().catch((e) => {
+      console.error('[_scheduleFlush] Unhandled rejection:', e);
+    });
   }, PERSIST_FLUSH_INTERVAL_MS);
 }
 
@@ -335,14 +337,18 @@ export function emit(category, level, message, payload) {
     else console.log.apply(console, consoleArgs);
   } catch { /* console unavailable in some contexts */ }
   try {
-    chrome.runtime.sendMessage(event).catch(() => {});
+    chrome.runtime.sendMessage(event).catch((e) => {
+      console.error('[consoleArgs] Unhandled rejection:', e);
+    });
   } catch { /* extension context invalidated */ }
   if (_currentRunId && _persistEnabled) {
     try {
       _runBuffer.push(event);
       _pendingPersistFlush = true;
       if (_runBuffer.length >= 200) {
-        _flushRunBuffer().catch(() => {});
+        _flushRunBuffer().catch((e) => {
+          console.error('[consoleArgs] Unhandled rejection:', e);
+        });
       }
     } catch { /* buffer append is non-critical */ }
   }

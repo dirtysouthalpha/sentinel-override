@@ -28,7 +28,10 @@ export async function appendAuditEntry(runId, entry) {
       outcome: String(entry.outcome || '').slice(0, 200),
     });
     if (log.length > MAX_ENTRIES_PER_RUN) log.splice(0, log.length - MAX_ENTRIES_PER_RUN);
-    await chrome.storage.local.set({ [key]: log }).catch(() => { /* storage write failed — fire-and-forget */ });
+    await chrome.storage.local.set({ [key]: log }).catch((e) => {
+      console.error('[log] Error:', e);
+      /* storage write failed — fire-and-forget */
+    });
   } catch { /* audit log append failed — never block the agent loop */ }
 }
 
@@ -69,6 +72,9 @@ export async function clearAuditLog(runId) {
   if (!runId) return;
   try {
     const key = STORAGE_KEY_PREFIX + String(runId).replace(/[^a-z0-9_-]/gi, '_');
-    await chrome.storage.local.remove(key).catch(() => { /* remove failed — non-fatal */ });
+    await chrome.storage.local.remove(key).catch((e) => {
+      console.error('[key] Error:', e);
+      /* remove failed — non-fatal */
+    });
   } catch { /* clear audit log failed — non-fatal */ }
 }

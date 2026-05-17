@@ -518,7 +518,9 @@ export async function startAgent(goal, sender) {
               evidence: modeDirective.evidence,
               confidence: modeDirective.confidence
             });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+              console.error('[actualWants] Unhandled rejection:', e);
+            });
           }
         } catch (_) { /* non-fatal */ }
 
@@ -538,14 +540,18 @@ export async function startAgent(goal, sender) {
               kind: 'mode_mismatch_decision',
               decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
             });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+              console.error('[decision] Unhandled rejection:', e);
+            });
           }
         } catch (_) {}
 
         if (decision.cancel) {
           agentRunning = false;
           try { await detachAllSentinelTabs(); } catch (_) {}
-          chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch(() => {});
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
+            console.error('[decision] Unhandled rejection:', e);
+          });
           return 'Agent cancelled by user (mode mismatch)';
         }
         // If decision.flip === true, the popup has already written the new
@@ -587,7 +593,9 @@ export async function startAgent(goal, sender) {
               originalLength: (result.originalGoal || '').length,
               adaptedLength: (result.adaptedGoal || '').length
             });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+              console.error('[result] Unhandled rejection:', e);
+            });
           }
         } catch (_) { /* non-fatal */ }
 
@@ -616,7 +624,9 @@ export async function startAgent(goal, sender) {
               mismatchHints: result.mismatchHints,
               originalGoal: result.originalGoal,
               adaptedGoal: result.adaptedGoal
-            }).catch(() => {});
+            }).catch((e) => {
+              console.error('[decision] Unhandled rejection:', e);
+            });
           } catch (_) {}
           finalGoal = result.adaptedGoal;
         }
@@ -649,7 +659,9 @@ async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
       mismatchHints: rewriteResult.mismatchHints,
       originalGoal: rewriteResult.originalGoal,
       adaptedGoal: rewriteResult.adaptedGoal
-    }).catch(() => {});
+    }).catch((e) => {
+      console.error('[finish] Unhandled rejection:', e);
+    });
     const listener = (message) => {
       if (message && message.action === 'adapted_goal_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
@@ -753,7 +765,9 @@ async function _waitForModeMismatchDecision(info) {
       actualMode: info.actualMode,
       evidence: info.evidence,
       confidence: info.confidence
-    }).catch(() => {});
+    }).catch((e) => {
+      console.error('[finish] Unhandled rejection:', e);
+    });
     const listener = (message) => {
       if (message && message.action === 'mode_mismatch_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
@@ -806,7 +820,9 @@ export async function resumeAgent() {
 export function setAgentSpeed(mode) {
   if (!['turbo', 'normal', 'stealth'].includes(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
   agentSpeed = mode;
-  chrome.storage.local.set({ agentSpeedMode: mode }).catch(() => {});
+  chrome.storage.local.set({ agentSpeedMode: mode }).catch((e) => {
+    console.error('[setAgentSpeed] Unhandled rejection:', e);
+  });
   return 'Speed set to ' + mode;
 }
 
@@ -1519,7 +1535,9 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
         requestId
       },
       requestId
-    }).catch(() => {});
+    }).catch((e) => {
+      console.error('[finish] Unhandled rejection:', e);
+    });
     const listener = (message) => {
       if (message && message.action === 'tenant_override_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
@@ -2288,7 +2306,9 @@ async function runAgentLoop(goal, workingTabId) {
         const _hardLimitSummary = 'Reached step limit of ' + dynamicMaxSteps + '. Task may be incomplete — ' + productiveSteps + ' productive actions extended the run.';
         finished = true;
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: _hardLimitSummary }).catch(() => {});
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: _hardLimitSummary }).catch((e) => {
+          console.error('[_hardLimitSummary] Unhandled rejection:', e);
+        });
         sendReportUpdate('generating');
         break;
       }
@@ -2320,7 +2340,9 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('No active tab -- stopping', stepCount);
         finished = true;
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'No active tab. Task interrupted.' }).catch(() => {});
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'No active tab. Task interrupted.' }).catch((e) => {
+          console.error('[tab] Unhandled rejection:', e);
+        });
         sendReportUpdate('generating');
         break;
       }
@@ -2337,7 +2359,9 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate('Agent tab was closed. Task stopped.', stepCount);
           finished = true;
           reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-          chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'Agent tab closed. Task interrupted.' }).catch(() => {});
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: 'Agent tab closed. Task interrupted.' }).catch((e) => {
+            console.error('[lostTab] Unhandled rejection:', e);
+          });
           sendReportUpdate('generating');
           break;
         }
@@ -2416,7 +2440,9 @@ async function runAgentLoop(goal, workingTabId) {
                 action: 'tenant_detected',
                 tenant: _td,
                 expected: expectedTenant
-              }).catch(() => {});
+              }).catch((e) => {
+                console.error('[_td] Unhandled rejection:', e);
+              });
             } catch (_) {}
           }
         }
@@ -2610,7 +2636,9 @@ async function runAgentLoop(goal, workingTabId) {
               host: _wallHit.host,
               evidence: _wallHit.evidence,
               stepNumber: stepCount
-            }).catch(() => {});
+            }).catch((e) => {
+              console.error('[_wallHit] Unhandled rejection:', e);
+            });
           } catch (_) {}
           // Log to forensic run log so HR/compliance reviews see when the agent
           // paused for credentials.
@@ -2624,7 +2652,9 @@ async function runAgentLoop(goal, workingTabId) {
                 host: _wallHit.host,
                 evidence: _wallHit.evidence
               });
-              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+                console.error('[_wallHit] Unhandled rejection:', e);
+              });
             }
           } catch (_) {}
           // Wait until user resumes (Resume button → resumeAgent message)
@@ -2657,7 +2687,9 @@ async function runAgentLoop(goal, workingTabId) {
               url: currentUrl,
               hint: _mfaHit,
               stepNumber: stepCount
-            }).catch(() => {});
+            }).catch((e) => {
+              console.error('[_mfaHit] Unhandled rejection:', e);
+            });
           } catch (_) {}
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(500);
@@ -2766,7 +2798,9 @@ async function runAgentLoop(goal, workingTabId) {
         sendActionResult(stepCount, { type: 'finish', summary }, false);
         historyPush({ step: stepCount, action: { type: 'finish', summary }, result: summary });
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary }).catch(() => {});
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary }).catch((e) => {
+          console.error('[summary] Unhandled rejection:', e);
+        });
         sendReportUpdate('generating');
         break;
       }
@@ -2817,7 +2851,9 @@ async function runAgentLoop(goal, workingTabId) {
                 auto_applied: !!_recovery.autoApply,
                 auto_apply_type: _recovery.autoApply ? _recovery.autoApply.type : null
               });
-              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+                console.error('[_recovery] Unhandled rejection:', e);
+              });
             }
           } catch (_) {}
           // Activity stream surface — single item showing which skills fired
@@ -3254,7 +3290,9 @@ async function runAgentLoop(goal, workingTabId) {
                 entryCount: runLogBuffer.length,
                 trustScore: _trustScore ? _trustScore.score : null,
                 trustBand: _trustScore ? _trustScore.band : null
-              }).catch(() => {});
+              }).catch((e) => {
+                console.error('[_skillStats] Unhandled rejection:', e);
+              });
             } catch (_) {}
           }
         } catch (_) {}
@@ -3309,7 +3347,9 @@ async function runAgentLoop(goal, workingTabId) {
             cacheRead:   agentState.totalCacheReadTokens  || 0,
             cacheWrite:  agentState.totalCacheWriteTokens || 0,
           }
-        }).catch(() => {});
+        }).catch((e) => {
+          console.error('[_retrySuggestions] Unhandled rejection:', e);
+        });
         sendReportUpdate('generating');
         saveLearnedPattern(goal, history, true);
         break;
@@ -3533,20 +3573,30 @@ async function runAgentLoop(goal, workingTabId) {
           if (_ci && _ci.typeSelect && _ci.commandTypes && _ci.commandTypes[_cmdType]) {
             const _typeSel = _ci.typeSelect;
             const _typeVal = _ci.commandTypes[_cmdType];
-            await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'select', selector: _typeSel, value: _typeVal } }).catch(() => {});
+            await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'select', selector: _typeSel, value: _typeVal } }).catch((e) => {
+              console.error('[_typeVal] Unhandled rejection:', e);
+            });
             await sleep(300);
           }
 
           // Clear + type the command
-          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _inputSel } }).catch(() => {});
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _inputSel } }).catch((e) => {
+            console.error('[_typeVal] Unhandled rejection:', e);
+          });
           await sleep(200);
-          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: `(function(){var el=document.querySelector(${JSON.stringify(_inputSel)});if(el){el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}})()` } }).catch(() => {});
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: `(function(){var el=document.querySelector(${JSON.stringify(_inputSel)});if(el){el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}})()` } }).catch((e) => {
+            console.error('[el] Unhandled rejection:', e);
+          });
           await sleep(150);
-          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'type', selector: _inputSel, text: _cmd } }).catch(() => {});
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'type', selector: _inputSel, text: _cmd } }).catch((e) => {
+            console.error('[el] Unhandled rejection:', e);
+          });
           await sleep(300);
 
           // Submit
-          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _submitSel } }).catch(() => {});
+          await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _submitSel } }).catch((e) => {
+            console.error('[el] Unhandled rejection:', e);
+          });
 
           // Wait for output — poll until readyText appears or timeout
           const _outputJs = `(function(){var el=document.querySelector(${JSON.stringify(_outputSel)});return el?(el.innerText||el.value||el.textContent||'').trim():'';})()`;
@@ -4161,7 +4211,9 @@ async function runAgentLoop(goal, workingTabId) {
               result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
-              chrome.tabs.remove(newTabs.map(t => t.id)).catch(() => {});
+              chrome.tabs.remove(newTabs.map(t => t.id)).catch((e) => {
+                console.error('[newCtx] Unhandled rejection:', e);
+              });
               await chrome.tabs.update(tab, { url: newUrl });
               await waitForPageLoad(tab);
               await sleep(500);
@@ -4306,7 +4358,9 @@ async function runAgentLoop(goal, workingTabId) {
           // Persist to storage every step.
           chrome.storage.local.set({
             ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
-          }).catch(() => {});
+          }).catch((e) => {
+            console.error('[agent-engine] Unhandled rejection:', e);
+          });
         }
       } catch (_) { /* never crash the loop on logging */ }
 
@@ -4424,7 +4478,9 @@ async function runAgentLoop(goal, workingTabId) {
   } catch (_) { /* non-fatal */ }
 
   // Signal completion via messaging (replaces polling for scheduler)
-  chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch(() => {});
+  chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
+    console.error('[agentReport] Unhandled rejection:', e);
+  });
 }
 
 // ========== Self-Learning ==========
@@ -4537,7 +4593,9 @@ async function requestApproval(command, stepNumber) {
         elementText: command.elementText || null,
         selector: command.selector || null },
       requestId
-    }).catch(() => {});
+    }).catch((e) => {
+      console.error('[finish] Unhandled rejection:', e);
+    });
     const listener = (message) => {
       if (message && message.action === 'approval_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
