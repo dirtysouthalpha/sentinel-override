@@ -41,6 +41,10 @@ import {
   exportClient as ck_exportClient,
   importClient as ck_importClient
 } from './client-knowledge.js';
+import { handleMenuClick } from './context-menu.js';
+import { createMonitor, removeMonitor, toggleMonitor, loadMonitors } from './page-monitor.js';
+import { startRecording, stopRecording, isRecording, loadMacros, historyToMacro } from './macro-recorder.js';
+import { generateHtmlReport } from './export-report.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -51,11 +55,72 @@ chrome.runtime.onInstalled.addListener(() => {
     if (result.model && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';
     if (Object.keys(updates).length > 0) chrome.storage.local.set(updates);
   });
+
+  // (v3.44) Install context menus
+  import('./context-menu.js').then(({ installContextMenus }) => {
+    installContextMenus();
+  }).catch(() => { /* context menus not critical */ });
 });
 
 // ========== Scheduler Initialization ==========
 // Re-register alarms on service worker restart (handles browser restart alarm loss)
 initScheduler();
+
+// ========== Context Menu Click Handler (v3.44) ==========
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  const result = handleMenuClick(info, tab);
+  if (!result) return;
+
+  // Route each context menu action to the message handler
+  const { action, params } = result;
+  const message = { action: `context_menu_${action}`, params };
+
+  // Direct invocation for agent-starting actions
+  if (['analyze', 'extract_data', 'auto_fill', 'screenshot_full', 'summarize'].includes(action)) {
+    chrome.runtime.sendMessage(message).catch(() => {});
+  } else if (action === 'monitor_changes') {
+    // Use selected text as selector hint, prompt via side panel
+    chrome.runtime.sendMessage({
+      action: 'context_menu_monitor_changes',
+      params: {
+        selector: params.selectionText ? `*:contains('${params.selectionText.substring(0, 50)}')` : 'body',
+        label: params.selectionText ? `Monitor: "${params.selectionText.substring(0, 30)}"` : 'Page Monitor',
+        url: params.pageUrl,
+      },
+    }).catch(() => {});
+  } else if (action === 'start_recording') {
+    chrome.runtime.sendMessage({ action: 'context_menu_start_recording' })
+      .then(() => {
+        chrome.action.setBadgeText({ text: 'REC' });
+        chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
+      })
+      .catch(() => {});
+  } else if (action === 'run_macro') {
+    // Open side panel with macro selection
+    chrome.sidePanel.open({ tabId: tab?.id }).catch(() => {});
+    chrome.runtime.sendMessage({ action: 'macro_list' }).catch(() => {});
+  } else if (action === 'export_report') {
+    chrome.runtime.sendMessage({ action: 'export_html_report', params: {} })
+      .then((resp) => {
+        if (resp?.ok && resp.data?.html) {
+          const blob = new Blob([resp.data.html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          chrome.downloads.download({
+            url,
+            filename: `sentinel-report-${Date.now()}.html`,
+            saveAs: true,
+          });
+        }
+      })
+      .catch(() => {});
+  }
+});
+
+// ========== Page Monitor Loop (v3.44) ==========
+try {
+  const { startMonitorLoop } = await import('./page-monitor.js');
+  startMonitorLoop();
+} catch { /* page monitor not critical */ }
 
 // ========== Frame Router Initialization ==========
 // Subscribe to webNavigation events to keep the per-tab frame map fresh
@@ -626,6 +691,83 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // Fire-and-forget messages from content script — acknowledge silently
     case 'content_script_ready':
       return null;
+
+    // ========== Context Menu Actions (v3.44) ==========
+    case 'context_menu_analyze':
+    case 'context_menu_extract':
+    case 'context_menu_fill_form':
+    case 'context_menu_screenshot':
+    case 'context_menu_summarize': {
+      if (agentRunning) throw new Error('Agent already running');
+      const goalMap = {
+        context_menu_analyze: (p) => `Analyze this page and ${p.selectionText ? `the selected text "${p.selectionText}"` : p.linkUrl ? `the link ${p.linkUrl}` : 'the current page content'}. Provide a detailed analysis.`,
+        context_menu_extract: (p) => `Extract all structured data from this text: "${p.selectionText}". Return as JSON.`,
+        context_menu_fill_form: () => 'Look at the current page and fill in any forms with appropriate test data.',
+        context_menu_screenshot: () => 'Take a full page screenshot of the current page.',
+        context_menu_summarize: () => 'Summarize the current page content concisely.',
+      };
+      const goal = goalMap[request.action](request.params || {});
+      return await startAgent(goal, sender);
+    }
+
+    case 'context_menu_monitor_changes': {
+      const { selector, label, url } = request.params || {};
+      const mon = await createMonitor(url || '', selector || 'body', label || 'Page Monitor');
+      return { monitor: mon };
+    }
+
+    case 'context_menu_start_recording': {
+      if (isRecording()) throw new Error('Already recording');
+      startRecording();
+      return { recording: true };
+    }
+
+    case 'context_menu_stop_recording': {
+      if (!isRecording()) throw new Error('Not recording');
+      const macro = await stopRecording(request.params?.name || 'Recorded Macro');
+      return { macro };
+    }
+
+    case 'monitor_list':
+      return await loadMonitors();
+
+    case 'monitor_create': {
+      const mon = await createMonitor(
+        request.params?.url || '',
+        request.params?.selector || 'body',
+        request.params?.label || 'Page Monitor',
+        request.params?.interval || 30
+      );
+      return { monitor: mon };
+    }
+
+    case 'monitor_remove': {
+      if (!request.params?.id) throw new Error('Monitor ID required');
+      await removeMonitor(request.params.id);
+      return { removed: true };
+    }
+
+    case 'monitor_toggle': {
+      if (!request.params?.id) throw new Error('Monitor ID required');
+      await toggleMonitor(request.params.id, request.params.active);
+      return { toggled: true };
+    }
+
+    case 'macro_list':
+      return await loadMacros();
+
+    case 'macro_stop_recording': {
+      if (!isRecording()) throw new Error('Not recording');
+      const macro = await stopRecording(request.params?.name || 'Recorded Macro');
+      return { macro };
+    }
+
+    case 'export_html_report': {
+      const log = await fetchAuditLog(request.params?.runId || null);
+      if (!log || log.length === 0) throw new Error('No audit log data to export');
+      const html = generateHtmlReport(log, request.params?.metadata || {});
+      return { html };
+    }
 
     default:
       throw new Error(`Unknown action: ${request.action}`);
