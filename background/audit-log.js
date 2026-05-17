@@ -76,5 +76,5 @@ export async function clearAuditLog(runId) {
       console.error('[key] Error:', e);
       /* remove failed — non-fatal */
     });
-  } catch { /* clear audit log failed — non-fatal */ }
+  } catch (e) { console.warn('[Sentinel/audit-log] clearAuditLog failed:', e && e.message); }
 }

@@ -52,7 +52,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         navSignalsBlock = '\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n' + lines.join('\n');
       }
     }
-  } catch { /* profile.waitStrings may be malformed — non-fatal */ }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] waitStrings parse failed:', e && e.message); }
 
   // Build KNOWN SUB-PAGES block from profile.pageTypes
   let subPagesBlock = '';
@@ -63,7 +63,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         subPagesBlock = '\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n' + lines.join('\n');
       }
     }
-  } catch { /* profile.pageTypes may be malformed — non-fatal */ }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] pageTypes parse failed:', e && e.message); }
 
   // Build WORKFLOW SCAFFOLD block from profile.workflowHints if goal matches
   let workflowScaffold = '';
@@ -76,7 +76,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         }
       }
     }
-  } catch { /* profile.workflowHints may be malformed — non-fatal */ }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] workflowHints parse failed:', e && e.message); }
 
   const profileBlock = `
 DETECTED PLATFORM: ${profile.label} (id: ${profile.id})

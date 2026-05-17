@@ -162,10 +162,10 @@ try {
         }).catch((e) => {
           console.error('[scheduleId] Unhandled rejection:', e);
         });
-      } catch { /* non-fatal */ }
+      } catch (e) { console.warn('[Sentinel/index] download capture failed:', e && e.message); }
     });
   }
-} catch { /* downloads API may be unavailable */ }
+} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', e && e.message); }
 
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -789,7 +789,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       await chrome.windows.update(win.id, { focused: true });
       sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch { /* non-fatal — window may have closed before query ran */ }
+  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', e && e.message); }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -823,7 +823,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch { /* non-fatal: sidePanel may be unavailable on chrome:// */ }
+  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', e && e.message); }
 });
 
 // ========== Keyboard Shortcut Commands ==========

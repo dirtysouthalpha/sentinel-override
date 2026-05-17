@@ -620,7 +620,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
               text,
               position: i + 1
             });
-          } catch { /* non-fatal */ }
+          } catch (e) { console.warn('[Sentinel/tab-manager] typing progress update failed:', e && e.message); }
         }
 
         if (ch === '\n' || ch === '\r') {
@@ -770,7 +770,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         scrollY: Number(vp.scrollY) || 0
       };
     }
-  } catch { /* non-fatal: keep defaults */ }
+  } catch (e) { console.warn('[Sentinel/tab-manager] viewport parse failed, keeping defaults:', e && e.message); }
 
   let base64Image = null;
   try {
