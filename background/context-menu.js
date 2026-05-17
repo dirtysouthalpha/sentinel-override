@@ -107,7 +107,7 @@ export function handleMenuClick(info, tab) {
     }),
 
     'sentinel-extract': () => ({
-      action: 'extract_data',
+      action: 'extract',
       params: {
         selectionText: info.selectionText || '',
         tabId,
@@ -115,12 +115,12 @@ export function handleMenuClick(info, tab) {
     }),
 
     'sentinel-fill-form': () => ({
-      action: 'auto_fill',
+      action: 'fill_form',
       params: { tabId },
     }),
 
     'sentinel-screenshot': () => ({
-      action: 'screenshot_full',
+      action: 'screenshot',
       params: { tabId },
     }),
 
