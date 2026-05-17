@@ -190,7 +190,7 @@ if (adaptivePromptsModeSelect) {
 
 if (adaptiveExpansionModeSelect) {
   adaptiveExpansionModeSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch(() => {});
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
   });
 }
 
@@ -458,7 +458,7 @@ if (ticketFormatSelect) {
         const el = __TECH_INPUTS[key];
         if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
       }
-      chrome.storage.local.set({ technicianInfo: tech }).catch(() => {});
+      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
     }, 400);
   };
   for (const key of Object.keys(__TECH_INPUTS)) {
@@ -484,7 +484,7 @@ if (expectedTenantInput) {
     if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
     __tenantSaveTimer = setTimeout(() => {
       const v = (expectedTenantInput.value || '').trim();
-      chrome.storage.local.set({ expectedTenant: v }).catch(() => {});
+      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
     }, 350);
   });
 }

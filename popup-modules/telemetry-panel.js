@@ -309,7 +309,7 @@
           (e.payload ? '  ' + JSON.stringify(e.payload) : '')
         ).join('\n');
         try {
-          navigator.clipboard.writeText(text).catch(() => {});
+          navigator.clipboard.writeText(text).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', e); });
           copyBtn.textContent = 'Copied!';
           setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
         } catch { /* clipboard API may be restricted */ }

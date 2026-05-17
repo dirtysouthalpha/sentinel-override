@@ -158,7 +158,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return await loadPersistedRun(request.runId); } catch { return []; }
     }
     case 'delete_persisted_telemetry_run': {
-      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: e.message }; }
     }
 
     // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
@@ -171,7 +171,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
-      try { await resetSkillStats(); return { ok: true }; } catch (e) { return { ok: false, error: e.message }; }
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: e.message }; }
     }
 
     case 'get_provider_catalog': {
@@ -280,11 +280,11 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const requestId = crypto.randomUUID();
         const codePreview = String(request.code || '').substring(0, 500);
         const kaName = 'exec_js_approval_' + requestId;
-        try { startSwKeepalive(kaName); } catch (e) {}
+        try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in index.js:', e); }
 
         return await new Promise((resolve) => {
           const finish = (payload) => {
-            try { stopSwKeepalive(kaName); } catch (e) {}
+            try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in index.js:', e); }
             resolve(payload);
           };
 

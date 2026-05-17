@@ -185,7 +185,7 @@ export async function restoreFromCheckpoint() {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10);
         if (tabId && typeof url === 'string') {
-          try { registerInitialTab(tabId, url); } catch (e) { /* tab may be gone */ }
+          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
         }
       }
     }
@@ -194,7 +194,7 @@ export async function restoreFromCheckpoint() {
 
     // Persist restored history to chrome.storage.local so it survives across
     // the boundary. The run loop reads it from there on the first step.
-    try { await persistHistory(); } catch (e) {}
+    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
     return {
       restored: true,
@@ -259,7 +259,7 @@ async function _updateRunLogIndex(runLogId, fields) {
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
       const evictKeys = evict.map(e => 'run_log_' + e.runLogId).filter(Boolean);
-      try { await chrome.storage.local.remove(evictKeys); } catch (_) {}
+      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
   } catch (_) { /* non-fatal */ }
@@ -307,7 +307,7 @@ function activityFail(stepNumber, key, label, detail) {
 
 /** Update an in-progress item's label without changing state (e.g., elapsed counter). */
 function activityUpdate(stepNumber, key, label) {
-  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (_) {}
+  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 }
 
 // ========== Configuration ==========
@@ -363,12 +363,12 @@ async function persistHistory() {
   } catch (e) {
     console.warn('[Sentinel] persistHistory storage write failed:', e && e.message);
   }
-  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (_) {}
+  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
-  try { tabCtxData = getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (_) {}
+  try { tabCtxData = getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return {
     goal,
     history: history.slice(),
@@ -483,16 +483,16 @@ export async function startAgent(goal, sender) {
     } catch (_) { /* non-fatal */ }
     // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
     // for matching telemetry events to forensic log entries during postmortems.
-    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (_) {}
+    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
     // (3.27.0) Tell the telemetry persistence layer this is a new run. If the
     // user has telemetryPersist enabled in settings, events start streaming
     // to chrome.storage.local from this point onward.
-    try { telStartRun(runLogId, goal); } catch (_) {}
+    try { telStartRun(runLogId, goal); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   } catch (_) { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
   // Subsequent open_tab handlers add their tabs to the same group.
-  try { await attachTabToSentinelGroup(startTabId); } catch (_) { /* non-fatal */ }
+  try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
   // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
@@ -548,7 +548,7 @@ export async function startAgent(goal, sender) {
 
         if (decision.cancel) {
           agentRunning = false;
-          try { await detachAllSentinelTabs(); } catch (_) {}
+          try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
             console.error('[decision] Unhandled rejection:', e);
           });
@@ -644,10 +644,10 @@ export async function startAgent(goal, sender) {
 async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
   const requestId = crypto.randomUUID();
   const kaName = 'adaptive_prompt_' + requestId;
-  try { startSwKeepalive(kaName); } catch (_) {}
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (_) {}
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -752,10 +752,10 @@ function _detectGoalModeDirective(goal) {
 async function _waitForModeMismatchDecision(info) {
   const requestId = crypto.randomUUID();
   const kaName = 'mode_mismatch_' + requestId;
-  try { startSwKeepalive(kaName); } catch (_) {}
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (_) {}
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -794,13 +794,13 @@ export async function stopAgent() {
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
-  try { await telEndRun(runLogId); } catch (_) {}
+  try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
-  try { await detachAllDebuggees(); } catch (_) { /* non-fatal */ }
+  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
-  try { await detachAllSentinelTabs(); } catch (_) { /* non-fatal */ }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1021,7 +1021,7 @@ async function detachAllSentinelTabs() {
   } catch (_) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (_e2) {}
+      try { await chrome.tabs.ungroup([id]); } catch (_e2) { console.error('[Sentinel] Error in agent-engine.js:', _e2); }
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
@@ -1483,7 +1483,7 @@ const TENANT_LOCKED_HOSTS_RE = /(microsoft\.com|microsoftonline\.com|azure\.com|
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 function _hostnameOf(url) {
-  try { return new URL(url).hostname; } catch (_) { return ''; }
+  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return ''; }
 }
 
 function _tenantsMatch(detected, expected) {
@@ -1517,10 +1517,10 @@ async function requestTenantOverride(blockInfo, command, stepNumber) {
   // MV3 idle limit. Without this, the listener gets GC'd before the user even
   // sees the prompt.
   const kaName = 'tenant_override_' + requestId;
-  try { startSwKeepalive(kaName); } catch (_) {}
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (_) {}
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -1775,7 +1775,7 @@ const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|e
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
   let host;
-  try { host = new URL(currentUrl).host; } catch (_) { return null; }
+  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return null; }
   if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
 
   // Signal 1: a password input is present in the observed elements
@@ -2282,7 +2282,7 @@ async function runAgentLoop(goal, workingTabId) {
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
-      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (_) {}
+      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -2579,7 +2579,7 @@ async function runAgentLoop(goal, workingTabId) {
             scrollY: shotResult.scrollY
           };
           // (3.7.1) Forward to the popup for the live mini-shot panel.
-          try { sendScreenshotUpdate(base64Image, stepCount); } catch (_) {}
+          try { sendScreenshotUpdate(base64Image, stepCount); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
         }
       }
 
@@ -3241,12 +3241,12 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
             // full slice between them.
-            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (_) {}
+            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
             // (3.27.0) Tell the persistence layer this run is done. Flushes
             // the buffer one last time and stamps finishedAt on the index.
             // Awaited so the storage write completes before the SW potentially
             // suspends after agent_finished fires.
-            try { await telEndRun(runLogId); } catch (_) {}
+            try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
             // (3.14.0) Stamp the index entry as completed with final step count.
             // (3.30.0) Compute the trust score and attach it to the index entry
             // so the popup-side Run Log list can render it without recomputing.
@@ -3317,7 +3317,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (_) { return null; }
         })();
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_finalTrustScore); } catch (_) { return []; }
+          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -3380,6 +3380,7 @@ async function runAgentLoop(goal, workingTabId) {
             );
             let _resolved;
             try { _resolved = JSON.parse(_resolvedStr); } catch (e) {
+              console.error('[Sentinel] Error in agent-engine.js:', e);
               historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${e.message}` });
               continue;
             }
@@ -3462,11 +3463,11 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
           // tab-manager already emits a debug-level read summary; this one is
           // at info level because the LLM explicitly chose to consume it.
-          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (_) {}
+          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (_) {}
+          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3492,7 +3493,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (_) {}
+          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
         }
         await sleep(300);
@@ -3809,7 +3810,7 @@ async function runAgentLoop(goal, workingTabId) {
           const ctx = await openTab(command.url, command.label);
           // (3.7.2) Attach the new tab to the Sentinel group so the user
           // sees it linked in the tab bar.
-          try { await attachTabToSentinelGroup(ctx.tabId); } catch (_) {}
+          try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           await switchToTab(ctx.tabId);
           await sleep(2000);
           await injectContentScript(ctx.tabId);
@@ -3866,13 +3867,13 @@ async function runAgentLoop(goal, workingTabId) {
         if (!isValidUrl(command.url)) {
           // (3.25.1) Telemetry: invalid navigate URL — usually means the LLM
           // hallucinated a URL or pasted a fragment without a scheme.
-          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (_) {}
+          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           result = 'Invalid URL: ' + command.url;
           actionFailed = true;
         } else {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
           // below so operators can see latency + landing-URL mismatches.
-          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (_) {}
+          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           const _navStart = Date.now();
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
@@ -3880,7 +3881,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
-            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (_) {}
+            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
             result = 'Navigated to ' + command.url + ' (content script failed to load)';
             actionFailed = true;
           } else {
@@ -3891,10 +3892,10 @@ async function runAgentLoop(goal, workingTabId) {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
-                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (_) {}
+                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
                 result = 'Navigated to ' + arrivedUrl;
               } else {
-                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (_) {}
+                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
                 result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
                 actionFailed = true;
               }
@@ -4105,7 +4106,7 @@ async function runAgentLoop(goal, workingTabId) {
               const bbox = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
               if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
                 // Make sure the element is in view, then click via CDP at its center.
-                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (_) { /* non-fatal */ }
+                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
                 // Re-query bbox after scroll
                 let cx = bbox.x, cy = bbox.y;
                 try {
@@ -4205,9 +4206,9 @@ async function runAgentLoop(goal, workingTabId) {
               const newCtx = getTabContext(newTab.id);
               if (newCtx) newCtx.isAgentCreated = true;
               // (3.7.2) Attach the click-opened new tab to the Sentinel group.
-              try { await attachTabToSentinelGroup(newTab.id); } catch (_) {}
+              try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (_) { _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); _host = newUrl || 'new page'; }
               result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
@@ -4218,7 +4219,7 @@ async function runAgentLoop(goal, workingTabId) {
               await waitForPageLoad(tab);
               await sleep(500);
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (_) { _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); _host = newUrl || 'new page'; }
               result = 'Clicked -> navigated to ' + _host;
             }
           } else {
@@ -4226,7 +4227,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (updatedTab && updatedTab.url !== urlBeforeCommand) {
               await waitForPageLoad(tab);
               await sleep(500);
-              try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch (_) { result = 'Clicked -> page navigated'; }
+              try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
             }
           }
         } catch (_) {}
@@ -4385,10 +4386,10 @@ async function runAgentLoop(goal, workingTabId) {
       }
       // (3.8.2) Roll up old history into a single summary entry so the
       // LLM prompt stays bounded on long multi-portal runs.
-      try { maybeRollupHistory(history); } catch (_) {}
+      try { maybeRollupHistory(history); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
       // (3.8.2) Periodic progress checkpoint chat message.
-      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (_) {}
+      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
       // Cap in-memory history
       if (history.length > CONFIG.maxHistoryEntries) {
@@ -4458,13 +4459,13 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   // Release any CDP debugger attachments held during the run.
-  try { await detachAllDebuggees(); } catch (_) { /* non-fatal */ }
+  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
 
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs(); } catch (_) { /* non-fatal */ }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
@@ -4521,7 +4522,7 @@ function sleep(ms) {
   // (between CDP mouse events, between content-script roundtrips) and would
   // drown out the panel. >=1500ms sleeps are usually post-navigate / page-load
   // waits, which are exactly what operators want to see.
-  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (_) {}
+  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -4580,10 +4581,10 @@ async function requestApproval(command, stepNumber) {
   // this, an AFK user past the ~30s MV3 idle timer kills the SW and the
   // listener gets GC'd — silent timeout, no recovery.
   const kaName = 'approval_' + requestId;
-  try { startSwKeepalive(kaName); } catch (_) {}
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (_) {}
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
