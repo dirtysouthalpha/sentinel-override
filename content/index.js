@@ -1765,7 +1765,7 @@ if (window.__sentinelInitialized) {
             }
             // User approved — mark so the privileged-API guard below passes too.
             cmd.approvalGranted = true;
-          } catch (e) {
+          } catch (_e) {
             // chrome.runtime.sendMessage can throw if the extension context is
             // invalidated (SW terminated, extension update, etc.). Default to
             // reject — the static privileged-API guard below still protects

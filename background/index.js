@@ -279,12 +279,9 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         // and wait for response.
         const requestId = crypto.randomUUID();
         const codePreview = String(request.code || '').substring(0, 500);
-        const kaName = 'exec_js_approval_' + requestId;
-        try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in index.js:', e); }
 
         return await new Promise((resolve) => {
           const finish = (payload) => {
-            try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in index.js:', e); }
             resolve(payload);
           };
 
@@ -303,8 +300,8 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
               sourceUrl: request.url || ''
             },
             requestId
-          }).catch((e) => {
-            console.error('[finish] Unhandled rejection:', e);
+          }).catch((_e) => {
+            console.error('[finish] Unhandled rejection:', _e);
           });
 
           // Notify the user
@@ -315,13 +312,15 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
               title: 'Sentinel Override — JS execution approval needed',
               message: 'Code: ' + codePreview.substring(0, 100) + '...'
             });
-          } catch (e) {}
+          } catch (_e) {}
+
+          let hardRejectId = null;
 
           const listener = (message) => {
             if (message && message.action === 'approval_response' && message.requestId === requestId) {
               chrome.runtime.onMessage.removeListener(listener);
               clearTimeout(timeoutId);
-              clearTimeout(hardRejectId);
+              if (hardRejectId) clearTimeout(hardRejectId);
               finish({
                 approved: message.approved === true,
                 reason: message.approved ? 'user_approved' : 'user_rejected'
@@ -333,23 +332,24 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           // Soft timeout: 60s — pause and notify
           const timeoutId = setTimeout(() => {
             // Hard-reject after 5 min total
-            const hardRejectId = setTimeout(() => {
+            hardRejectId = setTimeout(() => {
               chrome.runtime.onMessage.removeListener(listener);
               finish({ approved: false, reason: 'approval_hard_timeout' });
             }, 240000);
 
             const origListener = listener;
             chrome.runtime.onMessage.removeListener(origListener);
-            chrome.runtime.onMessage.addListener((message) => {
+            const replacementListener = (message) => {
               if (message && message.action === 'approval_response' && message.requestId === requestId) {
-                clearTimeout(hardRejectId);
-                chrome.runtime.onMessage.removeListener(arguments.callee);
+                if (hardRejectId) clearTimeout(hardRejectId);
+                chrome.runtime.onMessage.removeListener(replacementListener);
                 finish({
                   approved: message.approved === true,
                   reason: message.approved ? 'user_approved' : 'user_rejected'
                 });
               }
-            });
+            };
+            chrome.runtime.onMessage.addListener(replacementListener);
           }, 60000);
         });
       } catch (e) {

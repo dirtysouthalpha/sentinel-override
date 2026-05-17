@@ -218,7 +218,7 @@ export async function clearCheckpoint() {
       await chrome.storage.session.remove('agent_checkpoint');
     }
     _lastCheckpoint = null;
-  } catch (e) { /* non-fatal */ }
+  } catch (_e) { /* non-fatal */ }
 }
 
 try {

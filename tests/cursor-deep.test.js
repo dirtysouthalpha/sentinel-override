@@ -40,7 +40,7 @@ function createDocumentMock() {
           _classes: new Set(),
           add(c) { this._classes.add(c); },
           remove(c) { this._classes.delete(c); },
-          contains(c) { this._classes.has(c); },
+          contains(c) { return this._classes.has(c); },
         },
         setAttribute: fn,
         innerHTML: '',
@@ -76,6 +76,7 @@ beforeEach(() => {
   globalThis.window.__sentinelCursor = undefined;
   globalThis.window.__sentinelUtils = {};
   globalThis.document = createDocumentMock();
+  jest.resetModules();
   jest.useFakeTimers();
 });
 
