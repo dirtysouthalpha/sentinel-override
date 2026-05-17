@@ -76,7 +76,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const message = { action: `context_menu_${action}`, params };
 
   // Direct invocation for agent-starting actions
-  if (['analyze', 'extract_data', 'auto_fill', 'screenshot_full', 'summarize'].includes(action)) {
+  if (['analyze', 'extract', 'fill_form', 'screenshot', 'summarize'].includes(action)) {
     chrome.runtime.sendMessage(message).catch(() => {});
   } else if (action === 'monitor_changes') {
     // Use selected text as selector hint, prompt via side panel
