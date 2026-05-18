@@ -337,8 +337,8 @@ export function emit(category, level, message, payload) {
     else console.log.apply(console, consoleArgs);
   } catch { /* console unavailable in some contexts */ }
   try {
-    chrome.runtime.sendMessage(event).catch((e) => {
-      console.error('[consoleArgs] Unhandled rejection:', e);
+    chrome.runtime.sendMessage(event).catch(() => {
+      // Popup not open — expected when side panel is closed. Silent.
     });
   } catch { /* extension context invalidated */ }
   if (_currentRunId && _persistEnabled) {
@@ -346,9 +346,7 @@ export function emit(category, level, message, payload) {
       _runBuffer.push(event);
       _pendingPersistFlush = true;
       if (_runBuffer.length >= 200) {
-        _flushRunBuffer().catch((e) => {
-          console.error('[consoleArgs] Unhandled rejection:', e);
-        });
+        _flushRunBuffer().catch(() => {});
       }
     } catch { /* buffer append is non-critical */ }
   }
