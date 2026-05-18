@@ -2891,7 +2891,7 @@ async function runAgentLoop(goal, workingTabId) {
       }, 5000);
 
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
-      tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: promptHistory.length, hasScreenshot: !!base64Image });
+      tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
       let command;
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
