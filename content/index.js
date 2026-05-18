@@ -33,7 +33,7 @@ if (!window.__sentinelContentTel) {
   window.__sentinelContentTel.debug = (c, m, p) => window.__sentinelContentTel(c, 'debug', m, p);
   window.__sentinelContentTel.trace = (c, m, p) => window.__sentinelContentTel(c, 'trace', m, p);
 }
-const ctel = window.__sentinelContentTel;
+var ctel = window.__sentinelContentTel;
 
 // Re-injection guard: if already initialized, just signal ready and return early.
 // This prevents duplicate message listeners and duplicate MutationObservers
