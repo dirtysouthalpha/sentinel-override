@@ -67,7 +67,7 @@ chrome.runtime.onInstalled.addListener(() => {
 initScheduler();
 
 // ========== Context Menu Click Handler (v3.44) ==========
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+if (chrome.contextMenus?.onClicked) chrome.contextMenus.onClicked.addListener((info, tab) => {
   const result = handleMenuClick(info, tab);
   if (!result) return;
 
