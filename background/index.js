@@ -67,7 +67,17 @@ chrome.runtime.onInstalled.addListener(() => {
 initScheduler();
 
 // ========== Context Menu Click Handler (v3.44) ==========
-if (chrome.contextMenus?.onClicked) chrome.contextMenus.onClicked.addListener((info, tab) => {
+if (chrome.contextMenus?.onClicked) // (3.46.0) Quick Assist context menu
+  try {
+    chrome.contextMenus.create({
+      id: 'sentinel-quick-assist',
+      title: '⚡ Sentinel Quick Assist',
+      parentId: 'sentinel-parent',
+      contexts: ['selection']
+    }, () => chrome.runtime.lastError);
+  } catch (e) { /* already exists */ }
+
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
   const result = handleMenuClick(info, tab);
   if (!result) return;
 
