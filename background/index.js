@@ -42,7 +42,7 @@ import {
   importClient as ck_importClient
 } from './client-knowledge.js';
 import { handleMenuClick } from './context-menu.js';
-import { createMonitor, removeMonitor, toggleMonitor, loadMonitors } from './page-monitor.js';
+import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop } from './page-monitor.js';
 import { startRecording, stopRecording, isRecording, loadMacros, historyToMacro as _historyToMacro } from './macro-recorder.js';
 import { generateHtmlReport } from './export-report.js';
 
@@ -118,7 +118,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 // ========== Page Monitor Loop (v3.44) ==========
 try {
-  const { startMonitorLoop } = await import('./page-monitor.js');
   startMonitorLoop();
 } catch { /* page monitor not critical */ }
 
