@@ -993,6 +993,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     ? `\nFINISH NOW -- ${navigateCount} navigates with nothing recorded. Use your memory and finish with a comprehensive answer. Include ACTUAL content.\n`
     : '';
 
+  // (3.45.0) Quick Mode — action-oriented prompt injection
+  const quickModeCtx = (agentState && agentState.quickMode) ?
+    '\nQUICK MODE ACTIVE: Skip "note" actions. Every step must be a real action (click, type, navigate, extract, scroll, finish). Do NOT use "note" — think less, act more.\n' : '';
+
   // Platform-specific UI guidance
   const platformCtx = getPlatformContext(currentUrl, goal);
 
@@ -1474,7 +1478,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}
+${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}
 Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? 'Budget: ' + agentState.budgetHint + '\n' : ''}<GOAL>

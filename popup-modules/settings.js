@@ -378,6 +378,32 @@ function _renderSkillStatsModal(skills) {
   document.addEventListener('keydown', escClose);
 }
 
+// (3.45.0) Quick Mode — skip planning, reduce delays, action-oriented prompts
+const quickModeToggle = document.getElementById('quickModeToggle');
+const quickModeLabel = document.getElementById('quickModeLabel');
+if (quickModeToggle) {
+  chrome.storage.local.get(['quickMode'], (result) => {
+    const enabled = result.quickMode === true;
+    quickModeToggle.checked = enabled;
+    if (quickModeLabel) {
+      quickModeLabel.textContent = enabled
+        ? 'ON — Fast execution, no planning'
+        : 'OFF - Standard pace';
+    }
+  });
+  quickModeToggle.addEventListener('change', () => {
+    const enabled = quickModeToggle.checked;
+    chrome.storage.local.set({ quickMode: enabled }, () => {
+      if (quickModeLabel) {
+        quickModeLabel.textContent = enabled
+          ? 'ON — Fast execution, no planning'
+          : 'OFF - Standard pace';
+      }
+      showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success');
+    });
+  });
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /

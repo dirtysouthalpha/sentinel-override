@@ -2185,6 +2185,7 @@ async function runAgentLoop(goal, workingTabId) {
     stored = await chrome.storage.local.get([
       'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
       'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
+      'quickMode',
     ]);
   } catch (e) {
     console.warn('[Sentinel] runAgentLoop settings load failed:', e && e.message);
@@ -2195,6 +2196,7 @@ async function runAgentLoop(goal, workingTabId) {
     ticketFormat:   stored.ticketFormat  ?? 'standard',
     approvalMode:   stored.approvalMode  ?? false,
     useTrustedInput: stored.useTrustedInput ?? false,
+    quickMode:      stored.quickMode     ?? false,
   };
   expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
   tenantOverrideUrls = new Set();  // (3.11.0) cleared per-run
@@ -2224,39 +2226,43 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
 
-  // Generate a plan before execution
-  sendSilentUpdate('Planning task...');
-  const planProviderConfig = await getActiveProvider();
-  const planSettings = {
-    api_endpoint: planProviderConfig.endpoint,
-    api_key: planProviderConfig.apiKey,
-    model: planProviderConfig.model
-  };
+  // Generate a plan before execution (skip in quick mode)
+  if (!_runSettings.quickMode) {
+    sendSilentUpdate('Planning task...');
+    const planProviderConfig = await getActiveProvider();
+    const planSettings = {
+      api_endpoint: planProviderConfig.endpoint,
+      api_key: planProviderConfig.apiKey,
+      model: planProviderConfig.model
+    };
 
-  // Gather context for plan generation
-  const currentTabInfo = await getTabInfo(workingTabId);
-  const platformCtx = getPlatformContext(
-    currentTabInfo?.url || '',
-    goal
-  );
-  const patterns = await getRelevantPatterns(goal);
+    // Gather context for plan generation
+    const currentTabInfo = await getTabInfo(workingTabId);
+    const platformCtx = getPlatformContext(
+      currentTabInfo?.url || '',
+      goal
+    );
+    const patterns = await getRelevantPatterns(goal);
 
-  agentPlan = await generatePlan(goal, planSettings, {
-    currentUrl: currentTabInfo?.url || '',
-    pageTitle: currentTabInfo?.title || '',
-    platformContext: platformCtx,
-    relevantPatterns: patterns
-  });
-  if (agentPlan) {
-    sendSilentUpdate(`📋 Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
-  } else {
-    // Fallback: generate a basic heuristic plan from goal analysis
-    agentPlan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
+    agentPlan = await generatePlan(goal, planSettings, {
+      currentUrl: currentTabInfo?.url || '',
+      pageTitle: currentTabInfo?.title || '',
+      platformContext: platformCtx,
+      relevantPatterns: patterns
+    });
     if (agentPlan) {
-      sendSilentUpdate(`📋 Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
+      sendSilentUpdate(`📋 Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
     } else {
-      sendSilentUpdate('Running in direct mode');
+      // Fallback: generate a basic heuristic plan from goal analysis
+      agentPlan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
+      if (agentPlan) {
+        sendSilentUpdate(`📋 Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
+      } else {
+        sendSilentUpdate('Running in direct mode');
+      }
     }
+  } else {
+    sendSilentUpdate('⚡ Quick Mode — executing directly');
   }
 
   while (!finished && agentRunning) {
@@ -2901,7 +2907,7 @@ async function runAgentLoop(goal, workingTabId) {
         ' (' + _stepsRemaining + ' remaining; ' + productiveSteps + ' productive bumps so far). ' +
         'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
         'Aimless read_page / scroll = unproductive (does not extend).';
-      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification };
+      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -4511,7 +4517,8 @@ async function saveLearnedPattern(goal, history, success) {
 
 // ========== Utilities ==========
 async function enforceRateLimit() {
-  const delayNeeded = Math.max(0, CONFIG.minDelayBetweenCalls - (Date.now() - lastApiCallTime));
+  const delay = _runSettings.quickMode ? 500 : CONFIG.minDelayBetweenCalls;
+  const delayNeeded = Math.max(0, delay - (Date.now() - lastApiCallTime));
   if (delayNeeded > 0) await sleep(delayNeeded);
   lastApiCallTime = Date.now();
 }
