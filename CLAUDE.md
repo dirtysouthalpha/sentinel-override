@@ -60,6 +60,7 @@ AI-powered browser automation agent as a Chrome extension. Used daily by an IT S
 ## Critical Rules
 - NEVER break existing tests. If a test fails after your change, fix it.
 - NEVER add npm dependencies without a compelling reason.
+- NEVER use top-level await in background/index.js (service worker). Chrome MV3 does not support it. All async operations must be inside async functions or event listeners. Use static imports, not dynamic import() with await.
 - Commit early, commit often. Small focused commits > big messy ones.
 - Push after every commit so progress isn't lost.
 - If you hit a wall, skip and move to the next task.
