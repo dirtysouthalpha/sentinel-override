@@ -50,6 +50,7 @@ let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every s
 let failedSteps = 0;            // running count of steps where actionFailed=true
 let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
 let safetyBlocks = 0;           // sensitive-field block + cross-tenant block + CSP block hits
+let _pageStagnation = 0;      // (3.46.1) Counts consecutive non-mutating clicks on same page state — detects click-spam loops
 const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
@@ -333,7 +334,7 @@ const CONFIG = {
   stallConfig: {
     similarityWindow: 3,        // Look at last N actions for repeated identical failures
     maxConsecutiveFailures: 5,  // Hard limit: force recovery after this many total failures
-    stateRecheckSteps: 3,       // After N same-result steps, force re-scan
+    stateRecheckSteps: 4,       // (3.46.1) After N non-mutating clicks, force re-scan (stagnation)
   },
 };
 
@@ -387,6 +388,7 @@ export function resetAgentState() {
   agentMemory = {};
   productiveSteps = 0;
   consecutiveFailures = 0;
+  _pageStagnation = 0;
   currentStrategies = [];
   agentPlan = null;
   currentPlanStep = 0;
@@ -946,7 +948,16 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     }
   }
 
-  // Check 2: High consecutive failures regardless of action type
+  // Check 2: Page stagnation — too many clicks/types without page change
+  if (_pageStagnation >= CONFIG.stallConfig.stateRecheckSteps) {
+    return {
+      stalled: true,
+      reason: `${_pageStagnation} consecutive clicks/types without page change (stagnation)`,
+      recoveryAction: 'RESCAN_AND_REPLAN'
+    };
+  }
+
+  // Check 3: High consecutive failures regardless of action type
   if (consecutiveFailures >= CONFIG.stallConfig.maxConsecutiveFailures) {
     return {
       stalled: true,
@@ -4264,6 +4275,17 @@ async function runAgentLoop(goal, workingTabId) {
         currentStrategies = [];
       }
 
+      // (3.46.1) Page stagnation detection — if the page didn't change after a
+      // click/type, increment stagnation counter. Resets on navigate, extract,
+      // or any page-changing action.
+      const _isPageMutating = /^(navigate|click|click_at|type|press_key|select|check|check_all)$/.test(command.type);
+      const _pageChanged = _skipObserve === false; // fresh observation = page changed
+      if (_isPageMutating && !_pageChanged && !actionFailed) {
+        _pageStagnation++;
+      } else {
+        _pageStagnation = 0;
+      }
+
       // Check for stall
       const stall = detectStall(history, consecutiveFailures, currentStrategies);
       if (stall.stalled) {
@@ -4274,6 +4296,7 @@ async function runAgentLoop(goal, workingTabId) {
           agentPlan = null;
           currentPlanStep = 0;
           consecutiveFailures = 0;
+          _pageStagnation = 0;
           currentStrategies = [];
 
           // Inject stall context into history so the LLM knows what happened
