@@ -30,3 +30,4 @@ sentinel-override-v*.zip
 *.tmp
 *.bak
 coverage-stderr.txt
+coverage/
