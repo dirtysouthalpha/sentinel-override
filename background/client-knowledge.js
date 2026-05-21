@@ -82,6 +82,10 @@ function _genEntryId() {
 
 // ========== Client CRUD ==========
 
+/**
+ * List all clients sorted by lastUsedAt (most recent first).
+ * @returns {Promise<Array<{id: string, displayName: string, tenant: string, entries: Array}>>}
+ */
 export async function listClients() {
   const state = await _read();
   return Object.values(state.clients).sort((a, b) =>
@@ -89,18 +93,32 @@ export async function listClients() {
   );
 }
 
+/**
+ * Get a single client by ID.
+ * @param {string} id - The client's unique identifier.
+ * @returns {Promise<object|null>} The client object, or null if not found.
+ */
 export async function getClient(id) {
   if (!id) return null;
   const state = await _read();
   return state.clients[id] || null;
 }
 
+/**
+ * Get the currently active client (the one selected for the current session).
+ * @returns {Promise<object|null>} The active client, or null if none is set.
+ */
 export async function getActiveClient() {
   const state = await _read();
   if (!state.activeClientId) return null;
   return state.clients[state.activeClientId] || null;
 }
 
+/**
+ * Set the active client by ID. Pass null/falsy to deselect.
+ * @param {string|null} id - The client ID to activate, or null to deselect.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
 export async function setActiveClient(id) {
   const state = await _read();
   if (id && !state.clients[id]) return { ok: false, error: 'Unknown client id' };
@@ -110,6 +128,12 @@ export async function setActiveClient(id) {
   return { ok: true };
 }
 
+/**
+ * Create a new client with a display name and optional tenant.
+ * Generates a slug-based ID with collision avoidance.
+ * @param {{displayName: string, tenant?: string}} params - Client properties.
+ * @returns {Promise<{ok: boolean, client?: object, error?: string}>}
+ */
 export async function createClient({ displayName, tenant }) {
   if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
     return { ok: false, error: 'Display name is required' };
@@ -138,6 +162,12 @@ export async function createClient({ displayName, tenant }) {
   return { ok: true, client: state.clients[id] };
 }
 
+/**
+ * Update a client's display name and/or tenant.
+ * @param {string} id - The client ID to update.
+ * @param {{displayName?: string, tenant?: string}} updates - Fields to update.
+ * @returns {Promise<{ok: boolean, client?: object, error?: string}>}
+ */
 export async function updateClient(id, updates) {
   if (!id) return { ok: false, error: 'Client id required' };
   const state = await _read();
@@ -150,6 +180,11 @@ export async function updateClient(id, updates) {
   return { ok: true, client: c };
 }
 
+/**
+ * Delete a client by ID. Also clears it from active if it was selected.
+ * @param {string} id - The client ID to delete.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
 export async function deleteClient(id) {
   if (!id) return { ok: false, error: 'Client id required' };
   const state = await _read();
@@ -163,6 +198,12 @@ export async function deleteClient(id) {
 
 // ========== Entry CRUD ==========
 
+/**
+ * Add a knowledge entry to a client. Entries can be global or URL-scoped.
+ * @param {string} clientId - The client to add the entry to.
+ * @param {{scope?: string, urlPattern?: string, wisdom: string, tags?: string[]}} entry - Entry data.
+ * @returns {Promise<{ok: boolean, entry?: object, error?: string}>}
+ */
 export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
   if (!clientId) return { ok: false, error: 'Client id required' };
   if (!wisdom || typeof wisdom !== 'string' || !wisdom.trim()) {
@@ -186,6 +227,13 @@ export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
   return { ok: true, entry };
 }
 
+/**
+ * Update a knowledge entry's wisdom, scope, urlPattern, or tags.
+ * @param {string} clientId - The client that owns the entry.
+ * @param {string} entryId - The entry ID to update.
+ * @param {{wisdom?: string, scope?: string, urlPattern?: string, tags?: string[]}} updates - Fields to update.
+ * @returns {Promise<{ok: boolean, entry?: object, error?: string}>}
+ */
 export async function updateEntry(clientId, entryId, updates) {
   const state = await _read();
   const c = state.clients[clientId];
@@ -201,6 +249,12 @@ export async function updateEntry(clientId, entryId, updates) {
   return { ok: true, entry: e };
 }
 
+/**
+ * Delete a knowledge entry from a client.
+ * @param {string} clientId - The client that owns the entry.
+ * @param {string} entryId - The entry ID to delete.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
 export async function deleteEntry(clientId, entryId) {
   const state = await _read();
   const c = state.clients[clientId];
@@ -289,6 +343,11 @@ export async function markRunCompleted(clientId, usedEntryIds) {
 
 // ========== Export / Import (team sharing) ==========
 
+/**
+ * Export a client (with all entries) as a portable JSON payload for team sharing.
+ * @param {string} clientId - The client ID to export.
+ * @returns {Promise<{schemaVersion: number, exportedAt: string, client: object}|null>}
+ */
 export async function exportClient(clientId) {
   const state = await _read();
   const c = state.clients[clientId];
@@ -300,6 +359,13 @@ export async function exportClient(clientId) {
   };
 }
 
+/**
+ * Import a client from an exported JSON payload. Optionally rename on import.
+ * Generates new entry IDs to avoid collisions.
+ * @param {{schemaVersion: number, client: object}} payload - The exported client data.
+ * @param {{rename?: string}} options - Optional rename for the imported client.
+ * @returns {Promise<{ok: boolean, client?: object, error?: string}>}
+ */
 export async function importClient(payload, { rename } = {}) {
   if (!payload || typeof payload !== 'object' || !payload.client) {
     return { ok: false, error: 'Invalid import payload' };
