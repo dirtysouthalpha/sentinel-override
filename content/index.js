@@ -44,11 +44,12 @@ if (window.__sentinelInitialized) {
   window.__sentinelInitialized = true;
 
   // ====== execute_js Sandbox Configuration ======
-  // Sandbox is disabled by default — the Proxy-based sandbox was blocking
-  // legitimate agent operations (document.documentElement.outerHTML, etc.)
-  // Re-enable after tuning the allowlist/blocklist for real-world usage.
+  // Runtime sandbox is enabled. A self-contained Proxy-based sandbox is
+  // injected inline into the <script> tag so it runs in the page's MAIN world
+  // alongside the user code — no cross-scope reference issues.
+  // Defence-in-depth: approval gate + static regex guard still active.
    
-  const _EXECUTE_JS_SANDBOX_ENABLED = false;
+  const _EXECUTE_JS_SANDBOX_ENABLED = true;
 
   // Shorthand references to utility modules
   const dom = window.__sentinelUtils.dom;
@@ -855,21 +856,35 @@ if (window.__sentinelInitialized) {
    
   const _EXECUTE_JS_ALLOWED_GLOBALS = new Set([
     'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
-    'getElementsByTagName', 'getElementsByName', 'createElement', 'createTextNode',
+    'getElementsByClassName', 'getElementsByTagName', 'getElementsByName',
+    'createElement', 'createTextNode', 'createDocumentFragment', 'createComment',
     'getAttribute', 'setAttribute', 'removeAttribute', 'hasAttribute',
     'addEventListener', 'removeEventListener', 'dispatchEvent',
-    'classList', 'style', 'dataset', 'textContent', 'innerHTML',
+    'classList', 'style', 'dataset', 'textContent', 'innerHTML', 'innerText',
+    'outerHTML', 'tagName', 'nodeName', 'nodeType', 'nodeValue',
     'value', 'checked', 'selected', 'disabled', 'hidden',
-    'focus', 'blur', 'click', 'scrollIntoView', 'scrollTo',
+    'focus', 'blur', 'click', 'scrollIntoView', 'scrollTo', 'scrollBy',
     'appendChild', 'removeChild', 'insertBefore', 'replaceChild',
-    'parentElement', 'children', 'firstChild', 'lastChild', 'nextSibling', 'previousSibling',
+    'parentElement', 'parentNode', 'children', 'childNodes',
+    'firstChild', 'lastChild', 'firstElementChild', 'lastElementChild',
+    'nextSibling', 'previousSibling', 'nextElementSibling', 'previousElementSibling',
     'offsetHeight', 'offsetWidth', 'offsetTop', 'offsetLeft',
+    'clientHeight', 'clientWidth', 'clientTop', 'clientLeft',
+    'scrollHeight', 'scrollWidth', 'scrollTop', 'scrollLeft',
     'getBoundingClientRect', 'getComputedStyle',
-    'innerText', 'outerHTML', 'tagName', 'nodeType',
+    'documentElement', 'body', 'head', 'title', 'URL', 'baseURI', 'readyState',
+    'forms', 'images', 'links', 'scripts', 'anchors', 'embeds', 'plugins',
+    'documentMode', 'compatMode', 'characterSet', 'contentType',
+    'querySelector', 'querySelectorAll',
     'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+    'requestAnimationFrame', 'cancelAnimationFrame',
     'Promise', 'JSON', 'console', 'Math', 'Date', 'Array', 'Object', 'String', 'Number', 'Boolean',
-    'Map', 'Set', 'RegExp', 'Error', 'TypeError', 'RangeError',
-    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
+    'Symbol', 'BigInt', 'Map', 'Set', 'WeakMap', 'WeakSet', 'RegExp',
+    'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'NaN', 'Infinity',
+    'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
+    'btoa', 'atob',
+    'structuredClone', 'AbortController', 'AbortSignal',
     'alert', 'confirm', 'prompt'
   ]);
 
@@ -1732,13 +1747,20 @@ if (window.__sentinelInitialized) {
         // content scripts). The injected script runs under the PAGE's CSP,
         // which almost always allows inline scripts (needed for ads/analytics).
         //
-        // SAFETY (#3): The Proxy-based sandbox at createSandboxedWindow/Document
-        // is currently disabled (EXECUTE_JS_SANDBOX_ENABLED = false), so this
-        // path runs with full page privileges. We log a console warning on every
-        // invocation so the user can see what's running, and shorten the default
-        // timeout to 3s. Approval-gating MUST be enforced at the agent-engine
-        // level (Agent A's existing approval gate handles this when approvalMode
-        // is on).
+        // SANDBOX: When _EXECUTE_JS_SANDBOX_ENABLED=true AND the code has NOT
+        // been explicitly approved (cmd.approvalGranted), a self-contained
+        // Proxy-based sandbox is injected inline into the <script> tag. It uses
+        // `with` + Proxy to intercept bare-name lookups for dangerous APIs
+        // (fetch, XMLHttpRequest, localStorage, eval, etc.) at runtime. Approved
+        // code bypasses the sandbox and runs with full page privileges.
+        //
+        // Defence-in-depth layers:
+        //  1. Agent-engine approval gate (approvalMode)
+        //  2. Content-side approval round-trip (below)
+        //  3. Static regex guard for privileged APIs
+        //  4. Runtime Proxy sandbox (this layer)
+        // We log a console warning on every invocation so the user can see
+        // what's running, and cap the timeout to prevent runaway scripts.
         // Approval gate (defence-in-depth): when the agent-engine has NOT
         // already stamped approvalGranted (e.g. approval mode was off or this
         // code path was reached without going through the engine), we route
@@ -1872,18 +1894,97 @@ if (window.__sentinelInitialized) {
             const __safeCode = String(code).replace(/<\/script>/gi, '<\\/script>');
             const __eventIdJson = JSON.stringify(eventId);
             const scriptEl = document.createElement('script');
-            scriptEl.textContent =
-              '(async () => {' +
-                'try {' +
-                  'const __r = await (async () => { ' + __safeCode + '\n })();' +
-                  'const __s = typeof __r === "object" && __r !== null' +
-                    ' ? JSON.stringify(__r).substring(0, 3000)' +
-                    ' : String(__r || "").substring(0, 3000);' +
-                  'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
-                '} catch(e) {' +
-                  'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (e && e.message) ? e.message : String(e) }, "*");' +
-                '}' +
-              '})();';
+
+            // --- Runtime sandbox (self-contained, runs inside the injected <script>) ---
+            // When _EXECUTE_JS_SANDBOX_ENABLED is true we wrap the user code in a
+            // Proxy-based sandbox that blocks dangerous window/document APIs at
+            // runtime. The entire sandbox definition is serialised inline so it
+            // executes in the page's MAIN world — no cross-scope references needed.
+            //
+            // The sandbox uses a `with` statement to intercept bare-name lookups
+            // (e.g. `fetch()`, `document.cookie`).  `with` is only available in
+            // sloppy mode; we deliberately avoid strict-mode for this wrapper.
+            //
+            // For approved code (cmd.approvalGranted === true) the sandbox is
+            // skipped entirely, preserving full page privileges.
+
+            // Serialise the blocked-API sets so they can be embedded in the script.
+            const __blockedApisArr = JSON.stringify([...EXECUTE_JS_BLOCKED_APIS]);
+            const __blockedDocArr = JSON.stringify([...EXECUTE_JS_BLOCKED_DOC_PROPS]);
+
+            if (_EXECUTE_JS_SANDBOX_ENABLED && !cmd.approvalGranted) {
+              // SANDBOXED path — user code is NOT approved, run behind Proxy guards.
+              scriptEl.textContent =
+                '(async () => {' +
+                  'try {' +
+                    // Build the sandbox inline
+                    'var __blk = new Set(' + __blockedApisArr + ');' +
+                    'var __blkDoc = new Set(' + __blockedDocArr + ');' +
+                    // Window proxy — intercepts reads/writes/has on dangerous globals
+                    'var __wp = new Proxy(window, {' +
+                      'get(t,p) {' +
+                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked window."+String(p));' +
+                        'var v=t[p];' +
+                        'return typeof v==="function"?v.bind(t):v;' +
+                      '},' +
+                      'set(t,p,v) {' +
+                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked write window."+String(p));' +
+                        't[p]=v; return true;' +
+                      '},' +
+                      'has(t,p) {' +
+                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked access to "+String(p));' +
+                        'return true;' +  // always return true so `with` delegates to the proxy
+                      '}' +
+                    '});' +
+                    // Document proxy — intercepts reads/writes/has on sensitive doc props
+                    'var __dp = new Proxy(document, {' +
+                      'get(t,p) {' +
+                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked document."+String(p));' +
+                        'var v=t[p];' +
+                        'return typeof v==="function"?v.bind(t):v;' +
+                      '},' +
+                      'set(t,p,v) {' +
+                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked write document."+String(p));' +
+                        't[p]=v; return true;' +
+                      '},' +
+                      'has(t,p) {' +
+                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked document access to "+String(p));' +
+                        'return true;' +
+                      '}' +
+                    '});' +
+                    // Execute user code inside `with` blocks so bare references to
+                    // window/document globals are intercepted by the proxies.
+                    // outer with=__wp shadows window-level names; we also alias
+                    // `document` so that `document.querySelector(...)` hits __dp.
+                    'var __r;' +
+                    'with(__wp) { with(__dp) { ' +
+                      'var document = __dp;' +     // shadow the global `document` with the proxied version
+                      '__r = await (async () => { ' + __safeCode + '\n })();' +
+                    '}}' +
+                    'var __s = typeof __r === "object" && __r !== null' +
+                      ' ? JSON.stringify(__r).substring(0, 3000)' +
+                      ' : String(__r || "").substring(0, 3000);' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
+                  '} catch(e) {' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (e && e.message) ? e.message : String(e) }, "*");' +
+                  '}' +
+                '})();';
+            } else {
+              // UNSANDBOXED path — code is operator-approved or sandbox is disabled.
+              // Runs with full page privileges (same as the pre-sandbox behaviour).
+              scriptEl.textContent =
+                '(async () => {' +
+                  'try {' +
+                    'const __r = await (async () => { ' + __safeCode + '\n })();' +
+                    'const __s = typeof __r === "object" && __r !== null' +
+                      ' ? JSON.stringify(__r).substring(0, 3000)' +
+                      ' : String(__r || "").substring(0, 3000);' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
+                  '} catch(e) {' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (e && e.message) ? e.message : String(e) }, "*");' +
+                  '}' +
+                '})();';
+            }
             document.documentElement.appendChild(scriptEl);
           });
 
