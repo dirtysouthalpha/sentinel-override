@@ -151,6 +151,15 @@ export function handleMenuClick(info, tab) {
       action: 'export_report',
       params: { tabId },
     }),
+
+    'sentinel-quick-assist': () => ({
+      action: 'quick_assist',
+      params: {
+        selectionText: info.selectionText || '',
+        pageUrl: url,
+        tabId,
+      },
+    }),
   };
 
   const handler = handlers[menuItemId];

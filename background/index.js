@@ -67,17 +67,17 @@ chrome.runtime.onInstalled.addListener(() => {
 initScheduler();
 
 // ========== Context Menu Click Handler (v3.44) ==========
-if (chrome.contextMenus?.onClicked) // (3.46.0) Quick Assist context menu
-  try {
-    chrome.contextMenus.create({
-      id: 'sentinel-quick-assist',
-      title: '⚡ Sentinel Quick Assist',
-      parentId: 'sentinel-parent',
-      contexts: ['selection']
-    }, () => chrome.runtime.lastError);
-  } catch (e) { /* already exists */ }
+// (3.46.0) Quick Assist context menu — register before listener so item exists
+try {
+  chrome.contextMenus.create({
+    id: 'sentinel-quick-assist',
+    title: '⚡ Sentinel Quick Assist',
+    parentId: 'sentinel-parent',
+    contexts: ['selection']
+  }, () => chrome.runtime.lastError);
+} catch (e) { /* already exists */ }
 
-  chrome.contextMenus.onClicked.addListener((info, tab) => {
+chrome.contextMenus.onClicked.addListener((info, tab) => {
   const result = handleMenuClick(info, tab);
   if (!result) return;
 
@@ -123,6 +123,16 @@ if (chrome.contextMenus?.onClicked) // (3.46.0) Quick Assist context menu
         }
       })
       .catch(() => {});
+  } else if (action === 'quick_assist') {
+    // (3.46.0) Quick Assist — open side panel and inject selected text as prompt
+    chrome.sidePanel.open({ tabId: tab?.id }).catch(() => {});
+    chrome.runtime.sendMessage({
+      action: 'context_menu_quick_assist',
+      params: {
+        text: params.selectionText || '',
+        url: params.pageUrl || '',
+      },
+    }).catch(() => {});
   }
 });
 
