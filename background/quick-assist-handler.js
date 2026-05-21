@@ -1,69 +1,68 @@
-// background/quick-assist-handler.js
-// Quick Assist LLM handler — single completion call, no agent loop.
-// Reuses the provider registry for endpoint/auth detection.
+/**
+ * Sentinel Override v3.46.0 — Quick Assist LLM Handler
+ * Handles single-shot LLM completion requests from the Quick Assist panel.
+ * No agent loop, no tools — just a direct prompt → response call.
+ */
 
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
 
 /**
- * Call the active LLM provider with a simple completion prompt.
- * Returns the response text string.
+ * Build and send a single chat completion request for Quick Assist.
+ * Reuses the provider registry's format detection (Anthropic vs OpenAI-compatible).
+ *
+ * @param {string} prompt - The fully constructed prompt (system instruction + page context + selected text)
+ * @returns {Promise<string>} The LLM response text
  */
-export async function handleQuickAssist(prompt, pageInfo) {
-  const providerConfig = await getActiveProvider();
-  if (!providerConfig) {
-    throw new Error('No provider configured. Open Sentinel settings to set one up.');
-  }
-  const { endpoint, apiKey, model } = providerConfig;
-  if (!apiKey) {
-    throw new Error('API key not configured. Open Sentinel settings.');
+export async function handleQuickAssist(prompt) {
+  const config = await getActiveProvider();
+
+  if (!config.apiKey) {
+    throw new Error('No API key configured. Open Sentinel Override settings to set up an LLM provider.');
   }
 
-  const provider = resolveProvider(endpoint);
-  const isAnthropic = provider && provider.id === 'anthropic';
+  const provider = resolveProvider(config.endpoint);
+  const headers = provider.buildHeaders(config.apiKey);
 
-  let url = endpoint;
-  let headers = { 'Content-Type': 'application/json' };
+  // Build the request body. For Quick Assist we want a simple single-turn
+  // completion — no system prompt separation needed since the prompt already
+  // contains the system instruction as part of the user message.
   let body;
 
-  if (isAnthropic) {
-    // Anthropic format
-    headers['x-api-key'] = apiKey;
-    headers['anthropic-version'] = '2023-06-01';
-    if (!url.includes('/messages')) {
-      url = url.replace(/\/+$/, '') + '/messages';
-    }
-    body = JSON.stringify({
-      model,
-      max_tokens: 2048,
+  if (config.id === 'anthropic') {
+    // Anthropic uses system field + messages array
+    const systemPart = prompt.split('\n---\n')[0] || prompt.substring(0, 500);
+    const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
+    body = {
+      model: config.model,
+      max_tokens: 2000,
       temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }]
-    });
+      system: [{ type: 'text', text: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' }],
+      messages: [{ role: 'user', content: userPart || prompt }]
+    };
   } else {
-    // OpenAI-compatible (Z.AI, OpenAI, etc.)
-    headers['Authorization'] = 'Bearer ' + apiKey;
-    if (!url.includes('/chat/completions')) {
-      url = url.replace(/\/+$/, '') + '/chat/completions';
-    }
-    body = JSON.stringify({
-      model,
-      max_tokens: 2048,
+    // OpenAI-compatible: system message + user message
+    body = {
+      model: config.model,
+      max_tokens: 2000,
       temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }]
-    });
+      messages: [
+        { role: 'system', content: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' },
+        { role: 'user', content: prompt }
+      ]
+    };
   }
 
-  const response = await fetch(url, { method: 'POST', headers, body });
+  const response = await fetch(config.endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body)
+  });
+
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`LLM ${response.status}: ${text.substring(0, 200)}`);
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
   }
 
   const data = await response.json();
-
-  // Parse response based on provider format
-  if (isAnthropic) {
-    return data.content?.[0]?.text || data.completion || '[no response]';
-  } else {
-    return data.choices?.[0]?.message?.content || data.choices?.[0]?.text || '[no response]';
-  }
+  return provider.parseResponse(data);
 }

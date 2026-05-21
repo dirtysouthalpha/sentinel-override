@@ -108,6 +108,33 @@ function loadSettings() {
   });
 }
 
+// ========== Quick Assist Toggle (3.46.0) ==========
+// Controls whether the floating Quick Assist panel appears on text selection.
+const quickAssistToggle = document.getElementById('quickAssistToggle');
+const quickAssistLabel = document.getElementById('quickAssistLabel');
+if (quickAssistToggle) {
+  chrome.storage.local.get(['quickAssist'], (result) => {
+    if (chrome.runtime.lastError) return;
+    const enabled = result.quickAssist !== false; // default ON
+    quickAssistToggle.checked = enabled;
+    if (quickAssistLabel) {
+      quickAssistLabel.textContent = enabled
+        ? 'ON — Select text on any page'
+        : 'OFF — Quick Assist disabled';
+    }
+  });
+  quickAssistToggle.addEventListener('change', () => {
+    const enabled = quickAssistToggle.checked;
+    chrome.storage.local.set({ quickAssist: enabled }, () => {
+      if (quickAssistLabel) {
+        quickAssistLabel.textContent = enabled
+          ? 'ON — Select text on any page'
+          : 'OFF — Quick Assist disabled';
+      }
+    });
+  });
+}
+
 // ========== Trusted Input Toggle (#9 — CDP-based input dispatch) ==========
 // Opt-in: when enabled, the agent routes click/type/press_key through
 // chrome.debugger so events are dispatched with isTrusted: true. Default OFF
