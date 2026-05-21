@@ -126,13 +126,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   } else if (action === 'quick_assist') {
     // (3.46.0) Quick Assist — open side panel and inject selected text as prompt
     chrome.sidePanel.open({ tabId: tab?.id }).catch(() => {});
-    chrome.runtime.sendMessage({
-      action: 'context_menu_quick_assist',
-      params: {
-        text: params.selectionText || '',
-        url: params.pageUrl || '',
-      },
-    }).catch(() => {});
+    // Send show_quick_assist to the content script so quick-assist.js shows the floating panel
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, {
+        action: 'show_quick_assist',
+        selectedText: params.selectionText || '',
+        pageInfo: { url: params.pageUrl || '' },
+      }).catch(() => {});
+    }
   }
 });
 
