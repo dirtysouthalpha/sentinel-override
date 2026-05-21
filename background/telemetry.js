@@ -224,6 +224,12 @@ async function _flushRunBuffer() {
   }
 }
 
+/**
+ * Start a new telemetry run, creating an entry in the persisted runs index.
+ * Evicts oldest runs beyond MAX_PERSISTED_RUNS.
+ * @param {string} runId - Unique run identifier.
+ * @param {string} goal - The goal text for this run (truncated to 200 chars).
+ */
 export async function startRun(runId, goal) {
   _currentRunId = runId || null;
   _currentRunGoal = (goal || '').substring(0, 200);
@@ -249,6 +255,10 @@ export async function startRun(runId, goal) {
   } catch (e) { console.warn('[Sentinel/telemetry] startRun error:', e && e.message); }
 }
 
+/**
+ * End the current telemetry run, flush buffered events, and update the runs index.
+ * @param {string} runId - Run identifier to finalize (uses current if omitted).
+ */
 export async function endRun(runId) {
   if (_persistFlushTimer) { clearInterval(_persistFlushTimer); _persistFlushTimer = null; }
   const id = runId || _currentRunId;
@@ -273,6 +283,10 @@ export async function endRun(runId) {
   _runBuffer = [];
 }
 
+/**
+ * List all persisted telemetry run metadata from storage.
+ * @returns {Promise<Array>} Array of run index entries (runId, goal, startedAt, etc.).
+ */
 export async function listPersistedRuns() {
   try {
     const stored = await chrome.storage.local.get('telemetry_runs_index');
@@ -280,6 +294,11 @@ export async function listPersistedRuns() {
   } catch { return []; }
 }
 
+/**
+ * Load all telemetry events for a specific persisted run.
+ * @param {string} runId - The run identifier to load.
+ * @returns {Promise<Array>} Array of telemetry event objects.
+ */
 export async function loadPersistedRun(runId) {
   if (!runId) return [];
   try {
@@ -288,6 +307,10 @@ export async function loadPersistedRun(runId) {
   } catch { return []; }
 }
 
+/**
+ * Delete a persisted run from both the index and event storage.
+ * @param {string} runId - The run identifier to delete.
+ */
 export async function deletePersistedRun(runId) {
   if (!runId) return;
   try {
@@ -308,6 +331,16 @@ function _shouldEmit(level) {
   return lvl >= threshold;
 }
 
+/**
+ * Emit a telemetry event. Broadcasts to the popup/side-panel via runtime messaging,
+ * logs to the service worker console, and buffers for run persistence.
+ * Respects the current log level — events below threshold are silently dropped
+ * (errors always emit regardless of level).
+ * @param {string} category - Event category (e.g. 'agent', 'llm', 'ui').
+ * @param {string} level - Log level: 'trace'|'debug'|'info'|'warn'|'error'.
+ * @param {string} message - Human-readable event message.
+ * @param {*} [payload] - Optional structured data attached to the event.
+ */
 export function emit(category, level, message, payload) {
   if (level !== 'error' && !_shouldEmit(level)) return;
   _seq++;
@@ -360,10 +393,18 @@ export const tel = {
   trace: (cat, msg, pl) => emit(cat, 'trace', msg, pl),
 };
 
+/**
+ * Get the list of known telemetry event categories.
+ * @returns {string[]} Copy of the known categories array.
+ */
 export function listCategories() {
   return KNOWN_CATEGORIES.slice();
 }
 
+/**
+ * Get the current telemetry log level.
+ * @returns {string} Current level: 'trace'|'debug'|'info'|'verbose'|'quiet'.
+ */
 export function getLevel() {
   return _currentLevel;
 }
