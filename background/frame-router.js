@@ -21,6 +21,13 @@ const FRAME_UTILITY_FILES = [
 // Updated on chrome.webNavigation.onCommitted / onBeforeNavigate / onErrorOccurred.
 const frameIdsByTab = new Map();
 
+/**
+ * Rebuild the positional-index-to-frameId map for a tab.
+ * Queries chrome.webNavigation for all frames, filters to iframes only,
+ * and stores them sorted by frameId for consistent positional indexing.
+ * @param {number} tabId - The tab whose frame map to rebuild.
+ * @returns {Promise<void>}
+ */
 function rebuildFrameMap(tabId) {
   return chrome.webNavigation.getAllFrames({ tabId }).then((frames) => {
     if (!frames) {
@@ -39,6 +46,10 @@ function rebuildFrameMap(tabId) {
   });
 }
 
+/**
+ * Remove the cached frame map for a tab (e.g. on tab close).
+ * @param {number} tabId - The tab whose frame map to clear.
+ */
 function clearFrameMap(tabId) {
   frameIdsByTab.delete(tabId);
 }
@@ -46,6 +57,12 @@ function clearFrameMap(tabId) {
 // ========== Enumerate Frames ==========
 // Use chrome.webNavigation.getAllFrames to get all frames in a tab.
 // Returns array of { frameId, parentId, url, isIframe, isCrossOrigin }.
+/**
+ * Enumerate all frames in a tab, returning metadata about each.
+ * Includes frameId, parentId, url, whether it's an iframe, and cross-origin status.
+ * @param {number} tabId - The tab to enumerate frames in.
+ * @returns {Promise<Array<{frameId: number, parentId: number, url: string, isIframe: boolean, isCrossOrigin: boolean}>>}
+ */
 export async function enumerateFrames(tabId) {
   try {
     const frames = await chrome.webNavigation.getAllFrames({ tabId });
@@ -91,6 +108,13 @@ export async function enumerateFrames(tabId) {
 // The mapping is positional: frame index 0 = first iframe in DOM order.
 // Prefers the cached frameIdsByTab map (kept fresh by webNavigation events),
 // falling back to a live enumeration if the cache is empty.
+/**
+ * Map a positional frame index (from content script's "frame:N:" prefix) to a Chrome frameId.
+ * Uses the cached frameIdsByTab map first, falling back to a live enumeration if the cache is empty.
+ * @param {number} tabId - The tab containing the frame.
+ * @param {number} frameIndex - Zero-based positional index of the iframe.
+ * @returns {Promise<number|null>} The Chrome frameId, or null if not found.
+ */
 export async function resolveFrameForSelector(tabId, frameIndex) {
   if (tabId == null || frameIndex == null || frameIndex < 0) return null;
 
@@ -123,6 +147,15 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
 // ========== Execute In Frame ==========
 // Execute a DOM command inside a specific cross-origin iframe.
 // TWO-STEP injection: first inject utility modules, then run command using those utilities.
+/**
+ * Execute a DOM command inside a specific cross-origin iframe.
+ * Two-step injection: first injects utility content scripts into the frame,
+ * then runs the command function using those utilities.
+ * @param {number} tabId - The tab containing the iframe.
+ * @param {number} frameId - The Chrome frameId to execute in.
+ * @param {{type: string, [key: string]: any}} command - The DOM command to execute.
+ * @returns {Promise<{ok: boolean, error?: string, [key: string]: any}>}
+ */
 export async function executeInFrame(tabId, frameId, command) {
   // Note: frameId === 0 is the main frame and is a valid value, so check for nullish only.
   if (tabId == null || frameId == null) {
@@ -161,6 +194,13 @@ export async function executeInFrame(tabId, frameId, command) {
 // ========== Command Runner (injected into iframe) ==========
 // This function runs inside the target iframe. It has access to window.__sentinelUtils
 // because Step 1 injected the utility files that populate that namespace.
+/**
+ * Command runner injected into a cross-origin iframe via chrome.scripting.executeScript.
+ * Has access to window.__sentinelUtils populated by the utility content scripts injected in step 1.
+ * Dispatches DOM commands (click, type, read, etc.) using the loaded utility modules.
+ * @param {{type: string, [key: string]: any}} command - The DOM command to execute.
+ * @returns {{ok: boolean, error?: string, [key: string]: any}} Command result.
+ */
 function runCommandInFrame(command) {
   const utils = window.__sentinelUtils;
   if (!utils || !utils.dom) {
@@ -343,6 +383,12 @@ function runCommandInFrame(command) {
 // background/index.js. This module idempotently registers webNavigation
 // listeners so re-import doesn't double-subscribe.
 let __frameRouterListenersInstalled = false;
+/**
+ * Install chrome.webNavigation and chrome.tabs event listeners for frame tracking.
+ * Idempotent — safe to call multiple times; only registers listeners once.
+ * Subscribes to onCommitted, onErrorOccurred (to rebuild frame maps),
+ * and tabs.onRemoved (to clean up stale maps).
+ */
 export function addFrameRouterListeners() {
   if (__frameRouterListenersInstalled) return;
   __frameRouterListenersInstalled = true;

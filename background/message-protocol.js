@@ -96,6 +96,14 @@ export function sendSilentUpdate(text, stepNumber) {
   });
 }
 
+/**
+ * Send the current page context (URL, title, step number) to the popup.
+ * Used by the agent engine to keep the popup UI in sync with the active page.
+ * @param {string} url - The current page URL.
+ * @param {string} pageTitle - The current page title.
+ * @param {number} [stepNumber=0] - The current agent step number.
+ * @param {number} [tabId=null] - The active tab ID.
+ */
 export function sendPageContext(url, pageTitle, stepNumber, tabId) {
   chrome.runtime.sendMessage({
     action: 'page_context',

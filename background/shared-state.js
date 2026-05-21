@@ -36,6 +36,13 @@ export function clearSPATransition() { _spaTransitionPending = false; }
 const _keepaliveHandles = new Map();   // name -> intervalId
 const _keepaliveRefCounts = new Map(); // name -> count
 
+/**
+ * Start a service-worker keepalive heartbeat for the given name.
+ * Prevents Chrome from terminating the MV3 service worker during idle periods
+ * (e.g. while awaiting human input on approval prompts). Multiple callers can
+ * hold a keepalive by the same name — only the last release stops the heartbeat.
+ * @param {string} name - Identifier for the keepalive (defaults to 'default').
+ */
 export function startSwKeepalive(name) {
   if (typeof name !== 'string' || !name) name = 'default';
   _keepaliveRefCounts.set(name, (_keepaliveRefCounts.get(name) || 0) + 1);
@@ -57,6 +64,12 @@ export function startSwKeepalive(name) {
   _keepaliveHandles.set(name, handle);
 }
 
+/**
+ * Release one reference to a service-worker keepalive heartbeat.
+ * When the last reference is released, the interval is cleared and the session
+ * storage pulse key is cleaned up.
+ * @param {string} name - Identifier for the keepalive (defaults to 'default').
+ */
 export function stopSwKeepalive(name) {
   if (typeof name !== 'string' || !name) name = 'default';
   const refs = (_keepaliveRefCounts.get(name) || 0) - 1;
@@ -89,6 +102,16 @@ export function stopSwKeepalive(name) {
 // Accepts either form chrome.notifications.create supports:
 //   notifyIfEnabled(opts)            — auto-generated id
 //   notifyIfEnabled(id, opts)        — caller-supplied id
+/**
+ * Fire a desktop notification only if the user has enabled sound notifications.
+ * Accepts the same argument forms as chrome.notifications.create:
+ *   notifyIfEnabled(opts)         — auto-generated notification id
+ *   notifyIfEnabled(id, opts)     — caller-supplied notification id
+ * No-ops silently when notifications are disabled (the default).
+ * @param {string|object} idOrOpts - Notification id (string) or options object.
+ * @param {object} [optsIfId] - Options object when first arg is an id.
+ * @returns {Promise<void>}
+ */
 export async function notifyIfEnabled(idOrOpts, optsIfId) {
   try {
     const { sentinelSoundEnabled } = await chrome.storage.local.get({ sentinelSoundEnabled: false });
