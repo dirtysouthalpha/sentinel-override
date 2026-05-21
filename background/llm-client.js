@@ -33,6 +33,11 @@ const MULTI_PORTAL_DETECTORS = [
   { key: 'huntress',       re: /\bhuntress\b/i }
 ];
 
+/**
+ * Detect which admin portals (Entra, Exchange, Defender, etc.) are referenced in a goal string.
+ * @param {string} goal - The user's goal text to scan.
+ * @returns {string[]} Array of detected portal keys (e.g. ['entra', 'exchange']).
+ */
 export function detectGoalPortals(goal) {
   if (!goal || typeof goal !== 'string') return [];
   const found = [];
@@ -42,6 +47,12 @@ export function detectGoalPortals(goal) {
   return found;
 }
 
+/**
+ * Build the multi-portal execution directive injected into the system prompt
+ * when a goal spans 2+ admin portals. Returns empty string if only one (or zero).
+ * @param {string} goal - The user's goal text.
+ * @returns {string} Multi-portal directive, or '' if not applicable.
+ */
 export function getMultiPortalDirective(goal) {
   const portals = detectGoalPortals(goal);
   if (portals.length < 2) return '';
@@ -112,6 +123,12 @@ end-to-end. You have the budget and the tools — execute the sweep.
 // read_page + note WITHOUT close, then close at the end.
 const MULTI_ARTICLE_PATTERN = /\b(top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b|\b(give|provide|write|do)\s+(?:me\s+)?(?:a\s+)?(?:full\s+)?(?:breakdown|summary|recap|briefing|overview)\s+(?:on|for|of)\s+each\b/i;
 
+/**
+ * Build the multi-article directive for news/reading goals that request
+ * summarizing multiple articles. Returns '' if not a multi-article goal.
+ * @param {string} goal - The user's goal text.
+ * @returns {string} Multi-article execution directive, or ''.
+ */
 export function getMultiArticleDirective(goal) {
   if (!goal || typeof goal !== 'string') return '';
   if (!MULTI_ARTICLE_PATTERN.test(goal)) return '';
@@ -710,6 +727,13 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
 const _platformContextCache = new Map();
 const _PLATFORM_CTX_TTL_MS = 30000;
 
+/**
+ * Build platform-specific context (selectors, guidance) for the current URL and goal.
+ * Results are cached for 60s to avoid repeated lookups during a run.
+ * @param {string} currentUrl - The active tab's URL.
+ * @param {string} goal - The user's current goal text.
+ * @returns {string} Formatted platform context block for the system prompt.
+ */
 export function getPlatformContext(currentUrl, goal) {
   const _cacheKey = (currentUrl || '') + '||' + (goal || '').slice(0, 50);
   const _cached = _platformContextCache.get(_cacheKey);
@@ -735,6 +759,13 @@ export function getPlatformContext(currentUrl, goal) {
 // Signature is intentionally stable: supportsVision(model[, providerHint]).
 // When providerHint is omitted, we infer from common model-id patterns; this
 // preserves the legacy single-arg call sites.
+/**
+ * Check whether a given model supports vision/screenshot analysis.
+ * Uses a three-tier approach: exact model lookup, broad regex match, and a deny list.
+ * @param {string} model - The model identifier (e.g. 'gpt-4o', 'claude-3-5-sonnet').
+ * @param {string} [providerHint] - Optional provider key for faster matching.
+ * @returns {boolean} True if the model supports vision input.
+ */
 export function supportsVision(model, providerHint) {
   if (!model) return false;
   const m = String(model).toLowerCase();
@@ -778,6 +809,14 @@ export function supportsVision(model, providerHint) {
 // Generates a numbered plan from the goal before execution begins.
 // This gives the agent a map of what it's accomplished and what's left,
 // dramatically improving reliability on multi-step and multi-site tasks.
+/**
+ * Generate an initial step plan for a goal using a planning LLM call.
+ * Sends the goal + context to the configured model and returns parsed action steps.
+ * @param {string} goal - The user's automation goal.
+ * @param {Object} settings - Extension settings (api_key, model, api_endpoint, etc.).
+ * @param {Object} [context={}] - Additional context (currentUrl, pageTitle, etc.).
+ * @returns {Promise<Array|null>} Parsed plan steps, or null on failure.
+ */
 export async function generatePlan(goal, settings, context = {}) {
   const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
   const apiKey = settings.api_key;
@@ -933,6 +972,22 @@ const SENTINEL_TOOLS = [
 
 // ========== API Call with Retry ==========
 // CONFIG is passed as a parameter to avoid coupling to agent-engine state.
+/**
+ * Call the LLM with automatic retry on transient errors (429, 502, 503, timeouts).
+ * Uses exponential backoff with jitter. On permanent failure, re-throws.
+ * @param {Array} trimmedElements - Trimmed DOM elements for context.
+ * @param {number} totalElementCount - Total elements on page before trimming.
+ * @param {string} pageContent - Extracted page text content.
+ * @param {string|null} base64Image - Screenshot as base64, or null.
+ * @param {string} goal - Current goal text.
+ * @param {Array} history - Conversation history messages.
+ * @param {number} stepCount - Current step number.
+ * @param {string} currentUrl - Active tab URL.
+ * @param {number} retryCount - Current retry attempt number.
+ * @param {Object} CONFIG - Agent configuration object.
+ * @param {Object} agentState - Mutable agent state (plan, etc.).
+ * @returns {Promise<Object>} Parsed LLM response object.
+ */
 export async function callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount, CONFIG, agentState) {
   try {
     return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
@@ -1688,6 +1743,12 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
 }
 
 // ========== Response Parsing ==========
+/**
+ * Extract the first valid JSON object with a recognized "type" field from a string.
+ * Handles models that prepend reasoning/thinking text before the actual JSON payload.
+ * @param {string} str - Raw LLM response text.
+ * @returns {Object|null} Parsed action object, or null if no valid JSON found.
+ */
 export function extractFirstJsonObject(str) {
   // Try every '{' position to find a valid JSON object with a "type" field.
   // This handles models that prepend reasoning text before the actual JSON.
@@ -1802,6 +1863,14 @@ function regexSalvageFinishOrNote(content) {
   return { type: 'note', text: raw };
 }
 
+/**
+ * Parse an LLM response string into an action object.
+ * Strips markdown code fences, then tries direct JSON parse, then
+ * falls back to extractFirstJsonObject for responses with preamble text.
+ * @param {string} content - Raw LLM response text.
+ * @returns {Object} Parsed action object with a "type" field.
+ * @throws {Error} If the response cannot be parsed as valid action JSON.
+ */
 export function parseLLMResponse(content) {
   try {
     if (!content || typeof content !== 'string') {
@@ -1856,6 +1925,13 @@ export function parseLLMResponse(content) {
 }
 
 // ========== Self-Learning ==========
+/**
+ * Retrieve learned action patterns relevant to the current goal from storage.
+ * Patterns are scored by keyword overlap with the goal text and sorted by
+ * recency and success count.
+ * @param {string} goal - The user's current goal text.
+ * @returns {Promise<Array>} Sorted array of relevant learned patterns.
+ */
 export async function getRelevantPatterns(goal) {
   try {
     const stored = await chrome.storage.local.get(['learned_patterns']);
