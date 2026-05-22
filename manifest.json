@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sentinel Override",
-  "version": "3.44.2",
+  "version": "3.44.3",
   "description": "Human-like browser automation agent \u2014 investigates, configures, and troubleshoots the web with visible interactions",
   "permissions": [
     "activeTab",

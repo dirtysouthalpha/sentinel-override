@@ -382,6 +382,12 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
 }
 
 // ========== State Reset ==========
+
+/**
+ * Reset all agent run-scoped state to defaults.
+ * Called between runs so a fresh start is guaranteed — clears counters,
+ * memory, history, plan state, trust-score accumulators, and pending queues.
+ */
 export function resetAgentState() {
   apiCallCount = 0;
   lastApiCallTime = 0;
@@ -408,6 +414,14 @@ export function resetAgentState() {
 }
 
 // ========== Agent Lifecycle ==========
+
+/**
+ * Start the agent loop for the given goal on the sender's active tab.
+ * @param {string} goal - Natural language instruction for the agent to execute.
+ * @param {chrome.runtime.MessageSender} sender - Message sender providing tab context.
+ * @returns {Promise<string>} Status message on completion.
+ * @throws {Error} If the agent is already running or no active tab is found.
+ */
 export async function startAgent(goal, sender) {
   if (agentRunning) throw new Error('Agent already running');
 
@@ -791,6 +805,11 @@ async function _waitForModeMismatchDecision(info) {
   });
 }
 
+/**
+ * Stop the running agent — ends telemetry, detaches CDP debuggees,
+ * dissolves tab groups, and closes all agent-managed tabs.
+ * @returns {Promise<string>} 'Agent stopped'
+ */
 export async function stopAgent() {
   tel.info('lifecycle', 'Agent stopping (user-initiated)');
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
@@ -807,18 +826,31 @@ export async function stopAgent() {
   return 'Agent stopped';
 }
 
+/**
+ * Pause the agent loop. Steps will be skipped until resumeAgent is called.
+ * @returns {Promise<string>} Status message.
+ */
 export async function pauseAgent() {
   if (!agentRunning) return 'Agent not running';
   agentPaused = true;
   return 'Agent paused';
 }
 
+/**
+ * Resume the agent loop after a pause.
+ * @returns {Promise<string>} Status message.
+ */
 export async function resumeAgent() {
   if (!agentRunning) return 'Agent not running';
   agentPaused = false;
   return 'Agent resumed';
 }
 
+/**
+ * Set the agent speed mode, controlling inter-step delays.
+ * @param {'turbo'|'normal'|'stealth'} mode - Speed profile to use.
+ * @returns {string} Confirmation or error message.
+ */
 export function setAgentSpeed(mode) {
   if (!['turbo', 'normal', 'stealth'].includes(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
   agentSpeed = mode;
@@ -1043,15 +1075,29 @@ async function detachAllSentinelTabs() {
 
 // Public accessor so background/index.js can decide side-panel visibility on
 // tab-activation events without importing the full Set.
+/**
+ * Check if a tab is currently attached to the agent session.
+ * @param {number} tabId - Chrome tab ID to check.
+ * @returns {boolean}
+ */
 export function isAgentAttachedTab(tabId) {
   return agentAttachedTabs.has(tabId);
 }
 
+/**
+ * Return an array of all tab IDs currently attached to the agent session.
+ * @returns {number[]}
+ */
 export function getAttachedTabIds() {
   return Array.from(agentAttachedTabs);
 }
 
 // (3.40.0) Audit log access — delegated from background/index.js message handler.
+/**
+ * Fetch the audit log for a specific run, or the current run if no ID provided.
+ * @param {string} [id] - Run log ID; defaults to the current run.
+ * @returns {Promise<object>} The audit log object.
+ */
 export async function fetchAuditLog(id) {
   return getAuditLog(id || runLogId);
 }

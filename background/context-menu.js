@@ -46,6 +46,11 @@ const MENU_ITEMS = [
   },
 ];
 
+/**
+ * Register all Sentinel context menu items in Chrome.
+ * Creates a parent menu with child items for analysis, extraction, form fill,
+ * screenshot, summarization, monitoring, macro recording, and Quick Assist.
+ */
 export function installContextMenus() {
   chrome.contextMenus.removeAll(() => {
     // Parent menu
