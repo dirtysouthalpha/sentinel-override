@@ -12,8 +12,12 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   const shadow = window.__sentinelUtils.shadow || {};
 
   // ========== Open Dropdown ==========
-  // Opens a custom dropdown by clicking the trigger, then polls for option elements.
-  // Returns array of option elements, or null if opening failed.
+  /**
+   * Open a custom dropdown by clicking the trigger element, then poll for option elements.
+   * @param {Document} doc - The document context.
+   * @param {HTMLElement} triggerEl - The dropdown trigger element to click.
+   * @returns {Promise<Element[]|null>} Array of option elements, or null if opening failed within 3 s.
+   */
   dd.openDropdown = async function(doc, triggerEl) {
     if (!triggerEl) return null;
 
@@ -47,8 +51,14 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   };
 
   // ========== Find Dropdown Options ==========
-  // Finds dropdown option elements after a dropdown is opened.
-  // Checks multiple patterns: ARIA, common containers, shadow roots.
+  /**
+   * Find visible dropdown option elements after a dropdown has been opened.
+   * Uses scoped lookup (ARIA controls/owns, parent climb) first, then falls back
+   * to document-wide search including shadow roots.
+   * @param {Document} doc - The document context.
+   * @param {HTMLElement|null} triggerEl - The trigger element (used for scoping), or null.
+   * @returns {Element[]} Array of visible option elements.
+   */
   dd.findDropdownOptions = function(doc, triggerEl) {
     const options = [];
     const seen = new Set();
@@ -166,8 +176,15 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   };
 
   // ========== Select Dropdown Option ==========
-  // Selects a specific option from an open dropdown by value text.
-  // Returns the clicked element or null if selection failed.
+  /**
+   * Select a specific option from an open dropdown by matching its visible text.
+   * Matching priority: exact text → value attribute → starts-with → whole word → partial.
+   * For large option lists (≥ 50), falls back to a search-input typing strategy.
+   * @param {Document} doc - The document context.
+   * @param {Element[]} optionEls - Array of option elements returned by findDropdownOptions.
+   * @param {string} value - The text to match against option labels.
+   * @returns {Promise<Element|null>} The clicked option element, or null if no match.
+   */
   dd.selectDropdownOption = async function(doc, optionEls, value) {
     if (!optionEls || optionEls.length === 0) return null;
     if (!value && value !== '') return null;
@@ -262,9 +279,12 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   };
 
   // ========== Traverse Nested Menu ==========
-  // Traverses a nested hover/click menu structure.
-  // menuPath is an array of strings like ["Settings", "Security", "Firewall Rules"].
-  // Returns the clicked element or null if any level failed.
+  /**
+   * Traverse a nested hover/click menu structure by following a path of labels.
+   * @param {Document} doc - The document context.
+   * @param {string[]} menuPath - Ordered labels to follow, e.g. ["Settings", "Security", "Firewall"].
+   * @returns {Promise<Element|null>} The final clicked element, or null if any level failed.
+   */
   dd.traverseNestedMenu = async function(doc, menuPath) {
     if (!menuPath || menuPath.length === 0) return null;
 

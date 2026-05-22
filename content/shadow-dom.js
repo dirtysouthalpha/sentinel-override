@@ -10,8 +10,13 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   const shadow = window.__sentinelUtils.shadow;
 
   // ========== Get Shadow Root ==========
-  // Returns el.shadowRoot for open roots, or checks the captured WeakMap
-  // populated by shadow-intercept.js for closed roots.
+  /**
+   * Get the shadow root for an element.
+   * Returns el.shadowRoot for open roots, or checks the WeakMap
+   * populated by shadow-intercept.js for closed roots.
+   * @param {HTMLElement} el - The element to get the shadow root for.
+   * @returns {ShadowRoot|null} The shadow root, or null if not found.
+   */
   shadow.getShadowRoot = function(el) {
     if (!el) return null;
     // Open shadow root -- direct access
@@ -25,7 +30,11 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   };
 
   // ========== Is In Shadow DOM ==========
-  // Returns true if element's root node has a host (i.e., it lives inside a shadow DOM).
+  /**
+   * Check if an element resides inside a shadow DOM tree.
+   * @param {HTMLElement} el - The element to check.
+   * @returns {boolean} True if the element's root node has a host property.
+   */
   shadow.isInShadowDOM = function(el) {
     if (!el) return false;
     try {
@@ -37,8 +46,12 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   };
 
   // ========== Walk Shadow Tree ==========
-  // Walks entire DOM tree including open shadow roots, calling callback for each element.
-  // Does NOT descend into closed shadow roots that were not intercepted.
+  /**
+   * Walk the entire DOM tree including open (and intercepted closed) shadow roots,
+   * invoking the callback for each element node.
+   * @param {Node} root - The root node to start walking from.
+   * @param {function(Element): void} callback - Called for each element discovered.
+   */
   shadow.walkShadowTree = function(root, callback) {
     if (!root) return;
 
@@ -79,8 +92,14 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   };
 
   // ========== Query Deep ==========
-  // Recursively search piercing open shadow roots. Fast path: try querySelectorAll
-  // first on the root, then walk all elements checking shadowRoot. Returns Element[].
+  /**
+   * Recursively search the DOM piercing through shadow roots.
+   * Fast-path uses querySelectorAll on the root, then walks all elements
+   * checking for shadowRoot and querying inside each one.
+   * @param {Node} root - The root to search from (typically `document`).
+   * @param {string} selector - A CSS selector string.
+   * @returns {Element[]} Array of matched elements (deduplicated).
+   */
   shadow.queryDeep = function(root, selector) {
     if (!root || !selector) return [];
     const results = [];
@@ -123,7 +142,13 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   };
 
   // ========== Query Deep First ==========
-  // Returns first match only (more efficient for single element lookups).
+  /**
+   * Return the first element matching the selector, piercing through shadow roots.
+   * More efficient than queryDeep when only one element is needed.
+   * @param {Node} root - The root to search from.
+   * @param {string} selector - A CSS selector string.
+   * @returns {Element|null} The first matching element, or null.
+   */
   shadow.queryDeepFirst = function(root, selector) {
     if (!root || !selector) return null;
 
