@@ -726,11 +726,26 @@ if (window.__sentinelInitialized) {
     }
   }
 
+  /**
+   * Escape HTML special characters to prevent XSS when inserting into innerHTML.
+   * @param {string} str — Raw string that may contain HTML metacharacters.
+   * @returns {string} HTML-safe string with &, <, >, ", ' escaped.
+   */
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function showActionBanner(actionType, description) {
     try {
       const overlay = getOrCreateOverlay();
       if (!overlay) return;
-      const label = description || actionType;
+      const label = escapeHtml(description || actionType);
       overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
       overlay.style.opacity = '1';
     } catch { /* extension context may be invalidated */ }
@@ -836,7 +851,7 @@ if (window.__sentinelInitialized) {
     try {
       const overlay = getOrCreateOverlay();
       if (!overlay) return;
-      const preview = text.substring(0, 40) + (text.length > 40 ? '...' : '');
+      const preview = escapeHtml(text.substring(0, 40) + (text.length > 40 ? '...' : ''));
       const progress = position !== undefined ? ` (${position}/${total})` : '';
       overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${preview}"</span>${progress}`;
       overlay.style.opacity = '1';
