@@ -59,6 +59,11 @@ let _saveStatsTimer = null;
   } catch (e) { console.warn('[Sentinel/skills] init error:', e && e.message); }
 })();
 
+/**
+ * Schedule a debounced save of skill stats to chrome.storage.local.
+ * Coalesces rapid updates into a single write every 1500ms.
+ * @private
+ */
 function _scheduleSaveStats() {
   if (_saveStatsTimer) return;
   _saveStatsTimer = setTimeout(() => {
@@ -67,6 +72,14 @@ function _scheduleSaveStats() {
   }, 1500);
 }
 
+/**
+ * Compute the adaptive priority for a skill based on its success rate.
+ * Skills with higher success rates get a priority boost; low performers get penalized.
+ * Falls back to base priority when adaptation is disabled or insufficient data.
+ * @param {object} skill - Skill object with id and priority fields.
+ * @returns {number} Effective priority (base + adaptive delta).
+ * @private
+ */
 function _effectivePriority(skill) {
   const base = (skill && typeof skill.priority === 'number') ? skill.priority : 0;
   if (!_adaptEnabled) return base;
@@ -77,6 +90,13 @@ function _effectivePriority(skill) {
   return base + delta;
 }
 
+/**
+ * Record the outcome (success/failure) of previously pending skills.
+ * Called at the start of each runRecoverySkills invocation to resolve
+ * skills that were applied in the previous step.
+ * @param {object} context - Agent context with lastActionFailed flag.
+ * @private
+ */
 function _recordPendingOutcomes(context) {
   if (_pendingOutcomeSkillIds.length === 0) return;
   if (typeof context.lastActionFailed !== 'boolean') {
@@ -107,6 +127,11 @@ function _recordPendingOutcomes(context) {
   _scheduleSaveStats();
 }
 
+/**
+ * Reset all adaptive skill statistics.
+ * Clears in-memory stats and removes persisted data from chrome.storage.local.
+ * @returns {Promise<void>}
+ */
 export async function resetSkillStats() {
   _stats = {};
   _pendingOutcomeSkillIds = [];
@@ -114,6 +139,12 @@ export async function resetSkillStats() {
   try { tel.info('skill', 'Skill outcome stats reset', {}); } catch { /* telemetry unavailable */ }
 }
 
+/**
+ * Get a snapshot of current skill statistics.
+ * Returns an object keyed by skill ID, each containing fires, successes,
+ * failures, basePriority, effectivePriority, and successRate.
+ * @returns {Object<string, {fires: number, successes: number, failures: number, lastFiredAt: number, lastOutcomeAt: number, basePriority: number|null, effectivePriority: number|null, successRate: number|null}>}
+ */
 export function getSkillStats() {
   const out = {};
   for (const [k, v] of Object.entries(_stats)) {
@@ -126,6 +157,18 @@ export function getSkillStats() {
   return out;
 }
 
+/**
+ * Run the recovery skill library against the current agent context.
+ * Evaluates all registered skills, applies auto-recovery actions when matched,
+ * and collects prompt-injection directives for the LLM.
+ *
+ * Records pending outcomes that will be resolved on the next call to
+ * determine whether the recovery was successful.
+ *
+ * @param {object} context - Agent loop context including stepCount, consecutiveFailures,
+ *   lastActionFailed, lastCommand, and other state the skills use to match.
+ * @returns {{autoApply: object|null, promptInjection: string, appliedSkillIds: string[]}}
+ */
 export function runRecoverySkills(context) {
   const result = { autoApply: null, promptInjection: '', appliedSkillIds: [] };
   if (!context || typeof context !== 'object') return result;
@@ -205,6 +248,11 @@ export function runRecoverySkills(context) {
   return result;
 }
 
+/**
+ * List all registered recovery skills with their current priority and stats.
+ * Useful for diagnostic/telemetry UI surfaces.
+ * @returns {Array<{id: string, description: string, priority: number, effectivePriority: number, stats: object|null}>}
+ */
 export function listSkills() {
   return SKILLS.map(s => ({
     id: s.id,

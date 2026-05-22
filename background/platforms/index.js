@@ -57,7 +57,13 @@ const PROFILES = [
   networkDevice,
 ];
 
-/** Resolve the best-matching platform profile for the current goal+URL. Returns null if none match. */
+/**
+ * Resolve the best-matching platform profile for the current URL and goal.
+ * Iterates PROFILES in order and returns the first whose detect() returns true.
+ * @param {string} currentUrl - The active tab's URL.
+ * @param {string} goal - The user's goal text.
+ * @returns {object|null} The matching platform profile, or null if none matched.
+ */
 export function getPlatformProfile(currentUrl, goal) {
   for (const p of PROFILES) {
     try {
@@ -70,7 +76,13 @@ export function getPlatformProfile(currentUrl, goal) {
   return null;
 }
 
-/** Inspect a goal for menu paths that don't match the detected profile's surface. */
+/**
+ * Inspect a goal for menu paths that don't match the detected profile's surface.
+ * Returns hints that map on-box menu paths to their cloud-portal equivalents.
+ * @param {object} profile - The matched platform profile with mismatchHints array.
+ * @param {string} goal - The user's goal text.
+ * @returns {Array<{onbox: string, target: string}>} Mismatch hints found in the goal.
+ */
 export function findMismatchHints(profile, goal) {
   if (!profile || !Array.isArray(profile.mismatchHints) || !goal) return [];
   const hits = [];
@@ -84,7 +96,11 @@ export function findMismatchHints(profile, goal) {
   return hits;
 }
 
-/** Lightweight listing for UI surfaces (e.g., a future "platform profiles" settings page). */
+/**
+ * Lightweight listing of all registered platform profiles.
+ * Returns id, label, and memoryKeyPrefix for each profile.
+ * @returns {Array<{id: string, label: string, memoryKeyPrefix: string}>}
+ */
 export function listAllProfiles() {
   return PROFILES.map(p => ({ id: p.id, label: p.label, memoryKeyPrefix: p.memoryKeyPrefix }));
 }
