@@ -387,7 +387,16 @@ function installObservabilityEventHook() {
   } catch { /* chrome.debugger unavailable in some test contexts */ }
 }
 
-// Public reads.
+/**
+ * Read captured console messages for a tab (requires startConsoleCapture first).
+ * Supports filtering by severity level and limiting result count.
+ *
+ * @param {number} tabId - The tab whose console buffer to read.
+ * @param {object} [options] - Filter options.
+ * @param {number} [options.limit=50] - Maximum entries to return (most recent).
+ * @param {'error'|'errors'|'warning'|'warn'} [options.filter] - Severity filter.
+ * @returns {Array<{level:string,text:string,timestamp:number}>} Filtered console entries.
+ */
 export function readConsoleMessages(tabId, options) {
   const buf = consoleBuffers.get(tabId) || [];
   const limit = (options && Number(options.limit)) || 50;

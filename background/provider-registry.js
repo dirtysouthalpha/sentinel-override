@@ -584,6 +584,12 @@ export const PROVIDER_CATALOG = [
   }
 ];
 
+/**
+ * Look up a provider from the built-in catalog by its ID string.
+ *
+ * @param {string} id - Provider identifier (e.g. 'openai', 'anthropic', 'google').
+ * @returns {object|null} The catalog entry object, or null if not found.
+ */
 export function getCatalogProvider(id) {
   return PROVIDER_CATALOG.find(p => p.id === id) || null;
 }
@@ -594,6 +600,17 @@ export function getCatalogProvider(id) {
 // model id strings. Handles OpenAI-style { data: [{id}] }, Ollama-style
 // { models: [{name}] }, and Anthropic-style { data: [{id}] }.
 
+/**
+ * Fetch the list of available models from a provider's /models endpoint.
+ * Handles OpenAI-style ({ data: [{id}] }), Ollama-style ({ models: [{name}] }),
+ * and Anthropic-style response formats.
+ *
+ * @param {object} provider - A provider catalog entry with modelsUrl, auth, and headers.
+ * @param {string} apiKey - API key for authentication.
+ * @param {string} [customModelsUrl] - Override URL (takes precedence over provider.modelsUrl).
+ * @returns {Promise<string[]>} Normalized array of model ID strings.
+ * @throws {Error} If provider is null, has no models endpoint, or the request fails.
+ */
 export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   if (!provider) throw new Error('No provider given');
   const url = customModelsUrl || provider.modelsUrl;
