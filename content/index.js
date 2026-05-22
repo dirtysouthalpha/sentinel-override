@@ -676,7 +676,9 @@ if (window.__sentinelInitialized) {
       }
 
       default:
-        throw new Error('Unknown action: ' + request.action);
+        // Return null for unrecognised actions so other listeners (e.g. quick-assist.js)
+        // can still process the message. Chrome only allows one sendResponse per message.
+        return null;
     }
   }
 
@@ -861,7 +863,13 @@ if (window.__sentinelInitialized) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (chrome.runtime.lastError) { sendResponse({ ok: false, error: chrome.runtime.lastError.message }); return; }
     handleMessage(request)
-      .then(data => sendResponse({ ok: true, data }))
+      .then(data => {
+        // If handleMessage returned null the action is unrecognised — do NOT
+        // call sendResponse so other listeners (e.g. quick-assist.js) can
+        // handle the message instead.
+        if (data === null) return;
+        sendResponse({ ok: true, data });
+      })
       .catch(err => sendResponse({ ok: false, error: err.message }));
     return true; // keep message channel open for async responses
   });
