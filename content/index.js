@@ -1785,8 +1785,17 @@ if (window.__sentinelInitialized) {
             if (!approvalResult || approvalResult.approved !== true) {
               return 'BLOCKED: execute_js not approved by operator' + (approvalResult && approvalResult.reason ? ' (' + approvalResult.reason + ')' : '');
             }
-            // User approved — mark so the privileged-API guard below passes too.
-            cmd.approvalGranted = true;
+            // Track approval. If the background auto-approved (approval mode off),
+            // the reason is 'auto' — we set approvalGranted but NOT explicitApproval.
+            // The sandbox check below uses explicitApproval to decide whether to
+            // wrap the code in Proxy guards. Auto-approved code still runs through
+            // the sandbox; only explicitly user-approved code bypasses it.
+            if (approvalResult.reason === 'auto') {
+              cmd.approvalGranted = true;
+              cmd._autoApproved = true;
+            } else {
+              cmd.approvalGranted = true;
+            }
           } catch (_e) {
             // chrome.runtime.sendMessage can throw if the extension context is
             // invalidated (SW terminated, extension update, etc.). Default to
@@ -1905,14 +1914,16 @@ if (window.__sentinelInitialized) {
             // (e.g. `fetch()`, `document.cookie`).  `with` is only available in
             // sloppy mode; we deliberately avoid strict-mode for this wrapper.
             //
-            // For approved code (cmd.approvalGranted === true) the sandbox is
-            // skipped entirely, preserving full page privileges.
+            // For explicitly user-approved code (cmd.approvalGranted === true
+            // AND cmd._autoApproved !== true) the sandbox is skipped entirely,
+            // preserving full page privileges. Auto-approved code still runs
+            // through the sandbox as a defence-in-depth measure.
 
             // Serialise the blocked-API sets so they can be embedded in the script.
             const __blockedApisArr = JSON.stringify([...EXECUTE_JS_BLOCKED_APIS]);
             const __blockedDocArr = JSON.stringify([...EXECUTE_JS_BLOCKED_DOC_PROPS]);
 
-            if (_EXECUTE_JS_SANDBOX_ENABLED && !cmd.approvalGranted) {
+            if (_EXECUTE_JS_SANDBOX_ENABLED && !(cmd.approvalGranted && !cmd._autoApproved)) {
               // SANDBOXED path — user code is NOT approved, run behind Proxy guards.
               scriptEl.textContent =
                 '(async () => {' +

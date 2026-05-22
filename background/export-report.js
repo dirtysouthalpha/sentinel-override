@@ -3,6 +3,12 @@
  * Generates a sharable, styled HTML report from the audit log.
  */
 
+/**
+ * Generate a styled, self-contained HTML report from an audit log and run metadata.
+ * @param {Array<Object>} auditLog - Array of audit log entry objects.
+ * @param {Object} metadata - Run metadata (goal, startTime, endTime, totalSteps, status, trustScore).
+ * @returns {string} Complete HTML document string ready for download.
+ */
 export function generateHtmlReport(auditLog, metadata) {
   const {
     goal = 'Unknown',
@@ -144,10 +150,21 @@ export function generateHtmlReport(auditLog, metadata) {
 </html>`;
 }
 
+/**
+ * Escape HTML special characters to prevent XSS in generated reports.
+ * @param {string} str - Raw string to escape.
+ * @returns {string} HTML-safe string.
+ */
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * Truncate a string to a maximum length, appending an ellipsis if truncated.
+ * @param {string} str - String to potentially truncate.
+ * @param {number} max - Maximum character length.
+ * @returns {string} Original or truncated string.
+ */
 function truncate(str, max) {
   return str.length > max ? str.slice(0, max) + '…' : str;
 }

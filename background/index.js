@@ -346,8 +346,9 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const stored = await chrome.storage.local.get(['approvalMode']);
         if (stored.approvalMode !== true) {
           // Approval mode off — auto-approve for non-privileged code.
-          // The content script's static guard already blocks fetch/XHR/etc.
-          return { approved: true };
+          // Return reason:'auto' so the content script knows this wasn't
+          // explicit user approval and keeps the runtime sandbox active.
+          return { approved: true, reason: 'auto' };
         }
 
         // Approval mode on — present the code to the user via notification
