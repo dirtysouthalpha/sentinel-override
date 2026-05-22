@@ -28,6 +28,12 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
     } catch { /* non-fatal */ }
   }
 
+  /**
+   * Highlight a DOM element with an orange outline for visual feedback during
+   * action execution. Injects a CSS class rather than inline styles to avoid
+   * corrupting user CSS on error.
+   * @param {HTMLElement} el - Element to highlight.
+   */
   hl.highlightElement = function(el) {
     try {
       if (!el || !el.classList) return;
@@ -36,6 +42,11 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
     } catch (e) { console.warn('[Sentinel] highlight element:', e && e.message); }
   };
 
+  /**
+   * Remove the highlight CSS class from an element after a 500ms delay so the
+   * user can see what was acted upon.
+   * @param {HTMLElement} el - Element to remove highlight from.
+   */
   hl.removeHighlight = function(el) {
     try {
       if (!el || !el.classList) return;

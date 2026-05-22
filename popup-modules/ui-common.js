@@ -5,6 +5,11 @@
 // ========== Shared Helpers ==========
 // getState is defined in popup-state.js (loaded before this file).
 
+/**
+ * Escape a string for safe HTML insertion via textContent→innerHTML round-trip.
+ * @param {string} text - Raw text to escape.
+ * @returns {string} HTML-safe string with <, >, &, " encoded.
+ */
 // eslint-disable-next-line no-unused-vars
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -13,6 +18,12 @@ function escapeHtml(text) {
 }
 
 // ========== HTML Sanitization ==========
+/**
+ * Sanitize an HTML string by removing dangerous elements (script, iframe, etc.)
+ * and stripping event-handler attributes and javascript:/data: URLs.
+ * @param {string} dirtyHtml - Untrusted HTML string.
+ * @returns {string} Sanitized HTML safe for innerHTML insertion.
+ */
 // eslint-disable-next-line no-unused-vars
 function sanitizeHtml(dirtyHtml) {
   const doc = new DOMParser().parseFromString(dirtyHtml, 'text/html');
@@ -45,6 +56,11 @@ function sanitizeHtml(dirtyHtml) {
 }
 
 // ========== Utility Functions ==========
+/**
+ * Check whether a string is a valid URL (parsable by the URL constructor).
+ * @param {string} url - String to validate.
+ * @returns {boolean} True if the URL is syntactically valid.
+ */
 // eslint-disable-next-line no-unused-vars
 function isValidUrl(url) {
   try {
@@ -55,6 +71,12 @@ function isValidUrl(url) {
   }
 }
 
+/**
+ * Show a transient toast notification at the bottom of the popup.
+ * Auto-removes after 3 seconds.
+ * @param {string} message - Text to display in the toast.
+ * @param {'success'|'error'|'info'} [type='success'] - Toast style variant.
+ */
 // eslint-disable-next-line no-unused-vars
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
