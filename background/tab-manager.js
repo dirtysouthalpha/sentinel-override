@@ -7,10 +7,24 @@ let pageLoadConfig = {
   pageLoadTimeout: 25000
 };
 
+/**
+ * Override default page-load configuration.
+ * Merges the provided config into the active pageLoadConfig object.
+ *
+ * @param {object} config - Configuration overrides (e.g. { pageLoadTimeout: 30000 }).
+ */
 export function setPageLoadConfig(config) {
   pageLoadConfig = { ...pageLoadConfig, ...config };
 }
 
+/**
+ * Wait for a tab to finish loading (status === 'complete').
+ * Resolves immediately if the tab is already complete or doesn't exist.
+ * Uses the configured pageLoadTimeout as an upper bound.
+ *
+ * @param {number} tabId - The tab ID to wait for.
+ * @returns {Promise<void>}
+ */
 export async function waitForPageLoad(tabId) {
   const tab = await new Promise(resolve => { chrome.tabs.get(tabId, (i) => { resolve(chrome.runtime.lastError ? null : i); }); });
   if (!tab || tab.status === 'complete') return;
@@ -129,6 +143,15 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
 }
 
 // ========== Content Script Injection ==========
+/**
+ * Create a one-shot listener that waits for the content script to signal readiness.
+ * Returns a promise that resolves to `true` if the content script responds,
+ * or `false` on timeout. Also exposes a `cancel()` method for manual cleanup.
+ *
+ * @param {number} tabId - The tab to listen for.
+ * @param {number} [timeout=3000] - Maximum wait in milliseconds.
+ * @returns {{ promise: Promise<boolean>, cancel: () => void }}
+ */
 export function createContentScriptListener(tabId, timeout = 3000) {
   let timer, listener, resolved = false;
   const promise = new Promise((resolve) => {
@@ -164,6 +187,14 @@ const CONTENT_SCRIPT_FILES = [
   'content/index.js'
 ];
 
+/**
+ * Inject the content script bundle into the target tab and wait for readiness.
+ * Retries up to maxAttempts times with a 500ms delay between attempts.
+ *
+ * @param {number} tabId - The tab to inject into.
+ * @param {number} [maxAttempts=3] - Number of injection attempts.
+ * @returns {Promise<boolean>} True if the content script signaled ready.
+ */
 export async function injectContentScript(tabId, maxAttempts = 3) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const csListener = createContentScriptListener(tabId);
@@ -178,6 +209,17 @@ export async function injectContentScript(tabId, maxAttempts = 3) {
 }
 
 // ========== Message Sending with Retry ==========
+/**
+ * Send a message to the content script in a tab, with automatic retry and
+ * re-injection on failure. Unwraps the content-script response envelope
+ * ({ ok, data }) and the inner execute_command wrapper ({ result }).
+ *
+ * @param {number} tabId - Target tab ID.
+ * @param {object} message - The message payload to send.
+ * @param {number} [maxRetries=3] - Maximum send attempts before throwing.
+ * @returns {Promise<*>} The unwrapped response data from the content script.
+ * @throws {Error} If all retries are exhausted.
+ */
 export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -359,6 +401,18 @@ export function readConsoleMessages(tabId, options) {
   return out.slice(-limit);
 }
 
+/**
+ * Read recent network requests captured for a tab via CDP Network domain.
+ * Supports filtering by status code class and URL substring.
+ * Returns results most-recent-first, limited to `options.limit`.
+ *
+ * @param {number} tabId - The tab to read network requests from.
+ * @param {object} [options] - Filter options.
+ * @param {number} [options.limit=30] - Maximum entries to return.
+ * @param {'failed'|'4xx'|'5xx'} [options.filter] - Status-code filter.
+ * @param {string} [options.url_includes] - Only include URLs containing this substring.
+ * @returns {Array<{method:string,url:string,status:number,type:string,duration_ms:number,failed:boolean,error:string}>}
+ */
 export function readNetworkRequests(tabId, options) {
   const buf = networkBuffers.get(tabId);
   if (!buf) return [];
@@ -390,6 +444,12 @@ export function readNetworkRequests(tabId, options) {
   }));
 }
 
+/**
+ * Clear all observability buffers (console and network) for a tab.
+ * Also removes the tab from the installed-listeners set.
+ *
+ * @param {number} tabId - The tab to clear buffers for.
+ */
 export function clearObservabilityBuffers(tabId) {
   consoleBuffers.delete(tabId);
   networkBuffers.delete(tabId);
@@ -819,6 +879,12 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
 }
 
 // ========== Validation ==========
+/**
+ * Check whether a URL string is a valid http or https URL.
+ *
+ * @param {string} url - The URL to validate.
+ * @returns {boolean} True if the URL parses and uses http: or https: protocol.
+ */
 export function isValidUrl(url) {
   try { const p = new URL(url); return ['http:', 'https:'].includes(p.protocol); } catch { return false; }
 }
