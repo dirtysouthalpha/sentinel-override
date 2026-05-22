@@ -8,11 +8,25 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
   const wait = window.__sentinelUtils.wait;
 
   // ========== Sleep ==========
+  /**
+   * Return a promise that resolves after the specified delay.
+   * @param {number} ms - Delay in milliseconds.
+   * @returns {Promise<void>}
+   */
   wait.sleep = function(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   };
 
   // ========== Wait/Verify Logic ==========
+  /**
+   * Wait for a condition to become true, using MutationObserver with a
+   * polling fallback. Resolves immediately if the condition is already met.
+   * Times out after condition.timeout ms (default 10000).
+   * @param {object} condition - Condition object with type, timeout, and type-specific fields.
+   * @param {string} condition.type - 'wait_for_text', 'wait_for_element', or 'wait_for_navigation'.
+   * @param {number} [condition.timeout=10000] - Maximum wait time in ms.
+   * @returns {Promise<string>} Description of the result (met, timeout, etc.).
+   */
   wait.handleWaitFor = function(condition) {
     const timeout = condition.timeout || 10000;
     const startTime = Date.now();
@@ -55,6 +69,13 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
     });
   };
 
+  /**
+   * Check whether a wait condition is currently met.
+   * Supports wait_for_text (body text contains), wait_for_element (ref or selector),
+   * and wait_for_navigation (URL changed).
+   * @param {object} condition - The condition to check.
+   * @returns {boolean} True if the condition is met.
+   */
   wait.checkCondition = function(condition) {
     if (condition.type === 'wait_for_text') {
       const body = document.body;

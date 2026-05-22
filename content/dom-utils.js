@@ -9,6 +9,12 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   const dom = window.__sentinelUtils.dom;
 
   // ========== Visibility Check ==========
+  /**
+   * Check whether an element is visible on the page.
+   * Returns false for display:none, visibility:hidden, opacity:0, or zero-size elements.
+   * @param {HTMLElement} el - The element to check.
+   * @returns {boolean} True if the element is visible.
+   */
   dom.isVisible = function(el) {
     try {
       const style = document.defaultView.getComputedStyle(el);
@@ -20,6 +26,13 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   };
 
   // ========== Interactability Check (#20) ==========
+  /**
+   * Check whether an element is interactable for a given action type.
+   * Detects pointer-events:none, disabled, and aria-disabled states.
+   * @param {HTMLElement} el - The element to check.
+   * @param {string} action - The action being attempted (e.g. 'click').
+   * @returns {string|null} A reason string if blocked, or null if interactable.
+   */
   dom.checkInteractable = function(el, action) {
     if (!el) return 'Element not found';
     try {
@@ -36,6 +49,12 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   };
 
   // ========== Label Extraction ==========
+  /**
+   * Extract a human-readable label from an element.
+   * Tries innerText, placeholder, aria-label, title, value, then name attributes.
+   * @param {HTMLElement} el - The element to extract a label from.
+   * @returns {string} The extracted label, or 'No label'.
+   */
   dom.getLabel = function(el) {
     return (
       el.innerText ||
@@ -49,6 +68,13 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   };
 
   // ========== Multi-Strategy Selector ==========
+  /**
+   * Generate a unique CSS selector for an element using a multi-strategy approach.
+   * Prefers data-testid, then aria-label, then id (excluding generic ids),
+   * then name attribute, falling back to nth-of-type path.
+   * @param {HTMLElement} el - The element to generate a selector for.
+   * @returns {string} A CSS selector string.
+   */
   dom.getUniqueSelector = function(el) {
     const testId = el.getAttribute('data-testid');
     if (testId) return `[data-testid="${CSS.escape(testId)}"]`;
@@ -69,6 +95,11 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     return dom.getNthOfTypePath(el);
   };
 
+  /**
+   * Generate an nth-of-type CSS path for an element, up to MAX_DEPTH ancestors.
+   * @param {HTMLElement} el - The element to build a path for.
+   * @returns {string} A CSS selector path using nth-of-type notation.
+   */
   dom.getNthOfTypePath = function(el) {
     const MAX_DEPTH = 8;
     const path = [];
@@ -89,6 +120,14 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   };
 
   // ========== Find Element by Selector ==========
+  /**
+   * Find a DOM element by selector string, with fallback strategies.
+   * Tries standard querySelector, then regex-based parsing for data-testid,
+   * aria-label, and name selectors, and finally pierces shadow DOM.
+   * @param {Document|Element} doc - The root to search from.
+   * @param {string} selector - The CSS selector string.
+   * @returns {HTMLElement|null} The found element, or null.
+   */
   dom.findElementBySelector = function(doc, selector) {
     if (!selector) return null;
     try {
@@ -134,12 +173,23 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
   let __sentinelRefLookup = new Map();
   let __sentinelScanId = 0;
 
+  /**
+   * Reset the ref ID counter and lookup map for a new scan pass.
+   * @private
+   */
   dom._beginScan = function() {
     __sentinelRefCounter = 0;
     __sentinelRefLookup = new Map();
     __sentinelScanId++;
   };
 
+  /**
+   * Assign a stable ref ID (e.g. "ref_3") to an element and store a WeakRef
+   * in the lookup map for later resolution.
+   * @param {HTMLElement} el - The element to assign a ref to.
+   * @returns {string} The assigned ref ID.
+   * @private
+   */
   dom._assignRef = function(el) {
     __sentinelRefCounter++;
     const refId = 'ref_' + __sentinelRefCounter;
@@ -152,6 +202,13 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     return refId;
   };
 
+  /**
+   * Resolve a ref ID back to its live DOM element.
+   * Returns null if the ref is unknown, the element was garbage-collected,
+   * or the element is no longer connected to the document.
+   * @param {string} refId - The ref ID (e.g. "ref_5").
+   * @returns {HTMLElement|null} The live element, or null.
+   */
   dom.findElementByRef = function(refId) {
     if (!refId || typeof refId !== 'string') return null;
     const wr = __sentinelRefLookup.get(refId);
@@ -165,9 +222,22 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     return el;
   };
 
+  /**
+   * Get the current scan ID (incremented on each _beginScan call).
+   * @returns {number} The current scan ID.
+   */
   dom.getCurrentScanId = function() { return __sentinelScanId; };
 
   // ========== Document Scanning ==========
+  /**
+   * Scan a document (and its shadow DOM trees) for interactive elements.
+   * Collects visible interactive elements into the interactiveElements array
+   * and populates the selectorMap Set to prevent duplicates.
+   * @param {Document|Element} doc - The root to scan.
+   * @param {Array} interactiveElements - Accumulator array for found elements.
+   * @param {Set} selectorMap - Set of seen selectors for deduplication.
+   * @param {string} [prefix] - Optional selector prefix for iframe-scoped elements.
+   */
   dom.scanDocument = function(doc, interactiveElements, selectorMap, prefix) {
     const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
     if (!prefix) {
@@ -204,7 +274,16 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     }
   };
 
-  // Internal helper: add an element to the interactive elements list
+  /**
+   * Internal helper: add a single element to the interactive elements list.
+   * Assigns a ref ID, computes bounding box, and extracts metadata.
+   * @param {HTMLElement} el - The interactive element.
+   * @param {Array} interactiveElements - Accumulator array.
+   * @param {Set} selectorMap - Deduplication set.
+   * @param {string} prefix - Selector prefix.
+   * @param {boolean} inShadowDOM - Whether the element is inside a shadow root.
+   * @private
+   */
   dom._addElement = function(el, interactiveElements, selectorMap, prefix, inShadowDOM) {
     const text = dom.getLabel(el);
     const selector = prefix + dom.getUniqueSelector(el);
