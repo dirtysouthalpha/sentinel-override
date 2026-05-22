@@ -39,6 +39,11 @@ const MENU_ITEMS = [
     title: '⏺️ Start Recording Macro',
     contexts: ['page'],
   },
+  {
+    id: 'sentinel-quick-assist',
+    title: '⚡ Sentinel Quick Assist',
+    contexts: ['selection'],
+  },
 ];
 
 export function installContextMenus() {
