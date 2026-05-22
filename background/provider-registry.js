@@ -553,7 +553,7 @@ export const PROVIDER_CATALOG = [
     id: 'zai', label: 'Z.ai (GLM)', kind: 'openai',
     endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
     modelsUrl: null,
-    defaultModel: 'glm-5.1',
+    defaultModel: 'glm-5',
     auth: 'bearer',
     docsUrl: 'https://www.z.ai/api'
   },
