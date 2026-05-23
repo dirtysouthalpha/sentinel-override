@@ -1,0 +1,349 @@
+
+> sentinel-override@3.46.0 test
+> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/scheduler.test.js
+
+  console.warn
+    [Sentinel/telemetry] init error: chrome is not defined
+
+    [0m [90m 194 |[39m       }
+     [90m 195 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 196 |[39m   } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel/telemetry] init error:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 197 |[39m })()[33m;[39m
+     [90m 198 |[39m
+     [90m 199 |[39m [36mfunction[39m _scheduleFlush() {[0m
+
+      at loadLevel (background/telemetry.js:196:25)
+      at background/telemetry.js:197:3
+
+  console.warn
+    [Sentinel/skills] init error: chrome is not defined
+
+    [0m [90m 57 |[39m       }
+     [90m 58 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 59 |[39m   } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel/skills] init error:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                         [31m[1m^[22m[39m
+     [90m 60 |[39m })()[33m;[39m
+     [90m 61 |[39m
+     [90m 62 |[39m [90m/**[39m[0m
+
+      at loadAdaptiveState (background/skills/index.js:59:25)
+      at background/skills/index.js:60:3
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 0 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    [Sentinel/scheduler] Invalid alarm name: schedule-
+
+    [0m [90m 461 |[39m   [36mconst[39m scheduleId [33m=[39m alarmName[33m.[39mreplace([32m'schedule-'[39m[33m,[39m [32m''[39m)[33m;[39m
+     [90m 462 |[39m   [36mif[39m ([33m![39mscheduleId) {
+    [31m[1m>[22m[39m[90m 463 |[39m     console[33m.[39merror([32m'[Sentinel/scheduler] Invalid alarm name:'[39m[33m,[39m alarmName)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 464 |[39m     [36mreturn[39m[33m;[39m
+     [90m 465 |[39m   }
+     [90m 466 |[39m[0m
+
+      at executeScheduledTask (background/scheduler.js:463:13)
+      at Object.<anonymous> (tests/scheduler.test.js:416:18)
+
+  console.warn
+    [Sentinel/scheduler] Schedule nonexistent-id not found, clearing orphan alarm
+
+    [0m [90m 469 |[39m   [36mconst[39m schedule [33m=[39m schedules[scheduleId][33m;[39m
+     [90m 470 |[39m   [36mif[39m ([33m![39mschedule) {
+    [31m[1m>[22m[39m[90m 471 |[39m     console[33m.[39mwarn([32m`[Sentinel/scheduler] Schedule ${scheduleId} not found, clearing orphan alarm`[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 472 |[39m     clearAlarm(scheduleId)[33m;[39m
+     [90m 473 |[39m     [36mreturn[39m[33m;[39m
+     [90m 474 |[39m   }[0m
+
+      at executeScheduledTask (background/scheduler.js:471:13)
+      at Object.<anonymous> (tests/scheduler.test.js:420:5)
+
+  console.log
+    [Sentinel/scheduler] Executing scheduled task: Test Schedule { goal: 'Check the dashboard for alerts' }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Executing scheduled task: Test Schedule { goal: 'Check the dashboard for alerts' }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Executing scheduled task: Test Schedule { goal: 'Check the dashboard for alerts' }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    Failed to resolve goal for schedule Template Schedule: Error: Template not found: bad-template
+        at resolveTemplateGoal (C:\Users\Administrator\Projects\sentinel-override\background\template-manager.js:227:11)
+        at executeScheduledTask (C:\Users\Administrator\Projects\sentinel-override\background\scheduler.js:500:14)
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\tests\scheduler.test.js:518:5)
+
+    [0m [90m 503 |[39m     }
+     [90m 504 |[39m   } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 505 |[39m     console[33m.[39merror([32m`Failed to resolve goal for schedule ${schedule.name}:`[39m[33m,[39m err)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 506 |[39m     [36mtry[39m {
+     [90m 507 |[39m       [36mawait[39m storeResult(schedule[33m,[39m {
+     [90m 508 |[39m         status[33m:[39m [32m'failure'[39m[33m,[39m[0m
+
+      at executeScheduledTask (background/scheduler.js:505:13)
+      at Object.<anonymous> (tests/scheduler.test.js:518:5)
+
+  console.log
+    [Sentinel/scheduler] Executing scheduled task: Test Schedule { goal: 'Check the dashboard for alerts' }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    Failed to get/create tab: Error: Tab creation blocked
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\tests\scheduler.test.js:530:42)
+
+    [0m [90m 549 |[39m     }
+     [90m 550 |[39m   } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 551 |[39m     console[33m.[39merror([32m'Failed to get/create tab:'[39m[33m,[39m err)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 552 |[39m     [36mtry[39m {
+     [90m 553 |[39m       [36mawait[39m storeResult(schedule[33m,[39m {
+     [90m 554 |[39m         id[33m:[39m resultId[33m,[39m[0m
+
+      at executeScheduledTask (background/scheduler.js:551:13)
+      at Object.<anonymous> (tests/scheduler.test.js:532:5)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    Failed to check/register alarm for schedule Test Schedule: Error: alarms API failure
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\tests\scheduler.test.js:591:13)
+        at C:\Users\Administrator\Projects\sentinel-override\node_modules\jest-mock\build\index.js:397:39
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\node_modules\jest-mock\build\index.js:404:13)
+        at Object.mockConstructor [as get] (C:\Users\Administrator\Projects\sentinel-override\node_modules\jest-mock\build\index.js:108:19)
+        at alarm (C:\Users\Administrator\Projects\sentinel-override\background\scheduler.js:812:23)
+        at new Promise (<anonymous>)
+        at initScheduler (C:\Users\Administrator\Projects\sentinel-override\background\scheduler.js:811:27)
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\tests\scheduler.test.js:595:5)
+
+    [0m [90m 827 |[39m       }
+     [90m 828 |[39m     } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 829 |[39m       console[33m.[39merror([32m`Failed to check/register alarm for schedule ${schedule.name}:`[39m[33m,[39m err)[33m;[39m
+     [90m     |[39m               [31m[1m^[22m[39m
+     [90m 830 |[39m     }
+     [90m 831 |[39m   }
+     [90m 832 |[39m[0m
+
+      at initScheduler (background/scheduler.js:829:15)
+      at Object.<anonymous> (tests/scheduler.test.js:595:5)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Executing scheduled task: Test Schedule { goal: 'Check the dashboard for alerts' }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    Failed to resolve goal for schedule Recurring Template: Error: Template not found: tpl-bad
+        at resolveTemplateGoal (C:\Users\Administrator\Projects\sentinel-override\background\template-manager.js:227:11)
+        at executeScheduledTask (C:\Users\Administrator\Projects\sentinel-override\background\scheduler.js:500:14)
+        at Object.<anonymous> (C:\Users\Administrator\Projects\sentinel-override\tests\scheduler.test.js:827:5)
+
+    [0m [90m 503 |[39m     }
+     [90m 504 |[39m   } [36mcatch[39m (err) {
+    [31m[1m>[22m[39m[90m 505 |[39m     console[33m.[39merror([32m`Failed to resolve goal for schedule ${schedule.name}:`[39m[33m,[39m err)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 506 |[39m     [36mtry[39m {
+     [90m 507 |[39m       [36mawait[39m storeResult(schedule[33m,[39m {
+     [90m 508 |[39m         status[33m:[39m [32m'failure'[39m[33m,[39m[0m
+
+      at executeScheduledTask (background/scheduler.js:505:13)
+      at Object.<anonymous> (tests/scheduler.test.js:827:5)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    [Sentinel/scheduler] Invalid alarm name: schedule-
+
+    [0m [90m 461 |[39m   [36mconst[39m scheduleId [33m=[39m alarmName[33m.[39mreplace([32m'schedule-'[39m[33m,[39m [32m''[39m)[33m;[39m
+     [90m 462 |[39m   [36mif[39m ([33m![39mscheduleId) {
+    [31m[1m>[22m[39m[90m 463 |[39m     console[33m.[39merror([32m'[Sentinel/scheduler] Invalid alarm name:'[39m[33m,[39m alarmName)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 464 |[39m     [36mreturn[39m[33m;[39m
+     [90m 465 |[39m   }
+     [90m 466 |[39m[0m
+
+      at executeScheduledTask (background/scheduler.js:463:13)
+      at Object.<anonymous> (tests/scheduler.test.js:1309:18)
+
+  console.warn
+    [Sentinel/scheduler] Schedule some-other-alarm not found, clearing orphan alarm
+
+    [0m [90m 469 |[39m   [36mconst[39m schedule [33m=[39m schedules[scheduleId][33m;[39m
+     [90m 470 |[39m   [36mif[39m ([33m![39mschedule) {
+    [31m[1m>[22m[39m[90m 471 |[39m     console[33m.[39mwarn([32m`[Sentinel/scheduler] Schedule ${scheduleId} not found, clearing orphan alarm`[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 472 |[39m     clearAlarm(scheduleId)[33m;[39m
+     [90m 473 |[39m     [36mreturn[39m[33m;[39m
+     [90m 474 |[39m   }[0m
+
+      at executeScheduledTask (background/scheduler.js:471:13)
+      at Object.<anonymous> (tests/scheduler.test.js:1316:5)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 0 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.warn
+    [Sentinel/scheduler] loadSchedules failed: storage error
+
+    [0m [90m 51 |[39m     [36mreturn[39m result[[33mSCHEDULES_KEY[39m] [33m||[39m {}[33m;[39m
+     [90m 52 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 53 |[39m     console[33m.[39mwarn([32m'[Sentinel/scheduler] loadSchedules failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 54 |[39m     [36mreturn[39m {}[33m;[39m
+     [90m 55 |[39m   }
+     [90m 56 |[39m }[0m
+
+      at loadSchedules (background/scheduler.js:53:13)
+      at listSchedules (background/scheduler.js:340:21)
+      at Object.<anonymous> (tests/scheduler.test.js:1518:20)
+
+  console.warn
+    [Sentinel/scheduler] saveSchedules failed: quota
+
+    [0m [90m 64 |[39m     [36mawait[39m chrome[33m.[39mstorage[33m.[39mlocal[33m.[39m[36mset[39m({ [[33mSCHEDULES_KEY[39m][33m:[39m schedules })[33m;[39m
+     [90m 65 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 66 |[39m     console[33m.[39mwarn([32m'[Sentinel/scheduler] saveSchedules failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 67 |[39m   }
+     [90m 68 |[39m }
+     [90m 69 |[39m[0m
+
+      at saveSchedules (background/scheduler.js:66:13)
+      at createSchedule (background/scheduler.js:327:3)
+      at Object.<anonymous> (tests/scheduler.test.js:1525:22)
+
+  console.warn
+    [Sentinel/scheduler] loadResults failed: storage error
+
+    [0m [90m 77 |[39m     [36mreturn[39m result[[33mRESULTS_KEY[39m] [33m||[39m {}[33m;[39m
+     [90m 78 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 79 |[39m     console[33m.[39mwarn([32m'[Sentinel/scheduler] loadResults failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 80 |[39m     [36mreturn[39m {}[33m;[39m
+     [90m 81 |[39m   }
+     [90m 82 |[39m }[0m
+
+      at loadResults (background/scheduler.js:79:13)
+      at getRecentResults (background/scheduler.js:772:19)
+      at Object.<anonymous> (tests/scheduler.test.js:1537:20)
+
+  console.log
+    [Sentinel/scheduler] Initializing scheduler...
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/scheduler] Scheduler initialized. 1 enabled schedules.
+
+      at emit (background/telemetry.js:370:22)
+
+  console.warn
+    [Sentinel/scheduler] saveSchedules failed: Storage quota exceeded
+
+    [0m [90m 64 |[39m     [36mawait[39m chrome[33m.[39mstorage[33m.[39mlocal[33m.[39m[36mset[39m({ [[33mSCHEDULES_KEY[39m][33m:[39m schedules })[33m;[39m
+     [90m 65 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 66 |[39m     console[33m.[39mwarn([32m'[Sentinel/scheduler] saveSchedules failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 67 |[39m   }
+     [90m 68 |[39m }
+     [90m 69 |[39m[0m
+
+      at saveSchedules (background/scheduler.js:66:13)
+      at createSchedule (background/scheduler.js:327:3)
+      at Object.<anonymous> (tests/scheduler.test.js:1616:22)
+
+  console.warn
+    [Sentinel/scheduler] loadResults failed: Results storage corrupted
+
+    [0m [90m 77 |[39m     [36mreturn[39m result[[33mRESULTS_KEY[39m] [33m||[39m {}[33m;[39m
+     [90m 78 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 79 |[39m     console[33m.[39mwarn([32m'[Sentinel/scheduler] loadResults failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 80 |[39m     [36mreturn[39m {}[33m;[39m
+     [90m 81 |[39m   }
+     [90m 82 |[39m }[0m
+
+      at loadResults (background/scheduler.js:79:13)
+      at getRecentResults (background/scheduler.js:772:19)
+      at Object.<anonymous> (tests/scheduler.test.js:1650:21)
+
