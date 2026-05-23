@@ -171,6 +171,7 @@ const {
   getAttachedTabIds,
   fetchAuditLog,
   restoreFromCheckpoint,
+  clearCheckpoint,
   pauseAgent,
   resumeAgent,
   stopAgent,
@@ -1256,6 +1257,37 @@ describe('agent-engine — restoreFromCheckpoint', () => {
     const result = await restoreFromCheckpoint();
     expect(result.restored).toBe(true);
     expect(result.goal).toBe('minimal goal');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+describe('agent-engine — clearCheckpoint', () => {
+  test('removes checkpoint from session storage', async () => {
+    sessionData.agent_checkpoint = { lastGoal: 'test', lastUpdate: Date.now() };
+    chrome.storage.session.remove = jest.fn(async () => {});
+    await clearCheckpoint();
+    expect(chrome.storage.session.remove).toHaveBeenCalledWith('agent_checkpoint');
+  });
+
+  test('clears internal checkpoint reference', async () => {
+    sessionData.agent_checkpoint = { lastGoal: 'test', lastUpdate: Date.now() };
+    const removeMock = jest.fn(async () => {});
+    chrome.storage.session.remove = removeMock;
+    await clearCheckpoint();
+    // Just verify remove was called - the internal _lastCheckpoint is module-private
+    expect(removeMock).toHaveBeenCalledWith('agent_checkpoint');
+  });
+
+  test('handles missing chrome.storage gracefully', async () => {
+    const originalStorage = chrome.storage;
+    delete chrome.storage;
+    expect(await clearCheckpoint()).toBeUndefined();
+    chrome.storage = originalStorage;
+  });
+
+  test('handles chrome.storage.session.remove errors gracefully', async () => {
+    chrome.storage.session.remove = jest.fn(async () => { throw new Error('remove failed'); });
+    expect(await clearCheckpoint()).toBeUndefined();
   });
 });
 

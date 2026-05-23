@@ -32,5 +32,6 @@ sentinel-override-v*.zip
 coverage-stderr.txt
 coverage/
 test-output.txt
+*-output.txt
 scripts/analyze-functions.js
 scripts/check-coverage.js
