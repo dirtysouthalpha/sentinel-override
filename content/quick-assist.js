@@ -261,7 +261,7 @@
       // Inline code `text`
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       // Lists: - item or * item or 1. item
-      .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
       .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
       // Line breaks
       .replace(/\n/g, '<br>');
@@ -710,7 +710,7 @@
       if (chrome.runtime.lastError) return;
       enabled = result.quickAssist !== false; // default ON
     });
-  } catch (e) {
+  } catch (_e) {
     // Storage not available — keep enabled
   }
 

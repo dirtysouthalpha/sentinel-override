@@ -30,7 +30,6 @@ export async function handleQuickAssist(prompt) {
 
   if (config.id === 'anthropic') {
     // Anthropic uses system field + messages array
-    const systemPart = prompt.split('\n---\n')[0] || prompt.substring(0, 500);
     const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
     body = {
       model: config.model,

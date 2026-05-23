@@ -431,31 +431,6 @@ if (quickModeToggle) {
   });
 }
 
-// (3.46.0) Quick Assist — inline AI on any page
-const quickAssistToggle = document.getElementById('quickAssistToggle');
-const quickAssistLabel = document.getElementById('quickAssistLabel');
-if (quickAssistToggle) {
-  chrome.storage.local.get(['quickAssist'], (result) => {
-    const enabled = result.quickAssist !== false; // default ON
-    quickAssistToggle.checked = enabled;
-    if (quickAssistLabel) {
-      quickAssistLabel.textContent = enabled
-        ? 'ON — Select text on any page'
-        : 'OFF — Quick Assist disabled';
-    }
-  });
-  quickAssistToggle.addEventListener('change', () => {
-    const enabled = quickAssistToggle.checked;
-    chrome.storage.local.set({ quickAssist: enabled }, () => {
-      if (quickAssistLabel) {
-        quickAssistLabel.textContent = enabled
-          ? 'ON — Select text on any page'
-          : 'OFF — Quick Assist disabled';
-      }
-    });
-  });
-}
-
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
