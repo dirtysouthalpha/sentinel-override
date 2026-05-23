@@ -57,7 +57,7 @@ export function startSwKeepalive(name) {
       } else if (chrome && chrome.runtime && chrome.runtime.getPlatformInfo) {
         chrome.runtime.getPlatformInfo(() => {});
       }
-    } catch { /* ignore */ }
+    } catch (e) { /* chrome API not available */ }
   };
   tick();
   const handle = setInterval(tick, 20000);
@@ -80,7 +80,7 @@ export function stopSwKeepalive(name) {
   _keepaliveRefCounts.delete(name);
   const handle = _keepaliveHandles.get(name);
   if (handle) {
-    try { clearInterval(handle); } catch { /* clearInterval is safe to ignore */ }
+    try { clearInterval(handle); } catch (e) { /* clearInterval is safe to ignore */ }
     _keepaliveHandles.delete(name);
   }
   // Clean the session pulse key so it doesn't leak.
@@ -90,7 +90,7 @@ export function stopSwKeepalive(name) {
         console.error('[handle] Unhandled rejection:', e);
       });
     }
-  } catch { /* session storage may not be available */ }
+  } catch (e) { /* session storage may not be available */ }
 }
 
 // (3.11.3) Centralized "fire a desktop notification only if the user enabled
