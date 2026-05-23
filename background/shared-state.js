@@ -121,5 +121,5 @@ export async function notifyIfEnabled(idOrOpts, optsIfId) {
     } else {
       await chrome.notifications.create(idOrOpts);
     }
-  } catch { /* notifications permission optional / storage unavailable */ }
+  } catch (e) { /* notifications permission optional / storage unavailable */ }
 }
