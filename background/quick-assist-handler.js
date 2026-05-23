@@ -51,17 +51,30 @@ export async function handleQuickAssist(prompt) {
     };
   }
 
-  const response = await fetch(config.endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body)
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
+  try {
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    return provider.parseResponse(data);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out after 30 seconds. Please try again.');
+    }
+    throw error;
   }
-
-  const data = await response.json();
-  return provider.parseResponse(data);
 }
