@@ -65,45 +65,79 @@ if (typeof globalThis.crypto === 'undefined' || !globalThis.crypto.randomUUID) {
 }
 
 // ── Mock dependencies ──
+// Store mock functions so they can be accessed in tests
+const mockCallLLMWithRetry = jest.fn(async () => ({ type: 'finish', summary: 'done' }));
+const mockGeneratePlan = jest.fn(async () => ['Step 1', 'Step 2']);
+const mockSupportsVision = jest.fn(() => true);
+const mockGetPlatformContext = jest.fn(() => '');
+const mockGetRelevantPatterns = jest.fn(async () => []);
+
 jest.unstable_mockModule('../background/llm-client.js', () => ({
-  callLLMWithRetry: jest.fn(async () => ({ type: 'finish', summary: 'done' })),
-  generatePlan: jest.fn(async () => ['Step 1', 'Step 2']),
-  supportsVision: jest.fn(() => true),
-  getPlatformContext: jest.fn(() => ''),
-  getRelevantPatterns: jest.fn(async () => []),
+  callLLMWithRetry: mockCallLLMWithRetry,
+  generatePlan: mockGeneratePlan,
+  supportsVision: mockSupportsVision,
+  getPlatformContext: mockGetPlatformContext,
+  getRelevantPatterns: mockGetRelevantPatterns,
 }));
 
 jest.unstable_mockModule('../background/platforms/index.js', () => ({
   getPlatformProfile: jest.fn(() => null),
 }));
 
+// Store CDP mock functions
+const mockWaitForPageLoad = jest.fn(async () => {});
+const mockWaitForPageReady = jest.fn(async () => {});
+const mockInjectContentScript = jest.fn(async () => {});
+const mockSendMessageWithRetry = jest.fn(async () => ({}));
+const mockTakeScreenshot = jest.fn(async () => 'data:image/png;base64,abc');
+const mockIsValidUrl = jest.fn(() => true);
+const mockGetTabInfo = jest.fn(async () => ({ url: 'https://example.com', title: 'Test' }));
+const mockDetachAllDebuggees = jest.fn(async () => {});
+const mockCdpDispatchClick = jest.fn(async () => {});
+const mockCdpDispatchType = jest.fn(async () => {});
+const mockCdpDispatchKey = jest.fn(async () => {});
+const mockCdpExecuteJs = jest.fn(async () => ({ ok: true, value: 'test' }));
+const mockReadConsoleMessages = jest.fn(async () => []);
+const mockReadNetworkRequests = jest.fn(async () => []);
+
 jest.unstable_mockModule('../background/tab-manager.js', () => ({
-  waitForPageLoad: jest.fn(async () => {}),
-  waitForPageReady: jest.fn(async () => {}),
-  injectContentScript: jest.fn(async () => {}),
-  sendMessageWithRetry: jest.fn(async () => ({})),
-  takeScreenshot: jest.fn(async () => 'data:image/png;base64,abc'),
-  isValidUrl: jest.fn(() => true),
-  getTabInfo: jest.fn(async () => ({ url: 'https://example.com', title: 'Test' })),
-  detachAllDebuggees: jest.fn(async () => {}),
-  cdpDispatchClick: jest.fn(async () => {}),
-  cdpDispatchType: jest.fn(async () => {}),
-  cdpDispatchKey: jest.fn(async () => {}),
-  cdpExecuteJs: jest.fn(async () => ({ ok: true, value: 'test' })),
-  readConsoleMessages: jest.fn(async () => []),
-  readNetworkRequests: jest.fn(async () => []),
+  waitForPageLoad: mockWaitForPageLoad,
+  waitForPageReady: mockWaitForPageReady,
+  injectContentScript: mockInjectContentScript,
+  sendMessageWithRetry: mockSendMessageWithRetry,
+  takeScreenshot: mockTakeScreenshot,
+  isValidUrl: mockIsValidUrl,
+  getTabInfo: mockGetTabInfo,
+  detachAllDebuggees: mockDetachAllDebuggees,
+  cdpDispatchClick: mockCdpDispatchClick,
+  cdpDispatchType: mockCdpDispatchType,
+  cdpDispatchKey: mockCdpDispatchKey,
+  cdpExecuteJs: mockCdpExecuteJs,
+  readConsoleMessages: mockReadConsoleMessages,
+  readNetworkRequests: mockReadNetworkRequests,
 }));
 
+// Store message-protocol mock functions
+const mockSendSilentUpdate = jest.fn();
+const mockSendActionMessage = jest.fn();
+const mockSendActionResult = jest.fn();
+const mockSendReportUpdate = jest.fn();
+const mockSendPageContext = jest.fn();
+const mockSendTabStateUpdate = jest.fn();
+const mockSendScreenshotUpdate = jest.fn();
+const mockSendAgentActivity = jest.fn();
+const mockSendAgentStepStart = jest.fn();
+
 jest.unstable_mockModule('../background/message-protocol.js', () => ({
-  sendSilentUpdate: jest.fn(),
-  sendActionMessage: jest.fn(),
-  sendActionResult: jest.fn(),
-  sendReportUpdate: jest.fn(),
-  sendPageContext: jest.fn(),
-  sendTabStateUpdate: jest.fn(),
-  sendScreenshotUpdate: jest.fn(),
-  sendAgentActivity: jest.fn(),
-  sendAgentStepStart: jest.fn(),
+  sendSilentUpdate: mockSendSilentUpdate,
+  sendActionMessage: mockSendActionMessage,
+  sendActionResult: mockSendActionResult,
+  sendReportUpdate: mockSendReportUpdate,
+  sendPageContext: mockSendPageContext,
+  sendTabStateUpdate: mockSendTabStateUpdate,
+  sendScreenshotUpdate: mockSendScreenshotUpdate,
+  sendAgentActivity: mockSendAgentActivity,
+  sendAgentStepStart: mockSendAgentStepStart,
 }));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
@@ -209,10 +243,6 @@ const {
   resetAgentState,
   _isUnproductiveJsResult,
 } = agentEngine;
-
-// Dynamic imports for mocked modules (for re-configuring in tests)
-import * as cdpModule from '../background/tab-manager.js';
-import * as msgModule from '../background/message-protocol.js';
 
 // ── Helpers ──
 // Simulate a chrome.runtime.onMessage listener receiving a message.
@@ -772,61 +802,61 @@ describe('detectSignInWall', () => {
 // ══════════════════════════════════════════════════════════════════════
 describe('_runExecuteJsOnce', () => {
   test('returns JS Result with string value on CDP success', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: 'hello world' });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: 'hello world' });
     const result = await _runExecuteJsOnce(1, 'return "hello world"', 5000);
     expect(result).toBe('JS Result: hello world');
   });
 
   test('returns JS Result with object value serialized', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: { a: 1, b: 2 } });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: { a: 1, b: 2 } });
     const result = await _runExecuteJsOnce(1, 'return obj', 5000);
     expect(result).toMatch(/^JS Result: /);
     expect(result).toContain('"a":1');
   });
 
   test('returns JS Result with empty string for null value', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: null });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: null });
     const result = await _runExecuteJsOnce(1, 'return null', 5000);
     expect(result).toBe('JS Result: ');
   });
 
   test('returns JS Result with empty string for undefined value', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: undefined });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: undefined });
     const result = await _runExecuteJsOnce(1, 'return undefined', 5000);
     expect(result).toBe('JS Result: ');
   });
 
   test('falls back to content script on attachDenied', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
-    cdpModule.sendMessageWithRetry.mockResolvedValueOnce('Content script result');
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
+    mockSendMessageWithRetry.mockResolvedValueOnce('Content script result');
     const result = await _runExecuteJsOnce(1, 'return 1', 5000);
     expect(result).toBe('Content script result');
   });
 
   test('falls back to content script on CDP error', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: false, error: 'timeout' });
-    cdpModule.sendMessageWithRetry.mockResolvedValueOnce('Fallback worked');
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: false, error: 'timeout' });
+    mockSendMessageWithRetry.mockResolvedValueOnce('Fallback worked');
     const result = await _runExecuteJsOnce(1, 'return 1', 5000);
     expect(result).toBe('Fallback worked');
   });
 
   test('falls back to content script on CDP exception', async () => {
-    cdpModule.cdpExecuteJs.mockRejectedValueOnce(new Error('CDP crashed'));
-    cdpModule.sendMessageWithRetry.mockResolvedValueOnce('CS result');
+    mockCdpExecuteJs.mockRejectedValueOnce(new Error('CDP crashed'));
+    mockSendMessageWithRetry.mockResolvedValueOnce('CS result');
     const result = await _runExecuteJsOnce(1, 'return 1', 5000);
     expect(result).toBe('CS result');
   });
 
   test('returns Done when content script returns falsy', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
-    cdpModule.sendMessageWithRetry.mockResolvedValueOnce(null);
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
+    mockSendMessageWithRetry.mockResolvedValueOnce(null);
     const result = await _runExecuteJsOnce(1, 'return 1', 5000);
     expect(result).toBe('Done');
   });
 
   test('returns JS Error when content script throws', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
-    cdpModule.sendMessageWithRetry.mockRejectedValueOnce(new Error('CS failed'));
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: false, attachDenied: true });
+    mockSendMessageWithRetry.mockRejectedValueOnce(new Error('CS failed'));
     const result = await _runExecuteJsOnce(1, 'return 1', 5000);
     expect(result).toMatch(/^JS Error:/);
     expect(result).toContain('CS failed');
@@ -834,7 +864,7 @@ describe('_runExecuteJsOnce', () => {
 
   test('truncates object values to 3000 chars', async () => {
     const longObj = { data: 'x'.repeat(4000) };
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: longObj });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: longObj });
     const result = await _runExecuteJsOnce(1, 'return big', 5000);
     // The JS Result prefix + JSON stringified should be truncated
     const valPart = result.replace('JS Result: ', '');
@@ -847,7 +877,7 @@ describe('_runExecuteJsOnce', () => {
 // ══════════════════════════════════════════════════════════════════════
 describe('_runExecuteJsWithRetryLadder', () => {
   test('returns original strategy on success', async () => {
-    cdpModule.cdpExecuteJs.mockResolvedValueOnce({ ok: true, value: 'good data here' });
+    mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: 'good data here' });
     const result = await _runExecuteJsWithRetryLadder(1, 'return document.title', 5000);
     expect(result.strategy).toBe('original');
     expect(result.raw).toContain('good data here');
@@ -855,7 +885,7 @@ describe('_runExecuteJsWithRetryLadder', () => {
 
   test('falls back to body_text when original is unproductive', async () => {
     // First call (original): returns empty
-    cdpModule.cdpExecuteJs
+    mockCdpExecuteJs
       .mockResolvedValueOnce({ ok: true, value: '' })
       .mockResolvedValueOnce({ ok: true, value: 'Body text content from the page that is long enough' });
     const result = await _runExecuteJsWithRetryLadder(1, 'return ""', 5000);
@@ -864,7 +894,7 @@ describe('_runExecuteJsWithRetryLadder', () => {
   });
 
   test('falls back to visible_text when body_text is unproductive', async () => {
-    cdpModule.cdpExecuteJs
+    mockCdpExecuteJs
       .mockResolvedValueOnce({ ok: true, value: '' })       // original: empty
       .mockResolvedValueOnce({ ok: true, value: '' })        // body_text: empty
       .mockResolvedValueOnce({ ok: true, value: 'Visible element text aggregated from the page DOM' });
@@ -873,23 +903,23 @@ describe('_runExecuteJsWithRetryLadder', () => {
   });
 
   test('returns all_failed when all strategies are unproductive', async () => {
-    cdpModule.cdpExecuteJs
+    mockCdpExecuteJs
       .mockResolvedValue({ ok: true, value: '' });
     const result = await _runExecuteJsWithRetryLadder(1, 'return ""', 5000);
     expect(result.strategy).toBe('all_failed');
   });
 
   test('returns all_failed when all return null', async () => {
-    cdpModule.cdpExecuteJs
+    mockCdpExecuteJs
       .mockResolvedValue({ ok: true, value: null });
     const result = await _runExecuteJsWithRetryLadder(1, 'return null', 5000);
     expect(result.strategy).toBe('all_failed');
   });
 
   test('returns all_failed when all return JS Error', async () => {
-    cdpModule.cdpExecuteJs
+    mockCdpExecuteJs
       .mockResolvedValue({ ok: false, error: 'crash' });
-    cdpModule.sendMessageWithRetry
+    mockSendMessageWithRetry
       .mockRejectedValue(new Error('CS error'));
     const result = await _runExecuteJsWithRetryLadder(1, 'bad code', 5000);
     expect(result.strategy).toBe('all_failed');
@@ -1150,9 +1180,15 @@ describe('requestTenantOverride', () => {
 // 13. activityStart / activityDone / activityFail / activityUpdate
 // ══════════════════════════════════════════════════════════════════════
 describe('activity tracking helpers', () => {
+  test('mock is a jest mock', () => {
+    // Verify the mock is actually a Jest mock
+    expect(jest.isMockFunction(mockSendAgentActivity)).toBe(true);
+  });
+
   test('activityStart sends in_progress status', () => {
+    mockSendAgentActivity.mockClear();
     activityStart(3, 'observe', 'Observing page');
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       3, 'observe', 'Observing page', 'in_progress', null
     );
   });
@@ -1160,10 +1196,10 @@ describe('activity tracking helpers', () => {
   test('activityDone sends done status with durationMs', () => {
     // Start first to set the timestamp
     activityStart(3, 'observe', 'Observing page');
-    msgModule.sendAgentActivity.mockClear();
+    mockSendAgentActivity.mockClear();
 
     activityDone(3, 'observe', 'Observing page', { detail: 'some detail' });
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       3, 'observe', 'Observing page', 'done',
       expect.objectContaining({ durationMs: expect.any(Number), detail: 'some detail' })
     );
@@ -1171,7 +1207,7 @@ describe('activity tracking helpers', () => {
 
   test('activityDone with no prior start still works (durationMs null)', () => {
     activityDone(5, 'missing', 'Was never started');
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       5, 'missing', 'Was never started', 'done',
       expect.objectContaining({ durationMs: null })
     );
@@ -1179,10 +1215,10 @@ describe('activity tracking helpers', () => {
 
   test('activityFail sends failed status with durationMs', () => {
     activityStart(3, 'click', 'Clicking button');
-    msgModule.sendAgentActivity.mockClear();
+    mockSendAgentActivity.mockClear();
 
     activityFail(3, 'click', 'Clicking button', { error: 'timeout' });
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       3, 'click', 'Clicking button', 'failed',
       expect.objectContaining({ durationMs: expect.any(Number), error: 'timeout' })
     );
@@ -1190,7 +1226,7 @@ describe('activity tracking helpers', () => {
 
   test('activityFail with no prior start still works (durationMs null)', () => {
     activityFail(7, 'unknown', 'Unknown action');
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       7, 'unknown', 'Unknown action', 'failed',
       expect.objectContaining({ durationMs: null })
     );
@@ -1198,17 +1234,17 @@ describe('activity tracking helpers', () => {
 
   test('activityUpdate sends in_progress with updated label', () => {
     activityUpdate(3, 'observe', 'Still observing...');
-    expect(msgModule.sendAgentActivity).toHaveBeenCalledWith(
+    expect(mockSendAgentActivity).toHaveBeenCalledWith(
       3, 'observe', 'Still observing...', 'in_progress', null
     );
   });
 
   test('activityDone merges detail object', () => {
     activityStart(1, 'step', 'Step');
-    msgModule.sendAgentActivity.mockClear();
+    mockSendAgentActivity.mockClear();
 
     activityDone(1, 'step', 'Step', { extra: 'data', count: 5 });
-    const call = msgModule.sendAgentActivity.mock.calls[0];
+    const call = mockSendAgentActivity.mock.calls[0];
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('extra', 'data');
     expect(detailArg).toHaveProperty('count', 5);
@@ -1217,16 +1253,16 @@ describe('activity tracking helpers', () => {
 
   test('activityDone with no detail object', () => {
     activityStart(2, 'test', 'Test');
-    msgModule.sendAgentActivity.mockClear();
+    mockSendAgentActivity.mockClear();
 
     activityDone(2, 'test', 'Test');
-    const call = msgModule.sendAgentActivity.mock.calls[0];
+    const call = mockSendAgentActivity.mock.calls[0];
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('durationMs');
   });
 
   test('does not crash when sendAgentActivity throws', () => {
-    msgModule.sendAgentActivity.mockImplementation(() => { throw new Error('boom'); });
+    mockSendAgentActivity.mockImplementation(() => { throw new Error('boom'); });
     // These should not throw
     expect(() => activityStart(1, 'a', 'b')).not.toThrow();
     expect(() => activityDone(1, 'a', 'b')).not.toThrow();

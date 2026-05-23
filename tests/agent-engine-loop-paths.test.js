@@ -144,19 +144,33 @@ jest.unstable_mockModule('../background/shared-state.js', () => ({
   stopSwKeepalive: jest.fn(),
 }));
 
+// Store tab-context mock functions
+const mockGetActiveTabId = jest.fn(() => null);
+const mockGetTabContext = jest.fn(() => null);
+const mockGetAllTabContexts = jest.fn(() => []);
+const mockOpenTab = jest.fn(async () => 2);
+const mockSwitchToTab = jest.fn(async () => {});
+const mockCloseTab = jest.fn(async () => {});
+const mockCloseAllAgentTabs = jest.fn(async () => {});
+const mockUpdateSnapshot = jest.fn(async () => {});
+const mockResetAllContexts = jest.fn();
+const mockFindTabByLabel = jest.fn(() => null);
+const mockRegisterInitialTab = jest.fn();
+const mockGetTabCount = jest.fn(() => 0);
+
 jest.unstable_mockModule('../background/tab-context.js', () => ({
-  getActiveTabId: jest.fn(() => null),
-  getTabContext: jest.fn(() => null),
-  getAllTabContexts: jest.fn(() => []),
-  openTab: jest.fn(async () => 2),
-  switchToTab: jest.fn(async () => {}),
-  closeTab: jest.fn(async () => {}),
-  closeAllAgentTabs: jest.fn(async () => {}),
-  updateSnapshot: jest.fn(async () => {}),
-  resetAllContexts: jest.fn(),
-  findTabByLabel: jest.fn(() => null),
-  registerInitialTab: jest.fn(),
-  getTabCount: jest.fn(() => 0),
+  getActiveTabId: mockGetActiveTabId,
+  mockGetTabContext: mockGetTabContext,
+  getAllTabContexts: mockGetAllTabContexts,
+  openTab: mockOpenTab,
+  switchToTab: mockSwitchToTab,
+  closeTab: mockCloseTab,
+  closeAllAgentTabs: mockCloseAllAgentTabs,
+  updateSnapshot: mockUpdateSnapshot,
+  resetAllContexts: mockResetAllContexts,
+  findTabByLabel: mockFindTabByLabel,
+  registerInitialTab: mockRegisterInitialTab,
+  getTabCount: mockGetTabCount,
 }));
 
 jest.unstable_mockModule('../background/client-knowledge.js', () => ({
@@ -207,7 +221,6 @@ import {
   attachTabToSentinelGroup, detachAllSentinelTabs,
 } from '../background/agent-engine.js';
 
-import { getTabContext } from '../background/tab-context.js';
 import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
 import { generateReport } from '../background/report-generator.js';
 import { generatePlan } from '../background/llm-client.js';
@@ -255,7 +268,7 @@ describe('tab URL change listener', () => {
         lastScreenshotUrl: 'https://old.com',
       },
     };
-    getTabContext.mockReturnValue(mockCtx);
+    mockGetTabContext.mockReturnValue(mockCtx);
 
     const listener = onUpdatedListeners[onUpdatedListeners.length - 1];
     listener(1, { url: 'https://new.com' }, { id: 1 });
@@ -267,22 +280,22 @@ describe('tab URL change listener', () => {
   });
 
   test('skips when changeInfo has no url', () => {
-    getTabContext.mockReturnValue({ url: 'https://old.com' });
+    mockGetTabContext.mockReturnValue({ url: 'https://old.com' });
     const listener = onUpdatedListeners[onUpdatedListeners.length - 1];
     listener(1, { status: 'loading' }, { id: 1 });
-    // getTabContext should NOT be called with a URL change
+    // mockGetTabContext should NOT be called with a URL change
     // It IS called for the tabId lookup, but no mutation happens
   });
 
   test('skips when no tab context found', () => {
-    getTabContext.mockReturnValue(null);
+    mockGetTabContext.mockReturnValue(null);
     const listener = onUpdatedListeners[onUpdatedListeners.length - 1];
     expect(() => listener(1, { url: 'https://new.com' }, { id: 1 })).not.toThrow();
   });
 
   test('handles missing screenshotCache gracefully', () => {
     const mockCtx = { url: 'https://old.com' };
-    getTabContext.mockReturnValue(mockCtx);
+    mockGetTabContext.mockReturnValue(mockCtx);
     const listener = onUpdatedListeners[onUpdatedListeners.length - 1];
     expect(() => listener(1, { url: 'https://new.com' }, { id: 1 })).not.toThrow();
     expect(mockCtx.url).toBe('https://new.com');
