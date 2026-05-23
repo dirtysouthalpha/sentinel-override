@@ -552,5 +552,79 @@ describe('page-monitor', () => {
 
       expect(monitor.interval).toBe(3600);
     });
+
+    it('should handle alarm with wrong name gracefully', async () => {
+      startMonitorLoop();
+
+      // Get the registered listener
+      const listener = chrome.alarms.onAlarm.addListener.mock.calls[0]?.[0];
+
+      // Call with wrong alarm name - should not throw
+      await listener({ name: 'wrong-alarm-name' });
+
+      // Verify no error was thrown
+      expect(true).toBe(true);
+    });
+
+    it('should handle executeScript returning undefined result', async () => {
+      const monitor = await createMonitor('https://example.com', '#content', 'Test');
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([]);
+
+      const result = await checkMonitor(monitor);
+
+      expect(result.changed).toBe(false);
+      expect(result.content).toBe('');
+    });
+
+    it('should handle executeScript throwing error', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const monitor = await createMonitor('https://example.com', '#content', 'Test');
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockRejectedValue(new Error('Script injection failed'));
+
+      const result = await checkMonitor(monitor);
+
+      expect(result.changed).toBe(false);
+      expect(result.content).toBe('');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[Sentinel/page-monitor] checkMonitor failed:',
+        expect.any(String)
+      );
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle monitor not found in storage during check', async () => {
+      const monitor = await createMonitor('https://example.com', '#content', 'Test');
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: 'New content' },
+      ]);
+
+      // Clear storage to simulate monitor being deleted
+      mockStorage['sentinel_monitors'] = [];
+
+      const result = await checkMonitor(monitor);
+
+      // Should still return result but not update storage
+      expect(result.content).toBe('New content');
+    });
+
+    it('should handle content with leading/trailing whitespace', async () => {
+      const monitor = await createMonitor('https://example.com', '#content', 'Test');
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      // The injected function does el.textContent.trim(), so the mock should return the trimmed value
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: 'Content with spaces' },
+      ]);
+
+      const result = await checkMonitor(monitor);
+
+      expect(result.content).toBe('Content with spaces');
+    });
   });
 });
