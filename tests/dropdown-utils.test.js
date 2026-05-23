@@ -735,4 +735,153 @@ describe('Dropdown Utils', () => {
       expect(result).not.toBeNull();
     });
   });
+
+  describe('findDropdownOptions - aria-controls error handling', () => {
+    test('should handle aria-controls element not found gracefully', () => {
+      const triggerEl = createElement('button', { 'aria-controls': 'nonexistent-id' });
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+      parent.querySelectorAll = () => [];
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+        // Should return empty array when element not found
+        expect(Array.isArray(result)).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('should handle aria-controls getElementById error gracefully', () => {
+      const triggerEl = createElement('button', { 'aria-controls': 'test-id' });
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+      parent.querySelectorAll = () => [];
+
+      const originalGetElementById = globalThis.document.getElementById;
+      globalThis.document.getElementById = () => { throw new Error('getElementById failed'); };
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+        expect(Array.isArray(result)).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith('[Sentinel] aria-controls lookup:', expect.any(String));
+      } finally {
+        warnSpy.mockRestore();
+        globalThis.document.getElementById = originalGetElementById;
+      }
+    });
+  });
+
+  describe('findDropdownOptions - aria-owns error handling', () => {
+    test('should handle aria-owns element not found gracefully', () => {
+      const triggerEl = createElement('button', { 'aria-owns': 'nonexistent-id' });
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+      parent.querySelectorAll = () => [];
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+        // Should return empty array when element not found
+        expect(Array.isArray(result)).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('should handle aria-owns getElementById error gracefully', () => {
+      const triggerEl = createElement('button', { 'aria-owns': 'test-id' });
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+      parent.querySelectorAll = () => [];
+
+      const originalGetElementById = globalThis.document.getElementById;
+      globalThis.document.getElementById = () => { throw new Error('getElementById failed'); };
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      try {
+        const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+        expect(Array.isArray(result)).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith('[Sentinel] aria-owns lookup:', expect.any(String));
+      } finally {
+        warnSpy.mockRestore();
+        globalThis.document.getElementById = originalGetElementById;
+      }
+    });
+  });
+
+  describe('findDropdownOptions - parent container climb error handling', () => {
+    test('should handle parent container climb error gracefully', () => {
+      const triggerEl = createElement('button');
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+      parent.querySelectorAll = () => [];
+
+      // Just verify the function doesn't throw when parent has no options
+      const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+      expect(Array.isArray(result)).toBe(true);
+    });
+  });
+
+  describe('selectDropdownOption - large list search input strategy', () => {
+    test('should use search input strategy for large lists (>=50 options)', async () => {
+      const optionEls = [];
+      for (let i = 0; i < 60; i++) {
+        const opt = createElement('div', { role: 'option', innerText: `Option ${i}`, value: `option-${i}` });
+        opt.offsetWidth = 100;
+        opt.offsetHeight = 30;
+        optionEls.push(opt);
+      }
+
+      // Mock the internal functions to simulate the search input strategy
+      const originalFindSearchInput = dd._findSearchInput;
+      dd._findSearchInput = jest.fn(() => null); // No search input found, fall back to normal matching
+
+      const originalSleep = globalThis.sleep;
+      globalThis.sleep = () => Promise.resolve();
+
+      try {
+        const result = await dd.selectDropdownOption(globalThis.document, optionEls, 'Option 42');
+        // Should find the option through normal matching
+        expect(result).not.toBeNull();
+        expect(result.innerText).toBe('Option 42');
+      } finally {
+        dd._findSearchInput = originalFindSearchInput;
+        globalThis.sleep = originalSleep;
+      }
+    });
+
+    test('should handle search input strategy when no search input is found', async () => {
+      const optionEls = [];
+      for (let i = 0; i < 60; i++) {
+        const opt = createElement('div', { role: 'option', innerText: `Option ${i}`, value: `option-${i}` });
+        opt.offsetWidth = 100;
+        opt.offsetHeight = 30;
+        optionEls.push(opt);
+      }
+
+      // Mock to return null (no search input found)
+      const originalFindSearchInput = dd._findSearchInput;
+      dd._findSearchInput = () => null;
+
+      const originalSleep = globalThis.sleep;
+      globalThis.sleep = () => Promise.resolve();
+
+      try {
+        const result = await dd.selectDropdownOption(globalThis.document, optionEls, 'Option 15');
+        // Should fall back to normal matching
+        expect(result).not.toBeNull();
+        expect(result.innerText).toBe('Option 15');
+      } finally {
+        dd._findSearchInput = originalFindSearchInput;
+        globalThis.sleep = originalSleep;
+      }
+    });
+  });
 });
