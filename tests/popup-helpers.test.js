@@ -108,6 +108,107 @@ describe('Helpers.formatDuration', () => {
     const ts = Date.now();
     expect(Helpers.formatDuration(ts, ts)).toBe('0s');
   });
+
+  test('handles negative duration (end before start)', () => {
+    const start = Date.now();
+    const end = Date.now() - 5000;
+    // formatDuration returns "-5s" for negative duration
+    expect(Helpers.formatDuration(start, end)).toBe('-5s');
+  });
+
+  test('handles very large durations', () => {
+    const start = Date.now() - 999 * 86400000; // ~999 days
+    const end = Date.now();
+    const result = Helpers.formatDuration(start, end);
+    // Should handle without crashing
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test('handles single second precision', () => {
+    const start = Date.now() - 1000;
+    const end = Date.now();
+    expect(Helpers.formatDuration(start, end)).toBe('1s');
+  });
+
+  test('rounds seconds correctly', () => {
+    const start = Date.now() - 59999; // ~59.999s
+    const end = Date.now();
+    expect(Helpers.formatDuration(start, end)).toBe('59s');
+  });
+});
+
+describe('Helpers.formatCountdown — edge cases', () => {
+  test('handles exactly 7 days away', () => {
+    const ts = Date.now() + 7 * 86400000;
+    const result = Helpers.formatCountdown(ts);
+    // Should show formatted date, not countdown
+    expect(result).not.toContain('away');
+  });
+
+  test('handles exactly 24 hours away', () => {
+    const ts = Date.now() + 24 * 3600000;
+    const result = Helpers.formatCountdown(ts);
+    // Should show days format
+    expect(result).toContain('d');
+  });
+
+  test('handles exactly 60 minutes away', () => {
+    const ts = Date.now() + 60 * 60000;
+    const result = Helpers.formatCountdown(ts);
+    // Should show hours format
+    expect(result).toContain('h');
+  });
+
+  test('handles 1 minute away', () => {
+    const ts = Date.now() + 60000;
+    expect(Helpers.formatCountdown(ts)).toBe('1m away');
+  });
+
+  test('handles very far future timestamp', () => {
+    const ts = Date.now() + 365 * 86400000; // 1 year
+    const result = Helpers.formatCountdown(ts);
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Helpers.relativeTime — edge cases', () => {
+  test('handles exactly 1 minute ago', () => {
+    const ts = Date.now() - 60000;
+    expect(Helpers.relativeTime(ts)).toBe('1m ago');
+  });
+
+  test('handles exactly 1 hour ago', () => {
+    const ts = Date.now() - 3600000;
+    expect(Helpers.relativeTime(ts)).toBe('1h ago');
+  });
+
+  test('handles exactly 1 day ago', () => {
+    const ts = Date.now() - 86400000;
+    expect(Helpers.relativeTime(ts)).toBe('1d ago');
+  });
+
+  test('handles exactly 30 days ago', () => {
+    const ts = Date.now() - 30 * 86400000;
+    const result = Helpers.relativeTime(ts);
+    // Should be formatted date, not "30d ago"
+    expect(result).not.toContain('ago');
+  });
+
+  test('handles very old timestamp', () => {
+    const ts = Date.now() - 365 * 86400000; // 1 year ago
+    const result = Helpers.relativeTime(ts);
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test('handles future timestamp', () => {
+    const ts = Date.now() + 60000; // 1 minute in future
+    const result = Helpers.relativeTime(ts);
+    // Should still return something reasonable
+    expect(typeof result).toBe('string');
+  });
 });
 
 describe('global aliases', () => {
