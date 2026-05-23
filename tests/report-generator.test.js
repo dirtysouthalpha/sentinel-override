@@ -505,5 +505,89 @@ describe('report-generator', () => {
       expect(result.fullReport).toContain('Steps Taken');
       expect(result.structuredData).toBeDefined();
     });
+
+    test('generateReportViaLLM handles timeout error', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const abortController = new AbortController();
+      const timeoutError = new Error('AbortError');
+      timeoutError.name = 'AbortError';
+      globalThis.fetch.mockImplementationOnce(() => {
+        abortController.abort();
+        return Promise.reject(timeoutError);
+      });
+      const result = await generateReport(makeExecutionData(), { ...CONFIG, fetchTimeout: 100 });
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM handles network error', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const networkError = new Error('Network request failed');
+      globalThis.fetch.mockImplementationOnce(() => Promise.reject(networkError));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM handles HTTP error response', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const errorResponse = { ok: false, status: 500, statusText: 'Internal Server Error', text: async () => 'Server error' };
+      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(errorResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM handles invalid JSON response', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const invalidJsonResponse = { ok: true, status: 200, json: async () => { throw new Error('Invalid JSON'); }, text: async () => 'Not JSON' };
+      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(invalidJsonResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM handles response text error fallback', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const errorResponse = { ok: false, status: 502, text: async () => { throw new Error('Text extraction failed'); } };
+      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(errorResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM handles buildBody error', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
+      const badProvider = { ...mockProvider, buildBody: () => { throw new Error('Build failed'); } };
+      mockResolveProvider.mockReturnValueOnce(badProvider);
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      expect(result.structuredData).toBeDefined();
+    });
+
+    test('generateReportViaLLM strips code fences with markdown variant', async () => {
+      const responseWithFences = '```markdown\n# Report\n\nContent here.\n```';
+      const customResponse = { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: responseWithFences } }] }), text: async () => '' };
+      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(customResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).not.toMatch(/^```/);
+      expect(result.fullReport).not.toMatch(/```$/);
+    });
+
+    test('generateReportViaLLM strips code fences without language specifier', async () => {
+      const responseWithFences = '```\n# Report\n\nContent here.\n```';
+      const customResponse = { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: responseWithFences } }] }), text: async () => '' };
+      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(customResponse));
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).not.toMatch(/^```/);
+      expect(result.fullReport).not.toMatch(/```$/);
+    });
+
   });
 });
