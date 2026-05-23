@@ -1,0 +1,43 @@
+
+> sentinel-override@3.46.0 test
+> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/quick-assist-edge-cases.test.js
+
+  console.log
+    [DEBUG] mockGetActiveProvider: [Function: mockConstructor] {
+      _isMockFunction: true,
+      getMockImplementation: [Function (anonymous)],
+      mock: [Getter/Setter],
+      mockClear: [Function (anonymous)],
+      mockReset: [Function (anonymous)],
+      mockRestore: [Function (anonymous)],
+      mockReturnValueOnce: [Function (anonymous)],
+      mockResolvedValueOnce: [Function (anonymous)],
+      mockRejectedValueOnce: [Function (anonymous)],
+      mockReturnValue: [Function (anonymous)],
+      mockResolvedValue: [Function (anonymous)],
+      mockRejectedValue: [Function (anonymous)],
+      mockImplementationOnce: [Function (anonymous)],
+      withImplementation: [Function: bound withImplementation],
+      mockImplementation: [Function (anonymous)],
+      mockReturnThis: [Function (anonymous)],
+      mockName: [Function (anonymous)],
+      getMockName: [Function (anonymous)]
+    }
+
+      at Object.<anonymous> (tests/quick-assist-edge-cases.test.js:75:15)
+
+  console.log
+    [DEBUG] mockConfig: {
+      id: 'test-provider',
+      endpoint: 'https://api.test.com/v1/chat',
+      apiKey: 'test-key',
+      model: 'test-model'
+    }
+
+      at Object.<anonymous> (tests/quick-assist-edge-cases.test.js:76:15)
+
+  console.log
+    [DEBUG] mockGetActiveProvider.mock.calls: []
+
+      at Object.<anonymous> (tests/quick-assist-edge-cases.test.js:77:15)
+

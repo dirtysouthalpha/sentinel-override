@@ -1,0 +1,19 @@
+
+> sentinel-override@3.46.0 test
+> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/quick-assist-edge-cases.test.js
+
+  console.log
+    [DEBUG] mockGetActiveProvider.mock.results: []
+
+      at Object.<anonymous> (tests/quick-assist-edge-cases.test.js:85:15)
+
+  console.log
+    [DEBUG] mockConfig: {
+      id: 'test-provider',
+      endpoint: 'https://api.test.com/v1/chat',
+      apiKey: 'test-key',
+      model: 'test-model'
+    }
+
+      at Object.<anonymous> (tests/quick-assist-edge-cases.test.js:86:15)
+

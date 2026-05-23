@@ -534,8 +534,12 @@ export async function executeScheduledTask(alarmName) {
   // Find or open a tab
   let tabId;
   try {
-    const tabs = await new Promise(resolve => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
+    const tabs = await new Promise((resolve, reject) => {
+      try {
+        chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
+      } catch (err) {
+        reject(err);
+      }
     });
 
     if (tabs && tabs.length > 0) {

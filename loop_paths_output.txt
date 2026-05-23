@@ -1,0 +1,524 @@
+
+> sentinel-override@3.46.0 test
+> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/agent-engine-loop-paths.test.js
+
+  console.warn
+    [Sentinel/telemetry] init error: chrome is not defined
+
+    [0m [90m 194 |[39m       }
+     [90m 195 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 196 |[39m   } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel/telemetry] init error:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 197 |[39m })()[33m;[39m
+     [90m 198 |[39m
+     [90m 199 |[39m [36mfunction[39m _scheduleFlush() {[0m
+
+      at loadLevel (background/telemetry.js:196:25)
+      at background/telemetry.js:197:3
+
+  console.warn
+    [Sentinel/skills] init error: chrome is not defined
+
+    [0m [90m 57 |[39m       }
+     [90m 58 |[39m     })[33m;[39m
+    [31m[1m>[22m[39m[90m 59 |[39m   } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel/skills] init error:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                         [31m[1m^[22m[39m
+     [90m 60 |[39m })()[33m;[39m
+     [90m 61 |[39m
+     [90m 62 |[39m [90m/**[39m[0m
+
+      at loadAdaptiveState (background/skills/index.js:59:25)
+      at background/skills/index.js:60:3
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Test goal', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-si04y9 { runLogId: 'test-uuid-si04y9', goalLen: 9 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Test goal
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started {
+      goal: 'Mode: APPROVAL - please check firewall settings',
+      startTabId: 1
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-c8whkt { runLogId: 'test-uuid-c8whkt', goalLen: 47 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Mode: APPROVAL - please check firewall settings
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Mode: AUTONOMOUS - do everything fast', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-k0qpgz { runLogId: 'test-uuid-k0qpgz', goalLen: 37 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Test goal', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.error
+    [Sentinel/client-knowledge] _read failed: Storage corrupt
+
+    [0m [90m 53 |[39m     [36mreturn[39m state[33m;[39m
+     [90m 54 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 55 |[39m     console[33m.[39merror([32m'[Sentinel/client-knowledge] _read failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m    |[39m             [31m[1m^[22m[39m
+     [90m 56 |[39m     [36mreturn[39m { [33m...[39m[33mDEFAULT_STATE[39m }[33m;[39m
+     [90m 57 |[39m   }
+     [90m 58 |[39m }[0m
+
+      at _read (background/client-knowledge.js:55:13)
+      at getActiveClient (background/client-knowledge.js:112:17)
+      at startAgent (background/agent-engine.js:459:26)
+      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:549:5)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-frmxo2 { runLogId: 'test-uuid-frmxo2', goalLen: 9 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.warn
+    [Sentinel] adaptive-prompts pass failed (non-fatal): Storage corrupt
+
+    [0m [90m 649 |[39m       }
+     [90m 650 |[39m     }
+    [31m[1m>[22m[39m[90m 651 |[39m   } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] adaptive-prompts pass failed (non-fatal):'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m finalGoal [33m=[39m goal[33m;[39m }
+     [90m     |[39m                         [31m[1m^[22m[39m
+     [90m 652 |[39m
+     [90m 653 |[39m   runAgentLoop(finalGoal[33m,[39m startTabId)[33m;[39m
+     [90m 654 |[39m   [36mreturn[39m [32m'Agent started in background'[39m[33m;[39m[0m
+
+      at startAgent (background/agent-engine.js:651:25)
+      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:549:5)
+
+  console.log
+    Agent starting loop for goal: Test goal
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.warn
+    [Sentinel] runAgentLoop settings load failed: Storage corrupt
+
+    [0m [90m 2246 |[39m     ])[33m;[39m
+     [90m 2247 |[39m   } [36mcatch[39m (e) {
+    [31m[1m>[22m[39m[90m 2248 |[39m     console[33m.[39mwarn([32m'[Sentinel] runAgentLoop settings load failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 2249 |[39m     stored [33m=[39m {}[33m;[39m
+     [90m 2250 |[39m   }
+     [90m 2251 |[39m   _runSettings [33m=[39m {[0m
+
+      at runAgentLoop (background/agent-engine.js:2248:13)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Check firewall', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-1kq6ym { runLogId: 'test-uuid-1kq6ym', goalLen: 14 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Check firewall
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Test goal', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-xaxnu3 { runLogId: 'test-uuid-xaxnu3', goalLen: 9 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Test goal
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Test learning goal', startTabId: 1 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-fkc764 { runLogId: 'test-uuid-fkc764', goalLen: 18 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Test learning goal
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent started { goal: 'Test goal', startTabId: 5 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/storage] Run log opened: test-uuid-lzrlkk { runLogId: 'test-uuid-lzrlkk', goalLen: 9 }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    Agent starting loop for goal: Test goal
+
+      at runAgentLoop (background/agent-engine.js:2222:11)
+
+  console.log
+    [Sentinel/lifecycle] Step 1 starting {
+      stepCount: 1,
+      dynamicMaxSteps: 100,
+      productiveSteps: 0,
+      consecutiveFailures: 0
+    }
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.log
+    [Sentinel/lifecycle] Agent stopping (user-initiated)
+
+      at emit (background/telemetry.js:370:22)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
+  console.warn
+    Agent finished without reportData — skipping report generation
+
+    [0m [90m 4530 |[39m     }
+     [90m 4531 |[39m   } [36melse[39m {
+    [31m[1m>[22m[39m[90m 4532 |[39m     console[33m.[39mwarn([32m'Agent finished without reportData — skipping report generation'[39m)[33m;[39m
+     [90m      |[39m             [31m[1m^[22m[39m
+     [90m 4533 |[39m     sendReportUpdate([32m'error'[39m[33m,[39m [36mnull[39m[33m,[39m [32m'Agent finished without collecting execution data'[39m)[33m;[39m
+     [90m 4534 |[39m   }
+     [90m 4535 |[39m[0m
+
+      at runAgentLoop (background/agent-engine.js:4532:13)
+
