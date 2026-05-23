@@ -183,8 +183,8 @@ const {
 } = await import('../background/agent-engine.js');
 
 // Mock references for assertion
-const { getAllTabContexts } = await import('../background/tab-context.js');
-const { sendSilentUpdate } = await import('../background/message-protocol.js');
+import { getAllTabContexts } from '../background/tab-context.js';
+import { sendSilentUpdate } from '../background/message-protocol.js';
 
 beforeEach(() => {
   Object.keys(storageData).forEach(k => delete storageData[k]);

@@ -63,7 +63,7 @@ jest.unstable_mockModule('../background/shared-state.js', () => ({
   notifyIfEnabled: jest.fn(),
 }));
 
-const {
+import {
   createSchedule,
   listSchedules,
   deleteSchedule,
@@ -74,7 +74,7 @@ const {
   clearScheduleResults,
   initScheduler,
   onAgentComplete,
-} = await import('../background/scheduler.js');
+} from '../background/scheduler.js';
 
 beforeEach(() => {
   storageData = {};
@@ -365,7 +365,7 @@ describe('computeNextRun — fallback', () => {
 // ========== executeScheduledTask ==========
 
 // Must re-import executeScheduledTask since the mock above doesn't expose it
-const { executeScheduledTask } = await import('../background/scheduler.js');
+import { executeScheduledTask } from '../background/scheduler.js';
 
 describe('executeScheduledTask', () => {
   test('returns immediately for invalid alarm name', async () => {

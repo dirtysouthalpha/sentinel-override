@@ -200,18 +200,18 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
 }));
 
 // ── Import after mocks ──
-const {
+import {
   startAgent, stopAgent, pauseAgent, resumeAgent, resetAgentState,
   setAgentSpeed, injectContext, getAgentTabId,
   isAgentAttachedTab, getAttachedTabIds, fetchAuditLog,
   attachTabToSentinelGroup, detachAllSentinelTabs,
-} = await import('../background/agent-engine.js');
+} from '../background/agent-engine.js';
 
-const { getTabContext } = await import('../background/tab-context.js');
-const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
-const { generateReport } = await import('../background/report-generator.js');
-const { generatePlan } = await import('../background/llm-client.js');
-const { tel } = await import('../background/telemetry.js');
+import { getTabContext } from '../background/tab-context.js';
+import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
+import { generateReport } from '../background/report-generator.js';
+import { generatePlan } from '../background/llm-client.js';
+import { tel } from '../background/telemetry.js';
 
 // Record the addListener calls that fire at module-import time so we can
 // verify them without being affected by clearAllMocks().

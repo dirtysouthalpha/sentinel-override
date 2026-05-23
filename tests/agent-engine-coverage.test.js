@@ -172,7 +172,7 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
 }));
 
 // Import the module under test
-const agentEngine = await import('../background/agent-engine.js');
+import * as agentEngine from '../background/agent-engine.js';
 
 const {
   _isUnproductiveJsResult,

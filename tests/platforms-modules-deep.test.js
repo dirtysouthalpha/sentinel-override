@@ -3,19 +3,19 @@
 
 import { jest } from '@jest/globals';
 
-const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+import { networkDevice } from '../background/platforms/network_device.js';
+import { cisco } from '../background/platforms/cisco.js';
+import { dattoRmm } from '../background/platforms/datto_rmm.js';
+import { fortigate } from '../background/platforms/fortigate.js';
+import { huntress } from '../background/platforms/huntress.js';
+import { m365Admin } from '../background/platforms/m365_admin.js';
+import { nvd } from '../background/platforms/nvd.js';
+import { paloalto } from '../background/platforms/paloalto.js';
+import { sentinelone } from '../background/platforms/sentinelone.js';
+import { virustotal } from '../background/platforms/virustotal.js';
+import { sonicwallOnbox } from '../background/platforms/sonicwall_onbox.js';
 
-const { networkDevice } = await import('../background/platforms/network_device.js');
-const { cisco } = await import('../background/platforms/cisco.js');
-const { dattoRmm } = await import('../background/platforms/datto_rmm.js');
-const { fortigate } = await import('../background/platforms/fortigate.js');
-const { huntress } = await import('../background/platforms/huntress.js');
-const { m365Admin } = await import('../background/platforms/m365_admin.js');
-const { nvd } = await import('../background/platforms/nvd.js');
-const { paloalto } = await import('../background/platforms/paloalto.js');
-const { sentinelone } = await import('../background/platforms/sentinelone.js');
-const { virustotal } = await import('../background/platforms/virustotal.js');
-const { sonicwallOnbox } = await import('../background/platforms/sonicwall_onbox.js');
+const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
 const allPlatforms = [
   networkDevice, cisco, dattoRmm, fortigate, huntress, m365Admin,

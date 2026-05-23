@@ -38,7 +38,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
 // Mock global fetch
 globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
 
-const { generateReport } = await import('../background/report-generator.js');
+import { generateReport } from '../background/report-generator.js';
 
 // ---------- Helpers ----------
 function makeExecutionData(overrides = {}) {

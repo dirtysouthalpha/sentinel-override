@@ -3,6 +3,8 @@
 
 import { jest } from '@jest/globals';
 
+import { handleQuickAssist } from '../background/quick-assist-handler.js';
+
 // Mock provider-registry
 let mockConfig = {
   id: 'test-provider',
@@ -18,8 +20,6 @@ jest.unstable_mockModule('../background/provider-registry.js', () => ({
     parseResponse: (data) => data.choices?.[0]?.message?.content || data.content?.[0]?.text || 'Response',
   })),
 }));
-
-const { handleQuickAssist } = await import('../background/quick-assist-handler.js');
 
 describe('quick-assist-handler edge cases', () => {
   let originalFetch;

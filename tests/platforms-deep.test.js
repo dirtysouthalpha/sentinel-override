@@ -3,19 +3,19 @@
 
 import { jest } from '@jest/globals';
 
-const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-const {
+import {
   getPlatformProfile,
   listAllProfiles,
-} = await import('../background/platforms/index.js');
+} from '../background/platforms/index.js';
 
-const { ambioViewlinc } = await import('../background/platforms/ambio_viewlinc.js');
-const { connectwiseManage } = await import('../background/platforms/connectwise_manage.js');
-const { sonicwallNsm } = await import('../background/platforms/sonicwall_nsm.js');
-const { itglue } = await import('../background/platforms/itglue.js');
-const { ninjarmm } = await import('../background/platforms/ninjarmm.js');
-const { aruba } = await import('../background/platforms/aruba.js');
+import { ambioViewlinc } from '../background/platforms/ambio_viewlinc.js';
+import { connectwiseManage } from '../background/platforms/connectwise_manage.js';
+import { sonicwallNsm } from '../background/platforms/sonicwall_nsm.js';
+import { itglue } from '../background/platforms/itglue.js';
+import { ninjarmm } from '../background/platforms/ninjarmm.js';
+import { aruba } from '../background/platforms/aruba.js';
+
+const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
 describe('ambio_viewlinc detect', () => {
   test('detects by viewlinc hostname', () => {

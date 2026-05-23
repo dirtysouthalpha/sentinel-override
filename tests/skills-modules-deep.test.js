@@ -3,14 +3,16 @@
 
 import { jest } from '@jest/globals';
 
-const { clickNoTarget } = await import('../background/skills/click-no-target.js');
-const { consecutiveFailures } = await import('../background/skills/consecutive-failures.js');
-const { cspBlocked } = await import('../background/skills/csp-blocked.js');
-const { emptyObservation } = await import('../background/skills/empty-observation.js');
-const { navigateLoop } = await import('../background/skills/navigate-loop.js');
-const { selectorMiss } = await import('../background/skills/selector-miss.js');
-const { slowLlmCall } = await import('../background/skills/slow-llm-call.js');
-const { unproductiveExtract } = await import('../background/skills/unproductive-extract.js');
+import { clickNoTarget } from '../background/skills/click-no-target.js';
+import { consecutiveFailures } from '../background/skills/consecutive-failures.js';
+import { cspBlocked } from '../background/skills/csp-blocked.js';
+import { emptyObservation } from '../background/skills/empty-observation.js';
+import { navigateLoop } from '../background/skills/navigate-loop.js';
+import { selectorMiss } from '../background/skills/selector-miss.js';
+import { slowLlmCall } from '../background/skills/slow-llm-call.js';
+import { unproductiveExtract } from '../background/skills/unproductive-extract.js';
+
+const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
 const allSkills = [
   clickNoTarget, consecutiveFailures, cspBlocked, emptyObservation,
@@ -541,4 +543,8 @@ describe('unproductive-extract', () => {
     const prompt = skill.promptInjection({});
     expect(prompt).toContain('(unknown)');
   });
+});
+
+afterAll(() => {
+  warnSpy.mockRestore();
 });

@@ -4,15 +4,15 @@
 
 import { jest } from '@jest/globals';
 
-const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+import { ambioViewlinc } from '../background/platforms/ambio_viewlinc.js';
+import { aruba } from '../background/platforms/aruba.js';
+import { connectwiseManage } from '../background/platforms/connectwise_manage.js';
+import { itglue } from '../background/platforms/itglue.js';
+import { ninjarmm } from '../background/platforms/ninjarmm.js';
+import { screenconnect } from '../background/platforms/screenconnect.js';
+import { sonicwallNsm } from '../background/platforms/sonicwall_nsm.js';
 
-const { ambioViewlinc } = await import('../background/platforms/ambio_viewlinc.js');
-const { aruba } = await import('../background/platforms/aruba.js');
-const { connectwiseManage } = await import('../background/platforms/connectwise_manage.js');
-const { itglue } = await import('../background/platforms/itglue.js');
-const { ninjarmm } = await import('../background/platforms/ninjarmm.js');
-const { screenconnect } = await import('../background/platforms/screenconnect.js');
-const { sonicwallNsm } = await import('../background/platforms/sonicwall_nsm.js');
+const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
 const allPlatforms = [
   ambioViewlinc, aruba, connectwiseManage, itglue, ninjarmm, screenconnect, sonicwallNsm,

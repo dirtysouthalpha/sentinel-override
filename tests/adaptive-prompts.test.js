@@ -3,6 +3,10 @@
 
 import { jest } from '@jest/globals';
 
+import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
+import { getPlatformProfile, findMismatchHints } from '../background/platforms/index.js';
+import { getActiveProvider } from '../background/provider-registry.js';
+
 let storageData = {};
 globalThis.chrome = {
   storage: {
@@ -26,11 +30,6 @@ jest.unstable_mockModule('../background/platforms/index.js', () => ({
   getPlatformProfile: jest.fn(() => null),
   findMismatchHints: jest.fn(() => []),
 }));
-
-const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
-
-const { getPlatformProfile } = await import('../background/platforms/index.js');
-const { getActiveProvider } = await import('../background/provider-registry.js');
 
 const BASE_PROFILE = {
   id: 'test-platform',
@@ -119,7 +118,6 @@ describe('rewriteGoalForPlatform — early returns', () => {
 
   test('returns mismatchHints from findMismatchHints', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
-    const { findMismatchHints } = await import('../background/platforms/index.js');
     findMismatchHints.mockReturnValueOnce([{ onbox: 'Manage > Firewall', target: 'Security > Firewall' }]);
     getActiveProvider.mockResolvedValueOnce({ endpoint: '', apiKey: '', model: '' });
 
@@ -459,7 +457,6 @@ describe('rewriteGoalForPlatform — prompt construction', () => {
 
   test('includes mismatch hints in prompt', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
-    const { findMismatchHints } = await import('../background/platforms/index.js');
     findMismatchHints.mockReturnValueOnce([
       { onbox: 'Manage > Firewall', target: 'Security > Firewall' },
       { onbox: 'Device > VPN', target: 'Network > VPN' }
@@ -661,7 +658,6 @@ describe('rewriteGoalForPlatform — expansion modes', () => {
 
   test('off expansion mode proceeds when mismatches exist', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
-    const { findMismatchHints } = await import('../background/platforms/index.js');
     findMismatchHints.mockReturnValueOnce([{ onbox: 'Manage > Firewall', target: 'Security > Firewall' }]);
     getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
 
@@ -868,7 +864,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed waitStrings handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of malformed waitStrings handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 
@@ -888,7 +891,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed pageTypes handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of malformed pageTypes handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 
@@ -907,7 +917,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed workflowHints handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of malformed workflowHints handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 
@@ -926,7 +943,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of invalid RegExp match in workflowHints handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of invalid RegExp match in workflowHints handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 
@@ -950,7 +974,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of partial pageTypes handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of partial pageTypes handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 
@@ -973,7 +1004,14 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of empty waitStrings arrays handling in the system', summary: 'ok' }) } }]
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              adapted_goal: 'A long enough adapted goal for validation of empty waitStrings arrays handling in the system',
+              summary: 'ok'
+            })
+          }
+        }]
       })
     }));
 

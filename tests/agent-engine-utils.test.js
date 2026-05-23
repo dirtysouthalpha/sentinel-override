@@ -174,7 +174,7 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
 }));
 
 // ── Import after mocks ──
-const { resetAgentState } = await import('../background/agent-engine.js');
+import { resetAgentState } from '../background/agent-engine.js';
 
 beforeEach(() => {
   for (const k of Object.keys(storageData)) delete storageData[k];

@@ -179,7 +179,7 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
 }));
 
 // Import the module under test
-const agentEngine = await import('../background/agent-engine.js');
+import * as agentEngine from '../background/agent-engine.js';
 
 const {
   describeAction,
@@ -211,8 +211,8 @@ const {
 } = agentEngine;
 
 // Dynamic imports for mocked modules (for re-configuring in tests)
-const cdpModule = await import('../background/tab-manager.js');
-const msgModule = await import('../background/message-protocol.js');
+import cdpModule from '../background/tab-manager.js';
+import msgModule from '../background/message-protocol.js';
 
 // ── Helpers ──
 // Simulate a chrome.runtime.onMessage listener receiving a message.

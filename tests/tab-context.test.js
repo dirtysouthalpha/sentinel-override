@@ -20,7 +20,7 @@ jest.unstable_mockModule('../background/tab-manager.js', () => ({
   getTabInfo: jest.fn(async (tabId) => ({ url: 'https://example.com/page', title: 'Test Page' })),
 }));
 
-const {
+import {
   getActiveTabId,
   setActiveTab,
   getTabContext,
@@ -36,9 +36,9 @@ const {
   findTabByLabel,
   handleTabRemoved,
   TAB_LIMIT,
-} = await import('../background/tab-context.js');
+} from '../background/tab-context.js';
 
-const { sendTabStateUpdate } = await import('../background/message-protocol.js');
+import { sendTabStateUpdate } from '../background/message-protocol.js';
 
 beforeEach(() => {
   jest.clearAllMocks();
