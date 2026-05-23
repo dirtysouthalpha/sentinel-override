@@ -147,21 +147,21 @@ describe('Helpers.formatCountdown — edge cases', () => {
   });
 
   test('handles exactly 24 hours away', () => {
-    const ts = Date.now() + 24 * 3600000;
+    const ts = Date.now() + 24 * 3600000 + 100; // Add buffer for execution time
     const result = Helpers.formatCountdown(ts);
     // Should show days format
     expect(result).toContain('d');
   });
 
   test('handles exactly 60 minutes away', () => {
-    const ts = Date.now() + 60 * 60000;
+    const ts = Date.now() + 60 * 60000 + 100; // Add buffer for execution time
     const result = Helpers.formatCountdown(ts);
     // Should show hours format
     expect(result).toContain('h');
   });
 
   test('handles 1 minute away', () => {
-    const ts = Date.now() + 60000;
+    const ts = Date.now() + 60000 + 100; // Add buffer for execution time
     expect(Helpers.formatCountdown(ts)).toBe('1m away');
   });
 
@@ -175,22 +175,22 @@ describe('Helpers.formatCountdown — edge cases', () => {
 
 describe('Helpers.relativeTime — edge cases', () => {
   test('handles exactly 1 minute ago', () => {
-    const ts = Date.now() - 60000;
+    const ts = Date.now() - 60000 - 100; // Subtract buffer for execution time
     expect(Helpers.relativeTime(ts)).toBe('1m ago');
   });
 
   test('handles exactly 1 hour ago', () => {
-    const ts = Date.now() - 3600000;
+    const ts = Date.now() - 3600000 - 100; // Subtract buffer for execution time
     expect(Helpers.relativeTime(ts)).toBe('1h ago');
   });
 
   test('handles exactly 1 day ago', () => {
-    const ts = Date.now() - 86400000;
+    const ts = Date.now() - 86400000 - 100; // Subtract buffer for execution time
     expect(Helpers.relativeTime(ts)).toBe('1d ago');
   });
 
   test('handles exactly 30 days ago', () => {
-    const ts = Date.now() - 30 * 86400000;
+    const ts = Date.now() - 30 * 86400000 - 100; // Subtract buffer for execution time
     const result = Helpers.relativeTime(ts);
     // Should be formatted date, not "30d ago"
     expect(result).not.toContain('ago');

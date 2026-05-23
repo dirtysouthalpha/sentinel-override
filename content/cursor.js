@@ -268,7 +268,16 @@ window.__sentinelUtils = window.__sentinelUtils || {};
     },
 
     getPosition() {
-      return { x: lastX, y: lastY };
+      try {
+        const c = document.getElementById(CURSOR_ID);
+        if (!c || !c.isConnected) return { x: -1, y: -1 };
+        // Try to access the style to verify the element is valid
+        const _ = c.style; // eslint-disable-line no-unused-vars
+        return { x: lastX, y: lastY };
+      } catch (e) {
+        console.warn('[Sentinel] cursor.getPosition error:', e && e.message);
+        return { x: -1, y: -1 };
+      }
     }
   };
 
