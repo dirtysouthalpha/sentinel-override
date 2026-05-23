@@ -1033,4 +1033,143 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
       expect(result.adapted).toBe(false);
     });
   });
+
+  // ========== Profile parsing error handling (catch blocks) ==========
+
+  describe('rewriteGoalForPlatform — profile parsing error handling', () => {
+    test('handles waitStrings Object.entries throw (line 55)', async () => {
+      // Create an object that throws when Object.entries is called
+      const throwingObject = {};
+      Object.defineProperty(throwingObject, 'throwingProp', {
+        get: function() { throw new Error('Cannot read property'); },
+        enumerable: true
+      });
+
+      const badProfile = {
+        ...BASE_PROFILE,
+        waitStrings: throwingObject,
+      };
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                adapted_goal: 'A long enough adapted goal for validation of waitStrings error handling',
+                summary: 'ok'
+              })
+            }
+          }]
+        })
+      }));
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] waitStrings parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      // Should still succeed despite the parse error
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles pageTypes array iteration throw (line 66)', async () => {
+      // Create an array that throws during mapping
+      const throwingArray = [null, { name: 'test', hint: 'valid' }];
+      Object.defineProperty(throwingArray, '2', {
+        get: function() { throw new Error('Cannot read property'); },
+        enumerable: true
+      });
+
+      const badProfile = {
+        ...BASE_PROFILE,
+        pageTypes: throwingArray,
+      };
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                adapted_goal: 'A long enough adapted goal for validation of pageTypes error handling',
+                summary: 'ok'
+              })
+            }
+          }]
+        })
+      }));
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] pageTypes parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      // Should still succeed despite the parse error
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles workflowHints RegExp.test throw (line 79)', async () => {
+      // Create a RegExp that throws when .test() is called
+      const throwingRegExp = /test/;
+      const originalTest = throwingRegExp.test;
+      throwingRegExp.test = function() { throw new Error('RegExp.test failed'); };
+
+      const badProfile = {
+        ...BASE_PROFILE,
+        workflowHints: [
+          {
+            match: throwingRegExp,
+            hint: 'test hint'
+          }
+        ],
+      };
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                adapted_goal: 'A long enough adapted goal for validation of workflowHints error handling',
+                summary: 'ok'
+              })
+            }
+          }]
+        })
+      }));
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] workflowHints parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      // Restore original test method
+      throwingRegExp.test = originalTest;
+
+      // Should still succeed despite the parse error
+      expect(result.adapted).toBe(true);
+    });
+  });
 });
