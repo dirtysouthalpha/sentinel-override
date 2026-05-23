@@ -143,6 +143,11 @@ async function writeCheckpoint(stepCount) {
  * This is called from `resume_from_checkpoint` in index.js BEFORE
  * startAgent so the fresh run inherits the prior memory and history.
  */
+/**
+ * Restore agent state from a service worker checkpoint after SW restart.
+ * Recovers history, memory, tab contexts, and step count to continue runs.
+ * @returns {Promise<boolean>} True if checkpoint was restored, false otherwise.
+ */
 export async function restoreFromCheckpoint() {
   try {
     if (!chrome.storage || !chrome.storage.session || !chrome.storage.session.get) {
@@ -212,6 +217,11 @@ export async function restoreFromCheckpoint() {
 
 /**
  * Clear the persisted checkpoint after a successful resume or run finish.
+ */
+/**
+ * Clear the persisted checkpoint from chrome.storage.local.
+ * Call after a run completes successfully or when discarding state.
+ * @returns {Promise<void>}
  */
 export async function clearCheckpoint() {
   try {
@@ -383,6 +393,11 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
 
 // ========== State Reset ==========
 
+/**
+ * Reset all agent run-scoped state to defaults.
+ * Called between runs so a fresh start is guaranteed — clears counters,
+ * memory, history, plan state, trust-score accumulators, and pending queues.
+ */
 /**
  * Reset all agent run-scoped state to defaults.
  * Called between runs so a fresh start is guaranteed — clears counters,
@@ -810,6 +825,11 @@ async function _waitForModeMismatchDecision(info) {
  * dissolves tab groups, and closes all agent-managed tabs.
  * @returns {Promise<string>} 'Agent stopped'
  */
+/**
+ * Stop the agent loop and clean up resources.
+ * @returns {Promise<string>} Status message indicating the agent was stopped.
+ * @throws {Error} If the agent is not currently running.
+ */
 export async function stopAgent() {
   tel.info('lifecycle', 'Agent stopping (user-initiated)');
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
@@ -830,6 +850,11 @@ export async function stopAgent() {
  * Pause the agent loop. Steps will be skipped until resumeAgent is called.
  * @returns {Promise<string>} Status message.
  */
+/**
+ * Pause the agent loop. The agent will wait for resume before continuing.
+ * @returns {Promise<string>} Status message indicating the agent was paused.
+ * @throws {Error} If the agent is not currently running.
+ */
 export async function pauseAgent() {
   if (!agentRunning) return 'Agent not running';
   agentPaused = true;
@@ -839,6 +864,11 @@ export async function pauseAgent() {
 /**
  * Resume the agent loop after a pause.
  * @returns {Promise<string>} Status message.
+ */
+/**
+ * Resume a paused agent loop.
+ * @returns {Promise<string>} Status message indicating the agent was resumed.
+ * @throws {Error} If the agent is not currently paused.
  */
 export async function resumeAgent() {
   if (!agentRunning) return 'Agent not running';
@@ -850,6 +880,10 @@ export async function resumeAgent() {
  * Set the agent speed mode, controlling inter-step delays.
  * @param {'turbo'|'normal'|'stealth'} mode - Speed profile to use.
  * @returns {string} Confirmation or error message.
+ */
+/**
+ * Set the agent execution speed mode.
+ * @param {'fast'|'normal'} mode - Speed mode: 'fast' for minimal delays, 'normal' for human-observing pace.
  */
 export function setAgentSpeed(mode) {
   if (!['turbo', 'normal', 'stealth'].includes(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
@@ -1080,6 +1114,11 @@ async function detachAllSentinelTabs() {
  * @param {number} tabId - Chrome tab ID to check.
  * @returns {boolean}
  */
+/**
+ * Check if a tab is part of the agent's attached tab group.
+ * @param {number} tabId - Chrome tab ID to check.
+ * @returns {boolean} True if the tab is attached to the agent.
+ */
 export function isAgentAttachedTab(tabId) {
   return agentAttachedTabs.has(tabId);
 }
@@ -1087,6 +1126,10 @@ export function isAgentAttachedTab(tabId) {
 /**
  * Return an array of all tab IDs currently attached to the agent session.
  * @returns {number[]}
+ */
+/**
+ * Get all tab IDs that are attached to the agent.
+ * @returns {number[]} Array of Chrome tab IDs.
  */
 export function getAttachedTabIds() {
   return Array.from(agentAttachedTabs);
@@ -1097,6 +1140,11 @@ export function getAttachedTabIds() {
  * Fetch the audit log for a specific run, or the current run if no ID provided.
  * @param {string} [id] - Run log ID; defaults to the current run.
  * @returns {Promise<object>} The audit log object.
+ */
+/**
+ * Fetch an audit log entry by run ID from chrome.storage.local.
+ * @param {string} id - Run ID of the audit log to fetch.
+ * @returns {Promise<object|null>} Audit log data or null if not found.
  */
 export async function fetchAuditLog(id) {
   return getAuditLog(id || runLogId);
