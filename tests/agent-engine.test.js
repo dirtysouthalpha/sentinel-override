@@ -1389,4 +1389,41 @@ describe('agent-engine — edge cases', () => {
       expect(ids.length).toBe(0);
     });
   });
+
+  describe('injectContext edge cases', () => {
+    test('ignores empty strings', () => {
+      injectContext('');
+      injectContext('   ');
+      injectContext(null);
+      injectContext(undefined);
+      // Should not throw
+    });
+
+    test('handles non-string notes gracefully', () => {
+      injectContext(123);
+      injectContext({ note: 'test' });
+      injectContext(['note']);
+      // Should not throw
+    });
+  });
+
+  describe('fetchAuditLog edge cases', () => {
+    test('returns empty array for missing run ID', async () => {
+      const result = await fetchAuditLog('');
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
+    });
+
+    test('returns empty array for null run ID', async () => {
+      const result = await fetchAuditLog(null);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
+    });
+
+    test('returns empty array for undefined run ID', async () => {
+      const result = await fetchAuditLog(undefined);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
+    });
+  });
 });
