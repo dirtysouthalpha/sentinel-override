@@ -20,7 +20,7 @@ let onMessageListeners = [];
 let onUpdatedListeners = [];
 let onSuspendListeners = [];
 
-globalThis.chrome = {
+const chromeMock = {
   storage: {
     local: {
       get: jest.fn(async (keys) => {
@@ -81,6 +81,10 @@ globalThis.chrome = {
     create: jest.fn(async () => {}),
   },
 };
+
+// Set chrome in both globalThis and as a global variable
+globalThis.chrome = chromeMock;
+global.chrome = chromeMock;
 
 globalThis.crypto = {
   randomUUID: jest.fn(() => 'test-uuid-' + Math.random().toString(36).slice(2, 8)),
@@ -229,8 +233,10 @@ import { tel } from '../background/telemetry.js';
 
 // Record the addListener calls that fire at module-import time so we can
 // verify them without being affected by clearAllMocks().
-const _onUpdatedCalled = chrome.tabs.onUpdated.addListener.mock.calls.length > 0;
-const _onSuspendCalled = chrome.runtime.onSuspend.addListener.mock.calls.length > 0;
+// Note: Due to VM module context isolation, we check the listener arrays
+// rather than mock.calls, which may not be populated across module boundaries.
+const _onUpdatedCalled = onUpdatedListeners.length > 0;
+const _onSuspendCalled = onSuspendListeners.length > 0;
 
 // ── Helpers ──
 function makeSender(tabId = 1) {

@@ -76,6 +76,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('AbortError is caught and rethrown with user-friendly message', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => {
         throw new DOMException('Aborted', 'AbortError');
       });
@@ -86,6 +87,7 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('HTTP error handling', () => {
     test('401 error includes status code and error text', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 401,
@@ -96,6 +98,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('429 rate limit error is surfaced', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 429,
@@ -106,6 +109,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('500 server error is surfaced', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 500,
@@ -116,6 +120,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('error text truncation at 200 characters', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       const longError = 'A'.repeat(300);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
@@ -129,6 +134,7 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('malformed response handling', () => {
     test('non-JSON response throws', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => {
@@ -140,6 +146,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('empty JSON object response', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({}),
@@ -151,6 +158,7 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('response with null content', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({ choices: [{ message: { content: null } }] }),
@@ -246,20 +254,20 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('network errors', () => {
     test('network failure throws original error', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       const networkError = new TypeError('Failed to fetch');
       globalThis.fetch = jest.fn().mockImplementation(() => {
         throw networkError;
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       await expect(handleQuickAssist('test')).rejects.toThrow('Failed to fetch');
     });
 
     test('DNS failure surface', async () => {
+      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn().mockImplementation(() => {
         throw new Error('ECONNREFUSED');
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       await expect(handleQuickAssist('test')).rejects.toThrow();
     });

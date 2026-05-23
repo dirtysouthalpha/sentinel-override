@@ -71,7 +71,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-ahdl04 { runLogId: 'test-uuid-ahdl04', goalLen: 9 }
+    [Sentinel/storage] Run log opened: test-uuid-lkztbp { runLogId: 'test-uuid-lkztbp', goalLen: 9 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -104,7 +104,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-ahkdaz { runLogId: 'test-uuid-ahkdaz', goalLen: 47 }
+    [Sentinel/storage] Run log opened: test-uuid-uvb9vn { runLogId: 'test-uuid-uvb9vn', goalLen: 47 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -134,7 +134,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-uvmfc8 { runLogId: 'test-uuid-uvmfc8', goalLen: 37 }
+    [Sentinel/storage] Run log opened: test-uuid-n4znv4 { runLogId: 'test-uuid-n4znv4', goalLen: 37 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -182,10 +182,10 @@
       at _read (background/client-knowledge.js:55:13)
       at getActiveClient (background/client-knowledge.js:112:17)
       at startAgent (background/agent-engine.js:459:26)
-      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:543:5)
+      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:549:5)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-vyuxob { runLogId: 'test-uuid-vyuxob', goalLen: 9 }
+    [Sentinel/storage] Run log opened: test-uuid-3uwkou { runLogId: 'test-uuid-3uwkou', goalLen: 9 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -201,7 +201,7 @@
      [90m 654 |[39m   [36mreturn[39m [32m'Agent started in background'[39m[33m;[39m[0m
 
       at startAgent (background/agent-engine.js:651:25)
-      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:543:5)
+      at Object.<anonymous> (tests/agent-engine-loop-paths.test.js:549:5)
 
   console.log
     Agent starting loop for goal: Test goal
@@ -242,7 +242,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-73gek2 { runLogId: 'test-uuid-73gek2', goalLen: 14 }
+    [Sentinel/storage] Run log opened: test-uuid-rgiglu { runLogId: 'test-uuid-rgiglu', goalLen: 14 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -307,7 +307,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-wj4q49 { runLogId: 'test-uuid-wj4q49', goalLen: 9 }
+    [Sentinel/storage] Run log opened: test-uuid-rcoy6a { runLogId: 'test-uuid-rcoy6a', goalLen: 9 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -337,7 +337,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-65rdr3 { runLogId: 'test-uuid-65rdr3', goalLen: 18 }
+    [Sentinel/storage] Run log opened: test-uuid-oxfw5j { runLogId: 'test-uuid-oxfw5j', goalLen: 18 }
 
       at emit (background/telemetry.js:370:22)
 
@@ -377,7 +377,7 @@
       at emit (background/telemetry.js:370:22)
 
   console.log
-    [Sentinel/storage] Run log opened: test-uuid-fmqlar { runLogId: 'test-uuid-fmqlar', goalLen: 9 }
+    [Sentinel/storage] Run log opened: test-uuid-7wm7ai { runLogId: 'test-uuid-7wm7ai', goalLen: 9 }
 
       at emit (background/telemetry.js:370:22)
 
