@@ -170,6 +170,10 @@ const {
   isAgentAttachedTab,
   getAttachedTabIds,
   fetchAuditLog,
+  restoreFromCheckpoint,
+  pauseAgent,
+  resumeAgent,
+  stopAgent,
 } = await import('../background/agent-engine.js');
 
 beforeEach(() => {
@@ -1156,5 +1160,201 @@ describe('agent-engine — PII scrubbing reference tests', () => {
     expect(result).toContain('XXX.XXX.XXX.XXX');
     expect(result).toContain('[ticket]');
     expect(result).toContain('[client]');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+describe('agent-engine — restoreFromCheckpoint', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    sessionData.agent_checkpoint = null;
+  });
+
+  test('returns restored false when session storage unavailable', async () => {
+    chrome.storage.session.get = jest.fn(async () => { throw new Error('unavailable'); });
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(false);
+    expect(result.error).toBe('unavailable');
+  });
+
+  test('returns restored false when no checkpoint exists', async () => {
+    chrome.storage.session.get = jest.fn(async () => ({}));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(false);
+    expect(result.error).toBe('no checkpoint');
+  });
+
+  test('returns restored false when checkpoint is too old (>60 min)', async () => {
+    const oldCheckpoint = {
+      lastUpdate: Date.now() - (61 * 60 * 1000),
+      lastGoal: 'test goal'
+    };
+    sessionData.agent_checkpoint = oldCheckpoint;
+    chrome.storage.session.get = jest.fn(async () => ({ agent_checkpoint: oldCheckpoint }));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(false);
+    expect(result.error).toMatch(/checkpoint too old/);
+  });
+
+  test('returns restored false when checkpoint has no goal', async () => {
+    const invalidCheckpoint = {
+      lastUpdate: Date.now(),
+      lastGoal: null
+    };
+    sessionData.agent_checkpoint = invalidCheckpoint;
+    chrome.storage.session.get = jest.fn(async () => ({ agent_checkpoint: invalidCheckpoint }));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(false);
+    expect(result.error).toBe('no goal in checkpoint');
+  });
+
+  test('restores valid checkpoint successfully', async () => {
+    const validCheckpoint = {
+      lastUpdate: Date.now(),
+      lastGoal: 'test goal',
+      agentMemorySnapshot: { key1: 'value1' },
+      historySnapshot: [{ step: 1, action: { type: 'click' } }],
+      productiveSteps: 5,
+      consecutiveFailures: 2,
+      apiCallCount: 10,
+      runLogId: 'test-run-id',
+      agentSpeed: 'turbo',
+      expectedTenant: 'tenant-123',
+      activeClientId: 'client-456',
+      runSettingsSnapshot: { maxSteps: 100 },
+      trustCounters: { failedSteps: 1, consecutiveFailureMax: 3, safetyBlocks: 0 },
+      tabContextUrls: { '1': 'https://example.com' }
+    };
+    sessionData.agent_checkpoint = validCheckpoint;
+    chrome.storage.session.get = jest.fn(async () => ({ agent_checkpoint: validCheckpoint }));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(true);
+    expect(result.goal).toBe('test goal');
+    // tabContextUrls is not returned, only used internally
+  });
+
+  test('handles invalid history snapshot gracefully', async () => {
+    const checkpointWithBadHistory = {
+      lastUpdate: Date.now(),
+      lastGoal: 'test goal',
+      historySnapshot: 'not an array'
+    };
+    sessionData.agent_checkpoint = checkpointWithBadHistory;
+    chrome.storage.session.get = jest.fn(async () => ({ agent_checkpoint: checkpointWithBadHistory }));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(true);
+    expect(result.goal).toBe('test goal');
+  });
+
+  test('handles missing optional fields gracefully', async () => {
+    const minimalCheckpoint = {
+      lastUpdate: Date.now(),
+      lastGoal: 'minimal goal'
+    };
+    sessionData.agent_checkpoint = minimalCheckpoint;
+    chrome.storage.session.get = jest.fn(async () => ({ agent_checkpoint: minimalCheckpoint }));
+    const result = await restoreFromCheckpoint();
+    expect(result.restored).toBe(true);
+    expect(result.goal).toBe('minimal goal');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+describe('agent-engine — pause/resume/stop lifecycle', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('pauseAgent', () => {
+    test('returns "Agent not running" when agent not running', async () => {
+      const { stopAgent } = await import('../background/agent-engine.js');
+      await stopAgent(); // Ensure agent is not running
+      const result = await pauseAgent();
+      expect(result).toBe('Agent not running');
+    });
+  });
+
+  describe('resumeAgent', () => {
+    test('returns "Agent not running" when agent not running', async () => {
+      const { stopAgent } = await import('../background/agent-engine.js');
+      await stopAgent(); // Ensure agent is not running
+      const result = await resumeAgent();
+      expect(result).toBe('Agent not running');
+    });
+  });
+
+  describe('stopAgent', () => {
+    test('stops agent and returns message', async () => {
+      const result = await stopAgent();
+      expect(result).toBe('Agent stopped');
+    });
+
+    test('ends telemetry run via internal call', async () => {
+      const { endRun } = await import('../background/telemetry.js');
+      await stopAgent();
+      expect(endRun).toHaveBeenCalled();
+    });
+
+    test('detaches all debuggees', async () => {
+      const { detachAllDebuggees } = await import('../background/tab-manager.js');
+      await stopAgent();
+      expect(detachAllDebuggees).toHaveBeenCalled();
+    });
+
+    test('closes all agent tabs', async () => {
+      const { closeAllAgentTabs } = await import('../background/tab-context.js');
+      await stopAgent();
+      expect(closeAllAgentTabs).toHaveBeenCalled();
+    });
+
+    test('handles telemetry errors gracefully', async () => {
+      const { endRun } = await import('../background/telemetry.js');
+      endRun.mockRejectedValueOnce(new Error('telemetry error'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const result = await stopAgent();
+      expect(result).toBe('Agent stopped');
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────
+describe('agent-engine — edge cases', () => {
+  describe('setAgentSpeed error handling', () => {
+    test('returns error for invalid speed mode', () => {
+      const result = setAgentSpeed('invalid');
+      expect(result).toBe('Invalid speed mode. Use: turbo, normal, stealth');
+    });
+
+    test('handles storage errors gracefully', async () => {
+      chrome.storage.local.set = jest.fn(async () => { throw new Error('storage error'); });
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const result = setAgentSpeed('turbo');
+      expect(result).toBe('Speed set to turbo');
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('isAgentAttachedTab', () => {
+    test('returns false for non-existent tab', () => {
+      expect(isAgentAttachedTab(99999)).toBe(false);
+    });
+
+    test('returns false for null tab ID', () => {
+      expect(isAgentAttachedTab(null)).toBe(false);
+    });
+
+    test('returns false for undefined tab ID', () => {
+      expect(isAgentAttachedTab(undefined)).toBe(false);
+    });
+  });
+
+  describe('getAttachedTabIds', () => {
+    test('returns empty array when no tabs attached', () => {
+      const ids = getAttachedTabIds();
+      expect(Array.isArray(ids)).toBe(true);
+      expect(ids.length).toBe(0);
+    });
   });
 });
