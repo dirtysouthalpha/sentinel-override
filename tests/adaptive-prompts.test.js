@@ -41,11 +41,13 @@ const BASE_PROFILE = {
   workflowHints: [],
 };
 
+let getPlatformProfile, findMismatchHints, getActiveProvider;
+
 // Helper to get mocked modules
 async function getMockedModules() {
-  const { getPlatformProfile, findMismatchHints } = await import('../background/platforms/index.js');
-  const { getActiveProvider } = await import('../background/provider-registry.js');
-  return { getPlatformProfile, findMismatchHints, getActiveProvider };
+  const { getPlatformProfile: gpp, findMismatchHints: fmh } = await import('../background/platforms/index.js');
+  const { getActiveProvider: gap } = await import('../background/provider-registry.js');
+  return { getPlatformProfile: gpp, findMismatchHints: fmh, getActiveProvider: gap };
 }
 
 function mockProviderWithApiKey() {
@@ -65,10 +67,14 @@ function mockProviderWithApiKey() {
   };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   storageData = {};
   jest.clearAllMocks();
   if (globalThis.fetch) delete globalThis.fetch;
+  const mocks = await getMockedModules();
+  getPlatformProfile = mocks.getPlatformProfile;
+  findMismatchHints = mocks.findMismatchHints;
+  getActiveProvider = mocks.getActiveProvider;
 });
 
 // ========== Early return paths ==========
@@ -109,8 +115,6 @@ describe('rewriteGoalForPlatform — early returns', () => {
   });
 
   test('returns result with platform info when profile matches', async () => {
-    const { getPlatformProfile, getActiveProvider } = await getMockedModules();
-
     getPlatformProfile.mockReturnValueOnce({
       ...BASE_PROFILE,
       id: 'sonicwall-nsm',
