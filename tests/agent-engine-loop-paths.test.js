@@ -91,12 +91,19 @@ globalThis.crypto = {
 };
 
 // ── Mock all heavy dependencies ──
+// Store mock functions in variables so they can be used in tests
+const mockCallLLMWithRetry = jest.fn(async () => ({ type: 'finish', summary: 'done' }));
+const mockGeneratePlan = jest.fn(async () => ['Step 1', 'Step 2']);
+const mockSupportsVision = jest.fn(() => true);
+const mockGetPlatformContext = jest.fn(() => '');
+const mockGetRelevantPatterns = jest.fn(async () => []);
+
 jest.unstable_mockModule('../background/llm-client.js', () => ({
-  callLLMWithRetry: jest.fn(async () => ({ type: 'finish', summary: 'done' })),
-  generatePlan: jest.fn(async () => ['Step 1', 'Step 2']),
-  supportsVision: jest.fn(() => true),
-  getPlatformContext: jest.fn(() => ''),
-  getRelevantPatterns: jest.fn(async () => []),
+  callLLMWithRetry: mockCallLLMWithRetry,
+  generatePlan: mockGeneratePlan,
+  supportsVision: mockSupportsVision,
+  getPlatformContext: mockGetPlatformContext,
+  getRelevantPatterns: mockGetRelevantPatterns,
 }));
 
 jest.unstable_mockModule('../background/platforms/index.js', () => ({
@@ -132,8 +139,11 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendAgentStepStart: jest.fn(),
 }));
 
+// Store mock functions in variables so they can be used in tests
+const mockGenerateReport = jest.fn(async () => '## Report');
+
 jest.unstable_mockModule('../background/report-generator.js', () => ({
-  generateReport: jest.fn(async () => '## Report'),
+  generateReport: mockGenerateReport,
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
@@ -185,14 +195,22 @@ jest.unstable_mockModule('../background/client-knowledge.js', () => ({
   markRunCompleted: jest.fn(async () => {}),
 }));
 
+// Store mock functions in variables so they can be used in tests
+const mockRewriteGoalForPlatform = jest.fn(async () => null);
+
 jest.unstable_mockModule('../background/adaptive-prompts.js', () => ({
-  rewriteGoalForPlatform: jest.fn(async () => null),
+  rewriteGoalForPlatform: mockRewriteGoalForPlatform,
 }));
 
+// Store mock functions in variables so they can be used in tests
+const mockAppendAuditEntry = jest.fn(async () => {});
+const mockGetAuditLog = jest.fn(async () => []);
+const mockAuditLogToCsv = jest.fn(() => '');
+
 jest.unstable_mockModule('../background/audit-log.js', () => ({
-  appendAuditEntry: jest.fn(async () => {}),
-  getAuditLog: jest.fn(async () => []),
-  auditLogToCsv: jest.fn(() => ''),
+  appendAuditEntry: mockAppendAuditEntry,
+  getAuditLog: mockGetAuditLog,
+  auditLogToCsv: mockAuditLogToCsv,
 }));
 
 jest.unstable_mockModule('../background/skills/index.js', () => ({
@@ -344,8 +362,8 @@ describe('persistHistory error path', () => {
     });
 
     // startAgent triggers persistHistory via runAgentLoop
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'All done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'All done' });
 
     await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
 
@@ -361,8 +379,8 @@ describe('mode mismatch detection in startAgent', () => {
   test('detects mismatch when goal says APPROVAL but setting is autonomous', async () => {
     storageData.approvalMode = false;
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     const agentPromise = startAgent('Mode: APPROVAL - please check firewall settings', makeSender());
 
@@ -391,8 +409,8 @@ describe('mode mismatch detection in startAgent', () => {
   test('cancels run on mode mismatch timeout response', async () => {
     storageData.approvalMode = true;
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     const agentPromise = startAgent('Mode: AUTONOMOUS - do everything fast', makeSender());
 
@@ -426,7 +444,7 @@ describe('adaptive prompts flow in startAgent', () => {
     storageData.adaptivePromptsMode = 'auto';
     storageData.approvalMode = false;
 
-    rewriteGoalForPlatform.mockResolvedValueOnce({
+    mockRewriteGoalForPlatform.mockResolvedValueOnce({
       adapted: true,
       platform: { id: 'sonicwall' },
       summary: 'Expanded for SonicWall',
@@ -436,8 +454,8 @@ describe('adaptive prompts flow in startAgent', () => {
       durationMs: 100,
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Check firewall rules', makeSender())).resolves.toBeDefined();
 
@@ -446,10 +464,10 @@ describe('adaptive prompts flow in startAgent', () => {
 
   test('falls back to original goal on adaptive failure', async () => {
     storageData.adaptivePromptsMode = 'auto';
-    rewriteGoalForPlatform.mockRejectedValueOnce(new Error('Network error'));
+    mockRewriteGoalForPlatform.mockRejectedValueOnce(new Error('Network error'));
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Check firewall', makeSender())).resolves.toBeDefined();
   });
@@ -458,7 +476,7 @@ describe('adaptive prompts flow in startAgent', () => {
     storageData.adaptivePromptsMode = 'approval';
     storageData.approvalMode = false;
 
-    rewriteGoalForPlatform.mockResolvedValueOnce({
+    mockRewriteGoalForPlatform.mockResolvedValueOnce({
       adapted: true,
       platform: { id: 'cisco' },
       summary: 'Expanded for Cisco',
@@ -468,8 +486,8 @@ describe('adaptive prompts flow in startAgent', () => {
       durationMs: 50,
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     const agentPromise = startAgent('Check router config', makeSender());
 
@@ -497,7 +515,7 @@ describe('adaptive prompts flow in startAgent', () => {
     storageData.adaptivePromptsMode = 'approval';
     storageData.approvalMode = false;
 
-    rewriteGoalForPlatform.mockResolvedValueOnce({
+    mockRewriteGoalForPlatform.mockResolvedValueOnce({
       adapted: true,
       platform: { id: 'fortigate' },
       summary: 'Expanded for FortiGate',
@@ -507,8 +525,8 @@ describe('adaptive prompts flow in startAgent', () => {
       durationMs: 50,
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     const agentPromise = startAgent('Check firewall policies', makeSender());
 
@@ -543,8 +561,8 @@ describe('runAgentLoop setup paths', () => {
       throw new Error('Storage corrupt');
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
 
@@ -554,26 +572,26 @@ describe('runAgentLoop setup paths', () => {
   test('merges agent_context from storage into goal', async () => {
     storageData.agent_context = 'Previous session context about SonicWall';
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Check firewall', makeSender())).resolves.toBeDefined();
   });
 
   test('falls back to heuristic plan when generatePlan returns null', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Navigate to https://sonicwall.com and check settings', makeSender())).resolves.toBeDefined();
   });
 
   test('falls back to direct mode when both plan and heuristic fail', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     // Goal with no URL or search pattern → heuristic returns generic fallback
     await expect(startAgent('Do something vague', makeSender())).resolves.toBeDefined();
@@ -586,37 +604,37 @@ describe('runAgentLoop setup paths', () => {
 // ==========================
 describe('generateHeuristicPlan via startAgent', () => {
   test('multi-page research pattern generates multi-step plan', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Find the top 5 articles about network security and summarize each one', makeSender())).resolves.toBeDefined();
   });
 
   test('navigation-only goal generates simple plan', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Go to https://example.com/dashboard', makeSender())).resolves.toBeDefined();
   });
 
   test('search goal generates search plan', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Search for best practices for firewall configuration', makeSender())).resolves.toBeDefined();
   });
 
   test('null goal returns null for heuristic plan', async () => {
-    generatePlan.mockResolvedValueOnce(null);
+    mockGeneratePlan.mockResolvedValueOnce(null);
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     // Empty goal should still not crash
     await expect(startAgent('', makeSender())).resolves.toBeDefined();
@@ -628,10 +646,10 @@ describe('generateHeuristicPlan via startAgent', () => {
 // ==========================
 describe('post-loop cleanup paths', () => {
   test('handles report generation failure gracefully', async () => {
-    generateReport.mockRejectedValueOnce(new Error('Report template missing'));
+    mockGenerateReport.mockRejectedValueOnce(new Error('Report template missing'));
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'All tasks completed' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'All tasks completed' });
 
     await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
 
@@ -652,8 +670,8 @@ describe('post-loop cleanup paths', () => {
       Object.assign(storageData, obj);
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
 
@@ -674,8 +692,8 @@ describe('saveLearnedPattern via successful run', () => {
       Object.assign(storageData, obj);
     });
 
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done successfully' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done successfully' });
 
     await expect(startAgent('Test learning goal', makeSender())).resolves.toBeDefined();
 
@@ -696,8 +714,8 @@ describe('tab group attachment', () => {
   });
 
   test('tab group is created during startAgent', async () => {
-    const { callLLMWithRetry } = await import('../background/llm-client.js');
-    callLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
+    // Using mockCallLLMWithRetry variable
+    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
 
     await startAgent('Test goal', makeSender(5));
 
@@ -730,7 +748,7 @@ describe('resumeAgent', () => {
 describe('fetchAuditLog', () => {
   test('passes id to getAuditLog', async () => {
     const { getAuditLog } = await import('../background/audit-log.js');
-    getAuditLog.mockResolvedValueOnce([{ id: 1 }]);
+    mockGetAuditLog.mockResolvedValueOnce([{ id: 1 }]);
     await fetchAuditLog('log-123');
     expect(getAuditLog).toHaveBeenCalledWith('log-123');
   });
