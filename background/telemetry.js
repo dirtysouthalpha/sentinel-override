@@ -368,12 +368,12 @@ export function emit(category, level, message, payload) {
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
     else if (level === 'debug' || level === 'trace') console.debug.apply(console, consoleArgs);
     else console.log.apply(console, consoleArgs);
-  } catch (e) { /* console unavailable in some contexts */ }
+  } catch (_e) { /* console unavailable in some contexts */ }
   try {
     chrome.runtime.sendMessage(event).catch(() => {
       // Popup not open — expected when side panel is closed. Silent.
     });
-  } catch (e) { /* extension context invalidated */ }
+  } catch (_e) { /* extension context invalidated */ }
   if (_currentRunId && _persistEnabled) {
     try {
       _runBuffer.push(event);
@@ -381,7 +381,7 @@ export function emit(category, level, message, payload) {
       if (_runBuffer.length >= 200) {
         _flushRunBuffer().catch(() => {});
       }
-    } catch (e) { /* buffer append is non-critical */ }
+    } catch (_e) { /* buffer append is non-critical */ }
   }
 }
 

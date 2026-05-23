@@ -97,11 +97,11 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
         // Unwrap the content script envelope
         let data = result;
         if (typeof data === 'string') {
-          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (e) { /* parse failed, will try other formats */ }
+          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (_e) { /* parse failed, will try other formats */ }
         }
         if (data && typeof data === 'object') {
           let parsed;
-          try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (e) { parsed = null; /* parse failed, continue */ }
+          try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (_e) { parsed = null; /* parse failed, continue */ }
           if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
             domReady = true;
           }
@@ -111,10 +111,10 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
             if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
               domReady = true;
             }
-          } catch (e) { /* parse failed, will try other formats */ }
+          } catch (_e) { /* parse failed, will try other formats */ }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Content script not yet injected — this is normal during page load
     }
 
@@ -322,13 +322,13 @@ async function ensureObservabilityListeners(tabId) {
   if (observabilityListenersInstalled.has(tabId)) return;
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Log.enable');
-  } catch (e) { /* may not be supported on this target */ }
+  } catch (_e) { /* may not be supported on this target */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Runtime.enable');
-  } catch (e) { /* Runtime domain may not be available */ }
+  } catch (_e) { /* Runtime domain may not be available */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
-  } catch (e) { /* Network domain may not be available */ }
+  } catch (_e) { /* Network domain may not be available */ }
   observabilityListenersInstalled.add(tabId);
 }
 
@@ -382,9 +382,9 @@ function installObservabilityEventHook() {
         } else if (method === 'Network.loadingFailed') {
           recordNetworkFailure(tabId, params);
         }
-      } catch (e) { /* swallow per-event errors so one bad event can't disable the hook */ }
+      } catch (_e) { /* swallow per-event errors so one bad event can't disable the hook */ }
     });
-  } catch (e) { /* chrome.debugger unavailable in some test contexts */ }
+  } catch (_e) { /* chrome.debugger unavailable in some test contexts */ }
 }
 
 /**
@@ -479,7 +479,7 @@ function installDetachListenerOnce() {
         userDetachedTabs.add(source.tabId);
       }
     });
-  } catch (e) { /* in non-extension contexts (tests) chrome.debugger may be absent */ }
+  } catch (_e) { /* in non-extension contexts (tests) chrome.debugger may be absent */ }
 }
 
 /**
@@ -490,7 +490,7 @@ export async function detachAllDebuggees() {
   const ids = Array.from(attachedDebuggees);
   attachedDebuggees.clear();
   for (const tabId of ids) {
-    try { await chrome.debugger.detach({ tabId }); } catch (e) { /* may already be gone */ }
+    try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* may already be gone */ }
   }
 }
 
@@ -563,7 +563,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           y: Number(y) || 0,
           description: options.description || ('Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')')
         });
-      } catch (e) { /* content script may not be ready on first frame */ }
+      } catch (_e) { /* content script may not be ready on first frame */ }
       // Brief pause so the user sees the cursor arrive + element light up
       // before the click actually fires.
       await sleep(220);

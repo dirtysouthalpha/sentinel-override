@@ -91,7 +91,7 @@ export function findMismatchHints(profile, goal) {
       if (hint && hint.pattern && hint.pattern.test(goal)) {
         hits.push({ onbox: hint.onbox, target: hint.nsm });
       }
-    } catch (e) { /* skip bad pattern */ }
+    } catch (_e) { /* skip bad pattern */ }
   }
   return hits;
 }

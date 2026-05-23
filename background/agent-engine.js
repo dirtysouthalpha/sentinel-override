@@ -293,7 +293,7 @@ function activityDone(stepNumber, key, label, detail) {
     const durationMs = startedAt ? (Date.now() - startedAt) : null;
     _activityStartedAt.delete(_activityKey(stepNumber, key));
     sendAgentActivity(stepNumber, key, label, 'done', Object.assign({ durationMs }, detail || {}));
-  } catch (e) { /* activity tracking non-fatal */ }
+  } catch (_e) { /* activity tracking non-fatal */ }
 }
 
 /** Mark a sub-action as failed. Computes duration if start was recorded. */
@@ -303,7 +303,7 @@ function activityFail(stepNumber, key, label, detail) {
     const durationMs = startedAt ? (Date.now() - startedAt) : null;
     _activityStartedAt.delete(_activityKey(stepNumber, key));
     sendAgentActivity(stepNumber, key, label, 'failed', Object.assign({ durationMs }, detail || {}));
-  } catch (e) { /* activity tracking non-fatal */ }
+  } catch (_e) { /* activity tracking non-fatal */ }
 }
 
 /** Update an in-progress item's label without changing state (e.g., elapsed counter). */
@@ -560,7 +560,7 @@ export async function startAgent(goal, sender) {
               console.error('[decision] Unhandled rejection:', e);
             });
           }
-        } catch (e) { /* mode directive logging non-fatal */ }
+        } catch (_e) { /* mode directive logging non-fatal */ }
 
         if (decision.cancel) {
           agentRunning = false;
@@ -643,7 +643,7 @@ export async function startAgent(goal, sender) {
             }).catch((e) => {
               console.error('[decision] Unhandled rejection:', e);
             });
-          } catch (e) { /* run log storage non-fatal */ }
+          } catch (_e) { /* run log storage non-fatal */ }
           finalGoal = result.adaptedGoal;
         }
       }
@@ -1040,14 +1040,14 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e) { /* tab group update non-fatal */ }
+        } catch (_e) { /* tab group update non-fatal */ }
       }
     }
     agentAttachedTabs.add(tabId);
     // Ensure side panel is enabled on this attached tab.
     try {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
-    } catch (e) { /* side panel API may not be available */ }
+    } catch (_e) { /* side panel API may not be available */ }
   } catch (e) {
     console.warn('[Sentinel] attachTabToSentinelGroup failed:', e && e.message);
   }
@@ -1061,7 +1061,7 @@ async function detachAllSentinelTabs() {
   if (ids.length === 0) return;
   try {
     await chrome.tabs.ungroup(ids);
-  } catch (e) {
+  } catch (_e) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) { console.error('[Sentinel] Error in agent-engine.js:', _e2); }
@@ -1070,7 +1070,7 @@ async function detachAllSentinelTabs() {
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
   try {
     await chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' });
-  } catch (e) { /* side panel API may not be available */ }
+  } catch (_e) { /* side panel API may not be available */ }
 }
 
 // Public accessor so background/index.js can decide side-panel visibility on
@@ -1197,7 +1197,7 @@ async function getTechnicianInfo() {
     if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object') {
       return { ...defaults, ...stored.technicianInfo };
     }
-  } catch (e) { /* storage read non-fatal */ }
+  } catch (_e) { /* storage read non-fatal */ }
   return defaults;
 }
 
@@ -2506,7 +2506,7 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_td] Unhandled rejection:', e);
               });
-            } catch (e) {}
+            } catch (_e) {}
           }
         }
       } catch (_) { /* non-fatal */ }
@@ -2563,7 +2563,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const parsed = JSON.parse(val.replace('JS Result: ', ''));
                 val = (parsed && parsed.value !== undefined) ? parsed.value : val;
-              } catch (e) {}
+              } catch (_e) {}
             }
             _currentDomHash = typeof val === 'number' ? val : parseInt(String(val), 10) || 0;
           }
@@ -2702,7 +2702,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_wallHit] Unhandled rejection:', e);
             });
-          } catch (e) {}
+          } catch (_e) {}
           // Log to forensic run log so HR/compliance reviews see when the agent
           // paused for credentials.
           try {
@@ -2719,7 +2719,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_wallHit] Unhandled rejection:', e);
               });
             }
-          } catch (e) {}
+          } catch (_e) {}
           // Wait until user resumes (Resume button → resumeAgent message)
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -2753,7 +2753,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_mfaHit] Unhandled rejection:', e);
             });
-          } catch (e) {}
+          } catch (_e) {}
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -2918,14 +2918,14 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_recovery] Unhandled rejection:', e);
               });
             }
-          } catch (e) {}
+          } catch (_e) {}
           // Activity stream surface — single item showing which skills fired
           try {
             const _label = _recovery.autoApply
               ? 'Skill auto-applied: ' + _recovery.appliedSkillIds[0]
               : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
             activityDone(stepCount, 'recovery-skills', _label, null);
-          } catch (e) {}
+          } catch (_e) {}
         }
         if (_recovery.autoApply) {
           // Deterministic recovery — skip the LLM consult for this step.
@@ -3077,7 +3077,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (!refExists) {
           try {
             console.warn('[agent-engine] LLM returned unknown ref "' + command.ref + '" not in latest observation. Content script will fall back to selector if available.');
-          } catch (e) {}
+          } catch (_e) {}
         }
       }
 
@@ -3356,9 +3356,9 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_skillStats] Unhandled rejection:', e);
               });
-            } catch (e) {}
+            } catch (_e) {}
           }
-        } catch (e) {}
+        } catch (_e) {}
 
         // (3.31.0) Compute trust score for the agent_finished payload.
         // We recompute here rather than reaching into the run-log block's
@@ -3393,7 +3393,7 @@ async function runAgentLoop(goal, workingTabId) {
               scoreBand: _finalTrustScore ? _finalTrustScore.band : null
             });
           }
-        } catch (e) { /* mode directive logging non-fatal */ }
+        } catch (_e) { /* mode directive logging non-fatal */ }
         chrome.runtime.sendMessage({
           action: 'agent_finished',
           summary: finalSummary,
@@ -3468,7 +3468,7 @@ async function runAgentLoop(goal, workingTabId) {
               `(function(){const el=document.querySelector(${JSON.stringify(_verifySelector)});if(!el)return'';return(el.value!==undefined&&el.tagName!=='SELECT'?el.value:(el.innerText||el.textContent||'')).trim();})()` }
           }, 3, 1200).catch(() => null);
           _verifyActual = typeof _verifyResult === 'string' ? _verifyResult.trim() : '';
-        } catch (e) {}
+        } catch (_e) {}
         let _verifyOutcome;
         if (!_verifyActual) {
           _verifyOutcome = 'verify: element not found or empty (' + (_verifySelector || 'no selector') + ')';
@@ -3497,7 +3497,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
           activityDone(stepCount, 'note-content', 'Noted: "' + _preview + '"', null);
-        } catch (e) {}
+        } catch (_e) {}
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
         await persistHistory();
@@ -3552,7 +3552,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const _failed = entries.filter(e => e.failed || (e.status >= 400)).length;
             tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
-          } catch (e) {}
+          } catch (_e) {}
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
@@ -3734,7 +3734,7 @@ async function runAgentLoop(goal, workingTabId) {
                 action_type: _block.actionType
               });
               await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-            } catch (e) {}
+            } catch (_e) {}
           }
           const decision = await requestTenantOverride(_block, command, stepCount);
           if (decision.approved) {
@@ -3752,7 +3752,7 @@ async function runAgentLoop(goal, workingTabId) {
                   action_type: _block.actionType
                 });
                 await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-              } catch (e) {}
+              } catch (_e) {}
             }
             sendSilentUpdate('✓ Cross-tenant override granted — proceeding', stepCount);
           } else {
@@ -3769,7 +3769,7 @@ async function runAgentLoop(goal, workingTabId) {
                   action_type: _block.actionType
                 });
                 await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-              } catch (e) {}
+              } catch (_e) {}
             }
             historyPush({ step: stepCount, action: command, result: 'BLOCKED: cross-tenant action rejected by tenant lockdown (expected ' + _block.expected + ', detected ' + _block.detected + ')' });
             await persistHistory();
@@ -4025,7 +4025,7 @@ async function runAgentLoop(goal, workingTabId) {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
               tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory).length });
-            } catch (e) {}
+            } catch (_e) {}
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
               : `"${String(parsed.value).substring(0, 100)}"`;
@@ -4035,7 +4035,7 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.20.0) Show extraction outcome in the activity stream
             try {
               activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
-            } catch (e) {}
+            } catch (_e) {}
             } // close else (error-string guard)
           }
         } catch (_) {
@@ -4131,7 +4131,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' ? Object.keys(savedValue).length : null));
                 tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory).length });
-              } catch (e) {}
+              } catch (_e) {}
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
@@ -4142,7 +4142,7 @@ async function runAgentLoop(goal, workingTabId) {
                   ? _itemCount + ' items captured'
                   : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
                 activityDone(stepCount, 'js-extract-content', 'Saved "' + savedKey + '" → ' + _summary, null);
-              } catch (e) {}
+              } catch (_e) {}
             }
           }
         }
@@ -4293,7 +4293,7 @@ async function runAgentLoop(goal, workingTabId) {
               try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
             }
           }
-        } catch (e) {}
+        } catch (_e) {}
       }
 
       // Track success/failure for self-healing

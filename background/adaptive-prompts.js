@@ -149,7 +149,7 @@ function extractJsonObject(text) {
   }
   // eslint-disable-next-line no-control-regex
   s = s.replace(/[\x00-\x1f]/g, '');
-  try { return JSON.parse(s); } catch (e) { /* will try fallback parsing */ }
+  try { return JSON.parse(s); } catch (_e) { /* will try fallback parsing */ }
   // Find first { ... } balanced
   const start = s.indexOf('{');
   if (start < 0) return null;

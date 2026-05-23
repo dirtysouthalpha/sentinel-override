@@ -128,7 +128,7 @@ export async function closeTab(tabId) {
 
   const ctx = tabContexts.get(tabId);
   if (ctx && ctx.isAgentCreated) {
-    try { await chrome.tabs.remove(tabId); } catch (e) { /* tab may already be closed */ }
+    try { await chrome.tabs.remove(tabId); } catch (_e) { /* tab may already be closed */ }
   }
   tabContexts.delete(tabId);
   notifyStateChange();
@@ -251,5 +251,5 @@ export function handleTabRemoved(tabId) {
 
 /** Notify the popup of tab state changes. */
 function notifyStateChange() {
-  try { sendTabStateUpdate(getAllTabContexts()); } catch (e) { /* popup may be closed */ }
+  try { sendTabStateUpdate(getAllTabContexts()); } catch (_e) { /* popup may be closed */ }
 }
