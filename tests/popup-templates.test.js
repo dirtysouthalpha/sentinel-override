@@ -148,4 +148,108 @@ describe('filterTemplates', () => {
     const result = sandbox.filterTemplates([], '', '');
     expect(result).toHaveLength(0);
   });
+
+  test('handles templates with null or undefined names', () => {
+    const badNames = [
+      { name: null, goal: 'test', tags: ['x'] },
+      { name: undefined, goal: 'test', tags: ['y'] },
+      { name: 'Valid Name', goal: 'test', tags: ['z'] },
+    ];
+    const result = sandbox.filterTemplates(badNames, '', '');
+    // Should not crash, should handle null/undefined gracefully
+    expect(result).toBeDefined();
+    expect(result.length).toBeGreaterThanOrEqual(0);
+  });
+
+  test('search is case-insensitive ( searchTerm is pre-lowercased by loadTemplates)', () => {
+    const templates = [
+      { name: 'Network Scan', goal: 'test', tags: [], updatedAt: 100 },
+      { name: 'network scan', goal: 'test', tags: [], updatedAt: 100 },
+      { name: 'NETWORK SCAN', goal: 'test', tags: [], updatedAt: 100 },
+    ];
+    // searchTerm is already lowercased when passed to filterTemplates (see loadTemplates line 46)
+    const result = sandbox.filterTemplates(templates, 'network', '');
+    expect(result).toHaveLength(3);
+  });
+
+  test('handles special characters in search term', () => {
+    const templates = [
+      { name: 'Test: Special/Chars', goal: 'test', tags: [], updatedAt: 100 },
+      { name: 'Test@Home', goal: 'test', tags: [], updatedAt: 100 },
+    ];
+    const result = sandbox.filterTemplates(templates, '@', '');
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('Test@Home');
+  });
+
+  test('handles templates with missing tags property', () => {
+    const noTagsProp = [
+      { name: 'A', tags: ['x'] },
+      { name: 'B' }, // no tags property
+      { name: 'C', tags: null },
+    ];
+    const result = sandbox.filterTemplates(noTagsProp, '', 'x');
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('A');
+  });
+
+  test('handles empty tag array', () => {
+    const emptyTags = [
+      { name: 'A', tags: [] },
+      { name: 'B', tags: [] },
+    ];
+    const result = sandbox.filterTemplates(emptyTags, '', 'anything');
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe('parseTags — edge cases', () => {
+  let sandbox;
+  beforeAll(() => { sandbox = loadModule(createSandbox()); });
+
+  test('handles unicode tags', () => {
+    expect(sandbox.parseTags('日本語, 🚀, test')).toEqual(['日本語', '🚀', 'test']);
+  });
+
+  test('handles tags with special characters', () => {
+    expect(sandbox.parseTags('test@home, user-name, #tag')).toEqual(['test@home', 'user-name', '#tag']);
+  });
+
+  test('handles mixed separators (comma only)', () => {
+    // Only commas are separators, not other delimiters
+    expect(sandbox.parseTags('one,two;three:four')).toEqual(['one', 'two;three:four']);
+  });
+
+  test('handles trailing comma', () => {
+    expect(sandbox.parseTags('a,b,c,')).toEqual(['a', 'b', 'c']);
+  });
+
+  test('handles leading comma', () => {
+    expect(sandbox.parseTags(',a,b,c')).toEqual(['a', 'b', 'c']);
+  });
+
+  test('handles multiple consecutive commas', () => {
+    expect(sandbox.parseTags('a,,,b,,,,c')).toEqual(['a', 'b', 'c']);
+  });
+
+  test('handles tags with numbers', () => {
+    expect(sandbox.parseTags('test123, 456test, 789')).toEqual(['test123', '456test', '789']);
+  });
+
+  test('preserves tag casing', () => {
+    expect(sandbox.parseTags('TEST, Test, test')).toEqual(['TEST', 'Test', 'test']);
+  });
+
+  test('handles very long single tag', () => {
+    const longTag = 'a'.repeat(1000);
+    expect(sandbox.parseTags(longTag)).toEqual([longTag]);
+  });
+
+  test('handles newlines in input', () => {
+    expect(sandbox.parseTags('a\nb,c')).toEqual(['a\nb', 'c']);
+  });
+
+  test('handles tabs in input', () => {
+    expect(sandbox.parseTags('a\tb,c')).toEqual(['a\tb', 'c']);
+  });
 });
