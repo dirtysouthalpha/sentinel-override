@@ -11,7 +11,7 @@ let mockConfig = {
   model: 'test-model',
 };
 
-const mockGetActiveProvider = jest.fn();
+const mockGetActiveProvider = jest.fn(async () => mockConfig);
 const mockResolveProvider = jest.fn(() => ({
   buildHeaders: (apiKey) => ({ 'Authorization': `Bearer ${apiKey}` }),
   parseResponse: (data) => data.choices?.[0]?.message?.content || data.content?.[0]?.text || 'Response',
@@ -22,7 +22,12 @@ jest.unstable_mockModule('../background/provider-registry.js', () => ({
   resolveProvider: mockResolveProvider,
 }));
 
-import { handleQuickAssist } from '../background/quick-assist-handler.js';
+// Import handleQuickAssist after setting up mocks
+let handleQuickAssist;
+beforeAll(async () => {
+  const module = await import('../background/quick-assist-handler.js');
+  handleQuickAssist = module.handleQuickAssist;
+});
 
 describe('quick-assist-handler edge cases', () => {
   let originalFetch;
@@ -37,8 +42,6 @@ describe('quick-assist-handler edge cases', () => {
       apiKey: 'test-key',
       model: 'test-model',
     };
-    // Reset the mock to return the updated config
-    mockGetActiveProvider.mockResolvedValue(mockConfig);
   });
 
   afterEach(() => {
@@ -52,19 +55,16 @@ describe('quick-assist-handler edge cases', () => {
       // Note: With ESM module mocking limitations, we skip this test
       // The actual validation is tested in integration tests
       mockConfig.apiKey = null;
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       await expect(handleQuickAssist('test prompt')).rejects.toThrow('No API key configured');
     });
 
     test('empty string API key throws error', async () => {
       mockConfig.apiKey = '';
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       await expect(handleQuickAssist('test prompt')).rejects.toThrow('No API key configured');
     });
 
     test('undefined API key throws error', async () => {
       mockConfig.apiKey = undefined;
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       await expect(handleQuickAssist('test prompt')).rejects.toThrow('No API key configured');
     });
   });
@@ -76,7 +76,11 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('AbortError is caught and rethrown with user-friendly message', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
+      // Debug: check if mock is set up correctly
+      console.log('[DEBUG] mockGetActiveProvider:', mockGetActiveProvider);
+      console.log('[DEBUG] mockConfig:', mockConfig);
+      console.log('[DEBUG] mockGetActiveProvider.mock.calls:', mockGetActiveProvider.mock.calls);
+
       globalThis.fetch = jest.fn(async () => {
         throw new DOMException('Aborted', 'AbortError');
       });
@@ -87,7 +91,6 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('HTTP error handling', () => {
     test('401 error includes status code and error text', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 401,
@@ -98,7 +101,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('429 rate limit error is surfaced', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 429,
@@ -109,7 +111,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('500 server error is surfaced', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
         status: 500,
@@ -120,7 +121,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('error text truncation at 200 characters', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       const longError = 'A'.repeat(300);
       globalThis.fetch = jest.fn(async () => ({
         ok: false,
@@ -134,7 +134,6 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('malformed response handling', () => {
     test('non-JSON response throws', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => {
@@ -146,7 +145,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('empty JSON object response', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({}),
@@ -158,7 +156,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('response with null content', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({ choices: [{ message: { content: null } }] }),
@@ -175,7 +172,6 @@ describe('quick-assist-handler edge cases', () => {
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'Response' } }] }),
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       const result = await handleQuickAssist('');
       expect(typeof result).toBe('string');
@@ -187,7 +183,6 @@ describe('quick-assist-handler edge cases', () => {
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'Response' } }] }),
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       await expect(handleQuickAssist(longPrompt)).resolves.toBeDefined();
     });
@@ -198,7 +193,6 @@ describe('quick-assist-handler edge cases', () => {
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'Response' } }] }),
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       await expect(handleQuickAssist(specialPrompt)).resolves.toBeDefined();
     });
@@ -209,7 +203,6 @@ describe('quick-assist-handler edge cases', () => {
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'Response' } }] }),
       });
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
 
       await expect(handleQuickAssist(promptWithSeparator)).resolves.toBeDefined();
     });
@@ -218,7 +211,6 @@ describe('quick-assist-handler edge cases', () => {
   describe('Anthropic-specific handling', () => {
     test('Anthropic format uses system field and messages array', async () => {
       mockConfig.id = 'anthropic';
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ content: [{ type: 'text', text: 'Response' }] }),
@@ -229,7 +221,6 @@ describe('quick-assist-handler edge cases', () => {
 
     test('Anthropic with separator splits correctly', async () => {
       mockConfig.id = 'anthropic';
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ content: [{ type: 'text', text: 'Response' }] }),
@@ -242,7 +233,6 @@ describe('quick-assist-handler edge cases', () => {
   describe('OpenAI-compatible handling', () => {
     test('OpenAI format uses messages array with system and user', async () => {
       mockConfig.id = 'openai';
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'Response' } }] }),
@@ -254,7 +244,6 @@ describe('quick-assist-handler edge cases', () => {
 
   describe('network errors', () => {
     test('network failure throws original error', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       const networkError = new TypeError('Failed to fetch');
       globalThis.fetch = jest.fn().mockImplementation(() => {
         throw networkError;
@@ -264,7 +253,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('DNS failure surface', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockConfig);
       globalThis.fetch = jest.fn().mockImplementation(() => {
         throw new Error('ECONNREFUSED');
       });
