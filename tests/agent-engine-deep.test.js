@@ -211,8 +211,8 @@ const {
 } = agentEngine;
 
 // Dynamic imports for mocked modules (for re-configuring in tests)
-import cdpModule from '../background/tab-manager.js';
-import msgModule from '../background/message-protocol.js';
+import * as cdpModule from '../background/tab-manager.js';
+import * as msgModule from '../background/message-protocol.js';
 
 // ── Helpers ──
 // Simulate a chrome.runtime.onMessage listener receiving a message.
