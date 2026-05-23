@@ -460,7 +460,7 @@ export async function executeScheduledTask(alarmName) {
   // Parse scheduleId from alarm name
   const scheduleId = alarmName.replace('schedule-', '');
   if (!scheduleId) {
-    console.error('Invalid alarm name:', alarmName);
+    console.error('[Sentinel/scheduler] Invalid alarm name:', alarmName);
     return;
   }
 
@@ -468,7 +468,7 @@ export async function executeScheduledTask(alarmName) {
   const schedules = await loadSchedules();
   const schedule = schedules[scheduleId];
   if (!schedule) {
-    console.warn(`Schedule ${scheduleId} not found, clearing orphan alarm`);
+    console.warn(`[Sentinel/scheduler] Schedule ${scheduleId} not found, clearing orphan alarm`);
     clearAlarm(scheduleId);
     return;
   }

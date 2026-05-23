@@ -5,6 +5,8 @@ import { jest } from '@jest/globals';
 
 let storageData = {};
 let _agentRunning = false;
+// Track registered onMessage listeners so tests can fire messages into them
+let _msgListeners = [];
 globalThis.chrome = {
   storage: {
     local: {
@@ -28,7 +30,10 @@ globalThis.chrome = {
   runtime: {
     getURL: jest.fn((path) => 'chrome-extension://xxx/' + path),
     sendMessage: jest.fn(() => Promise.resolve()),
-    onMessage: { addListener: jest.fn(), removeListener: jest.fn() },
+    onMessage: {
+      addListener: jest.fn((fn) => { _msgListeners.push(fn); }),
+      removeListener: jest.fn(),
+    },
   },
   action: {
     setBadgeText: jest.fn(),
@@ -42,7 +47,7 @@ globalThis.chrome = {
 
 jest.unstable_mockModule('../background/agent-engine.js', () => ({
   get agentRunning() { return _agentRunning; },
-  startAgent: jest.fn(async () => {}),
+  startAgent: jest.fn(async () => {}).mockName('startAgent'),
 }));
 
 jest.unstable_mockModule('../background/template-manager.js', () => ({
@@ -63,6 +68,9 @@ jest.unstable_mockModule('../background/shared-state.js', () => ({
   notifyIfEnabled: jest.fn(),
 }));
 
+// Pre-import agent-engine to ensure mock is set up correctly
+const AgentEngineModule = import('../background/agent-engine.js');
+
 import {
   createSchedule,
   listSchedules,
@@ -78,6 +86,8 @@ import {
 
 beforeEach(() => {
   storageData = {};
+  _agentRunning = false;
+  _msgListeners = [];
   jest.clearAllMocks();
   // Restore storage mock implementations after clearAllMocks resets them
   chrome.storage.local.get.mockImplementation(async (keys) => {
@@ -87,6 +97,14 @@ beforeEach(() => {
   });
   chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
   chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
+  // Restore onMessage.addListener mock to push to _msgListeners
+  chrome.runtime.onMessage.addListener.mockImplementation((fn) => { _msgListeners.push(fn); });
+  // Restore tabs.query mock to support callback pattern
+  chrome.tabs.query.mockImplementation((opts, cb) => {
+    if (cb) cb([]);
+    return Promise.resolve([]);
+  });
+  chrome.tabs.create.mockResolvedValue({ id: 1, url: 'about:blank' });
 });
 
 // Helper: create a valid schedule
@@ -1391,29 +1409,31 @@ describe('initScheduler — disabled schedules', () => {
 // ========== executeScheduledTask — goal resolution uses goal directly when no templateId ==========
 
 describe('executeScheduledTask — direct goal (no template)', () => {
-  test('uses schedule.goal directly when templateId is null', async () => {
-    const schedule = await makeSchedule({ goal: 'Direct goal text' });
-    jest.clearAllMocks();
+  // Helper: fire agent_loop_complete to the registered listeners after a delay
+  async function fireAgentComplete(report = 'Done') {
+    await new Promise(r => setTimeout(r, 200));
+    for (const listener of _msgListeners) {
+      listener({ action: 'agent_loop_complete', report });
+    }
+  }
 
+  test('uses schedule.goal directly when templateId is null', async () => {
+    const agentEngine = await import('../background/agent-engine.js');
+
+    const schedule = await makeSchedule({ goal: 'Direct goal text' });
+
+    // Set up mocks
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
       return Promise.resolve([{ id: 42 }]);
     });
 
-    let msgListener;
-    chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
+    agentEngine.startAgent.mockResolvedValue(undefined);
 
     const execPromise = executeScheduledTask('schedule-' + schedule.id);
-
-    await new Promise(r => setTimeout(r, 50));
-    if (msgListener) {
-      msgListener({ action: 'agent_loop_complete', report: 'Done with direct goal' });
-    }
-
+    await fireAgentComplete('Done with direct goal');
     await execPromise;
 
-    // Verify startAgent was called with the direct goal
-    const agentEngine = await import('../background/agent-engine.js');
     expect(agentEngine.startAgent).toHaveBeenCalledWith(
       'Direct goal text',
       expect.objectContaining({ tab: { id: 42 } })
