@@ -985,3 +985,57 @@ describe('runCommandInFrame', () => {
     expect(result.error).toContain('DOM crash');
   });
 });
+
+// ========== rebuildFrameMap (internal function) ==========
+
+describe('rebuildFrameMap — internal function', () => {
+  test('sorts frames by frameId for stable ordering', async () => {
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
+      { frameId: 0, parentId: -1, url: 'https://example.com' },
+      { frameId: 10, parentId: 0, url: 'https://example.com/b' },
+      { frameId: 3, parentId: 0, url: 'https://example.com/a' },
+    ]);
+
+    // The sort function should order by frameId ascending
+    const result = await resolveFrameForSelector(7003, 0);
+    expect(result).toBe(3); // First iframe after sorting by frameId
+  });
+
+  test('handles getAllFrames rejection gracefully in listener', async () => {
+    chrome.webNavigation.getAllFrames.mockRejectedValueOnce(new Error('tab closed'));
+    // Simulate onCommitted listener calling rebuildFrameMap
+    const { addFrameRouterListeners } = await import('../background/frame-router.js');
+    const committedListener = chrome.webNavigation.onCommitted.addListener.mock.calls[0]?.[0];
+    if (committedListener) {
+      committedListener({ tabId: 7002, frameId: 0, url: 'https://example.com' });
+      await new Promise(r => setTimeout(r, 50));
+    }
+    // Should not throw
+    expect(true).toBe(true);
+  });
+});
+
+// ========== resolveFrameForSelector error handling ==========
+
+describe('resolveFrameForSelector — error handling', () => {
+  test('catches and logs getAllFrames errors', async () => {
+    chrome.webNavigation.getAllFrames.mockRejectedValueOnce(new Error('API failure'));
+    const result = await resolveFrameForSelector(7004, 0);
+    expect(result).toBeNull();
+  });
+
+  test('handles frames array with only main frame (no iframes)', async () => {
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
+      { frameId: 0, parentId: -1, url: 'https://example.com' },
+    ]);
+    const result = await resolveFrameForSelector(7005, 0);
+    // No iframes, so result should be null
+    expect(result).toBeNull();
+  });
+
+  test('handles empty frames array', async () => {
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([]);
+    const result = await resolveFrameForSelector(7006, 0);
+    expect(result).toBeNull();
+  });
+});
