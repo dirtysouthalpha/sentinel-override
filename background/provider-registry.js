@@ -435,13 +435,13 @@ export async function migrateLegacySettings() {
         }
       }
     });
-  } catch (_) { return; }
+  } catch (e) { return; }
 
   // CRITICAL: Remove old keys so stale values cannot cause confusion
   // callLLM() and other readers now use getActiveProvider() which reads the new structure
   try {
     await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
-  } catch (_) {}
+  } catch (e) { /* storage cleanup non-fatal */ }
 }
 
 // ========== Provider Catalog (3.10.0) ==========
