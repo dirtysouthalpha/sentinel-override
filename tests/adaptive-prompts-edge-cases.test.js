@@ -416,11 +416,32 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform technician info handling', () => {
     test('should handle technician info with name', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
       });
 
       const technicianInfo = {
@@ -436,11 +457,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle technician info with minimal data', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
       });
 
       const technicianInfo = {
