@@ -5,8 +5,6 @@ import { jest } from '@jest/globals';
 
 let storageData = {};
 let _agentRunning = false;
-let _agentStartShouldFail = false;
-let _agentStartError = null;
 globalThis.chrome = {
   storage: {
     local: {
@@ -44,11 +42,7 @@ globalThis.chrome = {
 
 jest.unstable_mockModule('../background/agent-engine.js', () => ({
   get agentRunning() { return _agentRunning; },
-  startAgent: jest.fn(async () => {
-    if (_agentStartShouldFail) {
-      throw _agentStartError || new Error('Agent start failed');
-    }
-  }),
+  startAgent: jest.fn(async () => {}),
 }));
 
 jest.unstable_mockModule('../background/template-manager.js', () => ({
@@ -93,14 +87,6 @@ beforeEach(() => {
   });
   chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
   chrome.alarms.get.mockImplementation(async (name, cb) => { if (cb) cb(null); });
-  // Note: We don't restore chrome.tabs mocks here - individual tests will set them up as needed
-});
-
-afterEach(() => {
-  // Reset global state that might interfere between tests
-  _agentRunning = false;
-  _agentStartShouldFail = false;
-  _agentStartError = null;
 });
 
 // Helper: create a valid schedule
@@ -1686,17 +1672,10 @@ describe('executeScheduledTask — tab creation failure path', () => {
   test('handles chrome.tabs.query rejection and stores failure result', async () => {
     const { createSchedule, executeScheduledTask } = await import('../background/scheduler.js');
 
-    // Clear mocks first to ensure clean state
-    jest.clearAllMocks();
-
-    // Mock chrome.tabs.query to call callback with undefined (triggering tab creation)
-    chrome.tabs.query.mockImplementation((_, callback) => {
-      callback();
-    });
-
-    // Mock chrome.tabs.create to throw
-    chrome.tabs.create.mockImplementation(() => {
-      throw new Error('Tab creation failed');
+    // Mock chrome.tabs.query to reject
+    const originalQuery = chrome.tabs.query;
+    chrome.tabs.query = jest.fn((_, callback) => {
+      throw new Error('Tabs query failed');
     });
 
     const schedule = await createSchedule({
@@ -1715,21 +1694,22 @@ describe('executeScheduledTask — tab creation failure path', () => {
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('failure');
     expect(results[0].error).toContain('Tab creation failed');
+
+    // Restore
+    chrome.tabs.query = originalQuery;
   });
 
   test('handles chrome.tabs.create rejection and stores failure result', async () => {
     const { createSchedule, executeScheduledTask } = await import('../background/scheduler.js');
 
-    // Clear mocks first to ensure clean state
-    jest.clearAllMocks();
-
     // Mock chrome.tabs.query to return empty array
-    chrome.tabs.query.mockImplementation((_, callback) => {
+    chrome.tabs.query = jest.fn((_, callback) => {
       callback([]);
     });
 
-    // Mock chrome.tabs.create to throw
-    chrome.tabs.create.mockImplementation(() => {
+    // Mock chrome.tabs.create to reject
+    const originalCreate = chrome.tabs.create;
+    chrome.tabs.create = jest.fn(() => {
       throw new Error('Tab creation failed');
     });
 
@@ -1749,6 +1729,9 @@ describe('executeScheduledTask — tab creation failure path', () => {
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe('failure');
     expect(results[0].error).toContain('Tab creation failed');
+
+    // Restore
+    chrome.tabs.create = originalCreate;
   });
 });
 
@@ -1756,17 +1739,15 @@ describe('executeScheduledTask — tab creation failure path', () => {
 
 describe('executeScheduledTask — agent start failure path for recurring', () => {
   test('handles startAgent rejection for recurring schedule and re-registers alarm', async () => {
-    // Clear mocks first to ensure clean state
-    jest.clearAllMocks();
-
     // Mock chrome.tabs.query to return a valid tab so we get past tab creation
-    chrome.tabs.query.mockImplementation((_, callback) => {
+    const originalQuery = chrome.tabs.query;
+    chrome.tabs.query = jest.fn((_, callback) => {
       callback([{ id: 1, url: 'https://example.com' }]);
     });
 
-    // Set global to make startAgent fail
-    _agentStartShouldFail = true;
-    _agentStartError = new Error('Agent start failed');
+    // Import the mocked AgentEngine
+    const AgentEngine = await import('../background/agent-engine.js');
+    const startAgentSpy = jest.spyOn(AgentEngine, 'startAgent').mockRejectedValue(new Error('Agent start failed'));
 
     const { createSchedule, executeScheduledTask, getScheduleResults } = await import('../background/scheduler.js');
 
@@ -1793,8 +1774,8 @@ describe('executeScheduledTask — agent start failure path for recurring', () =
 
     // Restore
     alarmCreateSpy.mockRestore();
-    _agentStartShouldFail = false;
-    _agentStartError = null;
+    startAgentSpy.mockRestore();
+    chrome.tabs.query = originalQuery;
   });
 });
 

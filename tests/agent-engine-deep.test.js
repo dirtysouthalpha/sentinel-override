@@ -212,64 +212,37 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
   suggestRetryActions: jest.fn(() => []),
 }));
 
-// Import the module under test using dynamic import to ensure mocks are applied
-let agentEngine;
-let describeAction;
-let _describeTarget;
-let getTechnicianInfo;
-let saveLearnedPattern;
-let enforceRateLimit;
-let sleep;
-let requestApproval;
-let requestTenantOverride;
-let _waitForAdaptedGoalDecision;
-let _waitForModeMismatchDecision;
-let _runExecuteJsOnce;
-let _runExecuteJsWithRetryLadder;
-let detectSignInWall;
-let activityStart;
-let activityDone;
-let activityFail;
-let activityUpdate;
-let historyPush;
-let trimHistory;
-let persistHistory;
-let buildCheckpoint;
-let writeCheckpoint;
-let attachTabToSentinelGroup;
-let detachAllSentinelTabs;
-let resetAgentState;
-let _isUnproductiveJsResult;
+// Import the module under test
+import * as agentEngine from '../background/agent-engine.js';
 
-beforeAll(async () => {
-  agentEngine = await import('../background/agent-engine.js');
-  describeAction = agentEngine.describeAction;
-  _describeTarget = agentEngine._describeTarget;
-  getTechnicianInfo = agentEngine.getTechnicianInfo;
-  saveLearnedPattern = agentEngine.saveLearnedPattern;
-  enforceRateLimit = agentEngine.enforceRateLimit;
-  sleep = agentEngine.sleep;
-  requestApproval = agentEngine.requestApproval;
-  requestTenantOverride = agentEngine.requestTenantOverride;
-  _waitForAdaptedGoalDecision = agentEngine._waitForAdaptedGoalDecision;
-  _waitForModeMismatchDecision = agentEngine._waitForModeMismatchDecision;
-  _runExecuteJsOnce = agentEngine._runExecuteJsOnce;
-  _runExecuteJsWithRetryLadder = agentEngine._runExecuteJsWithRetryLadder;
-  detectSignInWall = agentEngine.detectSignInWall;
-  activityStart = agentEngine.activityStart;
-  activityDone = agentEngine.activityDone;
-  activityFail = agentEngine.activityFail;
-  activityUpdate = agentEngine.activityUpdate;
-  historyPush = agentEngine.historyPush;
-  trimHistory = agentEngine.trimHistory;
-  persistHistory = agentEngine.persistHistory;
-  buildCheckpoint = agentEngine.buildCheckpoint;
-  writeCheckpoint = agentEngine.writeCheckpoint;
-  attachTabToSentinelGroup = agentEngine.attachTabToSentinelGroup;
-  detachAllSentinelTabs = agentEngine.detachAllSentinelTabs;
-  resetAgentState = agentEngine.resetAgentState;
-  _isUnproductiveJsResult = agentEngine._isUnproductiveJsResult;
-});
+const {
+  describeAction,
+  _describeTarget,
+  getTechnicianInfo,
+  saveLearnedPattern,
+  enforceRateLimit,
+  sleep,
+  requestApproval,
+  requestTenantOverride,
+  _waitForAdaptedGoalDecision,
+  _waitForModeMismatchDecision,
+  _runExecuteJsOnce,
+  _runExecuteJsWithRetryLadder,
+  detectSignInWall,
+  activityStart,
+  activityDone,
+  activityFail,
+  activityUpdate,
+  historyPush,
+  trimHistory,
+  persistHistory,
+  buildCheckpoint,
+  writeCheckpoint,
+  attachTabToSentinelGroup,
+  detachAllSentinelTabs,
+  resetAgentState,
+  _isUnproductiveJsResult,
+} = agentEngine;
 
 // ── Helpers ──
 // Simulate a chrome.runtime.onMessage listener receiving a message.

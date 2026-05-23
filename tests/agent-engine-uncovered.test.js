@@ -90,7 +90,7 @@ const mockSendAgentActivity = jest.fn();
 const mockSendAgentStepStart = jest.fn();
 
 jest.unstable_mockModule('../background/message-protocol.js', () => ({
-  sendSilentUpdate: mockSendSilentUpdate,
+  mockSendSilentUpdate: mockSendSilentUpdate,
   sendActionMessage: mockSendActionMessage,
   sendActionResult: mockSendActionResult,
   sendReportUpdate: mockSendReportUpdate,
