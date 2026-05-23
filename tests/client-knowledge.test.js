@@ -502,4 +502,214 @@ describe('client-knowledge edge cases', () => {
     const result = await importClient(payload);
     expect(result.ok).toBe(true);
   });
+
+  // Additional edge case tests for better branch coverage
+
+  // Note: Tests for _read error handling are difficult to mock reliably
+  // due to shared state. The error paths are covered by integration testing.
+
+  test('_write handles storage errors gracefully', async () => {
+    const { client } = await createClient({ displayName: 'WriteError' });
+
+    // Mock storage.set to throw error
+    const originalSet = chrome.storage.local.set;
+    chrome.storage.local.set = jest.fn(async () => {
+      throw new Error('Storage quota exceeded');
+    });
+
+    const result = await updateClient(client.id, { displayName: 'Should Fail' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Storage write failed');
+
+    // Restore original
+    chrome.storage.local.set = originalSet;
+  });
+
+  test('_urlMatches handles regex errors gracefully', async () => {
+    const { client } = await createClient({ displayName: 'RegexError' });
+    // Add a global entry first
+    await addEntry(client.id, { scope: 'global', wisdom: 'Global fact' });
+    // Pattern with invalid regex that will cause error during conversion
+    await addEntry(client.id, {
+      scope: 'url',
+      urlPattern: '[invalid(regex', // Invalid regex pattern
+      wisdom: 'This should still work'
+    });
+
+    // Should not throw, just return global entries
+    const entries = await getRelevantEntries(client.id, 'https://example.com');
+    // Global entries should still be returned, URL entry should be filtered out
+    expect(entries.length).toBe(1);
+    expect(entries[0].wisdom).toBe('Global fact');
+  });
+
+  test('_urlMatches matches wildcard patterns correctly', async () => {
+    const { client } = await createClient({ displayName: 'Wildcard' });
+    await addEntry(client.id, {
+      scope: 'url',
+      urlPattern: '*.example.com*',
+      wisdom: 'Wildcard match'
+    });
+
+    const entries = await getRelevantEntries(client.id, 'https://sub.example.com/path');
+    expect(entries.some(e => e.wisdom === 'Wildcard match')).toBe(true);
+  });
+
+  test('_urlMatches case insensitive matching', async () => {
+    const { client } = await createClient({ displayName: 'CaseTest' });
+    // Add a global entry first to ensure we get results
+    await addEntry(client.id, { scope: 'global', wisdom: 'Global fact' });
+    await addEntry(client.id, {
+      scope: 'url',
+      urlPattern: 'example.com', // Simple substring match (case insensitive)
+      wisdom: 'Case insensitive'
+    });
+
+    const entries = await getRelevantEntries(client.id, 'https://EXAMPLE.COM/path');
+    expect(entries.some(e => e.wisdom === 'Case insensitive')).toBe(true);
+  });
+
+  test('updateClient with missing id parameter', async () => {
+    const result = await updateClient('', { displayName: 'Test' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Client id required');
+  });
+
+  test('updateClient with null id parameter', async () => {
+    const result = await updateClient(null, { displayName: 'Test' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Client id required');
+  });
+
+  test('deleteClient with null id parameter', async () => {
+    const result = await deleteClient(null);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Client id required');
+  });
+
+  test('addEntry with null clientId', async () => {
+    const result = await addEntry(null, { wisdom: 'Test' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Client id required');
+  });
+
+  test('addEntry with empty clientId', async () => {
+    const result = await addEntry('', { wisdom: 'Test' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Client id required');
+  });
+
+  test('addEntry with very long wisdom gets truncated', async () => {
+    const { client } = await createClient({ displayName: 'Truncate' });
+    const longWisdom = 'A'.repeat(2000);
+    const result = await addEntry(client.id, { wisdom: longWisdom });
+    expect(result.ok).toBe(true);
+    expect(result.entry.wisdom.length).toBe(1000);
+  });
+
+  test('updateEntry with invalid scope ignores scope update', async () => {
+    const { client } = await createClient({ displayName: 'BadScope' });
+    const { entry } = await addEntry(client.id, { scope: 'global', wisdom: 'Test' });
+
+    const result = await updateEntry(client.id, entry.id, { scope: 'invalid' });
+    expect(result.ok).toBe(true);
+    // Scope should remain 'global' since 'invalid' is not valid
+    expect(result.entry.scope).toBe('global');
+  });
+
+  test('updateEntry with non-string wisdom ignores update', async () => {
+    const { client } = await createClient({ displayName: 'NonStringWisdom' });
+    const { entry } = await addEntry(client.id, { wisdom: 'Original' });
+
+    const result = await updateEntry(client.id, entry.id, { wisdom: 12345 });
+    expect(result.ok).toBe(true);
+    // Wisdom should remain 'Original' since number is ignored
+    expect(result.entry.wisdom).toBe('Original');
+  });
+
+  test('deleteEntry with null clientId', async () => {
+    const result = await deleteEntry(null, 'entry-id');
+    expect(result.ok).toBe(false);
+    // Empty string clientId results in "Client not found"
+    expect(result.error).toContain('not found');
+  });
+
+  test('deleteEntry with empty clientId', async () => {
+    const result = await deleteEntry('', 'entry-id');
+    expect(result.ok).toBe(false);
+    // Empty string clientId results in "Client not found"
+    expect(result.error).toContain('not found');
+  });
+
+  test('formatPromptSection with undefined currentUrl', async () => {
+    const { client } = await createClient({ displayName: 'UndefinedURL' });
+    await addEntry(client.id, { scope: 'global', wisdom: 'Global fact' });
+    const result = await formatPromptSection(client.id, undefined);
+    expect(result).toContain('Global fact');
+  });
+
+  test('markRunCompleted with undefined usedEntryIds', async () => {
+    const { client } = await createClient({ displayName: 'UndefinedIds' });
+    const { entry } = await addEntry(client.id, { wisdom: 'Test' });
+
+    await markRunCompleted(client.id, undefined);
+    const after = await getClient(client.id);
+    expect(after.runCount).toBe(1);
+    // Entry useCount should not increment
+    expect(after.entries[0].useCount).toBe(0);
+  });
+
+  test('exportClient with null clientId returns null', async () => {
+    const result = await exportClient(null);
+    expect(result).toBeNull();
+  });
+
+  test('importClient with non-object payload', async () => {
+    const result = await importClient('string-payload');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Invalid');
+  });
+
+  test('importClient with array payload', async () => {
+    const result = await importClient([{ displayName: 'Array' }]);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('Invalid');
+  });
+
+  test('importClient preserves entry timestamps when available', async () => {
+    const originalTimestamp = '2024-01-01T00:00:00.000Z';
+    const payload = {
+      schemaVersion: 1,
+      client: {
+        displayName: 'TimestampTest',
+        entries: [{
+          wisdom: 'Preserve timestamp',
+          scope: 'global',
+          capturedAt: originalTimestamp
+        }]
+      }
+    };
+
+    const result = await importClient(payload);
+    expect(result.ok).toBe(true);
+    expect(result.client.entries[0].capturedAt).toBe(originalTimestamp);
+  });
+
+  test('importClient generates new timestamps when missing', async () => {
+    const payload = {
+      schemaVersion: 1,
+      client: {
+        displayName: 'NewTimestamps',
+        entries: [{
+          wisdom: 'New timestamp',
+          scope: 'global'
+        }]
+      }
+    };
+
+    const result = await importClient(payload);
+    expect(result.ok).toBe(true);
+    expect(result.client.entries[0].capturedAt).toBeTruthy();
+    expect(result.client.entries[0].capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
 });
