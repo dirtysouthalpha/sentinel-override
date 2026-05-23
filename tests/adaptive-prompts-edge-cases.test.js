@@ -638,4 +638,504 @@ describe('adaptive-prompts edge cases', () => {
       expect(result.adapted).toBe(true);
     });
   });
+
+  describe('extractJsonObject edge cases', () => {
+    test('handles code fence with json label', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '```json\n{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}\n```' } }],
+        }),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(true);
+      expect(result.adaptedGoal).toBe('This is a properly adapted goal that is long enough');
+    });
+
+    test('handles code fence without json label', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '```\n{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}\n```' } }],
+        }),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(true);
+      expect(result.adaptedGoal).toBe('This is a properly adapted goal that is long enough');
+    });
+
+    test('handles incomplete JSON (opening brace but no closing)', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "incomplete' } }],
+        }),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('rewriter response not valid JSON');
+    });
+
+    test('handles JSON with extra text before and after', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'Some text before {"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"} and after' } }],
+        }),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles response with no opening brace', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: 'No JSON here, just plain text' } }],
+        }),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('rewriter response not valid JSON');
+    });
+  });
+
+  describe('rewriteGoalForPlatform API error handling', () => {
+    test('handles non-OK HTTP response', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: 'Internal server error' }),
+        text: () => Promise.resolve('Internal server error'),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('rewriter API 500');
+    });
+
+    test('handles API rate limit error', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({ error: 'Rate limited' }),
+        text: () => Promise.resolve('Rate limited'),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('rewriter API 429');
+    });
+
+    test('handles JSON parse error in response', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('Unexpected token');
+    });
+  });
+
+  describe('rewriteGoalForPlatform profile parsing error handling', () => {
+    test('handles waitStrings parse error (line 55)', async () => {
+      const { getPlatformProfile } = await import('../background/platforms/index.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      // Create a profile with waitStrings that throws during Object.entries
+      const badProfile = {
+        id: 'test',
+        label: 'Test Platform',
+        memoryKeyPrefix: 'test-',
+        liveDataCaveats: 'Data may be delayed',
+        knownGotchas: 'Login required',
+        needsTargetSelection: false,
+        preflightInstructions: 'Select a device first',
+        rewriteInstructions: 'Use cloud paths',
+        waitStrings: {
+          get loading() { throw new Error('Cannot read property'); },
+          get other() { return ['Please wait']; }
+        },
+        pageTypes: [{ name: 'Dashboard', hint: 'Main overview' }],
+        workflowHints: [{ match: /test/i, hint: 'Test workflow' }],
+      };
+
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
+      });
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] waitStrings parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles pageTypes parse error (line 66)', async () => {
+      const { getPlatformProfile } = await import('../background/platforms/index.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      // Create a profile with pageTypes that throws during map
+      const badProfile = {
+        id: 'test',
+        label: 'Test Platform',
+        memoryKeyPrefix: 'test-',
+        liveDataCaveats: 'Data may be delayed',
+        knownGotchas: 'Login required',
+        needsTargetSelection: false,
+        preflightInstructions: 'Select a device first',
+        rewriteInstructions: 'Use cloud paths',
+        waitStrings: { loading: ['Loading...'] },
+        pageTypes: [
+          { name: 'Dashboard', hint: 'Main overview' },
+          null,
+          { name: 'Settings', get hint() { throw new Error('Cannot read property'); } }
+        ],
+        workflowHints: [{ match: /test/i, hint: 'Test workflow' }],
+      };
+
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
+      });
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] pageTypes parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles workflowHints parse error (line 79)', async () => {
+      const { getPlatformProfile } = await import('../background/platforms/index.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      // Create a profile with workflowHints that throws during RegExp.test
+      const badRegExp = /test/;
+      const originalTest = badRegExp.test;
+      badRegExp.test = function() { throw new Error('RegExp.test failed'); };
+
+      const badProfile = {
+        id: 'test',
+        label: 'Test Platform',
+        memoryKeyPrefix: 'test-',
+        liveDataCaveats: 'Data may be delayed',
+        knownGotchas: 'Login required',
+        needsTargetSelection: false,
+        preflightInstructions: 'Select a device first',
+        rewriteInstructions: 'Use cloud paths',
+        waitStrings: { loading: ['Loading...'] },
+        pageTypes: [{ name: 'Dashboard', hint: 'Main overview' }],
+        workflowHints: [{ match: badRegExp, hint: 'Test workflow' }],
+      };
+
+      getPlatformProfile.mockReturnValueOnce(badProfile);
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
+      });
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        '[Sentinel/adaptive-prompts] workflowHints parse failed:',
+        expect.any(String)
+      );
+      consoleWarnSpy.mockRestore();
+
+      badRegExp.test = originalTest;
+      expect(result.adapted).toBe(true);
+    });
+  });
+
+  describe('rewriteGoalForPlatform provider errors', () => {
+    test('handles no active provider configured (lines 223-224)', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce(null);
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('no active provider configured');
+    });
+
+    test('handles provider without apiKey', async () => {
+      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+
+      getActiveProvider.mockResolvedValueOnce({
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        apiKey: null,
+      });
+
+      const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
+
+      expect(result.adapted).toBe(false);
+      expect(result.error).toBe('no active provider configured');
+    });
+  });
 });
