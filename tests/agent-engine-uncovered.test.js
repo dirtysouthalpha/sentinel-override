@@ -78,16 +78,27 @@ jest.unstable_mockModule('../background/tab-manager.js', () => ({
   readNetworkRequests: jest.fn(async () => []),
 }));
 
+// Store message-protocol mock functions
+const mockSendSilentUpdate = jest.fn();
+const mockSendActionMessage = jest.fn();
+const mockSendActionResult = jest.fn();
+const mockSendReportUpdate = jest.fn();
+const mockSendPageContext = jest.fn();
+const mockSendTabStateUpdate = jest.fn();
+const mockSendScreenshotUpdate = jest.fn();
+const mockSendAgentActivity = jest.fn();
+const mockSendAgentStepStart = jest.fn();
+
 jest.unstable_mockModule('../background/message-protocol.js', () => ({
-  sendSilentUpdate: jest.fn(),
-  sendActionMessage: jest.fn(),
-  sendActionResult: jest.fn(),
-  sendReportUpdate: jest.fn(),
-  sendPageContext: jest.fn(),
-  sendTabStateUpdate: jest.fn(),
-  sendScreenshotUpdate: jest.fn(),
-  sendAgentActivity: jest.fn(),
-  sendAgentStepStart: jest.fn(),
+  mockSendSilentUpdate: mockSendSilentUpdate,
+  sendActionMessage: mockSendActionMessage,
+  sendActionResult: mockSendActionResult,
+  sendReportUpdate: mockSendReportUpdate,
+  sendPageContext: mockSendPageContext,
+  sendTabStateUpdate: mockSendTabStateUpdate,
+  sendScreenshotUpdate: mockSendScreenshotUpdate,
+  sendAgentActivity: mockSendAgentActivity,
+  sendAgentStepStart: mockSendAgentStepStart,
 }));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
@@ -107,21 +118,37 @@ jest.unstable_mockModule('../background/shared-state.js', () => ({
   stopSwKeepalive: jest.fn(),
 }));
 
+// Store tab-context mock functions
+const mockGetActiveTabId = jest.fn(() => null);
+const mockSetActiveTab = jest.fn();
+const mockGetTabContext = jest.fn(() => null);
+const mockGetAllTabContexts = jest.fn(() => []);
+const mockOpenTab = jest.fn(async () => 2);
+const mockSwitchToTab = jest.fn(async () => {});
+const mockCloseTab = jest.fn(async () => {});
+const mockCloseAllAgentTabs = jest.fn(async () => {});
+const mockUpdateSnapshot = jest.fn();
+const mockResetAllContexts = jest.fn();
+const mockFindTabByLabel = jest.fn(() => null);
+const mockRegisterInitialTab = jest.fn();
+const mockHandleTabRemoved = jest.fn();
+const mockGetTabCount = jest.fn(() => 0);
+
 jest.unstable_mockModule('../background/tab-context.js', () => ({
-  getActiveTabId: jest.fn(() => null),
-  setActiveTab: jest.fn(),
-  getTabContext: jest.fn(() => null),
-  getAllTabContexts: jest.fn(() => []),
-  openTab: jest.fn(async () => 2),
-  switchToTab: jest.fn(async () => {}),
-  closeTab: jest.fn(async () => {}),
-  closeAllAgentTabs: jest.fn(async () => {}),
-  updateSnapshot: jest.fn(),
-  resetAllContexts: jest.fn(),
-  findTabByLabel: jest.fn(() => null),
-  registerInitialTab: jest.fn(),
-  handleTabRemoved: jest.fn(),
-  getTabCount: jest.fn(() => 0),
+  getActiveTabId: mockGetActiveTabId,
+  setActiveTab: mockSetActiveTab,
+  getTabContext: mockGetTabContext,
+  getAllTabContexts: mockGetAllTabContexts,
+  openTab: mockOpenTab,
+  switchToTab: mockSwitchToTab,
+  closeTab: mockCloseTab,
+  closeAllAgentTabs: mockCloseAllAgentTabs,
+  updateSnapshot: mockUpdateSnapshot,
+  resetAllContexts: mockResetAllContexts,
+  findTabByLabel: mockFindTabByLabel,
+  registerInitialTab: mockRegisterInitialTab,
+  handleTabRemoved: mockHandleTabRemoved,
+  getTabCount: mockGetTabCount,
 }));
 
 jest.unstable_mockModule('../background/client-knowledge.js', () => ({
@@ -182,10 +209,6 @@ const {
   _updateRunLogIndex,
 } = await import('../background/agent-engine.js');
 
-// Mock references for assertion
-import { getAllTabContexts } from '../background/tab-context.js';
-import { sendSilentUpdate } from '../background/message-protocol.js';
-
 beforeEach(() => {
   Object.keys(storageData).forEach(k => delete storageData[k]);
   Object.keys(sessionData).forEach(k => delete sessionData[k]);
@@ -202,7 +225,7 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('captureReportData', () => {
     test('maps tabContexts with label, url, hasScreenshot', () => {
-      getAllTabContexts.mockReturnValueOnce([
+      mockGetAllTabContexts.mockReturnValueOnce([
         { label: 'tab1', url: 'https://example.com', snapshot: 'data:image/png;base64,abc' },
         { label: 'tab2', url: 'https://other.com', snapshot: null },
         { label: 'tab3', url: 'https://third.com' },
@@ -222,14 +245,14 @@ describe('agent-engine uncovered paths', () => {
     });
 
     test('handles null plan', () => {
-      getAllTabContexts.mockReturnValueOnce([]);
+      mockGetAllTabContexts.mockReturnValueOnce([]);
       const data = captureReportData('goal', [], {}, null, 0, 0);
       expect(data.agentPlan).toBeNull();
     });
 
     test('returns a shallow copy of history (not the same array ref)', () => {
       const hist = [{ step: 1 }, { step: 2 }];
-      getAllTabContexts.mockReturnValueOnce([]);
+      mockGetAllTabContexts.mockReturnValueOnce([]);
       const data = captureReportData('goal', hist, {}, null, 0, 0);
       expect(data.history).toEqual(hist);
       expect(data.history).not.toBe(hist);
@@ -237,7 +260,7 @@ describe('agent-engine uncovered paths', () => {
 
     test('returns a shallow copy of agentMemory (not the same object ref)', () => {
       const mem = { a: 'b' };
-      getAllTabContexts.mockReturnValueOnce([]);
+      mockGetAllTabContexts.mockReturnValueOnce([]);
       const data = captureReportData('goal', [], mem, null, 0, 0);
       expect(data.agentMemory).toEqual(mem);
       expect(data.agentMemory).not.toBe(mem);
@@ -254,8 +277,8 @@ describe('agent-engine uncovered paths', () => {
         { action: { type: 'extract', url: '' } },
       ];
       maybePostProgressUpdate(25, hist, { key1: 'val1' });
-      expect(sendSilentUpdate).toHaveBeenCalledTimes(1);
-      const call = sendSilentUpdate.mock.calls[0];
+      expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
+      const call = mockSendSilentUpdate.mock.calls[0];
       expect(call[1]).toBe(25);
       expect(call[0]).toContain('PROGRESS UPDATE');
       expect(call[0]).toContain('step 25');
@@ -265,17 +288,17 @@ describe('agent-engine uncovered paths', () => {
 
     test('fires at interval 50', () => {
       maybePostProgressUpdate(50, [], {});
-      expect(sendSilentUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
     });
 
     test('skips at non-interval step', () => {
       maybePostProgressUpdate(10, [], {});
-      expect(sendSilentUpdate).not.toHaveBeenCalled();
+      expect(mockSendSilentUpdate).not.toHaveBeenCalled();
     });
 
     test('skips at step 0', () => {
       maybePostProgressUpdate(0, [], {});
-      expect(sendSilentUpdate).not.toHaveBeenCalled();
+      expect(mockSendSilentUpdate).not.toHaveBeenCalled();
     });
 
     test('detects multiple portal types', () => {
@@ -285,7 +308,7 @@ describe('agent-engine uncovered paths', () => {
         { action: { type: 'navigate', url: 'https://security.microsoft.com' } },
       ];
       maybePostProgressUpdate(25, hist, {});
-      const msg = sendSilentUpdate.mock.calls[0][0];
+      const msg = mockSendSilentUpdate.mock.calls[0][0];
       expect(msg).toContain('Exchange');
       expect(msg).toContain('Purview');
       expect(msg).toContain('Defender');
@@ -293,14 +316,14 @@ describe('agent-engine uncovered paths', () => {
 
     test('handles empty history gracefully', () => {
       maybePostProgressUpdate(25, [], {});
-      const msg = sendSilentUpdate.mock.calls[0][0];
+      const msg = mockSendSilentUpdate.mock.calls[0][0];
       expect(msg).toContain('(none yet)');
       expect(msg).toContain('(none)');
     });
 
     test('handles null entries in history', () => {
       maybePostProgressUpdate(25, [null, { action: null }, { action: { type: 'click' } }], {});
-      expect(sendSilentUpdate).toHaveBeenCalledTimes(1);
+      expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
     });
   });
 
