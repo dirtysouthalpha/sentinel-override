@@ -848,5 +848,283 @@ describe('agent-engine uncovered paths', () => {
       expect(result).toContain('Premier Networx');
       expect(result).toContain('706-426-6313');
     });
+
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatTicketFinalNotes (individual function coverage)
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatTicketFinalNotes', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('renders final notes template', () => {
+      const result = formatTicketFinalNotes('Issue resolved by restarting VPN service.', 'Ticket #12345', tech);
+      expect(result).toContain('Final Notes');
+      expect(result).toContain('Action Taken');
+      expect(result).toContain('investigation completed and findings documented');
+      expect(result).toContain('Ticket #12345');
+    });
+
+    test('handles empty ticket number', () => {
+      const result = formatTicketFinalNotes('Fixed it.', '', tech);
+      expect(result).toContain('Final Notes');
+      expect(result).toContain('Fixed it');
+    });
+
+    test('truncates long action summaries', () => {
+      const longSummary = 'A'.repeat(500);
+      const result = formatTicketFinalNotes(longSummary, 'Ticket #123', tech);
+      // Should not be excessively long
+      expect(result.length).toBeLessThan(2000);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatWaitingOnClient (individual function coverage)
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatWaitingOnClient', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('renders waiting on client template', () => {
+      const result = formatWaitingOnClient('Requested client to restart their router.', 'Ticket #12345', tech);
+      expect(result).toContain('Waiting on Client');
+      expect(result).toContain('Action Taken');
+      expect(result).toContain('Requested client to restart their router');
+      expect(result).toContain('will re-engage once client responds');
+    });
+
+    test('includes follow-up time when specified', () => {
+      const result = formatWaitingOnClient('Called client, no answer.', 'Ticket #123', tech, '2-3 business days');
+      expect(result).toContain('Waiting on Client');
+      expect(result).toContain('Follow up by');
+    });
+
+    test('handles missing follow-up time', () => {
+      const result = formatWaitingOnClient('Emailed client.', 'Ticket #123', tech);
+      expect(result).toContain('will re-engage once client responds');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatWaitingOnVendor (individual function coverage)
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatWaitingOnVendor', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('renders waiting on vendor template', () => {
+      const result = formatWaitingOnVendor('Opened SonicWall case #123456.', 'Ticket #789', tech, 'SonicWall Support', '2024-05-25');
+      expect(result).toContain('Waiting on Vendor');
+      expect(result).toContain('will follow up with vendor and update ticket');
+      expect(result).toContain('Brandon Goolsby');
+    });
+
+    test('handles missing vendor name', () => {
+      const result = formatWaitingOnVendor('Case opened with vendor.', 'Ticket #123', tech, '', '2024-05-25');
+      expect(result).toContain('Waiting on Vendor');
+      expect(result).toContain('Brandon Goolsby');
+    });
+
+    test('handles missing follow-up date', () => {
+      const result = formatWaitingOnVendor('Vendor ticket opened.', 'Ticket #123', tech, 'Fortinet Support', '');
+      expect(result).toContain('Waiting on Vendor');
+      expect(result).toContain('will follow up with vendor and update ticket');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatItGlueKb (individual function coverage)
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatItGlueKb', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('renders IT Glue KB template', () => {
+      const result = formatItGlueKb('How to configure SonicWall VPN', 'Step 1: Log in to SonicWall\nStep 2: Go to VPN settings\nStep 3: Configure tunnel', tech);
+      expect(result).toContain('IT Glue Knowledge Base Entry');
+      expect(result).toContain('How to configure SonicWall VPN');
+      expect(result).toContain('Resolution Steps');
+      expect(result).toContain('Step 1: Log in to SonicWall');
+    });
+
+    test('handles basic inputs', () => {
+      const result = formatItGlueKb('Title', 'Steps here', tech);
+      expect(result).toContain('IT Glue Knowledge Base Entry');
+      expect(result).toContain('Resolution Steps');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatClientEmail (individual function coverage)
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatClientEmail', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('renders client email template', () => {
+      const result = formatClientEmail('The VPN issue has been resolved.', 'Ticket #12345: VPN tunnel down', tech);
+      expect(result).toContain('**Subject:**');
+      expect(result).toContain('Hello [Client Name]');
+      expect(result).toContain('Ticket #12345');
+      expect(result).toContain('706-426-6313');
+      expect(result).toContain('support@augustaitguys.com');
+    });
+
+    test('handles missing ticket number', () => {
+      const result = formatClientEmail('Fixed the issue.', 'Investigate issue', tech);
+      expect(result).toContain('**Subject:**');
+      expect(result).toContain('Hello [Client Name]');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Error handling edge cases
+  // ═══════════════════════════════════════════════════════════════════
+  describe('error handling edge cases', () => {
+    test('captureReportData handles getAllTabContexts errors', () => {
+      mockGetAllTabContexts.mockImplementationOnce(() => {
+        throw new Error('Tab context error');
+      });
+      const data = captureReportData('goal', [], {}, null, 0, 0);
+      expect(data.tabContexts).toEqual([]);
+    });
+
+    test('captureReportData handles null snapshot gracefully', () => {
+      mockGetAllTabContexts.mockReturnValueOnce([
+        { label: 'tab1', url: 'https://example.com', snapshot: null },
+        { label: 'tab2', url: 'https://other.com' }, // no snapshot property
+      ]);
+      const data = captureReportData('goal', [], {}, null, 0, 0);
+      expect(data.tabContexts).toEqual([
+        { label: 'tab1', url: 'https://example.com', hasScreenshot: false },
+        { label: 'tab2', url: 'https://other.com', hasScreenshot: false },
+      ]);
+    });
+
+    test('maybePostProgressUpdate handles sendSilentUpdate errors', () => {
+      mockSendSilentUpdate.mockImplementationOnce(() => {
+        throw new Error('Send error');
+      });
+      // Should not throw
+      expect(() => {
+        maybePostProgressUpdate(25, [], {});
+      }).not.toThrow();
+    });
+
+    test('_updateRunLogIndex handles storage.get errors', async () => {
+      chrome.storage.local.get.mockImplementationOnce(() => {
+        throw new Error('Storage get error');
+      });
+      // Should not throw
+      await expect(_updateRunLogIndex('run-001', { goal: 'test' })).resolves.toBeUndefined();
+    });
+
+    test('_updateRunLogIndex handles storage.set errors', async () => {
+      chrome.storage.local.set.mockImplementationOnce(() => {
+        throw new Error('Storage set error');
+      });
+      // Should not throw
+      await expect(_updateRunLogIndex('run-001', { goal: 'test' })).resolves.toBeUndefined();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // formatTicketOutput edge cases
+  // ═══════════════════════════════════════════════════════════════════
+  describe('formatTicketOutput edge cases', () => {
+    const tech = {
+      name: 'Brandon Goolsby',
+      title: 'IT Support Technician',
+      company: 'Premier Networx',
+      phone: '706-426-6313',
+      email: 'support@augustaitguys.com',
+    };
+
+    test('handles null summary', () => {
+      const result = formatTicketOutput('FINAL_NOTES', null, 'Ticket #123', tech);
+      expect(result).toContain('Final Notes');
+    });
+
+    test('handles empty goal', () => {
+      const result = formatTicketOutput('TICKET_KICKOFF', 'Summary', '', tech);
+      expect(result).toContain('Ticket Kickoff');
+    });
+
+    test('handles very long goal text', () => {
+      const longGoal = 'A'.repeat(1000);
+      const result = formatTicketOutput('FINAL_NOTES', 'Done', longGoal, tech);
+      expect(result).toContain('Final Notes');
+    });
+
+    test('handles special characters in summary', () => {
+      const summary = 'Issue with <script>alert("XSS")</script> & "quotes"';
+      const result = formatTicketOutput('FINAL_NOTES', summary, 'Ticket #123', tech);
+      expect(result).toContain('Final Notes');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // generateHeuristicPlan edge cases
+  // ═══════════════════════════════════════════════════════════════════
+  describe('generateHeuristicPlan edge cases', () => {
+    test('handles goal with multiple URLs', () => {
+      const plan = generateHeuristicPlan(
+        'Compare https://site1.com and https://site2.com',
+        'https://google.com'
+      );
+      expect(plan).not.toBeNull();
+    });
+
+    test('handles goal with no clear pattern', () => {
+      const plan = generateHeuristicPlan(
+        'Just do something',
+        'https://example.com'
+      );
+      expect(plan).not.toBeNull();
+    });
+
+    test('handles URL with path and query params', () => {
+      const plan = generateHeuristicPlan(
+        'Check https://admin.microsoft.com/?page=users&filter=active',
+        'https://google.com'
+      );
+      expect(plan).not.toBeNull();
+      expect(plan[0]).toContain('admin.microsoft.com');
+    });
+
+    test('handles URL with port number', () => {
+      const plan = generateHeuristicPlan(
+        'Go to https://router.local:8080 and check settings',
+        'https://google.com'
+      );
+      expect(plan).not.toBeNull();
+    });
   });
 });
