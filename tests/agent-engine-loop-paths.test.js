@@ -40,6 +40,7 @@ const chromeMock = {
   },
   tabs: {
     query: jest.fn(async () => [{ id: 1 }]),
+    sendMessage: jest.fn(async () => ({})),
     get: jest.fn((id, callback) => callback({ id, url: 'https://example.com', title: 'Test' })),
     group: jest.fn(async () => 42),
     ungroup: jest.fn(async () => {}),
@@ -53,6 +54,9 @@ const chromeMock = {
   },
   sidePanel: {
     setOptions: jest.fn(async () => {}),
+  },
+  scripting: {
+    executeScript: jest.fn(async () => {}),
   },
   runtime: {
     sendMessage: jest.fn(async () => {}),
@@ -175,7 +179,7 @@ const mockGetTabCount = jest.fn(() => 0);
 
 jest.unstable_mockModule('../background/tab-context.js', () => ({
   getActiveTabId: mockGetActiveTabId,
-  mockGetTabContext: mockGetTabContext,
+  getTabContext: mockGetTabContext,
   getAllTabContexts: mockGetAllTabContexts,
   openTab: mockOpenTab,
   switchToTab: mockSwitchToTab,
@@ -236,18 +240,18 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
   suggestRetryActions: jest.fn(() => []),
 }));
 
-// ── Import after mocks ──
-import {
+// ── Import after mocks — use dynamic import for unstable_mockModule compatibility ──
+const {
   startAgent, stopAgent, pauseAgent, resumeAgent, resetAgentState,
   setAgentSpeed, injectContext, getAgentTabId,
   isAgentAttachedTab, getAttachedTabIds, fetchAuditLog,
   attachTabToSentinelGroup, detachAllSentinelTabs,
-} from '../background/agent-engine.js';
+} = await import('../background/agent-engine.js');
 
-import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
-import { generateReport } from '../background/report-generator.js';
-import { generatePlan } from '../background/llm-client.js';
-import { tel } from '../background/telemetry.js';
+const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
+const { generateReport } = await import('../background/report-generator.js');
+const { generatePlan } = await import('../background/llm-client.js');
+const { tel } = await import('../background/telemetry.js');
 
 // Record the addListener calls that fire at module-import time so we can
 // verify them without being affected by clearAllMocks().

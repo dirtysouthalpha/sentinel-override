@@ -33,6 +33,7 @@ globalThis.chrome = {
   },
   tabs: {
     query: jest.fn(async () => [{ id: 1 }]),
+    sendMessage: jest.fn(async () => ({})),
     group: jest.fn(async () => 42),
     ungroup: jest.fn(async () => {}),
     onUpdated: { addListener: jest.fn() },
@@ -42,6 +43,9 @@ globalThis.chrome = {
   },
   sidePanel: {
     setOptions: jest.fn(async () => {}),
+  },
+  scripting: {
+    executeScript: jest.fn(async () => {}),
   },
   runtime: {
     sendMessage: jest.fn(async () => {}),
@@ -212,9 +216,7 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
   suggestRetryActions: jest.fn(() => []),
 }));
 
-// Import the module under test
-import * as agentEngine from '../background/agent-engine.js';
-
+// Import the module under test — all test-only exports are available
 const {
   describeAction,
   _describeTarget,
@@ -242,7 +244,7 @@ const {
   detachAllSentinelTabs,
   resetAgentState,
   _isUnproductiveJsResult,
-} = agentEngine;
+} = await import('../background/agent-engine.js');
 
 // ── Helpers ──
 // Simulate a chrome.runtime.onMessage listener receiving a message.
