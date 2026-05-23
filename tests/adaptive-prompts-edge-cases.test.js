@@ -9,6 +9,15 @@ globalThis.chrome = {
   },
 };
 
+// Mock fetch globally
+global.fetch = jest.fn(() => Promise.resolve({
+  ok: true,
+  status: 200,
+  json: () => Promise.resolve({
+    choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+  }),
+}));
+
 jest.unstable_mockModule('../background/telemetry.js', () => ({
   emit: jest.fn(),
   tel: {
@@ -22,6 +31,25 @@ jest.unstable_mockModule('../background/telemetry.js', () => ({
 jest.unstable_mockModule('../background/llm-client.js', () => ({
   callLLM: jest.fn(async () => ({
     content: '{"adapted_goal": "test goal", "summary": "test summary"}',
+  })),
+}));
+
+jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getActiveProvider: jest.fn(() => ({
+    apiKey: 'test-key',
+    endpoint: 'https://test.example.com/v1',
+    model: 'test-model',
+    supportsToolUse: false,
+    buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+    buildBody: jest.fn((model, system, user, opts) => ({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      ...opts
+    })),
+    parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
   })),
 }));
 
@@ -111,47 +139,137 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform LLM response handling', () => {
     test('should handle LLM call returning null content', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({ content: null });
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: null } }],
+        }),
+      });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
 
       expect(result.adapted).toBe(false);
-      expect(result.error).toBe('rewriter response not valid JSON');
+      expect(result.error).toBe('rewriter returned empty content');
     });
 
     test('should handle LLM call returning undefined content', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({});
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: undefined } }],
+        }),
+      });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
 
       expect(result.adapted).toBe(false);
-      expect(result.error).toBe('rewriter response not valid JSON');
+      expect(result.error).toBe('rewriter returned empty content');
     });
 
     test('should handle empty LLM response', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({ content: '' });
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn(() => ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '' } }],
+        }),
+      });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
 
       expect(result.adapted).toBe(false);
-      expect(result.error).toBe('rewriter response not valid JSON');
+      expect(result.error).toBe('rewriter returned empty content');
     });
 
     test('should handle no_adaptation_needed response', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"no_adaptation_needed": true, "reason": "Goal already correct"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"no_adaptation_needed": true, "reason": "Goal already correct"}' } }],
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -161,11 +279,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle missing adapted_goal', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"summary": "test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"summary": "test summary"}' } }],
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -175,11 +314,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle short adapted_goal', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "short"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "short"}' } }],
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -189,10 +349,27 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle LLM call throwing error', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockRejectedValueOnce(new Error('LLM service unavailable'));
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockRejectedValueOnce(new Error('LLM service unavailable'));
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
 
@@ -276,11 +453,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle missing technician info', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }]
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -291,11 +489,32 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform expansion modes', () => {
     test('should handle full expansion mode', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }]
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'full');
@@ -304,11 +523,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle light expansion mode', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }]
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -317,7 +557,7 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle off expansion mode with mismatches', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const { getActiveProvider } = await import('../background/provider-registry.js');
       const { findMismatchHints } = await import('../background/platforms/index.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
@@ -325,8 +565,29 @@ describe('adaptive-prompts edge cases', () => {
         { onbox: 'Settings > Network', target: 'Network > Settings' },
       ]);
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      getActiveProvider.mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }]
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'off');

@@ -87,8 +87,8 @@ describe('frame-router edge cases', () => {
         const result = await resolveFrameForSelector(123, 0);
         expect(result).toBeNull();
         expect(errorSpy).toHaveBeenCalledWith(
-          '[Sentinel/frame-router] resolveFrameForSelector failed:',
-          expect.any(String)
+          '[Sentinel/frame-router] enumerateFrames failed:',
+          'Tab closed'
         );
       } finally {
         errorSpy.mockRestore();
