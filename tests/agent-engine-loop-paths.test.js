@@ -487,7 +487,7 @@ describe('adaptive prompts flow in startAgent', () => {
 
     await expect(startAgent('Check firewall rules', makeSender())).resolves.toBeDefined();
 
-    expect(rewriteGoalForPlatform).toHaveBeenCalled();
+    expect(mockRewriteGoalForPlatform).toHaveBeenCalled();
   });
 
   test('falls back to original goal on adaptive failure', async () => {
