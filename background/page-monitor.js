@@ -112,7 +112,8 @@ export async function checkMonitor(monitor) {
     const content = results?.[0]?.result || '';
     if (!content) return { changed: false, content: '' };
 
-    const changed = monitor.lastContent && content !== monitor.lastContent;
+    // Ensure changed is always a boolean: false if no prior content, true if content differs
+    const changed = Boolean(monitor.lastContent) && content !== monitor.lastContent;
 
     // Update stored content
     const monitors = await loadMonitors();

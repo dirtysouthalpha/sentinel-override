@@ -308,6 +308,106 @@ describe('page-monitor', () => {
 
       expect(result).toEqual({ changed: false, content: '' });
     });
+
+    it('should not detect change on first check (no lastContent)', async () => {
+      // First check: lastContent is empty string
+      // Clear any previous mock behavior
+      chrome.tabs.query.mockReset();
+      chrome.scripting.executeScript.mockReset();
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: 'First content' },
+      ]);
+
+      const result = await checkMonitor(testMonitor);
+
+      // When lastContent is falsy (empty string), changed should be false
+      expect(result).toEqual({ changed: false, content: 'First content' });
+
+      const monitors = await loadMonitors();
+      expect(monitors[0].lastContent).toBe('First content');
+      expect(monitors[0].changeCount).toBe(0);
+    });
+
+    it('should handle monitor not found in storage during check', async () => {
+      // Monitor exists but has been deleted from storage
+      const orphanMonitor = { ...testMonitor, id: 'orphan-id' };
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: 'Some content' },
+      ]);
+
+      const result = await checkMonitor(orphanMonitor);
+
+      // Should not throw, just return without updating storage
+      expect(result).toHaveProperty('changed');
+      expect(result).toHaveProperty('content', 'Some content');
+    });
+
+    it('should handle script execution throwing error', async () => {
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockRejectedValue(new Error('Script failed'));
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const result = await checkMonitor(testMonitor);
+
+      expect(result).toEqual({ changed: false, content: '' });
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle content with leading/trailing whitespace', async () => {
+      testMonitor.lastContent = 'old';
+
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: '  new content with spaces  ' },
+      ]);
+
+      const result = await checkMonitor(testMonitor);
+
+      // Content is trimmed by the content script
+      expect(result.content).toBe('  new content with spaces  ');
+      expect(result.changed).toBe(true);
+    });
+
+    it('should handle multiple tabs matching the URL', async () => {
+      chrome.tabs.query.mockResolvedValue([
+        { id: 1 },
+        { id: 2 },
+        { id: 3 },
+      ]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: 'Content from first tab' },
+      ]);
+
+      const result = await checkMonitor(testMonitor);
+
+      // Should use the first matching tab
+      expect(result.content).toBe('Content from first tab');
+    });
+
+    it('should handle executeScript returning undefined result', async () => {
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([
+        { result: undefined },
+      ]);
+
+      const result = await checkMonitor(testMonitor);
+
+      expect(result).toEqual({ changed: false, content: '' });
+    });
+
+    it('should handle malformed executeScript response', async () => {
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript.mockResolvedValue([{}]);
+
+      const result = await checkMonitor(testMonitor);
+
+      expect(result).toEqual({ changed: false, content: '' });
+    });
   });
 
   describe('runMonitorCycle', () => {
