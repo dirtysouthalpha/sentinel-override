@@ -40,6 +40,7 @@ globalThis.chrome = {
   },
   tabs: {
     query: jest.fn(async () => [{ id: 1 }]),
+    get: jest.fn((id, callback) => callback({ id, url: 'https://example.com', title: 'Test' })),
     group: jest.fn(async () => 42),
     ungroup: jest.fn(async () => {}),
     onUpdated: {
