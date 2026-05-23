@@ -853,3 +853,131 @@ describe('rewriteGoalForPlatform — edge cases', () => {
     expect(body.messages[0].content).toContain('EXPANSION: LIGHT');
   });
 });
+
+// ========== Edge case: malformed profile data ==========
+
+describe('rewriteGoalForPlatform — malformed profile data', () => {
+  test('handles malformed waitStrings gracefully', async () => {
+    const malformedProfile = {
+      ...BASE_PROFILE,
+      waitStrings: { malformed: 'not an array' },
+    };
+    getPlatformProfile.mockReturnValueOnce(malformedProfile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed waitStrings handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    // Should still adapt, just without the waitStrings block
+    expect(result.adapted).toBe(true);
+  });
+
+  test('handles malformed pageTypes gracefully', async () => {
+    const malformedProfile = {
+      ...BASE_PROFILE,
+      pageTypes: 'not an array',
+    };
+    getPlatformProfile.mockReturnValueOnce(malformedProfile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed pageTypes handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    expect(result.adapted).toBe(true);
+  });
+
+  test('handles malformed workflowHints gracefully', async () => {
+    const malformedProfile = {
+      ...BASE_PROFILE,
+      workflowHints: 'not an array',
+    };
+    getPlatformProfile.mockReturnValueOnce(malformedProfile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of malformed workflowHints handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    expect(result.adapted).toBe(true);
+  });
+
+  test('handles workflowHints with invalid RegExp match', async () => {
+    const malformedProfile = {
+      ...BASE_PROFILE,
+      workflowHints: [{ match: 'not a regex', hint: 'test hint' }],
+    };
+    getPlatformProfile.mockReturnValueOnce(malformedProfile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of invalid RegExp match in workflowHints handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    expect(result.adapted).toBe(true);
+  });
+
+  test('handles pageTypes with missing name or hint', async () => {
+    const malformedProfile = {
+      ...BASE_PROFILE,
+      pageTypes: [
+        { name: 'Dashboard' }, // missing hint
+        { hint: 'Go to users page' }, // missing name
+        null, // null entry
+        { name: 'Settings', hint: 'Configure settings' }, // valid
+      ],
+    };
+    getPlatformProfile.mockReturnValueOnce(malformedProfile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of partial pageTypes handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    expect(result.adapted).toBe(true);
+  });
+
+  test('handles waitStrings with empty arrays', async () => {
+    const profile = {
+      ...BASE_PROFILE,
+      waitStrings: {
+        'Dashboard': [], // empty array
+        'Users': ['user loaded'], // valid
+        null: ['invalid key'], // null key
+      },
+    };
+    getPlatformProfile.mockReturnValueOnce(profile);
+    getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+    globalThis.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ adapted_goal: 'A long enough adapted goal for validation of empty waitStrings arrays handling in the system', summary: 'ok' }) } }]
+      })
+    }));
+
+    const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+    expect(result.adapted).toBe(true);
+  });
+});
