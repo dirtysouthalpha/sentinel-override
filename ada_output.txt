@@ -1,0 +1,228 @@
+
+> sentinel-override@3.46.0 test
+> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js tests/adaptive-prompts.test.js
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 30 |[39m       [90m// that also match the dashboard/system patterns on IP hosts.[39m
+     [90m 31 |[39m       [36mif[39m ([35m/\b(?:\d{1,3}\.){3}\d{1,3}\b/[39m[33m.[39mtest(host) [33m&&[39m [35m/\/(?:main|dashboard|policy|network|vpn|users|log|system)/i[39m[33m.[39mtest(u[33m.[39mpathname) [33m&&[39m [33m![39m[35m/\/(?:fmc|asdm)/i[39m[33m.[39mtest(u[33m.[39mpathname)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 32 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 33 |[39m     [36mreturn[39m [35m/\b(?:sonicwall|sonicos|tz\d+|nsa\d+|soho|gen[57]\b)/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 34 |[39m   }[33m,[39m
+     [90m 35 |[39m[0m
+
+      at Object.detect (background/platforms/sonicwall_onbox.js:32:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 33 |[39m       ][33m;[39m
+     [90m 34 |[39m       [36mif[39m (m365Hosts[33m.[39msome(h [33m=>[39m host [33m===[39m h [33m||[39m host[33m.[39mendsWith([32m'.'[39m [33m+[39m h))) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 35 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 36 |[39m     [36mreturn[39m [35m/\b(m365|microsoft\s*365|entra|exchange\s+admin|purview|defender|intune)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 37 |[39m   }[33m,[39m
+     [90m 38 |[39m[0m
+
+      at Object.detect (background/platforms/m365_admin.js:35:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 24 |[39m       [36mif[39m ([35m/fortinet|fortigate|fortimanager|fortiweb|forticloud/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 25 |[39m       [36mif[39m ([35m/\/ng\/|\/p\/login|\/p\/dashboard/[39m[33m.[39mtest(path) [33m&&[39m [35m/\b(?:\d{1,3}\.){3}\d{1,3}\b/[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 26 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 27 |[39m     [36mreturn[39m [35m/\b(fortigate|fortimanager|fortinet|fortiweb|fortianalyzer)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 28 |[39m   }[33m,[39m
+     [90m 29 |[39m[0m
+
+      at Object.detect (background/platforms/fortigate.js:26:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 26 |[39m       [36mif[39m ([35m/(^|\.)itglue\.com$/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 27 |[39m       [36mif[39m ([35m/(^|\.)partner\.itglue\.com$/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 28 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 29 |[39m     [36mreturn[39m [35m/\bit\s*glue\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 30 |[39m   }[33m,[39m
+     [90m 31 |[39m[0m
+
+      at Object.detect (background/platforms/itglue.js:28:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 31 |[39m       [36mif[39m ([35m/\/(?:p\/login|aruba|swarm\.html|monitoring|configuration)\b/[39m[33m.[39mtest(path) [33m&&[39m
+     [90m 32 |[39m           [35m/\b(?:\d{1,3}\.){3}\d{1,3}\b/[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 33 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 34 |[39m     [36mreturn[39m [35m/\b(aruba|arubaos|aruba\s+central|aruba\s+instant|aos-?cx|hpe\s+aruba)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 35 |[39m   }[33m,[39m
+     [90m 36 |[39m[0m
+
+      at Object.detect (background/platforms/aruba.js:33:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 18 |[39m       [36mif[39m ([35m/ninjarmm\.com|ninjarmm\.io|app\.ninjarmm/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 19 |[39m       [36mif[39m ([35m/ninjarmm/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 20 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 21 |[39m     [36mreturn[39m [35m/\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 22 |[39m   }[33m,[39m
+     [90m 23 |[39m[0m
+
+      at Object.detect (background/platforms/ninjarmm.js:20:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 20 |[39m       [36mif[39m ([35m/cw\.manage|connectwisemanage/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 21 |[39m       [36mif[39m ([35m/\/v4_6_release\/services\/system_io\/router\/api\.rails/i[39m[33m.[39mtest(u[33m.[39mpathname)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 22 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 23 |[39m     [36mreturn[39m [35m/\b(?:connectwise\s+manage|cw\s+manage|cwmanage|connectwise\s+psa)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 24 |[39m   }[33m,[39m
+     [90m 25 |[39m[0m
+
+      at Object.detect (background/platforms/connectwise_manage.js:22:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 21 |[39m       [36mif[39m ([35m/centrastage\.net|dattormm\.com|datto\.com\/rmm/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 22 |[39m       [36mif[39m ([35m/autotask\.net|atask\.net/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 23 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 24 |[39m     [36mreturn[39m [35m/\b(?:datto\s+rmm|autotask|centrastage)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 25 |[39m   }[33m,[39m
+     [90m 26 |[39m[0m
+
+      at Object.detect (background/platforms/datto_rmm.js:23:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 21 |[39m       [36mif[39m (path[33m.[39mincludes([32m'/asdm'[39m) [33m||[39m path[33m.[39mincludes([32m'/fmc'[39m)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 22 |[39m       [36mif[39m ([35m/\.ise\./i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 23 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 24 |[39m     [36mconst[39m t [33m=[39m [33mString[39m(goal [33m||[39m [32m''[39m)[33m.[39mtoLowerCase()[33m;[39m
+     [90m 25 |[39m     [36mreturn[39m [35m/\b(cisco\s*asa|firepower|meraki|cisco\s*ise)\b/i[39m[33m.[39mtest(t)[33m;[39m
+     [90m 26 |[39m   }[33m,[39m[0m
+
+      at Object.detect (background/platforms/cisco.js:23:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 18 |[39m       [36mif[39m ([35m/panorama/i[39m[33m.[39mtest(u[33m.[39mhostname)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 19 |[39m       [36mif[39m ([35m/\/php\/rest\/pan/i[39m[33m.[39mtest(u[33m.[39mhref)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 20 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 21 |[39m     [36mconst[39m t [33m=[39m [33mString[39m(goal [33m||[39m [32m''[39m)[33m.[39mtoLowerCase()[33m;[39m
+     [90m 22 |[39m     [36mreturn[39m [35m/\b(palo\s*alto|pan-os|panorama)\b/i[39m[33m.[39mtest(t)[33m;[39m
+     [90m 23 |[39m   }[33m,[39m[0m
+
+      at Object.detect (background/platforms/paloalto.js:20:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 19 |[39m       [36mif[39m ([35m/\.sentinelone\.com$/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 20 |[39m       [36mif[39m ([35m/s1\.com$/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 21 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 22 |[39m     [36mreturn[39m [35m/\b(sentinelone|singularity)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 23 |[39m   }[33m,[39m
+     [90m 24 |[39m[0m
+
+      at Object.detect (background/platforms/sentinelone.js:21:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 20 |[39m       [36mif[39m (host[33m.[39mincludes([32m'cve.mitre.org'[39m)) [36mreturn[39m [36mtrue[39m[33m;[39m
+     [90m 21 |[39m       [36mif[39m (host[33m.[39mincludes([32m'cve.org'[39m)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 22 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 23 |[39m     [36mreturn[39m [35m/\b(nvd|cve\s*database|nist\s*nvd|cve\s*search)\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 24 |[39m   }[33m,[39m
+     [90m 25 |[39m[0m
+
+      at Object.detect (background/platforms/nvd.js:22:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 16 |[39m       [36mconst[39m host [33m=[39m [36mnew[39m [33mURL[39m(url)[33m.[39mhost[33m.[39mtoLowerCase()[33m;[39m
+     [90m 17 |[39m       [36mif[39m (host[33m.[39mincludes([32m'virustotal.com'[39m)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 18 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 19 |[39m     [36mconst[39m t [33m=[39m [33mString[39m(goal [33m||[39m [32m''[39m)[33m.[39mtoLowerCase()[33m;[39m
+     [90m 20 |[39m     [36mreturn[39m [35m/\bvirustotal\b/i[39m[33m.[39mtest(t) [33m||[39m [35m/\bvt\s+api\b/i[39m[33m.[39mtest(t)[33m;[39m
+     [90m 21 |[39m   }[33m,[39m[0m
+
+      at Object.detect (background/platforms/virustotal.js:18:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
+  console.warn
+    [Sentinel] URL parse failed: Invalid URL
+
+    [0m [90m 15 |[39m       [36mconst[39m host [33m=[39m [36mnew[39m [33mURL[39m(url)[33m.[39mhost[33m.[39mtoLowerCase()[33m;[39m
+     [90m 16 |[39m       [36mif[39m ([35m/huntress/i[39m[33m.[39mtest(host)) [36mreturn[39m [36mtrue[39m[33m;[39m
+    [31m[1m>[22m[39m[90m 17 |[39m     } [36mcatch[39m (e) { console[33m.[39mwarn([32m'[Sentinel] URL parse failed:'[39m[33m,[39m e [33m&&[39m e[33m.[39mmessage)[33m;[39m }
+     [90m    |[39m                           [31m[1m^[22m[39m
+     [90m 18 |[39m     [36mreturn[39m [35m/\bhuntress\b/i[39m[33m.[39mtest([33mString[39m(goal [33m||[39m [32m''[39m))[33m;[39m
+     [90m 19 |[39m   }[33m,[39m
+     [90m 20 |[39m[0m
+
+      at Object.detect (background/platforms/huntress.js:17:27)
+      at getPlatformProfile (background/platforms/index.js:70:52)
+      at rewriteGoalForPlatform (background/adaptive-prompts.js:201:21)
+      at Object.<anonymous> (tests/adaptive-prompts.test.js:770:26)
+
