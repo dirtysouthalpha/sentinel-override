@@ -130,7 +130,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // ========== Page Monitor Loop (v3.44) ==========
 try {
   startMonitorLoop();
-} catch { /* page monitor not critical */ }
+} catch (e) { /* page monitor not critical */ }
 
 // ========== Frame Router Initialization ==========
 // Subscribe to webNavigation events to keep the per-tab frame map fresh
@@ -191,7 +191,7 @@ try {
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', e && e.message));
-} catch { /* non-fatal on older Chrome */ }
+} catch (e) { /* non-fatal on older Chrome */ }
 
 // ========== Unified Message Handler ==========
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
@@ -219,7 +219,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
         if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);
         tel[lvl](cat, msg, payload);
-      } catch { /* never throw on telemetry */ }
+      } catch (e) { /* never throw on telemetry */ }
       return { ok: true };
     }
 
@@ -388,7 +388,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
               title: 'Sentinel Override — JS execution approval needed',
               message: 'Code: ' + codePreview.substring(0, 100) + '...'
             });
-          } catch (_e) {}
+          } catch (e) { /* notification API may not be available */ }
 
           let hardRejectId = null;
 
@@ -496,12 +496,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         let match = tabs.find(t => t && t.url === target);
         if (!match && targetHost) {
           match = tabs.find(t => {
-            try { return t && t.url && new URL(t.url).host === targetHost; } catch { return false; }
+            try { return t && t.url && new URL(t.url).host === targetHost; } catch (e) { return false; }
           });
         }
         if (!match) return { ok: false, error: 'no matching tab' };
-        try { await chrome.tabs.update(match.id, { active: true }); } catch { /* tab may have closed */ }
-        try { await chrome.windows.update(match.windowId, { focused: true }); } catch { /* window may have closed */ }
+        try { await chrome.tabs.update(match.id, { active: true }); } catch (e) { /* tab may have closed */ }
+        try { await chrome.windows.update(match.windowId, { focused: true }); } catch (e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
         return { ok: false, error: e && e.message ? e.message : 'unknown' };
@@ -856,7 +856,7 @@ chrome.commands.onCommand.addListener(async (command) => {
                 console.error('[attached] Unhandled rejection:', e);
               });
             }
-          } catch { /* no active tab — silently ignore */ }
+          } catch (e) { /* no active tab — silently ignore */ }
         }
         break;
       }
