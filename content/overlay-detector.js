@@ -24,8 +24,13 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   const VIEWPORT_COVERAGE_THRESHOLD = 0.8;
 
   // ========== Detect Overlay ==========
-  // Checks for modals, dialogs, cookie banners blocking the page.
-  // Returns the blocking element or null.
+  /**
+   * Checks for modals, dialogs, cookie banners blocking the page.
+   * Uses multiple heuristics: ARIA modal detection, role dialog checking,
+   * high z-index overlay detection, and viewport coverage analysis.
+   * @param {Document} doc - The document to check for overlays.
+   * @returns {Element|null} The blocking overlay element, or null if none found.
+   */
   ov.detectOverlay = function(doc) {
     if (!doc) return null;
 
@@ -107,8 +112,14 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   };
 
   // ========== Dismiss Overlay ==========
-  // Attempts to dismiss a detected overlay using systematic close patterns.
-  // Returns true if the overlay was successfully dismissed.
+  /**
+   * Attempts to dismiss a detected overlay using systematic close patterns.
+   * Tries multiple strategies: close buttons (ARIA labels), cookie accept buttons,
+   * text-matched dismiss buttons, and Escape key simulation.
+   * @param {Document} doc - The document containing the overlay.
+   * @param {Element} overlay - The overlay element to dismiss.
+   * @returns {boolean} True if the overlay was successfully dismissed (removed from DOM or hidden).
+   */
   ov.dismissOverlay = function(doc, overlay) {
     if (!overlay) return false;
 
@@ -201,8 +212,14 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   };
 
   // ========== Is Overlay Blocking ==========
-  // Check if a specific target element is obscured by an overlay.
-  // Uses elementFromPoint with the target's center coordinates.
+  /**
+   * Check if a specific target element is obscured by an overlay.
+   * Uses elementFromPoint with the target's center coordinates to determine
+   * if another element is blocking interaction with the target.
+   * @param {Document} doc - The document containing the elements.
+   * @param {Element} targetEl - The target element to check for blocking.
+   * @returns {Element|null} The blocking element if found, or null if not blocked.
+   */
   ov.isOverlayBlocking = function(doc, targetEl) {
     if (!doc || !targetEl) return null;
 
