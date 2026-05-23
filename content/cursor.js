@@ -194,9 +194,30 @@ window.__sentinelUtils = window.__sentinelUtils || {};
     };
   }
 
+  /**
+   * @typedef {Object} SentinelCursor
+   * @property {boolean} __initialized - Marker indicating the cursor has been initialized
+   * @property {function(number, number, Object=): Promise<void>} moveTo - Moves cursor to coordinates
+   * @property {function(Element, Object=): Promise<void>} moveToElement - Moves cursor to element center
+   * @property {function(): void} press - Shows cursor press animation
+   * @property {function(): void} show - Makes cursor visible
+   * @property {function(): void} hide - Hides cursor (dims it)
+   * @property {function(boolean): void} setKeepVisible - Controls whether cursor stays visible
+   * @property {function(): {x: number, y: number}} getPosition - Gets current cursor position
+   */
+
+  /** @type {SentinelCursor} */
   window.__sentinelCursor = {
     __initialized: true,
 
+    /**
+     * Moves the virtual cursor to the specified viewport coordinates.
+     * @param {number} x - Target X coordinate in viewport pixels
+     * @param {number} y - Target Y coordinate in viewport pixels
+     * @param {Object} [options] - Optional parameters
+     * @param {number} [options.duration] - Animation duration in milliseconds (default: 380)
+     * @returns {Promise<void>} Resolves when cursor animation completes
+     */
     moveTo(x, y, options) {
       try {
         if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
@@ -220,6 +241,13 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       }
     },
 
+    /**
+     * Moves the virtual cursor to the center of the specified element.
+     * @param {Element} el - Target DOM element
+     * @param {Object} [options] - Optional parameters
+     * @param {number} [options.duration] - Animation duration in milliseconds
+     * @returns {Promise<void>} Resolves when cursor animation completes
+     */
     moveToElement(el, options) {
       try {
         if (!el || typeof el.getBoundingClientRect !== 'function') {
@@ -233,6 +261,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       }
     },
 
+    /**
+     * Shows a "pressing" animation on the cursor to simulate mouse button press.
+     * Adds a CSS class that visually indicates the press state for 240ms.
+     * @returns {void}
+     */
     press() {
       try {
         const c = ensureCursor();
@@ -244,6 +277,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       } catch (e) { console.warn('[Sentinel] cursor press:', e && e.message); }
     },
 
+    /**
+     * Makes the virtual cursor visible by removing the dimmed state.
+     * Also schedules auto-hide if keepVisible mode is off.
+     * @returns {void}
+     */
     show() {
       try {
         const c = ensureCursor();
@@ -252,6 +290,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       } catch (e) { console.warn('[Sentinel] cursor show:', e && e.message); }
     },
 
+    /**
+     * Hides the virtual cursor by adding the dimmed state.
+     * Cancels any pending auto-hide timer.
+     * @returns {void}
+     */
     hide() {
       try {
         const c = document.getElementById(CURSOR_ID);
@@ -260,6 +303,12 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       } catch (e) { console.warn('[Sentinel] cursor hide:', e && e.message); }
     },
 
+    /**
+     * Controls whether the cursor stays visible during agent runs.
+     * When enabled, the cursor won't auto-hide and will remain visible between actions.
+     * @param {boolean} on - True to keep cursor visible, false to allow auto-hide
+     * @returns {void}
+     */
     setKeepVisible(on) {
       keepVisibleMode = !!on;
       if (on) {
@@ -267,6 +316,10 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       }
     },
 
+    /**
+     * Gets the current cursor position in viewport coordinates.
+     * @returns {{x: number, y: number}} Current cursor position, or (-1, -1) if cursor not found
+     */
     getPosition() {
       try {
         const c = document.getElementById(CURSOR_ID);
