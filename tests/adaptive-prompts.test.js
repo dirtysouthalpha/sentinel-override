@@ -3,9 +3,16 @@
 
 import { jest } from '@jest/globals';
 
+jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getActiveProvider: jest.fn(async () => ({ endpoint: 'https://api.test.com/v1', apiKey: 'test-key', model: 'test-model' })),
+}));
+
+jest.unstable_mockModule('../background/platforms/index.js', () => ({
+  getPlatformProfile: jest.fn(() => null),
+  findMismatchHints: jest.fn(() => []),
+}));
+
 import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
-import { getPlatformProfile, findMismatchHints } from '../background/platforms/index.js';
-import { getActiveProvider } from '../background/provider-registry.js';
 
 let storageData = {};
 globalThis.chrome = {
@@ -22,15 +29,6 @@ globalThis.chrome = {
   },
 };
 
-jest.unstable_mockModule('../background/provider-registry.js', () => ({
-  getActiveProvider: jest.fn(async () => ({ endpoint: 'https://api.test.com/v1', apiKey: 'test-key', model: 'test-model' })),
-}));
-
-jest.unstable_mockModule('../background/platforms/index.js', () => ({
-  getPlatformProfile: jest.fn(() => null),
-  findMismatchHints: jest.fn(() => []),
-}));
-
 const BASE_PROFILE = {
   id: 'test-platform',
   label: 'Test Platform',
@@ -42,6 +40,13 @@ const BASE_PROFILE = {
   pageTypes: [],
   workflowHints: [],
 };
+
+// Helper to get mocked modules
+async function getMockedModules() {
+  const { getPlatformProfile, findMismatchHints } = await import('../background/platforms/index.js');
+  const { getActiveProvider } = await import('../background/provider-registry.js');
+  return { getPlatformProfile, findMismatchHints, getActiveProvider };
+}
 
 function mockProviderWithApiKey() {
   return {
@@ -104,6 +109,8 @@ describe('rewriteGoalForPlatform — early returns', () => {
   });
 
   test('returns result with platform info when profile matches', async () => {
+    const { getPlatformProfile, getActiveProvider } = await getMockedModules();
+
     getPlatformProfile.mockReturnValueOnce({
       ...BASE_PROFILE,
       id: 'sonicwall-nsm',
