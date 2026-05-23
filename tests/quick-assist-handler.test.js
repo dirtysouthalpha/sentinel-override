@@ -347,5 +347,115 @@ describe('quick-assist-handler', () => {
 
       expect(result).toBe('Google response');
     });
+
+    it('should handle request timeout (30 seconds)', async () => {
+      // Directly test the AbortError handling path
+      // by mocking fetch to reject with an AbortError
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+
+      global.fetch.mockRejectedValue(abortError);
+
+      await expect(handleQuickAssist('test')).rejects.toThrow('Request timed out after 30 seconds');
+    });
+
+    it('should handle network errors', async () => {
+      const networkError = new Error('Network request failed');
+      global.fetch.mockRejectedValue(networkError);
+
+      await expect(handleQuickAssist('test')).rejects.toThrow('Network request failed');
+    });
+
+    it('should handle fetch returning non-OK status with no text method', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+      };
+      delete mockResponse.text;
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await expect(handleQuickAssist('test')).rejects.toThrow();
+    });
+
+    it('should handle DeepSeek provider (OpenAI-compatible)', async () => {
+      storageData = {
+        active_provider: 'deepseek',
+        api_key: 'test-key',
+        api_endpoint: 'https://api.deepseek.com/v1/chat/completions',
+        model: 'deepseek-chat',
+      };
+
+      const mockResponse = {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'DeepSeek response' } }],
+        }),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await handleQuickAssist('test');
+
+      expect(result).toBe('DeepSeek response');
+    });
+
+    it('should handle xAI provider (OpenAI-compatible)', async () => {
+      storageData = {
+        active_provider: 'xai',
+        api_key: 'test-key',
+        api_endpoint: 'https://api.x.ai/v1/chat/completions',
+        model: 'grok-beta',
+      };
+
+      const mockResponse = {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'xAI response' } }],
+        }),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await handleQuickAssist('test');
+
+      expect(result).toBe('xAI response');
+    });
+
+    it('should clear timeout on successful response', async () => {
+      const mockResponse = {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Success' } }],
+        }),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      await handleQuickAssist('test');
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('should clear timeout on error response', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      try {
+        await handleQuickAssist('test');
+      } catch (e) {
+        // Expected error
+      }
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockRestore();
+    });
   });
 });
