@@ -883,5 +883,50 @@ describe('Dropdown Utils', () => {
         globalThis.sleep = originalSleep;
       }
     });
+
+    test('should type into search input and filter results', async () => {
+      const optionEls = [];
+      for (let i = 0; i < 60; i++) {
+        // Use names that won't match our search text initially
+        const opt = createElement('div', { role: 'option', innerText: `Item ${i}`, value: `item-${i}` });
+        opt.offsetWidth = 100;
+        opt.offsetHeight = 30;
+        optionEls.push(opt);
+      }
+
+      // Create a mock search input
+      const searchInput = createElement('input', { type: 'text', className: 'search-input' });
+      searchInput.value = '';
+      searchInput.dispatchEvent = jest.fn();
+      searchInput.focus = jest.fn();
+
+      // Mock the internal functions
+      const originalFindSearchInput = dd._findSearchInput;
+      dd._findSearchInput = () => searchInput;
+
+      const originalFindDropdownOptions = dd.findDropdownOptions;
+      // After typing, return filtered results with our target
+      const targetOption = createElement('div', { role: 'option', innerText: 'Target Option', value: 'target' });
+      targetOption.offsetWidth = 100;
+      targetOption.offsetHeight = 30;
+      dd.findDropdownOptions = () => [targetOption];
+
+      const originalSleep = globalThis.sleep;
+      globalThis.sleep = () => Promise.resolve();
+
+      try {
+        // Search for "Target Option" which won't match any "Item X" initially
+        const result = await dd.selectDropdownOption(globalThis.document, optionEls, 'Target Option');
+        // Should have focused and typed into search input
+        expect(searchInput.focus).toHaveBeenCalled();
+        expect(searchInput.dispatchEvent).toHaveBeenCalled();
+        // Should find the filtered option
+        expect(result).not.toBeNull();
+      } finally {
+        dd._findSearchInput = originalFindSearchInput;
+        dd.findDropdownOptions = originalFindDropdownOptions;
+        globalThis.sleep = originalSleep;
+      }
+    });
   });
 });
