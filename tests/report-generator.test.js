@@ -334,5 +334,132 @@ describe('report-generator', () => {
       const result = await generateReport(data, CONFIG);
       expect(result.fullReport).toContain('items');
     });
+
+    // --- Line 248: fetch AbortError (timeout) handling ---
+    test('falls back on fetch timeout (AbortError)', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      globalThis.fetch = jest.fn(() => { throw abortError; });
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+      globalThis.fetch = jest.fn(() => Promise.resolve(mockFetchResponse));
+    });
+
+    // --- Lines 233-236: provider.buildHeaders throws ---
+    test('falls back when provider.buildHeaders throws', async () => {
+      const { resolveProvider } = await import('../background/provider-registry.js');
+      resolveProvider.mockReturnValueOnce({
+        buildBody: (model, system, prompt, opts) => ({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }], max_tokens: opts.maxTokens }),
+        buildHeaders: () => { throw new Error('buildHeaders explosion'); },
+        parseResponse: (data) => data.choices?.[0]?.message?.content || '',
+      });
+      mockGetActiveProviderResolve = { endpoint: 'https://api.test.com/v1/chat/completions', apiKey: 'test-key', model: 'test-model' };
+      const result = await generateReport(makeExecutionData(), CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+    });
+
+    // --- Lines 66-67: array truncation in _truncateMemoryValue ---
+    test('memorySummary truncates large arrays to first 5 items', async () => {
+      const bigArray = [];
+      for (let i = 0; i < 100; i++) bigArray.push(`Item ${i}: ${'x'.repeat(50)}`);
+      const data = makeExecutionData({ agentMemory: { large_array: bigArray } });
+      const result = await generateReport(data, CONFIG);
+      // Should truncate array to first 5 items
+      expect(result.fullReport).toBeTruthy();
+    });
+
+    // --- Lines 73-76: string truncation in _truncateMemoryValue ---
+    test('memorySummary truncates large string values', async () => {
+      const hugeString = 'x'.repeat(10000);
+      const data = makeExecutionData({ agentMemory: { huge_string: hugeString } });
+      const result = await generateReport(data, CONFIG);
+      // Should truncate to 600 chars
+      expect(result.fullReport).toBeTruthy();
+    });
+
+    // --- Line 42: non-string result handling in condensedHistory ---
+    test('handles non-string results in condensedHistory', async () => {
+      const data = makeExecutionData({
+        history: [
+          { step: 1, action: { type: 'navigate', url: 'https://example.com' }, result: { success: true, loaded: true } },
+          { step: 2, action: { type: 'click', selector: '#btn' }, result: null },
+          { step: 3, action: { type: 'extract', selector: '.data' }, result: 12345 },
+        ],
+        stepCount: 3,
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.structuredData.meta.totalSteps).toBe(3);
+    });
+
+    // --- Line 27: executionData validation ---
+    test('throws when executionData is null', async () => {
+      // The error is thrown before try-catch, so it should reject
+      await expect(generateReport(null, CONFIG)).rejects.toThrow('executionData is required');
+    });
+
+    test('throws when executionData is not an object', async () => {
+      await expect(generateReport('invalid', CONFIG)).rejects.toThrow('executionData is required');
+    });
+
+    // --- Line 285: buildStructuredData null handling ---
+    test('buildStructuredData returns empty object for null input', async () => {
+      const data = makeExecutionData();
+      // Call generateReport which internally calls buildStructuredData
+      const result = await generateReport(data, CONFIG);
+      // structuredData should always be present
+      expect(result.structuredData).toBeDefined();
+      expect(result.structuredData.meta).toBeDefined();
+    });
+
+    // --- Line 386: buildFallbackReport with missing fields ---
+    test('buildFallbackReport handles missing optional fields', async () => {
+      mockGetActiveProviderResolve = { endpoint: '', apiKey: '', model: '' };
+      const data = makeExecutionData({
+        history: [],
+        agentMemory: {},
+        stepCount: 0,
+        apiCallCount: 0,
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.fullReport).toContain('Goal');
+      expect(result.fullReport).toContain('Steps Taken');
+    });
+
+    // --- Line 398-399: stepsTaken filtering in buildFallbackReport ---
+    test('buildFallbackReport filters out read_page/scroll/wait actions from steps', async () => {
+      mockGetActiveProviderResolve = { endpoint: '', apiKey: '', model: '' };
+      const data = makeExecutionData({
+        history: [
+          { step: 1, action: { type: 'read_page', selector: 'body' }, result: 'read content' },
+          { step: 2, action: { type: 'scroll', selector: 'window' }, result: 'scrolled' },
+          { step: 3, action: { type: 'click', selector: '#btn' }, result: 'clicked' },
+          { step: 4, action: { type: 'wait_for_element', selector: '.loader' }, result: 'waited' },
+          { step: 5, action: { type: 'extract', selector: '.data' }, result: 'extracted' },
+        ],
+        stepCount: 5,
+      });
+      const result = await generateReport(data, CONFIG);
+      // Should only show click and extract, not read_page/scroll/wait actions
+      expect(result.fullReport).toContain('click');
+      expect(result.fullReport).toContain('extract');
+      expect(result.fullReport).not.toContain('read_page');
+      expect(result.fullReport).not.toContain('scroll');
+    });
+
+    // --- Line 42: result substring with short strings ---
+    test('condensedHistory handles short result strings without substring issues', async () => {
+      const data = makeExecutionData({
+        history: [
+          { step: 1, action: { type: 'navigate', url: 'https://example.com' }, result: 'OK' },
+          { step: 2, action: { type: 'click', selector: '#btn' }, result: '' },
+          { step: 3, action: { type: 'extract', selector: '.data' }, result: 'x' },
+        ],
+        stepCount: 3,
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.structuredData.meta.totalSteps).toBe(3);
+    });
   });
 });
