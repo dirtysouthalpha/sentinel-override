@@ -98,6 +98,7 @@ export default [
       'tests/**',
       'coverage/**',
       'marked.min.js',
+      'scripts/**',
     ],
   },
   // popup-full.js loads popup-modules/* which define these as globals
