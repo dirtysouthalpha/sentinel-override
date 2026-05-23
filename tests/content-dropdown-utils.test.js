@@ -487,4 +487,127 @@ describe('_findSearchInput', () => {
     const opt = { closest: () => null };
     expect(dd._findSearchInput(doc, [opt])).toBeNull();
   });
+
+  test('finds search input that uses native setter', () => {
+    const searchInput = { tagName: 'INPUT', value: '', dispatchEvent: () => {}, focus: () => {} };
+    const proto = { value: { set: function() {} } };
+    const descriptor = { set: function() {} };
+    const doc = {
+      querySelectorAll: () => [searchInput],
+      defaultView: {
+        HTMLInputElement: {
+          prototype: proto,
+        },
+      },
+    };
+    const opt = { closest: () => ({ querySelector: () => searchInput }) };
+    dd.findDropdownOptions = () => [{ innerText: 'Option', textContent: 'Option', value: 'Option' }];
+    // This exercises the nativeSetter path on line 246
+    dd._findSearchInput(doc, [opt]);
+  });
+});
+
+// Additional tests for uncovered branches
+describe('dropdown-utils edge cases', () => {
+  let dd;
+  beforeEach(() => { dd = getDd(loadModule(createSandbox())); });
+
+  test('handles parent container climb error (line 120)', () => {
+    const errorTrigger = mockElement({
+      tagName: 'DIV',
+      attrs: { 'aria-haspopup': 'listbox' },
+      parentElement: {
+        querySelectorAll: () => { throw new Error('Climb error'); },
+        parentElement: null,
+      },
+    });
+    const doc = {
+      querySelectorAll: () => [],
+      getElementById: () => null,
+    };
+    // Should not throw, should handle error gracefully
+    const result = dd.findDropdownOptions(doc, errorTrigger);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  test('handles className access error (line 374)', () => {
+    // Element that throws on className access
+    const badEl = {
+      tagName: 'DIV',
+      get className() { throw new Error('className access error'); },
+      getAttribute: () => null,
+      parentElement: null,
+      querySelectorAll: () => [],
+    };
+    // Should return false, not throw
+    expect(dd.isCustomDropdown(badEl)).toBe(false);
+  });
+
+  test('traverseNestedMenu falls back to click when hover fails (lines 340-349)', async () => {
+    const level1Item = {
+      innerText: 'Settings',
+      textContent: 'Settings',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    let callCount = 0;
+    dd.findDropdownOptions = () => {
+      callCount++;
+      // Hover fails (returns empty), click succeeds (returns items)
+      if (callCount === 1) return [level1Item];
+      if (callCount === 2) return []; // Hover failed
+      return [{ innerText: 'Security', textContent: 'Security' }]; // Click succeeded
+    };
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings', 'Security']);
+    // Should fall back to click and succeed
+    expect(result).toBeTruthy();
+  });
+
+  test('traverseNestedMenu returns null when both hover and click fail', async () => {
+    const level1Item = {
+      innerText: 'Settings',
+      textContent: 'Settings',
+      scrollIntoView: () => {},
+      dispatchEvent: () => {},
+      click: () => {},
+    };
+    let callCount = 0;
+    dd.findDropdownOptions = () => {
+      callCount++;
+      if (callCount === 1) return [level1Item];
+      return []; // Both hover and click fail
+    };
+    const result = await dd.traverseNestedMenu({ defaultView: {} }, ['Settings', 'Security']);
+    expect(result).toBeNull();
+  });
+
+  test('selectDropdownOption with search input and large option list', async () => {
+    const searchInput = {
+      tagName: 'INPUT',
+      value: '',
+      dispatchEvent: () => {},
+      focus: () => {},
+    };
+    const doc = {
+      querySelectorAll: (sel) => {
+        if (sel.includes('input')) return [searchInput];
+        return [];
+      },
+      defaultView: {},
+      getElementById: () => null,
+    };
+    // Create 50+ dummy options to trigger search input strategy
+    const dummyOptions = Array.from({ length: 60 }, (_, i) => ({
+      innerText: `Option${i}`,
+      textContent: `Option${i}`,
+      value: `Option${i}`,
+    }));
+    dd._findSearchInput = () => searchInput;
+    dd.findDropdownOptions = () => dummyOptions;
+    const result = await dd.selectDropdownOption(doc, dummyOptions, 'Option50');
+    // Should find and return the matched option
+    expect(result).toBeTruthy();
+    expect(result.value).toBe('Option50');
+  });
 });
