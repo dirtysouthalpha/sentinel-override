@@ -980,4 +980,57 @@ describe('rewriteGoalForPlatform — malformed profile data', () => {
     const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
     expect(result.adapted).toBe(true);
   });
+
+  // ========== extractJsonObject edge cases ==========
+
+  describe('extractJsonObject — edge cases', () => {
+    test('handles incomplete JSON response (opening brace but no closing)', async () => {
+      getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      // Response with opening { but no closing } - should return null from extractJsonObject
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '{"adapted_goal":"incomplete json response' } }]
+        })
+      }));
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+      // Should fall back to original goal when JSON parsing fails
+      expect(result.adapted).toBe(false);
+      expect(result.adaptedGoal).toBe(result.originalGoal);
+    });
+
+    test('handles JSON response with extra text before and after', async () => {
+      getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      // Response with extra text around the JSON object
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Here is the result: {"adapted_goal": "A long enough adapted goal for validation of JSON extraction with extra text", "summary": "ok"} End of response' } }]
+        })
+      }));
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+      expect(result.adapted).toBe(true);
+    });
+
+    test('handles empty response content', async () => {
+      getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
+      getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
+
+      globalThis.fetch = jest.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: '' } }]
+        })
+      }));
+
+      const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
+      expect(result.adapted).toBe(false);
+    });
+  });
 });
