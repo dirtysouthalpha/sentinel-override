@@ -32,7 +32,7 @@ export async function appendAuditEntry(runId, entry) {
       console.error('[log] Error:', e);
       /* storage write failed — fire-and-forget */
     });
-  } catch { /* audit log append failed — never block the agent loop */ }
+  } catch (e) { console.warn('[Sentinel/audit-log] appendAuditEntry failed:', e && e.message); }
 }
 
 /**
