@@ -144,4 +144,87 @@ describe('subscribe', () => {
     const unsub = subscribe('activeProviderId', jest.fn());
     expect(typeof unsub).toBe('function');
   });
+
+  test('handles null callback gracefully', () => {
+    expect(() => subscribe('activeProviderId', null)).not.toThrow();
+    const state = getState();
+    expect(() => { state.activeProviderId = 'openai'; }).not.toThrow();
+  });
+
+  test('handles undefined callback gracefully', () => {
+    expect(() => subscribe('activeProviderId', undefined)).not.toThrow();
+    const state = getState();
+    expect(() => { state.activeProviderId = 'openai'; }).not.toThrow();
+  });
+
+  test('handles non-function callback gracefully', () => {
+    expect(() => subscribe('activeProviderId', 'not a function')).not.toThrow();
+    const state = getState();
+    expect(() => { state.activeProviderId = 'openai'; }).not.toThrow();
+  });
+
+  test('subscriber receives old value correctly', () => {
+    const cb = jest.fn();
+    subscribe('activeProviderId', cb);
+
+    const state = getState();
+    state.activeProviderId = 'openai';
+
+    expect(cb).toHaveBeenCalledWith('openai', 'activeProviderId', 'anthropic');
+  });
+
+  test('multiple unsubscribes are safe (idempotent)', () => {
+    const cb = jest.fn();
+    const unsub = subscribe('activeProviderId', cb);
+
+    unsub();
+    unsub();
+    unsub();
+
+    const state = getState();
+    state.activeProviderId = 'openai';
+
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  test('subscriber can unsubscribe during callback (pattern check)', () => {
+    let callCount = 0;
+    let unsub;
+    const selfUnsubbingCb = () => {
+      callCount++;
+      if (callCount === 1) unsub();
+    };
+    unsub = subscribe('activeProviderId', selfUnsubbingCb);
+
+    const state = getState();
+    state.activeProviderId = 'openai';
+    state.activeProviderId = 'anthropic';
+
+    // Should only be called once (first change triggers unsub)
+    expect(callCount).toBe(1);
+  });
+
+  test('state changes trigger correct subscribers for nested properties', () => {
+    const cb = jest.fn();
+    subscribe('providerConfigs', cb);
+
+    const state = getState();
+    state.providerConfigs = { openai: { apiKey: 'test' } };
+
+    expect(cb).toHaveBeenCalled();
+  });
+
+  test('handles rapid state changes', () => {
+    const cb = jest.fn();
+    subscribe('activeProviderId', cb);
+
+    const state = getState();
+    // Start from 'anthropic', first set to 'openai' then alternate
+    for (let i = 0; i < 100; i++) {
+      state.activeProviderId = i % 2 === 0 ? 'openai' : 'anthropic';
+    }
+
+    // Should be called 100 times (each change, since we always change value)
+    expect(cb).toHaveBeenCalledTimes(100);
+  });
 });
