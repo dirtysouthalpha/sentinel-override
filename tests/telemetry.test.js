@@ -278,6 +278,33 @@ describe('run lifecycle', () => {
     await expect(deletePersistedRun(null)).resolves.toBeUndefined();
     await expect(deletePersistedRun('fake')).resolves.toBeUndefined();
   });
+
+  test('startRun handles storage.set errors gracefully', async () => {
+    globalThis.chrome.storage.local.set.mockRejectedValueOnce(new Error('storage failure'));
+    await expect(startRun('run-error', 'Test')).resolves.toBeUndefined();
+  });
+
+  test('endRun handles missing run in storage gracefully', async () => {
+    // endRun when run was never started
+    await expect(endRun('never-started')).resolves.toBeUndefined();
+  });
+
+  test('listPersistedRun handles storage.get errors gracefully', async () => {
+    globalThis.chrome.storage.local.get.mockRejectedValueOnce(new Error('read failure'));
+    const runs = await listPersistedRuns();
+    expect(Array.isArray(runs)).toBe(true);
+  });
+
+  test('loadPersistedRun handles malformed data gracefully', async () => {
+    storageData['telemetry_run_bad-json'] = 'not an array';
+    const events = await loadPersistedRun('bad-json');
+    expect(events).toEqual([]);
+  });
+
+  test('deletePersistedRun handles storage.remove errors gracefully', async () => {
+    globalThis.chrome.storage.local.remove.mockRejectedValueOnce(new Error('delete failure'));
+    await expect(deletePersistedRun('test-run')).resolves.toBeUndefined();
+  });
 });
 
 // ========== Level filtering — negative cases ==========
