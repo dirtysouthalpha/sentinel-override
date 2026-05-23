@@ -270,4 +270,20 @@ describe('wait.sleep — edge cases', () => {
     const result = await wait.sleep(-1);
     expect(result).toBeUndefined();
   });
+
+  test('resolves with very large ms value', async () => {
+    jest.useFakeTimers();
+    const promise = wait.sleep(999999);
+    jest.advanceTimersByTime(999999);
+    await expect(promise).resolves.toBeUndefined();
+    jest.useRealTimers();
+  });
+
+  test('handles multiple concurrent sleep calls', async () => {
+    jest.useFakeTimers();
+    const promises = [wait.sleep(100), wait.sleep(200), wait.sleep(50)];
+    jest.advanceTimersByTime(200);
+    await Promise.all(promises);
+    jest.useRealTimers();
+  });
 });
