@@ -64,8 +64,9 @@ describe('report-generator', () => {
     jest.clearAllMocks();
     mockGetActiveProviderResolve = { endpoint: 'https://api.test.com/v1/chat/completions', apiKey: 'test-key', model: 'test-model' };
     mockFetchResponse = { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: '## Report\n\nTest report content.' } }] }), text: async () => '' };
-    mockGetActiveProvider.mockResolvedValue(mockGetActiveProviderResolve);
-    globalThis.fetch.mockResolvedValue(mockFetchResponse);
+    // Use mockImplementation to ensure the mocks persist through clearAllMocks
+    mockGetActiveProvider.mockImplementation(async () => mockGetActiveProviderResolve);
+    globalThis.fetch.mockImplementation(async () => Promise.resolve(mockFetchResponse));
   });
 
   describe('generateReport', () => {
