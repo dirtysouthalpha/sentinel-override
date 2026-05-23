@@ -647,6 +647,82 @@ describe('cursor — scheduleAutoHide error', () => {
   });
 });
 
+// ========== cursor.hide edge cases ==========
+
+describe('cursor.hide — edge cases', () => {
+  test('handles null cursor element gracefully', () => {
+    const origGetEl = globalThis.document.getElementById;
+    globalThis.document.getElementById = () => null;
+
+    expect(() => cursor.hide()).not.toThrow();
+
+    globalThis.document.getElementById = origGetEl;
+  });
+
+  test('handles cursor.style.opacity error gracefully', () => {
+    const origGetEl = globalThis.document.getElementById;
+    const badCursor = {
+      id: '__sentinel_cursor__',
+      isConnected: true,
+      get style() { throw new Error('style fail'); },
+      classList: { _classes: new Set(), add: fn, remove: fn, contains: fn },
+    };
+    globalThis.document.getElementById = () => badCursor;
+
+    expect(() => cursor.hide()).not.toThrow();
+
+    globalThis.document.getElementById = origGetEl;
+  });
+
+  test('handles hideTimer.clear error gracefully', () => {
+    const origGetEl = globalThis.document.getElementById;
+    const badCursor = {
+      id: '__sentinel_cursor__',
+      isConnected: true,
+      style: {},
+      classList: { _classes: new Set(), add: fn, remove: fn, contains: fn },
+      _hideTimer: {
+        clear() { throw new Error('timer clear fail'); }
+      },
+    };
+    globalThis.document.getElementById = () => badCursor;
+
+    expect(() => cursor.hide()).not.toThrow();
+
+    globalThis.document.getElementById = origGetEl;
+  });
+});
+
+// ========== cursor.getPosition edge cases ==========
+
+describe('cursor.getPosition — edge cases', () => {
+  test('returns default position when cursor element not found', () => {
+    const origGetEl = globalThis.document.getElementById;
+    globalThis.document.getElementById = () => null;
+
+    const pos = cursor.getPosition();
+    expect(pos).toEqual({ x: -1, y: -1 });
+
+    globalThis.document.getElementById = origGetEl;
+  });
+
+  test('handles cursor.style parsing errors gracefully', () => {
+    const origGetEl = globalThis.document.getElementById;
+    const badCursor = {
+      id: '__sentinel_cursor__',
+      isConnected: true,
+      get style() { throw new Error('style parse fail'); },
+      classList: { _classes: new Set(), add: fn, remove: fn, contains: fn },
+    };
+    globalThis.document.getElementById = () => badCursor;
+
+    const pos = cursor.getPosition();
+    expect(pos).toEqual({ x: -1, y: -1 });
+
+    globalThis.document.getElementById = origGetEl;
+  });
+});
+
 // ========== setInterval fallback when documentElement is unavailable (line 143-144) ==========
 
 describe('cursor — setInterval fallback when documentElement unavailable', () => {
