@@ -10,8 +10,12 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
   const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
 
   // ========== Scan Iframes ==========
-  // Enumerate all iframes in the document. For same-origin iframes,
-  // recursively scan their contents. Cross-origin iframes get placeholders.
+  /**
+   * Enumerate all iframes in the document. For same-origin iframes,
+   * recursively scan their contents. Cross-origin iframes get placeholders.
+   * @param {Document} doc - The document to scan for iframes.
+   * @returns {{elements: Array, iframeCount: number, crossOriginCount: number}} Object containing scanned elements, iframe count, and cross-origin count.
+   */
   fm.scanIframes = function(doc) {
     let elements = [];
     let iframeCount = 0;
@@ -66,8 +70,12 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
   };
 
   // ========== Find In Iframe ==========
-  // Given a selector starting with "frame:", resolve the iframe and find the element.
-  // Returns { element, frameDoc } for same-origin or { crossOrigin: true, frameIndex, frameUrl, remainingSelector } for cross-origin.
+  /**
+   * Given a selector starting with "frame:", resolve the iframe and find the element.
+   * @param {Document} doc - The document containing the iframes.
+   * @param {string} selector - A selector starting with "frame:" (e.g., "frame:0:#button").
+   * @returns {{element: Element, frameDoc: Document, frameIndex: number, frameUrl: string} | {crossOrigin: true, frameIndex: number, frameUrl: string, remainingSelector: string} | null} Result object with element and frame info, or cross-origin info, or null if not found.
+   */
   fm.findInIframe = function(doc, selector) {
     if (!selector || !selector.startsWith('frame:')) {
       return null;
@@ -115,7 +123,11 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
   };
 
   // ========== Get Iframe Info ==========
-  // Return metadata about all iframes on the page.
+  /**
+   * Return metadata about all iframes on the page.
+   * @param {Document} doc - The document to analyze for iframes.
+   * @returns {Array<{index: number, src: string, sameOrigin: boolean, width: number, height: number, visible: boolean}>} Array of iframe metadata objects.
+   */
   fm.getIframeInfo = function(doc) {
     const info = [];
 
