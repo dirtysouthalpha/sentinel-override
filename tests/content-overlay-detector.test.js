@@ -804,4 +804,30 @@ describe('overlay-detector — dismissOverlay accept buttons and edge cases', ()
     expect(() => ov.dismissOverlay(doc, overlay)).not.toThrow();
     expect(callCount).toBeGreaterThan(0);
   });
+
+  test('continues to next accept selector after first throws error', () => {
+    const overlay = makeElement('div');
+    const workingBtn = makeElement('button');
+    _isVisibleResults.set(workingBtn, true);
+    _isVisibleResults.set(overlay, true);
+    let selectorCallCount = 0;
+    overlay.querySelectorAll = (sel) => {
+      selectorCallCount++;
+      // First accept selector throws, subsequent ones return workingBtn
+      if (sel === '.cookie-banner .accept') throw new Error('Security error');
+      if (sel.includes('accept') || sel.includes('consent')) return [workingBtn];
+      return [];
+    };
+    let dismissed = false;
+    workingBtn.click = () => { dismissed = true; };
+    workingBtn.dispatchEvent = () => { dismissed = true; };
+    const doc = {
+      body: { contains: () => !dismissed },
+      activeElement: overlay,
+    };
+    // Should catch first error, continue to next selector, and dismiss
+    expect(ov.dismissOverlay(doc, overlay)).toBe(true);
+    expect(selectorCallCount).toBeGreaterThan(1); // Proves multiple selectors were tried
+    expect(dismissed).toBe(true);
+  });
 });
