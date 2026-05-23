@@ -1038,4 +1038,59 @@ describe('resolveFrameForSelector — error handling', () => {
     const result = await resolveFrameForSelector(7006, 0);
     expect(result).toBeNull();
   });
+
+  test('handles getAllFrames returning null (not empty array)', async () => {
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce(null);
+    const result = await resolveFrameForSelector(7007, 0);
+    expect(result).toBeNull();
+  });
+
+  test('handles URL parse error for main frame (line 78-79)', async () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
+      { frameId: 0, parentId: -1, url: '::invalid-url::' },
+      { frameId: 1, parentId: 0, url: 'https://example.com/iframe' },
+    ]);
+    const frames = await enumerateFrames(7008);
+    expect(frames).toHaveLength(2);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Sentinel/frame-router] URL parse failed for main frame:',
+      expect.any(String)
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  test('handles URL parse error for iframe (line 88-89)', async () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
+      { frameId: 0, parentId: -1, url: 'https://example.com' },
+      { frameId: 1, parentId: 0, url: '::invalid-url::' },
+    ]);
+    const frames = await enumerateFrames(7009);
+    expect(frames).toHaveLength(2);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Sentinel/frame-router] URL parse failed for frame:',
+      expect.any(String)
+    );
+    consoleWarnSpy.mockRestore();
+  });
+
+  test('handles both main frame and iframe URL parse errors', async () => {
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    chrome.webNavigation.getAllFrames.mockResolvedValueOnce([
+      { frameId: 0, parentId: -1, url: '::invalid-main::' },
+      { frameId: 1, parentId: 0, url: '::invalid-iframe::' },
+    ]);
+    const frames = await enumerateFrames(7010);
+    expect(frames).toHaveLength(2);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Sentinel/frame-router] URL parse failed for main frame:',
+      expect.any(String)
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Sentinel/frame-router] URL parse failed for frame:',
+      expect.any(String)
+    );
+    consoleWarnSpy.mockRestore();
+  });
 });
