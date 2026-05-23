@@ -655,6 +655,80 @@ describe('parseLLMResponse', () => {
       expect(result.type).toBe(t);
     }
   });
+
+  test('handles empty string response', () => {
+    const result = parseLLMResponse('');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('handles whitespace-only response', () => {
+    const result = parseLLMResponse('   \n\t  ');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('handles response with null values', () => {
+    const result = parseLLMResponse('{"type":null,"text":null}');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Missing type field');
+  });
+
+  test('handles response with undefined values', () => {
+    const result = parseLLMResponse('{"type":"click","selector":undefined}');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('handles deeply nested object with missing required fields', () => {
+    const result = parseLLMResponse('{"nested":{"deep":{"value":"test"}}}');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Missing type field');
+  });
+
+  test('handles array response instead of object', () => {
+    const result = parseLLMResponse('[{"type":"click"},{"type":"type"}]');
+    expect(result.type).toBe('click');
+  });
+
+  test('handles number instead of object', () => {
+    const result = parseLLMResponse('12345');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('handles boolean response', () => {
+    const result = parseLLMResponse('true');
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('handles response with circular reference pattern (escaped)', () => {
+    const result = parseLLMResponse('{"type":"note","text":"[Circular]"}');
+    expect(result.type).toBe('note');
+    expect(result.text).toBe('[Circular]');
+  });
+
+  test('handles response with mixed line endings', () => {
+    const input = '{"type":"note","text":"line1\r\nline2\nline3\rline4"}';
+    const result = parseLLMResponse(input);
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('line1');
+  });
+
+  test('handles response with emoji and unicode', () => {
+    const input = '{"type":"note","text":"Hello 🌍 世界 🚀"}';
+    const result = parseLLMResponse(input);
+    expect(result.type).toBe('note');
+    expect(result.text).toBe('Hello 🌍 世界 🚀');
+  });
+
+  test('handles response with escaped unicode that becomes invalid after sanitization', () => {
+    const input = '{"type":"note","text":"\\uXXXX"}';
+    const result = parseLLMResponse(input);
+    expect(result.type).toBe('note');
+    expect(result.text).toBeTruthy();
+  });
 });
 
 // ========== getPlatformContext ==========
