@@ -970,14 +970,23 @@ export async function generatePlan(goal, settings, context = {}) {
       }
     } catch (_) { /* fall through to strategy 4 */ }
 
-    // Strategy 4: extract numbered steps from prose (e.g. "1. Navigate to...\n2. Click...")
+    // Strategy 4: extract numbered or bulleted steps from prose
+    // e.g. "1. Navigate to...\n2. Click..." or "- Navigate to...\n- Click..."
     {
       const lines = content.split(/\n/).map(l => l.trim()).filter(Boolean);
-      const stepLines = lines.filter(l => /^\d+[.)]\s+.{10,}/.test(l));
-      if (stepLines.length >= 2) {
-        const steps = stepLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim()).filter(Boolean);
+      const numberedLines = lines.filter(l => /^\d+[.)]\s+.{10,}/.test(l));
+      if (numberedLines.length >= 2) {
+        const steps = numberedLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim()).filter(Boolean);
         if (steps.length >= 2) {
-          console.warn('Plan generation: extracted ' + steps.length + ' steps from prose');
+          console.warn('Plan generation: extracted ' + steps.length + ' numbered steps from prose');
+          return steps;
+        }
+      }
+      const bulletLines = lines.filter(l => /^[-*•]\s+.{10,}/.test(l));
+      if (bulletLines.length >= 2) {
+        const steps = bulletLines.map(l => l.replace(/^[-*•]\s+/, '').trim()).filter(Boolean);
+        if (steps.length >= 2) {
+          console.warn('Plan generation: extracted ' + steps.length + ' bullet steps from prose');
           return steps;
         }
       }

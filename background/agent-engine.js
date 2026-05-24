@@ -2365,6 +2365,7 @@ async function runAgentLoop(goal, workingTabId) {
   goal = await _initRunState(goal);
 
   let consecutiveNavigates = 0;
+  let consecutiveInjectionFailures = 0;
   // Observation skip cache — reused when previous step was non-mutating and
   // the URL/SPA-route hasn't changed. DOM content hash catches SPA changes
   // without URL changes.
@@ -2618,7 +2619,17 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Inject content script
       const scriptReady = await injectContentScript(tab);
-      if (!scriptReady) { sendSilentUpdate('Content script failed -- retrying', stepCount); await sleep(2000); continue; }
+      if (!scriptReady) {
+        consecutiveInjectionFailures++;
+        sendSilentUpdate('Content script failed -- retrying', stepCount);
+        await sleep(2000);
+        // After 3 consecutive failures, let the LLM call proceed with empty observation
+        // so it can issue a navigate action to escape the stuck page.
+        if (consecutiveInjectionFailures < 3) continue;
+        console.warn('[Sentinel] Content script failed ' + consecutiveInjectionFailures + ' times — proceeding to LLM with empty observation');
+      } else {
+        consecutiveInjectionFailures = 0;
+      }
 
       // Stuck-loop detection: if the same action type failed 3+ times in a row,
       // inject a recovery hint to break the loop.
