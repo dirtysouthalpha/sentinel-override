@@ -3963,7 +3963,7 @@ async function runAgentLoop(goal, workingTabId) {
     function _updateHUDResult(tab, stepCount, result, isError) {
       try {
         const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-        sendMessageWithRetry(tab, {
+        chrome.tabs.sendMessage(tab, {
           action: 'update_hud',
           hudData: {
             step: stepCount,
@@ -3971,14 +3971,14 @@ async function runAgentLoop(goal, workingTabId) {
             resultSuccess: !isError,
             resultError: isError
           }
-        }, 1).catch(() => {});
+        }).catch(() => {});
       } catch (_) { /* non-fatal */ }
     }
 
       sendAgentStatus('executing', describeAction(command));
       // (3.50.0) Update the in-page action HUD so the user can see what's happening
       try {
-        sendMessageWithRetry(tab, {
+        chrome.tabs.sendMessage(tab, {
           action: 'update_hud',
           hudData: {
             step: stepCount,
@@ -3986,7 +3986,7 @@ async function runAgentLoop(goal, workingTabId) {
             action: command.type,
             actionLabel: describeAction(command).substring(0, 60)
           }
-        }, 1).catch(() => {});
+        }).catch(() => {});
       } catch (_) { /* non-fatal */ }
       sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
 
@@ -4087,7 +4087,19 @@ async function runAgentLoop(goal, workingTabId) {
           await switchToTab(ctx.tabId);
           await sleep(2000);
           await injectContentScript(ctx.tabId);
+          // (3.50.1) Validate we landed where we intended.
+          // Sites like Reddit can redirect to completely different content.
+          const _arrivedInfo = await getTabInfo(ctx.tabId);
+          const _arrivedUrl = _arrivedInfo?.url || '';
           result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
+          if (_arrivedUrl && command.url) {
+            const _intendedPath = new URL(command.url).pathname.replace(/\/$/, '');
+            const _arrivedPath = new URL(_arrivedUrl).pathname.replace(/\/$/, '');
+            if (_intendedPath !== _arrivedPath) {
+              result += ` — WARNING: redirected to ${_arrivedUrl}. The page may not contain the expected content. Check the URL and try a different link.`;
+              console.warn('[Sentinel/open_tab] URL mismatch. Intended:', command.url, 'Arrived:', _arrivedUrl);
+            }
+          }
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
@@ -4814,13 +4826,29 @@ async function runAgentLoop(goal, workingTabId) {
   // first, THEN stop the keepalive and do cleanup.
 
   console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
-  console.log('[Sentinel/DEBUG] reportData check:', typeof reportData, reportData ? Object.keys(reportData).join(',') : 'NULL');
+  console.error('[Sentinel/REPORT-DEBUG] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // reportData is already a snapshot, so cleanup order doesn't affect its content.
   // Keepalive must stay active for this fetch to complete.
   let agentReport = null;
+  // (3.50.1) Force-capture reportData if somehow null at this point.
+  // The normal capture is at line ~3470 in the finish handler, but edge cases
+  // (early breaks, SW suspensions) can leave it unset.
+  if (!reportData && finished) {
+    console.error('[Sentinel/REPORT-DEBUG] reportData was NULL at report time — force-capturing from current state');
+    reportData = {
+      goal: _lastGoal || '',
+      history: history.slice(),
+      agentMemory: { ...(await getAgentMemory()) },
+      agentPlan: null,
+      stepCount,
+      apiCallCount,
+      tabContexts: getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot }))
+    };
+  }
   if (reportData) {
+    console.error('[Sentinel/REPORT-DEBUG] Starting report generation with keys:', Object.keys(reportData).join(','));
     sendSilentUpdate('Generating report...', stepCount);
     try {
       agentReport = await generateReport(reportData, CONFIG);
