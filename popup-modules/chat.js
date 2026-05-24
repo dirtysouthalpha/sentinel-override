@@ -288,7 +288,14 @@ function ensureMiniShotPanel() {
       <span>Agent's view (latest)</span>
       <span class="mini-shot-toggle">▾ HIDE</span>
     </div>
-    <div class="mini-shot-img-wrap"><img id="mini-shot-img" alt=""></div>
+    <div class="mini-shot-img-wrap" style="position:relative;">
+      <img id="mini-shot-img" alt="" style="display:block; width:100%;">
+      <svg id="mini-shot-crosshair" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;" xmlns="http://www.w3.org/2000/svg">
+        <line id="msc-h" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <line id="msc-v" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle id="msc-dot" r="5" fill="none" stroke="#ff4444" stroke-width="2"/>
+      </svg>
+    </div>
   `;
   // Insert below the active-tab strip, before the chat container.
   const strip = document.getElementById('active-tab-strip');
@@ -322,6 +329,26 @@ function hideMiniShot() {
 // eslint-disable-next-line no-unused-vars
 function showMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = '';
+}
+
+let __lastClickCoords = null; // (7.1) last click_at coords for crosshair overlay
+let __lastViewportSize = null; // (7.1) viewport size from screenshotMeta for coord scaling
+
+function showCrosshair(x, y, viewportW, viewportH) {
+  const panel = __miniShotPanelEl;
+  if (!panel) return;
+  const svg = panel.querySelector('#mini-shot-crosshair');
+  if (!svg) return;
+  if (!viewportW || !viewportH || typeof x !== 'number' || typeof y !== 'number') { svg.style.display = 'none'; return; }
+  const px = (x / viewportW * 100).toFixed(2) + '%';
+  const py = (y / viewportH * 100).toFixed(2) + '%';
+  const h = svg.querySelector('#msc-h'); const v = svg.querySelector('#msc-v'); const dot = svg.querySelector('#msc-dot');
+  if (h) { h.setAttribute('x1', '0%'); h.setAttribute('x2', '100%'); h.setAttribute('y1', py); h.setAttribute('y2', py); }
+  if (v) { v.setAttribute('x1', px); v.setAttribute('x2', px); v.setAttribute('y1', '0%'); v.setAttribute('y2', '100%'); }
+  if (dot) { dot.setAttribute('cx', px); dot.setAttribute('cy', py); }
+  svg.style.display = 'block';
+  // Auto-hide after 3 seconds
+  setTimeout(() => { if (svg) svg.style.display = 'none'; }, 3000);
 }
 
 // ========== Approval Mode ==========
@@ -2852,10 +2879,15 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'heartbeat_update') {
     _updateHeartbeat(message.durationMs || 0);
   }
-  // (6.0) Screenshot live preview
+  // (6.0) Screenshot live preview; (7.1) show crosshair if we have pending click coords
   if (message.action === 'screenshot_update') {
     updateMiniShot(message.base64Image);
     showMiniShot();
+    if (message.viewportW && message.viewportH) __lastViewportSize = { w: message.viewportW, h: message.viewportH };
+    if (__lastClickCoords && __lastViewportSize) {
+      showCrosshair(__lastClickCoords.x, __lastClickCoords.y, __lastViewportSize.w, __lastViewportSize.h);
+      __lastClickCoords = null;
+    }
   }
   // (6.0) New step starting — create activity stream card
   if (message.action === 'agent_step_start') {
@@ -2869,6 +2901,12 @@ chrome.runtime.onMessage.addListener((message) => {
   // (6.0) Agent action — update step card headline and active tab strip
   if (message.action === 'agent_action') {
     const p = message.payload;
+    // (7.1) Save click coordinates for crosshair display on next screenshot
+    if (p && (p.type === 'click_at' || (p.type === 'click' && typeof p.x === 'number'))) {
+      if (typeof p.x === 'number' && typeof p.y === 'number') {
+        __lastClickCoords = { x: p.x, y: p.y };
+      }
+    }
     if (p && p.stepNumber) {
       _ensureActivityStream(p.stepNumber);
       updateStepCardAction(p.stepNumber, p.description || p.type);

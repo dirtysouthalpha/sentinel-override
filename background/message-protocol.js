@@ -325,12 +325,14 @@ export function sendAgentStepStart(stepNumber, totalPlannedSteps) {
  * @param {string} base64Image - JPEG base64 (without the data: prefix)
  * @param {number} stepNumber
  */
-export function sendScreenshotUpdate(base64Image, stepNumber) {
+export function sendScreenshotUpdate(base64Image, stepNumber, viewportMeta) {
   if (!base64Image) return;
   chrome.runtime.sendMessage({
     action: 'screenshot_update',
     base64Image,
-    stepNumber: stepNumber || 0
+    stepNumber: stepNumber || 0,
+    viewportW: viewportMeta && viewportMeta.width,
+    viewportH: viewportMeta && viewportMeta.height
   }).catch((e) => {
     console.error('[sendScreenshotUpdate] Unhandled rejection:', e);
   });

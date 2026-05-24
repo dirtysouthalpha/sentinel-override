@@ -2632,8 +2632,8 @@ async function runAgentLoop(goal, workingTabId) {
             scrollX: shotResult.scrollX,
             scrollY: shotResult.scrollY
           };
-          // (3.7.1) Forward to the popup for the live mini-shot panel.
-          try { sendScreenshotUpdate(base64Image, stepCount); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
+          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
         }
       }
 
@@ -4205,6 +4205,27 @@ async function runAgentLoop(goal, workingTabId) {
           result = 'Content script error: ' + (err.message || 'command failed to reach page');
           actionFailed = true;
         }
+      }
+
+      // (7.1) Automatic bbox fallback: if a click fails due to selector issues,
+      // resolve the element's bbox from the page and retry as click_at.
+      if (actionFailed && command.type === 'click' && !command._bboxFallback) {
+        try {
+          const bbox = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
+          if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
+            const cx = Math.round(bbox.x + (bbox.width || 0) / 2);
+            const cy = Math.round(bbox.y + (bbox.height || 0) / 2);
+            const fallbackCmd = { type: 'click_at', x: cx, y: cy, _bboxFallback: true };
+            const fallbackRes = await sendMessageWithRetry(tab, { action: 'execute_command', command: fallbackCmd });
+            if (fallbackRes && !String(fallbackRes).startsWith('Error') && !String(fallbackRes).includes('not found')) {
+              result = String(fallbackRes) + ' [bbox fallback at (' + cx + ',' + cy + ')]';
+              actionFailed = false;
+              sendSilentUpdate('Selector failed → retried with bbox coordinates (' + cx + ',' + cy + ')', stepCount);
+              // Send a click_at action message so the crosshair shows on the mini-shot
+              sendActionMessage({ ...command, type: 'click_at', x: cx, y: cy, _bboxFallback: true }, stepCount, observation);
+            }
+          }
+        } catch (_) { /* bbox fallback is always non-fatal */ }
       }
 
       // Post-click: handle navigation and new tab capture
