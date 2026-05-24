@@ -4215,7 +4215,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = res || 'Done';
-            actionFailed = result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
+            actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           } catch (err) {
             result = 'Content script error: ' + (err.message || 'command failed to reach page');
             actionFailed = true;
@@ -4249,7 +4249,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
               result = res || 'Done';
-              actionFailed = result.startsWith('Error') || result.startsWith('JS Error') || result.includes('timed out') || result.includes(' not found');
+              actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.startsWith('JS Error') || result.includes('timed out') || result.includes(' not found');
             }
           } else {
             // (3.49.1) Push undo entry for type actions when not using CDP path.
@@ -4267,7 +4267,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = res || 'Done';
-            actionFailed = result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
+            actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           }
         } catch (err) {
           result = 'Content script error: ' + (err.message || 'command failed to reach page');
