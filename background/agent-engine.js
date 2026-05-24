@@ -1143,7 +1143,12 @@ async function detachAllSentinelTabs() {
   } catch (_e) {
     // Some tabs may have been closed already; try one-by-one as a fallback.
     for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (_e2) { console.error('[Sentinel] Error in agent-engine.js:', _e2); }
+      try { await chrome.tabs.ungroup([id]); } catch (_e2) {
+        // Tab was already closed during the run — not an error, expected behavior
+        if (!_e2.message || !_e2.message.includes('No tab with id')) {
+          console.error('[Sentinel] Error in agent-engine.js:', _e2);
+        }
+      }
     }
   }
   // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.

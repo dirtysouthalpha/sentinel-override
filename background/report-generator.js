@@ -289,7 +289,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
 
   const provider = resolveProvider(endpoint);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout || 45000);
+  const timeout = setTimeout(() => controller.abort(), CONFIG.reportTimeout || Math.max(CONFIG.fetchTimeout * 2 || 90000, 90000));
 
   const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
 
