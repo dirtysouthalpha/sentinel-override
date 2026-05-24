@@ -910,6 +910,7 @@ function sendMessage() {
   sendBtn.disabled = true;
   goalInput.disabled = true;
   stopBtn.style.display = 'flex';
+  if (pauseBtn) { pauseBtn.style.display = 'flex'; pauseBtn.dataset.paused = 'false'; pauseBtn.innerHTML = PAUSE_ICON; pauseBtn.title = 'Pause agent'; }
   goalInput.placeholder = 'Waiting for response...';
   state.selectedAttachments = [];
   attachmentPreview.style.display = 'none';
@@ -960,6 +961,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
 function resetUI() {
   sendBtn.disabled = false;
   stopBtn.style.display = 'none';
+  if (pauseBtn) { pauseBtn.style.display = 'none'; pauseBtn.dataset.paused = 'false'; }
   goalInput.disabled = false;
   goalInput.placeholder = 'Tell me what to do...';
   hideStatus();
@@ -1001,6 +1003,8 @@ document.querySelectorAll('[data-speed]').forEach(btn => {
 
 // Pause/resume toggle
 const pauseBtn = document.getElementById('pauseBtn');
+const PAUSE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>';
+const RESUME_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"></polygon></svg>';
 if (pauseBtn) {
   pauseBtn.addEventListener('click', () => {
     const isPaused = pauseBtn.dataset.paused === 'true';
@@ -1008,7 +1012,8 @@ if (pauseBtn) {
     chrome.runtime.sendMessage({ action }, (resp) => {
       if (chrome.runtime.lastError && !resp) return;
       pauseBtn.dataset.paused = isPaused ? 'false' : 'true';
-      pauseBtn.textContent = isPaused ? '⏸ Pause' : '▶ Resume';
+      pauseBtn.innerHTML = isPaused ? PAUSE_ICON : RESUME_ICON;
+      pauseBtn.title = isPaused ? 'Pause agent' : 'Resume agent';
     });
   });
 }
@@ -2795,7 +2800,7 @@ chrome.runtime.onMessage.addListener((message) => {
         updateStatus('On: ' + message.url.substring(0, 60));
       }
       updateActiveTabPage(message.url, message.title || '');
-      if (message.stepNumber) updateActiveTabStep(message.stepNumber);
+      if (message.stepNumber) updateActiveTabStep(message.stepNumber, message.totalSteps || 0);
       if (typeof message.tabId === 'number') {
         __atsStripState.tabId = message.tabId;
       }

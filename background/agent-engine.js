@@ -2538,7 +2538,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendSilentUpdate('Observing page...', stepCount);
 
       // Send page context to popup so user can see where the agent is
-      sendPageContext(tabInfo?.url || '', tabInfo?.title || '', stepCount, tab);
+      sendPageContext(tabInfo?.url || '', tabInfo?.title || '', stepCount, tab, dynamicMaxSteps);
 
       // (3.7.0) Tenant detection on Microsoft admin URLs. We probe via the
       // content script and broadcast the result so the popup chip updates.

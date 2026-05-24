@@ -1106,6 +1106,20 @@ body {
   box-shadow: 0 0 8px var(--error-a30);
 }
 
+.btn-pause {
+  background: var(--accent-primary, #ff6b00);
+  clip-path: var(--chamfer);
+}
+
+.btn-pause:hover {
+  opacity: 0.85;
+  box-shadow: 0 0 8px rgba(255, 107, 0, 0.3);
+}
+
+.btn-pause[data-paused="true"] {
+  background: var(--success-color, #9ece6a);
+}
+
 .input-footer {
   font-size: 10px;
   font-family: var(--font-mono);

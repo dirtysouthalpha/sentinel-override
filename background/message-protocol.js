@@ -103,14 +103,16 @@ export function sendSilentUpdate(text, stepNumber) {
  * @param {string} pageTitle - The current page title.
  * @param {number} [stepNumber=0] - The current agent step number.
  * @param {number} [tabId=null] - The active tab ID.
+ * @param {number} [totalSteps=0] - The dynamic step budget for this run.
  */
-export function sendPageContext(url, pageTitle, stepNumber, tabId) {
+export function sendPageContext(url, pageTitle, stepNumber, tabId, totalSteps) {
   chrome.runtime.sendMessage({
     action: 'page_context',
     url: url || '',
     title: pageTitle || '',
     stepNumber: stepNumber || 0,
-    tabId: typeof tabId === 'number' ? tabId : null
+    tabId: typeof tabId === 'number' ? tabId : null,
+    totalSteps: typeof totalSteps === 'number' && totalSteps > 0 ? totalSteps : 0,
   }).catch((e) => {
     console.error('[sendPageContext] Unhandled rejection:', e);
   });
