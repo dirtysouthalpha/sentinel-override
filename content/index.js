@@ -1761,6 +1761,8 @@ if (window.__sentinelInitialized) {
           const currentAria = checkEl.getAttribute('aria-checked') === 'true';
           if (currentAria !== desiredState) {
             checkEl.click();
+            // Explicit change event for frameworks that listen to it on ARIA controls
+            checkEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
             await humanDelay(100, 200);
             hl.removeHighlight(checkEl);
             return (desiredState ? 'Checked' : 'Unchecked') + ' ARIA ' + describeTarget(cmd);
@@ -1786,6 +1788,8 @@ if (window.__sentinelInitialized) {
             // Use .click() so React Hook Form / Formik / native form handlers
             // see a real click + change pair — same as the 'check' case above.
             cb.click();
+            // Belt-and-suspenders: explicit change event for React-managed checkboxes
+            cb.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
             hl.removeHighlight(cb);
             count++;
           }
@@ -1855,7 +1859,11 @@ if (window.__sentinelInitialized) {
           'Enter': 'Enter', 'Tab': 'Tab', 'Escape': 'Escape', 'Backspace': 'Backspace',
           'Delete': 'Delete', 'Home': 'Home', 'End': 'End', 'PageUp': 'PageUp', 'PageDown': 'PageDown',
           'ArrowDown': 'ArrowDown', 'ArrowUp': 'ArrowUp', 'ArrowLeft': 'ArrowLeft', 'ArrowRight': 'ArrowRight',
-          ' ': ' ', 'Space': ' ', 'F5': 'F5', 'F12': 'F12'
+          ' ': ' ', 'Space': ' ',
+          'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4', 'F5': 'F5', 'F6': 'F6',
+          'F7': 'F7', 'F8': 'F8', 'F9': 'F9', 'F10': 'F10', 'F11': 'F11', 'F12': 'F12',
+          'Insert': 'Insert', 'PrintScreen': 'PrintScreen', 'ContextMenu': 'ContextMenu',
+          'a': 'a', 'c': 'c', 'v': 'v', 'x': 'x', 'z': 'z', 'A': 'A', 'C': 'C', 'V': 'V', 'X': 'X', 'Z': 'Z'
         };
         const keyVal = keyMap[key] || key;
         const activeEl = targetDoc.activeElement || targetDoc.body;
