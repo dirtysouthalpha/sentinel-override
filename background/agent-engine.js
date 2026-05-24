@@ -2766,13 +2766,9 @@ async function runAgentLoop(goal, workingTabId) {
       // Screenshot (CDP with per-tab cache)
       let freshTabInfo = await getTabInfo(tab);
       if (!freshTabInfo) {
-        if (consecutiveInjectionFailures >= 3) {
-          // Tab may be in a transient bad state after injection failures — fall
-          // back to the tabInfo we already validated earlier in this step.
-          freshTabInfo = tabInfo;
-        } else {
-          await sleep(1000); continue;
-        }
+        // Tab may be in a transient state (navigation, redirect). Always fall
+        // back to the tabInfo we validated earlier — never spin-loop here.
+        freshTabInfo = tabInfo;
       }
 
       const currentUrl = (freshTabInfo && freshTabInfo.url) || tabInfo.url;
@@ -2785,7 +2781,18 @@ async function runAgentLoop(goal, workingTabId) {
         // loop can continue rather than spin forever on the continue below.
         try { registerInitialTab(tab, currentUrl); } catch (_) {}
         tabCtx = getTabContext(tab);
-        if (!tabCtx) { await sleep(1000); continue; }
+        // If still null after re-registration, create a minimal context and
+        // proceed — never spin-loop here as it would keep apiCallCount at 0.
+        if (!tabCtx) {
+          console.warn('[Sentinel] tabCtx still null after re-register — creating minimal context for tab', tab);
+          try { registerInitialTab(tab, currentUrl); } catch (_) {}
+          tabCtx = getTabContext(tab);
+          if (!tabCtx) {
+            // Last resort: proceed with a synthetic screenshotCache object so
+            // the LLM call can still fire. Screenshot will be skipped this step.
+            tabCtx = { tabId: tab, url: currentUrl, screenshotCache: {} };
+          }
+        }
       }
       const screenshotCache = tabCtx.screenshotCache;
 
@@ -4801,29 +4808,22 @@ async function runAgentLoop(goal, workingTabId) {
     }
   }
 
-  // Release the loop keepalive and clear persisted running state
-  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
-  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {}
+  // (3.50.0) Generate report WHILE the keepalive is still running.
+  // Previously, keepalive was stopped before report generation, which could
+  // cause the SW to terminate mid-fetch on MV3. Now we generate the report
+  // first, THEN stop the keepalive and do cleanup.
 
   console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
-  if (finished) {
-    try {
-      await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
-    } catch (e) {
-      console.warn('[Sentinel] post-loop history/memory clear failed:', e && e.message);
-    }
-  }
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
-  // In MV3, closing all agent tabs can create a window where the service worker
-  // has no pending events and gets terminated before the report fetch completes.
   // reportData is already a snapshot, so cleanup order doesn't affect its content.
+  // Keepalive must stay active for this fetch to complete.
   let agentReport = null;
   if (reportData) {
+    sendSilentUpdate('Generating report...', stepCount);
     try {
       agentReport = await generateReport(reportData, CONFIG);
       sendReportUpdate('ready', agentReport);
-      // Backward compat: still write to storage for any code that polls
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
       console.error('Report generation failed:', err);
@@ -4837,6 +4837,18 @@ async function runAgentLoop(goal, workingTabId) {
   } else {
     console.warn('Agent finished without reportData — skipping report generation');
     sendReportUpdate('error', null, 'Agent finished without collecting execution data');
+  }
+
+  // NOW safe to release keepalive — report is already generated
+  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
+  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {}
+
+  if (finished) {
+    try {
+      await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
+    } catch (e) {
+      console.warn('[Sentinel] post-loop history/memory clear failed:', e && e.message);
+    }
   }
 
   // Release any CDP debugger attachments held during the run.

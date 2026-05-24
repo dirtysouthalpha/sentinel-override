@@ -111,10 +111,10 @@ function _buildMemorySummary(agentMemory) {
       && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
       && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
   });
-  // Hard-cap each memory entry at 600 chars — prevents multi-KB injections into the
-  // synthesis prompt that can hang or 4xx small-context LLMs.
+  // (3.50.0) Hard-cap each memory entry at 400 chars — keeps report prompt
+  // small enough to avoid timeouts on slower models.
   const memorySummary = usableKeys.length > 0
-    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 600)}`).join('\n')
+    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 400)}`).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
   const citableKeysList = usableKeys.length > 0
     ? usableKeys.map(k => `\`${k}\``).join(', ')
@@ -240,12 +240,17 @@ export async function generateReport(executionData, CONFIG) {
 
   sendSilentUpdate('Generating investigation report...');
 
-  const condensedHistory = history.map(h => ({
+  // (3.50.0) Cap condensed history to last 12 steps for report prompt.
+  // Long runs produce massive prompts that timeout small-context LLMs.
+  const _allHistory = history.map(h => ({
     step: h.step,
     action: h.action.type,
     detail: h.action.selector ? h.action.selector.substring(0, 80) : (h.action.url || h.action.text || ''),
-    result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
+    result: typeof h.result === 'string' ? h.result.substring(0, 150) : String(h.result)
   }));
+  const condensedHistory = _allHistory.length > 14
+    ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 4} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]
+    : _allHistory;
   const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
   const planContext = agentPlan && agentPlan.length > 0
     ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
@@ -266,8 +271,11 @@ export async function generateReport(executionData, CONFIG) {
     return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
     console.error('Report generation failed:', err);
-    const fallbackReport = buildFallbackReport(executionData);
-    return { summary: fallbackReport.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
+    // (3.50.0) Build a better fallback that actually shows the collected data
+    const fb = buildFallbackReport(executionData);
+    // Prepend a note about the LLM failure
+    const fallbackReport = `> ⚠️ AI report formatting failed (${err.message}). Showing raw collected data.\n\n---\n\n${fb}`;
+    return { summary: fb.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
 
