@@ -898,7 +898,7 @@ export async function generatePlan(goal, settings, context = {}) {
     const provider = resolveProvider(endpoint);
     // jsonMode requests JSON output — provider.id comes from PROVIDERS (not PROVIDER_CATALOG),
     // so use provider.id (not provider.kind which doesn't exist on PROVIDERS objects).
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: provider.id !== 'anthropic' }));
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: false }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -908,8 +908,8 @@ export async function generatePlan(goal, settings, context = {}) {
     });
     clearTimeout(timeout);
     if (!response.ok) {
-      console.warn('Plan generation API returned', response.status);
-      return null;
+      console.warn('Plan generation API returned', response.status, '— using goal as single-step fallback');
+      return [goal.substring(0, 300)];
     }
     const data = await response.json();
     const content = provider.parseResponse(data);
@@ -1762,6 +1762,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
 // totalElementCount: the raw count before trimming (for the prompt header)
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   _rateLimiter.check();
+  agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
   if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
   const { endpoint, apiKey } = providerConfig;
@@ -1771,7 +1772,6 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
   const model = _useSimple ? providerConfig.fastModel : providerConfig.model;
-  agentState.apiCallCount++;
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
   const last_action = history.length > 0 ? history[history.length - 1].action : null;

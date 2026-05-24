@@ -2461,6 +2461,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       let tab = getActiveTabId();
+      console.log('[Sentinel/DEBUG] Step', stepCount, 'tab:', tab);
       if (!tab) {
         sendSilentUpdate('No active tab -- stopping', stepCount);
         finished = true;
@@ -2474,6 +2475,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Get tab info
       let tabInfo = await getTabInfo(tab);
+      console.log('[Sentinel/DEBUG] Step', stepCount, 'tabInfo:', tabInfo ? {url: tabInfo.url, status: tabInfo.status} : null);
 
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
@@ -2503,6 +2505,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Do NOT auto-navigate away — the tech may deliberately be on
       // chrome://extensions, chrome://net-internals, or edge://policy for
       // diagnostic work. Instead, surface a clear error and let the loop end.
+      console.log('[Sentinel/DEBUG] Step', stepCount, 'checking URL:', tabInfo.url);
       if (tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')) {
         historyPush({ step: stepCount, action: { type: 'note' }, result: 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.' });
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
@@ -2511,6 +2514,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Auto-navigate to URL found in goal (first iteration only)
       // Smart: checks current page hostname before navigating
+      console.log('[Sentinel/DEBUG] Step', stepCount, 'checking auto-navigate, stepCount===1:', stepCount === 1, 'goal:', !!goal);
       if (stepCount === 1 && goal) {
         // Strip email addresses before URL extraction so "support@example.com" is
         // never mistaken for a navigation target.
@@ -2524,29 +2528,35 @@ async function runAgentLoop(goal, workingTabId) {
         const urlMatch = _isExplicitNav
           ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
           : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
+        console.log('[Sentinel/DEBUG] urlMatch:', urlMatch ? urlMatch[0] : null);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
             const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
             if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
+              console.log('[Sentinel/DEBUG] Navigating to:', goalUrl, 'tab:', tab);
               sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
               sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
               await chrome.tabs.update(tab, { url: goalUrl });
               await waitForPageLoad(tab);
               await waitForPageReady(tab);
               const reinjected = await injectContentScript(tab);
+              console.log('[Sentinel/DEBUG] injectContentScript result:', reinjected);
               if (reinjected) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
                 await persistHistory();
               }
+              console.log('[Sentinel/DEBUG] auto-navigate done, continuing to step 2');
               continue;
             }
+            console.log('[Sentinel/DEBUG] Already on right page, skipping navigation');
             // Already on the right page - skip navigation
           } catch (_) { /* URL parse error, skip auto-navigate */ }
         }
       }
 
+      console.log('[Sentinel/DEBUG] About to observe page...');
       sendSilentUpdate('Observing page...', stepCount);
 
       // Send page context to popup so user can see where the agent is
@@ -3106,7 +3116,7 @@ async function runAgentLoop(goal, workingTabId) {
           );
         } catch (e) {
           _aiCallError = e;
-          throw e;
+          command = { type: 'note', text: 'API call failed: ' + (e.message || String(e)) };
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
@@ -4597,7 +4607,7 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('Agent loop error:', err);
+      console.error('[Sentinel/DEBUG] Agent loop CAUGHT error:', err, err.message, err.stack);
       sendSilentUpdate(`Loop error: ${err.message}`, stepCount);
       consecutiveFailures++;
       if (err.message.includes('was closed')) { agentRunning = false; break; }
@@ -4608,6 +4618,7 @@ async function runAgentLoop(goal, workingTabId) {
   // Release the loop keepalive
   try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
 
+  console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
   if (finished) {
     try {
       await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
