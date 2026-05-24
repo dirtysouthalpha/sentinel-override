@@ -61,16 +61,6 @@ function getInFlightRequestCount(tabId) {
 }
 
 /**
- * Wait for a page to be truly ready after navigation. Combines DOM-ready polling
- * with network-idle detection. Falls back to a fixed sleep if the content script
- * isn't available.
- *
- * @param {number} tabId - The tab to check
- * @param {number} [maxWaitMs=5000] - Maximum time to wait (capped by pageLoadTimeout)
- * @returns {Promise<void>}
- */
-
-/**
  * Query the tab's content script for DOM readiness state.
  * Returns true if readyState=complete, body has content, and no spinner is visible.
  * @param {number} tabId

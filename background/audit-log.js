@@ -23,6 +23,10 @@ function _storageKey(runId) {
 /**
  * Append a single entry to the audit log for the given runId.
  * Fire-and-forget — never throws.
+ *
+ * @param {string} runId - Identifier for the current agent run.
+ * @param {{ts?:number, step?:number, type:string, target:string, outcome:string}} entry
+ * @returns {Promise<void>}
  */
 export async function appendAuditEntry(runId, entry) {
   if (!runId) return;
@@ -52,6 +56,8 @@ export async function appendAuditEntry(runId, entry) {
 /**
  * Retrieve the full audit log for a runId.
  * Returns the in-memory cache when available; falls back to storage.
+ *
+ * @param {string} runId - Identifier for the agent run to retrieve.
  * @returns {Promise<Array>} Array of entry objects (may be empty).
  */
 export async function getAuditLog(runId) {
@@ -68,7 +74,10 @@ export async function getAuditLog(runId) {
 }
 
 /**
- * Convert an audit log array to a CSV string.
+ * Convert an audit log array to a CSV string (UTF-8, CRLF line endings).
+ *
+ * @param {Array} log - Array of audit entry objects from getAuditLog.
+ * @returns {string} CSV with header row: timestamp, step, type, target, outcome.
  */
 export function auditLogToCsv(log) {
   const header = 'timestamp,step,type,target,outcome';
@@ -83,6 +92,9 @@ export function auditLogToCsv(log) {
 
 /**
  * Delete the audit log for a runId from storage and evict the in-memory cache.
+ *
+ * @param {string} runId - Identifier for the run to clear.
+ * @returns {Promise<void>}
  */
 export async function clearAuditLog(runId) {
   if (!runId) return;
