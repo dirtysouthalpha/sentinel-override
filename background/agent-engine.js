@@ -2517,7 +2517,9 @@ async function runAgentLoop(goal, workingTabId) {
       // EXCEPTION: chrome://newtab/ is a blank tab — the auto-navigate code below
       // will navigate it to the goal URL, so don't block it here.
       console.log('[Sentinel/DEBUG] Step', stepCount, 'checking URL:', tabInfo.url);
-      const _isNewTab = tabInfo.url === 'chrome://newtab/' || tabInfo.url === 'chrome://newtab';
+      const _isNewTab = tabInfo.url === 'chrome://newtab/' || tabInfo.url === 'chrome://newtab'
+        || tabInfo.url === 'about:blank' || tabInfo.url === 'about:newtab' || tabInfo.url === 'about:newtab/'
+        || tabInfo.url === 'edge://newtab/' || tabInfo.url === 'edge://newtab';
       const _isRestrictedPage = !_isNewTab && (
         tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')
       );
