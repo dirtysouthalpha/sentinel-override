@@ -1259,6 +1259,59 @@ if (window.__sentinelInitialized) {
         return 'Clicked ' + describeTarget(cmd) + (resolved.staleRef ? ' (selector fallback after stale ref)' : '');
       }
 
+      case 'right_click': {
+        var rcResolved = resolveCommandTarget(cmd, targetDoc);
+        var rcEl = rcResolved.el;
+        if (!rcEl) return 'Element not found: ' + describeTarget(cmd);
+        var rcBlock = await guardOverlayBlocking(targetDoc, rcEl, cmd);
+        if (rcBlock) return rcBlock;
+        hl.highlightElement(rcEl);
+        rcEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await waitForStableRect(rcEl, 2, 400);
+        try {
+          if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
+            await window.__sentinelCursor.moveToElement(rcEl);
+          }
+        } catch (e) { console.warn('[Sentinel] cursor right_click:', e && e.message); }
+        var rcRect = rcEl.getBoundingClientRect();
+        var rcX = Math.round(rcRect.left + rcRect.width / 2);
+        var rcY = Math.round(rcRect.top + rcRect.height / 2);
+        var rcView = targetDoc.defaultView;
+        rcEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, buttons: 2, clientX: rcX, clientY: rcY }));
+        rcEl.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, buttons: 0, clientX: rcX, clientY: rcY }));
+        rcEl.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, clientX: rcX, clientY: rcY }));
+        setTimeout(() => hl.removeHighlight(rcEl), 1500);
+        return 'Right-clicked ' + describeTarget(cmd) + (rcResolved.staleRef ? ' (selector fallback)' : '');
+      }
+
+      case 'double_click': {
+        var dcResolved = resolveCommandTarget(cmd, targetDoc);
+        var dcEl = dcResolved.el;
+        if (!dcEl) return 'Element not found: ' + describeTarget(cmd);
+        var dcBlock = await guardOverlayBlocking(targetDoc, dcEl, cmd);
+        if (dcBlock) return dcBlock;
+        hl.highlightElement(dcEl);
+        dcEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await waitForStableRect(dcEl, 2, 400);
+        try {
+          if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
+            await window.__sentinelCursor.moveToElement(dcEl);
+          }
+        } catch (e) { console.warn('[Sentinel] cursor double_click:', e && e.message); }
+        var dcView = targetDoc.defaultView;
+        var dcOpts = { bubbles: true, cancelable: true, composed: true, view: dcView };
+        dcEl.dispatchEvent(new MouseEvent('mousedown', { ...dcOpts, detail: 1 }));
+        dcEl.dispatchEvent(new MouseEvent('mouseup',   { ...dcOpts, detail: 1 }));
+        dcEl.dispatchEvent(new MouseEvent('click',     { ...dcOpts, detail: 1 }));
+        await humanDelay(50, 100);
+        dcEl.dispatchEvent(new MouseEvent('mousedown', { ...dcOpts, detail: 2 }));
+        dcEl.dispatchEvent(new MouseEvent('mouseup',   { ...dcOpts, detail: 2 }));
+        dcEl.dispatchEvent(new MouseEvent('click',     { ...dcOpts, detail: 2 }));
+        dcEl.dispatchEvent(new MouseEvent('dblclick',  { ...dcOpts, detail: 2 }));
+        setTimeout(() => hl.removeHighlight(dcEl), 1500);
+        return 'Double-clicked ' + describeTarget(cmd) + (dcResolved.staleRef ? ' (selector fallback)' : '');
+      }
+
       case 'click_at': {
         const x = cmd.x;
         const y = cmd.y;
