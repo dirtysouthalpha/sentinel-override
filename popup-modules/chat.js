@@ -1067,6 +1067,17 @@ if (undoBtn) {
 // Listen for undo stack size updates from background to enable/disable the button.
 // (Handled in the main message listener below alongside other agent messages.)
 
+// Ctrl+Z / Cmd+Z keyboard shortcut for undo — mirrors the undo button behavior
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    const active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+    if (!undoBtn || undoBtn.disabled || undoBtn.style.display === 'none') return;
+    e.preventDefault();
+    undoBtn.click();
+  }
+});
+
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
   if (confirm('Start a new chat? This will clear the current conversation. (The current chat will be archived to Recent Chats.)')) {

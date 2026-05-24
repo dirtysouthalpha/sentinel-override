@@ -75,6 +75,9 @@ if (window.__sentinelInitialized) {
   const SENTINEL_MAX_DISMISSALS = 3;
   const SENTINEL_RECENT_MS = 5000;
 
+  // Active iframe document for switch_to_frame / switch_to_parent_frame state.
+  let __sentinelActiveFrameDoc = null;
+
   try {
     const insertionObserver = new MutationObserver((muts) => {
       const now = Date.now();
@@ -1109,7 +1112,9 @@ if (window.__sentinelInitialized) {
   }
 
   async function executeCommand(cmd) {
-    let targetDoc = document;
+    // Use active frame doc if switch_to_frame was called and no explicit frame: prefix
+    let targetDoc = (__sentinelActiveFrameDoc && !(cmd.selector && cmd.selector.startsWith('frame:')))
+      ? __sentinelActiveFrameDoc : document;
     let selector = cmd.selector;
 
     // Check if command targets an iframe
@@ -2241,17 +2246,23 @@ if (window.__sentinelInitialized) {
       }
 
       case 'switch_to_frame': {
-        const frameIndex = cmd.frame_index || 0;
-        const iframes = document.querySelectorAll('iframe');
-        if (!iframes[frameIndex]) return 'Iframe not found at index ' + frameIndex;
+        var frameIdx = cmd.frame_index || 0;
+        var iframeEls = document.querySelectorAll('iframe');
+        if (!iframeEls[frameIdx]) return 'Iframe not found at index ' + frameIdx;
         try {
-          const iframeDoc = iframes[frameIndex].contentWindow.document;
-          const title = iframeDoc.title || '';
-          const url = iframes[frameIndex].src || '';
-          return 'Switched to iframe ' + frameIndex + ': ' + title + ' (' + url + '). Use read_page to scan content.';
+          var frameDoc = iframeEls[frameIdx].contentWindow.document;
+          __sentinelActiveFrameDoc = frameDoc;
+          var frameTitle = frameDoc.title || '';
+          var frameUrl = iframeEls[frameIdx].src || '';
+          return 'Switched to iframe ' + frameIdx + ': ' + frameTitle + ' (' + frameUrl + '). Subsequent actions target this frame. Use switch_to_parent_frame to return.';
         } catch {
-          return 'Cannot access iframe ' + frameIndex + ' (cross-origin)';
+          return 'Cannot access iframe ' + frameIdx + ' (cross-origin)';
         }
+      }
+
+      case 'switch_to_parent_frame': {
+        __sentinelActiveFrameDoc = null;
+        return 'Switched back to main document';
       }
 
       default:
