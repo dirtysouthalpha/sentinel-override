@@ -181,6 +181,7 @@ const CONTENT_SCRIPT_FILES = [
   'content/shadow-dom.js',
   'content/highlight.js',
   'content/cursor.js',
+  'content/action-hud.js',
   'content/wait-utils.js',
   'content/dropdown-utils.js',
   'content/special-inputs.js',
