@@ -2267,26 +2267,13 @@ function generateHeuristicPlan(goal, currentUrl) {
   ];
 }
 
-// ========== Main Agent Loop ==========
-async function runAgentLoop(goal, workingTabId) {
-  console.log('Agent starting loop for goal:', goal);
-  _lastGoal = goal || '';
-  let finished = false;
-  // (3.15.1) `history` is module-level — see declaration near agentMemory.
-  // Clear in-place so the array reference stays valid for any captured
-  // closures (the module-level trimHistory/persistHistory helpers).
-  history.length = 0;
-  let stepCount = 0;
-  let reportData = null;  // Snapshot for async report generation
-  agentPlan = null;
-  currentPlanStep = 0;
+// ========== Run Setup Helpers ==========
 
-  // Migrate legacy settings before any LLM calls
+// Load run-stable settings, initialize module-level state, and return the
+// (possibly context-prepended) goal string. Called once at the start of each run.
+async function _initRunState(goal) {
   await migrateLegacySettings();
-
-  // (3.41.0) Batch all run-stable settings in one storage read.
-  // ticketMode/ticketFormat/approvalMode/useTrustedInput never change mid-run;
-  // reading them from _runSettings avoids per-step storage round-trips.
+  // (3.41.0) Batch all run-stable settings in one read — avoids per-step round-trips.
   let stored;
   try {
     stored = await chrome.storage.local.get([
@@ -2299,78 +2286,92 @@ async function runAgentLoop(goal, workingTabId) {
     stored = {};
   }
   _runSettings = {
-    ticketMode:     stored.ticketMode    ?? false,
-    ticketFormat:   stored.ticketFormat  ?? 'standard',
-    approvalMode:   stored.approvalMode  ?? false,
+    ticketMode:      stored.ticketMode     ?? false,
+    ticketFormat:    stored.ticketFormat   ?? 'standard',
+    approvalMode:    stored.approvalMode   ?? false,
     useTrustedInput: stored.useTrustedInput ?? false,
-    quickMode:      stored.quickMode     ?? false,
+    quickMode:       stored.quickMode      ?? false,
   };
   expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
   tenantOverrideUrls = new Set();  // (3.11.0) cleared per-run
   detectedTenant = null;
-  // Each run gets a clean memory namespace — never carry over data from a prior
-  // task.  Restoring the previous global agent_memory caused cross-client data
-  // contamination (yesterday's Acme findings leaked into today's Beta Co task).
-  // Memory is still persisted per-step so it survives unexpected SW termination
-  // within a run; it's deliberately discarded between runs.
+  // Each run gets a clean memory namespace — never carry over data from a prior task.
+  // Cross-client contamination: yesterday's findings must never leak into today's run.
   agentMemory = {};
   try {
     await chrome.storage.local.set({ agent_history: [] });
   } catch (e) {
     console.warn('[Sentinel] agent_history clear failed:', e && e.message);
   }
-
   if (stored.agent_context && stored.agent_context.trim()) {
-    goal = `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
+    return `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
   }
+  return goal;
+}
+
+// Generate the initial execution plan before the agent loop starts.
+// In quick mode, skips planning and returns null. Otherwise tries LLM planning
+// first and falls back to a heuristic plan if the LLM call fails.
+async function _generateInitialPlan(goal, workingTabId) {
+  if (_runSettings.quickMode) {
+    sendSilentUpdate('⚡ Quick Mode — executing directly');
+    return null;
+  }
+  sendSilentUpdate('Planning task...');
+  const planProviderConfig = await getActiveProvider();
+  const planSettings = {
+    api_endpoint: planProviderConfig.endpoint,
+    api_key: planProviderConfig.apiKey,
+    model: planProviderConfig.model
+  };
+  const currentTabInfo = await getTabInfo(workingTabId);
+  const platformCtx = getPlatformContext(currentTabInfo?.url || '', goal);
+  const patterns = await getRelevantPatterns(goal);
+  let plan = await generatePlan(goal, planSettings, {
+    currentUrl: currentTabInfo?.url || '',
+    pageTitle: currentTabInfo?.title || '',
+    platformContext: platformCtx,
+    relevantPatterns: patterns
+  });
+  if (plan) {
+    sendSilentUpdate(`📋 Plan ready (${plan.length} steps): ${plan[0]}`);
+    return plan;
+  }
+  // Fallback: heuristic plan from goal analysis
+  plan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
+  if (plan) {
+    sendSilentUpdate(`📋 Basic plan (${plan.length} steps): ${plan[0]}`);
+  } else {
+    sendSilentUpdate('Running in direct mode');
+  }
+  return plan;
+}
+
+// ========== Main Agent Loop ==========
+async function runAgentLoop(goal, workingTabId) {
+  console.log('Agent starting loop for goal:', goal);
+  _lastGoal = goal || '';
+  let finished = false;
+  // (3.15.1) `history` is module-level — clear in-place so the array reference
+  // stays valid for any captured closures (trimHistory/persistHistory helpers).
+  history.length = 0;
+  let stepCount = 0;
+  let reportData = null;  // Snapshot for async report generation
+  agentPlan = null;
+  currentPlanStep = 0;
+
+  goal = await _initRunState(goal);
 
   let consecutiveNavigates = 0;
   // Observation skip cache — reused when previous step was non-mutating and
-  // the URL/SPA-route hasn't changed. Includes a DOM content hash so SPA
-  // content changes without URL changes invalidate the cache.
+  // the URL/SPA-route hasn't changed. DOM content hash catches SPA changes
+  // without URL changes.
   let _cachedObservation = null;
   let _cachedPageContent = null;
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
 
-  // Generate a plan before execution (skip in quick mode)
-  if (!_runSettings.quickMode) {
-    sendSilentUpdate('Planning task...');
-    const planProviderConfig = await getActiveProvider();
-    const planSettings = {
-      api_endpoint: planProviderConfig.endpoint,
-      api_key: planProviderConfig.apiKey,
-      model: planProviderConfig.model
-    };
-
-    // Gather context for plan generation
-    const currentTabInfo = await getTabInfo(workingTabId);
-    const platformCtx = getPlatformContext(
-      currentTabInfo?.url || '',
-      goal
-    );
-    const patterns = await getRelevantPatterns(goal);
-
-    agentPlan = await generatePlan(goal, planSettings, {
-      currentUrl: currentTabInfo?.url || '',
-      pageTitle: currentTabInfo?.title || '',
-      platformContext: platformCtx,
-      relevantPatterns: patterns
-    });
-    if (agentPlan) {
-      sendSilentUpdate(`📋 Plan ready (${agentPlan.length} steps): ${agentPlan[0]}`);
-    } else {
-      // Fallback: generate a basic heuristic plan from goal analysis
-      agentPlan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
-      if (agentPlan) {
-        sendSilentUpdate(`📋 Basic plan (${agentPlan.length} steps): ${agentPlan[0]}`);
-      } else {
-        sendSilentUpdate('Running in direct mode');
-      }
-    }
-  } else {
-    sendSilentUpdate('⚡ Quick Mode — executing directly');
-  }
+  agentPlan = await _generateInitialPlan(goal, workingTabId);
 
   while (!finished && agentRunning) {
     try {

@@ -45,11 +45,17 @@ export function sendMessage(tabId, message, timeoutMs = 10000) {
  * Checks chrome.runtime.lastError, rejects on error, resolves with response.
  *
  * @param {object} message
+ * @param {number} [timeoutMs=10000]
  * @returns {Promise<any>} response on success
  */
-export function sendRuntimeMessage(message) {
+export function sendRuntimeMessage(message, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error(`Runtime message timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
     chrome.runtime.sendMessage(message, (response) => {
+      clearTimeout(timeout);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;

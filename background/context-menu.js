@@ -1,7 +1,5 @@
-/**
- * Sentinel Override — Context Menu Manager.
- * Adds right-click menu items for AI-powered page actions.
- */
+// Sentinel Override — Context Menu Manager
+// Adds right-click menu items for AI-powered page actions.
 
 const MENU_ITEMS = [
   {
