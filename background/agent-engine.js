@@ -3993,6 +3993,25 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
+      } else if (command.type === 'navigate_back' || command.type === 'navigate_forward') {
+        try {
+          const _prevUrl = (await getTabInfo(tab))?.url || '';
+          const _navDelta = command.type === 'navigate_back' ? -1 : 1;
+          await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'execute_js', code: `history.go(${_navDelta})`, key: '_nav_hist' } });
+          await waitForPageLoad(tab);
+          await sleep(500);
+          const _newInfo = await getTabInfo(tab);
+          const _newUrl = _newInfo?.url || '';
+          if (_newUrl && _newUrl !== _prevUrl) {
+            result = (command.type === 'navigate_back' ? 'Navigated back to ' : 'Navigated forward to ') + _newUrl;
+          } else {
+            result = (command.type === 'navigate_back' ? 'Back navigation — ' : 'Forward navigation — ') + (_newUrl || 'no change');
+          }
+          actionFailed = false;
+        } catch (e) {
+          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + (e.message || 'unknown');
+          actionFailed = true;
+        }
       } else if (command.type === 'read_page') {
         try {
           const freshContent = await sendMessageWithRetry(tab, { action: 'read_page' });
@@ -4682,6 +4701,8 @@ function _describeTarget(cmd) {
 }
 function describeAction(command) {
   switch (command.type) {
+    case 'navigate_back':    return 'Navigate back';
+    case 'navigate_forward': return 'Navigate forward';
     case 'click':        return `Click: ${_describeTarget(command)}`;
     case 'right_click':  return `Right-click: ${_describeTarget(command)}`;
     case 'double_click': return `Double-click: ${_describeTarget(command)}`;

@@ -1662,6 +1662,8 @@ Actions:
 - { "type": "click", "selector": "FROM_LIST" }
 - { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
 - { "type": "navigate", "url": "URL" }
+- { "type": "navigate_back" }  -- browser back button (history.go(-1))
+- { "type": "navigate_forward" }  -- browser forward button (history.go(+1))
 - { "type": "scroll", "amount": INTEGER } — scroll the window. Or { "type": "scroll", "selector": "FROM_LIST", "amount": INTEGER } to scroll inside a specific container (use for tables, panels, virtualized lists)
 - { "type": "select", "selector": "FROM_LIST", "value": "OPTION_TEXT_OR_VALUE" }
 - { "type": "check", "selector": "FROM_LIST", "checked": true|false }
@@ -1955,6 +1957,7 @@ export function extractFirstJsonObject(str) {
     'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
     'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
     'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
+    'navigate_back', 'navigate_forward',
     'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
     'read_console_messages', 'read_network_requests',
     'lookup', 'run_remote_command', 'verify', 'repeat_for_each']);
@@ -2102,6 +2105,7 @@ export function parseLLMResponse(content) {
       'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
       'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
       'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
+      'navigate_back', 'navigate_forward',
       'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
       'read_console_messages', 'read_network_requests',
       'lookup', 'run_remote_command', 'verify', 'repeat_for_each'];
