@@ -1005,10 +1005,38 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
   }
 }
 
+// ========== LLM Rate Limiter ==========
+// Sliding-window rate limiter: prevents accidental runaway LLM spend.
+// Default: max 120 calls per 60-second window (2/sec burst cap).
+// Exported so CONFIG changes in agent-engine can adjust limits.
+const _rateLimiter = {
+  windowMs: 60_000,
+  maxCalls: 120,
+  timestamps: /** @type {number[]} */ ([]),
+  check() {
+    const now = Date.now();
+    // Drop timestamps outside the sliding window
+    this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
+    if (this.timestamps.length >= this.maxCalls) {
+      const oldestInWindow = this.timestamps[0];
+      const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
+      throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
+    }
+    this.timestamps.push(now);
+  },
+  reset() { this.timestamps = []; }
+};
+
+export function setLLMRateLimit(maxCalls, windowMs) {
+  if (typeof maxCalls === 'number' && maxCalls > 0) _rateLimiter.maxCalls = maxCalls;
+  if (typeof windowMs === 'number' && windowMs > 0) _rateLimiter.windowMs = windowMs;
+}
+
 // ========== Main LLM Call ==========
 // trimmedElements: the capped/cleaned element list built in the main loop
 // totalElementCount: the raw count before trimming (for the prompt header)
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
+  _rateLimiter.check();
   const providerConfig = await getActiveProvider();
   if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
   const { endpoint, apiKey, model } = providerConfig;

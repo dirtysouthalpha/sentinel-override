@@ -438,6 +438,8 @@ export function resetAgentState() {
  * @throws {Error} If the agent is already running or no active tab is found.
  */
 export async function startAgent(goal, sender) {
+  if (typeof goal !== 'string' || !goal.trim()) throw new Error('Goal must be a non-empty string');
+  goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
 
   // Determine which tab to operate on

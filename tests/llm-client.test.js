@@ -43,6 +43,8 @@ import {
   getRelevantPatterns,
 } from '../background/llm-client.js';
 
+import { PROVIDERS } from '../background/provider-registry.js';
+
 beforeEach(() => {
   _storageData = {};
   _mockFetch = null;
@@ -1716,5 +1718,164 @@ describe('getRelevantPatterns', () => {
     const result = await getRelevantPatterns('click the submit button');
     expect(result.length).toBe(1);
     expect(result[0].goal).toContain('click the submit button');
+  });
+});
+
+// ========== generatePlan: empty content from parseResponse (lines 894-895) ==========
+describe('generatePlan: empty parseResponse content path', () => {
+  const anthropicSettings = {
+    api_key: 'test-key',
+    api_endpoint: 'https://api.anthropic.com/v1/messages',
+    model: 'claude-sonnet-4-6'
+  };
+
+  test('returns null when Anthropic parseResponse returns empty string (lines 894-895)', async () => {
+    // Anthropic parseResponse returns block.text — if text is '' it is falsy,
+    // triggering the "Plan generation: empty response content" warning and null return.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        content: [{ type: 'text', text: '' }]
+      })
+    });
+    const result = await generatePlan('Check firewall rules', anthropicSettings);
+    expect(result).toBeNull();
+  });
+});
+
+// ========== callLLM: non-tool-use provider paths (lines 1655, 1740-1742) ==========
+describe('callLLM: non-tool-use provider fallback paths', () => {
+  const defaultConfig = {
+    maxRetries: 3,
+    retryDelay: 0,
+    maxRetryDelay: 100,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  function makeAgentState(overrides = {}) {
+    return {
+      apiCallCount: 0,
+      consecutiveFailures: 0,
+      currentStrategies: [],
+      agentMemory: {},
+      agentPlan: null,
+      currentPlanStep: 0,
+      ...overrides
+    };
+  }
+
+  // Temporarily disable supportsToolUse on a provider to exercise the non-tool-use
+  // branches in callLLM (lines 1655 and 1739-1742). We use the anthropic provider
+  // so that parseResponse can return an empty string (block.text === '') without
+  // throwing, giving us a falsy responseText for line 1741.
+  test('calls buildBody (not buildBodyWithTools) when provider lacks supportsToolUse (line 1655)', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+
+    const originalSupportsToolUse = PROVIDERS.anthropic.supportsToolUse;
+    PROVIDERS.anthropic.supportsToolUse = false;
+    try {
+      _mockFetch = () => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ type: 'text', text: '{"type":"note","text":"ok"}' }]
+        })
+      });
+
+      const result = await callLLMWithRetry(
+        [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
+        0, defaultConfig, makeAgentState()
+      );
+      // buildBody path taken — response parsed as text JSON
+      expect(result.type).toBe('note');
+    } finally {
+      PROVIDERS.anthropic.supportsToolUse = originalSupportsToolUse;
+    }
+  });
+
+  test('returns note when non-tool-use provider returns empty responseText (lines 1740-1742)', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+
+    const originalSupportsToolUse = PROVIDERS.anthropic.supportsToolUse;
+    PROVIDERS.anthropic.supportsToolUse = false;
+    try {
+      // Anthropic parseResponse returns block.text; an empty string is falsy,
+      // so line 1741 fires: return { type: 'note', text: 'Empty LLM response...' }
+      _mockFetch = () => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ type: 'text', text: '' }]
+        })
+      });
+
+      const result = await callLLMWithRetry(
+        [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
+        0, defaultConfig, makeAgentState()
+      );
+      expect(result.type).toBe('note');
+      expect(result.text).toContain('Empty LLM response');
+    } finally {
+      PROVIDERS.anthropic.supportsToolUse = originalSupportsToolUse;
+    }
+  });
+});
+
+// ========== regexSalvageFinishOrNote: empty raw for note type (lines 1862-1863) ==========
+describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-1863)', () => {
+  test('returns null from regexSalvageFinishOrNote when note text is empty (line 1862)', () => {
+    // Craft content > 200 chars that:
+    //  1. Has "text":"" so regexSalvageFinishOrNote detects a note action
+    //  2. Is not parseable as valid JSON (so sanitize-then-parse also fails)
+    //  3. Has no valid "type" field recognized by extractFirstJsonObject
+    // When raw is '' after the regex match, line 1862 returns null, and the
+    // outer salvage falls through to the default note with Parse error.
+    const padding = ' x'.repeat(120); // > 200 chars total
+    const malformed = `INVALID_PREFIX ${padding} {"text":"" broken json no closing brace`;
+    expect(malformed.length).toBeGreaterThan(200);
+
+    const result = parseLLMResponse(malformed);
+    // regexSalvageFinishOrNote returns null (raw is empty), so parseLLMResponse
+    // falls through to the default Parse error note.
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+});
+
+// ========== parseLLMResponse: sanitize-then-parse salvage with valid type (line 1913) ==========
+describe('parseLLMResponse: sanitize-then-parse catch-block salvage (line 1913)', () => {
+  test('returns parsed object with non-standard type via sanitize-then-parse salvage (line 1913)', () => {
+    // Build content > 200 chars containing a JSON object whose "type" value is NOT
+    // in the validTypes set. extractFirstJsonObject returns null (unknown type),
+    // so jsonStr stays as the raw string. sanitizeLlmJson + JSON.parse in the try
+    // block ALSO fail because parsed.type is invalid and throws "Invalid command type".
+    // In the catch block the salvage path re-runs sanitizeLlmJson on content.trim()
+    // and JSON.parse succeeds; since parsed.type is truthy, line 1913 returns parsed.
+    const padding = 'a'.repeat(180);
+    // The JSON itself is valid and sanitizable, but type is not in validTypes.
+    const content = `${padding}{"type":"my_custom_action","data":"something"}`;
+    expect(content.length).toBeGreaterThan(200);
+
+    const result = parseLLMResponse(content);
+    // The salvage path at line 1913 returns the parsed object with the custom type
+    expect(result.type).toBe('my_custom_action');
   });
 });

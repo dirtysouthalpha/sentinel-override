@@ -365,6 +365,25 @@ describe('ov.dismissOverlay — extended paths', () => {
     expect(ov.dismissOverlay(doc, overlay)).toBe(false);
   });
 
+  test('continues past selector errors in accept button phase', () => {
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    const overlay = {
+      querySelectorAll: (sel) => {
+        // Close selectors return empty, accept selectors throw
+        if (sel.includes('cookie-banner') || sel.includes('consent') || sel.includes('accept') || sel.includes('onetrust')) {
+          throw new Error('bad accept selector');
+        }
+        return [];
+      },
+    };
+    const doc = {
+      body: { contains: () => true },
+      activeElement: { dispatchEvent: fn },
+    };
+    // Should not throw; catch block continues the loop and falls through to text-match/Escape
+    expect(() => ov.dismissOverlay(doc, overlay)).not.toThrow();
+  });
+
   test('dismisses via accept button', () => {
     const acceptBtn = { click: jest.fn(), dispatchEvent: jest.fn() };
     globalThis.window.__sentinelUtils.dom.isVisible = () => true;

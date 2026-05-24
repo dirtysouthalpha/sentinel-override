@@ -422,6 +422,27 @@ describe('overlay-detector — dismissOverlay', () => {
     expect(ov.dismissOverlay(doc, overlay)).toBe(true);
   });
 
+  test('continues loop when querySelectorAll throws on accept selector', () => {
+    const overlay = makeElement('div');
+    let callCount = 0;
+    overlay.querySelectorAll = (sel) => {
+      // Throw on the first accept selector, fall through to text-match
+      if (sel.includes('accept') || sel.includes('consent')) {
+        callCount++;
+        throw new Error('selector error');
+      }
+      // Return empty for close selectors so we reach accept phase
+      return [];
+    };
+    const doc = {
+      body: { contains: () => true },
+      activeElement: overlay,
+    };
+    // Should not throw despite the exception — catch block continues the loop
+    expect(() => ov.dismissOverlay(doc, overlay)).not.toThrow();
+    expect(callCount).toBeGreaterThan(0);
+  });
+
   test('tries Escape key as last resort', () => {
     const overlay = makeElement('div');
     overlay.querySelectorAll = () => [];

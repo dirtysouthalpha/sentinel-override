@@ -662,14 +662,12 @@ describe('generateHeuristicPlan via startAgent', () => {
     await expect(startAgent('Search for best practices for firewall configuration', makeSender())).resolves.toBeDefined();
   });
 
-  test('null goal returns null for heuristic plan', async () => {
-    mockGeneratePlan.mockResolvedValueOnce(null);
+  test('empty goal is rejected with validation error', async () => {
+    await expect(startAgent('', makeSender())).rejects.toThrow('Goal must be a non-empty string');
+  });
 
-    // Using mockCallLLMWithRetry variable
-    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'Done' });
-
-    // Empty goal should still not crash
-    await expect(startAgent('', makeSender())).resolves.toBeDefined();
+  test('null goal is rejected with validation error', async () => {
+    await expect(startAgent(null, makeSender())).rejects.toThrow('Goal must be a non-empty string');
   });
 });
 

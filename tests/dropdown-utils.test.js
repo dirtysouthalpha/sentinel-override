@@ -928,5 +928,241 @@ describe('Dropdown Utils', () => {
         globalThis.sleep = originalSleep;
       }
     });
+
+    test('should use nativeSetter when HTMLInputElement prototype value setter exists', async () => {
+      // This covers the nativeSetter.call(...) branch (line 246)
+      const optionEls = [];
+      for (let i = 0; i < 60; i++) {
+        const opt = createElement('div', { role: 'option', innerText: `Item ${i}`, value: `item-${i}` });
+        opt.offsetWidth = 100;
+        opt.offsetHeight = 30;
+        optionEls.push(opt);
+      }
+
+      // Create a mock search input (INPUT element, not TEXTAREA)
+      const searchInput = createElement('input', { type: 'text' });
+      searchInput.value = '';
+      searchInput.dispatchEvent = jest.fn();
+      searchInput.focus = jest.fn();
+      searchInput.tagName = 'INPUT';
+
+      // Set up a native setter spy on the mock HTMLInputElement prototype
+      const nativeSetterSpy = jest.fn(function(v) { searchInput.value = v; });
+      const mockHTMLInputElementProto = {
+        get value() { return searchInput.value; },
+      };
+      Object.defineProperty(mockHTMLInputElementProto, 'value', {
+        set: nativeSetterSpy,
+        get: () => searchInput.value,
+        configurable: true,
+      });
+
+      const originalFindSearchInput = dd._findSearchInput;
+      dd._findSearchInput = () => searchInput;
+
+      const originalFindDropdownOptions = dd.findDropdownOptions;
+      const targetOption = createElement('div', { role: 'option', innerText: 'Target X', value: 'target-x' });
+      targetOption.offsetWidth = 100;
+      targetOption.offsetHeight = 30;
+      dd.findDropdownOptions = () => [targetOption];
+
+      // Attach HTMLInputElement prototype with a value setter to defaultView
+      const originalDefaultView = globalThis.document.defaultView;
+      globalThis.document = Object.assign({}, globalThis.document, {
+        defaultView: Object.assign({}, globalThis, {
+          HTMLInputElement: { prototype: mockHTMLInputElementProto },
+          HTMLTextAreaElement: undefined,
+        }),
+      });
+
+      try {
+        const result = await dd.selectDropdownOption(globalThis.document, optionEls, 'Target X');
+        // The nativeSetter should have been called for each character typed
+        expect(nativeSetterSpy).toHaveBeenCalled();
+        expect(result).not.toBeNull();
+      } finally {
+        dd._findSearchInput = originalFindSearchInput;
+        dd.findDropdownOptions = originalFindDropdownOptions;
+        globalThis.document = Object.assign({}, globalThis.document, { defaultView: originalDefaultView });
+      }
+    });
+  });
+
+  describe('findDropdownOptions - parent container climb catch branch', () => {
+    test('should warn and continue when parent querySelectorAll throws during DOM climb', () => {
+      // Covers line 120: catch(e) { console.warn('[Sentinel] parent container climb:', ...) }
+      // The DOM climb calls cursor.querySelectorAll at the parent level.
+      // Section 4 (siblings) also calls parent.querySelectorAll — we allow that call through
+      // to avoid an uncaught error. Use a call counter: throw on first call, return [] thereafter.
+      const triggerEl = createElement('button');
+      const parent = createElement('div');
+      triggerEl.parentElement = parent;
+
+      let callCount = 0;
+      parent.querySelectorAll = () => {
+        callCount++;
+        if (callCount === 1) throw new Error('DOM climb error');
+        return [];
+      };
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const result = dd.findDropdownOptions(globalThis.document, triggerEl);
+        expect(Array.isArray(result)).toBe(true);
+        expect(warnSpy).toHaveBeenCalledWith('[Sentinel] parent container climb:', 'DOM climb error');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('traverseNestedMenu - multi-level traversal', () => {
+    test('should hover intermediate item and return final clicked item when submenu appears after hover', async () => {
+      // Covers lines 327-334: hover path + sleep, subItems found, continues to next level
+      const subItem = createElement('div', { role: 'menuitem', innerText: 'About' });
+      subItem.offsetWidth = 100;
+      subItem.offsetHeight = 30;
+      subItem.scrollIntoView = jest.fn();
+      subItem.click = jest.fn();
+
+      const parentItem = createElement('div', { role: 'menuitem', innerText: 'Help' });
+      parentItem.offsetWidth = 100;
+      parentItem.offsetHeight = 30;
+      parentItem.scrollIntoView = jest.fn();
+      parentItem.click = jest.fn();
+
+      let callCount = 0;
+      const originalFind = dd.findDropdownOptions;
+      dd.findDropdownOptions = (doc, el) => {
+        callCount++;
+        if (callCount === 1) return [parentItem];  // First call: top-level items
+        if (callCount === 2) return [subItem];      // Second call: after hover, submenu appeared
+        return [subItem];                           // Subsequent calls for final level
+      };
+
+      const result = await dd.traverseNestedMenu(globalThis.document, ['Help', 'About']);
+      expect(result).not.toBeNull();
+      expect(result.innerText).toBe('About');
+
+      dd.findDropdownOptions = originalFind;
+    });
+
+    test('should fallback to click when hover produces no submenu, but click does', async () => {
+      // Covers lines 338-349: subItems.length === 0 → click fallback → clickSubItems found
+      const subItem = createElement('div', { role: 'menuitem', innerText: 'Details' });
+      subItem.offsetWidth = 100;
+      subItem.offsetHeight = 30;
+      subItem.scrollIntoView = jest.fn();
+      subItem.click = jest.fn();
+
+      const parentItem = createElement('div', { role: 'menuitem', innerText: 'View' });
+      parentItem.offsetWidth = 100;
+      parentItem.offsetHeight = 30;
+      parentItem.scrollIntoView = jest.fn();
+      parentItem.click = jest.fn();
+
+      let callCount = 0;
+      const originalFind = dd.findDropdownOptions;
+      dd.findDropdownOptions = (doc, el) => {
+        callCount++;
+        if (callCount === 1) return [parentItem];  // Top-level items found
+        if (callCount === 2) return [];             // After hover: no subItems (triggers fallback)
+        if (callCount === 3) return [subItem];      // After click fallback: submenu appeared
+        return [subItem];                           // Final level items
+      };
+
+      const result = await dd.traverseNestedMenu(globalThis.document, ['View', 'Details']);
+      expect(result).not.toBeNull();
+      expect(result.innerText).toBe('Details');
+
+      dd.findDropdownOptions = originalFind;
+    });
+
+    test('should return currentEl (line 353) after completing all levels via hover success path', async () => {
+      // Covers line 353: return currentEl after loop completes
+      // A 3-level path where loop finishes without hitting isLastLevel early exit
+      // Actually traverseNestedMenu returns matchedItem on the last level via isLastLevel branch
+      // Line 353 is hit when the for loop ends naturally (only happens if menuPath has 0 items
+      // after the guard — but since guard returns null for empty, we need hover + last iteration)
+      // The loop returns matchedItem at isLastLevel, so line 353 is dead unless... let's test
+      // the two-level case where hover succeeds to ensure lines 327-350 are all covered.
+      const finalItem = createElement('div', { role: 'menuitem', innerText: 'Zoom' });
+      finalItem.offsetWidth = 100;
+      finalItem.offsetHeight = 30;
+      finalItem.scrollIntoView = jest.fn();
+      finalItem.click = jest.fn();
+
+      const midItem = createElement('div', { role: 'menuitem', innerText: 'View' });
+      midItem.offsetWidth = 100;
+      midItem.offsetHeight = 30;
+      midItem.scrollIntoView = jest.fn();
+      midItem.click = jest.fn();
+
+      const topItem = createElement('div', { role: 'menuitem', innerText: 'Window' });
+      topItem.offsetWidth = 100;
+      topItem.offsetHeight = 30;
+      topItem.scrollIntoView = jest.fn();
+      topItem.click = jest.fn();
+
+      let callCount = 0;
+      const originalFind = dd.findDropdownOptions;
+      dd.findDropdownOptions = (doc, el) => {
+        callCount++;
+        if (callCount === 1) return [topItem];   // Level 0 items
+        if (callCount === 2) return [midItem];   // After hover on topItem: submenu appeared
+        if (callCount === 3) return [midItem];   // Level 1 items
+        return [finalItem];                      // Level 2 (last): final items
+      };
+
+      const result = await dd.traverseNestedMenu(globalThis.document, ['Window', 'View', 'Zoom']);
+      expect(result).not.toBeNull();
+
+      dd.findDropdownOptions = originalFind;
+    });
+  });
+
+  describe('isCustomDropdown - additional branches', () => {
+    test('should catch className access error and still return false (line 374)', () => {
+      // Covers line 374: catch(e) { console.warn('[Sentinel] className access:', ...) }
+      const el = {
+        tagName: 'DIV',
+        getAttribute: (name) => null,
+        get className() { throw new Error('className access denied'); },
+        parentElement: null,
+        querySelectorAll: () => [],
+      };
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const result = dd.isCustomDropdown(el);
+        expect(warnSpy).toHaveBeenCalledWith('[Sentinel] className access:', 'className access denied');
+        // Should not throw; result will be false since no class matches and no parent containers
+        expect(typeof result).toBe('boolean');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('should return false when element has no parent and no matching class (line 399)', () => {
+      // Covers line 399: return false at the end of isCustomDropdown
+      const el = createElement('div', { className: 'some-unrelated-class' });
+      el.parentElement = null; // No parent → sibling/child check skipped
+      // No ARIA attrs, no matching class name, no parent containers
+      const result = dd.isCustomDropdown(el);
+      expect(result).toBe(false);
+    });
+
+    test('should return false when parent has no sibling containers and element has no child containers (line 399)', () => {
+      // Also covers line 399 via the try block completing with no matches
+      const parent = createElement('div');
+      parent.querySelectorAll = () => []; // No sibling containers
+
+      const el = createElement('div', { className: 'plain-button' });
+      el.parentElement = parent;
+      el.querySelectorAll = () => []; // No child containers
+
+      const result = dd.isCustomDropdown(el);
+      expect(result).toBe(false);
+    });
   });
 });

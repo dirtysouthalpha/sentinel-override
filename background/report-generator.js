@@ -283,7 +283,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
  */
 function buildStructuredData(executionData, timestamp) {
   if (!executionData) return {};
-  const { goal, history, agentPlan, stepCount, apiCallCount, tabContexts } = executionData;
+  const { goal = '', history, agentPlan, stepCount = 0, apiCallCount = 0, tabContexts } = executionData;
   const agentMemory = executionData.agentMemory || {};
 
   // Classify action types for the action breakdown
