@@ -72,7 +72,7 @@ if (window.__sentinelInitialized) {
   const __sentinelRecentInsertions = new WeakMap();
   let __sentinelDismissalCount = 0;
   let __sentinelLastDismissRoute = '';
-  const SENTINEL_MAX_DISMISSALS = 3;
+  const SENTINEL_MAX_DISMISSALS = 5;
   const SENTINEL_RECENT_MS = 5000;
 
   // Active iframe document for switch_to_frame / switch_to_parent_frame state.
@@ -106,8 +106,15 @@ if (window.__sentinelInitialized) {
       const role = el.getAttribute && el.getAttribute('role');
       if (role === 'dialog' || role === 'alertdialog') return true;
       if (el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
-      const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 200);
+      const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 500);
+      // Core modal signals
       if (/\b(modal|dialog|sign in|subscribe)\b/.test(text)) return true;
+      // Ad-blocker / paywall / consent signals
+      if (/\b(ad.?block|adblocker|ad.?blocker|whitelist|white.?list|turn.?off.?ad|disable.?ad|remove.?ad|blocker.?detect|using.?an?.ad)\b/.test(text)) return true;
+      if (/\b(paywall|premium|subscription|required|register.?to.?read|subscribe.?to.?continue|sign.?up.?to.?continue)\b/.test(text)) return true;
+      if (/\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/.test(text)) return true;
+      // "Continue anyway" / "I understand" popup signals
+      if (/\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i.test(text)) return true;
     } catch (e) { console.warn('[Sentinel] modal signal check:', e && e.message); }
     return false;
   }
@@ -155,6 +162,13 @@ if (window.__sentinelInitialized) {
       // Ad-blocker / paywall warnings
       '[class*="adblock"] [class*="close" i]', '[class*="adblock"] [class*="dismiss" i]',
       '[class*="paywall"] [class*="close" i]', '[class*="paywall"] [class*="dismiss" i]',
+      // "Continue" / "Proceed" buttons inside ad-blocker and paywall overlays
+      '[class*="adblock"] button', '[class*="adblock"] [role="button"]',
+      '[class*="paywall"] button', '[class*="paywall"] [role="button"]',
+      '[class*="overlay"] button[class*="continue" i]', '[class*="overlay"] [class*="continue" i]',
+      '[class*="modal"] button[class*="continue" i]', '[class*="modal"] [class*="continue" i]',
+      '[class*="popup"] button[class*="continue" i]', '[class*="popup"] [class*="continue" i]',
+      '[class*="dialog"] button[class*="continue" i]', '[class*="dialog"] [class*="continue" i]',
       // Generic × buttons (SVG or text)
       'button[class*="close" i]', '[class*="dismiss-btn" i]',
     ];
@@ -173,6 +187,44 @@ if (window.__sentinelInitialized) {
         }
       } catch { /* invalid selector, skip */ }
     }
+
+    // Text-based Continue/Dismiss button detection — catches buttons that don't
+    // match any class selector but have recognizable text. Scans inside any
+    // visible overlay-like container (high z-index, fixed position).
+    const _continueTexts = [/^continue$/i, /^continue\s+to\s+site$/i, /^continue\s+anyway$/i,
+      /^continue\s+reading$/i, /^proceed$/i, /^dismiss$/i, /^not now$/i, /^maybe later$/i,
+      /^no,?\s*thanks$/i, /^i understand$/i, /^got it$/i, /^close$/i, /^skip$/i,
+      /^show\s+me\s+the\s+content$/i, /^let\s+me\s+in$/i, /^x$/i, /^✕$/i, /^×$/i];
+    try {
+      // Find all visible fixed-position containers that look like overlays
+      const _candidates = document.querySelectorAll(
+        '[style*="position: fixed"], [style*="position:fixed"], [class*="overlay"], [class*="modal"], [class*="popup"], [class*="dialog"], [class*="banner"], [class*="interstitial"]'
+      );
+      for (const _cand of _candidates) {
+        if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
+        try {
+          const _style = window.getComputedStyle(_cand);
+          if (_style.display === 'none' || _style.visibility === 'hidden') continue;
+          if (_style.position !== 'fixed' && _style.position !== 'absolute') continue;
+          const _zi = parseInt(_style.zIndex) || 0;
+          if (_zi < 100 && _style.position !== 'fixed') continue;
+          // Find buttons and clickable elements inside this overlay
+          const _btns = _cand.querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"], span[class*="btn"], div[class*="btn"], input[type="button"], input[type="submit"]');
+          for (const _btn of _btns) {
+            if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
+            const _btnText = (_btn.textContent || _btn.value || '').trim();
+            for (const _re of _continueTexts) {
+              if (_re.test(_btnText)) {
+                _btn.click();
+                __sentinelDismissalCount++;
+                dismissed.push('text-match: ' + _btnText.substring(0, 30));
+                break;
+              }
+            }
+          }
+        } catch (e) { /* skip */ }
+      }
+    } catch (e) { /* non-fatal */ }
 
     // Remove blocking overlays that cover the viewport — but only with strong
     // positive signals AND only if recently inserted. Skip structural roots.
@@ -195,7 +247,7 @@ if (window.__sentinelInitialized) {
         if (el.querySelector && el.querySelector('main')) continue;
 
         const style = window.getComputedStyle(el);
-        if (style.position !== 'fixed' || (parseInt(style.zIndex) || 0) <= 9000) continue;
+        if (style.position !== 'fixed' || (parseInt(style.zIndex) || 0) <= 1000) continue;
 
         const rect = el.getBoundingClientRect();
         const viewportArea = window.innerWidth * window.innerHeight;
@@ -204,9 +256,12 @@ if (window.__sentinelInitialized) {
         const cls = typeof el.className === 'string' ? el.className : '';
         if (cls.includes('sentinel')) continue;
 
-        // Require positive modal/dialog signal AND recent insertion.
+        // Require positive modal/dialog signal.
+        // Relax "recently inserted" check for overlays covering >80% of viewport —
+        // these are almost always popups that need dismissing, not page content.
         if (!__sentinelHasPositiveModalSignal(el)) continue;
-        if (!__sentinelWasInsertedRecently(el)) continue;
+        const _coversMost = elArea >= viewportArea * 0.8;
+        if (!_coversMost && !__sentinelWasInsertedRecently(el)) continue;
 
         // Safe-list: skip dialogs that contain active input/textarea/contenteditable
         // elements (Gmail compose, Linear drawers, Figma panels, form dialogs).
