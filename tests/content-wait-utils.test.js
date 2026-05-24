@@ -287,3 +287,45 @@ describe('wait.sleep — edge cases', () => {
     jest.useRealTimers();
   });
 });
+
+// ========== shadow DOM fallback ==========
+
+describe('wait.checkCondition — shadow DOM fallback', () => {
+  test('returns true for wait_for_element when shadow.queryDeep finds element', () => {
+    globalThis.document.querySelector = () => null;
+    const fakeEl = { tagName: 'INPUT' };
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: () => [fakeEl] };
+    expect(wait.checkCondition({ type: 'wait_for_element', selector: '#shadow-input' })).toBe(true);
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: () => [] };
+  });
+
+  test('returns false for wait_for_element when shadow.queryDeep returns empty array', () => {
+    globalThis.document.querySelector = () => null;
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: () => [] };
+    expect(wait.checkCondition({ type: 'wait_for_element', selector: '#not-found' })).toBe(false);
+  });
+
+  test('returns false for wait_for_element when shadow.queryDeep throws', () => {
+    globalThis.document.querySelector = () => null;
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: () => { throw new Error('traversal error'); } };
+    expect(wait.checkCondition({ type: 'wait_for_element', selector: '!!!' })).toBe(false);
+  });
+
+  test('skips shadow fallback when document.querySelector succeeds', () => {
+    const shadowSpy = jest.fn(() => []);
+    globalThis.document.querySelector = () => ({ tagName: 'DIV' });
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: shadowSpy };
+    expect(wait.checkCondition({ type: 'wait_for_element', selector: '.found' })).toBe(true);
+    expect(shadowSpy).not.toHaveBeenCalled();
+    globalThis.document.querySelector = () => null;
+    globalThis.window.__sentinelUtils.shadow = { queryDeep: () => [] };
+  });
+
+  test('returns false when shadow is null and querySelector returns null', () => {
+    globalThis.document.querySelector = () => null;
+    const origShadow = globalThis.window.__sentinelUtils.shadow;
+    globalThis.window.__sentinelUtils.shadow = null;
+    expect(wait.checkCondition({ type: 'wait_for_element', selector: '#missing' })).toBe(false);
+    globalThis.window.__sentinelUtils.shadow = origShadow;
+  });
+});

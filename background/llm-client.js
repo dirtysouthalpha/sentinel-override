@@ -1685,6 +1685,7 @@ Actions:
 - { "type": "dismiss_overlay" }
 - { "type": "switch_to_frame", "frame_index": INTEGER }  -- subsequent actions target this iframe until switch_to_parent_frame
 - { "type": "switch_to_parent_frame" }  -- return to main document after switch_to_frame
+- { "type": "drag_and_drop", "source_ref": "ref_N", "target_ref": "ref_M" }  -- drag from source to target (also accepts source_selector/target_selector or source_label/target_label)
 - { "type": "click_at", "x": PIXEL_X, "y": PIXEL_Y }
 - { "type": "scroll_to", "ref": "ref_N" }  -- scroll a specific element into view (also accepts "selector")
 - { "type": "read_console_messages", "filter": "errors|warning|null", "limit": 50 }  -- (3.7.0) returns buffered browser console entries (level, text, url, line, timestamp). Use to diagnose JS errors, failed AJAX, broken scripts on M365/Exchange/Entra/etc.
@@ -1951,7 +1952,7 @@ export function extractFirstJsonObject(str) {
   const validTypes = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
     'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
     'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-    'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
+    'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
     'read_console_messages', 'read_network_requests',
     'lookup', 'run_remote_command', 'verify', 'repeat_for_each']);
 
@@ -2097,7 +2098,7 @@ export function parseLLMResponse(content) {
     const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
       'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
       'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-      'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
+      'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
       'read_console_messages', 'read_network_requests',
       'lookup', 'run_remote_command', 'verify', 'repeat_for_each'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);

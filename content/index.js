@@ -660,6 +660,8 @@ if (window.__sentinelInitialized) {
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message); }
+        // Dispatch explicit FocusEvent for frameworks (Formik, React Hook Form) that use listeners
+        try { el.dispatchEvent(new FocusEvent('focus', { bubbles: true, composed: true })); } catch { /* non-fatal */ }
         // Clear existing value so CDP insertText replaces rather than appends,
         // matching the synthetic-path behavior. Only for inputs/textareas.
         try {
@@ -1322,6 +1324,54 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         setTimeout(() => hl.removeHighlight(el), 2000);
         return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + String(el.className).split(' ')[0] : '');
+      }
+
+      case 'drag_and_drop': {
+        var dragResolved = resolveCommandTarget({ ref: cmd.source_ref, selector: cmd.source_selector, label: cmd.source_label }, targetDoc);
+        var dropResolved = resolveCommandTarget({ ref: cmd.target_ref, selector: cmd.target_selector, label: cmd.target_label }, targetDoc);
+        var dragEl = dragResolved.el;
+        var dropEl = dropResolved.el;
+        if (!dragEl) return 'drag_and_drop: source element not found';
+        if (!dropEl) return 'drag_and_drop: target element not found';
+
+        hl.highlightElement(dragEl);
+        dragEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await waitForStableRect(dragEl, 2, 500);
+
+        var srcRect = dragEl.getBoundingClientRect();
+        var dstRect = dropEl.getBoundingClientRect();
+        var srcX = Math.round(srcRect.left + srcRect.width / 2);
+        var srcY = Math.round(srcRect.top + srcRect.height / 2);
+        var dstX = Math.round(dstRect.left + dstRect.width / 2);
+        var dstY = Math.round(dstRect.top + dstRect.height / 2);
+        var dView = targetDoc.defaultView;
+        var mkMouse = function(type, x, y) { return new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, view: dView, clientX: x, clientY: y }); };
+        var mkDrag  = function(type, x, y) { return new DragEvent(type, { bubbles: true, cancelable: true, composed: true, view: dView, clientX: x, clientY: y }); };
+
+        // mousedown + dragstart on source
+        dragEl.dispatchEvent(mkMouse('mousedown', srcX, srcY));
+        try { dragEl.dispatchEvent(mkDrag('dragstart', srcX, srcY)); } catch { /* DragEvent may be unavailable */ }
+
+        // intermediate mousemove steps for smooth drag appearance
+        var steps = 6;
+        for (var si = 1; si <= steps; si++) {
+          var mx = Math.round(srcX + (dstX - srcX) * (si / steps));
+          var my = Math.round(srcY + (dstY - srcY) * (si / steps));
+          dragEl.dispatchEvent(mkMouse('mousemove', mx, my));
+          try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch { /* non-fatal */ }
+          await humanDelay(20, 40);
+        }
+
+        // dragenter + drop + dragend on target
+        try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch { /* non-fatal */ }
+        try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch { /* non-fatal */ }
+        dragEl.dispatchEvent(mkMouse('mouseup', dstX, dstY));
+        try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch { /* non-fatal */ }
+
+        setTimeout(() => { hl.removeHighlight(dragEl); hl.removeHighlight(dropEl); }, 1500);
+        hl.highlightElement(dropEl);
+        return 'Dragged ' + describeTarget({ ref: cmd.source_ref, selector: cmd.source_selector, label: cmd.source_label }) +
+               ' to ' + describeTarget({ ref: cmd.target_ref, selector: cmd.target_selector, label: cmd.target_label });
       }
 
       case 'type': {
