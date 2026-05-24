@@ -5,7 +5,7 @@
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart } from './message-protocol.js';
+import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
@@ -2571,6 +2571,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendSilentUpdate('DOM changed (SPA) — re-observing...', stepCount);
         }
         // (3.16.0) Observation phase activity item
+        sendAgentStatus('observing', 'Reading page structure...');
         activityStart(stepCount, 'observe', 'Observing page');
         try {
           // (3.41.0) observe_page and read_page are independent read-only DOM
@@ -2943,6 +2944,7 @@ async function runAgentLoop(goal, workingTabId) {
         activityUpdate(stepCount, 'consult-ai', 'Consulting AI · ' + apiWaitSeconds + 's elapsed');
       }, 5000);
 
+      sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
       tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
       let command;
@@ -3019,6 +3021,7 @@ async function runAgentLoop(goal, workingTabId) {
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
+          try { sendHeartbeat(_lastAiCallMs); } catch (e) { /* non-fatal */ }
           base64Image = null; // release screenshot memory after LLM call
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
@@ -3683,6 +3686,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Handle wait_for actions
       if (command.type === 'wait_for_text' || command.type === 'wait_for_element' || command.type === 'wait_for_navigation') {
+        sendAgentStatus('waiting', 'Waiting for: ' + (command.text || command.selector || 'navigation'));
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
         sendActionMessage(command, stepCount, observation);
         const waitResult = await sendMessageWithRetry(tab, {
@@ -3697,6 +3701,7 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
+      sendAgentStatus('executing', describeAction(command));
       sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
 
       // Approval gate + CDP trusted input flag (#9)

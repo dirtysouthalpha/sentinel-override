@@ -208,7 +208,9 @@ export function sendActionMessage(command, stepNumber, observation) {
       fields: command.fields,
       text: enrichedText,
       code: enrichedCode,
-      targetText: resolvedText
+      targetText: resolvedText,
+      reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length > 0)
+        ? command.__reasoning.substring(0, 600) : undefined
     }
   }).catch((e) => {
     console.error('[el] Unhandled rejection:', e);
@@ -332,4 +334,35 @@ export function sendScreenshotUpdate(base64Image, stepNumber) {
   }).catch((e) => {
     console.error('[sendScreenshotUpdate] Unhandled rejection:', e);
   });
+}
+
+/**
+ * (6.0) Broadcast the agent's current lifecycle state to the popup live ticker.
+ * States: 'observing' | 'thinking' | 'planning' | 'executing' | 'verifying' | 'waiting' | 'idle'
+ *
+ * @param {string} state - Machine state name
+ * @param {string} [text] - Human-readable description shown in the ticker
+ */
+export function sendAgentStatus(state, text) {
+  const now = new Date();
+  const ts = now.toTimeString().slice(0, 8);
+  chrome.runtime.sendMessage({
+    action: 'agent_status',
+    state: state || 'idle',
+    text: text || '',
+    timestamp: ts
+  }).catch(() => {});
+}
+
+/**
+ * (6.0) Send API response time to popup for the health heartbeat indicator.
+ *
+ * @param {number} durationMs - LLM call duration in milliseconds
+ */
+export function sendHeartbeat(durationMs) {
+  chrome.runtime.sendMessage({
+    action: 'heartbeat_update',
+    durationMs: durationMs || 0,
+    timestamp: Date.now()
+  }).catch(() => {});
 }

@@ -2007,7 +2007,13 @@ export function parseLLMResponse(content) {
       if (match && match[1]) jsonStr = match[1].trim();
     }
     const firstObj = extractFirstJsonObject(jsonStr);
-    if (firstObj) jsonStr = firstObj;
+    // (6.0) Capture pre-JSON reasoning text for reasoning cards in the popup.
+    let __reasoning = '';
+    if (firstObj) {
+      const jsonIdx = jsonStr.indexOf(firstObj.substring(0, 30));
+      if (jsonIdx > 10) __reasoning = jsonStr.substring(0, jsonIdx).trim().slice(0, 600);
+      jsonStr = firstObj;
+    }
     // (3.8.4) Sanitize invalid escape sequences and raw control chars inside
     // string values BEFORE parsing. Replaces the old "strip 0x00-0x1f" pass
     // which destroyed newlines and broke the salvage path.
@@ -2024,6 +2030,7 @@ export function parseLLMResponse(content) {
       'read_console_messages', 'read_network_requests',
       'lookup', 'run_remote_command', 'verify', 'repeat_for_each'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
+    if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;
   } catch (err) {
     console.error('Failed to parse LLM response:', err, 'Content:', content);

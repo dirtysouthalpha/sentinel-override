@@ -2802,6 +2802,37 @@ if (pasteTicketBtn && pasteTicketModal) {
   }
 }
 
+// ========== Health Heartbeat (6.0) ==========
+const __heartbeat = { samples: [], el: null };
+function _ensureHeartbeatDot() {
+  if (__heartbeat.el) return __heartbeat.el;
+  const dot = document.createElement('span');
+  dot.id = 'hb-dot';
+  dot.title = 'API health';
+  dot.style.cssText = 'display:inline-block; width:8px; height:8px; border-radius:50%; background:#4caf50; margin-left:8px; vertical-align:middle; transition:background 0.5s;';
+  const statusEl = document.getElementById('status-text');
+  if (statusEl && statusEl.parentNode) statusEl.parentNode.appendChild(dot);
+  __heartbeat.el = dot;
+  return dot;
+}
+function _updateHeartbeat(durationMs) {
+  __heartbeat.samples.push(durationMs);
+  if (__heartbeat.samples.length > 5) __heartbeat.samples.shift();
+  const avg = Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / __heartbeat.samples.length);
+  const dot = _ensureHeartbeatDot();
+  dot.style.background = avg < 3000 ? '#4caf50' : avg < 10000 ? '#e0af68' : '#f44336';
+  dot.title = 'API: ' + (avg / 1000).toFixed(1) + 's avg (last ' + __heartbeat.samples.length + ' calls)';
+}
+
+// ========== Live Status Ticker (6.0) ==========
+let __lastStatusState = '';
+const _STATE_ICONS = { observing: '👁', thinking: '🧠', planning: '📋', executing: '⚡', verifying: '✔', waiting: '⏳', idle: '·' };
+function _showStatusTicker(state, text, timestamp) {
+  const icon = _STATE_ICONS[state] || '·';
+  const label = timestamp ? timestamp + ' — ' + text : text;
+  updateStatus(icon + ' ' + label);
+}
+
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
   // (3.49.1) Undo stack size updates — enable/disable the undo button.
@@ -2812,6 +2843,70 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'cdp_reattach_warning') {
     updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
+  }
+  // (6.0) Live status narration ticker
+  if (message.action === 'agent_status') {
+    _showStatusTicker(message.state, message.text, message.timestamp);
+  }
+  // (6.0) API health heartbeat
+  if (message.action === 'heartbeat_update') {
+    _updateHeartbeat(message.durationMs || 0);
+  }
+  // (6.0) Screenshot live preview
+  if (message.action === 'screenshot_update') {
+    updateMiniShot(message.base64Image);
+    showMiniShot();
+  }
+  // (6.0) New step starting — create activity stream card
+  if (message.action === 'agent_step_start') {
+    _ensureActivityStream(message.stepNumber);
+    updateActiveTabStep(message.stepNumber, message.totalPlannedSteps || 0);
+  }
+  // (6.0) Activity item upsert (observe / consult-ai / dispatch)
+  if (message.action === 'agent_activity') {
+    showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail);
+  }
+  // (6.0) Agent action — update step card headline and active tab strip
+  if (message.action === 'agent_action') {
+    const p = message.payload;
+    if (p && p.stepNumber) {
+      _ensureActivityStream(p.stepNumber);
+      updateStepCardAction(p.stepNumber, p.description || p.type);
+      updateActiveTabAction(p);
+      // (6.5) Reasoning card — show collapsible "Thinking..." section if reasoning is present
+      if (p.reasoning && p.reasoning.trim()) {
+        try {
+          const state = __activityState.get(p.stepNumber);
+          const card = state ? state.card : null;
+          if (card && !card.querySelector('.reasoning-section')) {
+            const section = document.createElement('div');
+            section.className = 'reasoning-section';
+            section.style.cssText = 'margin:4px 0 2px; font-size:11px;';
+            const toggle = document.createElement('span');
+            toggle.className = 'reasoning-toggle';
+            toggle.style.cssText = 'cursor:pointer; color:var(--text-secondary,#aaa); user-select:none;';
+            toggle.textContent = '🧠 Thinking... (click to expand)';
+            const body = document.createElement('div');
+            body.className = 'reasoning-body';
+            body.style.cssText = 'display:none; margin-top:4px; padding:6px 8px; background:var(--bg-tertiary,#1f1f1f); border-radius:4px; color:var(--text-secondary,#aaa); white-space:pre-wrap; word-break:break-word;';
+            body.textContent = p.reasoning;
+            toggle.addEventListener('click', () => {
+              const shown = body.style.display !== 'none';
+              body.style.display = shown ? 'none' : 'block';
+              toggle.textContent = shown ? '🧠 Thinking... (click to expand)' : '🧠 Thinking... (click to collapse)';
+            });
+            section.appendChild(toggle);
+            section.appendChild(body);
+            const stream = card.querySelector('.activity-stream');
+            if (stream) card.insertBefore(section, stream); else card.appendChild(section);
+          }
+        } catch (_) { /* non-fatal */ }
+      }
+    }
+  }
+  // (6.0) Action result — update step card with success/failure
+  if (message.action === 'agent_action_result') {
+    updateActionCardResult(message.stepNumber, message.result, message.isError);
   }
   if (message.action === 'tab_state_update') {
     renderTabBar(message.tabs || []);
