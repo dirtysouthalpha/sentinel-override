@@ -15,6 +15,7 @@ import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } fr
 import { generateReport } from './report-generator.js';
 // eslint-disable-next-line no-unused-vars
 import { migrateLegacySettings } from './provider-registry.js';
+import { callLLMSimple } from './llm-client.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
 import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
@@ -44,7 +45,7 @@ import {
 import { handleMenuClick } from './context-menu.js';
 import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop } from './page-monitor.js';
 import { startRecording, stopRecording, isRecording, loadMacros, historyToMacro as _historyToMacro } from './macro-recorder.js';
-import { generateHtmlReport } from './export-report.js';
+import { generateHtmlReport, generateReplayReport } from './export-report.js';
 
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
@@ -474,6 +475,18 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return await undoLastAction();
     }
 
+    case 'quick_assist_request': {
+      const qaPrompt = typeof request.prompt === 'string' ? request.prompt.trim() : '';
+      if (!qaPrompt) return { text: 'Error: empty prompt' };
+      const qaSystem = 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Give clear, concise, actionable answers. Format your response with markdown where helpful.';
+      try {
+        const text = await callLLMSimple(qaSystem, qaPrompt, 1200);
+        return { text };
+      } catch (err) {
+        return { text: 'Error: ' + (err.message || String(err)) };
+      }
+    }
+
     case 'inject_context': {
       if (!agentRunning) return { ok: false, error: 'No agent running' };
       const note = typeof request.note === 'string' ? request.note.trim() : '';
@@ -782,6 +795,19 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       const log = await fetchAuditLog(request.params?.runId || null);
       if (!log || log.length === 0) throw new Error('No audit log data to export');
       const html = generateHtmlReport(log, request.params?.metadata || {});
+      return { html };
+    }
+
+    case 'export_replay_report': {
+      const { runLogId: reqRunId, estimatedCostUsd } = request.params || {};
+      const runId = reqRunId || (await chrome.storage.local.get('run_log_index').then(r => {
+        const idx = (r.run_log_index || []);
+        return idx.length > 0 ? idx[0].runLogId : null;
+      }).catch(() => null));
+      if (!runId) throw new Error('No run log available to export');
+      const logData = await chrome.storage.local.get('run_log_' + runId).then(r => r['run_log_' + runId]).catch(() => null);
+      if (!logData || !logData.entries) throw new Error('Run log data not found');
+      const html = generateReplayReport(logData.entries, { goal: logData.goal, runLogId: runId, estimatedCostUsd: estimatedCostUsd || 0 });
       return { html };
     }
 

@@ -1801,6 +1801,34 @@ if (exportReportPdfBtn) {
   });
 }
 
+// Export: Interactive HTML Replay (9.3)
+const exportReplayBtn = document.getElementById('exportReplayBtn');
+if (exportReplayBtn) {
+  exportReplayBtn.addEventListener('click', async () => {
+    try {
+      exportReplayBtn.disabled = true;
+      exportReplayBtn.textContent = 'Generating…';
+      const costEl = document.getElementById('run-cost');
+      const costText = costEl ? costEl.title : '';
+      const costMatch = costText.match(/\$[\d.]+/);
+      const estimatedCostUsd = costMatch ? parseFloat(costMatch[0].slice(1)) : 0;
+      const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
+      if (!resp || !resp.ok || !resp.data || !resp.data.html) {
+        throw new Error((resp && resp.error) || 'No replay data available — run the agent first');
+      }
+      const blob = new Blob([resp.data.html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+      showToast('Replay report downloading…', 'info');
+    } catch (e) {
+      showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
+    } finally {
+      exportReplayBtn.disabled = false;
+      exportReplayBtn.textContent = 'Export Replay';
+    }
+  });
+}
+
 // Export: Copy as Plain Text
 copyReportTextBtn.addEventListener('click', () => {
   const state = getState();

@@ -42,6 +42,7 @@ let signInWallAckUrls = new Set(); // (3.14.1) URLs where the user has acknowled
 let detectedTenant = null;      // (3.7.0) {tid, onmicrosoft, chipText, hostname} most recently detected on a Microsoft admin URL
 let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in storage
 let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
+const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped at 20 entries for replay export
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
 // (3.30.0) Trust-score counters. Module-level so the loop can update them
@@ -407,6 +408,7 @@ export function resetAgentState() {
   _pendingCommandQueue.length = 0;
   _historyDirty = false;
   undoStack.length = 0;
+  _stepScreenshots.clear(); // (9.3) reset replay screenshot ring buffer
   resetAllContexts();
 }
 
@@ -2685,6 +2687,12 @@ async function runAgentLoop(goal, workingTabId) {
           };
           // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
           try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          // (9.3) Store screenshot for replay export (ring-cap at 20)
+          _stepScreenshots.set(stepCount, base64Image);
+          if (_stepScreenshots.size > 20) {
+            const oldest = _stepScreenshots.keys().next().value;
+            _stepScreenshots.delete(oldest);
+          }
         }
       }
 
@@ -4448,7 +4456,9 @@ async function runAgentLoop(goal, workingTabId) {
               x: command.x, y: command.y
             },
             result: typeof result === 'string' ? result.substring(0, 500) : JSON.stringify(result || '').substring(0, 500),
-            failed: !!actionFailed
+            failed: !!actionFailed,
+            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length > 0) ? command.__reasoning.substring(0, 400) : undefined,
+            screenshot: _stepScreenshots.get(stepCount) || undefined,
           });
           // Keep last 200 entries; older ones get rolled into a summary.
           if (runLogBuffer.length > 200) {
