@@ -457,14 +457,12 @@ export function getNextRunTime(schedule) {
  * @param {string} alarmName - The alarm name (format: schedule-${scheduleId})
  */
 export async function executeScheduledTask(alarmName) {
-  // Parse scheduleId from alarm name
   const scheduleId = alarmName.replace('schedule-', '');
   if (!scheduleId) {
     console.error('[Sentinel/scheduler] Invalid alarm name:', alarmName);
     return;
   }
 
-  // Load schedule
   const schedules = await loadSchedules();
   const schedule = schedules[scheduleId];
   if (!schedule) {
@@ -477,15 +475,12 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
 
-  // Check if agent is already running
   if (AgentEngine.agentRunning) {
     tel.info('scheduler', `Agent busy, skipping schedule ${schedule.name}`);
     schedule.lastRunStatus = 'skipped';
     schedule.lastRunAt = Date.now();
     schedules[scheduleId] = schedule;
     await saveSchedules(schedules);
-
-    // Re-register alarm for recurring schedules so they retry
     if (schedule.type === 'recurring' && schedule.recurrence) {
       schedule.nextRunAt = computeNextRun(schedule.recurrence);
       registerAlarm(schedule);
@@ -493,132 +488,44 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
 
-  // Resolve goal
-  let goal;
-  try {
-    if (schedule.templateId) {
-      goal = await resolveTemplateGoal(schedule.templateId, schedule.params || {});
-    } else {
-      goal = schedule.goal;
-    }
-  } catch (err) {
-    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, err);
-    try {
-      await storeResult(schedule, {
-        status: 'failure',
-        startedAt: Date.now(),
-        completedAt: Date.now(),
-        report: null,
-        error: `Goal resolution failed: ${err.message}`,
-      });
-    } catch (storeErr) {
-      console.error('Failed to store result for goal resolution failure:', storeErr);
-    }
-    schedule.lastRunStatus = 'failure';
-    schedule.lastRunAt = Date.now();
-    schedules[scheduleId] = schedule;
-    await saveSchedules(schedules);
-    if (schedule.type === 'recurring' && schedule.recurrence) {
-      schedule.nextRunAt = computeNextRun(schedule.recurrence);
-      registerAlarm(schedule);
-    }
-    return;
-  }
-
-  // Create result record
   const resultId = crypto.randomUUID();
   const startedAt = Date.now();
 
-  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });
-
-  // Find or open a tab
-  let tabId;
+  let goal;
   try {
-    const tabs = await new Promise(resolve => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
-    });
-
-    if (tabs && tabs.length > 0) {
-      tabId = tabs[0].id;
-    } else {
-      // No active tab -- create one
-      const newTab = await chrome.tabs.create({ url: 'about:blank' });
-      tabId = newTab.id;
-      // Give the tab a moment to initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    goal = await _resolveGoalForSchedule(schedule);
   } catch (err) {
-    console.error('Failed to get/create tab:', err);
-    try {
-      await storeResult(schedule, {
-        id: resultId,
-        status: 'failure',
-        startedAt,
-        completedAt: Date.now(),
-        report: null,
-        error: `Tab creation failed: ${err.message}`,
-      });
-    } catch (storeErr) {
-      console.error('Failed to store result for tab creation failure:', storeErr);
-    }
+    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, err);
+    await _handleTaskFailure(schedule, scheduleId, schedules, { startedAt, error: `Goal resolution failed: ${err.message}` });
     return;
   }
 
-  // Set up tab context
-  let tabInfo;
+  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });
+
+  let tabId;
   try {
-    tabInfo = await getTabInfo(tabId);
-  } catch {
-    tabInfo = null;
+    tabId = await _getOrCreateTab();
+  } catch (err) {
+    console.error('Failed to get/create tab:', err);
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${err.message}` });
+    return;
   }
+
+  let tabInfo;
+  try { tabInfo = await getTabInfo(tabId); } catch { tabInfo = null; }
   registerInitialTab(tabId, tabInfo?.url || '');
 
-  // Start the agent
   try {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
     console.error('Failed to start agent:', err);
-    try {
-      await storeResult(schedule, {
-        id: resultId,
-        status: 'failure',
-        startedAt,
-        completedAt: Date.now(),
-        report: null,
-        error: `Agent start failed: ${err.message}`,
-      });
-    } catch (storeErr) {
-      console.error('Failed to store result for agent start failure:', storeErr);
-    }
-    schedule.lastRunStatus = 'failure';
-    schedule.lastRunAt = Date.now();
-    schedules[scheduleId] = schedule;
-    await saveSchedules(schedules);
-    if (schedule.type === 'recurring' && schedule.recurrence) {
-      schedule.nextRunAt = computeNextRun(schedule.recurrence);
-      registerAlarm(schedule);
-    }
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${err.message}` });
     return;
   }
 
-  // Wait for agent completion via messaging (replaces polling)
-  const completionResult = await new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
-    }, 5 * 60 * 1000);
-
-    const listener = (msg) => {
-      if (msg.action === 'agent_loop_complete') {
-        clearTimeout(timeout);
-        chrome.runtime.onMessage.removeListener(listener);
-        resolve({ status: 'success', error: null, report: msg.report || null });
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-  });
-
+  const completionResult = await _waitForAgentCompletion(5 * 60 * 1000);
   const completedAt = Date.now();
+
   const finalResult = {
     id: resultId,
     scheduleId: schedule.id,
@@ -632,7 +539,6 @@ export async function executeScheduledTask(alarmName) {
     error: completionResult.error,
   };
 
-  // Store result — wrap to prevent silent data loss on storage errors
   try {
     await storeResult(schedule, finalResult);
   } catch (e) {
@@ -640,17 +546,13 @@ export async function executeScheduledTask(alarmName) {
     try { tel.error('scheduler', 'Failed to store result', { error: e && e.message }); } catch (e) { console.error('[Sentinel] Error in scheduler.js:', e); }
   }
 
-  // Update schedule -- consolidate all mutations into a single save
   schedule.lastRunAt = completedAt;
   schedule.lastRunStatus = completionResult.status;
 
-  // Re-register alarm for recurring schedules
   if (schedule.type === 'recurring' && schedule.recurrence) {
     schedule.nextRunAt = computeNextRun(schedule.recurrence);
     registerAlarm(schedule);
   }
-
-  // Disable one-time schedules after execution
   if (schedule.type === 'once') {
     schedule.enabled = false;
   }
@@ -663,13 +565,91 @@ export async function executeScheduledTask(alarmName) {
     try { tel.error('scheduler', 'Failed to save schedule state', { error: e && e.message }); } catch (e) { console.error('[Sentinel] Error in scheduler.js:', e); }
   }
 
-  // Send notification
   sendNotification(schedule, finalResult);
-
-  // Set badge
   setBadge(finalResult.status);
-
   tel.info('scheduler', `Scheduled task ${schedule.name} completed`, { status: finalResult.status });
+}
+
+// ========== Execution Helpers ==========
+
+/**
+ * Resolve the goal string for a schedule, applying template params if needed.
+ * @param {object} schedule
+ * @returns {Promise<string>}
+ */
+async function _resolveGoalForSchedule(schedule) {
+  if (schedule.templateId) {
+    return resolveTemplateGoal(schedule.templateId, schedule.params || {});
+  }
+  return schedule.goal;
+}
+
+/**
+ * Get the active tab ID, creating a new blank tab if no active tab exists.
+ * @returns {Promise<number>} The tab ID to use
+ */
+async function _getOrCreateTab() {
+  const tabs = await new Promise(resolve => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
+  });
+  if (tabs && tabs.length > 0) return tabs[0].id;
+  const newTab = await chrome.tabs.create({ url: 'about:blank' });
+  await new Promise(resolve => setTimeout(resolve, 500));
+  return newTab.id;
+}
+
+/**
+ * Wait for the agent to send an agent_loop_complete message, with a timeout.
+ * @param {number} timeoutMs
+ * @returns {Promise<{ status: string, error: string|null, report: string|null }>}
+ */
+function _waitForAgentCompletion(timeoutMs) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      chrome.runtime.onMessage.removeListener(listener);
+      resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
+    }, timeoutMs);
+
+    const listener = (msg) => {
+      if (msg.action === 'agent_loop_complete') {
+        clearTimeout(timer);
+        chrome.runtime.onMessage.removeListener(listener);
+        resolve({ status: 'success', error: null, report: msg.report || null });
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+  });
+}
+
+/**
+ * Persist a failure result and update the schedule's last-run state.
+ * Re-registers the alarm for recurring schedules before returning.
+ * @param {object} schedule
+ * @param {string} scheduleId
+ * @param {object} schedules - Full schedules map (mutated in place)
+ * @param {object} resultPartial - { id?, startedAt, error } for storeResult
+ */
+async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial) {
+  try {
+    await storeResult(schedule, {
+      id: resultPartial.id,
+      status: 'failure',
+      startedAt: resultPartial.startedAt,
+      completedAt: Date.now(),
+      report: null,
+      error: resultPartial.error,
+    });
+  } catch (storeErr) {
+    console.error('Failed to store failure result:', storeErr);
+  }
+  schedule.lastRunStatus = 'failure';
+  schedule.lastRunAt = Date.now();
+  schedules[scheduleId] = schedule;
+  await saveSchedules(schedules);
+  if (schedule.type === 'recurring' && schedule.recurrence) {
+    schedule.nextRunAt = computeNextRun(schedule.recurrence);
+    registerAlarm(schedule);
+  }
 }
 
 /**

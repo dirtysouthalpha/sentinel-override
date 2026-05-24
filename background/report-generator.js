@@ -5,6 +5,123 @@
 import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
 
+// ========== Pure Helpers ==========
+
+/**
+ * Truncate a memory value to maxChars for LLM prompt injection.
+ * Arrays are joined (up to 5 items); objects are JSON-stringified.
+ * @param {*} val
+ * @param {number} maxChars
+ * @returns {string}
+ */
+function _truncateMemoryValue(val, maxChars) {
+  if (val == null) return '';
+  let valStr;
+  if (Array.isArray(val)) {
+    valStr = val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
+  } else if (typeof val === 'object') {
+    try { valStr = JSON.stringify(val); } catch { valStr = String(val); }
+  } else {
+    valStr = String(val);
+  }
+  if (valStr.length > maxChars) {
+    valStr = valStr.substring(0, maxChars) + '... [truncated; full value in run log]';
+  }
+  return valStr;
+}
+
+/**
+ * Classify the goal into a task type string.
+ * @param {string} goal
+ * @returns {string}
+ */
+function _detectTaskType(goal) {
+  const goalLower = (goal || '').toLowerCase();
+  if (/top \d|briefing|latest|recent|news|articles/i.test(goalLower)) return 'briefing';
+  if (/compar|vs\.|versus|better|which/i.test(goalLower)) return 'comparison';
+  if (/extract|pull|scrape|list|inventory|export|gather/i.test(goalLower)) return 'extraction';
+  if (/investigat|analyz|audit|review|check|look into|diagnos|troubleshoot/i.test(goalLower)) return 'investigation';
+  if (/config|setup|install|deploy|create|add|enable|configure/i.test(goalLower)) return 'configuration';
+  return 'general';
+}
+
+/**
+ * Count actions by type and tally success/failure from history.
+ * @param {Array} history
+ * @returns {{ actionCounts: object, failedActions: number, successfulActions: number }}
+ */
+function _countActionHistory(history) {
+  const actionTypes = ['navigate', 'click', 'type', 'extract', 'extract_list', 'execute_js',
+    'read_page', 'note', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+    'select', 'check', 'hover', 'press_key', 'finish', 'open_tab', 'switch_tab', 'close_tab',
+    'dismiss_overlay', 'click_at', 'scroll_to', 'verify', 'lookup', 'read_console_messages',
+    'read_network_requests', 'run_remote_command', 'repeat_for_each'];
+  const actionCounts = {};
+  for (const t of actionTypes) actionCounts[t] = 0;
+  let failedActions = 0;
+  let successfulActions = 0;
+  for (const h of history) {
+    if (!h || !h.action) continue;
+    const t = h.action.type || 'unknown';
+    if (actionCounts[t] !== undefined) actionCounts[t]++;
+    const result = String(h.result || '');
+    if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
+      failedActions++;
+    } else {
+      successfulActions++;
+    }
+  }
+  return { actionCounts, failedActions, successfulActions };
+}
+
+/**
+ * Collect unique URLs visited from the action history.
+ * @param {Array} history
+ * @returns {string[]}
+ */
+function _collectUrlsVisited(history) {
+  const urlsVisited = [];
+  const seenUrls = new Set();
+  for (const h of history) {
+    if (h.action && h.action.type === 'navigate' && h.action.url) {
+      const u = h.action.url;
+      if (!seenUrls.has(u)) { urlsVisited.push(u); seenUrls.add(u); }
+    }
+    if (h.url && !seenUrls.has(h.url)) {
+      urlsVisited.push(h.url);
+      seenUrls.add(h.url);
+    }
+  }
+  return urlsVisited;
+}
+
+/**
+ * Build the memory summary string and citable-keys list for the report prompt.
+ * Filters out failed/empty entries and truncates each value to 600 chars.
+ * @param {object} agentMemory
+ * @returns {{ memorySummary: string, citableKeysList: string }}
+ */
+function _buildMemorySummary(agentMemory) {
+  const memoryKeys = Object.keys(agentMemory);
+  const usableKeys = memoryKeys.filter(k => {
+    const v = agentMemory[k];
+    let s;
+    try { s = typeof v === 'string' ? v : JSON.stringify(v); } catch { s = String(v); }
+    return s && s.length > 3 && s !== 'Done'
+      && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
+      && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
+  });
+  // Hard-cap each memory entry at 600 chars — prevents multi-KB injections into the
+  // synthesis prompt that can hang or 4xx small-context LLMs.
+  const memorySummary = usableKeys.length > 0
+    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 600)}`).join('\n')
+    : 'No usable data was extracted (all extractions failed or timed out).';
+  const citableKeysList = usableKeys.length > 0
+    ? usableKeys.map(k => `\`${k}\``).join(', ')
+    : '(none — investigation produced no extractable data)';
+  return { memorySummary, citableKeysList };
+}
+
 // ========== Report Generation ==========
 /**
  * Generate a structured investigation report from agent execution data.
@@ -34,7 +151,6 @@ export async function generateReport(executionData, CONFIG) {
 
   sendSilentUpdate('Generating investigation report...');
 
-  // Build a condensed history for the prompt (step + action type + result, not full elements)
   const condensedHistory = history.map(h => ({
     step: h.step,
     action: h.action.type,
@@ -42,57 +158,12 @@ export async function generateReport(executionData, CONFIG) {
     result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
   }));
 
-  // Build memory summary for evidence section — skip failed/empty entries
-  const memoryKeys = Object.keys(agentMemory);
-  const usableKeys = memoryKeys.filter(k => {
-    const v = agentMemory[k];
-    let s;
-    try { s = typeof v === 'string' ? v : JSON.stringify(v); } catch { s = String(v); }
-    return s && s.length > 3 && s !== 'Done'
-      && !s.startsWith('Execution error') && !s.startsWith('Code execution timed out')
-      && !s.startsWith('JS Error:') && !s.startsWith('Element not found');
-  });
-  // (3.12.4) Hard-cap each memory entry at 600 chars before injecting into
-  // the synthesis prompt. The previous logic stringified up to 5 array items
-  // per key with no per-key total cap, which produced multi-KB-per-key
-  // sections for research-heavy runs (NVD CVE lists, multi-page article
-  // briefings). Stuffed into a 6000-token model with a 4000-token context
-  // budget for the user prompt, this could hang or 4xx the LLM call. Cap is
-  // intentionally low -- the report-LLM doesn't need the raw scrape, just
-  // enough to cite from. The original full data lives in the run log.
-  function _truncateMemoryValue(val, maxChars) {
-    if (val == null) return '';
-    let valStr;
-    if (Array.isArray(val)) {
-      valStr = val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
-    } else if (typeof val === 'object') {
-      try { valStr = JSON.stringify(val); } catch { valStr = String(val); }
-    } else {
-      valStr = String(val);
-    }
-    if (valStr.length > maxChars) {
-      valStr = valStr.substring(0, maxChars) + '... [truncated; full value in run log]';
-    }
-    return valStr;
-  }
-  const memorySummary = usableKeys.length > 0
-    ? usableKeys
-        .map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 600)}`)
-        .join('\n')
-    : 'No usable data was extracted (all extractions failed or timed out).';
-  // (3.12.0) List of memory keys the report MUST cite from. Passed into
-  // the prompt so the report-LLM can emit [src:key] tags that the popup
-  // renders as clickable audit chips.
-  const citableKeysList = usableKeys.length > 0
-    ? usableKeys.map(k => `\`${k}\``).join(', ')
-    : '(none — investigation produced no extractable data)';
+  const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
 
-  // Build plan context if a plan was generated
   const planContext = agentPlan && agentPlan.length > 0
     ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
     : '\nNo formal plan was generated (direct execution mode).';
 
-  // Build tab/screenshot references
   const tabReferences = tabContexts.length > 0
     ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
     : '';
@@ -184,25 +255,16 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
 
   const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
 
-  // Build machine-readable structured data from raw execution data.
   const structuredData = buildStructuredData(executionData, timestamp);
 
   try {
-    // Make the LLM call for report generation
     const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
-
     const fullReport = typeof reportResult === 'string' ? reportResult.trim() : String(reportResult).trim();
-
-    // Extract summary: first paragraph or first 300 chars
     const firstParagraph = fullReport.split('\n\n')[0] || '';
-    const summary = firstParagraph.length > 300
-      ? firstParagraph.substring(0, 297) + '...'
-      : firstParagraph;
-
+    const summary = firstParagraph.length > 300 ? firstParagraph.substring(0, 297) + '...' : firstParagraph;
     return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
     console.error('Report generation failed:', err);
-    // Return a fallback report from the raw data
     const fallbackReport = buildFallbackReport(executionData);
     return { summary: fallbackReport.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
@@ -212,6 +274,10 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
 /**
  * Makes an LLM call specifically for report generation.
  * Reuses settings from chrome.storage but with a dedicated prompt.
+ * @param {string} prompt - The user prompt for report generation
+ * @param {object} CONFIG - Agent config with fetchTimeout
+ * @param {string} systemPrompt - System prompt override
+ * @returns {Promise<string>} The generated report text
  */
 async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const providerConfig = await getActiveProvider();
@@ -263,7 +329,6 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   }
   const responseText = provider.parseResponse(data);
 
-  // Strip code fences if present
   let cleaned = responseText.trim();
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/, '').replace(/\n?```\s*$/, '');
@@ -283,38 +348,14 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
  */
 function buildStructuredData(executionData, timestamp) {
   if (!executionData) return {};
-  const { goal = '', history, agentPlan, stepCount = 0, apiCallCount = 0, tabContexts } = executionData;
+  const { goal = '', history = [], agentPlan, stepCount = 0, apiCallCount = 0, tabContexts } = executionData;
   const agentMemory = executionData.agentMemory || {};
 
-  // Classify action types for the action breakdown
-  const actionCounts = {};
-  const actionTypes = ['navigate', 'click', 'type', 'extract', 'extract_list', 'execute_js',
-    'read_page', 'note', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
-    'select', 'check', 'hover', 'press_key', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-    'dismiss_overlay', 'click_at', 'scroll_to', 'verify', 'lookup', 'read_console_messages',
-    'read_network_requests', 'run_remote_command', 'repeat_for_each'];
-  for (const t of actionTypes) actionCounts[t] = 0;
-  let failedActions = 0;
-  let successfulActions = 0;
+  const { actionCounts, failedActions, successfulActions } = _countActionHistory(history);
 
-  for (const h of history) {
-    if (!h || !h.action) continue;
-    const t = h.action.type || 'unknown';
-    if (actionCounts[t] !== undefined) actionCounts[t]++;
-    const result = String(h.result || '');
-    if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
-      failedActions++;
-    } else {
-      successfulActions++;
-    }
-  }
-
-  // Extract findings from agent memory — separate by type
   const findings = {};
-  const memoryKeys = Object.keys(agentMemory || {});
-  for (const key of memoryKeys) {
+  for (const key of Object.keys(agentMemory)) {
     const val = agentMemory[key];
-    // Truncate large values for structured output
     if (Array.isArray(val)) {
       findings[key] = val.slice(0, 50);
     } else if (typeof val === 'object' && val !== null) {
@@ -330,35 +371,14 @@ function buildStructuredData(executionData, timestamp) {
     }
   }
 
-  // URLs visited
-  const urlsVisited = [];
-  const seenUrls = new Set();
-  for (const h of history) {
-    if (h.action && h.action.type === 'navigate' && h.action.url) {
-      const u = h.action.url;
-      if (!seenUrls.has(u)) { urlsVisited.push(u); seenUrls.add(u); }
-    }
-    if (h.url && !seenUrls.has(h.url)) {
-      urlsVisited.push(h.url);
-      seenUrls.add(h.url);
-    }
-  }
-
-  // Determine task type from goal text
-  let taskType = 'general';
-  const goalLower = (goal || '').toLowerCase();
-  if (/top \d|briefing|latest|recent|news|articles/i.test(goalLower)) taskType = 'briefing';
-  else if (/compar|vs\.|versus|better|which/i.test(goalLower)) taskType = 'comparison';
-  else if (/extract|pull|scrape|list|inventory|export|gather/i.test(goalLower)) taskType = 'extraction';
-  else if (/investigat|analyz|audit|review|check|look into|diagnos|troubleshoot/i.test(goalLower)) taskType = 'investigation';
-  else if (/config|setup|install|deploy|create|add|enable|configure/i.test(goalLower)) taskType = 'configuration';
+  const urlsVisited = _collectUrlsVisited(history);
 
   return {
     meta: {
       version: '4.0',
       timestamp,
       goal,
-      taskType,
+      taskType: _detectTaskType(goal),
       planSteps: agentPlan ? agentPlan.length : 0,
       totalSteps: stepCount,
       apiCallCount,
@@ -381,6 +401,8 @@ function buildStructuredData(executionData, timestamp) {
 /**
  * Builds a basic report from execution data when the LLM call fails.
  * Ensures the user always gets something useful even if report generation errors out.
+ * @param {object} executionData
+ * @returns {string} Markdown report string
  */
 function buildFallbackReport(executionData) {
   if (!executionData) return 'Report generation failed: no execution data available.';
