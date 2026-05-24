@@ -368,3 +368,19 @@ export function sendHeartbeat(durationMs) {
     timestamp: Date.now()
   }).catch(() => {});
 }
+
+/**
+ * (8.1) Broadcast the generated plan to the popup for preview before execution.
+ *
+ * @param {Array<string>} steps - Array of plan step strings
+ * @param {number} [estimatedSteps] - Total estimated step count
+ */
+export function sendPlanPreview(steps, estimatedSteps) {
+  if (!steps || !steps.length) return;
+  chrome.runtime.sendMessage({
+    action: 'plan_preview',
+    steps,
+    estimatedSteps: estimatedSteps || steps.length,
+    timestamp: Date.now()
+  }).catch(() => {});
+}

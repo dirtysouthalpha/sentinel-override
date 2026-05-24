@@ -2889,6 +2889,41 @@ chrome.runtime.onMessage.addListener((message) => {
       __lastClickCoords = null;
     }
   }
+  // (8.1) Plan preview — show collapsible plan card before execution starts
+  if (message.action === 'plan_preview') {
+    try {
+      const steps = message.steps;
+      if (Array.isArray(steps) && steps.length) {
+        const chatEl = document.getElementById('chat');
+        if (chatEl) {
+          const existing = chatEl.querySelector('.plan-preview-card');
+          if (existing) existing.remove();
+          const card = document.createElement('div');
+          card.className = 'plan-preview-card';
+          card.style.cssText = 'margin:8px 0; padding:10px 12px; background:var(--bg-secondary,#1a1a1a); border:1px solid var(--border,#333); border-radius:6px; font-size:12px;';
+          const header = document.createElement('div');
+          header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
+          header.innerHTML = '<span style="font-weight:600; color:var(--text-primary,#eee);">📋 Plan (' + steps.length + ' steps)</span><span class="plan-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
+          const list = document.createElement('ol');
+          list.style.cssText = 'margin:8px 0 0; padding-left:20px; color:var(--text-secondary,#aaa); line-height:1.6;';
+          steps.forEach(s => {
+            const li = document.createElement('li');
+            li.textContent = typeof s === 'string' ? s : (s.description || JSON.stringify(s));
+            list.appendChild(li);
+          });
+          header.addEventListener('click', () => {
+            const shown = list.style.display !== 'none';
+            list.style.display = shown ? 'none' : 'block';
+            header.querySelector('.plan-chevron').textContent = shown ? '▶' : '▼';
+          });
+          card.appendChild(header);
+          card.appendChild(list);
+          chatEl.appendChild(card);
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+      }
+    } catch (_) { /* non-fatal */ }
+  }
   // (6.0) New step starting — create activity stream card
   if (message.action === 'agent_step_start') {
     _ensureActivityStream(message.stepNumber);

@@ -101,6 +101,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendAgentStepStart: mockSendAgentStepStart,
   sendAgentStatus: jest.fn(),
   sendHeartbeat: jest.fn(),
+  sendPlanPreview: jest.fn(),
 }));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
