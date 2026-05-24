@@ -817,23 +817,23 @@ export function supportsVision(model, providerHint) {
  * @param {Object} [context={}] - Additional context (currentUrl, pageTitle, etc.).
  * @returns {Promise<Array|null>} Parsed plan steps, or null on failure.
  */
-export async function generatePlan(goal, settings, context = {}) {
-  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
-  const apiKey = settings.api_key;
-  const model = settings.model || 'glm-5';
-  if (!apiKey) return null;
-
+/**
+ * Build the plan-generation prompt string from a goal and context object.
+ * Extracted from generatePlan to keep that function under 50 lines.
+ * @param {string} goal
+ * @param {object} context - { currentUrl, pageTitle, platformContext, relevantPatterns }
+ * @returns {string}
+ */
+function _buildPlanPrompt(goal, context) {
   const urlContext = context.currentUrl
     ? `Current page: ${context.currentUrl}${context.pageTitle ? ` (${context.pageTitle})` : ''}\n`
     : '';
-
   const platformContext = context.platformContext || '';
-
   const patternContext = context.relevantPatterns && context.relevantPatterns.length > 0
     ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => `- "${p.goal}" -> ${p.steps.map(s => s.type).join(', ')}`).join('\n')}\n`
     : '';
 
-  const planPrompt = `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
+  return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
 
 DECOMPOSITION RULES — follow these exactly:
 1. Break every task into EXPLICIT, atomic browser actions. NEVER combine multiple actions into one step.
@@ -848,7 +848,7 @@ DECOMPOSITION RULES — follow these exactly:
 10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change, followed by a verify action
 11. Maximum 15 steps — be thorough but not redundant
 
-${urlContext}${platformContext}${patternContext}${(function(){const d = getMultiPortalDirective(goal); return d || '';})()}${(function(){const d = getMultiArticleDirective(goal); return d || '';})()}
+${urlContext}${platformContext}${patternContext}${getMultiPortalDirective(goal) || ''}${getMultiArticleDirective(goal) || ''}
 <GOAL>
 ${goal}
 </GOAL>
@@ -870,6 +870,15 @@ Goal: "Check the SonicWall at 10.0.0.1 for why traffic from 192.168.5.20 is bein
 Example BAD plan (too vague):
 Goal: "Check the SonicWall firewall for blocked connections"
 { "plan": ["Go to the website", "Find the information", "Get the data"] }`;
+}
+
+export async function generatePlan(goal, settings, context = {}) {
+  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
+  const apiKey = settings.api_key;
+  const model = settings.model || 'glm-5';
+  if (!apiKey) return null;
+
+  const planPrompt = _buildPlanPrompt(goal, context);
 
   try {
     const controller = new AbortController();

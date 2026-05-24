@@ -69,56 +69,60 @@ function getInFlightRequestCount(tabId) {
  * @param {number} [maxWaitMs=5000] - Maximum time to wait (capped by pageLoadTimeout)
  * @returns {Promise<void>}
  */
-export async function waitForPageReady(tabId, maxWaitMs = 5000) {
-  const cap = Math.min(maxWaitMs, pageLoadConfig.pageLoadTimeout);
-  const startTime = Date.now();
-  const pollInterval = 200; // poll every 200ms
-  const networkIdleMs = 500; // network must be idle for 500ms to count
 
-  let networkIdleSince = null; // timestamp when in-flight requests first hit 0
-
-  while (Date.now() - startTime < cap) {
-    // 1. Check DOM readiness via content script
-    let domReady = false;
-    try {
-      const result = await chrome.tabs.sendMessage(tabId, {
-        action: 'execute_command',
-        command: {
-          type: 'execute_js',
-          code: `(() => {
+/**
+ * Query the tab's content script for DOM readiness state.
+ * Returns true if readyState=complete, body has content, and no spinner is visible.
+ * @param {number} tabId
+ * @returns {Promise<boolean>}
+ */
+async function _checkDomReadyState(tabId) {
+  try {
+    const result = await chrome.tabs.sendMessage(tabId, {
+      action: 'execute_command',
+      command: {
+        type: 'execute_js',
+        code: `(() => {
             const rs = document.readyState;
             const bodyLen = (document.body && document.body.innerText) ? document.body.innerText.length : 0;
             const hasSpinner = !!document.querySelector('[class*="spinner"], [class*="loading"], [class*="loader"], [role="progressbar"]');
             return JSON.stringify({ readyState: rs, bodyLen: bodyLen, hasSpinner: hasSpinner });
           })()`
-        }
-      }).catch(() => null);
-      if (result) {
-        // Unwrap the content script envelope
-        let data = result;
-        if (typeof data === 'string') {
-          try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (_e) { /* parse failed, will try other formats */ }
-        }
-        if (data && typeof data === 'object') {
-          let parsed;
-          try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (_e) { parsed = null; /* parse failed, continue */ }
-          if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
-            domReady = true;
-          }
-        } else if (typeof data === 'string') {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) {
-              domReady = true;
-            }
-          } catch (_e) { /* parse failed, will try other formats */ }
-        }
       }
-    } catch (_e) {
-      // Content script not yet injected — this is normal during page load
+    }).catch(() => null);
+    if (!result) return false;
+    let data = result;
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (_e) { /* parse failed */ }
     }
+    if (data && typeof data === 'object') {
+      let parsed;
+      try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (_e) { parsed = null; }
+      if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
+    } else if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
+      } catch (_e) { /* parse failed */ }
+    }
+  } catch (_e) {
+    // Content script not yet injected — normal during page load
+  }
+  return false;
+}
 
-    // 2. Check network idle
+export async function waitForPageReady(tabId, maxWaitMs = 5000) {
+  const cap = Math.min(maxWaitMs, pageLoadConfig.pageLoadTimeout);
+  const startTime = Date.now();
+  const pollInterval = 200;
+  const networkIdleMs = 500;
+
+  let networkIdleSince = null;
+
+  while (Date.now() - startTime < cap) {
+    const domReady = await _checkDomReadyState(tabId);
+
+    // Check network idle
     const inFlight = getInFlightRequestCount(tabId);
     if (inFlight === 0) {
       if (!networkIdleSince) networkIdleSince = Date.now();

@@ -54,6 +54,9 @@ A self-healing, self-learning browser agent built for the work technicians actua
 | **14 themes + custom CSS** | ✅ Full visual customization | Limited |
 | **Hallucination hard-stop gate** | ✅ Counts claims vs evidence | Prompt-only |
 | **Multi-portal investigation mode** | ✅ Auto-detects + paces | ❌ |
+| **Self-healing selectors** | ✅ Case-insensitive, partial-match, text fallback | ❌ |
+| **Pause / resume mid-run** | ✅ One-click pause with state preservation | ❌ |
+| **Step progress counter** | ✅ Live STEP X/MAX in popup | Limited |
 
 ---
 
