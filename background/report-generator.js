@@ -289,63 +289,91 @@ export async function generateReport(executionData, CONFIG) {
  * @returns {Promise<string>} The generated report text
  */
 async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
-  const providerConfig = await getActiveProvider();
-  if (!providerConfig) throw new Error('No active provider configured');
-  const { endpoint, apiKey, model } = providerConfig;
+  const MAX_ATTEMPTS = 2;
+  const REPORT_TIMEOUT = CONFIG.reportTimeout || 90000;
+  let lastError = null;
 
-  if (!apiKey) throw new Error('API key not configured');
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const providerConfig = await getActiveProvider();
+      if (!providerConfig) throw new Error('No active provider configured');
+      const { endpoint, apiKey, model } = providerConfig;
+      if (!apiKey) throw new Error('API key not configured');
 
-  const provider = resolveProvider(endpoint);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CONFIG.reportTimeout || Math.max(CONFIG.fetchTimeout * 2 || 90000, 90000));
+      const provider = resolveProvider(endpoint);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REPORT_TIMEOUT);
 
-  const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
+      const reportSystem = systemPrompt || 'You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Return ONLY the report content with no wrapping.';
 
-  let requestBody, requestHeaders;
-  try {
-    requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens: 6000, temperature: 0.3 }));
-    requestHeaders = provider.buildHeaders(apiKey);
-  } catch (err) {
-    clearTimeout(timeout);
-    throw new Error('Failed to build report request: ' + err.message);
+      const maxTokens = attempt === 1 ? 4000 : 2000;
+      let requestBody, requestHeaders;
+      try {
+        requestBody = JSON.stringify(provider.buildBody(model, reportSystem, prompt, { maxTokens, temperature: 0.3 }));
+        requestHeaders = provider.buildHeaders(apiKey);
+      } catch (err) {
+        clearTimeout(timeout);
+        throw new Error('Failed to build report request: ' + err.message);
+      }
+
+      let response;
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: requestBody,
+          signal: controller.signal
+        });
+      } catch (err) {
+        clearTimeout(timeout);
+        if (err.name === 'AbortError') {
+          lastError = new Error('Report LLM timed out after ' + (REPORT_TIMEOUT/1000) + 's (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')');
+          if (attempt < MAX_ATTEMPTS) {
+            console.warn('[Sentinel/report] Attempt', attempt, 'timed out, retrying with shorter output...');
+            continue;
+          }
+          throw lastError;
+        }
+        throw err;
+      }
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        const errorData = await response.text().catch(() => 'unknown error');
+        lastError = new Error('Report LLM call failed: ' + response.status + ' - ' + errorData);
+        if (attempt < MAX_ATTEMPTS) {
+          console.warn('[Sentinel/report] Attempt', attempt, 'failed:', response.status, 'retrying...');
+          continue;
+        }
+        throw lastError;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Report LLM returned invalid JSON');
+      }
+      const responseText = provider.parseResponse(data);
+
+      let cleaned = responseText.trim();
+      if (cleaned.startsWith('```')) {
+        cleaned = cleaned.replace(/^```(?:markdown|md)?\s*
+?/, '').replace(/
+?```\s*$/, '');
+      }
+
+      return cleaned;
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn('[Sentinel/report] Attempt', attempt, 'failed:', err.message, 'retrying...');
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
   }
-
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers: requestHeaders,
-      body: requestBody,
-      signal: controller.signal
-    });
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === 'AbortError') throw new Error(`Report LLM call timed out after ${(CONFIG.fetchTimeout || 45000) / 1000}s`);
-    throw err;
-  }
-  clearTimeout(timeout);
-
-  if (!response.ok) {
-    const errorData = await response.text().catch(() => 'unknown error');
-    throw new Error(`Report LLM call failed: ${response.status} - ${errorData}`);
-  }
-
-  let data;
-  try {
-    data = await response.json();
-  } catch {
-    throw new Error('Report LLM returned invalid JSON');
-  }
-  const responseText = provider.parseResponse(data);
-
-  let cleaned = responseText.trim();
-  if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/, '').replace(/\n?```\s*$/, '');
-  }
-
-  return cleaned;
+  throw lastError;
 }
-
 // ========== Structured Data Builder ==========
 /**
  * Builds a machine-readable JSON object from raw execution data.
