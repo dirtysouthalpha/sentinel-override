@@ -67,6 +67,44 @@ chrome.runtime.onInstalled.addListener(() => {
 // Re-register alarms on service worker restart (handles browser restart alarm loss)
 initScheduler();
 
+// ========== Self-Healing: Auto-resume interrupted runs ==========
+// On SW restart, check if an agent run was in progress and auto-resume it.
+(async () => {
+  try {
+    const stored = await chrome.storage.session.get(['agentRunning', 'agentGoal', 'agentStartTime']);
+    if (stored && stored.agentRunning && stored.agentGoal) {
+      const age = Date.now() - (stored.agentStartTime || 0);
+      // Only auto-resume if the run started less than 10 minutes ago
+      if (age < 10 * 60 * 1000) {
+        console.log('[Sentinel/self-heal] Detected interrupted run. Goal:', stored.agentGoal, 'Age:', Math.floor(age/1000) + 's');
+        // Check for checkpoint with more state
+        const cp = await chrome.storage.session.get('agent_checkpoint');
+        if (cp && cp.agent_checkpoint && cp.agent_checkpoint.lastGoal) {
+          console.log('[Sentinel/self-heal] Checkpoint found, resuming...');
+          const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
+          const result = await restoreFromCheckpoint();
+          if (result.restored) {
+            await clearCheckpoint();
+            console.log('[Sentinel/self-heal] State restored, restarting agent loop');
+            const { startAgent } = await import('./agent-engine.js');
+            // Get any active tab to restart on
+            const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t || [])); });
+            if (tabs.length > 0) {
+              await startAgent(result.goal, { tab: tabs[0] });
+            }
+          }
+        }
+      } else {
+        // Stale run — clear the flag
+        console.log('[Sentinel/self-heal] Stale run detected (', Math.floor(age/60000), 'min old), clearing');
+        await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']);
+      }
+    }
+  } catch (e) {
+    console.warn('[Sentinel/self-heal] Auto-resume check failed:', e && e.message);
+  }
+})();
+
 // ========== Context Menu Click Handler (v3.44) ==========
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   const result = handleMenuClick(info, tab);

@@ -562,6 +562,8 @@ export async function startAgent(goal, sender) {
   }
 
   agentRunning = true;
+  // Persist running state so SW restarts can detect an interrupted run
+  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(e) {}
   resetAgentState();
   tel.info('lifecycle', 'Agent started', { goal: (goal || '').substring(0, 200), startTabId });
 
@@ -2384,7 +2386,9 @@ async function runAgentLoop(goal, workingTabId) {
   const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
   try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', e); }
 
+  console.log('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
   while (!finished && agentRunning) {
+    console.log('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
     try {
       // Pause check — wait until resumed
       if (agentPaused) {
@@ -2547,12 +2551,15 @@ async function runAgentLoop(goal, workingTabId) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
                 await persistHistory();
               }
-              console.log('[Sentinel/DEBUG] auto-navigate done, continuing to step 2');
+              console.log('[Sentinel/DEBUG] auto-navigate done, re-registering tab');
+              // Defensive: re-register the tab after navigation in case the tab
+              // lifecycle events cleared the context during page load
+              try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', e); }
               continue;
             }
             console.log('[Sentinel/DEBUG] Already on right page, skipping navigation');
             // Already on the right page - skip navigation
-          } catch (_) { /* URL parse error, skip auto-navigate */ }
+          } catch (navErr) { console.warn('[Sentinel/DEBUG] auto-navigate error:', navErr && navErr.message); /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -4610,13 +4617,34 @@ async function runAgentLoop(goal, workingTabId) {
       console.error('[Sentinel/DEBUG] Agent loop CAUGHT error:', err, err.message, err.stack);
       sendSilentUpdate(`Loop error: ${err.message}`, stepCount);
       consecutiveFailures++;
-      if (err.message.includes('was closed')) { agentRunning = false; break; }
+      // Don't kill the loop on tab-closed errors — try to recover instead
+      if (err.message.includes('was closed')) {
+        console.warn('[Sentinel/DEBUG] Tab was closed, attempting recovery...');
+        // Try to find another tab or the same tab re-created
+        try {
+          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
+          if (allTabs.length > 0) {
+            const recoveryTab = allTabs[0];
+            registerInitialTab(recoveryTab.id, recoveryTab.url || '');
+            console.log('[Sentinel/DEBUG] Recovered to tab:', recoveryTab.id, recoveryTab.url);
+          } else {
+            console.error('[Sentinel/DEBUG] No tabs available, stopping agent');
+            agentRunning = false;
+            break;
+          }
+        } catch (recoveryErr) {
+          console.error('[Sentinel/DEBUG] Recovery failed:', recoveryErr);
+          agentRunning = false;
+          break;
+        }
+      }
       await sleep(3000);
     }
   }
 
-  // Release the loop keepalive
+  // Release the loop keepalive and clear persisted running state
   try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
+  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {}
 
   console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
   if (finished) {
