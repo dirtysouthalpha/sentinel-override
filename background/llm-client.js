@@ -1046,6 +1046,122 @@ export function setLLMRateLimit(maxCalls, windowMs) {
 
 export function resetLLMRateLimiter() { _rateLimiter.reset(); }
 
+// ========== LLM Prompt Context Builders ==========
+
+// Build the strategy-shift injection when the agent has failed consecutively.
+// Returns an empty string when below the failure threshold.
+function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
+  if (agentState.consecutiveFailures < CONFIG.strategyShiftThreshold) return '';
+  const _u = (currentUrl || '').toLowerCase();
+  let platformHints = '';
+  if (/entra|admin\.microsoft|admin\.exchange|purview|defender|security\.microsoft|portal\.azure|intune|endpoint\.microsoft/.test(_u)) {
+    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):\n' +
+      '- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.\n' +
+      '- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.\n' +
+      '- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.\n';
+  } else if (/virustotal/.test(_u)) {
+    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):\n' +
+      '- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.\n' +
+      '- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.\n';
+  } else if (/sentinelone|singularity/.test(_u)) {
+    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):\n' +
+      '- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.\n' +
+      '- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".\n';
+  } else if (/sonicwall|sonicos|fortigate|paloalto/.test(_u)) {
+    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (network device UI):\n' +
+      '- Custom dropdowns: click trigger to open, then click option (NOT the select action).\n' +
+      '- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n' +
+      '- Long log loads: use wait_for_text with 30000ms timeout.\n';
+  }
+  return '\nSTRATEGY SHIFT REQUIRED -- You have failed ' + agentState.consecutiveFailures + ' times in a row.\n' +
+    'Approaches already tried: ' + agentState.currentStrategies.join(', ') + '\n' +
+    'You MUST try a COMPLETELY DIFFERENT approach. Consider:\n' +
+    '- Using "execute_js" to write custom JavaScript to accomplish the task\n' +
+    '- Using "read_network_requests" to read the underlying API response\n' +
+    '- Scrolling to find different elements\n' +
+    '- Navigating to a different page\n' +
+    '- Using "extract" + memory to build data step by step\n' +
+    platformHints +
+    'Do NOT repeat the same failed action.\n';
+}
+
+// Build the execution-plan status block injected before the prompt schema.
+// Returns empty string if no plan exists.
+function _buildPlanCtx(agentPlan, currentPlanStep) {
+  if (!agentPlan || !agentPlan.length) return '';
+  const planLines = agentPlan.map((step, i) => {
+    const marker = i < currentPlanStep ? '[done]' : i === currentPlanStep ? '[current]' : '[pending]';
+    return `${marker} ${i + 1}. ${step}`;
+  }).join('\n');
+  return `\nEXECUTION PLAN (your roadmap -- follow in order):\n${planLines}\n\nCURRENT PLAN STEP: ${currentPlanStep + 1} -- "${agentPlan[currentPlanStep] || 'All steps complete'}"\nWhen the current plan step is fully done, include "advance_plan": true in your JSON response.\n`;
+}
+
+// Build the multi-tab context block listing all managed tabs with snapshots.
+// Returns empty string when only one tab is managed.
+function _buildTabCtx() {
+  const allContexts = getAllTabContexts();
+  const activeId = getActiveTabId();
+  if (allContexts.length === 0) return '';
+  let tabCtxSection = `\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`;
+  for (const ctx of allContexts) {
+    const isActive = ctx.tabId === activeId;
+    const marker = isActive ? '[ACTIVE] ' : '';
+    const snapSummary = ctx.snapshot
+      ? `Last seen: "${(ctx.snapshot.pageContent || '').substring(0, 300)}..." (${new Date(ctx.snapshot.timestamp).toLocaleTimeString()})`
+      : 'No snapshot yet.';
+    tabCtxSection += `- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`;
+  }
+  tabCtxSection += `\nTab rules:\n`;
+  tabCtxSection += `- Use "open_tab" to open a new URL in a background tab (max ${TAB_LIMIT} tabs total)\n`;
+  tabCtxSection += `- Use "switch_tab" with a label to operate on a different tab\n`;
+  tabCtxSection += `- Use "close_tab" with a label to close a tab you no longer need\n`;
+  tabCtxSection += `- Extract data from a tab BEFORE opening new tabs that might push it past the ${TAB_LIMIT}-tab limit\n`;
+  tabCtxSection += `- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`;
+  return tabCtxSection;
+}
+
+// Strip screenshot payloads from history entries beyond the most-recent step,
+// and trim the window to the configured size. Keeps token cost bounded.
+function _sanitizeHistory(history, isRunbook, CONFIG) {
+  const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
+  const slicedHistory = history.slice(-historyWindowSize);
+  return slicedHistory.map((h, idx) => {
+    const isMostRecent = idx === slicedHistory.length - 1;
+    const action = h.action || {};
+    const safeAction = {
+      type: action.type,
+      selector: action.selector
+        ? (action.selector.length > 60 ? '...' + action.selector.slice(-60) : action.selector)
+        : undefined,
+      text: action.text,
+      url: action.url
+    };
+    let safeResult;
+    if (typeof h.result === 'string') {
+      safeResult = h.result.substring(0, 200);
+    } else if (h.result && typeof h.result === 'object') {
+      const r = { ...h.result };
+      if (!isMostRecent) {
+        if ('base64Image' in r) r.base64Image = '[screenshot omitted from history]';
+        if ('image_url' in r) r.image_url = '[screenshot omitted from history]';
+        if ('imageUrl' in r) r.imageUrl = '[screenshot omitted from history]';
+        if ('screenshot' in r) r.screenshot = '[screenshot omitted from history]';
+        if ('image' in r) r.image = '[screenshot omitted from history]';
+      }
+      safeResult = r;
+    } else {
+      safeResult = h.result;
+    }
+    const cleanedEntry = { step: h.step, action: safeAction, result: safeResult };
+    if (!isMostRecent) {
+      if ('base64Image' in h) cleanedEntry.base64Image = '[screenshot omitted from history]';
+      if ('image_url' in h) cleanedEntry.image_url = '[screenshot omitted from history]';
+      if ('imageUrl' in h) cleanedEntry.imageUrl = '[screenshot omitted from history]';
+    }
+    return cleanedEntry;
+  });
+}
+
 // ========== Main LLM Call ==========
 // trimmedElements: the capped/cleaned element list built in the main loop
 // totalElementCount: the raw count before trimming (for the prompt header)
@@ -1098,41 +1214,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const platformCtx = getPlatformContext(currentUrl, goal);
 
   // Self-healing: strategy shift prompt — platform-aware (3.9.0)
-  let strategyCtx = '';
-  if (agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold) {
-    // Detect what platform we're on and emit specific recovery hints.
-    let platformHints = '';
-    const _u = (currentUrl || '').toLowerCase();
-    if (/entra|admin\.microsoft|admin\.exchange|purview|defender|security\.microsoft|portal\.azure|intune|endpoint\.microsoft/.test(_u)) {
-      platformHints = '\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):\n' +
-        '- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.\n' +
-        '- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.\n' +
-        '- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.\n';
-    } else if (/virustotal/.test(_u)) {
-      platformHints = '\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):\n' +
-        '- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.\n' +
-        '- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.\n';
-    } else if (/sentinelone|singularity/.test(_u)) {
-      platformHints = '\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):\n' +
-        '- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.\n' +
-        '- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".\n';
-    } else if (/sonicwall|sonicos|fortigate|paloalto/.test(_u)) {
-      platformHints = '\nPLATFORM-SPECIFIC RECOVERY (network device UI):\n' +
-        '- Custom dropdowns: click trigger to open, then click option (NOT the select action).\n' +
-        '- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n' +
-        '- Long log loads: use wait_for_text with 30000ms timeout.\n';
-    }
-    strategyCtx = '\nSTRATEGY SHIFT REQUIRED -- You have failed ' + agentState.consecutiveFailures + ' times in a row.\n' +
-      'Approaches already tried: ' + agentState.currentStrategies.join(', ') + '\n' +
-      'You MUST try a COMPLETELY DIFFERENT approach. Consider:\n' +
-      '- Using "execute_js" to write custom JavaScript to accomplish the task\n' +
-      '- Using "read_network_requests" to read the underlying API response\n' +
-      '- Scrolling to find different elements\n' +
-      '- Navigating to a different page\n' +
-      '- Using "extract" + memory to build data step by step\n' +
-      platformHints +
-      'Do NOT repeat the same failed action.\n';
-  }
+  const strategyCtx = _buildStrategyCtx(agentState, currentUrl, CONFIG);
 
   // Self-learning: inject relevant patterns
   const patterns = await getRelevantPatterns(goal);
@@ -1168,86 +1250,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     : '';
 
   // Inject plan context if a plan was generated
-  let planCtx = '';
-  if (agentState.agentPlan && agentState.agentPlan.length > 0) {
-    const planLines = agentState.agentPlan.map((step, i) => {
-      const marker = i < agentState.currentPlanStep ? '[done]' : i === agentState.currentPlanStep ? '[current]' : '[pending]';
-      return `${marker} ${i + 1}. ${step}`;
-    }).join('\n');
-    planCtx = `\nEXECUTION PLAN (your roadmap -- follow in order):\n${planLines}\n\nCURRENT PLAN STEP: ${agentState.currentPlanStep + 1} -- "${agentState.agentPlan[agentState.currentPlanStep] || 'All steps complete'}"\nWhen the current plan step is fully done, include "advance_plan": true in your JSON response.\n`;
-  }
+  const planCtx = _buildPlanCtx(agentState.agentPlan, agentState.currentPlanStep);
 
   // Multi-tab context: show all managed tabs with summaries
-  const allContexts = getAllTabContexts();
-  const activeId = getActiveTabId();
-
-  let tabCtxSection = '';
-  if (allContexts.length > 0) {
-    tabCtxSection = `\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`;
-    for (const ctx of allContexts) {
-      const isActive = ctx.tabId === activeId;
-      const marker = isActive ? '[ACTIVE] ' : '';
-      const snapSummary = ctx.snapshot
-        ? `Last seen: "${(ctx.snapshot.pageContent || '').substring(0, 300)}..." (${new Date(ctx.snapshot.timestamp).toLocaleTimeString()})`
-        : 'No snapshot yet.';
-      tabCtxSection += `- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`;
-    }
-    tabCtxSection += `\nTab rules:\n`;
-    tabCtxSection += `- Use "open_tab" to open a new URL in a background tab (max ${TAB_LIMIT} tabs total)\n`;
-    tabCtxSection += `- Use "switch_tab" with a label to operate on a different tab\n`;
-    tabCtxSection += `- Use "close_tab" with a label to close a tab you no longer need\n`;
-    tabCtxSection += `- Extract data from a tab BEFORE opening new tabs that might push it past the ${TAB_LIMIT}-tab limit\n`;
-    tabCtxSection += `- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`;
-  }
+  const tabCtxSection = _buildTabCtx();
 
   // Loop directive from stall detection
   const loopCtx = agentState.loopDirective || '';
 
-  // History sanitization: strip large screenshot/image payloads from past
-  // history entries so we never resend old screenshots. The most recent
-  // screenshot is attached separately via the vision channel; older ones
-  // are left as a placeholder string for token-cost containment.
+  // History sanitization: strip screenshot payloads from older entries
   const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
-  const slicedHistory = history.slice(-historyWindowSize);
-  const sanitizedHistory = slicedHistory.map((h, idx) => {
-    const isMostRecent = idx === slicedHistory.length - 1;
-    const action = h.action || {};
-    const safeAction = {
-      type: action.type,
-      selector: action.selector
-        ? (action.selector.length > 60 ? '...' + action.selector.slice(-60) : action.selector)
-        : undefined,
-      text: action.text,
-      url: action.url
-    };
-
-    let safeResult;
-    if (typeof h.result === 'string') {
-      safeResult = h.result.substring(0, 200);
-    } else if (h.result && typeof h.result === 'object') {
-      // Strip image fields from non-most-recent entries.
-      const r = { ...h.result };
-      if (!isMostRecent) {
-        if ('base64Image' in r) r.base64Image = '[screenshot omitted from history]';
-        if ('image_url' in r) r.image_url = '[screenshot omitted from history]';
-        if ('imageUrl' in r) r.imageUrl = '[screenshot omitted from history]';
-        if ('screenshot' in r) r.screenshot = '[screenshot omitted from history]';
-        if ('image' in r) r.image = '[screenshot omitted from history]';
-      }
-      safeResult = r;
-    } else {
-      safeResult = h.result;
-    }
-
-    // Also strip any image fields embedded directly on the history entry.
-    const cleanedEntry = { step: h.step, action: safeAction, result: safeResult };
-    if (!isMostRecent) {
-      if ('base64Image' in h) cleanedEntry.base64Image = '[screenshot omitted from history]';
-      if ('image_url' in h) cleanedEntry.image_url = '[screenshot omitted from history]';
-      if ('imageUrl' in h) cleanedEntry.imageUrl = '[screenshot omitted from history]';
-    }
-    return cleanedEntry;
-  });
+  const sanitizedHistory = _sanitizeHistory(history, isRunbook, CONFIG);
 
   // Build prompt
   const prompt = `You are Sentinel Override v3, an autonomous browser agent. You can create tools, extract data, and solve ANY web task.
