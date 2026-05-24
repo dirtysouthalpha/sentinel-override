@@ -375,6 +375,24 @@ export function sendHeartbeat(durationMs) {
  * @param {Array<string>} steps - Array of plan step strings
  * @param {number} [estimatedSteps] - Total estimated step count
  */
+/**
+ * (9.1) Broadcast the client knowledge facts being injected so the popup can
+ * show "Using 5 facts for MSP Client: ..." before the run starts.
+ *
+ * @param {string} clientName - Display name of the active client
+ * @param {Array<{id:string,wisdom:string,scope:string}>} entries - Relevant entries
+ */
+export function sendClientKnowledgePreview(clientName, entries) {
+  if (!entries || !entries.length) return;
+  chrome.runtime.sendMessage({
+    action: 'client_knowledge_preview',
+    clientName: clientName || 'Unknown Client',
+    count: entries.length,
+    facts: entries.map(e => ({ id: e.id, wisdom: e.wisdom, scope: e.scope })),
+    timestamp: Date.now()
+  }).catch(() => {});
+}
+
 export function sendPlanPreview(steps, estimatedSteps) {
   if (!steps || !steps.length) return;
   chrome.runtime.sendMessage({

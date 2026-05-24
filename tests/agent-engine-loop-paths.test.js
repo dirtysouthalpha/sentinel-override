@@ -142,7 +142,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendAgentActivity: jest.fn(),
   sendAgentStepStart: jest.fn(),
   sendAgentStatus: jest.fn(),
-  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(),
+  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(), sendClientKnowledgePreview: jest.fn(),
 }));
 
 // Store mock functions in variables so they can be used in tests

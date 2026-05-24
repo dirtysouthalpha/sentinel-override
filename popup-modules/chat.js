@@ -2889,6 +2889,43 @@ chrome.runtime.onMessage.addListener((message) => {
       __lastClickCoords = null;
     }
   }
+  // (9.1) Client knowledge visibility — show which facts are being injected
+  if (message.action === 'client_knowledge_preview') {
+    try {
+      const facts = message.facts;
+      if (Array.isArray(facts) && facts.length) {
+        const chatEl = document.getElementById('chat');
+        if (chatEl) {
+          const existing = chatEl.querySelector('.ck-preview-card');
+          if (existing) existing.remove();
+          const card = document.createElement('div');
+          card.className = 'ck-preview-card';
+          card.style.cssText = 'margin:6px 0; padding:8px 12px; background:var(--bg-secondary,#1a1a1a); border:1px solid var(--border,#333); border-left:3px solid #4a9eff; border-radius:6px; font-size:11px;';
+          const header = document.createElement('div');
+          header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
+          header.innerHTML = '<span style="font-weight:600; color:#4a9eff;">🧠 ' + facts.length + ' fact' + (facts.length !== 1 ? 's' : '') + ' for ' + (message.clientName || 'client') + '</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
+          const list = document.createElement('div');
+          list.style.cssText = 'margin-top:6px;';
+          facts.forEach(f => {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding:3px 0; border-top:1px solid var(--border,#333); color:var(--text-secondary,#aaa); line-height:1.5;';
+            const wisdom = (f.wisdom || '').length > 120 ? f.wisdom.substring(0, 117) + '...' : f.wisdom;
+            item.textContent = wisdom;
+            list.appendChild(item);
+          });
+          header.addEventListener('click', () => {
+            const shown = list.style.display !== 'none';
+            list.style.display = shown ? 'none' : 'block';
+            header.querySelector('.ck-chevron').textContent = shown ? '▶' : '▼';
+          });
+          card.appendChild(header);
+          card.appendChild(list);
+          chatEl.appendChild(card);
+          chatEl.scrollTop = chatEl.scrollHeight;
+        }
+      }
+    } catch (_) { /* non-fatal */ }
+  }
   // (8.1) Plan preview — show collapsible plan card before execution starts
   if (message.action === 'plan_preview') {
     try {
