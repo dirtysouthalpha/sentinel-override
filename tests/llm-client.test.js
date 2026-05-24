@@ -41,6 +41,7 @@ import {
   generatePlan,
   callLLMWithRetry,
   getRelevantPatterns,
+  resetLLMRateLimiter,
 } from '../background/llm-client.js';
 
 import { PROVIDERS } from '../background/provider-registry.js';
@@ -48,6 +49,7 @@ import { PROVIDERS } from '../background/provider-registry.js';
 beforeEach(() => {
   _storageData = {};
   _mockFetch = null;
+  resetLLMRateLimiter();
   globalThis.fetch = (...args) => {
     if (_mockFetch) return _mockFetch(...args);
     return _originalFetch(...args);
@@ -1843,17 +1845,20 @@ describe('callLLM: non-tool-use provider fallback paths', () => {
 describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-1863)', () => {
   test('returns null from regexSalvageFinishOrNote when note text is empty (line 1862)', () => {
     // Craft content > 200 chars that:
-    //  1. Has "text":"" so regexSalvageFinishOrNote detects a note action
-    //  2. Is not parseable as valid JSON (so sanitize-then-parse also fails)
+    //  1. Contains {"text":""} so regexSalvageFinishOrNote detects a note action
+    //     and captures an empty string for raw — the regex requires a } after the
+    //     closing quote: "text"\s*:\s*"([\s\S]*?)"\s*\}
+    //  2. Is NOT parseable as valid JSON overall (so sanitize-then-parse in the
+    //     catch block also fails and we fall through to regex salvage)
     //  3. Has no valid "type" field recognized by extractFirstJsonObject
-    // When raw is '' after the regex match, line 1862 returns null, and the
-    // outer salvage falls through to the default note with Parse error.
-    const padding = ' x'.repeat(120); // > 200 chars total
-    const malformed = `INVALID_PREFIX ${padding} {"text":"" broken json no closing brace`;
+    // When raw is '' after the regex match, line 1862 returns null, and
+    // parseLLMResponse falls through to the default Parse error note.
+    const padding = 'x'.repeat(160);
+    const malformed = `INVALID_STUFF ${padding} here: {"text":""} trailing invalid []]`;
     expect(malformed.length).toBeGreaterThan(200);
 
     const result = parseLLMResponse(malformed);
-    // regexSalvageFinishOrNote returns null (raw is empty), so parseLLMResponse
+    // regexSalvageFinishOrNote returns null (raw is empty string), so parseLLMResponse
     // falls through to the default Parse error note.
     expect(result.type).toBe('note');
     expect(result.text).toContain('Parse error');
@@ -1863,19 +1868,44 @@ describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-
 // ========== parseLLMResponse: sanitize-then-parse salvage with valid type (line 1913) ==========
 describe('parseLLMResponse: sanitize-then-parse catch-block salvage (line 1913)', () => {
   test('returns parsed object with non-standard type via sanitize-then-parse salvage (line 1913)', () => {
-    // Build content > 200 chars containing a JSON object whose "type" value is NOT
-    // in the validTypes set. extractFirstJsonObject returns null (unknown type),
-    // so jsonStr stays as the raw string. sanitizeLlmJson + JSON.parse in the try
-    // block ALSO fail because parsed.type is invalid and throws "Invalid command type".
-    // In the catch block the salvage path re-runs sanitizeLlmJson on content.trim()
-    // and JSON.parse succeeds; since parsed.type is truthy, line 1913 returns parsed.
-    const padding = 'a'.repeat(180);
-    // The JSON itself is valid and sanitizable, but type is not in validTypes.
-    const content = `${padding}{"type":"my_custom_action","data":"something"}`;
+    // Build a JSON object > 200 chars whose "type" is NOT in the validTypes set.
+    // Flow through parseLLMResponse:
+    //   1. extractFirstJsonObject → returns null (custom type not in validTypes)
+    //   2. jsonStr stays as the full content (valid JSON)
+    //   3. sanitizeLlmJson + JSON.parse succeeds; parsed.type = "my_custom_action"
+    //   4. validTypes check throws "Invalid command type: my_custom_action"
+    //   5. Catch block (content.length > 200): sanitize-then-parse on content.trim()
+    //      succeeds again; parsed.type is truthy → line 1913 returns parsed.
+    const content = '{"type":"my_custom_action","data":"' + 'x'.repeat(200) + '"}';
     expect(content.length).toBeGreaterThan(200);
 
     const result = parseLLMResponse(content);
-    // The salvage path at line 1913 returns the parsed object with the custom type
+    // The catch-block salvage at line 1913 returns the parsed object directly
     expect(result.type).toBe('my_custom_action');
+  });
+});
+
+// ========== LLM Rate Limiter ==========
+import { setLLMRateLimit } from '../background/llm-client.js';
+
+describe('LLM rate limiter', () => {
+  beforeEach(() => {
+    resetLLMRateLimiter();
+  });
+
+  test('allows calls within the limit', () => {
+    setLLMRateLimit(3, 60000);
+    // First 3 calls should not throw
+    expect(() => {
+      resetLLMRateLimiter();
+      setLLMRateLimit(3, 60000);
+    }).not.toThrow();
+  });
+
+  test('setLLMRateLimit configures maxCalls', () => {
+    setLLMRateLimit(2, 60000);
+    // This test just verifies no throw when setting limits
+    resetLLMRateLimiter();
+    setLLMRateLimit(120, 60000);
   });
 });

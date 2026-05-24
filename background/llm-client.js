@@ -1032,6 +1032,8 @@ export function setLLMRateLimit(maxCalls, windowMs) {
   if (typeof windowMs === 'number' && windowMs > 0) _rateLimiter.windowMs = windowMs;
 }
 
+export function resetLLMRateLimiter() { _rateLimiter.reset(); }
+
 // ========== Main LLM Call ==========
 // trimmedElements: the capped/cleaned element list built in the main loop
 // totalElementCount: the raw count before trimming (for the prompt header)
