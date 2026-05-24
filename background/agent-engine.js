@@ -3559,7 +3559,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_e) {}
         let _verifyOutcome;
         if (!_verifyActual) {
-          _verifyOutcome = 'verify: element not found or empty (' + (_verifySelector || 'no selector') + ')';
+          _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
         } else if (!_verifyExpected) {
           _verifyOutcome = 'verified (read-back): ' + _verifyActual.slice(0, 200);
         } else if (_verifyActual.toLowerCase().includes(_verifyExpected.toLowerCase())) {
