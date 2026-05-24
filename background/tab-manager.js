@@ -111,6 +111,14 @@ async function _checkDomReadyState(tabId) {
   return false;
 }
 
+/**
+ * Poll until the tab's page is loaded and the content script is responsive.
+ * Caps the wait at the configured page-load timeout if maxWaitMs exceeds it.
+ *
+ * @param {number} tabId - Chrome tab ID to wait on.
+ * @param {number} [maxWaitMs=5000] - Maximum milliseconds to wait.
+ * @returns {Promise<void>}
+ */
 export async function waitForPageReady(tabId, maxWaitMs = 5000) {
   const cap = Math.min(maxWaitMs, pageLoadConfig.pageLoadTimeout);
   const startTime = Date.now();

@@ -875,6 +875,15 @@ Goal: "Check the SonicWall firewall for blocked connections"
 { "plan": ["Go to the website", "Find the information", "Get the data"] }`;
 }
 
+/**
+ * Generate a step-by-step execution plan for the given goal using the LLM.
+ * Returns an array of step strings, or null if planning fails or no API key is set.
+ *
+ * @param {string} goal - The user's task description.
+ * @param {object} settings - Provider settings: { api_endpoint, api_key, model }.
+ * @param {object} [context] - Optional context: { currentUrl, pageTitle, platformContext, relevantPatterns }.
+ * @returns {Promise<string[]|null>}
+ */
 export async function generatePlan(goal, settings, context = {}) {
   const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
   const apiKey = settings.api_key;
@@ -1039,11 +1048,17 @@ const _rateLimiter = {
   reset() { this.timestamps = []; }
 };
 
+/**
+ * Override the LLM rate limiter thresholds at runtime.
+ * @param {number} maxCalls - Maximum API calls allowed per window.
+ * @param {number} windowMs - Window duration in milliseconds.
+ */
 export function setLLMRateLimit(maxCalls, windowMs) {
   if (typeof maxCalls === 'number' && maxCalls > 0) _rateLimiter.maxCalls = maxCalls;
   if (typeof windowMs === 'number' && windowMs > 0) _rateLimiter.windowMs = windowMs;
 }
 
+/** Reset the LLM rate limiter call count and window start time. */
 export function resetLLMRateLimiter() { _rateLimiter.reset(); }
 
 // ========== LLM Prompt Context Builders ==========

@@ -139,36 +139,10 @@ function _buildMemorySummary(agentMemory) {
  * @param {object} CONFIG - Agent configuration object
  * @returns {Promise<{summary: string, fullReport: string, structuredData: object, goal: string, timestamp: string}>}
  */
-export async function generateReport(executionData, CONFIG) {
-  if (!executionData || typeof executionData !== 'object') {
-    throw new Error('generateReport: executionData is required');
-  }
-  const { goal = '', agentPlan, stepCount = 0, apiCallCount = 0 } = executionData;
-  const history = Array.isArray(executionData.history) ? executionData.history : [];
-  const tabContexts = Array.isArray(executionData.tabContexts) ? executionData.tabContexts : [];
-  const agentMemory = executionData.agentMemory || {};
-  const timestamp = new Date().toISOString();
-
-  sendSilentUpdate('Generating investigation report...');
-
-  const condensedHistory = history.map(h => ({
-    step: h.step,
-    action: h.action.type,
-    detail: h.action.selector ? h.action.selector.substring(0, 80) : (h.action.url || h.action.text || ''),
-    result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
-  }));
-
-  const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
-
-  const planContext = agentPlan && agentPlan.length > 0
-    ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
-    : '\nNo formal plan was generated (direct execution mode).';
-
-  const tabReferences = tabContexts.length > 0
-    ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
-    : '';
-
-  const reportPrompt = `You are a brilliant research analyst and writer — think Claude-quality output. Your job is to take raw data collected by a browser agent and produce a polished, insightful report that the user actually WANTS to read.
+// Build the report-generation prompt from execution data pieces.
+// Returns the user-content prompt string for the LLM report writer.
+function _buildReportPrompt(goal, planContext, stepCount, apiCallCount, timestamp, condensedHistory, memorySummary, tabReferences, citableKeysList) {
+  return `You are a brilliant research analyst and writer — think Claude-quality output. Your job is to take raw data collected by a browser agent and produce a polished, insightful report that the user actually WANTS to read.
 
 ## Original Goal
 ${goal}
@@ -252,9 +226,36 @@ Hard rules:
 5. Cite generously — overcitation is acceptable; under-citation is not.
 
 This is not optional. A report with specific numbers but no \`[src:*]\` tags is broken, even if the prose looks polished.`;
+}
 
+export async function generateReport(executionData, CONFIG) {
+  if (!executionData || typeof executionData !== 'object') {
+    throw new Error('generateReport: executionData is required');
+  }
+  const { goal = '', agentPlan, stepCount = 0, apiCallCount = 0 } = executionData;
+  const history = Array.isArray(executionData.history) ? executionData.history : [];
+  const tabContexts = Array.isArray(executionData.tabContexts) ? executionData.tabContexts : [];
+  const agentMemory = executionData.agentMemory || {};
+  const timestamp = new Date().toISOString();
+
+  sendSilentUpdate('Generating investigation report...');
+
+  const condensedHistory = history.map(h => ({
+    step: h.step,
+    action: h.action.type,
+    detail: h.action.selector ? h.action.selector.substring(0, 80) : (h.action.url || h.action.text || ''),
+    result: typeof h.result === 'string' ? h.result.substring(0, 200) : String(h.result)
+  }));
+  const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
+  const planContext = agentPlan && agentPlan.length > 0
+    ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    : '\nNo formal plan was generated (direct execution mode).';
+  const tabReferences = tabContexts.length > 0
+    ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
+    : '';
+
+  const reportPrompt = _buildReportPrompt(goal, planContext, stepCount, apiCallCount, timestamp, condensedHistory, memorySummary, tabReferences, citableKeysList);
   const reportSystemPrompt = `You are a world-class research analyst and writer. You produce clear, insightful, beautifully structured reports from raw data. Your writing is conversational yet authoritative — like a brilliant colleague who respects the reader's time. You never use filler phrases, corporate jargon, or generic descriptions. Every word earns its place.`;
-
   const structuredData = buildStructuredData(executionData, timestamp);
 
   try {

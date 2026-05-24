@@ -288,6 +288,14 @@ function _buildScheduleTiming(data, now) {
   throw new Error('Schedule type must be "once" or "recurring" with recurrence config');
 }
 
+/**
+ * Create and persist a new scheduled task.
+ * Validates the data, computes the first run time from cron/recurrence/runAt,
+ * and writes it to chrome.storage.local.
+ *
+ * @param {object} data - Schedule configuration (name, goal/templateId, recurrence, etc.).
+ * @returns {Promise<object>} The created schedule object with its generated id.
+ */
 export async function createSchedule(data) {
   _validateScheduleData(data);
 
