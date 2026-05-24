@@ -124,6 +124,39 @@ export function sendPageContext(url, pageTitle, stepNumber, tabId, totalSteps) {
   });
 }
 
+// Build a human-readable one-liner describing a command for the popup action card.
+function _describeCommand(command, observation) {
+  if (['click', 'type', 'hover', 'select', 'extract'].includes(command.type) && observation && observation.elements) {
+    const el = observation.elements.find(e => e.selector === command.selector);
+    if (el && el.text && el.text !== 'No label') {
+      const label = el.text.length > 50 ? el.text.substring(0, 47) + '...' : el.text;
+      if (command.type === 'click')    return `Click "${label}"`;
+      if (command.type === 'hover')    return `Hover "${label}"`;
+      if (command.type === 'select')   return `Select in "${label}"`;
+      if (command.type === 'extract')  return `Extract from "${label}"`;
+      return `Type into "${label}"`;
+    }
+    return `${command.type} element`;
+  }
+  if (command.type === 'navigate' && command.url) {
+    try { return `Navigate to ${new URL(command.url).hostname}`; } catch { return `Navigate to ${command.url}`; }
+  }
+  if (command.type === 'scroll')              return `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
+  if (command.type === 'execute_js') {
+    const codePreview = (command.code || '').substring(0, 60).replace(/\n/g, ' ');
+    return command.key ? `Run JS → save as "${command.key}": ${codePreview}...` : `Run JS: ${codePreview}...`;
+  }
+  if (command.type === 'press_key')           return `Press ${command.key || 'Enter'}`;
+  if (command.type === 'wait_for_text')       return `Wait for text: "${(command.text || '').substring(0, 40)}"`;
+  if (command.type === 'wait_for_element')    return 'Wait for element';
+  if (command.type === 'wait_for_navigation') return 'Wait for navigation';
+  if (command.type === 'click_at')            return `Click at (${command.x}, ${command.y})`;
+  if (command.type === 'open_tab')            return `Open tab: ${command.label || command.url}`;
+  if (command.type === 'switch_tab')          return `Switch to: ${command.label || command.tab_id}`;
+  if (command.type === 'close_tab')           return `Close tab: ${command.label || command.tab_id}`;
+  return `${command.type}`;
+}
+
 /**
  * Send an action message to the popup (shows an action card).
  *
@@ -132,41 +165,7 @@ export function sendPageContext(url, pageTitle, stepNumber, tabId, totalSteps) {
  * @param {object} [observation] - The page observation (with elements array)
  */
 export function sendActionMessage(command, stepNumber, observation) {
-  let description;
-  if (['click', 'type', 'hover', 'select', 'extract'].includes(command.type) && observation && observation.elements) {
-    const el = observation.elements.find(e => e.selector === command.selector);
-    if (el && el.text && el.text !== 'No label') {
-      const label = el.text.length > 50 ? el.text.substring(0, 47) + '...' : el.text;
-      description = command.type === 'click' ? `Click "${label}"` : command.type === 'hover' ? `Hover "${label}"` : command.type === 'select' ? `Select in "${label}"` : command.type === 'extract' ? `Extract from "${label}"` : `Type into "${label}"`;
-    } else {
-      description = `${command.type} element`;
-    }
-  } else if (command.type === 'navigate' && command.url) {
-    try { description = `Navigate to ${new URL(command.url).hostname}`; } catch { description = `Navigate to ${command.url}`; }
-  } else if (command.type === 'scroll') {
-    description = `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
-  } else if (command.type === 'execute_js') {
-    const codePreview = (command.code || '').substring(0, 60).replace(/\n/g, ' ');
-    description = command.key ? `Run JS → save as "${command.key}": ${codePreview}...` : `Run JS: ${codePreview}...`;
-  } else if (command.type === 'press_key') {
-    description = `Press ${command.key || 'Enter'}`;
-  } else if (command.type === 'wait_for_text') {
-    description = `Wait for text: "${(command.text || '').substring(0, 40)}"`;
-  } else if (command.type === 'wait_for_element') {
-    description = `Wait for element`;
-  } else if (command.type === 'wait_for_navigation') {
-    description = `Wait for navigation`;
-  } else if (command.type === 'click_at') {
-    description = `Click at (${command.x}, ${command.y})`;
-  } else if (command.type === 'open_tab') {
-    description = `Open tab: ${command.label || command.url}`;
-  } else if (command.type === 'switch_tab') {
-    description = `Switch to: ${command.label || command.tab_id}`;
-  } else if (command.type === 'close_tab') {
-    description = `Close tab: ${command.label || command.tab_id}`;
-  } else {
-    description = `${command.type}`;
-  }
+  const description = _describeCommand(command, observation);
   // (3.7.1) Enriched payload — include the raw command fields so the popup's
   // describeActionPlain helper (and the active-tab strip) can render a rich,
   // human-readable live status with the actual click target text, typed value,

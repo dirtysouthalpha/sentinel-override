@@ -595,80 +595,72 @@ export async function startAgent(goal, sender) {
     }
   } catch (e) { console.warn('[Sentinel] mode-directive check failed (non-fatal):', e && e.message); }
 
-  // (3.15.0) Adaptive Prompts: rewrite the goal for the detected platform
-  // BEFORE the agent loop starts. Settings:
-  //   adaptivePromptsMode: 'auto' (default) | 'approval' | 'off'
-  //   adaptiveExpansionMode: 'light' (default) | 'off' | 'full'
-  // 'auto' rewrites silently; 'approval' waits for the user to accept the
-  // diff via a popup card. Failures fall back to the original goal.
-  let finalGoal = goal;
-  try {
-    const apSettings = await chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode', 'technicianInfo']);
-    const apMode = (apSettings.adaptivePromptsMode || 'auto').toString();
-    if (apMode !== 'off') {
-      const result = await rewriteGoalForPlatform(
-        goal,
-        tabInfo?.url || '',
-        apSettings.technicianInfo || null,
-        apSettings.adaptiveExpansionMode || 'light'
-      );
-      if (result && result.adapted) {
-        // Log to forensic run log
-        try {
-          if (runLogId) {
-            runLogBuffer.push({
-              step: 0,
-              timestamp: new Date().toISOString(),
-              kind: 'adaptive_prompt_applied',
-              platform: result.platform ? result.platform.id : '',
-              mismatchCount: (result.mismatchHints || []).length,
-              durationMs: result.durationMs,
-              originalLength: (result.originalGoal || '').length,
-              adaptedLength: (result.adaptedGoal || '').length
-            });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-              console.error('[result] Unhandled rejection:', e);
-            });
-          }
-        } catch (_) { /* non-fatal */ }
-
-        if (apMode === 'approval') {
-          // Pause until user clicks Accept / Use Original / Edit on the popup card
-          const decision = await _waitForAdaptedGoalDecision(result, startTabId);
-          if (decision.useOriginal) {
-            finalGoal = goal;
-          } else if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) {
-            finalGoal = decision.editedGoal;
-          } else if (decision.approved) {
-            finalGoal = result.adaptedGoal;
-          } else {
-            // Timeout or unknown — default to adapted (autonomous-like fallback)
-            finalGoal = result.adaptedGoal;
-          }
-        } else {
-          // Auto mode: swap silently but still broadcast the card so the
-          // popup can show what changed (collapsed by default).
-          try {
-            chrome.runtime.sendMessage({
-              action: 'adapted_goal_available',
-              mode: 'auto',
-              platform: result.platform,
-              summary: result.summary,
-              mismatchHints: result.mismatchHints,
-              originalGoal: result.originalGoal,
-              adaptedGoal: result.adaptedGoal
-            }).catch((e) => {
-              console.error('[decision] Unhandled rejection:', e);
-            });
-          } catch (_e) { /* run log storage non-fatal */ }
-          finalGoal = result.adaptedGoal;
-        }
-      }
-    }
-  } catch (e) { console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', e && e.message); finalGoal = goal; }
+  const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId);
 
   runAgentLoop(finalGoal, startTabId);
   return 'Agent started in background';
+}
+
+// (3.15.0) Run the adaptive-prompts platform-rewrite pass before agent execution.
+// Reads user settings, calls rewriteGoalForPlatform, handles the approval flow
+// (if mode === 'approval'), and returns the final goal string to use for the run.
+// Falls back to the original goal on any error.
+async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
+  try {
+    const apSettings = await chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode', 'technicianInfo']);
+    const apMode = (apSettings.adaptivePromptsMode || 'auto').toString();
+    if (apMode === 'off') return goal;
+    const result = await rewriteGoalForPlatform(
+      goal,
+      tabInfo?.url || '',
+      apSettings.technicianInfo || null,
+      apSettings.adaptiveExpansionMode || 'light'
+    );
+    if (!result || !result.adapted) return goal;
+    // Log the adaptation to the forensic run log
+    try {
+      if (runLogId) {
+        runLogBuffer.push({
+          step: 0,
+          timestamp: new Date().toISOString(),
+          kind: 'adaptive_prompt_applied',
+          platform: result.platform ? result.platform.id : '',
+          mismatchCount: (result.mismatchHints || []).length,
+          durationMs: result.durationMs,
+          originalLength: (result.originalGoal || '').length,
+          adaptedLength: (result.adaptedGoal || '').length
+        });
+        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+          console.error('[_applyAdaptivePrompts] Unhandled rejection:', e);
+        });
+      }
+    } catch (_) { /* non-fatal */ }
+    if (apMode === 'approval') {
+      const decision = await _waitForAdaptedGoalDecision(result, startTabId);
+      if (decision.useOriginal) return goal;
+      if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) return decision.editedGoal;
+      // approved, timeout, or unknown → use adapted
+      return result.adaptedGoal;
+    }
+    // Auto mode: swap silently but broadcast the card for the popup diff view
+    try {
+      chrome.runtime.sendMessage({
+        action: 'adapted_goal_available',
+        mode: 'auto',
+        platform: result.platform,
+        summary: result.summary,
+        mismatchHints: result.mismatchHints,
+        originalGoal: result.originalGoal,
+        adaptedGoal: result.adaptedGoal
+      }).catch((e) => {
+        console.error('[_applyAdaptivePrompts] Unhandled rejection:', e);
+      });
+    } catch (_e) { /* non-fatal */ }
+    return result.adaptedGoal;
+  } catch (e) {
+    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', e && e.message);
+    return goal;
+  }
 }
 
 // (3.15.0) Approval flow for Adaptive Prompts. Broadcasts the rewritten goal
