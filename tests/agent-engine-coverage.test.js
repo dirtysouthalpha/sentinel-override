@@ -191,7 +191,6 @@ const {
   captureReportData,
   detectMfaInText,
   detectSignInWall,
-  shouldLockoutCrossTenantAction,
   generateHeuristicPlan,
   formatTicketOutput,
   formatTicketFinalNotes,
@@ -1146,25 +1145,3 @@ describe('detectSignInWall', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────
-describe('shouldLockoutCrossTenantAction', () => {
-  test('allows same-tenant action', () => {
-    const result = shouldLockoutCrossTenantAction(
-      { type: 'click' },
-      'https://admin.microsoft.com/',
-      { onmicrosoft: 'contoso.onmicrosoft.com' },
-      'contoso.onmicrosoft.com'
-    );
-    expect(result).toBeNull();
-  });
-
-  test('allows non-auth host action', () => {
-    const result = shouldLockoutCrossTenantAction(
-      { type: 'click' },
-      'https://example.com/',
-      { onmicrosoft: 'contoso.onmicrosoft.com' },
-      'fabrikam.onmicrosoft.com'
-    );
-    expect(result).toBeNull();
-  });
-});

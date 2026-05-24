@@ -168,7 +168,6 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
 const {
   detectMfaInText,
   detectSignInWall,
-  shouldLockoutCrossTenantAction,
   evaluateHallucinationRisk,
   _isUnproductiveJsResult,
   _shouldAcceptMemoryWrite,
@@ -302,48 +301,6 @@ describe('detectSignInWall', () => {
     const elements = [{ type: 'text', selector: '#passwordField' }];
     const result = detectSignInWall(elements, 'https://login.microsoftonline.com/tenant', '');
     expect(result).toBeTruthy();
-  });
-});
-
-// ──────────────────────────────────────────────────────────────────────
-describe('shouldLockoutCrossTenantAction', () => {
-  test('non-modifying action returns null', () => {
-    expect(shouldLockoutCrossTenantAction({ type: 'read_page' }, 'https://admin.microsoft.com', {}, 'contoso')).toBeNull();
-  });
-
-  test('no expected tenant returns null', () => {
-    expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://admin.microsoft.com', {}, '')).toBeNull();
-  });
-
-  test('non-Microsoft URL returns null', () => {
-    expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://example.com', {}, 'contoso')).toBeNull();
-  });
-
-  test('tenant mismatch returns lockout info', () => {
-    const result = shouldLockoutCrossTenantAction(
-      { type: 'click' },
-      'https://admin.microsoft.com/adminportal',
-      { chipText: 'fabrikam', onmicrosoft: 'fabrikam.onmicrosoft.com', tid: 'aaa' },
-      'contoso'
-    );
-    expect(result).toBeTruthy();
-    expect(result.expected).toBe('contoso');
-    expect(result.host).toContain('microsoft.com');
-    expect(result.actionType).toBe('click');
-  });
-
-  test('tenant match returns null', () => {
-    const result = shouldLockoutCrossTenantAction(
-      { type: 'click' },
-      'https://admin.microsoft.com/adminportal',
-      { chipText: 'Contoso Ltd', onmicrosoft: 'contoso.onmicrosoft.com', tid: '123' },
-      'contoso'
-    );
-    expect(result).toBeNull();
-  });
-
-  test('null command returns null', () => {
-    expect(shouldLockoutCrossTenantAction(null, 'https://admin.microsoft.com', {}, 'contoso')).toBeNull();
   });
 });
 

@@ -573,7 +573,6 @@ describe('agent-engine checkpoint functionality', () => {
       expect(checkpoint).toHaveProperty('trustCounters');
       expect(checkpoint.trustCounters).toHaveProperty('failedSteps');
       expect(checkpoint.trustCounters).toHaveProperty('consecutiveFailureMax');
-      expect(checkpoint.trustCounters).toHaveProperty('safetyBlocks');
     });
 
     test('maps tabContextUrls from getAllTabContexts', () => {

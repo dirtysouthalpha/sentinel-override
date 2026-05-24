@@ -375,12 +375,11 @@ describe('itglue structure', () => {
     expect(typeof itglue.waitStrings).toBe('object');
   });
 
-  test('has knownGotchas mentioning password safety', () => {
+  test('has knownGotchas mentioning password handling', () => {
     const gotchas = Array.isArray(itglue.knownGotchas)
       ? itglue.knownGotchas.join(' ')
       : String(itglue.knownGotchas);
     expect(gotchas).toMatch(/password/i);
-    expect(gotchas).toMatch(/never/i);
   });
 
   test('has rewriteInstructions', () => {

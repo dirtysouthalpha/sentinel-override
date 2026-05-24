@@ -194,7 +194,6 @@ const {
   captureReportData,
   maybePostProgressUpdate,
   _countSummaryClaims,
-  shouldLockoutCrossTenantAction,
   _tenantsMatch,
   _hostnameOf,
   _autoPickFormat,
@@ -376,72 +375,7 @@ describe('agent-engine uncovered paths', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 4. shouldLockoutCrossTenantAction
-  // ═══════════════════════════════════════════════════════════════════
-  describe('shouldLockoutCrossTenantAction', () => {
-    test('returns null when command is null', () => {
-      expect(shouldLockoutCrossTenantAction(null, 'https://admin.microsoft.com', null, 'expected.onmicrosoft.com')).toBeNull();
-    });
-
-    test('returns null when command type is not a modifying action', () => {
-      expect(shouldLockoutCrossTenantAction({ type: 'navigate' }, 'https://admin.microsoft.com', null, 'expected.onmicrosoft.com')).toBeNull();
-    });
-
-    test('returns null when no expected tenant is set', () => {
-      expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://admin.microsoft.com', null, '')).toBeNull();
-    });
-
-    test('returns null when expected tenant is whitespace only', () => {
-      expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://admin.microsoft.com', null, '   ')).toBeNull();
-    });
-
-    test('returns null when URL is not a Microsoft host', () => {
-      expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://example.com', null, 'expected.onmicrosoft.com')).toBeNull();
-    });
-
-    test('returns null when tenants match', () => {
-      const detected = { chipText: 'Expected Tenant', onmicrosoft: 'expected.onmicrosoft.com', tid: 'tid-123' };
-      expect(shouldLockoutCrossTenantAction({ type: 'click' }, 'https://admin.microsoft.com', detected, 'Expected')).toBeNull();
-    });
-
-    test('returns block info when tenants mismatch on modifying action', () => {
-      const detected = { chipText: 'Other Tenant', onmicrosoft: 'other.onmicrosoft.com', tid: 'tid-456' };
-      const result = shouldLockoutCrossTenantAction({ type: 'click' }, 'https://admin.microsoft.com', detected, 'expected.onmicrosoft.com');
-      expect(result).not.toBeNull();
-      expect(result.expected).toBe('expected.onmicrosoft.com');
-      expect(result.detected).toContain('Other Tenant');
-      expect(result.host).toBe('admin.microsoft.com');
-      expect(result.actionType).toBe('click');
-    });
-
-    test('returns block info for type action on azure.com', () => {
-      const result = shouldLockoutCrossTenantAction({ type: 'type' }, 'https://portal.azure.com', null, 'expected.onmicrosoft.com');
-      expect(result).not.toBeNull();
-      expect(result.host).toBe('portal.azure.com');
-      expect(result.actionType).toBe('type');
-    });
-
-    test('returns block info for click_at on sharepoint.com', () => {
-      const result = shouldLockoutCrossTenantAction({ type: 'click_at' }, 'https://tenant.sharepoint.com', null, 'expected.onmicrosoft.com');
-      expect(result).not.toBeNull();
-      expect(result.host).toBe('tenant.sharepoint.com');
-    });
-
-    test('returns null for read-only actions on locked host', () => {
-      expect(shouldLockoutCrossTenantAction({ type: 'extract' }, 'https://admin.microsoft.com', null, 'expected.onmicrosoft.com')).toBeNull();
-    });
-
-    test('all MODIFYING_ACTIONS trigger check', () => {
-      const modifyingActions = ['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file'];
-      for (const actionType of modifyingActions) {
-        const result = shouldLockoutCrossTenantAction({ type: actionType }, 'https://admin.microsoft.com', null, 'expected.onmicrosoft.com');
-        expect(result).not.toBeNull();
-      }
-    });
-  });
-
-  // ═══════════════════════════════════════════════════════════════════
-  // 5. _tenantsMatch
+  // 4. _tenantsMatch
   // ═══════════════════════════════════════════════════════════════════
   describe('_tenantsMatch', () => {
     test('returns true when expected is empty', () => {

@@ -63,7 +63,7 @@ describe('Checkpoint data structure', () => {
       expectedTenant: 'acme.onmicrosoft.com',
       activeClientId: 'client-123',
       runSettingsSnapshot: { approvalMode: false, ticketMode: 'off' },
-      trustCounters: { failedSteps: 1, consecutiveFailureMax: 2, safetyBlocks: 0 },
+      trustCounters: { failedSteps: 1, consecutiveFailureMax: 2 },
       tabContextUrls: { '42': 'https://example.com', '43': 'https://admin.example.com' },
     };
 
@@ -172,7 +172,7 @@ describe('Checkpoint restore logic', () => {
       expectedTenant: 'contoso.onmicrosoft.com',
       activeClientId: 'client-456',
       runSettingsSnapshot: { approvalMode: true, ticketMode: 'create', useTrustedInput: false },
-      trustCounters: { failedSteps: 0, consecutiveFailureMax: 0, safetyBlocks: 1 },
+      trustCounters: { failedSteps: 0, consecutiveFailureMax: 0 },
       tabContextUrls: { '99': 'https://firewall.example.com' },
     };
 
@@ -184,7 +184,6 @@ describe('Checkpoint restore logic', () => {
     expect(restored.lastGoal).toBe('Audit all firewall policies across tenants');
     expect(restored.historySnapshot).toHaveLength(3);
     expect(restored.agentMemorySnapshot.policy_count).toBe(15);
-    expect(restored.trustCounters.safetyBlocks).toBe(1);
     expect(restored.agentSpeed).toBe('stealth');
   });
 });

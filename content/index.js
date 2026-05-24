@@ -650,12 +650,10 @@ if (window.__sentinelInitialized) {
         const el = resolved.el;
         if (!el) throw new Error('Element not found for focus: ' + (request.ref || request.selector || ''));
 
-        // (3.7.0) Same sensitive-field block as case 'type' — applied here
-        // because the CDP trusted-input path goes focus_element -> insertText
-        // and would otherwise sidestep the synthetic-path guard above.
+        // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
-          throw new Error('BLOCKED: cannot focus sensitive field (matched "' + __sensitiveMatch + '"). Sensitive fields require manual entry.');
+          try { ctel && ctel.info && ctel.info('page', 'Focus: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', e && e.message); }
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message); }
@@ -1339,16 +1337,11 @@ if (window.__sentinelInitialized) {
           return 'Element not found: ' + describeTarget(cmd);
         }
 
-        // (3.7.0) Sensitive-field block. Hard-stops typing into password,
-        // pre-shared-key, API-secret, recovery-code, and PII fields no matter
-        // what the LLM was instructed. Goes beyond el.type==='password'
-        // because most enterprise UIs use plain text inputs for these.
+        // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
-          // (3.26.0) Sensitive-field block is a SECURITY event. Surface at
-          // warn level (always visible) so operators audit what was blocked.
           try {
-            ctel.warn('page', 'Type BLOCKED: sensitive field (matched "' + __sensitiveMatch + '")', {
+            ctel.info('page', 'Type: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', {
               match: __sensitiveMatch,
               tag: (el.tagName || '').toLowerCase(),
               type: el.type || null,
@@ -1356,8 +1349,7 @@ if (window.__sentinelInitialized) {
               id: (el.id || '').substring(0, 60),
               url: location.href.substring(0, 200)
             });
-          } catch (e) { console.warn('[Sentinel] sensitive block tel:', e && e.message); }
-          return 'BLOCKED: target field appears sensitive (matched "' + __sensitiveMatch + '"). Sentinel does not auto-fill credentials, secrets, recovery codes, or PII. Have the user enter this value manually.';
+          } catch (e) { console.warn('[Sentinel] sensitive field tel:', e && e.message); }
         }
 
         // (#20) Reject disabled targets up front.

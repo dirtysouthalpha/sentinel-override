@@ -1223,7 +1223,7 @@ describe('agent-engine — restoreFromCheckpoint', () => {
       expectedTenant: 'tenant-123',
       activeClientId: 'client-456',
       runSettingsSnapshot: { maxSteps: 100 },
-      trustCounters: { failedSteps: 1, consecutiveFailureMax: 3, safetyBlocks: 0 },
+      trustCounters: { failedSteps: 1, consecutiveFailureMax: 3 },
       tabContextUrls: { '1': 'https://example.com' }
     };
     sessionData.agent_checkpoint = validCheckpoint;

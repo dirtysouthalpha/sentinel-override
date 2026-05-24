@@ -111,7 +111,7 @@ describe('agent-engine checkpoint functions', () => {
         expectedTenant: 'tenant-1',
         activeClientId: 'client-1',
         runSettingsSnapshot: { maxSteps: 100 },
-        trustCounters: { failedSteps: 2, consecutiveFailureMax: 5, safetyBlocks: 0 },
+        trustCounters: { failedSteps: 2, consecutiveFailureMax: 5 },
         tabContextUrls: { '1': 'https://example.com' },
       };
 

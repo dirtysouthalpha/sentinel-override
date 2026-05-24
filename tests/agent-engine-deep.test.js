@@ -225,7 +225,6 @@ const {
   enforceRateLimit,
   sleep,
   requestApproval,
-  requestTenantOverride,
   _waitForAdaptedGoalDecision,
   _waitForModeMismatchDecision,
   _runExecuteJsOnce,
@@ -1109,79 +1108,6 @@ describe('_waitForModeMismatchDecision', () => {
   });
 });
 
-// ══════════════════════════════════════════════════════════════════════
-// 12. requestTenantOverride
-// ══════════════════════════════════════════════════════════════════════
-describe('requestTenantOverride', () => {
-  test('resolves approved=true when user approves', async () => {
-    const blockInfo = {
-      expected: 'tenant-a.onmicrosoft.com',
-      detected: 'tenant-b.onmicrosoft.com',
-      host: 'admin.microsoft.com',
-      actionType: 'click',
-    };
-    const command = { type: 'click', selector: '#btn' };
-
-    const promise = requestTenantOverride(blockInfo, command, 5);
-    await new Promise(r => setTimeout(r, 10));
-
-    const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(sentMsg.action).toBe('request_tenant_override');
-
-    simulateOnMessage({
-      action: 'tenant_override_response',
-      requestId: sentMsg.requestId,
-      approved: true,
-    });
-
-    const result = await promise;
-    expect(result.approved).toBe(true);
-    expect(result.rejected).toBe(false);
-  });
-
-  test('resolves rejected=true when user rejects', async () => {
-    const blockInfo = {
-      expected: 'tenant-a.onmicrosoft.com',
-      detected: 'tenant-b.onmicrosoft.com',
-      host: 'admin.microsoft.com',
-      actionType: 'click',
-    };
-    const command = { type: 'click', selector: '#btn' };
-
-    const promise = requestTenantOverride(blockInfo, command, 5);
-    await new Promise(r => setTimeout(r, 10));
-
-    const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
-    simulateOnMessage({
-      action: 'tenant_override_response',
-      requestId: sentMsg.requestId,
-      rejected: true,
-    });
-
-    const result = await promise;
-    expect(result.rejected).toBe(true);
-    expect(result.approved).toBe(false);
-  });
-
-  test('defaults to rejected on 90s timeout (fail-closed)', async () => {
-    jest.useFakeTimers();
-    const blockInfo = {
-      expected: 'tenant-a',
-      detected: 'tenant-b',
-      host: 'admin.microsoft.com',
-      actionType: 'click',
-    };
-    const command = { type: 'click', selector: '#btn' };
-
-    const promise = requestTenantOverride(blockInfo, command, 5);
-    jest.advanceTimersByTime(90000 + 100);
-
-    const result = await promise;
-    expect(result.rejected).toBe(true);
-    expect(result.approved).toBe(false);
-    expect(result.reason).toBe('tenant_override_timeout');
-  });
-});
 
 // ══════════════════════════════════════════════════════════════════════
 // 13. activityStart / activityDone / activityFail / activityUpdate

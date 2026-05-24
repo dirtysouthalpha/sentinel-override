@@ -40,7 +40,6 @@ let _runSettings = {};          // (3.41.0) Run-stable settings cache: loaded on
 let mfaAckUrl = null;           // (3.7.0) URL where the user last acknowledged MFA — prevents re-pausing on the same challenge
 let signInWallAckUrls = new Set(); // (3.14.1) URLs where the user has acknowledged a sign-in wall this run — prevents re-pausing after manual sign-in
 let detectedTenant = null;      // (3.7.0) {tid, onmicrosoft, chipText, hostname} most recently detected on a Microsoft admin URL
-let tenantOverrideUrls = new Set(); // (3.11.0) URLs where the tech has explicitly approved a cross-tenant action this run
 let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in storage
 let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
@@ -49,7 +48,6 @@ let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every s
 // from any branch and the run finalize block can read them at the end.
 let failedSteps = 0;            // running count of steps where actionFailed=true
 let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
-let safetyBlocks = 0;           // sensitive-field block + cross-tenant block + CSP block hits
 let _pageStagnation = 0;      // (3.46.1) Counts consecutive non-mutating clicks on same page state — detects click-spam loops
 const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
@@ -119,7 +117,7 @@ function buildCheckpoint(stepCount) {
     expectedTenant,
     activeClientId,
     runSettingsSnapshot: { ..._runSettings },
-    trustCounters: { failedSteps, consecutiveFailureMax, safetyBlocks },
+    trustCounters: { failedSteps, consecutiveFailureMax },
     // Tab context URLs for re-registration after SW restart
     tabContextUrls: Object.fromEntries(
       getAllTabContexts().map(([id, ctx]) => [id, ctx.url || ''])
@@ -174,7 +172,6 @@ export async function restoreFromCheckpoint() {
     if (cp.trustCounters && typeof cp.trustCounters === 'object') {
       if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
       if (typeof cp.trustCounters.consecutiveFailureMax === 'number') consecutiveFailureMax = cp.trustCounters.consecutiveFailureMax;
-      if (typeof cp.trustCounters.safetyBlocks === 'number') safetyBlocks = cp.trustCounters.safetyBlocks;
     }
 
     // Re-register tab contexts from URLs. After SW restart we don't have the
@@ -406,7 +403,6 @@ export function resetAgentState() {
   // run-scoped state so a re-run starts from a clean slate.
   failedSteps = 0;
   consecutiveFailureMax = 0;
-  safetyBlocks = 0;
   _pendingContextInjections.length = 0;
   _pendingCommandQueue.length = 0;
   _historyDirty = false;
@@ -1593,14 +1589,6 @@ function formatTicketOutput(format, summary, goal, tech, options) {
   }
 }
 
-// ========== Tenant Lockdown (3.11.0) ==========
-// Hard-blocks modifying actions on Microsoft admin URLs when the detected
-// tenant does not match the user's expectedTenant setting. Forces a separate
-// "cross-tenant override" approval card before dispatching. Logs the override
-// event to the forensic run log so HR/compliance reviews have a timestamped
-// record of intentional cross-tenant work.
-
-const TENANT_LOCKED_HOSTS_RE = /(microsoft\.com|microsoftonline\.com|azure\.com|office\.com|sharepoint\.com)$/i;
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 function _hostnameOf(url) {
@@ -1615,68 +1603,6 @@ function _tenantsMatch(detected, expected) {
   return signals.some(s => s && (s.includes(exp) || exp.includes(s)));
 }
 
-function shouldLockoutCrossTenantAction(command, currentUrl, detectedTenant, expectedTenant) {
-  if (!command || !MODIFYING_ACTIONS.has(command.type)) return null;
-  if (!expectedTenant || !expectedTenant.trim()) return null;  // no expected tenant set = no lock
-  const host = _hostnameOf(currentUrl);
-  if (!host || !TENANT_LOCKED_HOSTS_RE.test(host)) return null;
-  if (_tenantsMatch(detectedTenant, expectedTenant)) return null;
-  if (tenantOverrideUrls.has(currentUrl)) return null;  // already overridden this URL
-  return {
-    expected: expectedTenant,
-    detected: detectedTenant
-      ? (detectedTenant.chipText || detectedTenant.onmicrosoft || detectedTenant.tid || 'unknown')
-      : '(none detected)',
-    host,
-    actionType: command.type
-  };
-}
-
-async function requestTenantOverride(blockInfo, command, stepNumber) {
-  const requestId = crypto.randomUUID();
-  // (3.14.0) Pin SW alive — tenant override has a 90s timeout, well past the
-  // MV3 idle limit. Without this, the listener gets GC'd before the user even
-  // sees the prompt.
-  const kaName = 'tenant_override_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-  return new Promise((resolve) => {
-    const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-      resolve(payload);
-    };
-    chrome.runtime.sendMessage({
-      action: 'request_tenant_override',
-      payload: {
-        expected: blockInfo.expected,
-        detected: blockInfo.detected,
-        host: blockInfo.host,
-        actionType: blockInfo.actionType,
-        actionDescription: describeAction(command),
-        stepNumber,
-        requestId
-      },
-      requestId
-    }).catch((e) => {
-      console.error('[finish] Unhandled rejection:', e);
-    });
-    const listener = (message) => {
-      if (message && message.action === 'tenant_override_response' && message.requestId === requestId) {
-        chrome.runtime.onMessage.removeListener(listener);
-        clearTimeout(timeoutId);
-        finish({
-          approved: message.approved === true,
-          rejected: message.rejected === true
-        });
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-    // Fail-closed: 90s timeout = reject (never silently approve cross-tenant work)
-    const timeoutId = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      finish({ approved: false, rejected: true, reason: 'tenant_override_timeout' });
-    }, 90000);
-  });
-}
 
 // ========== Hallucination Hard-Stop (3.9.1) ==========
 // Counts distinct "claim items" in a finish summary vs the actual evidence
@@ -2307,7 +2233,6 @@ async function _initRunState(goal) {
     quickMode:       stored.quickMode      ?? false,
   };
   expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
-  tenantOverrideUrls = new Set();  // (3.11.0) cleared per-run
   detectedTenant = null;
   // Each run gets a clean memory namespace — never carry over data from a prior task.
   // Cross-client contamination: yesterday's findings must never leak into today's run.
@@ -3389,8 +3314,7 @@ async function runAgentLoop(goal, workingTabId) {
                 skillStats: _skillStats,
                 apiCallCount,
                 planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
-                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
-                safetyBlocks
+                planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0)
               });
               tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
                 score: _trustScore.score,
@@ -3774,76 +3698,6 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
-
-      // (3.11.0) Tenant Lockdown — fires BEFORE the regular approval gate so
-      // cross-tenant modifying actions on Microsoft admin URLs are caught even
-      // when the user is in autonomous mode.
-      try {
-        const _block = shouldLockoutCrossTenantAction(command, currentUrl, detectedTenant, expectedTenant);
-        if (_block) {
-          // (3.30.0) Trust-score: count each cross-tenant block as a safety
-          // incident. These are *good* outcomes (we prevented something bad)
-          // but they reflect the underlying LLM request being suspect.
-          safetyBlocks++;
-          sendSilentUpdate('🛑 Cross-tenant action blocked — awaiting override approval', stepCount);
-          // Forensic log: override request fired
-          if (runLogId) {
-            try {
-              runLogBuffer.push({
-                step: stepCount,
-                timestamp: new Date().toISOString(),
-                kind: 'tenant_override_requested',
-                url: currentUrl,
-                expected: _block.expected,
-                detected: _block.detected,
-                action_type: _block.actionType
-              });
-              await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-            } catch (_e) {}
-          }
-          const decision = await requestTenantOverride(_block, command, stepCount);
-          if (decision.approved) {
-            tenantOverrideUrls.add(currentUrl);
-            // Log the override grant
-            if (runLogId) {
-              try {
-                runLogBuffer.push({
-                  step: stepCount,
-                  timestamp: new Date().toISOString(),
-                  kind: 'tenant_override_granted',
-                  url: currentUrl,
-                  expected: _block.expected,
-                  detected: _block.detected,
-                  action_type: _block.actionType
-                });
-                await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-              } catch (_e) {}
-            }
-            sendSilentUpdate('✓ Cross-tenant override granted — proceeding', stepCount);
-          } else {
-            // Log the rejection and skip the action
-            if (runLogId) {
-              try {
-                runLogBuffer.push({
-                  step: stepCount,
-                  timestamp: new Date().toISOString(),
-                  kind: 'tenant_override_denied',
-                  url: currentUrl,
-                  expected: _block.expected,
-                  detected: _block.detected,
-                  action_type: _block.actionType
-                });
-                await chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } });
-              } catch (_e) {}
-            }
-            historyPush({ step: stepCount, action: command, result: 'BLOCKED: cross-tenant action rejected by tenant lockdown (expected ' + _block.expected + ', detected ' + _block.detected + ')' });
-            await persistHistory();
-            sendSilentUpdate('🛑 Cross-tenant override denied — action skipped', stepCount);
-            await sleep(1000);
-            continue;
-          }
-        }
-      } catch (_) { /* never crash the loop on lockdown check */ }
 
       // Approval gate + CDP trusted input flag (#9)
       // (3.41.0) Read from run-stable settings cache instead of per-step storage fetch.
@@ -4399,16 +4253,6 @@ async function runAgentLoop(goal, workingTabId) {
         // recover get penalized for getting stuck in the middle.
         failedSteps++;
         if (consecutiveFailures > consecutiveFailureMax) consecutiveFailureMax = consecutiveFailures;
-        // (3.30.0) Safety-block detection — content-script returns specific
-        // string prefixes for these. Only count the safety variants, not the
-        // many internal "BLOCKED: " guardrails (those reflect agent logic
-        // failures, which already get counted via failedSteps).
-        if (typeof result === 'string') {
-          if (result.startsWith('CSP_BLOCKED') ||
-              result.startsWith('BLOCKED: target field appears sensitive')) {
-            safetyBlocks++;
-          }
-        }
         currentStrategies.push(`${command.type}:${command.selector || command.url || ''}`);
         if (currentStrategies.length > 10) currentStrategies.shift();
       } else {
@@ -4827,7 +4671,6 @@ async function requestApproval(command, stepNumber) {
 export {
   detectMfaInText,
   detectSignInWall,
-  shouldLockoutCrossTenantAction,
   evaluateHallucinationRisk,
   _isUnproductiveJsResult,
   _shouldAcceptMemoryWrite,
@@ -4864,7 +4707,6 @@ export {
   enforceRateLimit,
   sleep,
   requestApproval,
-  requestTenantOverride,
   _waitForAdaptedGoalDecision,
   _waitForModeMismatchDecision,
   _handleModeMismatchCheck,
