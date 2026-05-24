@@ -3,7 +3,7 @@
  * Tests for HTML report generation from audit logs
  */
 
-import { generateHtmlReport } from '../background/export-report.js';
+import { generateHtmlReport, generateReplayReport } from '../background/export-report.js';
 
 // Mock truncate and escapeHtml for testing since they're not exported
 // We'll test them indirectly through generateHtmlReport
@@ -325,5 +325,141 @@ describe('export-report', () => {
 
       expect(html).toContain('0s'); // default duration
     });
+  });
+});
+
+// ========== generateReplayReport (Phase 9.3) ==========
+
+describe('generateReplayReport', () => {
+  const makeEntry = (overrides = {}) => ({
+    kind: 'action',
+    step: 1,
+    timestamp: '2024-06-01T10:00:00Z',
+    action_type: 'click',
+    action: { selector: '#login-btn' },
+    result: 'Done',
+    failed: false,
+    ...overrides,
+  });
+
+  it('produces a self-contained HTML document', () => {
+    const html = generateReplayReport([makeEntry()], { goal: 'Login to site', runLogId: 'abc123' });
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('</html>');
+    expect(html).toContain('Sentinel Override');
+    expect(html).toContain('Run Replay');
+  });
+
+  it('includes the goal in the output', () => {
+    const html = generateReplayReport([makeEntry()], { goal: 'Find the VPN tunnel' });
+    expect(html).toContain('Find the VPN tunnel');
+  });
+
+  it('escapes HTML in goal to prevent XSS', () => {
+    const html = generateReplayReport([makeEntry()], { goal: '<script>alert(1)</script>' });
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('only renders action-kind entries', () => {
+    const entries = [
+      makeEntry({ kind: 'action', step: 1, action_type: 'click' }),
+      { kind: 'plan', step: 0, text: 'plan text' },
+      makeEntry({ kind: 'action', step: 2, action_type: 'type' }),
+    ];
+    const html = generateReplayReport(entries, { goal: 'test' });
+    expect(html).toContain('click');
+    expect(html).toContain('type');
+    expect(html).not.toContain('plan text');
+  });
+
+  it('embeds screenshot as base64 img when present', () => {
+    const entry = makeEntry({ screenshot: 'abc123base64data' });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('data:image/jpeg;base64,abc123base64data');
+    expect(html).toContain('<img');
+    expect(html).toContain('loading="lazy"');
+  });
+
+  it('skips screenshot img when screenshot is absent', () => {
+    const entry = makeEntry({ screenshot: undefined });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).not.toContain('data:image/jpeg;base64,');
+  });
+
+  it('includes reasoning in a collapsible details element', () => {
+    const entry = makeEntry({ reasoning: 'I chose this button because it was the primary CTA' });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('<details');
+    expect(html).toContain('Reasoning');
+    expect(html).toContain('I chose this button because it was the primary CTA');
+  });
+
+  it('escapes HTML in reasoning', () => {
+    const entry = makeEntry({ reasoning: 'Found <b>bold</b> element' });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).not.toContain('<b>bold</b>');
+    expect(html).toContain('&lt;b&gt;bold&lt;/b&gt;');
+  });
+
+  it('marks failed steps with red border and ❌ icon', () => {
+    const entry = makeEntry({ failed: true, result: 'Element not found' });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('❌');
+    expect(html).toContain('#f87171');
+  });
+
+  it('marks successful steps with green border and ✅ icon', () => {
+    const entry = makeEntry({ failed: false });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('✅');
+    expect(html).toContain('#34d399');
+  });
+
+  it('shows estimated cost when provided', () => {
+    const html = generateReplayReport([makeEntry()], { goal: 'test', estimatedCostUsd: 0.0035 });
+    expect(html).toContain('Cost:');
+    expect(html).toContain('0.0035');
+  });
+
+  it('omits cost section when estimatedCostUsd is 0', () => {
+    const html = generateReplayReport([makeEntry()], { goal: 'test', estimatedCostUsd: 0 });
+    expect(html).not.toContain('Cost:');
+  });
+
+  it('handles empty entries array', () => {
+    const html = generateReplayReport([], { goal: 'test' });
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('test');
+  });
+
+  it('handles null/undefined entries gracefully', () => {
+    expect(() => generateReplayReport(null, { goal: 'test' })).not.toThrow();
+    expect(() => generateReplayReport(undefined, { goal: 'test' })).not.toThrow();
+  });
+
+  it('shows action detail for url actions', () => {
+    const entry = makeEntry({ action_type: 'navigate', action: { url: 'https://example.com/long/path?q=1' } });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('https://example.com');
+  });
+
+  it('shows action detail for text actions', () => {
+    const entry = makeEntry({ action_type: 'type', action: { text: 'admin@example.com' } });
+    const html = generateReplayReport([entry], { goal: 'test' });
+    expect(html).toContain('admin@example.com');
+  });
+
+  it('shows step numbers', () => {
+    const entries = [makeEntry({ step: 1 }), makeEntry({ step: 2, action_type: 'type' })];
+    const html = generateReplayReport(entries, { goal: 'test' });
+    expect(html).toContain('#1');
+    expect(html).toContain('#2');
+  });
+
+  it('truncates runLogId in header', () => {
+    const html = generateReplayReport([makeEntry()], { goal: 'test', runLogId: 'abcdefgh-ijkl-mnop' });
+    expect(html).toContain('abcdefgh');
+    expect(html).toContain('…');
   });
 });

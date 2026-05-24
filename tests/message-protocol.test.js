@@ -52,6 +52,10 @@ const {
   sendAgentActivity,
   sendAgentStepStart,
   sendScreenshotUpdate,
+  sendAgentStatus,
+  sendPlanPreview,
+  sendClientKnowledgePreview,
+  sendCostUpdate,
 } = await import('../background/message-protocol.js');
 
 beforeEach(() => {
@@ -214,7 +218,7 @@ describe('sendSilentUpdate', () => {
   });
 
   test('catches send errors silently', () => {
-    chrome.runtime.sendMessage.mockReturnValue(Promise.reject(new Error('no listener')));
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('no listener'));
     expect(() => sendSilentUpdate('test')).not.toThrow();
   });
 });
@@ -507,5 +511,123 @@ describe('sendScreenshotUpdate', () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
     sendScreenshotUpdate('', 3);
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ========== Phase 9 message helpers ==========
+
+describe('sendAgentStatus', () => {
+  test('sends agent_status message with state and text', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendAgentStatus('thinking', 'Analyzing context...');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'agent_status', state: 'thinking', text: 'Analyzing context...' })
+    );
+  });
+
+  test('includes a timestamp string', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendAgentStatus('observing', 'Reading page...');
+    const call = chrome.runtime.sendMessage.mock.calls[0][0];
+    expect(call.timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  test('defaults state to idle when not provided', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendAgentStatus(null, 'text');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'idle' })
+    );
+  });
+
+  test('defaults text to empty string when not provided', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendAgentStatus('waiting');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ text: '' })
+    );
+  });
+
+  test('catches send errors silently', () => {
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('no listener'));
+    expect(() => sendAgentStatus('thinking', 'test')).not.toThrow();
+  });
+});
+
+describe('sendPlanPreview', () => {
+  test('sends plan_preview with steps and count', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    const steps = ['Step 1: Login', 'Step 2: Navigate', 'Step 3: Click'];
+    sendPlanPreview(steps, 3);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'plan_preview', steps, estimatedSteps: 3 })
+    );
+  });
+
+  test('skips sending when steps array is empty', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPlanPreview([], 0);
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('catches send errors silently', () => {
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('no listener'));
+    expect(() => sendPlanPreview(['step'], 1)).not.toThrow();
+  });
+});
+
+describe('sendClientKnowledgePreview', () => {
+  test('sends client_knowledge_preview with mapped facts and clientName', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    const entries = [{ id: '1', wisdom: 'Admin IP: 192.168.1.1', scope: 'global', extra: 'ignored' }];
+    sendClientKnowledgePreview('ACME Corp', entries);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'client_knowledge_preview',
+        clientName: 'ACME Corp',
+        count: 1,
+        facts: [{ id: '1', wisdom: 'Admin IP: 192.168.1.1', scope: 'global' }],
+      })
+    );
+  });
+
+  test('skips sending when entries are empty', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendClientKnowledgePreview('client', []);
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('catches send errors silently', () => {
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('no listener'));
+    expect(() => sendClientKnowledgePreview('client', [{ id: '1', wisdom: 'x', scope: 'y' }])).not.toThrow();
+  });
+});
+
+describe('sendCostUpdate', () => {
+  test('sends cost_update with cost and token counts', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendCostUpdate(0.0042, 1000, 500, 3);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'cost_update',
+        estimatedCostUsd: 0.0042,
+        inputTokens: 1000,
+        outputTokens: 500,
+        callCount: 3,
+      })
+    );
+  });
+
+  test('handles zero cost with defaults', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendCostUpdate(0, 0, 0, 0);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ estimatedCostUsd: 0, callCount: 0 })
+    );
+  });
+
+  test('catches send errors silently', () => {
+    chrome.runtime.sendMessage.mockRejectedValue(new Error('no listener'));
+    expect(() => sendCostUpdate(0.01, 100, 50, 1)).not.toThrow();
   });
 });
