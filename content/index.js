@@ -1496,9 +1496,20 @@ if (window.__sentinelInitialized) {
       }
 
       case 'scroll': {
-        targetDoc.defaultView.scrollBy({ top: cmd.amount || 0, behavior: 'smooth' });
+        var scrollAmount = cmd.amount || 0;
+        // If a selector/ref is provided, scroll that element; otherwise scroll the window.
+        if (cmd.selector || cmd.ref) {
+          var resolvedScroll = resolveCommandTarget(cmd, targetDoc);
+          var scrollEl = resolvedScroll && resolvedScroll.el;
+          if (scrollEl) {
+            scrollEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+            await new Promise(r => setTimeout(r, 400));
+            return 'Scrolled element ' + describeTarget(cmd) + ' by ' + scrollAmount;
+          }
+        }
+        targetDoc.defaultView.scrollBy({ top: scrollAmount, behavior: 'smooth' });
         await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll animation
-        return 'Scrolled ' + (cmd.amount || 0);
+        return 'Scrolled ' + scrollAmount;
       }
 
       case 'select': {
