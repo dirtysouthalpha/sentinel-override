@@ -3785,9 +3785,11 @@ async function runAgentLoop(goal, workingTabId) {
         sendAgentStatus('waiting', 'Waiting for: ' + (command.text || command.selector || 'navigation'));
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
         sendActionMessage(command, stepCount, observation);
+        // Default timeout: navigation waits need more time than element waits
+        const _waitTimeout = command.timeout || (command.type === 'wait_for_navigation' ? 20000 : 10000);
         const waitResult = await sendMessageWithRetry(tab, {
           action: 'wait_for',
-          condition: { ...command, currentUrl: tabInfo.url }
+          condition: { ...command, currentUrl: tabInfo.url, timeout: _waitTimeout }
         });
         const result = waitResult || 'Wait completed';
         sendActionResult(stepCount, result, false);
