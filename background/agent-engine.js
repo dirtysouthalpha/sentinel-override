@@ -2524,8 +2524,15 @@ async function runAgentLoop(goal, workingTabId) {
         tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')
       );
       if (_isRestrictedPage) {
-        historyPush({ step: stepCount, action: { type: 'note' }, result: 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.' });
+        const _restrictedMsg = 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.';
+        historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
+        finished = true;
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⚠️ ' + _restrictedMsg }).catch((e) => {
+          console.error('[restrictedPage] Unhandled rejection:', e);
+        });
+        sendReportUpdate('generating');
         break;
       }
 
