@@ -1670,7 +1670,7 @@ Actions:
 - { "type": "press_key", "key": "Enter|Tab|Escape|Backspace|ArrowDown|...", "modifiers": {"ctrl": true, "shift": true} }
 - { "type": "upload_file", "selector": "FROM_LIST", "file_name": "example.txt" }
 - { "type": "open_dropdown", "selector": "FROM_LIST" }
-- { "type": "extract", "key": "memory_key", "selector": "FROM_LIST", "attribute": "text|href|value|..." }
+- { "type": "extract", "key": "memory_key", "selector": "FROM_LIST", "attribute": "text|href|value|src|html|checked|<any-attr>" }  -- attribute: "value" reads input/select value; "checked" reads checkbox state; "html" reads innerHTML
 - { "type": "extract_list", "key": "memory_key", "selector": "CSS_SELECTOR", "fields": { "title": "h2", "price": ".price" }, "limit": 10 }
 - { "type": "wait_for_text", "text": "TEXT", "timeout": 5000 }
 - { "type": "wait_for_element", "selector": "FROM_LIST", "timeout": 5000 }

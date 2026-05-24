@@ -2204,7 +2204,15 @@ if (window.__sentinelInitialized) {
         if (attr === 'text') {
           value = (el.innerText || el.textContent || '').trim();
         } else if (attr === 'href') {
-          value = el.href || '';
+          value = el.href || el.getAttribute('href') || '';
+        } else if (attr === 'value') {
+          value = el.value !== undefined ? String(el.value) : (el.getAttribute('value') || '');
+        } else if (attr === 'src') {
+          value = el.src || el.getAttribute('src') || '';
+        } else if (attr === 'html' || attr === 'innerHTML') {
+          value = el.innerHTML || '';
+        } else if (attr === 'checked') {
+          value = String(el.checked !== undefined ? el.checked : el.getAttribute('aria-checked') === 'true');
         } else {
           value = el.getAttribute(attr) || '';
         }
