@@ -1068,13 +1068,21 @@ if (undoBtn) {
 // (Handled in the main message listener below alongside other agent messages.)
 
 // Ctrl+Z / Cmd+Z keyboard shortcut for undo — mirrors the undo button behavior
+// Space key while agent is running: toggle pause/resume
 document.addEventListener('keydown', (e) => {
+  const active = document.activeElement;
+  const inText = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-    const active = document.activeElement;
-    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+    if (inText) return;
     if (!undoBtn || undoBtn.disabled || undoBtn.style.display === 'none') return;
     e.preventDefault();
     undoBtn.click();
+  }
+  if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (inText) return;
+    if (!pauseBtn || pauseBtn.style.display === 'none') return;
+    e.preventDefault();
+    pauseBtn.click();
   }
 });
 

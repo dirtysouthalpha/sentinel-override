@@ -3006,6 +3006,12 @@ async function runAgentLoop(goal, workingTabId) {
         apiWaitSeconds += 5;
         sendSilentUpdate(`Consulting AI... (${apiWaitSeconds}s)`, stepCount);
         activityUpdate(stepCount, 'consult-ai', 'Consulting AI · ' + apiWaitSeconds + 's elapsed');
+        // (6.4) Phase thresholds: warn at 30s, show pause option at 60s
+        if (apiWaitSeconds === 30) {
+          sendAgentStatus('waiting', '⚠️ Waiting for API response (' + apiWaitSeconds + 's)...');
+        } else if (apiWaitSeconds >= 60 && apiWaitSeconds % 30 === 0) {
+          sendAgentStatus('waiting', '⚠️ API still responding (' + apiWaitSeconds + 's) — you can Pause to cancel');
+        }
       }, 5000);
 
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
