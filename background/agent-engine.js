@@ -2465,6 +2465,14 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       let tab = getActiveTabId();
+      if (!tab) {
+        // Try to recover from tab contexts before giving up
+        const allCtx = getAllTabContexts();
+        if (allCtx.length > 0) {
+          tab = allCtx[0].tabId;
+          console.log('[Sentinel/DEBUG] Step', stepCount, 'Recovered tab from context:', tab);
+        }
+      }
       console.log('[Sentinel/DEBUG] Step', stepCount, 'tab:', tab);
       if (!tab) {
         sendSilentUpdate('No active tab -- stopping', stepCount);
@@ -2602,6 +2610,27 @@ async function runAgentLoop(goal, workingTabId) {
       // Inject content script
       const scriptReady = await injectContentScript(tab);
       if (!scriptReady) { sendSilentUpdate('Content script failed -- retrying', stepCount); await sleep(2000); continue; }
+
+      // Stuck-loop detection: if the same action type failed 3+ times in a row,
+      // inject a recovery hint to break the loop.
+      try {
+        const recentFailures = history.slice(-4);
+        const lastActionTypes = recentFailures.map(h => h.action && h.action.type).filter(Boolean);
+        const lastFailureFlags = recentFailures.map(h => h.actionFailed);
+        if (lastActionTypes.length >= 3) {
+          const allSame = lastActionTypes.every(t => t === lastActionTypes[0]);
+          const allFailed = lastFailureFlags.every(f => f === true);
+          if (allSame && allFailed) {
+            const stuckAction = lastActionTypes[0];
+            console.warn('[Sentinel/stuck] Detected stuck loop: ' + stuckAction + ' failed ' + lastActionTypes.length + ' times');
+            // Inject a forced recovery note into history
+            history.push({
+              role: 'user',
+              content: `[SYSTEM RECOVERY] The action "${stuckAction}" has failed ${lastActionTypes.length} times in a row. You are stuck in a loop. Try a COMPLETELY DIFFERENT approach. If close_tab isn't working, try navigate to the main page instead. If you can't close a tab, just navigate away from it. Do NOT repeat "${stuckAction}" again.`
+            });
+          }
+        }
+      } catch (e) { /* non-fatal */ }
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
       try {
@@ -3976,19 +4005,35 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
-      // Handle close_tab
+      // Handle close_tab — supports index, label, tab_id, or defaults to active tab
       if (command.type === 'close_tab') {
         let targetId = command.tab_id;
         if (!targetId && command.label) {
           targetId = findTabByLabel(command.label);
         }
+        // Support the `index` parameter from the tool definition
+        if (!targetId && typeof command.index === 'number') {
+          const allCtx = getAllTabContexts();
+          if (command.index >= 0 && command.index < allCtx.length) {
+            targetId = allCtx[command.index].tabId;
+          }
+        }
+        // Default: close the current active tab (if it's not the last one)
         if (!targetId) {
-          result = `Tab not found: ${command.label || command.tab_id}`;
+          const allCtx = getAllTabContexts();
+          const activeId = getActiveTabId();
+          if (allCtx.length > 1 && activeId) {
+            targetId = activeId;
+            console.log('[Sentinel/DEBUG] close_tab: no target specified, defaulting to active tab', targetId);
+          }
+        }
+        if (!targetId) {
+          result = 'No tab to close (only one tab open or no valid target). Use navigate to go elsewhere instead.';
           actionFailed = true;
         } else {
-          sendActionMessage(command, stepCount, null); // Show action card in popup
+          sendActionMessage(command, stepCount, null);
           await closeTab(targetId);
-          result = `Closed tab "${command.label || targetId}"`;
+          result = `Closed tab ${targetId}`;
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
