@@ -77,23 +77,23 @@ describe('generatePlan — empty response content', () => {
     model: 'gpt-4o'
   };
 
-  test('returns null when parseResponse returns null/empty content', async () => {
-    // Provider returns a response where parseResponse yields null
+  test('returns single-step fallback when parseResponse returns null/empty content', async () => {
+    // Provider returns a response where parseResponse yields null — Strategy 5 kicks in.
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ choices: [{ message: { content: null } }] })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
-  test('returns null when parseResponse returns empty string content', async () => {
+  test('returns single-step fallback when parseResponse returns empty string content', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ choices: [{ message: { content: '' } }] })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 });
 

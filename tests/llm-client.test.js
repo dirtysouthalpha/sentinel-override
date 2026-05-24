@@ -803,19 +803,19 @@ describe('generatePlan', () => {
     expect(result).toBeNull();
   });
 
-  test('returns null when API returns non-200 status', async () => {
+  test('returns single-step fallback when API returns non-200 status', async () => {
     _mockFetch = () => Promise.resolve({ ok: false, status: 500 });
     const result = await generatePlan('Click the button', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Click the button']);
   });
 
-  test('returns null when API returns empty content', async () => {
+  test('returns single-step fallback when API returns empty content', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ choices: [{ message: { content: '' } }] })
     });
     const result = await generatePlan('Click the button', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Click the button']);
   });
 
   test('returns plan array from valid API response', async () => {
@@ -840,7 +840,7 @@ describe('generatePlan', () => {
     expect(result).toEqual(['Step 1', 'Step 2']);
   });
 
-  test('returns null when plan is empty array', async () => {
+  test('returns single-step fallback when plan is empty array', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -848,10 +848,10 @@ describe('generatePlan', () => {
       })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
-  test('returns null when content is prose with no plan JSON', async () => {
+  test('returns single-step fallback when content is prose with no plan JSON', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -859,13 +859,13 @@ describe('generatePlan', () => {
       })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
-  test('returns null on network error', async () => {
+  test('returns single-step fallback on network error', async () => {
     _mockFetch = () => Promise.reject(new Error('Network error'));
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
   test('returns plan via extractFirstJsonObject fallback', async () => {
@@ -882,7 +882,7 @@ describe('generatePlan', () => {
     expect(result).toEqual(['Step A', 'Step B']);
   });
 
-  test('returns null when extractFirstJsonObject returns malformed JSON', async () => {
+  test('returns single-step fallback when response is malformed JSON', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -890,10 +890,10 @@ describe('generatePlan', () => {
       })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
-  test('returns null when extractFirstJsonObject finds JSON without plan key', async () => {
+  test('returns single-step fallback when JSON has no plan/steps key', async () => {
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -901,7 +901,7 @@ describe('generatePlan', () => {
       })
     });
     const result = await generatePlan('Check firewall', openaiSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 
   test('uses context.currentUrl in prompt when provided', async () => {
@@ -1731,9 +1731,9 @@ describe('generatePlan: empty parseResponse content path', () => {
     model: 'claude-sonnet-4-6'
   };
 
-  test('returns null when Anthropic parseResponse returns empty string (lines 894-895)', async () => {
+  test('returns single-step fallback when Anthropic parseResponse returns empty string', async () => {
     // Anthropic parseResponse returns block.text — if text is '' it is falsy,
-    // triggering the "Plan generation: empty response content" warning and null return.
+    // triggering the single-step fallback (Strategy 5).
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -1741,7 +1741,7 @@ describe('generatePlan: empty parseResponse content path', () => {
       })
     });
     const result = await generatePlan('Check firewall rules', anthropicSettings);
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall rules']);
   });
 });
 

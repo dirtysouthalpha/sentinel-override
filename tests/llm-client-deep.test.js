@@ -253,9 +253,9 @@ describe('generatePlan — empty response content', () => {
     model: 'gpt-4o'
   };
 
-  test('returns null when provider.parseResponse returns null', async () => {
+  test('returns single-step fallback when provider.parseResponse returns null', async () => {
     // OpenAI parseResponse throws when content is null, so use Anthropic format
-    // where parseResponse returns null via empty content array
+    // where parseResponse returns null via empty content array — Strategy 5 kicks in.
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
@@ -268,7 +268,7 @@ describe('generatePlan — empty response content', () => {
       api_endpoint: 'https://api.anthropic.com/v1/messages',
       model: 'claude-sonnet-4-6'
     });
-    expect(result).toBeNull();
+    expect(result).toEqual(['Check firewall']);
   });
 });
 
