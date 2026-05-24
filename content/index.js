@@ -523,6 +523,14 @@ if (window.__sentinelInitialized) {
         return dismissOverlays();
       }
 
+      case 'update_hud': {
+        // (3.50.0) Update the in-page action HUD overlay
+        if (window.__sentinelActionHUD && window.__sentinelActionHUD.update) {
+          window.__sentinelActionHUD.update(request.hudData || {});
+        }
+        return { ok: true };
+      }
+
       case 'get_viewport_info': {
         // (#11) DPR-aware screenshots: report viewport in CSS pixels plus DPR
         // and scroll offsets so the background can attach metadata to each capture.

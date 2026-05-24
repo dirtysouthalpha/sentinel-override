@@ -3951,7 +3951,36 @@ async function runAgentLoop(goal, workingTabId) {
         continue;
       }
 
+
+    // (3.50.0) Send HUD result feedback to the in-page overlay
+    function _updateHUDResult(tab, stepCount, result, isError) {
+      try {
+        const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+        sendMessageWithRetry(tab, {
+          action: 'update_hud',
+          hudData: {
+            step: stepCount,
+            result: resultStr.substring(0, 80),
+            resultSuccess: !isError,
+            resultError: isError
+          }
+        }, 1).catch(() => {});
+      } catch (_) { /* non-fatal */ }
+    }
+
       sendAgentStatus('executing', describeAction(command));
+      // (3.50.0) Update the in-page action HUD so the user can see what's happening
+      try {
+        sendMessageWithRetry(tab, {
+          action: 'update_hud',
+          hudData: {
+            step: stepCount,
+            totalSteps: dynamicMaxSteps || 20,
+            action: command.type,
+            actionLabel: describeAction(command).substring(0, 60)
+          }
+        }, 1).catch(() => {});
+      } catch (_) { /* non-fatal */ }
       sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
 
       // Approval gate + CDP trusted input flag (#9)
