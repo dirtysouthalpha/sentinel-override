@@ -914,8 +914,8 @@ export async function generatePlan(goal, settings, context = {}) {
     const data = await response.json();
     const content = provider.parseResponse(data);
     if (!content) {
-      console.warn('Plan generation: empty response content');
-      return null;
+      console.warn('Plan generation: empty response content — using single-step fallback');
+      return [goal.substring(0, 300)];
     }
     // Strategy 1: strip markdown fences, strip control chars, then JSON.parse
     let jsonStr = content.trim();
@@ -931,13 +931,31 @@ export async function generatePlan(goal, settings, context = {}) {
       if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
     } catch (_) { /* fall through to strategy 2 */ }
 
-    // Strategy 2: find first JSON object in the response (handles preamble prose)
+    // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
+    // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
     try {
-      const firstObj = extractFirstJsonObject(content);
-      if (firstObj) {
-        const parsed = JSON.parse(firstObj);
-        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
-        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+      let s2from = 0;
+      while (s2from < content.length) {
+        const s2start = content.indexOf('{', s2from);
+        if (s2start === -1) break;
+        let depth = 0, inStr = false, esc = false, s2end = -1;
+        for (let i = s2start; i < content.length; i++) {
+          const ch = content[i];
+          if (esc) { esc = false; continue; }
+          if (ch === '\\' && inStr) { esc = true; continue; }
+          if (ch === '"') { inStr = !inStr; continue; }
+          if (inStr) continue;
+          if (ch === '{') depth++;
+          else if (ch === '}') { depth--; if (depth === 0) { s2end = i; break; } }
+        }
+        if (s2end !== -1) {
+          try {
+            const parsed = JSON.parse(content.substring(s2start, s2end + 1));
+            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+          } catch (_) { /* not valid JSON at this position, keep scanning */ }
+          s2from = s2end + 1;
+        } else { break; }
       }
     } catch (_) { /* fall through to strategy 3 */ }
 
