@@ -464,4 +464,158 @@ describe('ov.dismissOverlay — extended paths', () => {
     const doc = { body, activeElement: null };
     expect(ov.dismissOverlay(doc, overlay)).toBe(true);
   });
+
+  test('invisible close button is skipped via continue (line 139)', () => {
+    const invisibleBtn = { click: jest.fn(), dispatchEvent: jest.fn(), innerText: '' };
+    globalThis.window.__sentinelUtils.dom.isVisible = (el) => el !== invisibleBtn;
+    const overlay = {
+      querySelectorAll: (sel) => {
+        if (sel.includes('close') || sel.includes('Close') || sel.includes('dismiss') || sel.includes('Dismiss')) return [invisibleBtn];
+        return [];
+      },
+    };
+    const doc = { body: { contains: () => true }, activeElement: { dispatchEvent: fn } };
+    const result = ov.dismissOverlay(doc, overlay);
+    expect(invisibleBtn.click).not.toHaveBeenCalled();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    expect(result).toBe(false);
+  });
+
+  test('invisible accept button is skipped via continue (line 166)', () => {
+    const invisibleAccept = { click: jest.fn(), dispatchEvent: jest.fn() };
+    globalThis.window.__sentinelUtils.dom.isVisible = (el) => el !== invisibleAccept;
+    const overlay = {
+      querySelectorAll: (sel) => {
+        if (sel.includes('accept') || sel.includes('consent')) return [invisibleAccept];
+        return [];
+      },
+    };
+    const doc = { body: { contains: () => true }, activeElement: { dispatchEvent: fn } };
+    const result = ov.dismissOverlay(doc, overlay);
+    expect(invisibleAccept.click).not.toHaveBeenCalled();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    expect(result).toBe(false);
+  });
+});
+
+describe('ov.detectOverlay — additional branches', () => {
+  test('aria-modal found but invisible returns null (line 40 false branch)', () => {
+    const modal = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.dom.isVisible = () => false;
+    const doc = {
+      querySelectorAll: (sel) => sel === '[aria-modal="true"]' ? [modal] : [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+  });
+
+  test('detects aria-modal in shadow DOM (lines 44-48)', () => {
+    const shadowModal = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.shadow.queryDeep = (doc, sel) =>
+      sel === '[aria-modal="true"]' ? [shadowModal] : [];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(shadowModal);
+    globalThis.window.__sentinelUtils.shadow.queryDeep = () => [];
+  });
+
+  test('shadow aria-modal found but invisible returns null', () => {
+    const shadowModal = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.dom.isVisible = (el) => el !== shadowModal;
+    globalThis.window.__sentinelUtils.shadow.queryDeep = (doc, sel) =>
+      sel === '[aria-modal="true"]' ? [shadowModal] : [];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    globalThis.window.__sentinelUtils.shadow.queryDeep = () => [];
+  });
+
+  test('detects role=dialog in shadow DOM (lines 59-63)', () => {
+    const shadowDialog = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.shadow.queryDeep = (doc, sel) =>
+      sel === '[role="dialog"], [role="alertdialog"]' ? [shadowDialog] : [];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(shadowDialog);
+    globalThis.window.__sentinelUtils.shadow.queryDeep = () => [];
+  });
+
+  test('non-numeric zIndex falls back to 0 via || 0 (line 73)', () => {
+    const el = {
+      getBoundingClientRect: () => ({ width: 1024, height: 768, left: 0, top: 0 }),
+    };
+    const doc = {
+      querySelectorAll: (sel) => sel === 'div, section' ? [el] : [],
+      defaultView: {
+        innerWidth: 1024, innerHeight: 768,
+        getComputedStyle: () => ({ position: 'fixed', zIndex: 'notanumber', pointerEvents: 'auto' }),
+      },
+    };
+    // parseInt('notanumber') = NaN → NaN || 0 = 0 → 0 <= MIN_BLOCKING_Z_INDEX → skip
+    expect(ov.detectOverlay(doc)).toBeNull();
+  });
+
+  test('high z-index overlay invisible returns null (line 81-82 false branch)', () => {
+    const overlay = {
+      getBoundingClientRect: () => ({ width: 1024, height: 768, left: 0, top: 0 }),
+    };
+    globalThis.window.__sentinelUtils.dom.isVisible = () => false;
+    const doc = {
+      querySelectorAll: (sel) => sel === 'div, section' ? [overlay] : [],
+      defaultView: {
+        innerWidth: 1024, innerHeight: 768,
+        getComputedStyle: () => ({ position: 'fixed', zIndex: '9999', pointerEvents: 'auto' }),
+      },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+  });
+
+  test('detects cookie banner in shadow DOM (lines 101-108)', () => {
+    const shadowBanner = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.shadow.queryDeep = (doc, sel) =>
+      sel === '.cookie-banner' ? [shadowBanner] : [];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBe(shadowBanner);
+    globalThis.window.__sentinelUtils.shadow.queryDeep = () => [];
+  });
+
+  test('shadow cookie banner found but invisible skips it (line 106 false branch)', () => {
+    const shadowBanner = { tagName: 'DIV' };
+    globalThis.window.__sentinelUtils.dom.isVisible = (el) => el !== shadowBanner;
+    globalThis.window.__sentinelUtils.shadow.queryDeep = (doc, sel) =>
+      sel === '.cookie-banner' ? [shadowBanner] : [];
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1024, innerHeight: 768, getComputedStyle: () => ({}) },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    globalThis.window.__sentinelUtils.shadow.queryDeep = () => [];
+  });
+
+  test('position not fixed or absolute continues past element (line 72)', () => {
+    const el = {
+      getBoundingClientRect: () => ({ width: 1024, height: 768, left: 0, top: 0 }),
+    };
+    const doc = {
+      querySelectorAll: (sel) => sel === 'div, section' ? [el] : [],
+      defaultView: {
+        innerWidth: 1024, innerHeight: 768,
+        getComputedStyle: () => ({ position: 'relative', zIndex: '9999', pointerEvents: 'auto' }),
+      },
+    };
+    expect(ov.detectOverlay(doc)).toBeNull();
+  });
 });

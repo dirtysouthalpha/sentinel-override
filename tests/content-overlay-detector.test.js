@@ -852,3 +852,189 @@ describe('overlay-detector — dismissOverlay accept buttons and edge cases', ()
     expect(dismissed).toBe(true);
   });
 });
+
+// ── Uncovered branch coverage ────────────────────────────────────────────────
+
+describe('overlay-detector — lines 5-6: || {} fallbacks when __sentinelUtils missing', () => {
+  test('creates __sentinelUtils and overlay when window has neither', () => {
+    const bareWindow = {};  // no __sentinelUtils at all
+    const sandboxEmpty = {
+      window: bareWindow,
+      console,
+      JSON, Error, TypeError, RegExp, Object, Array, Math, Date, String, Number, Boolean, Map, Set,
+      MouseEvent: class { constructor(t, o) { this.type = t; } },
+      KeyboardEvent: class { constructor(t, o) { this.type = t; } },
+      document: {
+        body: { contains: () => false, dispatchEvent: () => {} },
+        documentElement: {},
+        querySelectorAll: () => [],
+        defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+        activeElement: null,
+      },
+    };
+    sandboxEmpty.globalThis = sandboxEmpty;
+    vm.createContext(sandboxEmpty);
+    const source = readFileSync(join(__dirname, '../content/overlay-detector.js'), 'utf8');
+    new vm.Script(source, { filename: 'overlay-detector.js' }).runInContext(sandboxEmpty);
+    // Both || {} branches must have fired
+    expect(bareWindow.__sentinelUtils).toBeDefined();
+    expect(bareWindow.__sentinelUtils.overlay).toBeDefined();
+  });
+});
+
+describe('overlay-detector — dom falsy: short-circuit in detectOverlay', () => {
+  let sandbox2, ov2;
+
+  beforeEach(() => {
+    sandbox2 = createSandbox();
+    // Set dom to null so dom && ... is always false (lines 40-73, 81-106)
+    sandbox2.window.__sentinelUtils.dom = null;
+    loadOverlayModule(sandbox2);
+    ov2 = sandbox2.window.__sentinelUtils.overlay;
+  });
+
+  test('aria-modal not returned when dom is null (dom && check short-circuits)', () => {
+    const modal = { getAttribute: () => 'true' };
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === '[aria-modal="true"]') return [modal];
+        return [];
+      },
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+    };
+    // dom is null → dom && dom.isVisible() → false → modal not returned
+    expect(ov2.detectOverlay(doc)).toBeNull();
+  });
+
+  test('role=dialog not returned when dom is null', () => {
+    const dialog = { getAttribute: () => null };
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === '[role="dialog"], [role="alertdialog"]') return [dialog];
+        return [];
+      },
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+    };
+    expect(ov2.detectOverlay(doc)).toBeNull();
+  });
+
+  test('high z-index overlay not returned when dom is null', () => {
+    const overlay = {
+      getBoundingClientRect: () => ({ width: 1200, height: 800, left: 0, top: 0 }),
+    };
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === 'div, section') return [overlay];
+        return [];
+      },
+      defaultView: {
+        innerWidth: 1200, innerHeight: 800,
+        getComputedStyle: () => ({ position: 'fixed', zIndex: '9999', pointerEvents: 'auto' }),
+      },
+    };
+    expect(ov2.detectOverlay(doc)).toBeNull();
+  });
+
+  test('cookie banner not returned when dom is null', () => {
+    const banner = {};
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === '.cookie-banner') return [banner];
+        return [];
+      },
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+    };
+    expect(ov2.detectOverlay(doc)).toBeNull();
+  });
+});
+
+describe('overlay-detector — shadow.queryDeep absent', () => {
+  let sandbox3, ov3;
+
+  beforeEach(() => {
+    sandbox3 = createSandbox();
+    // shadow exists but queryDeep is not a function — tests the shadow && shadow.queryDeep branch
+    sandbox3.window.__sentinelUtils.shadow = {};
+    loadOverlayModule(sandbox3);
+    ov3 = sandbox3.window.__sentinelUtils.overlay;
+  });
+
+  test('detectOverlay does not crash when shadow.queryDeep is missing', () => {
+    const doc = {
+      querySelectorAll: () => [],
+      defaultView: { innerWidth: 1200, innerHeight: 800, getComputedStyle: () => ({ position: 'static', zIndex: 'auto', pointerEvents: 'auto' }) },
+    };
+    expect(() => ov3.detectOverlay(doc)).not.toThrow();
+    expect(ov3.detectOverlay(doc)).toBeNull();
+  });
+});
+
+describe('overlay-detector — invisible buttons skipped in dismissOverlay', () => {
+  let sandbox4, ov4;
+
+  beforeEach(() => {
+    sandbox4 = createSandbox();
+    loadOverlayModule(sandbox4);
+    ov4 = sandbox4.window.__sentinelUtils.overlay;
+  });
+
+  test('invisible close button is skipped (line 139 continue branch)', () => {
+    const overlay = makeElement('div');
+    const invisibleBtn = makeElement('button');
+    _isVisibleResults.set(invisibleBtn, false);  // invisible → continue
+    _isVisibleResults.set(overlay, true);
+    overlay.querySelectorAll = (sel) => {
+      if (sel.includes('Close') || sel.includes('close') || sel.includes('dismiss') || sel.includes('Dismiss')) return [invisibleBtn];
+      return [];
+    };
+    const doc = { body: { contains: () => true }, activeElement: overlay };
+    // invisible button should be skipped — dismiss returns false (no dismiss)
+    expect(ov4.dismissOverlay(doc, overlay)).toBe(false);
+  });
+
+  test('invisible accept button is skipped (line 166 continue branch)', () => {
+    const overlay = makeElement('div');
+    const invisibleAccept = makeElement('button');
+    _isVisibleResults.set(invisibleAccept, false);
+    _isVisibleResults.set(overlay, true);
+    overlay.querySelectorAll = (sel) => {
+      if (sel.includes('accept') || sel.includes('consent')) return [invisibleAccept];
+      return [];
+    };
+    const doc = { body: { contains: () => true }, activeElement: overlay };
+    expect(ov4.dismissOverlay(doc, overlay)).toBe(false);
+  });
+
+  test('invisible text-match button is skipped (line 185 continue branch)', () => {
+    const overlay = makeElement('div');
+    const visBtn = makeElement('button');
+    visBtn.innerText = 'Close';
+    _isVisibleResults.set(visBtn, false);  // invisible
+    _isVisibleResults.set(overlay, true);
+    overlay.querySelectorAll = (sel) => {
+      if (sel === 'button, a, [role="button"]') return [visBtn];
+      return [];
+    };
+    const doc = { body: { contains: () => true }, activeElement: overlay };
+    expect(ov4.dismissOverlay(doc, overlay)).toBe(false);
+  });
+
+  test('non-numeric zIndex falls back to 0 (line 73 parseInt || 0)', () => {
+    const overlay = makeElement('div');
+    overlay.getBoundingClientRect = () => ({ width: 1200, height: 800, left: 0, top: 0 });
+    _isVisibleResults.set(overlay, true);
+    const doc = {
+      querySelectorAll(sel) {
+        if (sel === 'div, section') return [overlay];
+        return [];
+      },
+      defaultView: {
+        innerWidth: 1200, innerHeight: 800,
+        // zIndex is non-numeric → parseInt returns NaN → || 0 → zIndex = 0 → below MIN_BLOCKING_Z_INDEX → skip
+        getComputedStyle: () => ({ position: 'fixed', zIndex: 'notanumber', pointerEvents: 'auto' }),
+      },
+    };
+    const ov4d = sandbox4.window.__sentinelUtils.overlay;
+    expect(ov4d.detectOverlay(doc)).toBeNull();
+  });
+});

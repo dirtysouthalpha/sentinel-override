@@ -322,3 +322,140 @@ describe('cursor style injection', () => {
     expect(styleAppend).toBeDefined();
   });
 });
+
+// ── Uncovered branch coverage ────────────────────────────────────────────────
+
+describe('line 19: __sentinelUtils || {} fallback', () => {
+  test('creates __sentinelUtils object when it is undefined', async () => {
+    delete globalThis.window.__sentinelUtils;  // force the || {} branch
+    const cursor = await loadCursor();
+    expect(globalThis.window.__sentinelUtils).toBeDefined();
+    expect(cursor).toBeDefined();
+  });
+});
+
+describe('line 39: ensureStyle early-return when style already exists', () => {
+  test('skips creating a second style element when style already in DOM', async () => {
+    // Pre-seed a style element so getElementById finds it
+    createdElements.push({ id: '__sentinel_cursor_style__', tagName: 'STYLE', textContent: '' });
+    await loadCursor();
+    const styleEls = createdElements.filter(el => el.tagName === 'STYLE');
+    // Only the pre-seeded one should exist — no duplicate created
+    expect(styleEls).toHaveLength(1);
+  });
+});
+
+describe('line 94: ensureStyle uses documentElement when head is null', () => {
+  test('appends style to documentElement when document.head is null', async () => {
+    globalThis.document.head = null;
+    await loadCursor();
+    const docElAppends = appendedTo.filter(a => a.target === 'documentElement' && a.el && a.el.tagName === 'STYLE');
+    expect(docElAppends.length).toBeGreaterThan(0);
+  });
+});
+
+describe('lines 112-113: innerWidth/Height 0 → 800/600 fallback', () => {
+  test('initializes cursor position using 800x600 defaults when dimensions are 0', async () => {
+    globalThis.window.innerWidth = 0;
+    globalThis.window.innerHeight = 0;
+    const cursor = await loadCursor();
+    expect(cursor).toBeDefined();
+    // lastX = (0 || 800)/2 = 400, lastY = (0 || 600)/2 = 300
+    const p = cursor.moveTo(400, 300);
+    jest.advanceTimersByTime(500);
+    await p;
+    expect(cursor.getPosition()).toEqual({ x: 400, y: 300 });
+  });
+});
+
+describe('lines 133-136: appendNow catch + body fallback', () => {
+  test('falls back to body.appendChild when documentElement.appendChild throws', async () => {
+    const origAppend = globalThis.document.documentElement.appendChild;
+    globalThis.document.documentElement.appendChild = () => { throw new Error('append fail'); };
+    const cursor = await loadCursor();
+    expect(cursor).toBeDefined();
+    // body should have been used as fallback for the cursor element
+    const bodyAppends = appendedTo.filter(a => a.target === 'body');
+    expect(bodyAppends.length).toBeGreaterThan(0);
+    globalThis.document.documentElement.appendChild = origAppend;
+  });
+});
+
+describe('lines 140-147: setInterval polling when documentElement initially null', () => {
+  test('appends cursor element via interval once documentElement appears', async () => {
+    const savedDocEl = globalThis.document.documentElement;
+    globalThis.document.documentElement = null;
+    // Load module (IIFE runs with null docEl → setInterval set up)
+    await loadCursor();
+    // Restore documentElement before interval fires
+    globalThis.document.documentElement = savedDocEl;
+    jest.advanceTimersByTime(35);
+    // appendNow should have been called; root was body since docEl was null at closure time
+    expect(appendedTo.length).toBeGreaterThan(0);
+  });
+});
+
+describe('line 104: c.remove() throws when cleaning up detached cursor', () => {
+  test('handles removal error for detached cursor element gracefully', async () => {
+    const detachedEl = {
+      id: '__sentinel_cursor__',
+      tagName: 'DIV',
+      isConnected: false,
+      remove: () => { throw new Error('remove failed'); },
+      style: { left: '0px', top: '0px' },
+      classList: { _classes: new Set(), add: fn, remove: fn, contains: () => false },
+      setAttribute: fn,
+      innerHTML: '',
+      appendChild: fn,
+    };
+    createdElements.push(detachedEl);
+    const cursor = await loadCursor();
+    expect(cursor).toBeDefined();
+  });
+});
+
+describe('line 161: MutationObserver callback early-return when cursor still connected', () => {
+  test('does not recreate cursor when it is still connected', async () => {
+    globalThis.window.innerWidth = 800;
+    globalThis.window.innerHeight = 600;
+    await loadCursor();
+    const countBefore = createdElements.length;
+    // Fire observer callback — cursor is still in DOM and isConnected = true
+    if (observers.length > 0 && observers[0]._cb) {
+      observers[0]._cb([]);
+    }
+    // No additional elements should have been created (early return taken)
+    expect(createdElements.length).toBe(countBefore);
+  });
+});
+
+describe('line 181: auto-hide timer no-op when cursor absent', () => {
+  test('does not throw when cursor element is gone before auto-hide fires', async () => {
+    const cursor = await loadCursor();
+    cursor.setKeepVisible(false);
+    cursor.show();
+    // Remove cursor elements so getElementById returns null when timer fires
+    createdElements = createdElements.filter(e => e.id !== '__sentinel_cursor__');
+    expect(() => jest.advanceTimersByTime(13000)).not.toThrow();
+    cursor.setKeepVisible(true);
+  });
+});
+
+describe('line 315: setKeepVisible(true) when cursor not in DOM', () => {
+  test('does not crash when no cursor element exists', async () => {
+    const cursor = await loadCursor();
+    createdElements = createdElements.filter(e => e.id !== '__sentinel_cursor__');
+    expect(() => cursor.setKeepVisible(true)).not.toThrow();
+  });
+});
+
+describe('line 326: getPosition when cursor disconnected', () => {
+  test('returns (-1, -1) when cursor element is disconnected', async () => {
+    globalThis.window.innerWidth = 800;
+    globalThis.window.innerHeight = 600;
+    const cursor = await loadCursor();
+    const cursorEl = createdElements.find(e => e.id === '__sentinel_cursor__');
+    if (cursorEl) cursorEl.isConnected = false;
+    expect(cursor.getPosition()).toEqual({ x: -1, y: -1 });
+  });
+});
