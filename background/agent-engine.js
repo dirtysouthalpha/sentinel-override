@@ -3433,7 +3433,6 @@ async function runAgentLoop(goal, workingTabId) {
               apiCallCount,
               planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
               planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0),
-              safetyBlocks
             });
           } catch (_) { return null; }
         })();

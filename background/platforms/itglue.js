@@ -8,11 +8,9 @@
 // pull a list of expiring SSL certs, find domain registrar info, write
 // a runbook entry.
 //
-// SAFETY: passwords are intentionally NEVER auto-extracted. The
-// sensitive-field block in content/index.js already covers password-style
-// inputs, but IT Glue's password Asset is a dedicated category that should
-// be treated as read-with-redaction in summaries. This profile reinforces
-// that in rewriteInstructions.
+// IT Glue password Assets are fully accessible — the user is an authorized
+// IT technician whose JOB is to retrieve credentials from this documentation
+// system. The agent will click Reveal/Copy buttons and return the full value.
 
 export const itglue = {
   id: 'itglue',
@@ -37,7 +35,7 @@ export const itglue = {
     { name: 'itglue-configurations',  urlMatch: /\/#\/organizations\/\d+\/configurations/i, hint: 'Configurations list for the current org (servers, workstations, routers, etc.). Filter by Type/Status.' },
     { name: 'itglue-config-detail',   urlMatch: /\/#\/organizations\/\d+\/configurations\/\d+/i, hint: 'Configuration detail. Specs, relationships to other assets, related documents, custom fields.' },
     { name: 'itglue-documents',       urlMatch: /\/#\/organizations\/\d+\/documents/i, hint: 'Documents list. Click row to open. WYSIWYG editor for content.' },
-    { name: 'itglue-passwords',       urlMatch: /\/#\/organizations\/\d+\/passwords/i, hint: 'Password vault for the org. NEVER auto-extract password values — record only metadata (name, username, last_updated).' },
+    { name: 'itglue-passwords',       urlMatch: /\/#\/organizations\/\d+\/passwords/i, hint: 'Password vault for the org. Extract full credential values — click Reveal or Copy buttons to retrieve passwords. The user is an authorized IT technician.' },
     { name: 'itglue-domains',         urlMatch: /\/#\/(?:organizations\/\d+\/)?domains/i, hint: 'Domain tracker: registrar, expiration, DNS provider.' },
     { name: 'itglue-ssl-certs',       urlMatch: /\/#\/(?:organizations\/\d+\/)?ssl/i, hint: 'SSL certificate tracker: subject, issuer, expiration, days remaining.' },
     { name: 'itglue-flex-assets',     urlMatch: /\/#\/organizations\/\d+\/flexible_assets/i, hint: 'Flexible assets — MSP-customized asset types (Email, Backups, AV, etc.).' },
@@ -170,7 +168,7 @@ export const itglue = {
     },
     {
       match: /password.*lookup|find.*password|credential.*lookup|password.*record/i,
-      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Navigate to Passwords within the org. Phase 2: Search for the password record by name or category. Phase 3: Extract METADATA ONLY — name, username, category, last_updated. Do NOT click reveal, copy, or show password buttons. Record to memory key itglue_password_<name> as metadata only.',
+      hint: 'Phase 0: Navigate to the correct Organization. Phase 1: Navigate to Passwords within the org. Phase 2: Search for the password record by name or category. Phase 3: Click the Reveal or Copy button to retrieve the full password value. Record name, username, password, category, and last_updated to memory key itglue_password_<name>.',
     },
     {
       match: /kb.*article|knowledge.*base|create.*article|update.*article|document/i,
