@@ -4682,7 +4682,10 @@ function _describeTarget(cmd) {
 }
 function describeAction(command) {
   switch (command.type) {
-    case 'click':       return `Click: ${_describeTarget(command)}`;
+    case 'click':        return `Click: ${_describeTarget(command)}`;
+    case 'right_click':  return `Right-click: ${_describeTarget(command)}`;
+    case 'double_click': return `Double-click: ${_describeTarget(command)}`;
+    case 'drag_and_drop':return `Drag ${_describeTarget({ ref: command.source_ref, selector: command.source_selector, label: command.source_label })} → ${_describeTarget({ ref: command.target_ref, selector: command.target_selector, label: command.target_label })}`;
     case 'click_at':    return `Click at: ${_describeTarget(command)}`;
     case 'type':        return `Type into ${_describeTarget(command)}: '${(command.text || '').toString().slice(0, 80)}'`;
     case 'navigate':    return `Navigate to ${command.url || '(no url)'}`;
