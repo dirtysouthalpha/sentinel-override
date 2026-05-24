@@ -138,6 +138,26 @@ function clearAlarm(scheduleId) {
  * @param {object} recurrence - { interval, periodInMinutes, daysOfWeek, time }
  * @returns {number} Timestamp in ms for the next run
  */
+/**
+ * Find how many days ahead the next matching weekday is, given daysOfWeek and a candidate time.
+ * @param {number[]} daysOfWeek - Array of day indices (0=Sun, 6=Sat)
+ * @param {number} currentDay - Current day index
+ * @param {number} candidateTime - Candidate Date getTime()
+ * @param {number} nowTime - Current Date getTime()
+ * @returns {number} Days ahead until next matching day
+ */
+function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime) {
+  const sortedDays = daysOfWeek.slice().sort((a, b) => a - b);
+  let daysAhead = 0;
+  for (const day of sortedDays) {
+    let diff = day - currentDay;
+    if (diff < 0) diff += 7;
+    if (diff === 0 && candidateTime <= nowTime) diff = 7;
+    if (daysAhead === 0 || diff < daysAhead) daysAhead = diff;
+  }
+  return daysAhead;
+}
+
 function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
@@ -148,53 +168,26 @@ function computeNextRun(recurrence) {
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 
   if (recurrence.interval === 'daily') {
-    // If the time has already passed today, add one day
-    if (candidate.getTime() <= now.getTime()) {
-      candidate.setDate(candidate.getDate() + 1);
-    }
+    if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);
     return candidate.getTime();
   }
 
   if (recurrence.interval === 'weekly' && recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
-    // Find the next matching day of the week
-    const currentDay = now.getDay();
-    let daysAhead = 0;
-
-    // Sort daysOfWeek to find the next one
-    const sortedDays = recurrence.daysOfWeek.sort((a, b) => a - b);
-
-    // Find the first day that is >= today and time hasn't passed, or next week
-    for (const day of sortedDays) {
-      let diff = day - currentDay;
-      if (diff < 0) diff += 7;
-      if (diff === 0 && candidate.getTime() <= now.getTime()) diff = 7;
-      if (daysAhead === 0 || diff < daysAhead) {
-        daysAhead = diff;
-      }
-    }
-
+    const daysAhead = _computeWeeklyDaysAhead(recurrence.daysOfWeek, now.getDay(), candidate.getTime(), now.getTime());
     candidate.setDate(candidate.getDate() + daysAhead);
     return candidate.getTime();
   }
 
   if (recurrence.interval === 'custom') {
-    // For custom, just add the period to now (or next whole period boundary)
     const periodMs = (recurrence.periodInMinutes || 60) * 60 * 1000;
     const nowMs = now.getTime();
-    // Align to next period boundary from midnight
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const elapsed = nowMs - midnight;
-    const periodsElapsed = Math.floor(elapsed / periodMs);
+    const periodsElapsed = Math.floor((nowMs - midnight) / periodMs);
     const nextPeriod = midnight + (periodsElapsed + 1) * periodMs;
-
-    // But also ensure it's at least 1 minute in the future
-    if (nextPeriod <= nowMs + 60000) {
-      return midnight + (periodsElapsed + 2) * periodMs;
-    }
+    if (nextPeriod <= nowMs + 60000) return midnight + (periodsElapsed + 2) * periodMs;
     return nextPeriod;
   }
 
-  // Fallback: 1 hour from now
   return now.getTime() + 3600000;
 }
 
@@ -257,55 +250,50 @@ function setBadge(status) {
  * @param {{ name: string, templateId?: string, goal?: string, params?: object, type: 'once'|'recurring', recurrence?: object, runAt?: number }} data
  * @returns {Promise<object>} The created schedule
  */
-export async function createSchedule(data) {
-  if (!data || typeof data !== 'object') {
-    throw new Error('Schedule data must be an object');
-  }
-  if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') {
-    throw new Error('Schedule name is required');
-  }
+/**
+ * Validate createSchedule input fields and throw descriptive errors.
+ * @param {object} data
+ */
+function _validateScheduleData(data) {
+  if (!data || typeof data !== 'object') throw new Error('Schedule data must be an object');
+  if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') throw new Error('Schedule name is required');
   if (!data.templateId && (!data.goal || typeof data.goal !== 'string' || data.goal.trim() === '')) {
     throw new Error('Either templateId or goal is required');
   }
+}
 
-  const id = crypto.randomUUID();
-  const now = Date.now();
-
-  let nextRunAt = null;
-  let recurrence = null;
-
+/**
+ * Build the recurrence config and compute the next run timestamp for a schedule.
+ * @param {object} data - Raw schedule data from the caller
+ * @param {number} now - Current timestamp (ms)
+ * @returns {{ recurrence: object|null, nextRunAt: number }}
+ */
+function _buildScheduleTiming(data, now) {
   if (data.type === 'once') {
-    // runAt is a timestamp in ms; if not provided or in the past, use 1 hour from now
-    if (data.runAt && data.runAt > now) {
-      nextRunAt = data.runAt;
-    } else {
-      nextRunAt = now + 3600000;
-    }
-  } else if (data.type === 'recurring' && data.recurrence) {
-    recurrence = {
+    return { recurrence: null, nextRunAt: (data.runAt && data.runAt > now) ? data.runAt : now + 3600000 };
+  }
+  if (data.type === 'recurring' && data.recurrence) {
+    const recurrence = {
       interval: data.recurrence.interval || 'daily',
       periodInMinutes: data.recurrence.periodInMinutes || 1440,
       daysOfWeek: data.recurrence.daysOfWeek || null,
       time: data.recurrence.time || '09:00',
     };
-
-    // Compute periodInMinutes from interval if not explicitly provided
     if (!data.recurrence.periodInMinutes) {
-      switch (recurrence.interval) {
-        case 'daily':
-          recurrence.periodInMinutes = 1440;
-          break;
-        case 'weekly':
-          recurrence.periodInMinutes = 10080;
-          break;
-        // 'custom' keeps the user-provided value
-      }
+      if (recurrence.interval === 'daily') recurrence.periodInMinutes = 1440;
+      else if (recurrence.interval === 'weekly') recurrence.periodInMinutes = 10080;
     }
-
-    nextRunAt = computeNextRun(recurrence);
-  } else {
-    throw new Error('Schedule type must be "once" or "recurring" with recurrence config');
+    return { recurrence, nextRunAt: computeNextRun(recurrence) };
   }
+  throw new Error('Schedule type must be "once" or "recurring" with recurrence config');
+}
+
+export async function createSchedule(data) {
+  _validateScheduleData(data);
+
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const { recurrence, nextRunAt } = _buildScheduleTiming(data, now);
 
   const schedule = {
     id,
@@ -325,8 +313,6 @@ export async function createSchedule(data) {
   const schedules = await loadSchedules();
   schedules[id] = schedule;
   await saveSchedules(schedules);
-
-  // Register the alarm
   registerAlarm(schedule);
 
   return schedule;
