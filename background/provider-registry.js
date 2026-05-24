@@ -111,15 +111,19 @@ export const PROVIDERS = {
     }),
 
     /** Build request body for OpenAI Chat Completions API. */
-    buildBody: (model, systemPrompt, userContent, opts = {}) => ({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent }
-      ],
-      temperature: opts.temperature || 0.3,
-      max_tokens: opts.maxTokens || 8000
-    }),
+    buildBody: (model, systemPrompt, userContent, opts = {}) => {
+      const body = {
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent }
+        ],
+        temperature: opts.temperature || 0.3,
+        max_tokens: opts.maxTokens || 8000
+      };
+      if (opts.jsonMode) body.response_format = { type: 'json_object' };
+      return body;
+    },
 
     /** Parse OpenAI Chat Completions response and extract text content. */
     parseResponse: (data) => {

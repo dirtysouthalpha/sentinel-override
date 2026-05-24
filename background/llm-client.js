@@ -820,7 +820,7 @@ export function supportsVision(model, providerHint) {
 export async function generatePlan(goal, settings, context = {}) {
   const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
   const apiKey = settings.api_key;
-  const model = settings.model || 'glm-5.1';
+  const model = settings.model || 'glm-5';
   if (!apiKey) return null;
 
   const urlContext = context.currentUrl
@@ -875,7 +875,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2 }));
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: provider.id === 'openai' }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',

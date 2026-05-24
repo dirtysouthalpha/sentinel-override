@@ -966,7 +966,7 @@ describe('generatePlan', () => {
       api_endpoint: 'https://api.openai.com/v1/chat/completions'
     });
     const body = JSON.parse(mockFn.mock.calls[0][1].body);
-    expect(body.model).toBe('glm-5.1');
+    expect(body.model).toBe('glm-5');
   });
 
   test('handles Anthropic endpoint format', async () => {
