@@ -33,11 +33,13 @@ const {
   appendAuditEntry,
   getAuditLog,
   clearAuditLog,
+  _resetAuditCacheForTesting,
 } = await import('../background/audit-log.js');
 
 beforeEach(() => {
   storageData = {};
   jest.clearAllMocks();
+  _resetAuditCacheForTesting();
 });
 
 // ========== auditLogToCsv ==========
