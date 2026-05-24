@@ -10,8 +10,9 @@ import { consecutiveFailures } from '../background/skills/consecutive-failures.j
 import { emptyObservation } from '../background/skills/empty-observation.js';
 import { cspBlocked } from '../background/skills/csp-blocked.js';
 import { slowLlmCall } from '../background/skills/slow-llm-call.js';
+import { authWall } from '../background/skills/auth-wall.js';
 
-const allSkills = [cspBlocked, clickNoTarget, navigateLoop, selectorMiss, unproductiveExtract, emptyObservation, consecutiveFailures, slowLlmCall];
+const allSkills = [cspBlocked, authWall, clickNoTarget, navigateLoop, selectorMiss, unproductiveExtract, emptyObservation, consecutiveFailures, slowLlmCall];
 
 // ========== Shared shape validation ==========
 
@@ -434,5 +435,86 @@ describe('slowLlmCall', () => {
   test('promptInjection mentions the duration in seconds', () => {
     const text = slowLlmCall.promptInjection({ lastAiCallMs: 35000 });
     expect(text).toContain('35');
+  });
+});
+
+// ========== authWall ==========
+
+describe('authWall', () => {
+  test('matches on known SSO/login URL patterns', () => {
+    const ssoUrls = [
+      'https://login.microsoftonline.com/tenant/oauth2/authorize',
+      'https://accounts.google.com/signin/v2/identifier',
+      'https://myorg.okta.com/login/login.htm',
+      'https://example.com/auth/login',
+      'https://example.com/sso/saml',
+    ];
+    for (const url of ssoUrls) {
+      expect(authWall.matches({ currentUrl: url, pageText: 'some text' })).toBe(true);
+    }
+  });
+
+  test('matches on MFA/login text with short page', () => {
+    expect(authWall.matches({
+      currentUrl: 'https://example.com/app',
+      pageText: 'Enter your two-factor authentication code',
+    })).toBe(true);
+  });
+
+  test('matches on session expired text', () => {
+    expect(authWall.matches({
+      currentUrl: 'https://example.com/app',
+      pageText: 'Your session has expired. Please sign in again.',
+    })).toBe(true);
+  });
+
+  test('does not match on a normal page with short text', () => {
+    expect(authWall.matches({
+      currentUrl: 'https://example.com/dashboard',
+      pageText: 'Welcome back. Your dashboard is loading.',
+    })).toBe(false);
+  });
+
+  test('does not match on long page that mentions login incidentally', () => {
+    const longPage = 'Click Login to sign in. '.repeat(200);
+    expect(authWall.matches({
+      currentUrl: 'https://example.com/docs',
+      pageText: longPage,
+    })).toBe(false);
+  });
+
+  test('returns null from autoApply (user must authenticate)', () => {
+    const cmd = authWall.autoApply({ currentUrl: 'https://login.microsoftonline.com/', pageText: 'Sign in' });
+    expect(cmd).toBeNull();
+  });
+
+  test('promptInjection for MFA challenge mentions wait_for_navigation', () => {
+    const text = authWall.promptInjection({
+      currentUrl: 'https://duo.com/verify',
+      pageText: 'Approve this sign-in request from Duo',
+    });
+    expect(text).toContain('wait_for_navigation');
+    expect(text).toContain('MFA');
+  });
+
+  test('promptInjection for SSO redirect mentions SSO and waiting', () => {
+    const text = authWall.promptInjection({
+      currentUrl: 'https://login.microsoftonline.com/tenant/oauth2',
+      pageText: 'Sign in to your account',
+    });
+    expect(text).toContain('SSO');
+    expect(text).toContain('wait_for_navigation');
+  });
+
+  test('promptInjection for generic login mentions credentials', () => {
+    const text = authWall.promptInjection({
+      currentUrl: 'https://example.com/login',
+      pageText: 'Enter your email and password',
+    });
+    expect(text).toContain('login');
+  });
+
+  test('matches returns false for null', () => {
+    expect(authWall.matches(null)).toBe(false);
   });
 });

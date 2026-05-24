@@ -15,10 +15,12 @@ import { consecutiveFailures } from './consecutive-failures.js';
 import { emptyObservation } from './empty-observation.js';
 import { slowLlmCall } from './slow-llm-call.js';
 import { cspBlocked } from './csp-blocked.js';
+import { authWall } from './auth-wall.js';
 import { tel } from '../telemetry.js';
 
 const SKILLS = [
   cspBlocked,
+  authWall,
   clickNoTarget,
   navigateLoop,
   selectorMiss,

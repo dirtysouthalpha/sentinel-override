@@ -885,7 +885,7 @@ Goal: "Check the SonicWall firewall for blocked connections"
  * @returns {Promise<string[]|null>}
  */
 export async function generatePlan(goal, settings, context = {}) {
-  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/paas/v4/chat/completions';
+  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
   const apiKey = settings.api_key;
   const model = settings.model || 'glm-5';
   if (!apiKey) return null;
@@ -1662,7 +1662,7 @@ Actions:
 - { "type": "click", "selector": "FROM_LIST" }
 - { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
 - { "type": "navigate", "url": "URL" }
-- { "type": "scroll", "amount": INTEGER }
+- { "type": "scroll", "amount": INTEGER } — scroll the window. Or { "type": "scroll", "selector": "FROM_LIST", "amount": INTEGER } to scroll inside a specific container (use for tables, panels, virtualized lists)
 - { "type": "select", "selector": "FROM_LIST", "value": "OPTION_TEXT_OR_VALUE" }
 - { "type": "check", "selector": "FROM_LIST", "checked": true|false }
 - { "type": "check_all", "selector": "CSS_SELECTOR", "checked": true|false }
