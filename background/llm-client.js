@@ -896,9 +896,11 @@ export async function generatePlan(goal, settings, context = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
-    // jsonMode requests JSON output — provider.id comes from PROVIDERS (not PROVIDER_CATALOG),
-    // so use provider.id (not provider.kind which doesn't exist on PROVIDERS objects).
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: true }));
+    // Only send response_format:json_object to OpenAI proper — Z.AI and other
+    // compatible providers may reject or ignore it, causing 400 errors.
+    // The fallback strategies in the parse block below handle non-JSON responses.
+    const useJsonMode = endpoint.includes('api.openai.com');
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: useJsonMode }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',
