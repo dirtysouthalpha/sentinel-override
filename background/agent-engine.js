@@ -3527,16 +3527,29 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (command.type === 'verify') {
         // (3.40.0) Read back an element to confirm a config change persisted.
-        const _verifySelector = command.selector || command.ref || null;
+        // Route through execute_command/extract to use the full resolveCommandTarget()
+        // fallback chain (handles refs, shadow DOM, aria-label, XPath, etc.).
+        // extract with attribute:'text' returns innerText; for inputs use attribute:'value'.
         const _verifyExpected = typeof command.expected === 'string' ? command.expected.trim() : '';
         let _verifyActual = '';
         try {
-          const _verifyResult = await sendMessageWithRetry(tab, {
-            action: 'dispatch_command',
-            command: { type: 'execute_js', key: '_verify_val', code:
-              `(function(){const el=document.querySelector(${JSON.stringify(_verifySelector)});if(!el)return'';return(el.value!==undefined&&el.tagName!=='SELECT'?el.value:(el.innerText||el.textContent||'')).trim();})()` }
-          }, 3, 1200).catch(() => null);
-          _verifyActual = typeof _verifyResult === 'string' ? _verifyResult.trim() : '';
+          // Try value attribute first (for inputs), then fall back to text
+          const _extractText = await sendMessageWithRetry(tab, {
+            action: 'execute_command',
+            command: { type: 'extract', key: '_verify_val', selector: command.selector, ref: command.ref, attribute: 'text' }
+          }, 2, 1200).catch(() => null);
+          const _extractValue = await sendMessageWithRetry(tab, {
+            action: 'execute_command',
+            command: { type: 'extract', key: '_verify_val2', selector: command.selector, ref: command.ref, attribute: 'value' }
+          }, 1, 800).catch(() => null);
+          // Parse JSON result from extract action: { key, value }
+          const _parseExtract = (r) => {
+            if (!r || typeof r !== 'string') return '';
+            try { const p = JSON.parse(r); return (p && typeof p.value === 'string') ? p.value.trim() : ''; } catch { return ''; }
+          };
+          const _textVal = _parseExtract(_extractText);
+          const _inputVal = _parseExtract(_extractValue);
+          _verifyActual = _inputVal || _textVal;
         } catch (_e) {}
         let _verifyOutcome;
         if (!_verifyActual) {
