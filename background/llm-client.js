@@ -965,10 +965,14 @@ export async function generatePlan(goal, settings, context = {}) {
       }
     }
 
-    // Strategy 5: single-step fallback from goal
-    console.warn('Plan generation: could not parse response as plan JSON. Content:', content.slice(0, 200));
+    // Strategy 5: single-step fallback from goal — guarantees a non-null plan
+    // even when the model ignores the JSON instruction entirely.
+    console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', content.slice(0, 200));
+    return [goal.substring(0, 300)];
   } catch (e) {
     console.warn('Plan generation failed (non-fatal):', e.message);
+    // Even on hard exception, return a minimal fallback so the loop has a plan.
+    if (goal) return [goal.substring(0, 300)];
   }
   return null;
 }

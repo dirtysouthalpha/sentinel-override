@@ -656,7 +656,16 @@ export async function startAgent(goal, sender) {
 
   const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId);
 
-  runAgentLoop(finalGoal, startTabId);
+  // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
+  // stuck at true if runAgentLoop crashes before its own cleanup runs.
+  runAgentLoop(finalGoal, startTabId).catch(err => {
+    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', err && err.message);
+    agentRunning = false;
+    chrome.runtime.sendMessage({
+      action: 'agent_finished',
+      summary: 'Agent crashed unexpectedly: ' + (err && err.message ? err.message : String(err))
+    }).catch(() => {});
+  });
   return 'Agent started in background';
 }
 
@@ -2362,8 +2371,13 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
 
-  agentPlan = await _generateInitialPlan(goal, workingTabId);
-  try { sendPlanPreview(agentPlan, agentPlan.length); } catch (_) {}
+  try {
+    agentPlan = await _generateInitialPlan(goal, workingTabId);
+  } catch (e) {
+    console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', e && e.message);
+    agentPlan = null;
+  }
+  try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_) {}
 
   while (!finished && agentRunning) {
     try {
