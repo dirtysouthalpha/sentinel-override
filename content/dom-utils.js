@@ -159,6 +159,50 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (shadowEl) return shadowEl;
     }
 
+    // ── Self-healing fallbacks ────────────────────────────────────────────
+    // 1. Case-insensitive aria-label (LLM sometimes gets casing wrong)
+    const ariaHealMatch = selector.match(/\[aria-label="([^"]+)"\]/i);
+    if (ariaHealMatch) {
+      try {
+        const lc = ariaHealMatch[1].toLowerCase();
+        const candidates = doc.querySelectorAll('[aria-label]');
+        for (var _hi = 0; _hi < candidates.length; _hi++) {
+          if ((candidates[_hi].getAttribute('aria-label') || '').toLowerCase() === lc) return candidates[_hi];
+        }
+      } catch (_) { /* non-fatal */ }
+    }
+
+    // 2. Partial data-testid match (catches dynamic suffixes like -123)
+    const testIdHealMatch = selector.match(/\[data-testid="([^"]+)"\]/);
+    if (testIdHealMatch) {
+      try {
+        const base = testIdHealMatch[1];
+        const el = doc.querySelector('[data-testid*="' + base.replace(/"/g, '') + '"]');
+        if (el) return el;
+      } catch (_) { /* non-fatal */ }
+    }
+
+    // 3. Text-content match for interactive elements (catches label/text changes)
+    try {
+      var _textHint = null;
+      var _ariaLabelChunk = selector.match(/\[aria-label="([^"]+)"\]/i);
+      if (_ariaLabelChunk) { _textHint = _ariaLabelChunk[1]; }
+      if (!_textHint) {
+        // Extract likely button text from :contains()-style selectors or end of chain
+        var _textChunk = selector.match(/:contains\("([^"]+)"\)/i) || selector.match(/['"]([\w\s]{2,40})['"]/);
+        if (_textChunk) _textHint = _textChunk[1];
+      }
+      if (_textHint) {
+        var _lc = _textHint.trim().toLowerCase();
+        var _interactives = doc.querySelectorAll('button, a, [role="button"], input[type="submit"], input[type="button"], [role="link"]');
+        for (var _ii = 0; _ii < _interactives.length; _ii++) {
+          var _el = _interactives[_ii];
+          var _elText = (_el.innerText || _el.textContent || _el.value || _el.getAttribute('aria-label') || '').trim().toLowerCase();
+          if (_elText === _lc || _elText.includes(_lc)) return _el;
+        }
+      }
+    } catch (_) { /* non-fatal */ }
+
     return null;
   };
 

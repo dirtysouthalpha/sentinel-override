@@ -199,6 +199,61 @@ describe('dom.findElementBySelector', () => {
   test('returns null for null selector', () => {
     expect(dom.findElementBySelector(globalThis.document, null)).toBeNull();
   });
+
+  test('finds element via exact querySelector', () => {
+    const btn = createElement('button', { id: 'exact-btn' });
+    globalThis.document.querySelector = (sel) => sel === '#exact-btn' ? btn : null;
+    expect(dom.findElementBySelector(globalThis.document, '#exact-btn')).toBe(btn);
+    globalThis.document.querySelector = () => null;
+  });
+
+  test('self-healing: case-insensitive aria-label match', () => {
+    const btn = createElement('button');
+    btn.getAttribute = (attr) => attr === 'aria-label' ? 'Save Changes' : null;
+    globalThis.document.querySelector = () => null;
+    globalThis.document.querySelectorAll = (sel) => {
+      if (sel === '[aria-label]') return [btn];
+      return [];
+    };
+    // Selector uses lowercase "save changes" but element has "Save Changes"
+    const found = dom.findElementBySelector(globalThis.document, '[aria-label="save changes"]');
+    expect(found).toBe(btn);
+    globalThis.document.querySelectorAll = () => [];
+  });
+
+  test('self-healing: partial data-testid match', () => {
+    const btn = createElement('button');
+    globalThis.document.querySelector = (sel) => {
+      // Exact match fails, partial match succeeds
+      if (sel.includes('*=')) return btn;
+      return null;
+    };
+    const found = dom.findElementBySelector(globalThis.document, '[data-testid="submit-btn"]');
+    expect(found).toBe(btn);
+    globalThis.document.querySelector = () => null;
+  });
+
+  test('self-healing: text content match via aria-label hint', () => {
+    const btn = createElement('button');
+    btn.innerText = 'Submit Form';
+    btn.textContent = 'Submit Form';
+    btn.getAttribute = (attr) => attr === 'aria-label' ? 'Submit Form' : null;
+    globalThis.document.querySelector = () => null;
+    globalThis.document.querySelectorAll = (sel) => {
+      if (sel === '[aria-label]') return [];
+      if (sel.includes('button')) return [btn];
+      return [];
+    };
+    const found = dom.findElementBySelector(globalThis.document, 'button[aria-label="Submit Form"]');
+    expect(found).toBe(btn);
+    globalThis.document.querySelectorAll = () => [];
+  });
+
+  test('returns null when no fallback matches', () => {
+    globalThis.document.querySelector = () => null;
+    globalThis.document.querySelectorAll = () => [];
+    expect(dom.findElementBySelector(globalThis.document, '[data-testid="nonexistent"]')).toBeNull();
+  });
 });
 
 describe('dom ref system', () => {
