@@ -119,6 +119,8 @@ function buildCheckpoint(stepCount) {
     activeClientId,
     runSettingsSnapshot: { ..._runSettings },
     trustCounters: { failedSteps, consecutiveFailureMax },
+    agentPlan: Array.isArray(agentPlan) ? agentPlan.slice() : null,
+    currentPlanStep,
     // Tab context URLs for re-registration after SW restart
     tabContextUrls: Object.fromEntries(
       getAllTabContexts().map(([id, ctx]) => [id, ctx.url || ''])
@@ -174,6 +176,8 @@ export async function restoreFromCheckpoint() {
       if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
       if (typeof cp.trustCounters.consecutiveFailureMax === 'number') consecutiveFailureMax = cp.trustCounters.consecutiveFailureMax;
     }
+    if (Array.isArray(cp.agentPlan)) agentPlan = cp.agentPlan.slice();
+    if (typeof cp.currentPlanStep === 'number') currentPlanStep = cp.currentPlanStep;
 
     // Re-register tab contexts from URLs. After SW restart we don't have the
     // full context objects, just URLs, but that's enough for the tab manager

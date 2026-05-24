@@ -35,6 +35,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
    */
   dom.checkInteractable = function(el, action) {
     if (!el) return 'Element not found';
+    if (el.isConnected === false) return 'Element is detached from DOM';
     try {
       const view = (el.ownerDocument && el.ownerDocument.defaultView) || window;
       const style = view.getComputedStyle(el);
