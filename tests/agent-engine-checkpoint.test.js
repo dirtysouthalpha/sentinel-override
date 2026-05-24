@@ -86,7 +86,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendAgentActivity: jest.fn(),
   sendAgentStepStart: jest.fn(),
   sendAgentStatus: jest.fn(),
-  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(), sendClientKnowledgePreview: jest.fn(),
+  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(), sendClientKnowledgePreview: jest.fn(), sendCostUpdate: jest.fn(),
 }));
 
 describe('agent-engine checkpoint functions', () => {

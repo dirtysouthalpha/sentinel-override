@@ -5,7 +5,7 @@
 import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview } from './message-protocol.js';
+import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate } from './message-protocol.js';
 import { generateReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
@@ -3073,6 +3073,13 @@ async function runAgentLoop(goal, workingTabId) {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
           try { sendHeartbeat(_lastAiCallMs); } catch (e) { /* non-fatal */ }
+          // (9.2) Broadcast running cost estimate after each LLM call
+          try {
+            const _cost = agentState.estimatedCostUsd || 0;
+            if (_cost > 0 || agentState.totalInputTokens > 0) {
+              sendCostUpdate(_cost, agentState.totalInputTokens || 0, agentState.totalOutputTokens || 0, agentState.apiCallCount || 0);
+            }
+          } catch (e) { /* non-fatal */ }
           base64Image = null; // release screenshot memory after LLM call
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {

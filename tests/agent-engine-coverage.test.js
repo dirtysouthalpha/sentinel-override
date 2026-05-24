@@ -63,7 +63,7 @@ jest.unstable_mockModule('../background/llm-client.js', () => ({
   generatePlan: jest.fn(async () => ['Step 1', 'Step 2']),
   supportsVision: jest.fn(() => true),
   getPlatformContext: jest.fn(() => ''),
-  getRelevantPatterns: jest.fn(async () => []),
+  getRelevantPatterns: jest.fn(async () => []), estimateCostUsd: jest.fn(() => 0), isSimpleStep: jest.fn(() => false),
 }));
 
 jest.unstable_mockModule('../background/platforms/index.js', () => ({
@@ -98,7 +98,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendAgentActivity: jest.fn(),
   sendAgentStepStart: jest.fn(),
   sendAgentStatus: jest.fn(),
-  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(), sendClientKnowledgePreview: jest.fn(),
+  sendHeartbeat: jest.fn(), sendPlanPreview: jest.fn(), sendClientKnowledgePreview: jest.fn(), sendCostUpdate: jest.fn(),
 }));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({

@@ -1061,6 +1061,70 @@ export function setLLMRateLimit(maxCalls, windowMs) {
 /** Reset the LLM rate limiter call count and window start time. */
 export function resetLLMRateLimiter() { _rateLimiter.reset(); }
 
+// ========== Cost Estimation (9.2) ==========
+// Per-million-token pricing table (input / output) in USD.
+// Approximate public rates as of 2025-Q3. Falls back to $3/$15 if unknown.
+const _PRICING = {
+  // Anthropic
+  'claude-haiku-4-5': [0.80, 4.00],
+  'claude-haiku-4-5-20251001': [0.80, 4.00],
+  'claude-3-5-haiku': [0.80, 4.00],
+  'claude-3-haiku': [0.25, 1.25],
+  'claude-sonnet-4-6': [3.00, 15.00],
+  'claude-sonnet-4-5': [3.00, 15.00],
+  'claude-3-5-sonnet': [3.00, 15.00],
+  'claude-3-sonnet': [3.00, 15.00],
+  'claude-opus-4-6': [15.00, 75.00],
+  'claude-opus-4-7': [15.00, 75.00],
+  'claude-opus-4-5': [15.00, 75.00],
+  'claude-3-opus': [15.00, 75.00],
+  // OpenAI
+  'gpt-4o': [2.50, 10.00],
+  'gpt-4o-mini': [0.15, 0.60],
+  'gpt-4.1': [2.00, 8.00],
+  'gpt-4.1-mini': [0.40, 1.60],
+  'gpt-4.1-nano': [0.10, 0.40],
+  'o4-mini': [1.10, 4.40],
+  'o3': [10.00, 40.00],
+};
+
+/**
+ * Estimate run cost in USD from token counts and model name.
+ * @param {number} inputTokens
+ * @param {number} outputTokens
+ * @param {string} modelName
+ * @returns {number} estimated cost in USD
+ */
+export function estimateCostUsd(inputTokens, outputTokens, modelName) {
+  const m = (modelName || '').toLowerCase();
+  let rates = [3.00, 15.00]; // default: Sonnet-class
+  for (const [key, r] of Object.entries(_PRICING)) {
+    if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
+  }
+  return ((inputTokens || 0) * rates[0] + (outputTokens || 0) * rates[1]) / 1_000_000;
+}
+
+/**
+ * (9.2) Determine whether the current step is "simple" enough to route to a
+ * cheaper / faster model. Simple = early in the run, no failures, not runbook,
+ * and the pending action type (if known) is a low-stakes operation.
+ *
+ * @param {object} agentState
+ * @param {number} stepCount
+ * @param {Array} history
+ * @returns {boolean}
+ */
+export function isSimpleStep(agentState, stepCount, history) {
+  if (agentState.consecutiveFailures > 0) return false;
+  if (agentState.quickMode) return false; // quick mode already uses fewer tokens
+  const goal = (agentState.goal || '').toLowerCase();
+  const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|runbook|investigation/i.test(agentState.goal || '');
+  if (isRunbook) return false;
+  if (stepCount > 6) return false;
+  if ((history || []).length > 8) return false;
+  return true;
+}
+
 // ========== LLM Prompt Context Builders ==========
 
 // Build the strategy-shift injection when the agent has failed consecutively.
@@ -1658,11 +1722,15 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   _rateLimiter.check();
   const providerConfig = await getActiveProvider();
   if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
-  const { endpoint, apiKey, model } = providerConfig;
+  const { endpoint, apiKey } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
   if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
+  // (9.2) Route simple steps to fast model if configured
+  const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
+  const model = _useSimple ? providerConfig.fastModel : providerConfig.model;
   agentState.apiCallCount++;
+  if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
   const last_action = history.length > 0 ? history[history.length - 1].action : null;
   const last_result = history.length > 0 ? history[history.length - 1].result : null;
@@ -1819,6 +1887,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   if (_in > 0 || _out > 0) {
     agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _in;
     agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _out;
+    // (9.2) Update running cost estimate
+    agentState.estimatedCostUsd = estimateCostUsd(agentState.totalInputTokens, agentState.totalOutputTokens, providerConfig.model);
   }
   if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
   if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;

@@ -382,6 +382,25 @@ export function sendHeartbeat(durationMs) {
  * @param {string} clientName - Display name of the active client
  * @param {Array<{id:string,wisdom:string,scope:string}>} entries - Relevant entries
  */
+/**
+ * (9.2) Broadcast running cost estimate to the popup.
+ *
+ * @param {number} estimatedCostUsd - Total estimated run cost in USD
+ * @param {number} inputTokens - Total input tokens so far
+ * @param {number} outputTokens - Total output tokens so far
+ * @param {number} callCount - Number of LLM calls so far
+ */
+export function sendCostUpdate(estimatedCostUsd, inputTokens, outputTokens, callCount) {
+  chrome.runtime.sendMessage({
+    action: 'cost_update',
+    estimatedCostUsd: estimatedCostUsd || 0,
+    inputTokens: inputTokens || 0,
+    outputTokens: outputTokens || 0,
+    callCount: callCount || 0,
+    timestamp: Date.now()
+  }).catch(() => {});
+}
+
 export function sendClientKnowledgePreview(clientName, entries) {
   if (!entries || !entries.length) return;
   chrome.runtime.sendMessage({

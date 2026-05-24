@@ -2851,6 +2851,27 @@ function _updateHeartbeat(durationMs) {
   dot.title = 'API: ' + (avg / 1000).toFixed(1) + 's avg (last ' + __heartbeat.samples.length + ' calls)';
 }
 
+// ========== Cost Display (9.2) ==========
+let __costEl = null;
+function _ensureCostEl() {
+  if (__costEl) return __costEl;
+  const el = document.createElement('span');
+  el.id = 'run-cost';
+  el.style.cssText = 'display:inline-block; margin-left:8px; font-size:10px; color:var(--text-secondary,#aaa); vertical-align:middle; font-variant-numeric:tabular-nums;';
+  el.title = 'Estimated API cost for this run';
+  const statusEl = document.getElementById('status-text');
+  if (statusEl && statusEl.parentNode) statusEl.parentNode.appendChild(el);
+  __costEl = el;
+  return el;
+}
+function _updateCostDisplay(estimatedCostUsd, callCount) {
+  const el = _ensureCostEl();
+  const cents = estimatedCostUsd * 100;
+  const label = cents < 0.1 ? '<$0.01' : '$' + estimatedCostUsd.toFixed(cents < 1 ? 3 : 2);
+  el.textContent = label;
+  el.title = 'Run cost: ~' + label + ' (' + callCount + ' API call' + (callCount !== 1 ? 's' : '') + ')';
+}
+
 // ========== Live Status Ticker (6.0) ==========
 let __lastStatusState = '';
 const _STATE_ICONS = { observing: '👁', thinking: '🧠', planning: '📋', executing: '⚡', verifying: '✔', waiting: '⏳', idle: '·' };
@@ -2878,6 +2899,10 @@ chrome.runtime.onMessage.addListener((message) => {
   // (6.0) API health heartbeat
   if (message.action === 'heartbeat_update') {
     _updateHeartbeat(message.durationMs || 0);
+  }
+  // (9.2) Running cost estimate
+  if (message.action === 'cost_update') {
+    _updateCostDisplay(message.estimatedCostUsd || 0, message.callCount || 0);
   }
   // (6.0) Screenshot live preview; (7.1) show crosshair if we have pending click coords
   if (message.action === 'screenshot_update') {
