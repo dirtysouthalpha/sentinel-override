@@ -4325,7 +4325,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Post-click: handle navigation and new tab capture
-      if (command.type === 'click' || command.type === 'click_at') {
+      if (command.type === 'click' || command.type === 'click_at' || command.type === 'double_click') {
         await sleep(1000);
         try {
           const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
