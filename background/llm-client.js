@@ -896,7 +896,9 @@ export async function generatePlan(goal, settings, context = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: provider.kind === 'openai' }));
+    // jsonMode requests JSON output — provider.id comes from PROVIDERS (not PROVIDER_CATALOG),
+    // so use provider.id (not provider.kind which doesn't exist on PROVIDERS objects).
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: provider.id !== 'anthropic' }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -915,26 +917,56 @@ export async function generatePlan(goal, settings, context = {}) {
       console.warn('Plan generation: empty response content');
       return null;
     }
-    // Try direct parse first (plan responses have { "plan": [...] } not { "type": "..." })
+    // Strategy 1: strip markdown fences, strip control chars, then JSON.parse
     let jsonStr = content.trim();
     if (jsonStr.includes('```')) {
       const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       if (match && match[1]) jsonStr = match[1].trim();
     }
-    // Strip control characters that break JSON.parse
     jsonStr = jsonStr.replace(/[\x00-\x1f]/gu, '');  // eslint-disable-line no-control-regex
     try {
       const parsed = JSON.parse(jsonStr);
       if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
-    } catch (e) {
-      // Fallback: try extractFirstJsonObject for models that wrap the plan
+      // Some models return { "steps": [...] } instead of { "plan": [...] }
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+    } catch (_) { /* fall through to strategy 2 */ }
+
+    // Strategy 2: find first JSON object in the response (handles preamble prose)
+    try {
       const firstObj = extractFirstJsonObject(content);
       if (firstObj) {
         const parsed = JSON.parse(firstObj);
         if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
       }
-      console.warn('Plan generation: could not parse response as plan JSON:', e.message, 'Content:', content.slice(0, 200));
+    } catch (_) { /* fall through to strategy 3 */ }
+
+    // Strategy 3: find first { and last } and try that substring
+    try {
+      const start = content.indexOf('{');
+      const end = content.lastIndexOf('}');
+      if (start !== -1 && end > start) {
+        const parsed = JSON.parse(content.slice(start, end + 1));
+        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+      }
+    } catch (_) { /* fall through to strategy 4 */ }
+
+    // Strategy 4: extract numbered steps from prose (e.g. "1. Navigate to...\n2. Click...")
+    {
+      const lines = content.split(/\n/).map(l => l.trim()).filter(Boolean);
+      const stepLines = lines.filter(l => /^\d+[.)]\s+.{10,}/.test(l));
+      if (stepLines.length >= 2) {
+        const steps = stepLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim()).filter(Boolean);
+        if (steps.length >= 2) {
+          console.warn('Plan generation: extracted ' + steps.length + ' steps from prose');
+          return steps;
+        }
+      }
     }
+
+    // Strategy 5: single-step fallback from goal
+    console.warn('Plan generation: could not parse response as plan JSON. Content:', content.slice(0, 200));
   } catch (e) {
     console.warn('Plan generation failed (non-fatal):', e.message);
   }

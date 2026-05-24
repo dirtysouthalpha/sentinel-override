@@ -3100,6 +3100,10 @@ async function runAgentLoop(goal, workingTabId) {
             }
           } catch (e) { /* non-fatal */ }
           base64Image = null; // release screenshot memory after LLM call
+          // Sync apiCallCount — always, even on failure. callLLM increments
+          // agentState.apiCallCount before the fetch, so if the call throws the
+          // module-level var must still be updated or the final log shows 0.
+          apiCallCount = agentState.apiCallCount;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
             activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (_aiCallError.message || 'unknown'), null);
@@ -3114,9 +3118,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-      // Sync apiCallCount — callLLM mutates agentState.apiCallCount by reference, but the
-      // module-level var is a primitive and doesn't auto-update. Pull it back from the object.
-      apiCallCount = agentState.apiCallCount;
+      // apiCallCount is now synced in the finally block above (handles both success and failure).
 
       // Advance plan step if the LLM signalled it's done with the current step
       if (command.advance_plan && agentPlan && currentPlanStep < agentPlan.length - 1) {
