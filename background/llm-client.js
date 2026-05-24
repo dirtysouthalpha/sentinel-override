@@ -898,7 +898,7 @@ export async function generatePlan(goal, settings, context = {}) {
     const provider = resolveProvider(endpoint);
     // jsonMode requests JSON output — provider.id comes from PROVIDERS (not PROVIDER_CATALOG),
     // so use provider.id (not provider.kind which doesn't exist on PROVIDERS objects).
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: false }));
+    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: true }));
     const planHeaders = provider.buildHeaders(apiKey);
     const response = await fetch(endpoint, {
       method: 'POST',

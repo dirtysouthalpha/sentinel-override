@@ -2719,24 +2719,31 @@ async function runAgentLoop(goal, workingTabId) {
       const screenshotProviderConfig = await getActiveProvider();
       const modelForScreenshot = screenshotProviderConfig.model || 'glm-5.1';
       if (supportsVision(modelForScreenshot)) {
-        const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
-        if (shotResult) {
-          base64Image = shotResult.base64Image;
-          screenshotMeta = {
-            width: shotResult.width,
-            height: shotResult.height,
-            dpr: shotResult.dpr,
-            scrollX: shotResult.scrollX,
-            scrollY: shotResult.scrollY
-          };
-          // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
-          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-          // (9.3) Store screenshot for replay export (ring-cap at 20)
-          _stepScreenshots.set(stepCount, base64Image);
-          if (_stepScreenshots.size > 20) {
-            const oldest = _stepScreenshots.keys().next().value;
-            _stepScreenshots.delete(oldest);
+        try {
+          const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
+          if (shotResult) {
+            base64Image = shotResult.base64Image;
+            screenshotMeta = {
+              width: shotResult.width,
+              height: shotResult.height,
+              dpr: shotResult.dpr,
+              scrollX: shotResult.scrollX,
+              scrollY: shotResult.scrollY
+            };
+            // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
+            try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+            // (9.3) Store screenshot for replay export (ring-cap at 20)
+            _stepScreenshots.set(stepCount, base64Image);
+            if (_stepScreenshots.size > 20) {
+              const oldest = _stepScreenshots.keys().next().value;
+              _stepScreenshots.delete(oldest);
+            }
           }
+        } catch (shotErr) {
+          // Screenshot failure is non-fatal — continue to LLM call without image.
+          console.warn('[Sentinel] Screenshot failed, continuing without image:', shotErr && shotErr.message);
+          base64Image = null;
+          screenshotMeta = null;
         }
       }
 
