@@ -3340,6 +3340,33 @@ async function runAgentLoop(goal, workingTabId) {
         }
 
 
+        // (3.50.0) Multi-article completion guard: don't let the agent finish
+        // with just link lists — it must actually OPEN and READ the articles.
+        try {
+          const _articleGoal = (typeof goal === 'string') ? goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i) : null;
+          if (_articleGoal && !command.force) {
+            const _targetN = parseInt(_articleGoal[1], 10);
+            const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
+            const _notes = history.filter(h => h.action && h.action.type === 'note').length;
+            const _summaryKeys = Object.keys(agentMemory).filter(k =>
+              k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
+            );
+            // Block: haven't opened ANY article tabs AND no summaries written
+            if (_openTabs === 0 && _summaryKeys.length === 0 && _notes === 0) {
+              console.warn('[Sentinel/multi-article] Blocking premature finish —', _targetN, 'articles requested, 0 opened/read');
+              history.push({
+                role: 'user',
+                content: `[SYSTEM] DO NOT finish. The goal asks for ${_targetN} articles with summaries. You collected link URLs but have NOT read any article content. You MUST: 1) Use open_tab to open article URLs from your extracted data, 2) Read each page, 3) Use note with a summary for each. Call finish ONLY after reading at least ${Math.min(_targetN, 3)} articles.`
+              });
+              historyPush({ step: stepCount, action: command, result: 'BLOCKED: premature finish — must open and read articles first. Use open_tab on article URLs.' });
+              await persistHistory();
+              sendSilentUpdate('Finish blocked — must read articles first', stepCount);
+              await sleep(1000);
+              continue;
+            }
+          }
+        } catch (_) { /* non-fatal */ }
+
         // (3.7.0) Configuration-change verification gate. If the goal involves
         // adding/changing config on a known platform (firewall, M365, RMM, etc.),
         // require a Save/Apply/Commit click + a follow-up read_page or extract
