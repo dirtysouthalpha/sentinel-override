@@ -59,6 +59,7 @@ let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this r
 let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
 let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
+let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 
 // Expose agentRunning for index.js
 export { agentRunning };
@@ -409,10 +410,129 @@ export function resetAgentState() {
   _pendingContextInjections.length = 0;
   _pendingCommandQueue.length = 0;
   _historyDirty = false;
+  undoStack.length = 0;
   resetAllContexts();
 }
 
+/**
+ * Undo the last reversible agent action.
+ * Pops the most recent entry from `undoStack` and reverses it:
+ * - navigate: navigates the tab back to the previous URL
+ * - type: clears the target field and restores the previous value
+ *
+ * @returns {Promise<{ success: boolean, description: string }|{ success: boolean, reason: string }>}
+ */
+export async function undoLastAction() {
+  if (undoStack.length === 0) {
+    return { success: false, reason: 'Nothing to undo' };
+  }
+  const entry = undoStack.pop();
+  try {
+    chrome.runtime.sendMessage({ action: 'undo_stack_updated', size: undoStack.length }).catch(() => {});
+    if (entry.type === 'navigate') {
+      const prevUrl = entry.previousUrl;
+      if (!prevUrl) {
+        // No previous URL — try goBack
+        try { await chrome.tabs.goBack(entry.tabId); } catch (_) { /* goBack not always available */ }
+        return { success: true, description: 'Navigated back (no previous URL recorded)' };
+      }
+      await chrome.tabs.update(entry.tabId, { url: prevUrl });
+      return { success: true, description: 'Navigated back to ' + prevUrl };
+    } else if (entry.type === 'type') {
+      const selector = entry.selector;
+      const prevValue = entry.previousValue || '';
+      if (!selector) {
+        return { success: false, reason: 'Cannot undo type: no selector recorded' };
+      }
+      const code = `(function(){const el=document.querySelector(${JSON.stringify(selector)});if(!el)return'not found';el.value=${JSON.stringify(prevValue)};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return'ok';})()`;
+      try {
+        await sendMessageWithRetry(entry.tabId, { action: 'execute_command', command: { type: 'execute_js', code } }, 1);
+      } catch (e) {
+        return { success: false, reason: 'Could not restore field: ' + (e.message || String(e)) };
+      }
+      return { success: true, description: 'Restored field "' + selector + '" to previous value' };
+    }
+    return { success: false, reason: 'Unknown undo entry type: ' + entry.type };
+  } catch (e) {
+    return { success: false, reason: 'Undo failed: ' + (e.message || String(e)) };
+  }
+}
+
 // ========== Agent Lifecycle ==========
+
+/**
+ * Check for a mode-directive mismatch between the goal text and the stored
+ * approvalMode setting.  When a mismatch is detected the function logs to the
+ * forensic run log, waits for the user's decision via
+ * `_waitForModeMismatchDecision`, logs that decision, and then either cancels
+ * the run (returns `{ cancel: true }`) or lets it continue (`{ cancel: false }`).
+ *
+ * @param {string} goal - The trimmed goal text to scan for mode directives.
+ * @param {{ detected: boolean, wants: string, evidence: string, confidence: string }} modeDirective - Pre-parsed directive from `_detectGoalModeDirective`.
+ * @param {string|null} runLogId - Current run-log UUID (may be null if log init failed).
+ * @param {Array} runLogBuffer - In-memory run-log buffer to append decision entries to.
+ * @returns {Promise<{ cancel: boolean }>} Whether the run should be cancelled.
+ */
+async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuffer) {
+  try {
+    const stored = await chrome.storage.local.get(['approvalMode']);
+    const actualWants = (stored.approvalMode === true) ? 'approval' : 'autonomous';
+    if (modeDirective.wants === actualWants) {
+      return { cancel: false };
+    }
+
+    // Log the mismatch to the forensic run log
+    try {
+      if (runLogId) {
+        runLogBuffer.push({
+          step: 0,
+          timestamp: new Date().toISOString(),
+          kind: 'mode_mismatch_detected',
+          goalWants: modeDirective.wants,
+          actualMode: actualWants,
+          evidence: modeDirective.evidence,
+          confidence: modeDirective.confidence
+        });
+        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+          console.error('[_handleModeMismatchCheck] run log set failed:', e);
+        });
+      }
+    } catch (_) { /* non-fatal */ }
+
+    const decision = await _waitForModeMismatchDecision({
+      goalWants: modeDirective.wants,
+      actualMode: actualWants,
+      evidence: modeDirective.evidence,
+      confidence: modeDirective.confidence
+    });
+
+    // Log the decision
+    try {
+      if (runLogId) {
+        runLogBuffer.push({
+          step: 0,
+          timestamp: new Date().toISOString(),
+          kind: 'mode_mismatch_decision',
+          decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
+        });
+        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+          console.error('[_handleModeMismatchCheck] decision log set failed:', e);
+        });
+      }
+    } catch (_e) { /* mode directive logging non-fatal */ }
+
+    if (decision.cancel) {
+      return { cancel: true };
+    }
+    // If decision.flip === true, the popup has already written the new
+    // approvalMode to storage. The action loop reads storage on every
+    // step, so it will pick up the new value automatically.
+    return { cancel: false };
+  } catch (e) {
+    console.warn('[Sentinel] _handleModeMismatchCheck failed (non-fatal):', e && e.message);
+    return { cancel: false };
+  }
+}
 
 /**
  * Start the agent loop for the given goal on the sender's active tab.
@@ -517,67 +637,18 @@ export async function startAgent(goal, sender) {
   // run starts. Prevents the "user wrote APPROVAL in the prompt but the
   // toggle was still AUTONOMOUS" disaster scenario on live config changes.
   // Run BEFORE adaptive-prompts so a cancelled run doesn't burn an LLM call.
-  try {
-    const modeDirective = _detectGoalModeDirective(goal);
-    if (modeDirective.detected) {
-      const stored = await chrome.storage.local.get(['approvalMode']);
-      const actualWants = (stored.approvalMode === true) ? 'approval' : 'autonomous';
-      if (modeDirective.wants !== actualWants) {
-        // Log to forensic run log
-        try {
-          if (runLogId) {
-            runLogBuffer.push({
-              step: 0,
-              timestamp: new Date().toISOString(),
-              kind: 'mode_mismatch_detected',
-              goalWants: modeDirective.wants,
-              actualMode: actualWants,
-              evidence: modeDirective.evidence,
-              confidence: modeDirective.confidence
-            });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-              console.error('[actualWants] Unhandled rejection:', e);
-            });
-          }
-        } catch (_) { /* non-fatal */ }
-
-        const decision = await _waitForModeMismatchDecision({
-          goalWants: modeDirective.wants,
-          actualMode: actualWants,
-          evidence: modeDirective.evidence,
-          confidence: modeDirective.confidence
-        });
-
-        // Log the decision
-        try {
-          if (runLogId) {
-            runLogBuffer.push({
-              step: 0,
-              timestamp: new Date().toISOString(),
-              kind: 'mode_mismatch_decision',
-              decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
-            });
-            chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-              console.error('[decision] Unhandled rejection:', e);
-            });
-          }
-        } catch (_e) { /* mode directive logging non-fatal */ }
-
-        if (decision.cancel) {
-          agentRunning = false;
-          try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-          chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
-            console.error('[decision] Unhandled rejection:', e);
-          });
-          return 'Agent cancelled by user (mode mismatch)';
-        }
-        // If decision.flip === true, the popup has already written the new
-        // approvalMode to storage. The action loop reads storage on every
-        // step (line ~2185), so it will pick up the new value automatically.
-        // No further action needed here.
-      }
+  const modeDirective = _detectGoalModeDirective(goal);
+  if (modeDirective.detected) {
+    const mismatchResult = await _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuffer);
+    if (mismatchResult.cancel) {
+      agentRunning = false;
+      try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+      chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
+        console.error('[startAgent] mode mismatch cancel sendMessage failed:', e);
+      });
+      return 'Agent cancelled by user (mode mismatch)';
     }
-  } catch (e) { console.warn('[Sentinel] mode-directive check failed (non-fatal):', e && e.message); }
+  }
 
   const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId);
 
@@ -3931,6 +4002,12 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
           // below so operators can see latency + landing-URL mismatches.
           try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          // (3.49.1) Push undo entry before navigating so we can go back.
+          try {
+            undoStack.push({ type: 'navigate', tabId: tab, previousUrl: currentUrl || '' });
+            if (undoStack.length > 10) undoStack.shift();
+            chrome.runtime.sendMessage({ action: 'undo_stack_updated', size: undoStack.length }).catch(() => {});
+          } catch (_) { /* undo stack non-fatal */ }
           const _navStart = Date.now();
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
@@ -4179,6 +4256,17 @@ async function runAgentLoop(goal, workingTabId) {
               }
             } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', e && e.message); }
           } else if (command.type === 'type') {
+            // (3.49.1) Push undo entry before typing so we can restore the field.
+            try {
+              let _prevVal = '';
+              try {
+                const _valRes = await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'execute_js', code: `(function(){const el=document.querySelector(${JSON.stringify(command.selector||'')});return el?el.value:'';})()` } }, 1);
+                if (typeof _valRes === 'string' && _valRes.startsWith('JS Result: ')) _prevVal = _valRes.slice('JS Result: '.length);
+              } catch (_) { /* prev value capture non-fatal */ }
+              undoStack.push({ type: 'type', tabId: tab, selector: command.selector || command.ref || '', previousValue: _prevVal });
+              if (undoStack.length > 10) undoStack.shift();
+              chrome.runtime.sendMessage({ action: 'undo_stack_updated', size: undoStack.length }).catch(() => {});
+            } catch (_) { /* undo stack non-fatal */ }
             // Focus the target via the content script (it knows the ref/selector
             // resolution rules), then dispatch trusted text via CDP.
             try {
@@ -4237,6 +4325,19 @@ async function runAgentLoop(goal, workingTabId) {
               actionFailed = result.startsWith('Error') || result.startsWith('JS Error') || result.includes('timed out') || result.includes(' not found');
             }
           } else {
+            // (3.49.1) Push undo entry for type actions when not using CDP path.
+            if (command.type === 'type') {
+              try {
+                let _prevVal = '';
+                try {
+                  const _valRes = await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'execute_js', code: `(function(){const el=document.querySelector(${JSON.stringify(command.selector||'')});return el?el.value:'';})()` } }, 1);
+                  if (typeof _valRes === 'string' && _valRes.startsWith('JS Result: ')) _prevVal = _valRes.slice('JS Result: '.length);
+                } catch (_) { /* prev value capture non-fatal */ }
+                undoStack.push({ type: 'type', tabId: tab, selector: command.selector || command.ref || '', previousValue: _prevVal });
+                if (undoStack.length > 10) undoStack.shift();
+                chrome.runtime.sendMessage({ action: 'undo_stack_updated', size: undoStack.length }).catch(() => {});
+              } catch (_) { /* undo stack non-fatal */ }
+            }
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = res || 'Done';
             actionFailed = result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
@@ -4766,6 +4867,8 @@ export {
   requestTenantOverride,
   _waitForAdaptedGoalDecision,
   _waitForModeMismatchDecision,
+  _handleModeMismatchCheck,
+  undoStack,
   _runExecuteJsOnce,
   _runExecuteJsWithRetryLadder,
   activityStart,

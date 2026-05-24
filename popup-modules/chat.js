@@ -911,6 +911,7 @@ function sendMessage() {
   goalInput.disabled = true;
   stopBtn.style.display = 'flex';
   if (pauseBtn) { pauseBtn.style.display = 'flex'; pauseBtn.dataset.paused = 'false'; pauseBtn.innerHTML = PAUSE_ICON; pauseBtn.title = 'Pause agent'; }
+  if (undoBtn) { undoBtn.style.display = 'flex'; undoBtn.disabled = true; }
   goalInput.placeholder = 'Waiting for response...';
   state.selectedAttachments = [];
   attachmentPreview.style.display = 'none';
@@ -962,6 +963,7 @@ function resetUI() {
   sendBtn.disabled = false;
   stopBtn.style.display = 'none';
   if (pauseBtn) { pauseBtn.style.display = 'none'; pauseBtn.dataset.paused = 'false'; }
+  if (undoBtn) { undoBtn.style.display = 'none'; undoBtn.disabled = true; }
   goalInput.disabled = false;
   goalInput.placeholder = 'Tell me what to do...';
   hideStatus();
@@ -1017,6 +1019,30 @@ if (pauseBtn) {
     });
   });
 }
+
+// ========== Undo Button ==========
+const undoBtn = document.getElementById('undoBtn');
+if (undoBtn) {
+  undoBtn.addEventListener('click', () => {
+    undoBtn.disabled = true;
+    chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
+      if (chrome.runtime.lastError && !resp) {
+        addMessage('Undo failed: ' + chrome.runtime.lastError.message, 'assistant');
+        return;
+      }
+      if (resp && resp.ok === false) {
+        addMessage('Undo failed: ' + (resp.error || 'Unknown error'), 'assistant');
+      } else if (resp && resp.data && resp.data.success === false) {
+        addMessage('Nothing to undo: ' + (resp.data.reason || ''), 'assistant');
+      } else if (resp && resp.data && resp.data.success) {
+        addMessage('Undone: ' + (resp.data.description || 'Last action reversed'), 'assistant');
+      }
+    });
+  });
+}
+
+// Listen for undo stack size updates from background to enable/disable the button.
+// (Handled in the main message listener below alongside other agent messages.)
 
 // ========== New Chat ==========
 newChatBtn.addEventListener('click', () => {
@@ -2778,6 +2804,12 @@ if (pasteTicketBtn && pasteTicketModal) {
 
 // ========== Background Message Handler ==========
 chrome.runtime.onMessage.addListener((message) => {
+  // (3.49.1) Undo stack size updates — enable/disable the undo button.
+  if (message.action === 'undo_stack_updated') {
+    if (undoBtn) {
+      undoBtn.disabled = (typeof message.size !== 'number' || message.size === 0);
+    }
+  }
   if (message.action === 'cdp_reattach_warning') {
     updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
   }

@@ -1177,108 +1177,50 @@ function _sanitizeHistory(history, isRunbook, CONFIG) {
   });
 }
 
-// ========== Main LLM Call ==========
-// trimmedElements: the capped/cleaned element list built in the main loop
-// totalElementCount: the raw count before trimming (for the prompt header)
-async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
-  _rateLimiter.check();
-  const providerConfig = await getActiveProvider();
-  if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
-  const { endpoint, apiKey, model } = providerConfig;
-  if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
-  const provider = resolveProvider(endpoint);
-  if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
-  agentState.apiCallCount++;
+/**
+ * Build the system prompt string for the agent's main LLM call.
+ * @param {Object} params - All variables needed to render the prompt.
+ * @param {string} params.quickModeCtx - Quick Mode injection string (empty string when inactive).
+ * @param {string} params.runbookCtx - Runbook mode directive (empty string when inactive).
+ * @param {string} params.platformCtx - Platform-specific UI guidance string.
+ * @param {string} params.goal - The user's goal text.
+ * @param {string} params.currentUrl - The current page URL.
+ * @param {number} params.stepCount - Current step number in the agent run.
+ * @param {string} params.pageContent - Rendered page content string.
+ * @param {Array}  params.trimmedElements - Capped list of interactive elements.
+ * @param {number} params.totalElementCount - Raw element count before trimming.
+ * @param {number} params.historyWindowSize - Number of history entries included.
+ * @param {boolean} params.isRunbook - Whether the run is in runbook/investigation mode.
+ * @param {Array}  params.sanitizedHistory - History array with screenshots stripped.
+ * @param {Object|null} params.last_action - The most recent action object, or null.
+ * @param {*}           params.last_result - The most recent action result, or null.
+ * @param {string} params.planCtx - Rendered plan context string.
+ * @param {string} params.strategyCtx - Strategy-shift directive string.
+ * @param {string} params.finishCtx - Navigation-fatigue / finish-now directive string.
+ * @param {string} params.verificationCtx - Vision-based action verification directive string.
+ * @param {string} params.patternCtx - Past successful patterns context string.
+ * @param {string} params.memoryCtx - Agent memory context string.
+ * @param {string} params.clientKnowledgeCtx - Client knowledge context string.
+ * @param {string} params.tabCtxSection - Multi-tab context section string.
+ * @param {string} params.loopCtx - Loop / stall-detection directive string.
+ * @param {Object} params.agentState - Live agent state (for budgetHint and screenshotMeta).
+ * @param {string|null} params.base64Image - Base64-encoded screenshot, or null/empty.
+ * @param {Object} params.provider - Resolved provider object (uses supportsToolUse).
+ * @returns {string} The fully rendered system prompt.
+ */
+function _buildAgentPrompt(params) {
+  const {
+    quickModeCtx, runbookCtx, platformCtx,
+    goal, currentUrl, stepCount, pageContent,
+    trimmedElements, totalElementCount,
+    historyWindowSize, isRunbook, sanitizedHistory,
+    last_action, last_result,
+    planCtx, strategyCtx, finishCtx, verificationCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    agentState, base64Image, provider
+  } = params;
 
-  const last_action = history.length > 0 ? history[history.length - 1].action : null;
-  const last_result = history.length > 0 ? history[history.length - 1].result : null;
-
-  // Runbook detection
-  const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
-
-  const runbookCtx = isRunbook ? `
-RUNBOOK / INVESTIGATION MODE ACTIVE
-You are executing a structured, multi-phase IT investigation. Rules for this mode:
-1. NEVER finish early -- complete ALL phases listed in the goal before calling "finish".
-2. Use "note" actions liberally to document every finding: IPs, zone names, rule IDs, log entries, FQDN lists, any value observed on screen.
-3. Use "extract" to save key values (client IP, rule name, zone, etc.) to memory for later reference via ::key::.
-4. Navigate to each UI location specified. Read the page after every navigation before acting.
-5. If a page has a form or filter, fill it in before reading results.
-6. Follow the phase order exactly. Complete each phase fully before advancing.
-7. At the end, call "finish" with a COMPLETE ticket-ready summary: all phases covered, all findings listed, the exact change made (or recommended), and rollback steps.
-8. Do NOT skip phases because you think you found the answer early -- document ALL phases as instructed.
-` : '';
-
-  // Navigation fatigue detection -- DISABLED in runbook mode.
-  const navigateCount = history.filter(h => h.action.type === 'navigate').length;
-  const extractCount = history.filter(h => ['extract', 'extract_list'].includes(h.action.type)).length;
-  const noteCount = history.filter(h => h.action.type === 'note').length;
-
-  const finishCtx = isRunbook ? '' :
-    (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
-    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
-    : (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
-    ? `\nFINISH NOW -- ${navigateCount} navigates with nothing recorded. Use your memory and finish with a comprehensive answer. Include ACTUAL content.\n`
-    : '';
-
-  // (3.45.0) Quick Mode — action-oriented prompt injection
-  const quickModeCtx = (agentState && agentState.quickMode) ?
-    '\nQUICK MODE ACTIVE: Skip "note" actions. Every step must be a real action (click, type, navigate, extract, scroll, finish). Do NOT use "note" — think less, act more.\n' : '';
-
-  // Platform-specific UI guidance
-  const platformCtx = getPlatformContext(currentUrl, goal);
-
-  // Self-healing: strategy shift prompt — platform-aware (3.9.0)
-  const strategyCtx = _buildStrategyCtx(agentState, currentUrl, CONFIG);
-
-  // Self-learning: inject relevant patterns
-  const patterns = await getRelevantPatterns(goal);
-  const patternCtx = patterns.length > 0
-    ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => `${i+1}. "${p.goal}" -> ${p.steps.map(s => s.type).join(' -> ')}`).join('\n')}\n`
-    : '';
-
-  // Memory context
-  const memoryKeys = Object.keys(agentState.agentMemory);
-  const memoryCtx = memoryKeys.length > 0
-    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState.agentMemory, null, 2)}\n`
-    : '';
-
-  // (3.12.0) Client knowledge context. agent-engine.js pre-formats this
-  // string at run start and passes it through agentState.clientKnowledgeText.
-  // When set, it lists facts learned from prior runs for the active client
-  // — site quirks, timing rules, custom paths, recurring errors. Inject
-  // verbatim so the LLM sees them every step.
-  const clientKnowledgeCtx = (agentState.clientKnowledgeText && typeof agentState.clientKnowledgeText === 'string')
-    ? agentState.clientKnowledgeText
-    : '';
-
-  // (3.12.0) Vision-based action verification. When the immediately prior
-  // step was a modifying action (click, type, select, check, press_key,
-  // upload_file), force the model to look at the post-action screenshot
-  // and explicitly confirm the action took effect BEFORE proposing the next
-  // command. No extra API call -- this just sharpens the existing
-  // observation cycle so silent failures (click registered but modal didn't
-  // close, form filled but hidden validation rejected) get caught.
-  const _pv = agentState.pendingVerification;
-  const verificationCtx = (_pv && _pv.type)
-    ? `\n## VERIFY YOUR LAST ACTION FIRST\nYour previous step was: **${_pv.type}** -> "${(_pv.description || '').replace(/"/g, '\\"').substring(0, 100)}".\n\nBefore proposing the next command, examine the current screenshot and confirm the action took effect. Look for evidence:\n- Click on a button -> Did the modal close? Did the page navigate? Did a success message appear?\n- Type in a field -> Does the field now contain the typed text?\n- Select a dropdown -> Did the selected value update?\n- Check / check_all -> Are the checkboxes now in the expected state?\n- press_key (Enter/Tab/etc.) -> Did the form submit / focus advance / dropdown open?\n\nIf the page state confirms the action took effect: proceed with the next planned step.\n\nIf the page does NOT reflect the action (button still highlighted, modal still open, field still empty, no navigation): treat the step as failed. Do NOT proceed as if it succeeded. Choose ONE recovery:\n1. Retry the same action with a different selector (often the click missed or hit a wrapper element).\n2. wait 1500ms, then re-observe -- some SPAs commit asynchronously.\n3. scroll_to the element first, then retry.\n4. Use execute_js to trigger the action programmatically (.click(), dispatchEvent('click'), HTMLElement.value setter + 'input' event).\n\nThis verification is mandatory -- never skip past a destructive action without confirming it landed.\n`
-    : '';
-
-  // Inject plan context if a plan was generated
-  const planCtx = _buildPlanCtx(agentState.agentPlan, agentState.currentPlanStep);
-
-  // Multi-tab context: show all managed tabs with summaries
-  const tabCtxSection = _buildTabCtx();
-
-  // Loop directive from stall detection
-  const loopCtx = agentState.loopDirective || '';
-
-  // History sanitization: strip screenshot payloads from older entries
-  const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
-  const sanitizedHistory = _sanitizeHistory(history, isRunbook, CONFIG);
-
-  // Build prompt
-  const prompt = `You are Sentinel Override v3, an autonomous browser agent. You can create tools, extract data, and solve ANY web task.
+  return `You are Sentinel Override v3, an autonomous browser agent. You can create tools, extract data, and solve ANY web task.
 
 ## SAFETY BOUNDARIES (NON-NEGOTIABLE)
 
@@ -1706,6 +1648,118 @@ ${base64Image ? (function() {
 })() : ''}
 
 ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.'}`;
+}
+
+// ========== Main LLM Call ==========
+// trimmedElements: the capped/cleaned element list built in the main loop
+// totalElementCount: the raw count before trimming (for the prompt header)
+async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
+  _rateLimiter.check();
+  const providerConfig = await getActiveProvider();
+  if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
+  const { endpoint, apiKey, model } = providerConfig;
+  if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
+  const provider = resolveProvider(endpoint);
+  if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
+  agentState.apiCallCount++;
+
+  const last_action = history.length > 0 ? history[history.length - 1].action : null;
+  const last_result = history.length > 0 ? history[history.length - 1].result : null;
+
+  // Runbook detection
+  const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
+
+  const runbookCtx = isRunbook ? `
+RUNBOOK / INVESTIGATION MODE ACTIVE
+You are executing a structured, multi-phase IT investigation. Rules for this mode:
+1. NEVER finish early -- complete ALL phases listed in the goal before calling "finish".
+2. Use "note" actions liberally to document every finding: IPs, zone names, rule IDs, log entries, FQDN lists, any value observed on screen.
+3. Use "extract" to save key values (client IP, rule name, zone, etc.) to memory for later reference via ::key::.
+4. Navigate to each UI location specified. Read the page after every navigation before acting.
+5. If a page has a form or filter, fill it in before reading results.
+6. Follow the phase order exactly. Complete each phase fully before advancing.
+7. At the end, call "finish" with a COMPLETE ticket-ready summary: all phases covered, all findings listed, the exact change made (or recommended), and rollback steps.
+8. Do NOT skip phases because you think you found the answer early -- document ALL phases as instructed.
+` : '';
+
+  // Navigation fatigue detection -- DISABLED in runbook mode.
+  const navigateCount = history.filter(h => h.action.type === 'navigate').length;
+  const extractCount = history.filter(h => ['extract', 'extract_list'].includes(h.action.type)).length;
+  const noteCount = history.filter(h => h.action.type === 'note').length;
+
+  const finishCtx = isRunbook ? '' :
+    (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
+    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
+    : (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
+    ? `\nFINISH NOW -- ${navigateCount} navigates with nothing recorded. Use your memory and finish with a comprehensive answer. Include ACTUAL content.\n`
+    : '';
+
+  // (3.45.0) Quick Mode — action-oriented prompt injection
+  const quickModeCtx = (agentState && agentState.quickMode) ?
+    '\nQUICK MODE ACTIVE: Skip "note" actions. Every step must be a real action (click, type, navigate, extract, scroll, finish). Do NOT use "note" — think less, act more.\n' : '';
+
+  // Platform-specific UI guidance
+  const platformCtx = getPlatformContext(currentUrl, goal);
+
+  // Self-healing: strategy shift prompt — platform-aware (3.9.0)
+  const strategyCtx = _buildStrategyCtx(agentState, currentUrl, CONFIG);
+
+  // Self-learning: inject relevant patterns
+  const patterns = await getRelevantPatterns(goal);
+  const patternCtx = patterns.length > 0
+    ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => `${i+1}. "${p.goal}" -> ${p.steps.map(s => s.type).join(' -> ')}`).join('\n')}\n`
+    : '';
+
+  // Memory context
+  const memoryKeys = Object.keys(agentState.agentMemory);
+  const memoryCtx = memoryKeys.length > 0
+    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState.agentMemory, null, 2)}\n`
+    : '';
+
+  // (3.12.0) Client knowledge context. agent-engine.js pre-formats this
+  // string at run start and passes it through agentState.clientKnowledgeText.
+  // When set, it lists facts learned from prior runs for the active client
+  // — site quirks, timing rules, custom paths, recurring errors. Inject
+  // verbatim so the LLM sees them every step.
+  const clientKnowledgeCtx = (agentState.clientKnowledgeText && typeof agentState.clientKnowledgeText === 'string')
+    ? agentState.clientKnowledgeText
+    : '';
+
+  // (3.12.0) Vision-based action verification. When the immediately prior
+  // step was a modifying action (click, type, select, check, press_key,
+  // upload_file), force the model to look at the post-action screenshot
+  // and explicitly confirm the action took effect BEFORE proposing the next
+  // command. No extra API call -- this just sharpens the existing
+  // observation cycle so silent failures (click registered but modal didn't
+  // close, form filled but hidden validation rejected) get caught.
+  const _pv = agentState.pendingVerification;
+  const verificationCtx = (_pv && _pv.type)
+    ? `\n## VERIFY YOUR LAST ACTION FIRST\nYour previous step was: **${_pv.type}** -> "${(_pv.description || '').replace(/"/g, '\\"').substring(0, 100)}".\n\nBefore proposing the next command, examine the current screenshot and confirm the action took effect. Look for evidence:\n- Click on a button -> Did the modal close? Did the page navigate? Did a success message appear?\n- Type in a field -> Does the field now contain the typed text?\n- Select a dropdown -> Did the selected value update?\n- Check / check_all -> Are the checkboxes now in the expected state?\n- press_key (Enter/Tab/etc.) -> Did the form submit / focus advance / dropdown open?\n\nIf the page state confirms the action took effect: proceed with the next planned step.\n\nIf the page does NOT reflect the action (button still highlighted, modal still open, field still empty, no navigation): treat the step as failed. Do NOT proceed as if it succeeded. Choose ONE recovery:\n1. Retry the same action with a different selector (often the click missed or hit a wrapper element).\n2. wait 1500ms, then re-observe -- some SPAs commit asynchronously.\n3. scroll_to the element first, then retry.\n4. Use execute_js to trigger the action programmatically (.click(), dispatchEvent('click'), HTMLElement.value setter + 'input' event).\n\nThis verification is mandatory -- never skip past a destructive action without confirming it landed.\n`
+    : '';
+
+  // Inject plan context if a plan was generated
+  const planCtx = _buildPlanCtx(agentState.agentPlan, agentState.currentPlanStep);
+
+  // Multi-tab context: show all managed tabs with summaries
+  const tabCtxSection = _buildTabCtx();
+
+  // Loop directive from stall detection
+  const loopCtx = agentState.loopDirective || '';
+
+  // History sanitization: strip screenshot payloads from older entries
+  const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
+  const sanitizedHistory = _sanitizeHistory(history, isRunbook, CONFIG);
+
+  const prompt = _buildAgentPrompt({
+    quickModeCtx, runbookCtx, platformCtx,
+    goal, currentUrl, stepCount, pageContent,
+    trimmedElements, totalElementCount,
+    historyWindowSize, isRunbook, sanitizedHistory,
+    last_action, last_result,
+    planCtx, strategyCtx, finishCtx, verificationCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    agentState, base64Image, provider
+  });
 
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);

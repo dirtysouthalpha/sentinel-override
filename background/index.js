@@ -469,6 +469,11 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return resumeAgent();
     }
 
+    case 'undo_action': {
+      const { undoLastAction } = await import('./agent-engine.js');
+      return await undoLastAction();
+    }
+
     case 'inject_context': {
       if (!agentRunning) return { ok: false, error: 'No agent running' };
       const note = typeof request.note === 'string' ? request.note.trim() : '';

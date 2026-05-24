@@ -559,6 +559,7 @@ const KNOWN_ACTIONS = [
   'stop_agent_loop',
   'pause_agent_loop',
   'resume_agent_loop',
+  'undo_action',
   'inject_context',
   'get_audit_log',
   'focus_tab_by_url',

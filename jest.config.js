@@ -4,7 +4,7 @@ export default {
   testEnvironment: 'node',
   transform: {},
   testMatch: ['**/tests/**/*.test.js'],
+  testPathIgnorePatterns: ['/node_modules/', '/.claude/'],
   moduleNameMapper: {},
-  // Disable coverage for now - focus on making tests pass
   collectCoverage: false,
 };
