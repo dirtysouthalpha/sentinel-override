@@ -516,8 +516,11 @@
           setResponse('<span class="qa-error">Error: ' + (chrome.runtime.lastError.message || 'Unknown error') + '</span>');
           return;
         }
-        if (response && response.text) {
-          setResponse(response.text);
+        var text = response && (response.data && response.data.text || response.text);
+        if (text) {
+          setResponse(text);
+        } else if (response && response.ok === false) {
+          setResponse('<span class="qa-error">Error: ' + (response.error || 'Unknown error') + '</span>');
         } else {
           setResponse('<span class="qa-error">No response received.</span>');
         }
