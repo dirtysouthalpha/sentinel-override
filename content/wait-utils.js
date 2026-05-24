@@ -90,10 +90,18 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
         if (!condition.selector) return false;
       }
       try {
-        return !!document.querySelector(condition.selector);
+        if (document.querySelector(condition.selector)) return true;
       } catch {
         return false;
       }
+      const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
+      if (shadow && shadow.queryDeep) {
+        try {
+          const found = shadow.queryDeep(document, condition.selector);
+          return !!(found && found.length > 0);
+        } catch { /* invalid selector or shadow traversal error */ }
+      }
+      return false;
     } else if (condition.type === 'wait_for_navigation') {
       return condition.currentUrl !== window.location.href;
     }

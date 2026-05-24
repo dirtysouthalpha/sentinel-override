@@ -123,6 +123,16 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   ov.dismissOverlay = function(doc, overlay) {
     if (!overlay) return false;
 
+    // 0. Escape key first — fastest path for enterprise modal dialogs (M365, Azure, etc.)
+    const activeEl = doc.activeElement || doc.body;
+    const escOpts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
+    activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
+    activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
+    activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
+    if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+      return true;
+    }
+
     // 1. Close buttons (ARIA labels)
     const closeSelectors = [
       '[aria-label="Close" i]', '[aria-label="Dismiss" i]',
@@ -195,18 +205,19 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       }
     }
 
-    // 4. Escape key — full keydown + keypress + keyup sequence (#23)
-    const activeEl = doc.activeElement || doc.body;
-    const escOpts = {
-      key: 'Escape', code: 'Escape', keyCode: 27, which: 27,
-      bubbles: true, cancelable: true, composed: true
-    };
-    activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
-    activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
-    activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
-    if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
-      return true;
-    }
+    // 4. Backdrop click — click outside the overlay bounds as a last resort
+    try {
+      const rect = overlay.getBoundingClientRect();
+      const outsideX = rect.right + 10;
+      const outsideY = rect.bottom + 10;
+      const clickOpts = { clientX: outsideX, clientY: outsideY, bubbles: true, cancelable: true, composed: true };
+      doc.body.dispatchEvent(new MouseEvent('mousedown', clickOpts));
+      doc.body.dispatchEvent(new MouseEvent('mouseup', clickOpts));
+      doc.body.dispatchEvent(new MouseEvent('click', clickOpts));
+      if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+        return true;
+      }
+    } catch { /* backdrop click failed */ }
 
     return false;
   };

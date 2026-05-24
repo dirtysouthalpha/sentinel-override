@@ -2193,11 +2193,16 @@ if (window.__sentinelInitialized) {
       }
 
       case 'dismiss_overlay': {
-        if (ov) {
-          const dismissed = await ov.dismissOverlay(document);
-          return dismissed ? 'Overlay dismissed successfully' : 'No overlay detected';
-        }
-        return 'Overlay utilities not available';
+        if (!ov) return 'Overlay utilities not available';
+        // Try Escape globally first — handles enterprise dialogs that trap focus
+        var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
+        try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch { /* safe */ }
+        try { document.body.dispatchEvent(new KeyboardEvent('keydown', escO)); } catch { /* safe */ }
+        await new Promise(r => setTimeout(r, 200));
+        var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;
+        if (!detectedOverlay) return 'Overlay dismissed (Escape key sent)';
+        var dismissed = ov.dismissOverlay(document, detectedOverlay);
+        return dismissed ? 'Overlay dismissed successfully' : 'No dismissible overlay found — tried Escape and close buttons';
       }
 
       case 'scroll_to': {

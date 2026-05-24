@@ -50,14 +50,9 @@ const copyReportMdBtn = document.getElementById('copyReportMdBtn');
 const downloadReportBtn = document.getElementById('downloadReportBtn');
 const copyReportTextBtn = document.getElementById('copyReportTextBtn');
 
-// Speech Recognition Setup
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null;
-if (SpeechRecognition) {
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.lang = 'en-US';
-}
+// Voice Input - uses webkitSpeechRecognition in the active tab
+// (Web Speech API doesn't work in extension popups, so we delegate to the tab)
+let _voiceListening = false;
 
 
 // ========== Tenant Chip (3.7.0) ==========
@@ -1265,52 +1260,105 @@ function updateAttachmentPreview() {
   }
 }
 
-// ========== Voice Input ==========
-// eslint-disable-next-line no-unused-vars
+// ========== Voice Input (tab-based) ==========
 function setupVoiceInput() {
-  if (!recognition) {
-    voiceBtn.style.opacity = '0.5';
-    voiceBtn.disabled = true;
-    voiceBtn.title = 'Voice input not supported';
-    return;
-  }
+  voiceBtn.addEventListener('click', async () => {
+    if (_voiceListening) {
+      _voiceListening = false;
+      voiceBtn.classList.remove('listening');
+      voiceBtn.title = 'Voice input (click to speak)';
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) chrome.tabs.sendMessage(tab.id, { action: 'stop_voice' }).catch(() => {});
+      } catch (e) { /* ignore */ }
+      return;
+    }
 
-  voiceBtn.addEventListener('click', () => {
-    if (voiceBtn.classList.contains('listening')) {
-      recognition.stop();
-    } else {
-      recognition.start();
-      voiceBtn.classList.add('listening');
+    _voiceListening = true;
+    voiceBtn.classList.add('listening');
+    voiceBtn.title = 'Listening... (click to stop)';
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || !tab.id) {
+        showToast('No active tab found', 'error');
+        _voiceListening = false;
+        voiceBtn.classList.remove('listening');
+        return;
+      }
+
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: () => {
+          if (window.__sentinelVoiceHandler) {
+            try { window.__sentinelVoiceHandler.stop(); } catch(e) {}
+          }
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (!SpeechRecognition) {
+            chrome.runtime.sendMessage({ action: 'voice_error', error: 'Speech recognition not supported in this tab' });
+            return;
+          }
+          const recognition = new SpeechRecognition();
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.lang = 'en-US';
+          let finalTranscript = '';
+          recognition.onresult = (event) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              if (event.results[i].isFinal) {
+                finalTranscript += event.results[i][0].transcript;
+              } else {
+                interim += event.results[i][0].transcript;
+              }
+            }
+            chrome.runtime.sendMessage({ action: 'voice_interim', text: finalTranscript + interim }).catch(() => {});
+          };
+          recognition.onend = () => {
+            chrome.runtime.sendMessage({ action: 'voice_result', text: finalTranscript }).catch(() => {});
+          };
+          recognition.onerror = (event) => {
+            chrome.runtime.sendMessage({ action: 'voice_error', error: event.error }).catch(() => {});
+          };
+          recognition.start();
+          window.__sentinelVoiceHandler = recognition;
+        }
+      });
+      showToast('Listening... speak now', 'success');
+    } catch (err) {
+      console.error('Voice input error:', err);
+      showToast('Voice error: ' + (err.message || 'Unknown error'), 'error');
+      _voiceListening = false;
+      voiceBtn.classList.remove('listening');
     }
   });
 
-  recognition.onstart = () => {
-    voiceBtn.classList.add('listening');
-  };
-
-  recognition.onend = () => {
-    voiceBtn.classList.remove('listening');
-  };
-
-  recognition.onresult = (event) => {
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      transcript += event.results[i][0].transcript;
-    }
-
-    if (transcript) {
-      goalInput.value = transcript;
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.action === 'voice_result' && msg.text) {
+      goalInput.value = msg.text;
       goalInput.style.height = 'auto';
       goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+      _voiceListening = false;
+      voiceBtn.classList.remove('listening');
+      voiceBtn.title = 'Voice input (click to speak)';
       showToast('Voice input captured', 'success');
+      goalInput.focus();
     }
-  };
-
-  recognition.onerror = (event) => {
-    console.error('Speech recognition error:', event.error);
-    showToast(`Voice error: ${event.error}`, 'error');
-  };
+    if (msg.action === 'voice_interim' && msg.text) {
+      goalInput.value = msg.text;
+      goalInput.style.height = 'auto';
+      goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+    }
+    if (msg.action === 'voice_error') {
+      showToast('Voice error: ' + msg.error, 'error');
+      _voiceListening = false;
+      voiceBtn.classList.remove('listening');
+      voiceBtn.title = 'Voice input (click to speak)';
+    }
+  });
 }
+
+setupVoiceInput();
 
 // ========== Conversation Export ==========
 exportBtn.addEventListener('click', () => {
@@ -3112,6 +3160,39 @@ chrome.runtime.onMessage.addListener((message) => {
         const lastMsg = chatContainer.querySelector('.message-group:last-child .message.assistant-msg, .message-group:last-child .assistant-wrapper');
         if (lastMsg) renderSourceChipsIn(lastMsg);
       } catch { /* non-fatal */ }
+      // Inline replay export shortcut (9.3)
+      try {
+        const replayBar = document.createElement('div');
+        replayBar.style.cssText = 'display:flex; gap:6px; margin:6px 0 2px; padding:0 4px;';
+        const replayBtn = document.createElement('button');
+        replayBtn.textContent = '↓ Export Replay';
+        replayBtn.title = 'Export an interactive HTML replay of this run';
+        replayBtn.style.cssText = 'padding:4px 10px; font-size:11px; background:#4a9eff; color:#fff; border:none; border-radius:4px; cursor:pointer; flex-shrink:0;';
+        replayBtn.addEventListener('click', async () => {
+          replayBtn.disabled = true;
+          replayBtn.textContent = 'Generating…';
+          try {
+            const costEl = document.getElementById('run-cost');
+            const costText = costEl ? costEl.title : '';
+            const costMatch = costText.match(/\$[\d.]+/);
+            const estimatedCostUsd = costMatch ? parseFloat(costMatch[0].slice(1)) : 0;
+            const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
+            if (!resp || !resp.ok || !resp.data || !resp.data.html) throw new Error((resp && resp.error) || 'No replay data');
+            const blob = new Blob([resp.data.html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+            showToast('Replay report downloading…', 'info');
+          } catch (e) {
+            showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
+          } finally {
+            replayBtn.disabled = false;
+            replayBtn.textContent = '↓ Export Replay';
+          }
+        });
+        replayBar.appendChild(replayBtn);
+        chatContainer.appendChild(replayBar);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      } catch { /* non-fatal UI enhancement */ }
       // (3.30.0) Trust score badge — inline render so we don't add a new
       // top-level helper to this file (chat.js has had recurring truncation
       // issues during large edits). All UI for the score is contained here.

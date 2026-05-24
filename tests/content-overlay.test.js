@@ -98,12 +98,14 @@ describe('ov.dismissOverlay', () => {
         if (sel === 'button, a, [role="button"]') return [];
         return [];
       },
+      getBoundingClientRect: () => ({ left: 100, top: 100, right: 400, bottom: 300, width: 300, height: 200 }),
     };
+    // contains: () => true — overlay persists after Escape so execution reaches close buttons
     const doc = {
-      body: { contains: () => false },
+      body: { contains: () => true, dispatchEvent: jest.fn() },
       activeElement: { dispatchEvent: fn },
     };
-    const result = ov.dismissOverlay(doc, overlay);
+    ov.dismissOverlay(doc, overlay);
     expect(closeBtn.click).toHaveBeenCalled();
   });
 });
