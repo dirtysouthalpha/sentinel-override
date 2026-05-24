@@ -2737,8 +2737,17 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (err) {
           activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
           sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
-          await sleep(2000);
-          continue;
+          if (consecutiveInjectionFailures < 3) {
+            // Content script may still recover — retry next step.
+            await sleep(2000);
+            continue;
+          }
+          // After 3 consecutive injection failures the page is unreachable.
+          // Use empty observation so the LLM can issue a navigate action to
+          // escape the stuck page rather than spinning forever.
+          console.warn('[Sentinel] Observe failed after injection failure — using empty observation for LLM call');
+          observation = { elements: [] };
+          pageContent = { content: '' };
         }
       }
 
@@ -2751,8 +2760,16 @@ async function runAgentLoop(goal, workingTabId) {
       });
 
       // Screenshot (CDP with per-tab cache)
-      const freshTabInfo = await getTabInfo(tab);
-      if (!freshTabInfo) { await sleep(1000); continue; }
+      let freshTabInfo = await getTabInfo(tab);
+      if (!freshTabInfo) {
+        if (consecutiveInjectionFailures >= 3) {
+          // Tab may be in a transient bad state after injection failures — fall
+          // back to the tabInfo we already validated earlier in this step.
+          freshTabInfo = tabInfo;
+        } else {
+          await sleep(1000); continue;
+        }
+      }
 
       const currentUrl = (freshTabInfo && freshTabInfo.url) || tabInfo.url;
 
