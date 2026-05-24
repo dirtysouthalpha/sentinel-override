@@ -2304,6 +2304,7 @@ async function _generateInitialPlan(goal, workingTabId) {
     return null;
   }
   sendSilentUpdate('Planning task...');
+  sendAgentStatus('planning', 'Generating task plan...');
   const planProviderConfig = await getActiveProvider();
   const planSettings = {
     api_endpoint: planProviderConfig.endpoint,
@@ -3218,6 +3219,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _gateGoal = (typeof goal === 'string') ? goal : '';
           const _gateUrl  = (typeof currentUrl === 'string') ? currentUrl : '';
           if (isConfigChangeGoal(_gateGoal, _gateUrl)) {
+            sendAgentStatus('verifying', 'Checking if configuration change was committed...');
             if (!hasRecentCommitClick(history)) {
               const blockMsg = 'BLOCKED: configuration change detected but no Save/Apply/Commit click in recent history. Find and click the Apply/Save/Commit/Deploy button before finishing.';
               historyPush({ step: stepCount, action: command, result: blockMsg });
@@ -3234,6 +3236,7 @@ async function runAgentLoop(goal, workingTabId) {
               await sleep(1000);
               continue;
             }
+            sendAgentStatus('verifying', 'Change committed and verified.');
           }
         } catch (_) { /* non-fatal: never let the gate itself crash the loop */ }
 

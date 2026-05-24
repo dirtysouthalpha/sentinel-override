@@ -859,6 +859,7 @@ function updateStatus(text) {
 
 function hideStatus() {
   if (status) status.style.display = 'none';
+  if (statusText) statusText.textContent = '';
 }
 
 // ========== Input Area ==========
