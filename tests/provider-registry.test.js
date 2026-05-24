@@ -727,9 +727,9 @@ describe('PROVIDER_CATALOG entries', () => {
     expect(p.modelsUrl).toBeNull();
   });
 
-  test('zai has no modelsUrl', () => {
+  test('zai has a models endpoint', () => {
     const z = getCatalogProvider('zai');
-    expect(z.modelsUrl).toBeNull();
+    expect(z.modelsUrl).toContain('z.ai');
   });
 
   test('lmstudio has auth none', () => {

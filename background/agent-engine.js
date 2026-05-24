@@ -3490,6 +3490,11 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           continue;
         }
+        const MAX_REPEAT_ITEMS = 50;
+        if (items.length > MAX_REPEAT_ITEMS) {
+          historyPush({ step: stepCount, action: command, result: 'repeat_for_each: capped at ' + MAX_REPEAT_ITEMS + ' items (list had ' + items.length + ')' });
+          items.splice(MAX_REPEAT_ITEMS);
+        }
         sendSilentUpdate(`repeat_for_each: ${items.length} items × ${doActions.length} actions`, stepCount);
         const iterVar = command.item_var || 'item';
         for (const _item of items) {
