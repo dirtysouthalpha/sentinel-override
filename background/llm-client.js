@@ -197,19 +197,16 @@ will overflow your budget. Use this BATCH pattern instead:
 // (3.18.0) Renamed to internal; the new wrapper below appends structured
 // selector hints from the platforms/ profile system. Existing prose logic
 // untouched — selectors complement, not replace.
-function _getPlatformProseInternal(currentUrl, goal) {
-  const url  = (currentUrl || '').toLowerCase();
-  const text = (goal || '').toLowerCase();
-
-  // -- SonicWall --
-  const isSonicWall =
-    url.includes('sonicwall') ||
-    text.includes('sonicwall') ||
-    text.includes('sonicos') ||
-    /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/.test(url);
-
-  if (isSonicWall) {
-    return `
+// Platform detection specs: each entry has a test(url, text) predicate and prose to inject.
+// Evaluated in order; first match wins. Keeping detection logic and prose co-located makes
+// it easy to add or update platforms without touching function control flow.
+const _PLATFORM_SPECS = [
+  {
+    test: (url, text) =>
+      url.includes('sonicwall') || text.includes('sonicwall') ||
+      text.includes('sonicos') ||
+      /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/.test(url),
+    prose: `
 PLATFORM: SonicWall Management UI (SonicOS)
 UI-SPECIFIC RULES -- follow these exactly:
 
@@ -242,16 +239,13 @@ SESSION EXPIRY: If you see a login form mid-task, the session expired.
 IFRAMES: Some SonicWall panels (especially older 6.5 UI) embed content in iframes.
   - If expected elements aren't found, try scrolling or waiting -- they may be in a same-origin iframe that the scanner will pick up automatically.
   - Cross-origin iframes cannot be read -- note this and use read_page on the outer frame instead.
-`;
-  }
-
-  // -- Fortinet / FortiGate --
-  const isFortinet =
-    url.includes('fortinet') || url.includes('fortigate') || url.includes('fortimanager') ||
-    text.includes('fortinet') || text.includes('fortigate');
-
-  if (isFortinet) {
-    return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('fortinet') || url.includes('fortigate') || url.includes('fortimanager') ||
+      text.includes('fortinet') || text.includes('fortigate'),
+    prose: `
 PLATFORM: Fortinet / FortiGate Management UI
 UI-SPECIFIC RULES:
   - Dropdowns are custom widgets -- click to open, then click the option (not native select).
@@ -259,18 +253,15 @@ UI-SPECIFIC RULES:
   - Log pages use virtual scrolling -- scroll down to load more entries.
   - Tables have inline edit icons (pencil); click the icon not the row to edit.
   - Session timeout is short -- if a login page appears, re-authenticate using goal credentials.
-`;
-  }
-
-  // -- Cisco (FMC / ASDM / ISE / Meraki) --
-  const isCisco =
-    url.includes('cisco') || url.includes('/asdm') || url.includes('/fmc') ||
-    url.includes('meraki') || url.includes('.ise.') ||
-    text.includes('cisco asa') || text.includes('firepower') || text.includes('meraki') ||
-    text.includes('cisco ise');
-
-  if (isCisco) {
-    return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('cisco') || url.includes('/asdm') || url.includes('/fmc') ||
+      url.includes('meraki') || url.includes('.ise.') ||
+      text.includes('cisco asa') || text.includes('firepower') || text.includes('meraki') ||
+      text.includes('cisco ise'),
+    prose: `
 PLATFORM: Cisco Management UI (ASA/FMC/Meraki/ISE)
 UI-SPECIFIC RULES:
   - ASDM uses Java -- if the UI is Java-based, use execute_js sparingly; DOM interaction is limited.
@@ -278,16 +269,13 @@ UI-SPECIFIC RULES:
   - Meraki dashboard: standard web UI, most actions work normally; wait for AJAX to settle after saves.
   - Always look for a Deploy or Commit button after policy changes -- pending changes are staged, not live.
   - Log tables use pagination -- note the page number when extracting log entries.
-`;
-  }
-
-  // -- Palo Alto (PAN-OS / Panorama) --
-  const isPaloAlto =
-    url.includes('paloalto') || url.includes('panorama') || url.includes('/php/rest/pan') ||
-    text.includes('palo alto') || text.includes('pan-os') || text.includes('panorama');
-
-  if (isPaloAlto) {
-    return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('paloalto') || url.includes('panorama') || url.includes('/php/rest/pan') ||
+      text.includes('palo alto') || text.includes('pan-os') || text.includes('panorama'),
+    prose: `
 PLATFORM: Palo Alto Networks (PAN-OS / Panorama)
 UI-SPECIFIC RULES:
   - After any change, a "Commit" step is required -- look for the Commit button (top right) and click it.
@@ -295,13 +283,13 @@ UI-SPECIFIC RULES:
   - Tabs within panels are clickable text -- click the tab label to switch views.
   - Log Viewer uses AJAX pagination -- wait for spinner to disappear before extracting log data.
   - Object names are case-sensitive -- extract exact names as shown on screen.
-`;
-  }
-
-  // -- SentinelOne (RMM/EDR console) --
-  const isSentinelOne = url.includes('sentinelone.net') || url.includes('.sentinelone.com') || url.includes('s1.com') ||
-                        text.includes('sentinelone') || text.includes('singularity');
-  if (isSentinelOne) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('sentinelone.net') || url.includes('.sentinelone.com') || url.includes('s1.com') ||
+      text.includes('sentinelone') || text.includes('singularity'),
+    prose: `
 [SentinelOne Singularity Console — Platform Context]
 - Top-bar global search accepts SHA1, SHA256, MD5 hashes, filenames, IPs, URLs.
   After typing, press Enter to execute the search; results appear in a side
@@ -326,99 +314,98 @@ UI-SPECIFIC RULES:
 - Search results often paginate — scroll to load more, or use the page selector.
 - Wait for spinners to clear after Run/Refresh; use wait_for_text on a result
   count (e.g., "results") with 30000ms timeout.
-`;
+`
+  },
+  {
+    test: (url) => url.includes('nvd.nist.gov') || url.includes('cve.mitre.org') || url.includes('cve.org'),
+    prose: `[NIST NVD / CVE Database -- Platform Context (3.12.6)]
 
-  // -- NIST NVD CVE Database (3.12.6) --
-  const isNvd = url.includes('nvd.nist.gov') || url.includes('cve.mitre.org') || url.includes('cve.org');
-  if (isNvd) return [
-    '[NIST NVD / CVE Database -- Platform Context (3.12.6)]',
-    '',
-    '## CRITICAL RULE: When you have the listing data, you are DONE.',
-    '',
-    'NVD search results pages embed each CVEs ID, CVSS v3 score (with severity',
-    'label like "9.8 CRITICAL"), summary description, CNA, and assigned date',
-    'INLINE in each row. ONE execute_js on the listing page can harvest all of',
-    'this for ALL listed CVEs. After that, you have everything you need.',
-    '',
-    'DO NOT click into individual CVE detail pages just to "get more detail".',
-    'Detail pages cost 4-6 steps each (navigate, wait, extract, back, navigate-',
-    'next), the extraction is fragile, and the data you would gain is already',
-    'in the listing. Drilling in is the #1 budget waster on NVD goals -- the',
-    'previous version of this extension burned 14+ steps clicking into detail',
-    'pages when 1 listing extract would have answered the goal.',
-    '',
-    'ONLY drill into a detail page if the user specifically asked for:',
-    '   - full CPE enumeration (every affected product/version pair)',
-    '   - the complete reference link list (advisor URLs, vendor advisories)',
-    '   - exploit module references or PoC links',
-    'For "find me N CVEs" / "rank by severity" / "give me CVSS scores" --',
-    'the listing has it. Extract once, finish.',
-    '',
-    '## Listing-page extraction strategy',
-    '',
-    '1. Land on nvd.nist.gov/vuln/search and use the keyword field for',
-    '   vendor name (e.g. "fortinet fortigate") OR Advanced Search with',
-    '   a CPE filter (cpe:2.3:o:fortinet:fortios:*) for cleaner results.',
-    '   Date range: "Last 3 Months" or "Last Year" for "recent" goals.',
-    '   Sort by "Date Last Modified" descending for most-recent goals.',
-    '',
-    '2. Wait for results to render (NVD is server-rendered Angular but lists',
-    '   load fast). Then run a SINGLE execute_js to harvest all rows. Use',
-    '   query selectors that target the result row container -- common shapes',
-    '   are tr inside the vuln-table tbody, divs with class .row-result-snippet',
-    '   ancestors, or [data-testid="vuln-row"]. From each row pull innerText',
-    '   from: the CVE-link, the severity badge, the summary paragraph, the',
-    '   publish date. Use the (el || {}).innerText null-guard pattern from',
-    '   EXECUTE_JS RELIABILITY PATTERNS.',
-    '',
-    '3. If selectors miss, use document.body.innerText regex on the listing:',
-    '   match /^CVE-\\d{4}-\\d{4,7}/ at line starts; for the next line capture',
-    '   the severity label or numeric score; capture subsequent lines as',
-    '   description until the next CVE marker. This text-pattern approach is',
-    '   robust against UI changes.',
-    '',
-    '## Detail-page extraction (only if you genuinely need to drill)',
-    '',
-    'If the user asked for full CPE/refs and you must drill into a detail',
-    'page (nvd.nist.gov/vuln/detail/CVE-XXXX-XXXXX):',
-    '',
-    '1. The CVSS v3 base score lives in the page text near "CVSS 3.x Severity',
-    '   and Metrics" header. Use body.innerText regex: match digits.digits',
-    '   followed by space + (CRITICAL|HIGH|MEDIUM|LOW). The CVSS vector',
-    '   string starts with "CVSS:3.1/AV:" or "CVSS:3.0/AV:".',
-    '',
-    '2. Affected versions are in the "Known Affected Software Configurations"',
-    '   section as CPE strings (cpe:2.3:o:fortinet:fortios:7.4.0:*). Each is',
-    '   a list item; iterate document.querySelectorAll(".vuln-detail-table',
-    '   td, .cpe-text, [class*=cpe]") and pull innerText.',
-    '',
-    '3. Description text is in a <p> with id="vulnDescription" or class',
-    '   .vuln-description. Pull innerText.',
-    '',
-    'If the detail extraction fails twice, FALL BACK to body.innerText regex',
-    'rather than retrying the same selectors. NVD updates their UI quarterly.',
-    '',
-    '## Other CVE sources',
-    '',
-    '4. CISA KEV catalog (cisa.gov/known-exploited-vulnerabilities-catalog) is',
-    '   the authoritative source for "exploited in the wild" status. If a CVE',
-    '   appears in KEV, it has confirmed in-wild exploitation. Cite as',
-    '   [src:kev_<cveid>]. The KEV table can be filtered by CVE ID.',
-    '',
-    '5. MITRE / CVE.org (cve.org/CVERecord?id=...) has the CNAs official',
-    '   description but typically NO CVSS score -- NVD enriches it. Use',
-    '   CVE.org only when NVD is rate-limiting or for very-recent CVEs not',
-    '   yet in NVD.',
-    '',
-    'NEVER fabricate CVSS scores or affected versions when extraction fails.',
-    'If a score was not on the page you read, leave it "not captured" and',
-    'recommend the user check NVD directly. The hallucination gate enforces.'
-  ].join('\n');
+## CRITICAL RULE: When you have the listing data, you are DONE.
 
-  // -- VirusTotal --
-  const isVirusTotal = url.includes('virustotal.com') || url.includes('vt-api') ||
-                       text.includes('virustotal') || text.includes(' vt ');
-  if (isVirusTotal) return `
+NVD search results pages embed each CVEs ID, CVSS v3 score (with severity
+label like "9.8 CRITICAL"), summary description, CNA, and assigned date
+INLINE in each row. ONE execute_js on the listing page can harvest all of
+this for ALL listed CVEs. After that, you have everything you need.
+
+DO NOT click into individual CVE detail pages just to "get more detail".
+Detail pages cost 4-6 steps each (navigate, wait, extract, back, navigate-
+next), the extraction is fragile, and the data you would gain is already
+in the listing. Drilling in is the #1 budget waster on NVD goals -- the
+previous version of this extension burned 14+ steps clicking into detail
+pages when 1 listing extract would have answered the goal.
+
+ONLY drill into a detail page if the user specifically asked for:
+   - full CPE enumeration (every affected product/version pair)
+   - the complete reference link list (advisor URLs, vendor advisories)
+   - exploit module references or PoC links
+For "find me N CVEs" / "rank by severity" / "give me CVSS scores" --
+the listing has it. Extract once, finish.
+
+## Listing-page extraction strategy
+
+1. Land on nvd.nist.gov/vuln/search and use the keyword field for
+   vendor name (e.g. "fortinet fortigate") OR Advanced Search with
+   a CPE filter (cpe:2.3:o:fortinet:fortios:*) for cleaner results.
+   Date range: "Last 3 Months" or "Last Year" for "recent" goals.
+   Sort by "Date Last Modified" descending for most-recent goals.
+
+2. Wait for results to render (NVD is server-rendered Angular but lists
+   load fast). Then run a SINGLE execute_js to harvest all rows. Use
+   query selectors that target the result row container -- common shapes
+   are tr inside the vuln-table tbody, divs with class .row-result-snippet
+   ancestors, or [data-testid="vuln-row"]. From each row pull innerText
+   from: the CVE-link, the severity badge, the summary paragraph, the
+   publish date. Use the (el || {}).innerText null-guard pattern from
+   EXECUTE_JS RELIABILITY PATTERNS.
+
+3. If selectors miss, use document.body.innerText regex on the listing:
+   match /^CVE-\\d{4}-\\d{4,7}/ at line starts; for the next line capture
+   the severity label or numeric score; capture subsequent lines as
+   description until the next CVE marker. This text-pattern approach is
+   robust against UI changes.
+
+## Detail-page extraction (only if you genuinely need to drill)
+
+If the user asked for full CPE/refs and you must drill into a detail
+page (nvd.nist.gov/vuln/detail/CVE-XXXX-XXXXX):
+
+1. The CVSS v3 base score lives in the page text near "CVSS 3.x Severity
+   and Metrics" header. Use body.innerText regex: match digits.digits
+   followed by space + (CRITICAL|HIGH|MEDIUM|LOW). The CVSS vector
+   string starts with "CVSS:3.1/AV:" or "CVSS:3.0/AV:".
+
+2. Affected versions are in the "Known Affected Software Configurations"
+   section as CPE strings (cpe:2.3:o:fortinet:fortios:7.4.0:*). Each is
+   a list item; iterate document.querySelectorAll(".vuln-detail-table
+   td, .cpe-text, [class*=cpe]") and pull innerText.
+
+3. Description text is in a <p> with id="vulnDescription" or class
+   .vuln-description. Pull innerText.
+
+If the detail extraction fails twice, FALL BACK to body.innerText regex
+rather than retrying the same selectors. NVD updates their UI quarterly.
+
+## Other CVE sources
+
+4. CISA KEV catalog (cisa.gov/known-exploited-vulnerabilities-catalog) is
+   the authoritative source for "exploited in the wild" status. If a CVE
+   appears in KEV, it has confirmed in-wild exploitation. Cite as
+   [src:kev_<cveid>]. The KEV table can be filtered by CVE ID.
+
+5. MITRE / CVE.org (cve.org/CVERecord?id=...) has the CNAs official
+   description but typically NO CVSS score -- NVD enriches it. Use
+   CVE.org only when NVD is rate-limiting or for very-recent CVEs not
+   yet in NVD.
+
+NEVER fabricate CVSS scores or affected versions when extraction fails.
+If a score was not on the page you read, leave it "not captured" and
+recommend the user check NVD directly. The hallucination gate enforces.`
+  },
+  {
+    test: (url, text) =>
+      url.includes('virustotal.com') || url.includes('vt-api') ||
+      text.includes('virustotal') || text.includes(' vt '),
+    prose: `
 [VirusTotal — Platform Context]
 - The GUI is built with Lit shadow-DOM web components (vt-ui-main-generic-report,
   vt-ui-file-card, vt-ui-detections-list, vt-ui-results-summary). Standard
@@ -445,13 +432,14 @@ URL patterns:
 
 NEVER fabricate detection ratios or AV vendor results when extraction fails.
 Report the failure honestly and recommend a manual lookup.
-`;
-
-  // -- Microsoft 365 admin centers --
-  const isM365Admin = url.includes('admin.microsoft.com') || url.includes('admin.exchange.microsoft.com') ||
-                      url.includes('admin.exchange.outlook.com') || url.includes('compliance.microsoft.com') ||
-                      url.includes('security.microsoft.com') || url.includes('purview.microsoft.com');
-  if (isM365Admin) return `
+`
+  },
+  {
+    test: (url) =>
+      url.includes('admin.microsoft.com') || url.includes('admin.exchange.microsoft.com') ||
+      url.includes('admin.exchange.outlook.com') || url.includes('compliance.microsoft.com') ||
+      url.includes('security.microsoft.com') || url.includes('purview.microsoft.com'),
+    prose: `
 [Microsoft 365 Admin Center — Platform Context]
 - Built on Microsoft Fluent UI / FluentUI React. Prefer selectors using:
     [data-automationid="..."]
@@ -483,13 +471,14 @@ Report the failure honestly and recommend a manual lookup.
                          redirecting to purview.microsoft.com — prefer purview).
 - After ANY save: wait for toast text and re-read the user/group panel to
   verify the change is reflected. Don't finish before verification.
-`;
-
-  // -- Entra ID / Microsoft Entra (Azure AD successor) --
-  const isEntra = url.includes('entra.microsoft.com') || url.includes('aad.portal.azure.com') ||
-                  url.includes('myapps.microsoft.com') || text.includes('entra') ||
-                  (text.includes('azure ad') && url.includes('microsoft'));
-  if (isEntra) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('entra.microsoft.com') || url.includes('aad.portal.azure.com') ||
+      url.includes('myapps.microsoft.com') || text.includes('entra') ||
+      (text.includes('azure ad') && url.includes('microsoft')),
+    prose: `
 [Microsoft Entra ID — Platform Context]
 - Identity admin UI built on FluentUI React + Monaco editor for JSON details.
 - ⚠ CRITICAL: Sign-in logs, Audit logs, and Users tables render INSIDE
@@ -514,11 +503,11 @@ Report the failure honestly and recommend a manual lookup.
   modifying action (Conditional Access, App registrations, Users).
 - Sign-in audit goal pattern: group by user × status × IP, flag any IP
   with >3 failures or country mismatch with the user's typical location.
-`;
-
-  // -- Azure portal --
-  const isAzurePortal = url.includes('portal.azure.com') || url.includes('preview.portal.azure.com');
-  if (isAzurePortal) return `
+`
+  },
+  {
+    test: (url) => url.includes('portal.azure.com') || url.includes('preview.portal.azure.com'),
+    prose: `
 [Azure Portal — Platform Context]
 - Heavy use of iframes and Monaco editor. iframe-aware element scanning is
   on by default but cross-origin frames may need execute_in_frame routing.
@@ -531,29 +520,14 @@ Report the failure honestly and recommend a manual lookup.
   before any modify.
 - Tags + RBAC are common edit targets. Both render in side blades with Save
   at the bottom.
-`;
-
-  // -- Generic enterprise/network device UI --
-  const isNetworkDevice =
-    text.includes('firewall') || text.includes('router') || text.includes('switch') ||
-    text.includes('access point') || text.includes('management ui') ||
-    text.includes('admin panel') || text.includes('web ui');
-
-  if (isNetworkDevice) {
-    return `
-PLATFORM: Network/Security Device Management UI (generic)
-UI-SPECIFIC RULES:
-  - Many network device UIs use custom dropdowns -- if "select" fails, try click-to-open then click-option.
-  - Changes are often staged -- look for Apply, Save, Commit, or Accept buttons after edits.
-  - Log pages may be slow to load -- use wait_for_text with generous timeouts (20000-30000ms).
-  - Session timeouts are common -- if a login form appears, re-authenticate using credentials from the goal.
-  - Table rows often open edit dialogs on click -- click the row or its edit icon to modify entries.
-`;
-  }
-
-  // -- ConnectWise Manage/PSA --
-  const isConnectWise = url.includes('connectwise') || url.includes('cw.manage') || url.includes('my.connectwise') || url.includes('cwautomate') || text.includes('connectwise');
-  if (isConnectWise) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('connectwise') || url.includes('cw.manage') ||
+      url.includes('my.connectwise') || url.includes('cwautomate') ||
+      text.includes('connectwise'),
+    prose: `
 [ConnectWise Platform Context]
 - Navigation uses a left sidebar with expandable menu sections (Service, Sales, Procurement, etc.)
 - Tables use a filter bar at top — click the filter icon to add criteria, then click Refresh
@@ -565,11 +539,13 @@ UI-SPECIFIC RULES:
 - For bulk operations, use the checkbox column to select rows, then use the action toolbar
 - SSO/SAML redirects are common — if redirected to a login page, wait for it to load
 - Configurations (devices) are under the Configurations tab on a company or ticket
-`;
-
-  // -- NinjaOne RMM --
-  const isNinjaOne = url.includes('ninjarmm') || url.includes('ninja.io') || url.includes('ninjabe') || text.includes('ninjaone') || text.includes('ninja rmm');
-  if (isNinjaOne) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('ninjarmm') || url.includes('ninja.io') || url.includes('ninjabe') ||
+      text.includes('ninjaone') || text.includes('ninja rmm'),
+    prose: `
 [NinjaOne Platform Context]
 - Navigation uses a top menu bar with Organizations, Devices, Software, Policies, etc.
 - Device list has a search/filter bar — type to search by hostname, IP, or organization
@@ -581,11 +557,13 @@ UI-SPECIFIC RULES:
 - Software management: Software > patching status, approve/deny updates
 - Ninja uses React-based custom dropdowns — use click to open, click to select
 - Tables support column sorting by clicking column headers
-`;
-
-  // -- Datto RMM / Autotask PSA --
-  const isDatto = url.includes('datto') || url.includes('centrestage') || url.includes('autotask') || url.includes('adra') || text.includes('datto rmm') || text.includes('autotask');
-  if (isDatto) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('datto') || url.includes('centrestage') || url.includes('autotask') ||
+      url.includes('adra') || text.includes('datto rmm') || text.includes('autotask'),
+    prose: `
 [Datto/Autotask Platform Context]
 - Autotask PSA: navigation via top menu (Dispatch, Service Desk, Projects, etc.)
 - Ticket creation: Service Desk > Tickets > New Ticket
@@ -596,11 +574,11 @@ UI-SPECIFIC RULES:
 - Autotask uses custom ASP.NET dropdowns — click to open, may need to type to filter
 - Datto RMM uses Angular-based dropdowns — click to open, click to select
 - Both platforms have session timeouts — if login form appears, re-authenticate
-`;
-
-  // -- IT Glue --
-  const isITGlue = url.includes('itglue') || url.includes('it-glue') || text.includes('it glue');
-  if (isITGlue) return `
+`
+  },
+  {
+    test: (url, text) => url.includes('itglue') || url.includes('it-glue') || text.includes('it glue'),
+    prose: `
 [IT Glue Platform Context]
 - Navigation: left sidebar with Organizations, Passwords, Documents, Configurations, etc.
 - Search bar at top of every page — type to search across all asset types
@@ -610,11 +588,11 @@ UI-SPECIFIC RULES:
 - Configurations: network devices, servers, workstations listed with IPs and credentials
 - IT Glue uses standard HTML forms — type, click, select all work natively
 - Related items section at bottom of each asset links to connected configs/passwords
-`;
-
-  // -- Huntress MDR --
-  const isHuntress = url.includes('huntress') || text.includes('huntress');
-  if (isHuntress) return `
+`
+  },
+  {
+    test: (url, text) => url.includes('huntress') || text.includes('huntress'),
+    prose: `
 [Huntress Platform Context]
 - Dashboard shows threat summary with alert counts
 - Left sidebar: Dashboard, Threat Intelligence, Managed Agents, Reports, Account
@@ -623,11 +601,13 @@ UI-SPECIFIC RULES:
 - Agent deployment: Account > Deployment > download installer or copy install command
 - Reports: generates PDF/CSV reports for compliance
 - Huntress uses custom React dropdowns — click to open, click to select
-`;
-
-  // -- ScreenConnect / ConnectWise Control --
-  const isScreenConnect = url.includes('screenconnect') || url.includes('connectwisecontrol') || text.includes('screenconnect');
-  if (isScreenConnect) return `
+`
+  },
+  {
+    test: (url, text) =>
+      url.includes('screenconnect') || url.includes('connectwisecontrol') ||
+      text.includes('screenconnect'),
+    prose: `
 [ScreenConnect Platform Context]
 - Access page lists all managed machines with status (online/offline)
 - Search bar filters by hostname, organization, or custom property
@@ -636,9 +616,32 @@ UI-SPECIFIC RULES:
 - Command tab allows running commands on connected machines
 - File transfer tab for uploading/downloading files
 - Custom properties used for tagging/organization — editable in machine details
-`;
+`
+  },
+  {
+    test: (_, text) =>
+      text.includes('firewall') || text.includes('router') || text.includes('switch') ||
+      text.includes('access point') || text.includes('management ui') ||
+      text.includes('admin panel') || text.includes('web ui'),
+    prose: `
+PLATFORM: Network/Security Device Management UI (generic)
+UI-SPECIFIC RULES:
+  - Many network device UIs use custom dropdowns -- if "select" fails, try click-to-open then click-option.
+  - Changes are often staged -- look for Apply, Save, Commit, or Accept buttons after edits.
+  - Log pages may be slow to load -- use wait_for_text with generous timeouts (20000-30000ms).
+  - Session timeouts are common -- if a login form appears, re-authenticate using credentials from the goal.
+  - Table rows often open edit dialogs on click -- click the row or its edit icon to modify entries.
+`
+  },
+];
 
-  return ''; // No platform-specific context needed
+function _getPlatformProseInternal(currentUrl, goal) {
+  const url  = (currentUrl || '').toLowerCase();
+  const text = (goal || '').toLowerCase();
+  for (const spec of _PLATFORM_SPECS) {
+    if (spec.test(url, text)) return spec.prose;
+  }
+  return '';
 }
 
 // (3.18.0) Format the structured profile's knownSelectors + waitStrings +
