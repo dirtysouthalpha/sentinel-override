@@ -4814,6 +4814,7 @@ async function runAgentLoop(goal, workingTabId) {
   // first, THEN stop the keepalive and do cleanup.
 
   console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
+  console.log('[Sentinel/DEBUG] reportData check:', typeof reportData, reportData ? Object.keys(reportData).join(',') : 'NULL');
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // reportData is already a snapshot, so cleanup order doesn't affect its content.
