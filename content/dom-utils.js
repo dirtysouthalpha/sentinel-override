@@ -203,6 +203,43 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       }
     } catch (_) { /* non-fatal */ }
 
+    // 4. Strip positional pseudo-classes and retry — SPAs re-render and change
+    //    :nth-child / :nth-of-type positions; removing them often recovers the match.
+    try {
+      var _stripped = selector.replace(/:nth-child\(\d+\)|:nth-of-type\(\d+\)|:first-child|:last-child|:first-of-type|:last-of-type|:only-child|:only-of-type/g, '').trim();
+      if (_stripped && _stripped !== selector) {
+        try {
+          var _strippedEl = doc.querySelector(_stripped);
+          if (_strippedEl) return _strippedEl;
+        } catch (_) { /* invalid after strip */ }
+      }
+    } catch (_) { /* non-fatal */ }
+
+    // 5. Try the leaf (last combinatorial segment) of a complex path selector.
+    //    e.g. "div.container > ul > li > a.btn" → try "a.btn" alone.
+    try {
+      var _parts = selector.split(/[\s>+~]+/);
+      var _leaf = (_parts[_parts.length - 1] || '').trim();
+      if (_leaf && _leaf !== selector && _leaf.length > 1) {
+        try {
+          var _leafEl = doc.querySelector(_leaf);
+          if (_leafEl) return _leafEl;
+        } catch (_) { /* invalid leaf */ }
+      }
+    } catch (_) { /* non-fatal */ }
+
+    // 6. Placeholder / name / id text match for inputs (catches renamed attributes).
+    try {
+      var _labelHint = selector.match(/\[placeholder="([^"]+)"\]/i);
+      if (_labelHint) {
+        var _ph = _labelHint[1].trim().toLowerCase();
+        var _inputs = doc.querySelectorAll('input, textarea');
+        for (var _pi = 0; _pi < _inputs.length; _pi++) {
+          if ((_inputs[_pi].getAttribute('placeholder') || '').trim().toLowerCase() === _ph) return _inputs[_pi];
+        }
+      }
+    } catch (_) { /* non-fatal */ }
+
     return null;
   };
 
