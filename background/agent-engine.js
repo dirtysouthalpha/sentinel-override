@@ -2506,11 +2506,14 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
-      // Do NOT auto-navigate away — the tech may deliberately be on
-      // chrome://extensions, chrome://net-internals, or edge://policy for
-      // diagnostic work. Instead, surface a clear error and let the loop end.
+      // EXCEPTION: chrome://newtab/ is a blank tab — the auto-navigate code below
+      // will navigate it to the goal URL, so don't block it here.
       console.log('[Sentinel/DEBUG] Step', stepCount, 'checking URL:', tabInfo.url);
-      if (tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')) {
+      const _isNewTab = tabInfo.url === 'chrome://newtab/' || tabInfo.url === 'chrome://newtab';
+      const _isRestrictedPage = !_isNewTab && (
+        tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')
+      );
+      if (_isRestrictedPage) {
         historyPush({ step: stepCount, action: { type: 'note' }, result: 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.' });
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
         break;
