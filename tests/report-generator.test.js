@@ -517,11 +517,10 @@ describe('report-generator', () => {
     });
 
     test('generateReportViaLLM handles timeout error', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
       const abortController = new AbortController();
       const timeoutError = new Error('AbortError');
       timeoutError.name = 'AbortError';
-      globalThis.fetch.mockImplementationOnce(() => {
+      globalThis.fetch.mockImplementation(() => {
         abortController.abort();
         return Promise.reject(timeoutError);
       });
@@ -532,9 +531,8 @@ describe('report-generator', () => {
     });
 
     test('generateReportViaLLM handles network error', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
       const networkError = new Error('Network request failed');
-      globalThis.fetch.mockImplementationOnce(() => Promise.reject(networkError));
+      globalThis.fetch.mockImplementation(() => Promise.reject(networkError));
       const result = await generateReport(makeExecutionData(), CONFIG);
       expect(result.fullReport).toContain('Goal');
       expect(result.fullReport).toContain('Steps Taken');
@@ -542,9 +540,8 @@ describe('report-generator', () => {
     });
 
     test('generateReportViaLLM handles HTTP error response', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
       const errorResponse = { ok: false, status: 500, statusText: 'Internal Server Error', text: async () => 'Server error' };
-      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(errorResponse));
+      globalThis.fetch.mockImplementation(() => Promise.resolve(errorResponse));
       const result = await generateReport(makeExecutionData(), CONFIG);
       expect(result.fullReport).toContain('Goal');
       expect(result.fullReport).toContain('Steps Taken');
@@ -562,9 +559,8 @@ describe('report-generator', () => {
     });
 
     test('generateReportViaLLM handles response text error fallback', async () => {
-      mockGetActiveProvider.mockResolvedValueOnce(mockGetActiveProviderResolve);
       const errorResponse = { ok: false, status: 502, text: async () => { throw new Error('Text extraction failed'); } };
-      globalThis.fetch.mockImplementationOnce(() => Promise.resolve(errorResponse));
+      globalThis.fetch.mockImplementation(() => Promise.resolve(errorResponse));
       const result = await generateReport(makeExecutionData(), CONFIG);
       expect(result.fullReport).toContain('Goal');
       expect(result.fullReport).toContain('Steps Taken');

@@ -364,6 +364,11 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       return cleaned;
     } catch (err) {
       lastError = err;
+      const isNonRetryable = err.message === 'No active provider configured'
+        || err.message === 'API key not configured'
+        || err.message.startsWith('Failed to build report request')
+        || err.message === 'Report LLM returned invalid JSON';
+      if (isNonRetryable) break;
       if (attempt < MAX_ATTEMPTS) {
         console.warn('[Sentinel/report] Attempt', attempt, 'failed:', err.message, 'retrying...');
         await new Promise(r => setTimeout(r, 1000));
