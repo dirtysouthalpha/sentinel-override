@@ -4826,7 +4826,7 @@ async function runAgentLoop(goal, workingTabId) {
   // first, THEN stop the keepalive and do cleanup.
 
   console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
-  console.error('[Sentinel/REPORT-DEBUG] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
+  console.log('[Sentinel/REPORT-DEBUG] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // reportData is already a snapshot, so cleanup order doesn't affect its content.
@@ -4836,11 +4836,11 @@ async function runAgentLoop(goal, workingTabId) {
   // The normal capture is at line ~3470 in the finish handler, but edge cases
   // (early breaks, SW suspensions) can leave it unset.
   if (!reportData && finished) {
-    console.error('[Sentinel/REPORT-DEBUG] reportData was NULL at report time — force-capturing from current state');
+    console.log('[Sentinel/REPORT-DEBUG] reportData was NULL at report time — force-capturing from current state');
     reportData = {
       goal: _lastGoal || '',
       history: history.slice(),
-      agentMemory: { ...(await getAgentMemory()) },
+      agentMemory: { ...agentMemory },
       agentPlan: null,
       stepCount,
       apiCallCount,
@@ -4848,7 +4848,7 @@ async function runAgentLoop(goal, workingTabId) {
     };
   }
   if (reportData) {
-    console.error('[Sentinel/REPORT-DEBUG] Starting report generation with keys:', Object.keys(reportData).join(','));
+    console.log('[Sentinel/REPORT-DEBUG] Starting report generation with keys:', Object.keys(reportData).join(','));
     sendSilentUpdate('Generating report...', stepCount);
     try {
       agentReport = await generateReport(reportData, CONFIG);
