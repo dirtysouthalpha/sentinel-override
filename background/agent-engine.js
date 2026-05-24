@@ -2379,6 +2379,11 @@ async function runAgentLoop(goal, workingTabId) {
   }
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_) {}
 
+  // (SW keepalive) Pin the service worker for the entire agent loop duration.
+  // Without this, the SW can be terminated during long LLM calls or page loads.
+  const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
+  try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', e); }
+
   while (!finished && agentRunning) {
     try {
       // Pause check — wait until resumed
@@ -4599,6 +4604,9 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(3000);
     }
   }
+
+  // Release the loop keepalive
+  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
 
   if (finished) {
     try {
