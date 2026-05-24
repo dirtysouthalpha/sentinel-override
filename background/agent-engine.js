@@ -2737,15 +2737,14 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (err) {
           activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
           sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
-          if (consecutiveInjectionFailures < 3) {
-            // Content script may still recover — retry next step.
-            await sleep(2000);
-            continue;
-          }
-          // After 3 consecutive injection failures the page is unreachable.
-          // Use empty observation so the LLM can issue a navigate action to
-          // escape the stuck page rather than spinning forever.
-          console.warn('[Sentinel] Observe failed after injection failure — using empty observation for LLM call');
+          // sendMessageWithRetry already retried 3× with content-script re-injection
+          // between each attempt. By the time we reach here the page is truly unreachable
+          // for this step. Proceeding with empty observation lets the LLM fire and issue
+          // a navigate action to escape, rather than continue-ing back to the top of the
+          // loop and spinning forever (especially when injection keeps succeeding but
+          // observe keeps failing, which would reset consecutiveInjectionFailures to 0
+          // and keep the old `< 3` guard from ever breaking the cycle).
+          console.warn('[Sentinel] Observe failed (sendMessageWithRetry exhausted) — using empty observation so LLM can navigate away');
           observation = { elements: [] };
           pageContent = { content: '' };
         }
@@ -2774,8 +2773,15 @@ async function runAgentLoop(goal, workingTabId) {
       const currentUrl = (freshTabInfo && freshTabInfo.url) || tabInfo.url;
 
       // Get per-tab screenshot cache
-      const tabCtx = getTabContext(tab);
-      if (!tabCtx) { await sleep(1000); continue; }
+      let tabCtx = getTabContext(tab);
+      if (!tabCtx) {
+        // Context should have been registered in startAgent/registerInitialTab.
+        // If it's missing (e.g., tab was replaced mid-run), re-register so the
+        // loop can continue rather than spin forever on the continue below.
+        try { registerInitialTab(tab, currentUrl); } catch (_) {}
+        tabCtx = getTabContext(tab);
+        if (!tabCtx) { await sleep(1000); continue; }
+      }
       const screenshotCache = tabCtx.screenshotCache;
 
       let base64Image = null;
