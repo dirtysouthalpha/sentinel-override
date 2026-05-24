@@ -6,7 +6,7 @@
 
 A self-healing, self-learning browser agent built for the work technicians actually do — multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it click, read, think, and report.
 
-![Version](https://img.shields.io/badge/version-3.48.0-orange)
+![Version](https://img.shields.io/badge/version-3.49.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
