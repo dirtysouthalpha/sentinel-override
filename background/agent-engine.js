@@ -2248,6 +2248,49 @@ async function _initRunState(goal) {
   return goal;
 }
 
+// Build a plain-English one-liner describing what the agent can see on the page.
+// Pure heuristic — no LLM call. Used for Phase 8.2 page state narration.
+function _buildPageNarration(url, title, observation, pageContent) {
+  try {
+    const els = (observation && observation.elements) || [];
+    const text = (pageContent && pageContent.content) || '';
+    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } })();
+    const pageTitle = (title || '').trim();
+
+    const forms = els.filter(e => e.tag === 'form' || e.tag === 'FORM').length;
+    const buttons = els.filter(e => e.tag === 'button' || e.tag === 'BUTTON' || e.role === 'button').length;
+    const inputs = els.filter(e => ['input','textarea','select','INPUT','TEXTAREA','SELECT'].includes(e.tag)).length;
+    const links = els.filter(e => e.tag === 'a' || e.tag === 'A').length;
+    const headings = els.filter(e => /^h[1-3]$/i.test(e.tag || '')).map(e => e.text || '').filter(Boolean);
+
+    const parts = [];
+    if (pageTitle) parts.push(pageTitle);
+    else if (host) parts.push(host);
+
+    if (headings.length > 0) {
+      const h = headings[0].length > 60 ? headings[0].substring(0, 57) + '...' : headings[0];
+      if (h.toLowerCase() !== pageTitle.toLowerCase()) parts.push('"' + h + '"');
+    }
+
+    const details = [];
+    if (forms > 0) details.push(forms + ' form' + (forms > 1 ? 's' : ''));
+    if (inputs > 0) details.push(inputs + ' input' + (inputs > 1 ? 's' : ''));
+    if (buttons > 0) details.push(buttons + ' button' + (buttons > 1 ? 's' : ''));
+    if (links > 5) details.push(links + ' links');
+
+    const errorEl = els.find(e => {
+      const t = (e.text || '').toLowerCase();
+      return t.includes('error') || t.includes('invalid') || t.includes('failed');
+    });
+    if (errorEl) details.push('⚠ error message visible');
+
+    const summary = parts.join(' — ') + (details.length ? ' (' + details.join(', ') + ')' : '');
+    return 'I can see: ' + (summary || host);
+  } catch (_) {
+    return '';
+  }
+}
+
 // Generate the initial execution plan before the agent loop starts.
 // In quick mode, skips planning and returns null. Otherwise tries LLM planning
 // first and falls back to a heuristic plan if the LLM call fails.
@@ -2589,6 +2632,11 @@ async function runAgentLoop(goal, workingTabId) {
           _lastObservedUrl = _obsUrl;
           // Update DOM hash from the fresh observation
           _lastObservedDomHash = textLen * 31 + elemCount;
+          // (8.2) Page state narration — heuristic summary of what the agent sees
+          try {
+            const narration = _buildPageNarration(tabInfo && tabInfo.url, tabInfo && tabInfo.title, observation, pageContent);
+            if (narration) sendAgentStatus('observing', narration);
+          } catch (_) {}
         } catch (err) {
           activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
           sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
