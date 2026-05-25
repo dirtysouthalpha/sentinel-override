@@ -2800,38 +2800,37 @@ async function runAgentLoop(goal, workingTabId) {
       // (#11) DPR-aware screenshot metadata. Defaults are safe for non-vision
       // models / failed captures and signal "no metadata available".
       let screenshotMeta = null;
-      const screenshotProviderConfig = await getActiveProvider();
-      const modelForScreenshot = screenshotProviderConfig.model || 'glm-5.1';
-      const _visionOk = supportsVision(modelForScreenshot);
-      console.error('[Sentinel/SCREENSHOT] model:', modelForScreenshot, 'vision:', _visionOk, 'provider:', screenshotProviderConfig.id);
-      if (_visionOk) {
-        try {
-          const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
-          if (shotResult) {
-            console.error('[Sentinel/SCREENSHOT] ✓ Captured screenshot', shotResult.width + 'x' + shotResult.height, 'DPR:', shotResult.dpr);
-            base64Image = shotResult.base64Image;
-            screenshotMeta = {
-              width: shotResult.width,
-              height: shotResult.height,
-              dpr: shotResult.dpr,
-              scrollX: shotResult.scrollX,
-              scrollY: shotResult.scrollY
-            };
-            // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
-            try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-            // (9.3) Store screenshot for replay export (ring-cap at 20)
-            _stepScreenshots.set(stepCount, base64Image);
-            if (_stepScreenshots.size > 20) {
-              const oldest = _stepScreenshots.keys().next().value;
-              _stepScreenshots.delete(oldest);
-            }
+      // (3.51) ALWAYS capture screenshots — no vision gate. OpenAI-compatible APIs
+      // (Z.ai) gracefully ignore image content if the model can't process it.
+      // This guarantees screenshots for every step regardless of model/provider.
+      try {
+        const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
+        if (shotResult) {
+          base64Image = shotResult.base64Image;
+          screenshotMeta = {
+            width: shotResult.width,
+            height: shotResult.height,
+            dpr: shotResult.dpr,
+            scrollX: shotResult.scrollX,
+            scrollY: shotResult.scrollY
+          };
+          console.error('[Sentinel/SCREENSHOT] ✓ Step', stepCount, ':', shotResult.width + 'x' + shotResult.height, 'DPR:', shotResult.dpr, 'size:', Math.round(base64Image.length / 1024) + 'KB');
+          // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
+          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          // (9.3) Store screenshot for replay export (ring-cap at 20)
+          _stepScreenshots.set(stepCount, base64Image);
+          if (_stepScreenshots.size > 20) {
+            const oldest = _stepScreenshots.keys().next().value;
+            _stepScreenshots.delete(oldest);
           }
-        } catch (shotErr) {
-          // Screenshot failure is non-fatal — continue to LLM call without image.
-          console.warn('[Sentinel] Screenshot failed, continuing without image:', shotErr && shotErr.message);
-          base64Image = null;
-          screenshotMeta = null;
+        } else {
+          console.error('[Sentinel/SCREENSHOT] ✗ Step', stepCount, ': takeScreenshot returned null');
         }
+      } catch (shotErr) {
+        // Screenshot failure is non-fatal — continue to LLM call without image.
+        console.error('[Sentinel/SCREENSHOT] ✗ Step', stepCount, ':', shotErr && shotErr.message);
+        base64Image = null;
+        screenshotMeta = null;
       }
 
       // Truncate page content

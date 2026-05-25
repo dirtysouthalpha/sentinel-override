@@ -1914,8 +1914,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
 
   // Build request body using provider registry
-  const _useVision = supportsVision(model, providerConfig.id) && base64Image;
-  console.error("[Sentinel/SCREENSHOT] callLLM vision: model:", model, "provider:", providerConfig.id, "hasImage:", !!base64Image, "useVision:", _useVision);
+  // (3.51) Always send vision content when we have an image. OpenAI-compatible APIs
+  // gracefully ignore the image_url if the model can't process it.
+  const _useVision = !!base64Image && typeof provider.buildVisionContent === 'function';
+  console.error("[Sentinel/SCREENSHOT] callLLM: model:", model, "provider:", providerConfig.id, "hasImage:", !!base64Image, "useVision:", _useVision);
   const userContent = (_useVision)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
