@@ -2799,32 +2799,58 @@ if (document.readyState === 'loading') {
   checkResumeOnLoad();
 }
 
-// v3.61.1: Load last report from storage on panel open.
-// The agent saves the report to chrome.storage.local but the sidePanel
-// may refresh during cleanup (closeAllAgentTabs triggers tab switch).
-// Without this, the report card DOM is lost and the user sees nothing.
-async function loadLastReport() {
+// v3.61.2: Robust report display via storage listener + retry.
+// The agent saves the report to chrome.storage.local but sendReportUpdate
+// via runtime.sendMessage can be lost if the panel isn't listening.
+// This uses BOTH a storage change listener AND a polling fallback.
+let _reportShown = false;
+
+async function _tryShowReport() {
+  if (_reportShown) return;
   try {
     const stored = await chrome.storage.local.get(['last_agent_report']);
     const report = stored.last_agent_report;
     if (!report || typeof report !== 'object') return;
     // Only show if report is less than 5 minutes old
     const age = Date.now() - new Date(report.timestamp).getTime();
-    if (age > 5 * 60 * 1000) return; // older than 5 min
+    if (age > 5 * 60 * 1000) return;
     // Don't show if there's already a report card in the chat
-    if (chatContainer.querySelector('.report-card-title')) return;
+    if (chatContainer && chatContainer.querySelector('.report-card-title')) {
+      _reportShown = true;
+      return;
+    }
+    console.log('[Sentinel/report] Loading report from storage:', report.summary?.substring(0, 60));
     addReportCard(report);
-    // Clear so it doesn't show again on next panel open
-    await chrome.storage.local.remove(['last_agent_report']);
+    _reportShown = true;
+    // Auto-scroll to the report card
+    setTimeout(() => {
+      const card = chatContainer && chatContainer.querySelector('.report-card-title');
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
   } catch (e) {
-    console.warn('[Sentinel] loadLastReport failed:', e);
+    console.warn('[Sentinel/report] _tryShowReport failed:', e);
   }
 }
 
+// Storage change listener — fires in real-time when report is saved
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.last_agent_report && changes.last_agent_report.newValue) {
+    console.log('[Sentinel/report] Storage change detected — showing report');
+    setTimeout(_tryShowReport, 100);
+  }
+});
+
+// Polling fallback — try 3 times at 500ms, 1500ms, 3000ms
+function _scheduleReportPoll() {
+  setTimeout(_tryShowReport, 500);
+  setTimeout(_tryShowReport, 1500);
+  setTimeout(_tryShowReport, 3000);
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => setTimeout(loadLastReport, 500));
+  document.addEventListener('DOMContentLoaded', _scheduleReportPoll);
 } else {
-  setTimeout(loadLastReport, 500);
+  _scheduleReportPoll();
 }
 
 
