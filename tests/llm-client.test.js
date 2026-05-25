@@ -987,6 +987,58 @@ describe('generatePlan', () => {
     });
     expect(result).toEqual(['Step 1']);
   });
+
+  test('Z.AI endpoint does NOT include response_format in request body (Bug #2 regression guard)', async () => {
+    const mockFn = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '{"plan":["Navigate to site","Extract articles"]}' } }]
+      })
+    }));
+    _mockFetch = mockFn;
+    const result = await generatePlan('Go to dnn.com and give me top articles', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(result).toEqual(['Navigate to site', 'Extract articles']);
+    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  test('Z.AI numbered-prose response parsed via Strategy 4 (no JSON in response)', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Here is my plan:\n1. Navigate to dnn.com\n2. Read the homepage to find top stories\n3. Extract the top 10 article links and titles\n4. Open each article tab\n5. Read and summarize each article' } }]
+      })
+    });
+    const result = await generatePlan('Go to dnn.com and give me top 10 articles', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0]).toMatch(/navigate/i);
+  });
+
+  test('Z.AI bulleted-prose response parsed via Strategy 4b', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Steps to complete the task:\n- Navigate to the firewall management URL\n- Log in with provided credentials\n- Check the access rules table\n- Extract blocked connection entries' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall rules', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0]).toMatch(/navigate/i);
+  });
 });
 
 // ========== callLLMWithRetry ==========
