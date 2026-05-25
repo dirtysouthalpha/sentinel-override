@@ -2106,6 +2106,38 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         } catch (_) { /* give up */ }
       }
     }
+    // v3.61: z.ai sometimes returns finish_reason="tool_calls" with malformed/empty tool_calls
+    // but the content or reasoning_content contains the tool intent. Detect and construct action.
+    if (choice && choice.finish_reason === 'tool_calls') {
+      const _intentText = ((choice.message && choice.message.content) || '') + ' ' + ((choice.message && choice.message.reasoning_content) || '');
+      // Detect smart_navigate intent from content
+      if (/smart[._\-]?navigate/i.test(_intentText)) {
+        let _site = 'google', _query = '';
+        if (/weather\.gov/i.test(goal)) _site = 'weather.gov';
+        else if (/wikipedia/i.test(goal)) _site = 'wikipedia';
+        else if (/youtube/i.test(goal)) _site = 'youtube';
+        else if (/amazon/i.test(goal)) _site = 'amazon';
+        else if (/reddit/i.test(goal)) _site = 'reddit';
+        else if (/twitter\.com|x\.com/i.test(goal)) _site = 'twitter';
+        // Extract query from goal text
+        const _qm = goal.match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
+        if (_qm) _query = _qm[1].trim();
+        else {
+          const _fm = goal.match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
+          if (_fm) _query = _fm[1].trim();
+        }
+        if (_query) {
+          console.log('[Sentinel/FALLBACK] Detected smart_navigate intent from content — site:', _site, 'query:', _query);
+          return { type: 'smart_navigate', site: _site, query: _query };
+        }
+      }
+      // Detect explicit navigate URL in content
+      const _navUrl = _intentText.match(/navigate\s+(?:to\s+)?(?:the\s+)?(?:url\s+)?["']?(https?:\/\/[^\s"'\])\]]+)/i);
+      if (_navUrl) {
+        console.log('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
+        return { type: 'navigate', url: _navUrl[1] };
+      }
+    }
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
   }
   // Fallback: text-JSON parsing (non-tool-use providers)
@@ -2131,7 +2163,8 @@ export function extractFirstJsonObject(str) {
     'navigate_back', 'navigate_forward',
     'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
     'read_console_messages', 'read_network_requests',
-    'lookup', 'run_remote_command', 'verify', 'repeat_for_each']);
+    'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
+    'smart_navigate', 'batch']);
 
   let searchFrom = 0;
   while (searchFrom < str.length) {
@@ -2279,7 +2312,8 @@ export function parseLLMResponse(content) {
       'navigate_back', 'navigate_forward',
       'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
       'read_console_messages', 'read_network_requests',
-      'lookup', 'run_remote_command', 'verify', 'repeat_for_each'];
+      'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
+      'smart_navigate', 'batch'];
     if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;

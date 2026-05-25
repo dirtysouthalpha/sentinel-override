@@ -1327,7 +1327,7 @@ async function _cdpObservePage(tabId) {
   const currentUrl = tabInfo ? tabInfo.url : '';
   // In batch mode (queue has items), always use cache if available (no TTL limit)
   const _inBatchMode = typeof _pendingCommandQueue !== 'undefined' && _pendingCommandQueue.length > 0;
-  const _cacheTTL = _inBatchMode ? 60000 : 3000; // 60s in batch mode, 3s normal
+  const _cacheTTL = _inBatchMode ? 60000 : 30000; // 60s in batch mode, 30s normal
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
     console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', url);
