@@ -278,6 +278,14 @@ export const MODEL_VISION_OVERRIDES = {
   'glm-4.5v': true,
   'glm-4.6v': true,
   'glm-5v': true,
+  // (3.51) Z.ai's OpenAI-compatible endpoint accepts image_url for all GLM models.
+  // Even text-primary models gracefully ignore the image if they can't process it.
+  'glm-4': true,
+  'glm-4.5': true,
+  'glm-4.7': true,
+  'glm-5': true,
+  'glm-5.1': true,
+  'glm-5-turbo': true,
   // Qwen / open-source vision
   'qwen2-vl': true,
   'qwen2.5-vl': true,

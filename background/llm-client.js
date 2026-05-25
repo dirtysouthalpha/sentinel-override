@@ -1778,9 +1778,18 @@ ${base64Image ? (function() {
     ? `Viewport: ${meta.width}x${meta.height} CSS pixels, devicePixelRatio: ${meta.dpr}. `
     : '';
   return metaLine +
-    'VISUAL MODE: You can see a screenshot of the current page. You may use "click_at" with x,y pixel coordinates to click elements you can see but that are not in the element list. ' +
+    'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n' +
+    '1. Look at the screenshot to find the element you want to interact with.\n' +
+    '2. Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n' +
+    '3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n' +
+    '4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n' +
+    'RULES:\n' +
+    '- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n' +
+    '- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n' +
+    '- If click_at misses, fall back to click with a selector from the element list.\n' +
+    '- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n' +
     dprLine +
-    'Coordinates in `click_at` actions are CSS pixels (the same coordinate system as `bbox` in element data). The screenshot image may be rendered at higher resolution if devicePixelRatio > 1, but you should still emit CSS-pixel coordinates. Use click_at when the element list is empty or the selectors don\'t match what you see.\n';
+    'Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n';
 })() : ''}
 
 ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.'}`;

@@ -549,7 +549,8 @@ if (window.__sentinelInitialized) {
 
           // Show a brief action banner at top of page
           let banner = document.getElementById('__sentinel_action_banner');
-          if (!banner) {
+          // (3.51) Re-check if banner was removed by SPA
+          if (!banner || !banner.parentElement) {
             banner = document.createElement('div');
             banner.id = '__sentinel_action_banner';
             banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);' +
@@ -558,7 +559,8 @@ if (window.__sentinelInitialized) {
               'padding:8px 20px;border-radius:8px;border:1px solid #e94560;' +
               'box-shadow:0 4px 20px rgba(233,69,96,0.3);pointer-events:none;' +
               'transition:opacity 0.3s,transform 0.3s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;';
-            document.body.appendChild(banner);
+            // (3.51) Attach to documentElement like cursor — body gets replaced by React/Lit SPAs
+            (document.documentElement || document.body).appendChild(banner);
           }
 
           // Icon map for action types
