@@ -106,6 +106,14 @@ export async function openTab(url, label) {
 export async function switchToTab(tabId) {
   if (!tabContexts.has(tabId)) return false;
   try { await chrome.tabs.update(tabId, { active: true }); } catch { return false; }
+  // (3.50.1) Dismiss overlays (cursor, HUD, highlights) on ALL other tabs
+  // so visual feedback only shows on the active agent tab.
+  const otherTabIds = Array.from(tabContexts.keys()).filter(id => id !== tabId);
+  for (const otherId of otherTabIds) {
+    try {
+      await chrome.tabs.sendMessage(otherId, { action: 'dismiss_overlays' });
+    } catch (_) { /* tab may not have content script */ }
+  }
   return setActiveTab(tabId);
 }
 
