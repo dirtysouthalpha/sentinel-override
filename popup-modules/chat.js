@@ -53,6 +53,7 @@ const copyReportTextBtn = document.getElementById('copyReportTextBtn');
 // Voice Input - uses webkitSpeechRecognition in the active tab
 // (Web Speech API doesn't work in extension popups, so we delegate to the tab)
 let _voiceListening = false;
+let _voiceMessageListener = null;
 
 
 // ========== Tenant Chip (3.7.0) ==========
@@ -1277,6 +1278,14 @@ function updateAttachmentPreview() {
 
 // ========== Voice Input (tab-based) ==========
 function setupVoiceInput() {
+  // Remove previous listener if exists (prevent duplicates on popup reopen)
+  if (_voiceMessageListener) {
+    try {
+      chrome.runtime.onMessage.removeListener(_voiceMessageListener);
+    } catch (_e) { /* ignore */ }
+    _voiceMessageListener = null;
+  }
+
   voiceBtn.addEventListener('click', async () => {
     if (_voiceListening) {
       _voiceListening = false;
@@ -1348,7 +1357,7 @@ function setupVoiceInput() {
     }
   });
 
-  chrome.runtime.onMessage.addListener((msg) => {
+  _voiceMessageListener = (msg) => {
     if (msg.action === 'voice_result' && msg.text) {
       goalInput.value = msg.text;
       goalInput.style.height = 'auto';
@@ -1370,7 +1379,9 @@ function setupVoiceInput() {
       voiceBtn.classList.remove('listening');
       voiceBtn.title = 'Voice input (click to speak)';
     }
-  });
+  };
+
+  chrome.runtime.onMessage.addListener(_voiceMessageListener);
 }
 
 setupVoiceInput();
