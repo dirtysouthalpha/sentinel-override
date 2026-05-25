@@ -150,6 +150,7 @@ const mockGenerateReport = jest.fn(async () => '## Report');
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
   generateReport: mockGenerateReport,
+  buildFallbackReport: jest.fn(() => '## Fallback Report'),
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
@@ -685,9 +686,9 @@ describe('post-loop cleanup paths', () => {
 
     await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
 
-    // Report error should have been sent
+    // Fallback report should have been sent as 'ready' (new behavior: save fallback before LLM attempt)
     const { sendReportUpdate } = await import('../background/message-protocol.js');
-    expect(sendReportUpdate).toHaveBeenCalledWith('error', null, expect.any(String));
+    expect(sendReportUpdate).toHaveBeenCalledWith('ready', expect.objectContaining({ _isFallback: true }));
   });
 
   test('handles post-loop storage clear failure', async () => {

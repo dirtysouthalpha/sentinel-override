@@ -106,6 +106,7 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
   generateReport: jest.fn(async () => '## Report'),
+  buildFallbackReport: jest.fn(() => '## Fallback Report'),
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
