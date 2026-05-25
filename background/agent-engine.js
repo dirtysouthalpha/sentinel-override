@@ -1219,6 +1219,110 @@ async function _enableSidePanelEverywhere() {
 }
 
 
+// ========== CDP Fallback (v3.54) ==========
+// When the content script can't inject (CSP, security headers, etc.), use CDP
+// directly to observe the page, dismiss overlays, and execute commands.
+// CDP bypasses CSP entirely — it's the same channel DevTools uses.
+
+async function _cdpObservePage(tabId) {
+  // Extract interactive elements and page text via CDP Runtime.evaluate
+  const code = `
+    const results = { elements: [], text: '', overlays: [] };
+    try {
+      // Page text
+      results.text = document.body ? document.body.innerText.substring(0, 8000) : '';
+      
+      // Interactive elements
+      const els = document.querySelectorAll('a[href], button, input, select, textarea, [role="button"], [role="link"], [onclick], [class*="consent"], [class*="cookie"], [id*="consent"], [id*="cookie"], [id*="onetrust"]');
+      const seen = new Set();
+      for (const el of els) {
+        if (seen.size >= 60) break;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) continue;
+        if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+        const tag = el.tagName.toLowerCase();
+        const text = (el.textContent || '').trim().substring(0, 50);
+        const href = el.href || '';
+        const type = el.type || '';
+        const id = el.id || '';
+        const cls = el.className && typeof el.className === 'string' ? el.className.substring(0, 80) : '';
+        const selector = id ? '#' + id : (tag + (cls ? '.' + cls.split(' ').filter(c=>c).slice(0,2).join('.') : '')).substring(0, 80);
+        const key = selector + text.substring(0, 20);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        results.elements.push({
+          tag, text: text.substring(0, 40), href: href.substring(0, 100),
+          type, id: id.substring(0, 40),
+          bbox: { x: Math.round(rect.left), y: Math.round(rect.top), w: Math.round(rect.width), h: Math.round(rect.height) },
+          selector: selector.substring(0, 100)
+        });
+      }
+      
+      // Detect overlays (cookie consent, GDPR, paywalls)
+      const overlaySelectors = [
+        '[class*="consent" i]', '[class*="cookie" i]', '[class*="gdpr" i]',
+        '[id*="consent" i]', '[id*="cookie" i]', '[id*="onetrust" i]',
+        '[class*="overlay" i]', '[class*="popup" i]', '[class*="modal" i]',
+        '[class*="dialog" i]', '[class*="paywall" i]', '[class*="interstitial" i]',
+        '[class*="privacy" i]', '[class*="banner" i]'
+      ];
+      for (const sel of overlaySelectors) {
+        const nodes = document.querySelectorAll(sel);
+        for (const node of nodes) {
+          const style = window.getComputedStyle(node);
+          if (style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity) > 0.1) {
+            const rect = node.getBoundingClientRect();
+            if (rect.width > 100 && rect.height > 50) {
+              // Find dismiss/accept buttons inside
+              const buttons = node.querySelectorAll('button, a, [role="button"], [class*="accept" i], [class*="agree" i], [class*="dismiss" i], [class*="close" i], [class*="opt" i]');
+              const btnList = [];
+              for (const btn of buttons) {
+                const bText = (btn.textContent || '').trim().substring(0, 40);
+                const bRect = btn.getBoundingClientRect();
+                if (bRect.width > 0 && bRect.height > 0) {
+                  btnList.push({ text: bText, x: Math.round(bRect.left + bRect.width/2), y: Math.round(bRect.top + bRect.height/2) });
+                }
+              }
+              results.overlays.push({ selector: sel, text: (node.textContent || '').substring(0, 100), buttons: btnList });
+            }
+          }
+        }
+      }
+    } catch(e) { results.error = e.message; }
+    return results;
+  `;
+  const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
+  if (result && result.ok && result.value) {
+    return result.value;
+  }
+  return null;
+}
+
+async function _cdpDismissOverlays(tabId, overlays) {
+  if (!overlays || overlays.length === 0) return 0;
+  let dismissed = 0;
+  for (const overlay of overlays) {
+    // Try clicking accept/agree buttons first (zero-friction policy)
+    const acceptBtn = overlay.buttons.find(b => 
+      /agree|accept|accept all|got it|ok|consent|allow|continue|proceed/i.test(b.text)
+    );
+    const dismissBtn = acceptBtn || overlay.buttons[0]; // fallback to first button
+    if (dismissBtn && dismissBtn.x && dismissBtn.y) {
+      const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
+      if (r && r.ok) {
+        dismissed++;
+        await new Promise(r => setTimeout(r, 500)); // let overlay close
+      }
+    }
+  }
+  return dismissed;
+}
+
+// Track whether we're in CDP fallback mode for the current step
+let _cdpFallbackActive = false;
+
+
+
 /**
  * Get all tab IDs currently attached to the agent session.
  * @returns {number[]} Array of Chrome tab IDs.
@@ -2675,14 +2779,21 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Inject content script
       const scriptReady = await injectContentScript(tab);
+      _cdpFallbackActive = false;
       if (!scriptReady) {
         consecutiveInjectionFailures++;
-        sendSilentUpdate('Content script failed -- retrying', stepCount);
-        await sleep(2000);
-        // After 3 consecutive failures, let the LLM call proceed with empty observation
-        // so it can issue a navigate action to escape the stuck page.
-        if (consecutiveInjectionFailures < 3) continue;
-        console.warn('[Sentinel] Content script failed ' + consecutiveInjectionFailures + ' times — proceeding to LLM with empty observation');
+        sendSilentUpdate('Content script failed -- trying CDP fallback', stepCount);
+        
+        // (v3.54) CDP Fallback: bypass CSP by using Chrome DevTools Protocol directly.
+        // After 2 failures, switch to CDP mode — observe, dismiss overlays, read page.
+        if (consecutiveInjectionFailures >= 2) {
+          console.warn('[Sentinel] Content script failed ' + consecutiveInjectionFailures + ' times — activating CDP fallback');
+          _cdpFallbackActive = true;
+          // Don't continue/continue — fall through to observation with CDP data
+        } else {
+          await sleep(2000);
+          continue; // retry injection on first failure
+        }
       } else {
         consecutiveInjectionFailures = 0;
       }
@@ -2709,13 +2820,27 @@ async function runAgentLoop(goal, workingTabId) {
       } catch (_e) { /* non-fatal */ }
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
-      try {
-        const overlayResult = await sendMessageWithRetry(tab, { action: 'dismiss_overlays' });
-        if (overlayResult && overlayResult.count > 0) {
-          sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
-          await sleep(800); // let overlay close animate
-        }
-      } catch (_) { /* non-fatal */ }
+      if (_cdpFallbackActive) {
+        // (v3.54) CDP fallback: dismiss overlays via DevTools Protocol
+        try {
+          const cdpObs = await _cdpObservePage(tab);
+          if (cdpObs && cdpObs.overlays && cdpObs.overlays.length > 0) {
+            const dismissed = await _cdpDismissOverlays(tab, cdpObs.overlays);
+            if (dismissed > 0) {
+              sendSilentUpdate(`[CDP] Dismissed ${dismissed} overlay(s)`, stepCount);
+              await sleep(800);
+            }
+          }
+        } catch (_) { /* non-fatal */ }
+      } else {
+        try {
+          const overlayResult = await sendMessageWithRetry(tab, { action: 'dismiss_overlays' });
+          if (overlayResult && overlayResult.count > 0) {
+            sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
+            await sleep(800); // let overlay close animate
+          }
+        } catch (_) { /* non-fatal */ }
+      }
 
       // Get page data — skip re-observation when the previous action was
       // non-mutating (note/extract/scroll/wait) AND no SPA transition occurred
@@ -2771,12 +2896,38 @@ async function runAgentLoop(goal, workingTabId) {
         sendAgentStatus('observing', 'Reading page structure...');
         activityStart(stepCount, 'observe', 'Observing page');
         try {
+          if (_cdpFallbackActive) {
+            // (v3.54) CDP fallback: observe page via DevTools Protocol instead of content script
+            const cdpObs = await _cdpObservePage(tab);
+            if (cdpObs) {
+              observation = { elements: cdpObs.elements || [] };
+              pageContent = { content: cdpObs.text || '' };
+              // Also check for overlays and auto-dismiss
+              if (cdpObs.overlays && cdpObs.overlays.length > 0) {
+                const dismissed = await _cdpDismissOverlays(tab, cdpObs.overlays);
+                if (dismissed > 0) {
+                  sendSilentUpdate(`[CDP] Auto-dismissed ${dismissed} overlay(s) during observation`, stepCount);
+                  await sleep(800);
+                  // Re-observe after dismissal
+                  const cdpObs2 = await _cdpObservePage(tab);
+                  if (cdpObs2) {
+                    observation = { elements: cdpObs2.elements || [] };
+                    pageContent = { content: cdpObs2.text || '' };
+                  }
+                }
+              }
+            } else {
+              observation = { elements: [] };
+              pageContent = { content: '' };
+            }
+          } else {
           // (3.41.0) observe_page and read_page are independent read-only DOM
           // operations; run them in parallel to save 100-300ms per step.
           [observation, pageContent] = await Promise.all([
             sendMessageWithRetry(tab, { action: 'observe_page' }),
             sendMessageWithRetry(tab, { action: 'read_page' })
           ]);
+          }
           const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
           const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
           activityDone(stepCount, 'observe', 'Observed ' + elemCount + ' elements, ' + textLen + ' chars of text', null);
@@ -3206,7 +3357,7 @@ async function runAgentLoop(goal, workingTabId) {
         ' (' + _stepsRemaining + ' remaining; ' + productiveSteps + ' productive bumps so far). ' +
         'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
         'Aimless read_page / scroll = unproductive (does not extend).';
-      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode };
+      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -4605,6 +4756,43 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      // (v3.54) CDP fallback for click: when content script can't inject and click fails,
+      // resolve the element via CDP and click its center coordinates.
+      if (actionFailed && _cdpFallbackActive && (command.type === 'click' || command.type === 'right_click' || command.type === 'double_click')) {
+        try {
+          const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          if (sel) {
+            const cdpCode = '(function(){'
+              + 'var el = null;'
+              + 'try { el = document.querySelector(' + JSON.stringify(sel) + '); } catch(e) {}'
+              + 'if (!el) {'
+              + '  var allEls = document.querySelectorAll("button, a, [role=\\"button\\"], input, [onclick]");'
+              + '  for (var i = 0; i < allEls.length; i++) {'
+              + '    if (allEls[i].textContent && allEls[i].textContent.trim().length > 0) { el = allEls[i]; break; }'
+              + '  }'
+              + '}'
+              + 'if (!el) return null;'
+              + 'var r = el.getBoundingClientRect();'
+              + 'return { x: r.left + r.width/2, y: r.top + r.height/2, w: r.width, h: r.height };'
+              + '})()';
+            const cdpBbox = await cdpExecuteJs(tab, cdpCode, { timeout: 3000 });
+            if (cdpBbox && cdpBbox.ok && cdpBbox.value && cdpBbox.value.x != null) {
+              const cx = Math.round(cdpBbox.value.x);
+              const cy = Math.round(cdpBbox.value.y);
+              const r = await cdpDispatchClick(tab, cx, cy, {
+                button: command.type === 'right_click' ? 'right' : 'left',
+                clickCount: command.type === 'double_click' ? 2 : 1,
+                description: '[CDP fallback] Clicking ' + sel
+              });
+              if (r && r.ok) {
+                result = 'Clicked ' + sel + ' via CDP fallback at (' + cx + ',' + cy + ')';
+                actionFailed = false;
+                sendSilentUpdate('[CDP] Clicked ' + sel + ' at (' + cx + ',' + cy + ')', stepCount);
+              }
+            }
+          }
+        } catch (_) { /* CDP click fallback non-fatal */ }
+      }
       // (7.1) Automatic bbox fallback: if a click fails due to selector issues,
       // resolve the element's bbox from the page and retry as click_at.
       if (actionFailed && command.type === 'click' && !command._bboxFallback) {
