@@ -2988,6 +2988,13 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'cdp_reattach_warning') {
     updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
   }
+  // (3.51) Report display — show report card in chat when report is ready
+  if (message.action === 'report_update' && message.status === 'ready' && message.report) {
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', e); }
+  }
+  if (message.action === 'agent_loop_complete' && message.report) {
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', e); }
+  }
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
     _showStatusTicker(message.state, message.text, message.timestamp);
