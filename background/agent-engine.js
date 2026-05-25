@@ -1295,8 +1295,11 @@ async function _cdpObservePage(tabId) {
     } catch(e) { results.error = e.message; }
     return results;
   `;
+  console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
+  console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
   if (result && result.ok && result.value) {
+    console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
     return result.value;
   }
   return null;
@@ -1383,15 +1386,24 @@ async function _cdpDismissOverlays(tabId, overlays) {
     + '})()';
 
   try {
+    console.log('[Sentinel/CDP] Phase2: sending nuke code (' + nukeCode.length + ' chars) to tab', tabId);
     const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 8000 });
+    console.log('[Sentinel/CDP] Phase2 raw result:', JSON.stringify(nukeResult));
     if (nukeResult && nukeResult.ok) {
       console.log('[Sentinel/CDP] Phase2 nuclear removal:', nukeResult.value, 'elements removed');
       totalRemoved += (nukeResult.value || 0);
     } else {
-      console.warn('[Sentinel/CDP] Phase2 nuke returned:', nukeResult);
+      console.warn('[Sentinel/CDP] Phase2 FAILED. ok:', nukeResult && nukeResult.ok, 'error:', nukeResult && nukeResult.error, 'attachDenied:', nukeResult && nukeResult.attachDenied);
+      // Try a simple test to verify CDP works at all
+      try {
+        const testResult = await cdpExecuteJs(tabId, 'return document.title', { timeout: 3000 });
+        console.log('[Sentinel/CDP] CDP test (document.title):', JSON.stringify(testResult));
+      } catch(testErr) {
+        console.warn('[Sentinel/CDP] CDP test also failed:', testErr && testErr.message);
+      }
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Phase2 nuke failed:', e && e.message);
+    console.warn('[Sentinel/CDP] Phase2 nuke threw:', e && e.message);
   }
 
   // Phase 3: If still blocked, try scrolling the page to check if overlay is really gone
