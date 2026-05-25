@@ -649,7 +649,7 @@ export async function startAgent(goal, sender) {
   try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   // (v3.53) Disable side panel on all tabs except the working tab
-  try { await _scopeSidePanelToAttachedTabs(); } catch (_) {}
+  // (v3.57) sidePanel scoping removed — was closing panel on start
 
   // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
   // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
@@ -1146,7 +1146,7 @@ async function attachTabToSentinelGroup(tabId) {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
     } catch (_e) { /* side panel API may not be available */ }
     // (v3.53) Re-scope: enable panel on this new tab, disable on others
-    try { await _scopeSidePanelToAttachedTabs(); } catch (_) {}
+    // (v3.57) sidePanel scoping removed from tab attach
   } catch (e) {
     console.warn('[Sentinel] attachTabToSentinelGroup failed:', e && e.message);
   }
