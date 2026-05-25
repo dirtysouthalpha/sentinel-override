@@ -1231,13 +1231,11 @@ async function _enableSidePanelEverywhere() {
 async function _cdpObservePage(tabId) {
   // (v3.57) Extract interactive elements and page text via CDP Runtime.evaluate
   // First, wait for DOM to be ready (document.body can be null on slow-loading pages)
-  const waitCode = '(function(){'
-    + 'var body = document.body || document.documentElement;'
+  const waitCode = 'var body = document.body || document.documentElement;'
     + 'var title = document.title || "";'
     + 'var childCount = body ? body.childNodes.length : 0;'
     + 'return { hasBody: !!document.body, title: title, childCount: childCount, '
-    + '  url: window.location.href, readyState: document.readyState };'
-    + '})()';
+    + '  url: window.location.href, readyState: document.readyState };';
 
   try {
     const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 3000 });
@@ -1259,8 +1257,7 @@ async function _cdpObservePage(tabId) {
     console.warn('[Sentinel/CDP] Ready check failed:', e && e.message);
   }
 
-  const code = '(function(){'
-    + 'var results = { elements: [], text: "", overlays: [] };'
+  const code = 'var results = { elements: [], text: "", overlays: [] };'
     + 'try {'
     + '  var body = document.body || document.documentElement;'
     // Page text — use documentElement as fallback if body is null
@@ -1320,8 +1317,7 @@ async function _cdpObservePage(tabId) {
     + '    }'
     + '  }'
     + '} catch(e) { results.error = e.message; }'
-    + 'return results;'
-    + '})()';
+    + 'return results;';
 
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
@@ -1355,8 +1351,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
   // Phase 2: Remove ALL iframes (consent dialogs are almost always in iframes)
   // and remove ANY fixed/absolute element with high z-index covering significant screen area
-  const nukeCode = '(function(){'
-    + 'var n = 0;'
+  const nukeCode = 'var n = 0;'
     // Step A: Nuke ALL iframes unconditionally — consent CMPs load in cross-origin iframes
     + 'var iframes = document.querySelectorAll("iframe");'
     + 'for (var i = iframes.length - 1; i >= 0; i--) {'
@@ -1408,8 +1403,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
     // Step E: Restore scrolling (null-safe)
     + 'if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; }'
     + 'if (document.documentElement) { document.documentElement.style.overflow = ""; }'
-    + 'return n;'
-    + '})()';
+    + 'return n;';
 
   try {
     console.log('[Sentinel/CDP] Phase2: sending nuke code (' + nukeCode.length + ' chars) to tab', tabId);
@@ -2918,7 +2912,7 @@ async function runAgentLoop(goal, workingTabId) {
           // If empty (no body, no title), reload the page via CDP.
           if (consecutiveInjectionFailures === 2) {
             try {
-              const pgCheck = await cdpExecuteJs(tab, '(function(){return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};})()', { timeout: 3000 });
+              const pgCheck = await cdpExecuteJs(tab, 'return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};', { timeout: 3000 });
               console.log('[Sentinel/CDP] Page check on first CDP activation:', JSON.stringify(pgCheck && pgCheck.value));
               if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
                 console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
@@ -4898,8 +4892,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
           if (sel) {
-            const cdpCode = '(function(){'
-              + 'var el = null;'
+            const cdpCode = 'var el = null;'
               + 'try { el = document.querySelector(' + JSON.stringify(sel) + '); } catch(e) {}'
               + 'if (!el) {'
               + '  var allEls = document.querySelectorAll("button, a, [role=\\"button\\"], input, [onclick]");'
@@ -4910,7 +4903,6 @@ async function runAgentLoop(goal, workingTabId) {
               + 'if (!el) return null;'
               + 'var r = el.getBoundingClientRect();'
               + 'return { x: r.left + r.width/2, y: r.top + r.height/2, w: r.width, h: r.height };'
-              + '})()';
             const cdpBbox = await cdpExecuteJs(tab, cdpCode, { timeout: 3000 });
             if (cdpBbox && cdpBbox.ok && cdpBbox.value && cdpBbox.value.x != null) {
               const cx = Math.round(cdpBbox.value.x);
