@@ -2,7 +2,7 @@
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, getRelevantPatterns } from './llm-client.js';
+import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate } from './message-protocol.js';
@@ -563,7 +563,7 @@ export async function startAgent(goal, sender) {
 
   agentRunning = true;
   // Persist running state so SW restarts can detect an interrupted run
-  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(e) {}
+  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(_e) {}
   resetAgentState();
   tel.info('lifecycle', 'Agent started', { goal: (goal || '').substring(0, 200), startTabId });
 
@@ -2277,7 +2277,7 @@ async function _initRunState(goal) {
 function _buildPageNarration(url, title, observation, pageContent) {
   try {
     const els = (observation && observation.elements) || [];
-    const text = (pageContent && pageContent.content) || '';
+    const _text = (pageContent && pageContent.content) || '';
     const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } })();
     const pageTitle = (title || '').trim();
 
@@ -2655,7 +2655,7 @@ async function runAgentLoop(goal, workingTabId) {
             });
           }
         }
-      } catch (e) { /* non-fatal */ }
+      } catch (_e) { /* non-fatal */ }
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
       try {
@@ -3220,14 +3220,14 @@ async function runAgentLoop(goal, workingTabId) {
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
-          try { sendHeartbeat(_lastAiCallMs); } catch (e) { /* non-fatal */ }
+          try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
           // (9.2) Broadcast running cost estimate after each LLM call
           try {
             const _cost = agentState.estimatedCostUsd || 0;
             if (_cost > 0 || agentState.totalInputTokens > 0) {
               sendCostUpdate(_cost, agentState.totalInputTokens || 0, agentState.totalOutputTokens || 0, agentState.apiCallCount || 0);
             }
-          } catch (e) { /* non-fatal */ }
+          } catch (_e) { /* non-fatal */ }
           base64Image = null; // release screenshot memory after LLM call
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
@@ -4916,7 +4916,7 @@ async function runAgentLoop(goal, workingTabId) {
 
   // NOW safe to release keepalive — report is already generated
   try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
-  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {}
+  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(_e) {}
 
   if (finished) {
     try {

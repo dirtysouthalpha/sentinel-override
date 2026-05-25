@@ -8,12 +8,12 @@ window.__sentinelUtils = window.__sentinelUtils || {};
 (function() {
   const HUD_ID = '__sentinel_action_hud__';
   const HUD_STYLE_ID = '__sentinel_action_hud_style__';
-  let hudEl = null;
+  let _hudEl = null;
   let hideTimer = null;
   let currentStep = 0;
   let totalSteps = 20;
   let currentAction = '';
-  let statusText = '';
+  let _statusText = '';
   let pulseTimer = null;
 
   // ── Styles ──

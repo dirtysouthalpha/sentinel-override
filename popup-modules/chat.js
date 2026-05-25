@@ -204,7 +204,6 @@ function describeActionPlain(payload) {
   }
 }
 
-// eslint-disable-next-line no-unused-vars
 function updateActiveTabAction(payload) {
   const elAction = document.getElementById('ats-action');
   if (!elAction) return;
@@ -310,7 +309,6 @@ function ensureMiniShotPanel() {
   return wrap;
 }
 
-// eslint-disable-next-line no-unused-vars
 function updateMiniShot(base64Image) {
   if (!base64Image) return;
   const panel = ensureMiniShotPanel();
@@ -321,7 +319,6 @@ function updateMiniShot(base64Image) {
 function hideMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = 'none';
 }
-// eslint-disable-next-line no-unused-vars
 function showMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = '';
 }
@@ -672,7 +669,6 @@ function appendLogLine(stepNumber, text) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
-// eslint-disable-next-line no-unused-vars
 function updateActionCardResult(stepNumber, resultText, isError) {
   const card = document.getElementById(`agent-action-${stepNumber}`);
   if (!card) return;
@@ -1289,7 +1285,7 @@ function setupVoiceInput() {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab) chrome.tabs.sendMessage(tab.id, { action: 'stop_voice' }).catch(() => {});
-      } catch (e) { /* ignore */ }
+      } catch (_e) { /* ignore */ }
       return;
     }
 
@@ -1310,7 +1306,7 @@ function setupVoiceInput() {
         target: { tabId: tab.id },
         func: () => {
           if (window.__sentinelVoiceHandler) {
-            try { window.__sentinelVoiceHandler.stop(); } catch(e) {}
+            try { window.__sentinelVoiceHandler.stop(); } catch(_e) {}
           }
           const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
           if (!SpeechRecognition) {
@@ -1652,7 +1648,6 @@ function removeReportGeneratingIndicator() {
  *
  * @param {object} report - Report object with summary, fullReport, goal, timestamp
  */
-// eslint-disable-next-line no-unused-vars
 function addReportCard(report) {
   // (3.19.1) Defensive guard — some report-generation failure paths can call
   // this with undefined/null. Don't crash the popup; surface a non-blocking
@@ -2106,7 +2101,6 @@ function _ensureActivityStream(stepNumber) {
 }
 
 /** Upsert an activity item in the step's stream. */
-// eslint-disable-next-line no-unused-vars
 function showAgentActivity(stepNumber, key, label, status, detail) {
   if (!stepNumber || stepNumber < 1) return;
   const stream = _ensureActivityStream(stepNumber);
@@ -2175,7 +2169,6 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
 }
 
 /** Update the step card's headline action label (called when agent_action arrives). */
-// eslint-disable-next-line no-unused-vars
 function updateStepCardAction(stepNumber, actionDescription) {
   if (!stepNumber || stepNumber < 1) return;
   const state = __activityState.get(stepNumber);

@@ -56,7 +56,7 @@ if (window.__sentinelInitialized) {
   const hl = window.__sentinelUtils.highlight;
   const wait = window.__sentinelUtils.wait;
   const dd = window.__sentinelUtils.dropdown;
-  const si = window.__sentinelUtils.specialInputs;
+  // const si = window.__sentinelUtils.specialInputs; // Not yet used
   const ov = window.__sentinelUtils.overlay;
   const fm = window.__sentinelUtils.frame;
 
@@ -222,9 +222,9 @@ if (window.__sentinelInitialized) {
               }
             }
           }
-        } catch (e) { /* skip */ }
+        } catch (_e) { /* skip */ }
       }
-    } catch (e) { /* non-fatal */ }
+    } catch (_e) { /* non-fatal */ }
 
     // Remove blocking overlays that cover the viewport — but only with strong
     // positive signals AND only if recently inserted. Skip structural roots.
