@@ -4065,19 +4065,24 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // (3.20.1) Navigate-loop guard. If the LLM emits 2 consecutive navigate
-      // commands to the same URL, force a strategy shift. Earlier guards
-      // exist for read_page; navigate had none, so we'd see Step 2 → /policy,
-      // Step 5 → /policy and waste steps.
+      // commands to the same URL WHILE ALREADY ON THAT PAGE, force a strategy shift.
+      // (3.51) FIXED: if we're on a DIFFERENT page, navigating back to a previous
+      // URL is recovery, not a loop — allow it (e.g., click_at landed on wrong site).
       if (command.type === 'navigate' && typeof command.url === 'string') {
-        const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
-        if (_recent.length >= 1) {
-          const _msg = 'BLOCKED: already navigated to ' + command.url + ' in the last step. Do NOT navigate to the same URL twice. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.';
-          activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
-          sendActionResult(stepCount, _msg, true);
-          historyPush({ step: stepCount, action: command, result: _msg });
-          await persistHistory();
-          await sleep(800);
-          continue;
+        const _currentHost = (() => { try { return new URL(currentUrl).hostname.toLowerCase(); } catch(_) { return ''; } })();
+        const _targetHost = (() => { try { return new URL(command.url).hostname.toLowerCase(); } catch(_) { return ''; } })();
+        const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHost.replace(/^www\./, '')) || _targetHost.includes(_currentHost.replace(/^www\./, '')));
+        if (_alreadyThere) {
+          const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
+          if (_recent.length >= 1) {
+            const _msg = 'BLOCKED: already on ' + command.url + '. Do NOT navigate to the same URL. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.';
+            activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
+            sendActionResult(stepCount, _msg, true);
+            historyPush({ step: stepCount, action: command, result: _msg });
+            await persistHistory();
+            await sleep(800);
+            continue;
+          }
         }
       }
 
