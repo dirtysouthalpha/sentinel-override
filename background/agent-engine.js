@@ -2899,6 +2899,7 @@ async function runAgentLoop(goal, workingTabId) {
   try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', e); }
 
   console.log('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
+  let command;  // v3.66: Moved declaration here so batch skip can assign it
   while (!finished && agentRunning) {
     console.log('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
 
@@ -3077,9 +3078,29 @@ async function runAgentLoop(goal, workingTabId) {
         const _isExplicitNav = /^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
           || /\bbegin at:\s*\S/i.test(_goalForUrlExtract)
           || /\bstart url:\s*\S/i.test(_goalForUrlExtract);
-        const urlMatch = _isExplicitNav
+        let urlMatch = _isExplicitNav
           ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
           : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
+        // v3.66: Bare site name fallback for Step 1 auto-navigate
+        if (!urlMatch && _isExplicitNav) {
+          const _step1BareMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
+          const _step1Bare = _goalForUrlExtract.match(/(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
+          if (_step1Bare) {
+            const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
+            if (_step1BareMap[_step1Key]) {
+              urlMatch = ['go to ' + _step1Bare[1], _step1BareMap[_step1Key]];
+              console.log('[Sentinel/DEBUG] Step 1 bare site matched:', _step1Bare[1], '->', _step1BareMap[_step1Key]);
+            } else {
+              for (const [k, v] of Object.entries(_step1BareMap)) {
+                if (_step1Key.includes(k) || k.includes(_step1Key)) {
+                  urlMatch = ['go to ' + _step1Bare[1], v];
+                  console.log('[Sentinel/DEBUG] Step 1 partial site matched:', _step1Bare[1], '->', v);
+                  break;
+                }
+              }
+            }
+          }
+        }
         console.log('[Sentinel/DEBUG] urlMatch:', urlMatch ? urlMatch[0] : null);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
@@ -3536,7 +3557,7 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.65) CAPTCHA / bot detection. If the page is a known CAPTCHA page,
       // try to auto-solve or navigate around it before proceeding.
       try {
-        const _captchaHit = detectCaptcha(currentUrl, pageText, elements.length);
+        const _captchaHit = detectCaptcha(currentUrl, pageText, allElements.length);
         if (_captchaHit && _captchaHit.confidence >= 0.5) {
           const _captchaResult = await recoverFromCaptcha({id: workingTabId}, _captchaHit, currentUrl, goal);
           if (_captchaResult === 'solved' || _captchaResult === 'bypassed' || _captchaResult === 'went_back') {
@@ -3760,7 +3781,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
       tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
-      let command;
+      command = null;
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
       // from knowing they have 200 vs 50 steps remaining.
@@ -5250,6 +5271,56 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_) { /* CDP click fallback non-fatal */ }
       }
+      // (v3.66) CDP fallback for type: when content script can't inject,
+      // resolve the input element via CDP, focus it, and dispatch keyboard events.
+      if (actionFailed && _cdpFallbackActive && command.type === 'type') {
+        try {
+          const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          if (sel) {
+            // Focus the input via CDP
+            const focusCode = 'var el = document.querySelector(' + JSON.stringify(sel) + ');'
+              + 'if (!el) { var inputs = document.querySelectorAll("input, textarea, [contenteditable]"); for (var i = 0; i < inputs.length; i++) { if (inputs[i].offsetParent !== null) { el = inputs[i]; break; } } }'
+              + 'if (!el) return null;'
+              + 'el.focus(); el.value = "";'
+              + 'return el.tagName;'
+            const focusResult = await cdpExecuteJs(tab, focusCode, { timeout: 3000 });
+            if (focusResult && focusResult.ok && focusResult.value) {
+              // Type each character via CDP Input.dispatchKeyEvent
+              const text = command.text || '';
+              const target = chrome.debugger && chrome.debugger.detach ? tab : tab;
+              for (let ci = 0; ci < text.length; ci++) {
+                const ch = text[ci];
+                try {
+                  await new Promise((res, rej) => {
+                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' ? tab.id : tab }, 'Input.dispatchKeyEvent', {
+                      type: 'keyDown',
+                      text: ch,
+                      key: ch,
+                      code: 'Key' + ch.toUpperCase()
+                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
+                  });
+                  await new Promise((res, rej) => {
+                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' ? tab.id : tab }, 'Input.dispatchKeyEvent', {
+                      type: 'keyUp',
+                      key: ch,
+                      code: 'Key' + ch.toUpperCase()
+                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
+                  });
+                } catch (keyErr) {
+                  // Fallback: set value directly via CDP JS
+                  const setCode = 'var el = document.querySelector(' + JSON.stringify(sel) + '); if (el) { el.value = ' + JSON.stringify(text) + '; el.dispatchEvent(new Event("input",{bubbles:true})); }';
+                  await cdpExecuteJs(tab, setCode, { timeout: 2000 });
+                  break;
+                }
+              }
+              result = 'Typed via CDP fallback into ' + sel;
+              actionFailed = false;
+              sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
+            }
+          }
+        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', _typeErr.message); }
+      }
+
       // (7.1) Automatic bbox fallback: if a click fails due to selector issues,
       // resolve the element's bbox from the page and retry as click_at.
       if (actionFailed && command.type === 'click' && !command._bboxFallback) {
