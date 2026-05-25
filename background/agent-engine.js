@@ -1229,72 +1229,100 @@ async function _enableSidePanelEverywhere() {
 // CDP bypasses CSP entirely — it's the same channel DevTools uses.
 
 async function _cdpObservePage(tabId) {
-  // Extract interactive elements and page text via CDP Runtime.evaluate
-  const code = `
-    const results = { elements: [], text: '', overlays: [] };
-    try {
-      // Page text
-      results.text = document.body ? document.body.innerText.substring(0, 8000) : '';
-      
-      // Interactive elements
-      const els = document.querySelectorAll('a[href], button, input, select, textarea, [role="button"], [role="link"], [onclick], [class*="consent"], [class*="cookie"], [id*="consent"], [id*="cookie"], [id*="onetrust"]');
-      const seen = new Set();
-      for (const el of els) {
-        if (seen.size >= 60) break;
-        const rect = el.getBoundingClientRect();
-        if (rect.width < 2 || rect.height < 2) continue;
-        if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
-        const tag = el.tagName.toLowerCase();
-        const text = (el.textContent || '').trim().substring(0, 50);
-        const href = el.href || '';
-        const type = el.type || '';
-        const id = el.id || '';
-        const cls = el.className && typeof el.className === 'string' ? el.className.substring(0, 80) : '';
-        const selector = id ? '#' + id : (tag + (cls ? '.' + cls.split(' ').filter(c=>c).slice(0,2).join('.') : '')).substring(0, 80);
-        const key = selector + text.substring(0, 20);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        results.elements.push({
-          tag, text: text.substring(0, 40), href: href.substring(0, 100),
-          type, id: id.substring(0, 40),
-          bbox: { x: Math.round(rect.left), y: Math.round(rect.top), w: Math.round(rect.width), h: Math.round(rect.height) },
-          selector: selector.substring(0, 100)
-        });
+  // (v3.57) Extract interactive elements and page text via CDP Runtime.evaluate
+  // First, wait for DOM to be ready (document.body can be null on slow-loading pages)
+  const waitCode = '(function(){'
+    + 'var body = document.body || document.documentElement;'
+    + 'var title = document.title || "";'
+    + 'var childCount = body ? body.childNodes.length : 0;'
+    + 'return { hasBody: !!document.body, title: title, childCount: childCount, '
+    + '  url: window.location.href, readyState: document.readyState };'
+    + '})()';
+
+  try {
+    const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 3000 });
+    console.log('[Sentinel/CDP] Page ready check:', JSON.stringify(readyState && readyState.value));
+    if (readyState && readyState.ok && readyState.value) {
+      const r = readyState.value;
+      // If page has no body and no children, wait a moment and try again
+      if (!r.hasBody && r.childCount === 0) {
+        console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
-      
-      // Detect overlays (cookie consent, GDPR, paywalls)
-      const overlaySelectors = [
-        '[class*="consent" i]', '[class*="cookie" i]', '[class*="gdpr" i]',
-        '[id*="consent" i]', '[id*="cookie" i]', '[id*="onetrust" i]',
-        '[class*="overlay" i]', '[class*="popup" i]', '[class*="modal" i]',
-        '[class*="dialog" i]', '[class*="paywall" i]', '[class*="interstitial" i]',
-        '[class*="privacy" i]', '[class*="banner" i]'
-      ];
-      for (const sel of overlaySelectors) {
-        const nodes = document.querySelectorAll(sel);
-        for (const node of nodes) {
-          const style = window.getComputedStyle(node);
-          if (style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity) > 0.1) {
-            const rect = node.getBoundingClientRect();
-            if (rect.width > 100 && rect.height > 50) {
-              // Find dismiss/accept buttons inside
-              const buttons = node.querySelectorAll('button, a, [role="button"], [class*="accept" i], [class*="agree" i], [class*="dismiss" i], [class*="close" i], [class*="opt" i]');
-              const btnList = [];
-              for (const btn of buttons) {
-                const bText = (btn.textContent || '').trim().substring(0, 40);
-                const bRect = btn.getBoundingClientRect();
-                if (bRect.width > 0 && bRect.height > 0) {
-                  btnList.push({ text: bText, x: Math.round(bRect.left + bRect.width/2), y: Math.round(bRect.top + bRect.height/2) });
-                }
-              }
-              results.overlays.push({ selector: sel, text: (node.textContent || '').substring(0, 100), buttons: btnList });
-            }
-          }
-        }
+      // If title is empty and URL is still about:blank or loading, wait
+      if (!r.title && (r.url === 'about:blank' || r.url === '')) {
+        console.log('[Sentinel/CDP] Page still loading — waiting 2s...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
-    } catch(e) { results.error = e.message; }
-    return results;
-  `;
+    }
+  } catch(e) {
+    console.warn('[Sentinel/CDP] Ready check failed:', e && e.message);
+  }
+
+  const code = '(function(){'
+    + 'var results = { elements: [], text: "", overlays: [] };'
+    + 'try {'
+    + '  var body = document.body || document.documentElement;'
+    // Page text — use documentElement as fallback if body is null
+    + '  results.text = body ? (body.innerText || "").substring(0, 8000) : "";'
+    // Interactive elements
+    + '  var els = document.querySelectorAll("a[href], button, input, select, textarea, [role=\\"button\\"], [role=\\"link\\"], [onclick]");'
+    + '  var seen = new Set();'
+    + '  for (var i = 0; i < els.length; i++) {'
+    + '    if (seen.size >= 60) break;'
+    + '    var el = els[i];'
+    + '    var rect = el.getBoundingClientRect();'
+    + '    if (rect.width < 2 || rect.height < 2) continue;'
+    + '    if (rect.bottom < 0 || rect.top > window.innerHeight) continue;'
+    + '    var tag = el.tagName.toLowerCase();'
+    + '    var text = (el.textContent || "").trim().substring(0, 50);'
+    + '    var href = el.href || "";'
+    + '    var type = el.type || "";'
+    + '    var id = el.id || "";'
+    + '    var cls = el.className && typeof el.className === "string" ? el.className.substring(0, 80) : "";'
+    + '    var selector = id ? "#" + id : (tag + (cls ? "." + cls.split(" ").filter(function(c){return c;}).slice(0,2).join(".") : "")).substring(0, 80);'
+    + '    var key = selector + text.substring(0, 20);'
+    + '    if (seen.has(key)) continue;'
+    + '    seen.add(key);'
+    + '    results.elements.push({'
+    + '      tag: tag, text: text.substring(0, 40), href: href.substring(0, 100),'
+    + '      type: type, id: id.substring(0, 40),'
+    + '      bbox: { x: Math.round(rect.left), y: Math.round(rect.top), w: Math.round(rect.width), h: Math.round(rect.height) },'
+    + '      selector: selector.substring(0, 100)'
+    + '    });'
+    + '  }'
+    // Detect overlays — only if we have a body
+    + '  if (document.body) {'
+    + '    var overlayEls = document.querySelectorAll("div, section, aside, dialog");'
+    + '    for (var o = 0; o < overlayEls.length; o++) {'
+    + '      try {'
+    + '        var node = overlayEls[o];'
+    + '        var nst = window.getComputedStyle(node);'
+    + '        if (nst.display === "none" || nst.visibility === "hidden") continue;'
+    + '        var npos = nst.position || "";'
+    + '        var nz = parseInt(nst.zIndex) || 0;'
+    + '        if ((npos === "fixed" || npos === "absolute") && nz >= 100) {'
+    + '          var nrect = node.getBoundingClientRect();'
+    + '          if (nrect.width > 200 && nrect.height > 100) {'
+    + '            var buttons = node.querySelectorAll("button, a, [role=\\"button\\"]");'
+    + '            var btnList = [];'
+    + '            for (var b = 0; b < buttons.length; b++) {'
+    + '              var bText = (buttons[b].textContent || "").trim().substring(0, 40);'
+    + '              var bRect = buttons[b].getBoundingClientRect();'
+    + '              if (bRect.width > 0 && bRect.height > 0) {'
+    + '                btnList.push({ text: bText, x: Math.round(bRect.left + bRect.width/2), y: Math.round(bRect.top + bRect.height/2) });'
+    + '              }'
+    + '            }'
+    + '            results.overlays.push({ selector: "overlay", text: (node.textContent || "").substring(0, 100), buttons: btnList });'
+    + '          }'
+    + '        }'
+    + '      } catch(e) {}'
+    + '    }'
+    + '  }'
+    + '} catch(e) { results.error = e.message; }'
+    + 'return results;'
+    + '})()';
+
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
@@ -1377,11 +1405,9 @@ async function _cdpDismissOverlays(tabId, overlays) {
     + '    ) { masks[m].remove(); n++; }'
     + '  } catch(e) {}'
     + '}'
-    // Step E: Restore scrolling
-    + 'document.body.style.overflow = "";'
-    + 'document.documentElement.style.overflow = "";'
-    + 'document.body.style.position = "";'
-    + 'document.body.style.width = "";'
+    // Step E: Restore scrolling (null-safe)
+    + 'if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; }'
+    + 'if (document.documentElement) { document.documentElement.style.overflow = ""; }'
     + 'return n;'
     + '})()';
 
@@ -2888,7 +2914,20 @@ async function runAgentLoop(goal, workingTabId) {
         if (consecutiveInjectionFailures >= 2) {
           console.warn('[Sentinel] Content script failed ' + consecutiveInjectionFailures + ' times — activating CDP fallback');
           _cdpFallbackActive = true;
-          // Don't continue/continue — fall through to observation with CDP data
+          // (v3.57) On first CDP activation, check if page has any DOM at all.
+          // If empty (no body, no title), reload the page via CDP.
+          if (consecutiveInjectionFailures === 2) {
+            try {
+              const pgCheck = await cdpExecuteJs(tab, '(function(){return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};})()', { timeout: 3000 });
+              console.log('[Sentinel/CDP] Page check on first CDP activation:', JSON.stringify(pgCheck && pgCheck.value));
+              if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
+                console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
+                await chrome.debugger.sendCommand({ tabId: tab }, 'Page.reload', { ignoreCache: true });
+                await new Promise(r => setTimeout(r, 4000));
+              }
+            } catch(_) { /* non-fatal */ }
+          }
+          // Don't continue — fall through to observation with CDP data
         } else {
           await sleep(2000);
           continue; // retry injection on first failure
@@ -3287,8 +3326,8 @@ async function runAgentLoop(goal, workingTabId) {
         }
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
         const recentWindow = history.slice(-8);
-        const recentJsCount = recentWindow.filter(h => h.action.type === 'execute_js').length;
-        const recentExtractCount = recentWindow.filter(h => ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
+        const recentJsCount = recentWindow.filter(h => h && h.action && h.action.type === 'execute_js').length;
+        const recentExtractCount = recentWindow.filter(h => h && h.action && ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
 
         if (consecutiveNonProductive >= 3 || jsLoop) {
