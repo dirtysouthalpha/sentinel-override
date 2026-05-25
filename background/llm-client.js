@@ -1914,10 +1914,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
 
   // Build request body using provider registry
-  // (3.51) Always send vision content when we have an image. OpenAI-compatible APIs
-  // gracefully ignore the image_url if the model can't process it.
+  // (3.51) Send vision content when we have an image and the provider supports it.
+  // If the endpoint rejects the vision request with 400, we fall back to text-only
+  // (see the 400-retry block below) so non-vision model variants don't silently fail.
   const _useVision = !!base64Image && typeof provider.buildVisionContent === 'function';
-  console.error("[Sentinel/SCREENSHOT] callLLM: model:", model, "provider:", providerConfig.id, "hasImage:", !!base64Image, "useVision:", _useVision);
   const userContent = (_useVision)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
@@ -1952,7 +1952,42 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     try { errorData = await response.text(); } catch { errorData = 'unable to read error body'; }
     if (response.status === 429) throw new Error(`429 Rate limited. ${errorData}`);
     if (response.status === 400 && errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
-    throw new Error(`API Error: ${response.status} - ${errorData}`);
+    // (3.51.1) Vision fallback: if we sent image content and got a 400, retry
+    // text-only. Some OpenAI-compatible endpoints (e.g. Z.AI for text-primary
+    // GLM variants) reject image_url even though the protocol accepts it.
+    if (response.status === 400 && _useVision) {
+      console.warn('[Sentinel] Vision request rejected (400) — retrying without image. Error:', errorData.slice(0, 200));
+      agentState.apiCallCount++; // second attempt counts as its own call
+      const _fbContent = prompt; // text-only
+      let _fbBody;
+      if (useThinking) {
+        _fbBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));
+      } else if (provider.supportsToolUse) {
+        _fbBody = JSON.stringify(provider.buildBodyWithTools(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, { maxTokens: 8000, temperature: 0.1 }));
+      } else {
+        _fbBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, _fbContent, { maxTokens: 8000, temperature: 0.1 }));
+      }
+      const _fbCtrl = new AbortController();
+      const _fbTimeout = setTimeout(() => _fbCtrl.abort(), CONFIG.fetchTimeout);
+      let _fbResp;
+      try {
+        _fbResp = await fetch(endpoint, { method: 'POST', headers: requestHeaders, body: _fbBody, signal: _fbCtrl.signal });
+      } catch (err) {
+        clearTimeout(_fbTimeout);
+        throw err.name === 'AbortError' ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
+      }
+      clearTimeout(_fbTimeout);
+      if (!_fbResp.ok) {
+        let _fbErr;
+        try { _fbErr = await _fbResp.text(); } catch { _fbErr = 'unable to read error body'; }
+        if (_fbResp.status === 429) throw new Error(`429 Rate limited. ${_fbErr}`);
+        throw new Error(`API Error: ${_fbResp.status} - ${_fbErr}`);
+      }
+      // Replace `response` with the successful fallback response for the parse logic below
+      response = _fbResp;
+    } else {
+      throw new Error(`API Error: ${response.status} - ${errorData}`);
+    }
   }
 
   let data;

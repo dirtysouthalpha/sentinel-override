@@ -3,16 +3,20 @@
 ## CRITICAL: These are REAL bugs reported by the user on the LIVE extension. Fix them ALL.
 
 ## Bug #1: Agent completes with 0 API calls
-**Symptom:** "Agent completed. Total API calls: 0" — the agent starts but never actually calls the LLM.
-**Root cause:** After generatePlan fails or succeeds, the agent loop doesn't transition to calling the LLM for actions.
-**File:** `background/agent-engine.js` — the runAgentLoop function
-**Fix:** Trace the full loop from plan generation → action execution → make sure callLLM actually fires
+**Status: FIXED** (2026-05-24 — commits `c4d1d3a`, `3ef74f5`, `b51ca30`, `25952c8`)
+Four spin-loop paths that prevented callLLM from firing were all addressed:
+1. `about:blank` treated as restricted page → added to `_isNewTab` allowlist
+2. Injection failure → `consecutiveInjectionFailures` counter added; after 3 fails, proceeds to LLM
+3. Observe fails after 3 injection failures → removed conditional continue, uses empty observation
+4. Injection succeeds but observe fails → removed the counter-gated `continue` entirely from the observe catch block
 
 ## Bug #2: generatePlan returns prose not JSON for Z.AI
-**Symptom:** "Plan generation: could not parse response as plan JSON: Unexpected token 'T'"  
-**Root cause:** jsonMode wasn't being sent for Z.AI provider (FIXED to `provider.kind === 'openai'`) BUT the plan parsing might still fail if the model doesn't follow instructions.
-**File:** `background/llm-client.js` generatePlan function
-**Fix:** Make the plan parser more robust — try to extract JSON from markdown code blocks, handle trailing text after JSON, add a regex fallback that extracts the steps array
+**Status: FIXED** (2026-05-24 — commit `63dd5c2`)
+- `response_format` is only sent to `api.openai.com`; Z.AI endpoint never gets it
+- 5-strategy fallback parse chain handles prose/numbered/bulleted responses
+- Regression tests added in `d5d2891`
+
+**If Z.AI returns 400 on vision requests:** A fallback was added (commit after `1d353b0`) — if vision content causes a 400, the request is automatically retried text-only so the agent doesn't silently fail.
 
 ## Bug #3: Voice input mic button doesn't work
 **Symptom:** Clicking the mic button does nothing
@@ -28,9 +32,8 @@
 **Verify:** Make sure the model fetch actually works and populates the UI
 
 ## Bug #5: Extension doesn't work AT ALL on basic sites
-**Symptom:** User tries "go to dnn.com and give me top 10 articles" and agent does nothing
-**Root cause:** Combination of Bug #1 (0 API calls) and Bug #2 (plan parse failure)
-**Fix:** The ENTIRE flow must work: user types goal → generatePlan → parse plan → execute steps → each step calls LLM → LLM returns actions → actions execute on page → results collected → final report
+**Status: FIXED** — root causes (Bug #1 + Bug #2) are resolved. The full flow works:
+user types goal → generatePlan → parsePlan → runAgentLoop → each step calls callLLM → LLM returns tool_calls → executeToolAction → next step → final report
 
 ## Instructions
 

@@ -2814,7 +2814,6 @@ async function runAgentLoop(goal, workingTabId) {
             scrollX: shotResult.scrollX,
             scrollY: shotResult.scrollY
           };
-          console.error('[Sentinel/SCREENSHOT] ✓ Step', stepCount, ':', shotResult.width + 'x' + shotResult.height, 'DPR:', shotResult.dpr, 'size:', Math.round(base64Image.length / 1024) + 'KB');
           // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
           try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
           // (9.3) Store screenshot for replay export (ring-cap at 20)
@@ -2823,12 +2822,10 @@ async function runAgentLoop(goal, workingTabId) {
             const oldest = _stepScreenshots.keys().next().value;
             _stepScreenshots.delete(oldest);
           }
-        } else {
-          console.error('[Sentinel/SCREENSHOT] ✗ Step', stepCount, ': takeScreenshot returned null');
         }
       } catch (shotErr) {
         // Screenshot failure is non-fatal — continue to LLM call without image.
-        console.error('[Sentinel/SCREENSHOT] ✗ Step', stepCount, ':', shotErr && shotErr.message);
+        console.warn('[Sentinel] Screenshot failed, continuing without image:', shotErr && shotErr.message);
         base64Image = null;
         screenshotMeta = null;
       }
