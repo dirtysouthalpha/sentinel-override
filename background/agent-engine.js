@@ -315,12 +315,12 @@ function activityUpdate(stepNumber, key, label) {
 
 // ========== Configuration ==========
 const CONFIG = {
-  minDelayBetweenCalls: 2000,
-  maxRetries: 3,
-  retryDelay: 5000,
-  maxRetryDelay: 30000,
+  minDelayBetweenCalls: 500,
+  maxRetries: 2,
+  retryDelay: 2000,
+  maxRetryDelay: 10000,
   screenshotQuality: 30,
-  fetchTimeout: 90000,
+  fetchTimeout: 30000,
   pageLoadTimeout: 25000,
   maxSteps: 100,
   maxPageContentLength: 16000,
@@ -1334,7 +1334,7 @@ async function _cdpObservePage(tabId) {
     return _cachedObservation;
   }
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
-  const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
+  const result = await cdpExecuteJs(tabId, code, { timeout: 3000 });
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
   if (result && result.ok && result.value) {
     console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
@@ -1442,7 +1442,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
             console.warn('[Sentinel/CDP] Nuke destroyed page content — reloading via CDP...');
             try {
               await chrome.debugger.sendCommand({ tabId: tabId }, 'Page.reload', { ignoreCache: true });
-              await new Promise(r => setTimeout(r, 4000));
+              await new Promise(r => setTimeout(r, 2000));
               console.log('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
               console.warn('[Sentinel/CDP] Reload failed:', reloadErr && reloadErr.message);
@@ -2975,7 +2975,7 @@ async function runAgentLoop(goal, workingTabId) {
               if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
                 console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
                 await chrome.debugger.sendCommand({ tabId: tab }, 'Page.reload', { ignoreCache: true });
-                await new Promise(r => setTimeout(r, 4000));
+                await new Promise(r => setTimeout(r, 2000));
               }
             } catch(_) { /* non-fatal */ }
           }
@@ -3025,7 +3025,7 @@ async function runAgentLoop(goal, workingTabId) {
           const overlayResult = await sendMessageWithRetry(tab, { action: 'dismiss_overlays' });
           if (overlayResult && overlayResult.count > 0) {
             sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
-            await sleep(800); // let overlay close animate
+            await sleep(400); // let overlay close animate
           }
         } catch (_) { /* non-fatal */ }
       }
@@ -5299,17 +5299,17 @@ async function runAgentLoop(goal, workingTabId) {
       await writeCheckpoint(stepCount);
       // Human-like pacing between steps — variable delays so it feels like an operator working
       // Respects speed mode: turbo (0.2x), normal (1x), stealth (2x)
-      const speedMultiplier = agentSpeed === 'turbo' ? 0.05 : agentSpeed === 'stealth' ? 2.0 : agentSpeed === 'fast' ? 0.3 : 1.0;
+      const speedMultiplier = agentSpeed === 'turbo' ? 0.02 : agentSpeed === 'stealth' ? 2.0 : agentSpeed === 'fast' ? 0.15 : 1.0;
       const actionType = command.type;
       let baseDelay;
       if (['read_page', 'extract', 'extract_list', 'note'].includes(actionType)) {
-        baseDelay = 200 + Math.random() * 100;    // 200-300ms: data gathering (turbo makes this ~15ms)
+        baseDelay = 100 + Math.random() * 50;     // 100-150ms: data gathering (turbo ~7ms)
       } else if (['click', 'type', 'select', 'navigate', 'check', 'check_all'].includes(actionType)) {
-        baseDelay = 400 + Math.random() * 200;    // 400-600ms: deliberate actions (turbo ~30ms)
+        baseDelay = 200 + Math.random() * 100;    // 200-300ms: deliberate actions (turbo ~15ms)
       } else if (['execute_js', 'scroll', 'dismiss_overlay'].includes(actionType)) {
-        baseDelay = 150 + Math.random() * 100;    // 150-250ms: utility actions (turbo ~10ms)
+        baseDelay = 75 + Math.random() * 50;      // 75-125ms: utility actions (turbo ~5ms)
       } else {
-        baseDelay = 300 + Math.random() * 200;    // 300-500ms: default (turbo ~25ms)
+        baseDelay = 150 + Math.random() * 100;    // 150-250ms: default (turbo ~12ms)
       }
       await sleep(baseDelay * speedMultiplier);
 
@@ -5485,7 +5485,7 @@ async function saveLearnedPattern(goal, history, success) {
 
 // ========== Utilities ==========
 async function enforceRateLimit() {
-  const delay = _runSettings.quickMode ? 500 : CONFIG.minDelayBetweenCalls;
+  const delay = _runSettings.quickMode ? 200 : CONFIG.minDelayBetweenCalls;
   const delayNeeded = Math.max(0, delay - (Date.now() - lastApiCallTime));
   if (delayNeeded > 0) await sleep(delayNeeded);
   lastApiCallTime = Date.now();
