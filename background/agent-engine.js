@@ -33,7 +33,7 @@ let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy sh
 let currentStrategies = [];     // Self-healing: remembers tried approaches
 let agentPlan = null;           // Planning phase: numbered list of steps
 let currentPlanStep = 0;        // Planning phase: which step we're currently on
-let agentSpeed = 'normal';      // Speed mode: 'turbo' (0.2x), 'normal' (1x), 'stealth' (2x)
+let agentSpeed = 'turbo';       // Speed mode: 'turbo' (0.05x), 'fast' (0.3x), 'normal' (1x), 'stealth' (2x)
 let agentPaused = false;        // Pause/resume: agent loop waits when true
 let _historyDirty = false;      // (3.41.0) Dirty-bit: true when history has changed since last persist
 let _runSettings = {};          // (3.41.0) Run-stable settings cache: loaded once at runAgentLoop start
@@ -581,8 +581,8 @@ export async function startAgent(goal, sender) {
   // Load speed mode from settings
   try {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
-    agentSpeed = speedSettings.agentSpeedMode || 'normal';
-  } catch (_) { agentSpeed = 'normal'; }
+    agentSpeed = speedSettings.agentSpeedMode || 'turbo';
+  } catch (_) { agentSpeed = 'turbo'; }
 
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
@@ -1325,7 +1325,10 @@ async function _cdpObservePage(tabId) {
   // SPEED: Check cache — if same URL observed recently, reuse
   const tabInfo = await getTabInfo(tabId);
   const currentUrl = tabInfo ? tabInfo.url : '';
-  if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < 3000) {
+  // In batch mode (queue has items), always use cache if available (no TTL limit)
+  const _inBatchMode = typeof _pendingCommandQueue !== 'undefined' && _pendingCommandQueue.length > 0;
+  const _cacheTTL = _inBatchMode ? 60000 : 3000; // 60s in batch mode, 3s normal
+  if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
     console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', url);
     return _cachedObservation;
@@ -1469,6 +1472,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
 let _cdpFallbackActive = false;
 let _lastNukeClean = false; // Track if last nuke found nothing to remove
 let _pageWasReady = false; // Skip ready check if previous observe succeeded
+let _skipObserveThisStep = false; // Batch mode: skip observe+LLM when commands queued
 let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
 let _observeCacheHits = 0;
 
@@ -2701,6 +2705,22 @@ async function runAgentLoop(goal, workingTabId) {
   console.log('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
   while (!finished && agentRunning) {
     console.log('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
+
+    // SPEED (v3.60): If batch commands are queued, skip observe+LLM and execute directly
+    if (_pendingCommandQueue.length > 0) {
+      try {
+        command = _pendingCommandQueue.shift();
+        console.log('[Sentinel/SPEED] Batch skip: executing queued ' + command.type + ' (' + _pendingCommandQueue.length + ' remaining)');
+        activityDone(stepCount, 'speed', 'Batch: ' + command.type, null);
+        _lastAiCallMs = 0;
+        // Skip directly to action execution by jumping past the observe+LLM block
+        // We'll set a flag and the observe block will check it
+        _skipObserveThisStep = true;
+      } catch (e) { console.warn('[Sentinel/SPEED] Batch skip error:', e); }
+    } else {
+      _skipObserveThisStep = false;
+    }
+
     try {
       // Pause check — wait until resumed
       if (agentPaused) {
@@ -4435,6 +4455,46 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // (3.20.1) Navigate-loop guard. If the LLM emits 2 consecutive navigate
+
+      // SPEED (v3.60): Handle batch actions — execute multiple actions without re-observing
+      if (command.type === 'batch' && Array.isArray(command.actions)) {
+        const batchActions = command.actions.filter(a => a && a.type);
+        if (batchActions.length > 0) {
+          console.log('[Sentinel/SPEED] Batch: queuing ' + batchActions.length + ' actions');
+          // Push in reverse so shift() gets them in order
+          for (let i = batchActions.length - 1; i >= 0; i--) {
+            _pendingCommandQueue.unshift(batchActions[i]);
+          }
+          command = _pendingCommandQueue.shift();
+          console.log('[Sentinel/SPEED] Batch: executing first action: ' + command.type);
+        } else {
+          result = 'Batch contained no valid actions';
+          actionFailed = true;
+        }
+      }
+
+      // SPEED (v3.60): Handle auto-navigate for common patterns
+      // If goal mentions a site+query, construct the direct URL instead of clicking through
+      if (command.type === 'smart_navigate' && command.query) {
+        const site = command.site || 'google';
+        const q = encodeURIComponent(command.query);
+        let smartUrl = '';
+        if (site === 'google') smartUrl = 'https://www.google.com/search?q=' + q;
+        else if (site === 'weather.gov') smartUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' + q;
+        else if (site === 'wikipedia') smartUrl = 'https://en.wikipedia.org/wiki/Special:Search?search=' + q;
+        else if (site === 'youtube') smartUrl = 'https://www.youtube.com/results?search_query=' + q;
+        else if (site === 'amazon') smartUrl = 'https://www.amazon.com/s?k=' + q;
+        else if (site === 'reddit') smartUrl = 'https://www.reddit.com/search/?q=' + q;
+        else if (site === 'twitter' || site === 'x') smartUrl = 'https://x.com/search?q=' + q;
+        if (smartUrl) {
+          command = { type: 'navigate', url: smartUrl };
+          console.log('[Sentinel/SPEED] smart_navigate → ' + smartUrl);
+        } else {
+          // Fallback to Google
+          command = { type: 'navigate', url: 'https://www.google.com/search?q=' + q };
+        }
+      }
+
       // commands to the same URL WHILE ALREADY ON THAT PAGE, force a strategy shift.
       // (3.51) FIXED: if we're on a DIFFERENT page, navigating back to a previous
       // URL is recovery, not a loop — allow it (e.g., click_at landed on wrong site).
@@ -5233,17 +5293,17 @@ async function runAgentLoop(goal, workingTabId) {
       await writeCheckpoint(stepCount);
       // Human-like pacing between steps — variable delays so it feels like an operator working
       // Respects speed mode: turbo (0.2x), normal (1x), stealth (2x)
-      const speedMultiplier = agentSpeed === 'turbo' ? 0.2 : agentSpeed === 'stealth' ? 2.0 : 1.0;
+      const speedMultiplier = agentSpeed === 'turbo' ? 0.05 : agentSpeed === 'stealth' ? 2.0 : agentSpeed === 'fast' ? 0.3 : 1.0;
       const actionType = command.type;
       let baseDelay;
       if (['read_page', 'extract', 'extract_list', 'note'].includes(actionType)) {
-        baseDelay = 800 + Math.random() * 600;    // 800-1400ms: quick data gathering
+        baseDelay = 200 + Math.random() * 100;    // 200-300ms: data gathering (turbo makes this ~15ms)
       } else if (['click', 'type', 'select', 'navigate', 'check', 'check_all'].includes(actionType)) {
-        baseDelay = 1200 + Math.random() * 800;   // 1200-2000ms: deliberate actions
+        baseDelay = 400 + Math.random() * 200;    // 400-600ms: deliberate actions (turbo ~30ms)
       } else if (['execute_js', 'scroll', 'dismiss_overlay'].includes(actionType)) {
-        baseDelay = 600 + Math.random() * 400;    // 600-1000ms: quick utility actions
+        baseDelay = 150 + Math.random() * 100;    // 150-250ms: utility actions (turbo ~10ms)
       } else {
-        baseDelay = 1000 + Math.random() * 1000;  // 1000-2000ms: default
+        baseDelay = 300 + Math.random() * 200;    // 300-500ms: default (turbo ~25ms)
       }
       await sleep(baseDelay * speedMultiplier);
 
@@ -5272,7 +5332,7 @@ async function runAgentLoop(goal, workingTabId) {
           break;
         }
       }
-      await sleep(3000);
+      await sleep(500);  // SPEED: reduced from 3000ms — recover faster
     }
   }
 

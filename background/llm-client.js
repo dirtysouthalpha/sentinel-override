@@ -1743,8 +1743,16 @@ RULES:
 8. For native <select> dropdowns: use "select" (works on <select> elements with visible options). For custom SPA dropdowns (React, Angular): use "click" to open → "click" to select option. For hover menus: use "hover" then "click".
 9. For checkboxes: use "check" with "checked": true/false to set explicit state. For bulk operations: use "check_all" with a selector.
 10. For modifier keys (Ctrl+A, Ctrl+V, etc.): use "press_key" with "modifiers": {"ctrl": true}.
-11. One action per step.
-12. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
+11. **BATCH ACTIONS** — When you know the next 2-5 steps in advance (e.g., type + Enter, click nav + click subnav, scroll + read), return a \`batch\` action with all steps. This avoids 2-5 LLM round-trips and is the #1 way to be faster.
+12. **BE FAST, NOT THOROUGH** — Minimize steps:
+   - Use \`smart_navigate\` to go directly to search results instead of navigating to homepage then clicking through menus
+   - Use \`batch\` for predictable sequences: type query + press Enter, navigate + wait + read, scroll + extract
+   - Use \`execute_js\` with a comprehensive key to extract ALL data in ONE call instead of clicking each item
+   - Don't \`read_page\` then \`extract\` — just \`extract\` directly with the right selector
+   - Don't scroll then observe — scroll then extract in a batch
+   - If the goal is "find X on site Y", \`smart_navigate\` directly to the search results, don't browse the homepage
+
+13. **HIGH-QUALITY FINISH** -- When you call "finish", your summary should be the ONLY thing the user reads. Make it count:
    - For briefings/lists: Use clear numbered sections with headlines, key takeaways, and source links
    - For research tasks: Lead with the answer, then support with evidence
    - For comparisons: Use structured "vs" format with specific data points
@@ -1756,6 +1764,8 @@ Actions:
 - { "type": "click", "selector": "FROM_LIST" }
 - { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
 - { "type": "navigate", "url": "URL" }
+- { "type": "smart_navigate", "site": "google|weather.gov|wikipedia|youtube|amazon|reddit|twitter", "query": "SEARCH QUERY" }  — auto-constructs direct URL for the site search/forecast page. ALWAYS prefer over clicking through menus.
+- { "type": "batch", "actions": [ACTION1, ACTION2, ...] }  — execute multiple actions in sequence WITHOUT re-observing. Use for: type+Enter, scroll+extract, click+wait+read, navigate+wait+read. Max 5 actions per batch.
 - { "type": "navigate_back" }  -- browser back button (history.go(-1))
 - { "type": "navigate_forward" }  -- browser forward button (history.go(+1))
 - { "type": "scroll", "amount": INTEGER } — scroll the window. Or { "type": "scroll", "selector": "FROM_LIST", "amount": INTEGER } to scroll inside a specific container (use for tables, panels, virtualized lists)
