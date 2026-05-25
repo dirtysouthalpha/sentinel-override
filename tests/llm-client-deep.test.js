@@ -952,3 +952,150 @@ describe('getRelevantPatterns — additional edge cases', () => {
     expect(result[0].goal).toContain('SonicWall');
   });
 });
+
+// ========== callLLM — vision fallback on 400 (Bug #2 hardening) ==========
+describe('callLLM — vision fallback on 400', () => {
+  const defaultConfig = {
+    maxRetries: 3,
+    retryDelay: 100,
+    maxRetryDelay: 500,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  function makeAgentState(overrides = {}) {
+    return {
+      apiCallCount: 0,
+      consecutiveFailures: 0,
+      currentStrategies: [],
+      agentMemory: {},
+      agentPlan: null,
+      currentPlanStep: 0,
+      ...overrides
+    };
+  }
+
+  beforeEach(() => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions'
+        }
+      }
+    };
+  });
+
+  test('retries without image when vision request causes 400 error', async () => {
+    let callCount = 0;
+    _mockFetch = (url, opts) => {
+      callCount++;
+      if (callCount === 1) {
+        // First call with image returns 400
+        const body = JSON.parse(opts.body);
+        // Verify first call includes vision content (has image_url in messages)
+        const hasImage = body.messages.some(msg =>
+          msg.content && Array.isArray(msg.content) &&
+          msg.content.some(part => part.type === 'image_url')
+        );
+        expect(hasImage).toBe(true);
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('Invalid image content')
+        });
+      } else {
+        // Second call (fallback, text-only) succeeds
+        const body = JSON.parse(opts.body);
+        // Verify fallback has no image content
+        const hasImage = body.messages.some(msg =>
+          msg.content && Array.isArray(msg.content) &&
+          msg.content.some(part => part.type === 'image_url')
+        );
+        expect(hasImage).toBe(false);
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            choices: [{
+              message: {
+                content: '{"type":"click","selector":"#btn"}',
+                tool_calls: null
+              },
+              finish_reason: 'stop'
+            }],
+            usage: {}
+          })
+        });
+      }
+    };
+
+    const result = await callLLMWithRetry(
+      [], 0, 'page content', 'data:image/png;base64,abc123', 'do something', [], 1,
+      'https://example.com', 0, defaultConfig, makeAgentState()
+    );
+
+    expect(callCount).toBe(2);
+    expect(result.type).toBe('click');
+    expect(result.selector).toBe('#btn');
+  });
+
+  test('vision fallback propagates 429 rate limit error', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: false,
+      status: 400,
+      text: () => Promise.resolve('Invalid image content')
+    });
+
+    // Mock the fallback to also return 429
+    let callCount = 0;
+    _mockFetch = () => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('Invalid image content')
+        });
+      } else {
+        return Promise.resolve({
+          ok: false,
+          status: 429,
+          text: () => Promise.resolve('Rate limited')
+        });
+      }
+    };
+
+    await expect(async () => {
+      await callLLMWithRetry(
+        [], 0, 'page content', 'data:image/png;base64,abc123', 'do something', [], 1,
+        'https://example.com', 0, defaultConfig, makeAgentState()
+      );
+    }).rejects.toThrow('429');
+  });
+
+  test('vision fallback propagates network errors', async () => {
+    let callCount = 0;
+    _mockFetch = () => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('Invalid image content')
+        });
+      } else {
+        return Promise.reject(new Error('Network error'));
+      }
+    };
+
+    await expect(async () => {
+      await callLLMWithRetry(
+        [], 0, 'page content', 'data:image/png;base64,abc123', 'do something', [], 1,
+        'https://example.com', 0, defaultConfig, makeAgentState()
+      );
+    }).rejects.toThrow('Network error');
+  });
+});
