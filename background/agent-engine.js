@@ -1351,69 +1351,60 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
   // Phase 2: Remove ALL iframes (consent dialogs are almost always in iframes)
   // and remove ANY fixed/absolute element with high z-index covering significant screen area
-  const nukeCode = 'var n = 0;'
-    // Phase A: Find and click consent/accept/agree buttons FIRST (surgical)
-    + 'var btns = document.querySelectorAll("button, a, [role=\"button\"], input[type=\"submit\"]");'
-    + 'var consentClicked = false;'
-    + 'for (var b = 0; b < btns.length; b++) {'
-    + '  var t = (btns[b].textContent || "").trim().toLowerCase();'
-    + '  if (t === "accept" || t === "agree" || t === "i agree" || t === "ok" || t === "got it" || t === "accept all" || t === "agree all" || t === "consent" || t === "allow all" || t === "yes, i agree" || t.indexOf("accept") === 0 || t.indexOf("agree") === 0) {'
-    + '    btns[b].click(); consentClicked = true; n++; break;'
-    + '  }'
-    + '}'
-    // Phase B: Remove ONLY iframes that look like consent CMPs (small, consent-related src)
-    + 'if (!consentClicked) {'
-    + '  var iframes = document.querySelectorAll("iframe");'
-    + '  for (var i = iframes.length - 1; i >= 0; i--) {'
-    + '    var src = (iframes[i].src || "").toLowerCase();'
-    + '    var iid = (iframes[i].id || "").toLowerCase();'
-    + '    var icls = (iframes[i].className || "").toLowerCase();'
-    // Only remove iframes that match consent patterns AND are small (not main content)
-    + '    var isConsent = src.indexOf("consent") >= 0 || src.indexOf("cookie") >= 0 || src.indexOf("gdpr") >= 0 || src.indexOf("onetrust") >= 0 || src.indexOf("trustarc") >= 0 || src.indexOf("sourcepoint") >= 0 || src.indexOf("privacymgmt") >= 0 || iid.indexOf("consent") >= 0 || iid.indexOf("sp_message") >= 0;'
-    + '    var rect = iframes[i].getBoundingClientRect();'
-    + '    var isSmall = rect.height < 300 && rect.width < 600;'
-    + '    if (isConsent && isSmall) { iframes[i].remove(); n++; }'
-    + '  }'
-    + '}'
-    // Phase C: Remove overlay elements — but ONLY if they're clearly overlays
-    // (high z-index, covers viewport, minimal text content = not article content)
-    + 'if (!consentClicked) {'
-    + '  var overlaySels = ["#onetrust-consent-sdk","#onetrust-banner-sdk","#cookieConsent","#cookie-notice","#cookie-banner",".cky-consent-container",".cc-window",".cc-banner",".cc-floating","[aria-modal=true]","[role=dialog]","div[id^=sp_message]",".sp_message",".sp_veil"];'
-    + '  for (var s = 0; s < overlaySels.length; s++) {'
-    + '    try {'
-    + '      var els = document.querySelectorAll(overlaySels[s]);'
-    + '      for (var j = 0; j < els.length; j++) {'
-    + '        els[j].remove(); n++;'
-    + '      }'
-    + '    } catch(e) {}'
-    + '  }'
-    + '}'
-    // Phase D: Last resort — remove any fixed/absolute element with z>=100 that covers >30%
-    // of viewport BUT has less than 200 chars of visible text (real content has more)
-    + 'if (!consentClicked && n === 0) {'
-    + '  var allDivs = document.querySelectorAll("div, section, aside, dialog");'
-    + '  for (var k = 0; k < allDivs.length; k++) {'
-    + '    try {'
-    + '      var st = window.getComputedStyle(allDivs[k]);'
-    + '      var pos = st.position || "";'
-    + '      var z = parseInt(st.zIndex) || 0;'
-    + '      if ((pos === "fixed" || pos === "absolute") && z >= 100) {'
-    + '        var r = allDivs[k].getBoundingClientRect();'
-    + '        var area = r.width * r.height;'
-    + '        var screen = window.innerWidth * window.innerHeight;'
-    + '        var textLen = (allDivs[k].textContent || "").trim().length;'
-    // Only remove if it covers >30% of screen AND has little text (it's an overlay, not content)
-    + '        if (area > screen * 0.3 && textLen < 200) {'
-    + '          allDivs[k].remove(); n++;'
-    + '        }'
-    + '      }'
-    + '    } catch(e) {}'
-    + '  }'
-    + '}'
-    // Phase E: Restore scrolling (null-safe)
-    + 'if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; }'
-    + 'if (document.documentElement) { document.documentElement.style.overflow = ""; }'
-    + 'return n;';
+  const nukeCode = [
+        'var n = 0;',
+        'var btns = document.querySelectorAll("button, a, [role=\\"button\\"], input[type=\\"submit\\"]");',
+        'var consentClicked = false;',
+        'for (var b = 0; b < btns.length; b++) {',
+        '  var t = (btns[b].textContent || "").trim().toLowerCase();',
+        '  if (t === "accept" || t === "agree" || t === "i agree" || t === "ok" || t === "got it" || t === "accept all" || t === "agree all" || t === "consent" || t === "allow all" || t === "yes, i agree" || t.indexOf("accept") === 0 || t.indexOf("agree") === 0) {',
+        '    btns[b].click(); consentClicked = true; n++; break;',
+        '  }',
+        '}',
+        'if (!consentClicked) {',
+        '  var iframes = document.querySelectorAll("iframe");',
+        '  for (var i = iframes.length - 1; i >= 0; i--) {',
+        '    var src = (iframes[i].src || "").toLowerCase();',
+        '    var iid = (iframes[i].id || "").toLowerCase();',
+        '    var icls = (iframes[i].className || "").toLowerCase();',
+        '    var isConsent = src.indexOf("consent") >= 0 || src.indexOf("cookie") >= 0 || src.indexOf("gdpr") >= 0 || src.indexOf("onetrust") >= 0 || src.indexOf("trustarc") >= 0 || src.indexOf("sourcepoint") >= 0 || src.indexOf("privacymgmt") >= 0 || iid.indexOf("consent") >= 0 || iid.indexOf("sp_message") >= 0;',
+        '    var rect = iframes[i].getBoundingClientRect();',
+        '    var isSmall = rect.height < 300 && rect.width < 600;',
+        '    if (isConsent && isSmall) { iframes[i].remove(); n++; }',
+        '  }',
+        '}',
+        'if (!consentClicked && n === 0) {',
+        '  var overlaySels = ["#onetrust-consent-sdk","#onetrust-banner-sdk","#cookieConsent","#cookie-notice","#cookie-banner",".cky-consent-container",".cc-window",".cc-banner",".cc-floating","[aria-modal=true]","[role=dialog]","div[id^=sp_message]",".sp_message",".sp_veil"];',
+        '  for (var s = 0; s < overlaySels.length; s++) {',
+        '    try {',
+        '      var els = document.querySelectorAll(overlaySels[s]);',
+        '      for (var j = 0; j < els.length; j++) { els[j].remove(); n++; }',
+        '    } catch(e) {}',
+        '  }',
+        '}',
+        'if (!consentClicked && n === 0) {',
+        '  var allDivs = document.querySelectorAll("div, section, aside, dialog");',
+        '  for (var k = 0; k < allDivs.length; k++) {',
+        '    try {',
+        '      var st = window.getComputedStyle(allDivs[k]);',
+        '      var pos = st.position || "";',
+        '      var z = parseInt(st.zIndex) || 0;',
+        '      if ((pos === "fixed" || pos === "absolute") && z >= 100) {',
+        '        var r = allDivs[k].getBoundingClientRect();',
+        '        var area = r.width * r.height;',
+        '        var screen = window.innerWidth * window.innerHeight;',
+        '        var textLen = (allDivs[k].textContent || "").trim().length;',
+        '        if (area > screen * 0.3 && textLen < 200) {',
+        '          allDivs[k].remove(); n++;',
+        '        }',
+        '      }',
+        '    } catch(e) {}',
+        '  }',
+        '}',
+        'if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; }',
+        'if (document.documentElement) { document.documentElement.style.overflow = ""; }',
+        'return n;'
+      ].join('\n');
 
   try {
     console.log('[Sentinel/CDP] Phase2: sending surgical nuke (' + nukeCode.length + ' chars) to tab', tabId);
