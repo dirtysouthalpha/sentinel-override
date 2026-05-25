@@ -2483,7 +2483,30 @@ function generateHeuristicPlan(goal, currentUrl) {
   // Extract target URL from goal
   const urlMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i)
     || goal.match(/(https?:\/\/[^\s]+)/);
-  const targetUrl = urlMatch ? urlMatch[1] : null;
+  // v3.63: Also match bare site names ("go to Amazon", "go to Reddit")
+  const _bareSiteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
+  let _urlMatch = urlMatch;
+  if (!_urlMatch) {
+    const _bareMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
+    if (_bareMatch) {
+      const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
+      if (_bareSiteMap[_siteKey]) {
+        _urlMatch = ['go to ' + _bareMatch[1], 'https://' + _bareSiteMap[_siteKey]];
+        console.log('[Sentinel/DEBUG] Bare site matched:', _bareMatch[1], '->', _bareSiteMap[_siteKey]);
+      } else {
+        // Try partial match
+        for (const [k, v] of Object.entries(_bareSiteMap)) {
+          if (_siteKey.includes(k) || k.includes(_siteKey)) {
+            _urlMatch = ['go to ' + _bareMatch[1], 'https://' + v];
+            console.log('[Sentinel/DEBUG] Partial site matched:', _bareMatch[1], '->', v);
+            break;
+          }
+        }
+      }
+    }
+  }
+  const urlMatchFinal = _urlMatch;
+  const targetUrl = urlMatchFinal ? urlMatchFinal[1] : null;
   const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
   const alreadyThere = targetHost && currentHost.includes(targetHost);
 

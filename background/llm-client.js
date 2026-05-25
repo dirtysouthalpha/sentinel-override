@@ -2137,6 +2137,26 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         console.log('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
         return { type: 'navigate', url: _navUrl[1] };
       }
+      // v3.63: Detect navigate_back / go back intent
+      if (/\b(?:go|navigate)\s*back\b|\bback\s+to\b|\breturn\s+to\b|\bprevious\s+page\b/i.test(_intentText)) {
+        console.log('[Sentinel/FALLBACK] Detected navigate_back intent from content');
+        return { type: 'navigate_back' };
+      }
+      // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
+      const _siteUrl = _intentText.match(/(?:go|navigate)\s+(?:to\s+)?(?:the\s+)?(amazon|reddit|youtube|google|twitter|github|wikipedia|hackernews|hacker\s+news|cnn|bbc|nytimes|weather\.gov|stackoverflow|facebook|instagram|linkedin)[\s.,)]/i);
+      if (_siteUrl) {
+        const _siteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', google: 'google.com', twitter: 'twitter.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', 'weather.gov': 'weather.gov', stackoverflow: 'stackoverflow.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com' };
+        const _mapped = _siteMap[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
+        if (_mapped) {
+          console.log('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
+          return { type: 'navigate', url: 'https://' + _mapped };
+        }
+      }
+      // v3.63: Detect finish intent from content
+      if (/\b(?:finish|done|complete|here\s+(?:is|are)|summary|report)\b/i.test(_intentText) && /\b(?:task|report|findings|articles|results)\b/i.test(_intentText)) {
+        console.log('[Sentinel/FALLBACK] Detected finish intent from content');
+        return { type: 'finish', summary: _intentText.substring(0, 500) };
+      }
     }
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
   }
