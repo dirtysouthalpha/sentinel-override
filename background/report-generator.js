@@ -444,7 +444,7 @@ function buildStructuredData(executionData, timestamp) {
  * @param {object} executionData
  * @returns {string} Markdown report string
  */
-function buildFallbackReport(executionData) {
+export function buildFallbackReport(executionData) {
   if (!executionData) return 'Report generation failed: no execution data available.';
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 

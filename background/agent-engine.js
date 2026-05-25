@@ -6,7 +6,7 @@ import { callLLMWithRetry, generatePlan, supportsVision, getPlatformContext, get
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate } from './message-protocol.js';
-import { generateReport } from './report-generator.js';
+import { generateReport, buildFallbackReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
 import { getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount } from './tab-context.js';
@@ -4843,10 +4843,8 @@ async function runAgentLoop(goal, workingTabId) {
   // Keepalive must stay active for this fetch to complete.
   let agentReport = null;
   // (3.50.1) Force-capture reportData if somehow null at this point.
-  // The normal capture is at line ~3470 in the finish handler, but edge cases
-  // (early breaks, SW suspensions) can leave it unset.
   if (!reportData && finished) {
-    console.log('[Sentinel/REPORT-DEBUG] reportData was NULL at report time — force-capturing from current state');
+    console.error('[Sentinel/REPORT-DEBUG] reportData was NULL — force-capturing');
     reportData = {
       goal: _lastGoal || '',
       history: history.slice(),
@@ -4858,29 +4856,47 @@ async function runAgentLoop(goal, workingTabId) {
     };
   }
   if (reportData) {
-    console.log('[Sentinel/REPORT-DEBUG] Starting report generation with keys:', Object.keys(reportData).join(','));
-    sendSilentUpdate('Generating report...', stepCount);
-    // (3.50.2) Hard 45s timeout — MV3 SW can die during long LLM calls.
-    // If the report takes >45s, use the fallback instead.
-    const _reportTimeout = new Promise((_, rej) =>
-      setTimeout(() => rej(new Error('Report generation hard timeout (45s)')), 45000)
-    );
+    console.error('[Sentinel/REPORT-DEBUG] reportData keys:', Object.keys(reportData).join(','));
+
+    // ═══════════════════════════════════════════════════════════════
+    // (3.50.3) SAVE FALLBACK REPORT FIRST — before any LLM call.
+    // MV3 kills idle SWs during await fetch(). If we don't save NOW,
+    // the SW dies and we lose the report entirely.
+    // ═══════════════════════════════════════════════════════════════
+    const _fbReport = {
+      summary: `Investigation complete: ${reportData.stepCount} steps, ${reportData.apiCallCount} API calls.`,
+      fullReport: buildFallbackReport(reportData),
+      structuredData: { stepCount: reportData.stepCount, apiCallCount: reportData.apiCallCount, timestamp: new Date().toISOString() },
+      goal: reportData.goal,
+      timestamp: new Date().toISOString(),
+      _isFallback: true
+    };
     try {
+      await chrome.storage.local.set({ last_agent_report: _fbReport });
+      sendReportUpdate('ready', _fbReport);
+      console.error('[Sentinel/REPORT-DEBUG] ✓ Fallback report saved (' + _fbReport.fullReport.length + ' chars)');
+    } catch (e) {
+      console.error('[Sentinel/REPORT-DEBUG] Fallback save failed:', e);
+    }
+
+    // Now try the fancy LLM-generated report — if SW dies here, fallback is already saved
+    sendSilentUpdate('Enhancing report with AI...', stepCount);
+    try {
+      const _reportTimeout = new Promise((_, rej) =>
+        setTimeout(() => rej(new Error('Report LLM timeout (45s)')), 45000)
+      );
       agentReport = await Promise.race([generateReport(reportData, CONFIG), _reportTimeout]);
-      console.error('[Sentinel/REPORT-DEBUG] Report generated OK, summary len:', (agentReport.summary || '').length);
+      // LLM succeeded — overwrite fallback with the polished version
+      console.error('[Sentinel/REPORT-DEBUG] ✓ LLM report OK, summary:', (agentReport.summary || '').length, 'chars');
+      agentReport._isFallback = false;
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
-      console.error('Report generation failed:', err);
-      sendReportUpdate('error', null, err.message);
-      try {
-        await chrome.storage.local.set({ last_agent_report_error: err.message });
-      } catch (e) {
-        console.warn('[Sentinel] report error storage write failed:', e && e.message);
-      }
+      console.error('[Sentinel/REPORT-DEBUG] LLM report failed (fallback already saved):', err.message);
+      agentReport = _fbReport;
     }
   } else {
-    console.warn('Agent finished without reportData — skipping report generation');
+    console.error('[Sentinel/REPORT-DEBUG] No reportData — skipping report');
     sendReportUpdate('error', null, 'Agent finished without collecting execution data');
   }
 
