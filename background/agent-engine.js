@@ -320,7 +320,7 @@ const CONFIG = {
   retryDelay: 5000,
   maxRetryDelay: 30000,
   screenshotQuality: 30,
-  fetchTimeout: 45000,
+  fetchTimeout: 90000,
   pageLoadTimeout: 25000,
   maxSteps: 100,
   maxPageContentLength: 16000,
@@ -4634,8 +4634,14 @@ async function runAgentLoop(goal, workingTabId) {
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
             try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-            result = 'Navigated to ' + command.url + ' (content script failed to load)';
-            actionFailed = true;
+            // In CDP mode, content script failure is expected — don't mark as action failure
+            if (_cdpFallbackActive) {
+              result = 'Navigated to ' + command.url;
+              // Don't set actionFailed — navigation succeeded, CDP will handle observation
+            } else {
+              result = 'Navigated to ' + command.url + ' (content script failed to load)';
+              actionFailed = true;
+            }
           } else {
             // Verify we actually arrived at the intended page
             const newTabInfo = await getTabInfo(tab);
@@ -4819,7 +4825,7 @@ async function runAgentLoop(goal, workingTabId) {
               const hygiene = _shouldAcceptMemoryWrite(savedKey, savedValue, agentMemory);
               if (!hygiene.ok) {
                 actionFailed = true;
-                result = 'JS result rejected by memory hygiene: ' + hygiene.reason + '. Try a different extraction strategy or move on to another data source.';
+                result = 'JS result rejected by memory hygiene: ' + hygiene.reason + '. This data is already captured — use the existing memory key and proceed to finish or next step. Do NOT retry extraction.';
                 savedValue = null;
               }
             }

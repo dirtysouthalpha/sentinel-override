@@ -1084,6 +1084,10 @@ const SENTINEL_TOOLS = [
     input_schema: { type: 'object', properties: { items_key: { type: 'string' }, item_var: { type: 'string' }, do: { type: 'array' } }, required: ['items_key', 'item_var', 'do'] } },
   { name: 'read_network_requests', description: 'Read recent network requests matching a URL pattern; useful for extracting API responses when DOM is blocked.',
     input_schema: { type: 'object', properties: { url_includes: { type: 'string' }, limit: { type: 'number' } } } },
+  { name: 'smart_navigate', description: 'Navigate directly to a known site search/forecast page. MUCH faster than clicking through menus. Supported: google, weather.gov, wikipedia, youtube, amazon, reddit, twitter.',
+    input_schema: { type: 'object', properties: { site: { type: 'string', description: 'google|weather.gov|wikipedia|youtube|amazon|reddit|twitter' }, query: { type: 'string', description: 'Search query or location' } }, required: ['site', 'query'] } },
+  { name: 'batch', description: 'Execute multiple actions in sequence WITHOUT re-observing between them. Use for predictable sequences like type+Enter, navigate+wait+read, scroll+extract. Max 5 actions.',
+    input_schema: { type: 'object', properties: { actions: { type: 'array', description: 'Array of action objects to execute in order', items: { type: 'object' } } }, required: ['actions'] } },
 ];
 
 // ========== API Call with Retry ==========
