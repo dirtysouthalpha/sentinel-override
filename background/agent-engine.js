@@ -648,6 +648,9 @@ export async function startAgent(goal, sender) {
   // Subsequent open_tab handlers add their tabs to the same group.
   try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
+  // (v3.53) Disable side panel on all tabs except the working tab
+  try { await _scopeSidePanelToAttachedTabs(); } catch (_) {}
+
   // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
   // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
   // is false (or vice versa), pause for explicit user decision before the
@@ -659,7 +662,9 @@ export async function startAgent(goal, sender) {
     const mismatchResult = await _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuffer);
     if (mismatchResult.cancel) {
       agentRunning = false;
-      try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+      try { await detachAllSentinelTabs();
+    // (v3.53) Re-enable side panel on all tabs now that agent stopped
+    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
         console.error('[startAgent] mode mismatch cancel sendMessage failed:', e);
       });
@@ -911,7 +916,9 @@ export async function stopAgent() {
   // Release any CDP attachments held by the screenshot pipeline.
   try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
-  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { await detachAllSentinelTabs();
+    // (v3.53) Re-enable side panel on all tabs now that agent stopped
+    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1138,6 +1145,8 @@ async function attachTabToSentinelGroup(tabId) {
     try {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
     } catch (_e) { /* side panel API may not be available */ }
+    // (v3.53) Re-scope: enable panel on this new tab, disable on others
+    try { await _scopeSidePanelToAttachedTabs(); } catch (_) {}
   } catch (e) {
     console.warn('[Sentinel] attachTabToSentinelGroup failed:', e && e.message);
   }
@@ -1178,6 +1187,37 @@ async function detachAllSentinelTabs() {
 export function isAgentAttachedTab(tabId) {
   return agentAttachedTabs.has(tabId);
 }
+
+// ========== Side Panel Scoping (v3.53) ==========
+// During a run, only the agent's working tabs should show the side panel.
+// Other tabs get it disabled — mirrors Claude's computer-use behavior.
+
+async function _scopeSidePanelToAttachedTabs() {
+  try {
+    const allTabs = await chrome.tabs.query({});
+    for (const tab of allTabs) {
+      if (tab.id && !agentAttachedTabs.has(tab.id)) {
+        try {
+          await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' });
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
+async function _enableSidePanelEverywhere() {
+  try {
+    const allTabs = await chrome.tabs.query({});
+    for (const tab of allTabs) {
+      if (tab.id) {
+        try {
+          await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 
 /**
  * Get all tab IDs currently attached to the agent session.
@@ -4976,7 +5016,9 @@ async function runAgentLoop(goal, workingTabId) {
   await closeAllAgentTabs();
 
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { await detachAllSentinelTabs();
+    // (v3.53) Re-enable side panel on all tabs now that agent stopped
+    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
