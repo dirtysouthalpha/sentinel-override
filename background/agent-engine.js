@@ -4612,7 +4612,17 @@ async function runAgentLoop(goal, workingTabId) {
             if (updatedTab && updatedTab.url !== urlBeforeCommand) {
               await waitForPageLoad(tab);
               await sleep(500);
-              try { result = 'Clicked -> navigated to ' + new URL(updatedTab.url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
+              try {
+                const _clickedHost = new URL(updatedTab.url).hostname.toLowerCase();
+                const _fromHost = urlBeforeCommand ? new URL(urlBeforeCommand).hostname.toLowerCase() : '';
+                const _crossDomain = _fromHost && _clickedHost && !_clickedHost.includes(_fromHost.replace(/^www\./, '')) && !_fromHost.includes(_clickedHost.replace(/^www\./, ''));
+                if (_crossDomain) {
+                  result = 'WARNING: Click navigated away from ' + _fromHost + ' to ' + _clickedHost + '. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ' + _fromHost + ' and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).';
+                  actionFailed = true;
+                } else {
+                  result = 'Clicked -> navigated to ' + _clickedHost;
+                }
+              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
             }
           }
         } catch (_e) {}
