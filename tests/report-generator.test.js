@@ -818,5 +818,38 @@ describe('report-generator', () => {
       expect(result.fullReport).toContain('?');
     });
 
+    // --- Lines 232-234: invalid executionData ---
+    test('throws when executionData is null', async () => {
+      await expect(generateReport(null, CONFIG)).rejects.toThrow('executionData is required');
+    });
+
+    test('throws when executionData is undefined', async () => {
+      await expect(generateReport(undefined, CONFIG)).rejects.toThrow('executionData is required');
+    });
+
+    test('throws when executionData is not an object', async () => {
+      await expect(generateReport('string', CONFIG)).rejects.toThrow('executionData is required');
+      await expect(generateReport(123, CONFIG)).rejects.toThrow('executionData is required');
+    });
+
+    // --- Lines 251-253: history condensing when > 14 steps ---
+    test('condenses history when more than 14 steps', async () => {
+      const longHistory = [];
+      for (let i = 1; i <= 20; i++) {
+        longHistory.push({
+          step: i,
+          action: { type: i % 2 === 0 ? 'click' : 'navigate', selector: `#element-${i}` },
+          result: `Action ${i} completed`
+        });
+      }
+      const data = makeExecutionData({
+        history: longHistory,
+        stepCount: 20,
+        agentPlan: Array(20).fill('Step').map((s, i) => `Step ${i + 1}`)
+      });
+      const result = await generateReport(data, CONFIG);
+      expect(result.structuredData.meta.totalSteps).toBe(20);
+      expect(result).toHaveProperty('fullReport');
+    });
   });
 });
