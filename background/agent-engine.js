@@ -5398,7 +5398,43 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_) { /* bbox fallback is always non-fatal */ }
       }
 
-      // Post-click: handle navigation and new tab capture
+      // (v3.67) UNIVERSAL CDP fallback — when content script is dead and a specific
+      // CDP handler didn't fire, convert the failed action to execute_js via CDP.
+      // Covers: select, check, check_all, scroll_to, wait_for_element, hover, wait_for_text
+      if (actionFailed && _cdpFallbackActive && !['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list', 'note', 'batch', 'smart_navigate'].includes(command.type)) {
+        try {
+          let _universalJs = '';
+          const _sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          if (command.type === 'select' && _sel && command.value) {
+            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');'
+              + 'if(!el){var ss=document.querySelectorAll("select");for(var i=0;i<ss.length;i++){if(ss[i].offsetParent!==null){el=ss[i];break;}}}'
+              + 'if(!el)return null;var opts=el.options;'
+              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + JSON.stringify(command.value) + '||opts[i].text.toLowerCase().includes(' + JSON.stringify(command.value.toLowerCase()) + ')){'
+              + 'el.selectedIndex=i;el.value=opts[i].value;el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;}}return null;})()';
+          } else if (command.type === 'check' && _sel) {
+            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(!el)el=document.querySelector("[type=checkbox]");if(el){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));return"checked";}return null;})()';
+          } else if (command.type === 'scroll_to' && _sel) {
+            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.scrollIntoView({behavior:"smooth",block:"center"});return"scrolled";}return null;})()';
+          } else if (command.type === 'wait_for_element' && _sel) {
+            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');return el?"found":"not_found";})()';
+          } else if (command.type === 'wait_for_text' && command.text) {
+            _universalJs = '(function(){var t=document.body.innerText;return t.indexOf(' + JSON.stringify(command.text) + ')>=0?"found":"not_found";})()';
+          } else if (command.type === 'hover' && _sel) {
+            // Hover via CDP: dispatch mouseover/mouseenter events
+            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
+          }
+          if (_universalJs) {
+            const _uniRes = await cdpExecuteJs(tab, _universalJs, { timeout: 3000 });
+            if (_uniRes && _uniRes.ok && _uniRes.value != null && _uniRes.value !== 'not_found') {
+              result = command.type + ' via CDP universal fallback';
+              actionFailed = false;
+              sendSilentUpdate('[CDP] ' + command.type + ' executed via universal fallback', stepCount);
+            }
+          }
+        } catch (_uniErr) { /* universal CDP fallback non-fatal */ }
+      }
+
+            // Post-click: handle navigation and new tab capture
       if (command.type === 'click' || command.type === 'click_at' || command.type === 'double_click') {
         await sleep(1000);
         try {
@@ -5501,6 +5537,33 @@ async function runAgentLoop(goal, workingTabId) {
       } else {
         // Reset on any non-click_at action
         if (typeof _clickAtLoopCount !== 'undefined') _clickAtLoopCount = 0;
+      }
+
+      // (v3.67) Same-command loop detector — if the LLM emits 3+ consecutive
+      // commands of the same type (select, wait_for_text, etc.) with no page change,
+      // inject a recovery note telling it to switch strategy.
+      if (typeof _lastCmdType === 'undefined') { var _lastCmdType = ''; }
+      if (typeof _sameCmdCount === 'undefined') { var _sameCmdCount = 0; }
+      if (command.type === _lastCmdType) {
+        _sameCmdCount++;
+      } else {
+        _sameCmdCount = 0;
+        _lastCmdType = command.type;
+      }
+      if (_sameCmdCount >= 3 && !['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list'].includes(command.type)) {
+        console.warn('[Sentinel/RECOVERY] Same-command loop:', command.type, 'used', _sameCmdCount + 1, 'times. Forcing strategy shift.');
+        historyPush({
+          step: stepCount,
+          action: { type: 'note', text: 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row without progress. ' +
+            'STOP using ' + command.type + '. The content script is NOT available on this page. ' +
+            'Instead use execute_js to interact with the page via JavaScript. ' +
+            'For example: { "type": "execute_js", "code": "document.querySelector(\'select\').value = \'X\'; document.querySelector(\'select\').dispatchEvent(new Event(\'change\'))" }' },
+          result: 'Recovery from ' + command.type + ' loop'
+        });
+        await persistHistory();
+        _sameCmdCount = 0;
+        agentPlan = null;
+        currentPlanStep = 0;
       }
 
       // Check for stall
