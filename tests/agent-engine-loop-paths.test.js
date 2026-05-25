@@ -146,7 +146,13 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
 }));
 
 // Store mock functions in variables so they can be used in tests
-const mockGenerateReport = jest.fn(async () => '## Report');
+const mockGenerateReport = jest.fn(async () => ({
+  summary: '## Report',
+  fullReport: '## Report\n\nFull report content here.',
+  structuredData: {},
+  goal: 'test goal',
+  timestamp: new Date().toISOString()
+}));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
   generateReport: mockGenerateReport,

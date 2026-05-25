@@ -4901,8 +4901,14 @@ async function runAgentLoop(goal, workingTabId) {
       );
       agentReport = await Promise.race([generateReport(reportData, CONFIG), _reportTimeout]);
       // LLM succeeded — overwrite fallback with the polished version
-      console.error('[Sentinel/REPORT-DEBUG] ✓ LLM report OK, summary:', (agentReport.summary || '').length, 'chars');
-      agentReport._isFallback = false;
+      // (3.50.4) Defensive: if generateReport returns malformed data, fall back
+      if (typeof agentReport !== 'object' || !agentReport || typeof agentReport.fullReport !== 'string') {
+        console.error('[Sentinel/REPORT-DEBUG] generateReport returned malformed data, using fallback');
+        agentReport = _fbReport;
+      } else {
+        console.error('[Sentinel/REPORT-DEBUG] ✓ LLM report OK, summary:', (agentReport.summary || '').length, 'chars');
+        agentReport._isFallback = false;
+      }
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
