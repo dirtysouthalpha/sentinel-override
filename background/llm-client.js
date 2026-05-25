@@ -1808,15 +1808,31 @@ ${base64Image ? (function() {
     ? `Viewport: ${meta.width}x${meta.height} CSS pixels, devicePixelRatio: ${meta.dpr}. `
     : '';
   return metaLine +
-    'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n' +
+    // (v3.52) Gate click_at preference on actual vision capability.
+    // Text-only models receive screenshots but can't process them for coordinates.
+    // Forcing click_at on text models causes infinite click loops (glm-5 + CNN).
+    const _visionCapable = supportsVision(agentState && agentState.model);
+    const _visionHeader = _visionCapable
+      ? 'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n'
+      : 'SCREENSHOT ACTIVE — a screenshot is attached for visual context, but you cannot determine pixel coordinates from it.\n'
+        + 'Use selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n';
+    return metaLine +
+    _visionHeader +
     '1. Look at the screenshot to find the element you want to interact with.\n' +
-    '2. Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n' +
-    '3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n' +
+    '2. ' + (_visionCapable
+      ? 'Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n' +
+        '3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n'
+      : 'Use the element list below to find the right ref or selector, then use click with that ref.\n' +
+        '3. Example: { "type": "click", "ref": "ref_12" } or { "type": "click", "selector": "button.accept" }.\n') +
     '4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n' +
     'RULES:\n' +
-    '- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n' +
-    '- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n' +
-    '- If click_at misses, fall back to click with a selector from the element list.\n' +
+    (_visionCapable
+      ? '- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n'
+        + '- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n'
+        + '- If click_at misses, fall back to click with a selector from the element list.\n'
+      : '- Use click with ref/selector from the element list for ALL interactions.\n'
+        + '- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n'
+        + '- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n') +
     '- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n' +
     dprLine +
     'Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n';

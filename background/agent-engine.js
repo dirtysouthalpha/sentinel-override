@@ -4665,6 +4665,32 @@ async function runAgentLoop(goal, workingTabId) {
         _pageStagnation = 0;
       }
 
+      // (v3.52) click_at loop detector — catches the pattern where a text-only model
+      // keeps generating click_at with wrong coordinates (e.g., CNN overlay with glm-5).
+      // If we see 4+ consecutive click_at commands with no progress, inject recovery.
+      if (command.type === 'click_at') {
+        if (typeof _clickAtLoopCount === 'undefined') { var _clickAtLoopCount = 0; }
+        _clickAtLoopCount++;
+        if (_clickAtLoopCount >= 4 && productiveSteps === 0) {
+          console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with 0 productive steps');
+          historyPush({
+            step: stepCount,
+            action: { type: 'note', text: 'SYSTEM: click_at loop detected! You have used click_at ' + _clickAtLoopCount + ' times without progress. ' +
+              'STOP using click_at. Instead: (1) Look at the element list for overlay/consent buttons. ' +
+              '(2) Use { "type": "click", "ref": "ref_N" } to click by element reference. ' +
+              '(3) Or use { "type": "execute_js", "code": "document.querySelector(\'button.accept\').click()" } to dismiss overlays.' },
+            result: 'Recovery from click_at loop'
+          });
+          await persistHistory();
+          _clickAtLoopCount = 0;
+          agentPlan = null;
+          currentPlanStep = 0;
+        }
+      } else {
+        // Reset on any non-click_at action
+        if (typeof _clickAtLoopCount !== 'undefined') _clickAtLoopCount = 0;
+      }
+
       // Check for stall
       const stall = detectStall(history, consecutiveFailures, currentStrategies);
       if (stall.stalled) {
