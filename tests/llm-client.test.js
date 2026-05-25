@@ -1106,6 +1106,45 @@ describe('generatePlan', () => {
     expect(result.length).toBeGreaterThanOrEqual(2);
     expect(result[0]).toMatch(/navigate/i);
   });
+
+  test('Z.AI <think> block with JSON inside does NOT corrupt the real plan (Bug #2 regression)', async () => {
+    // GLM models sometimes embed <think>...</think> in content. The thinking block
+    // may contain a JSON snippet that looks like a plan — it must be stripped so
+    // Strategy 2 finds the REAL plan JSON that follows the closing </think>.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '<think>\nI should structure this as JSON like {"plan":["wrong step 1","wrong step 2"]}.\n</think>\n\n{"plan":["Navigate to the firewall admin panel","Login with credentials","Check access rules","Extract blocked entries","Finish with findings"]}' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(3);
+    expect(result[0]).toMatch(/navigate/i);
+    // Must NOT return steps from the thinking block
+    expect(result[0]).not.toMatch(/wrong/i);
+  });
+
+  test('Z.AI <think> block strips correctly when only prose follows (Strategy 4 fallback)', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '<think>Let me think through this task step by step.</think>\n\n1. Navigate to the SonicWall admin URL\n2. Login with provided credentials\n3. Check the firewall access rules\n4. Extract blocked connection entries\n5. Finish with a summary' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(3);
+    expect(result[0]).toMatch(/navigate/i);
+  });
 });
 
 // ========== callLLMWithRetry ==========
