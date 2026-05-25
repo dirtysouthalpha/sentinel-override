@@ -1914,7 +1914,9 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
 
   // Build request body using provider registry
-  const userContent = (supportsVision(model, providerConfig.id) && base64Image)
+  const _useVision = supportsVision(model, providerConfig.id) && base64Image;
+  console.error("[Sentinel/SCREENSHOT] callLLM vision: model:", model, "provider:", providerConfig.id, "hasImage:", !!base64Image, "useVision:", _useVision);
+  const userContent = (_useVision)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
 
