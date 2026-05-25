@@ -1195,14 +1195,18 @@ export function isAgentAttachedTab(tabId) {
 async function _scopeSidePanelToAttachedTabs() {
   try {
     const allTabs = await chrome.tabs.query({});
+    const attachedIds = Array.from(agentAttachedTabs);
+    let disabled = 0;
     for (const tab of allTabs) {
       if (tab.id && !agentAttachedTabs.has(tab.id)) {
         try {
           await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' });
+          disabled++;
         } catch (_) {}
       }
     }
-  } catch (_) {}
+    console.log('[Sentinel/v3.55] Scoped sidePanel: attached=' + attachedIds.join(',') + ' disabled=' + disabled + ' of ' + allTabs.length + ' total tabs');
+  } catch (e) { console.warn('[Sentinel] scopeSidePanel failed:', e && e.message); }
 }
 
 async function _enableSidePanelEverywhere() {
@@ -1301,20 +1305,105 @@ async function _cdpObservePage(tabId) {
 async function _cdpDismissOverlays(tabId, overlays) {
   if (!overlays || overlays.length === 0) return 0;
   let dismissed = 0;
+
+  // Phase 1: Click accept/agree buttons first (zero-friction policy)
   for (const overlay of overlays) {
-    // Try clicking accept/agree buttons first (zero-friction policy)
-    const acceptBtn = overlay.buttons.find(b => 
-      /agree|accept|accept all|got it|ok|consent|allow|continue|proceed/i.test(b.text)
+    const acceptBtn = overlay.buttons.find(b =>
+      /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure|understand/i.test(b.text)
     );
-    const dismissBtn = acceptBtn || overlay.buttons[0]; // fallback to first button
+    const dismissBtn = acceptBtn || overlay.buttons.find(b => b.text.length > 0) || overlay.buttons[0];
     if (dismissBtn && dismissBtn.x && dismissBtn.y) {
+      console.log('[Sentinel/CDP] Clicking overlay button:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
       const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
-      if (r && r.ok) {
-        dismissed++;
-        await new Promise(r => setTimeout(r, 500)); // let overlay close
-      }
+      if (r && r.ok) { dismissed++; }
+      await new Promise(r => setTimeout(r, 600));
     }
   }
+
+  // Phase 2: Nuclear — remove ALL overlay-like elements from DOM via CDP
+  // This handles cases where clicking didn't work (iframe overlays, shadow DOM, etc.)
+  const nukeCode = [
+    '(function() {',
+    '  var removed = 0;',
+    '  // Common overlay selectors',
+    '  var selectors = [',
+    '    "[class*=consent i]", "[class*=cookie i]", "[class*=gdpr i]",',
+    '    "[class*=overlay i]", "[class*=popup i]", "[class*=modal i]",',
+    '    "[class*=dialog i]", "[class*=interstitial i]", "[class*=paywall i]",',
+    '    "[class*=banner i]", "[class*=privacy i]", "[class*=wall i]",',
+    '    "[id*=consent i]", "[id*=cookie i]", "[id*=gdpr i]",',
+    '    "[id*=onetrust i]", "[id*=overlay i]", "[id*=popup i]",',
+    '    "[id*=modal i]", "[id*=dialog i]", "[id*=interstitial i]",',
+    '    "[id*=paywall i]", "[id*=banner i]", "[id*=privacy i]",',
+    '    "[id*=sp_message i]", "[id*=sp_message_id i]",',
+    '    ".sp_message", ".message-container",',
+    '    "[aria-modal*=true i]", "[role=dialog]",',
+    '    "div[id^=sp_message]", "div.sp_veil",',
+    '    "#onetrust-consent-sdk", "#onetrust-banner-sdk",',
+    '    "#cookieConsent", "#cookie-notice", "#cookie-banner",',
+    '    ".cky-consent-container", ".cky-modal",',
+    '    ".cc-window", ".cc-banner", ".cc-floating",',
+    '    "#__next + div[class*=fixed]", "div[class*=fixed][class*=inset]"',
+    '  ];',
+    '  for (var s = 0; s < selectors.length; s++) {',
+    '    try {',
+    '      var els = document.querySelectorAll(selectors[s]);',
+    '      for (var i = 0; i < els.length; i++) {',
+    '        var el = els[i];',
+    '        var style = window.getComputedStyle(el);',
+    '        if (style.display !== "none" && style.visibility !== "hidden") {',
+    '          // Check if it covers significant screen area',
+    '          var rect = el.getBoundingClientRect();',
+    '          var area = rect.width * rect.height;',
+    '          var screenArea = window.innerWidth * window.innerHeight;',
+    '          if (area > screenArea * 0.05) {',
+    '            el.remove();',
+    '            removed++;',
+    '          }',
+    '        }',
+    '      }',
+    '    } catch(e) {}',
+    '  }',
+    '  // Remove backdrop/mask elements (dark overlays behind popups)',
+    '  try {',
+    '    var masks = document.querySelectorAll("div, section, aside");',
+    '    for (var m = 0; m < masks.length; m++) {',
+    '      var st = window.getComputedStyle(masks[m]);',
+    '      var bg = st.backgroundColor || st.background || "";',
+    '      var pos = st.position || "";',
+    '      var z = parseInt(st.zIndex) || 0;',
+    '      var rect = masks[m].getBoundingClientRect();',
+    '      if ((pos === "fixed" || pos === "absolute") && z >= 1000',
+    '        && rect.width > window.innerWidth * 0.8',
+    '        && rect.height > window.innerHeight * 0.8',
+    '        && !masks[m].querySelector("input, textarea, select, [contenteditable]")) {',
+    '        // This is likely a backdrop mask — remove it',
+    '        masks[m].remove();',
+    '        removed++;',
+    '      }',
+    '    }',
+    '  } catch(e) {}',
+    '  // Restore scrolling',
+    '  try {',
+    '    document.body.style.overflow = "";',
+    '    document.documentElement.style.overflow = "";',
+    '    document.body.style.position = "";',
+    '    document.body.style.width = "";',
+    '  } catch(e) {}',
+    '  return removed;',
+    '})()'
+  ].join('\n');
+
+  try {
+    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 5000 });
+    if (nukeResult && nukeResult.ok && nukeResult.value > 0) {
+      console.log('[Sentinel/CDP] Nuclear overlay removal:', nukeResult.value, 'elements removed');
+      dismissed += nukeResult.value;
+    }
+  } catch(e) {
+    console.warn('[Sentinel/CDP] Nuclear overlay removal failed:', e && e.message);
+  }
+
   return dismissed;
 }
 
@@ -2821,15 +2910,13 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
       if (_cdpFallbackActive) {
-        // (v3.54) CDP fallback: dismiss overlays via DevTools Protocol
+        // (v3.54→3.55) CDP fallback: always run nuclear overlay removal.
+        // Don't wait for overlay detection — just nuke everything that looks like one.
         try {
-          const cdpObs = await _cdpObservePage(tab);
-          if (cdpObs && cdpObs.overlays && cdpObs.overlays.length > 0) {
-            const dismissed = await _cdpDismissOverlays(tab, cdpObs.overlays);
-            if (dismissed > 0) {
-              sendSilentUpdate(`[CDP] Dismissed ${dismissed} overlay(s)`, stepCount);
-              await sleep(800);
-            }
+          const dismissed = await _cdpDismissOverlays(tab, []);
+          if (dismissed > 0) {
+            sendSilentUpdate('[CDP] Nuked ' + dismissed + ' overlay element(s)', stepCount);
+            await sleep(800);
           }
         } catch (_) { /* non-fatal */ }
       } else {
