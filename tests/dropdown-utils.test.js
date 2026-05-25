@@ -1165,4 +1165,55 @@ describe('Dropdown Utils', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('selectDropdownOption - search input without native setter', () => {
+    test('should fall back to direct value assignment when native setter is not available', async () => {
+      // Covers line 248: else branch when nativeSetter is undefined
+      // Create 50+ options to trigger search input strategy (line 233: optionEls.length >= 50)
+      const optionEls = [];
+      for (let i = 0; i < 50; i++) {
+        const opt = createElement('div', { role: 'option', innerText: `Option ${i}`, value: `opt-${i}` });
+        opt.offsetWidth = 100;
+        opt.offsetHeight = 30;
+        optionEls.push(opt);
+      }
+
+      const searchInput = createElement('input', { type: 'text' });
+      searchInput.value = '';
+      searchInput.dispatchEvent = jest.fn();
+      searchInput.focus = jest.fn();
+      searchInput.tagName = 'INPUT';
+
+      // Set up defaultView WITHOUT a value descriptor (nativeSetter will be undefined)
+      const originalDefaultView = globalThis.document.defaultView;
+      globalThis.document = Object.assign({}, globalThis.document, {
+        defaultView: Object.assign({}, globalThis, {
+          HTMLInputElement: { prototype: {} }, // No 'value' property descriptor
+          HTMLTextAreaElement: undefined,
+        }),
+      });
+
+      const originalFindSearchInput = dd._findSearchInput;
+      dd._findSearchInput = () => searchInput;
+
+      const originalFindDropdownOptions = dd.findDropdownOptions;
+      const targetOption = createElement('div', { role: 'option', innerText: 'Cherry', value: 'cherry' });
+      targetOption.offsetWidth = 100;
+      targetOption.offsetHeight = 30;
+      // After typing, return filtered results with our target
+      dd.findDropdownOptions = () => [targetOption];
+
+      try {
+        const result = await dd.selectDropdownOption(globalThis.document, optionEls, 'Cherry');
+        // Should still work by falling back to direct value assignment
+        expect(result).not.toBeNull();
+        // Verify the value was set directly (line 248 path)
+        expect(searchInput.value).toContain('herry'); // Last characters typed
+      } finally {
+        dd._findSearchInput = originalFindSearchInput;
+        dd.findDropdownOptions = originalFindDropdownOptions;
+        globalThis.document = Object.assign({}, globalThis.document, { defaultView: originalDefaultView });
+      }
+    });
+  });
 });
