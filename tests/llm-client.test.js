@@ -1039,6 +1039,73 @@ describe('generatePlan', () => {
     expect(result.length).toBeGreaterThanOrEqual(2);
     expect(result[0]).toMatch(/navigate/i);
   });
+
+  test('Z.AI plain array response handled by Strategy 1 (no wrapper object)', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '["Navigate to the firewall admin page","Login with credentials","Check access rules","Extract blocked entries","Finish with summary"]' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall rules', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0]).toMatch(/navigate/i);
+  });
+
+  test('Z.AI object-steps response normalized to strings by Strategy 1', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '{"plan":[{"step":1,"action":"Navigate to firewall admin"},{"step":2,"action":"Login with credentials"},{"step":3,"action":"Check rules"}]}' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0]).toMatch(/navigate/i);
+  });
+
+  test('Z.AI bold-markdown numbered steps parsed by Strategy 4', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '**Steps:**\n**1. Navigate to the firewall admin panel**\n**2. Login with your credentials**\n**3. Click on Access Rules to view them**\n**4. Extract all blocked connection entries**' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('Z.AI bare array embedded in prose handled by Strategy 3', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Here is the plan: ["Navigate to the admin panel","Login with credentials","Check firewall rules","Extract blocked entries","Finish with a summary of findings"] Hope this helps!' } }]
+      })
+    });
+    const result = await generatePlan('Check firewall', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+      model: 'glm-5'
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0]).toMatch(/navigate/i);
+  });
 });
 
 // ========== callLLMWithRetry ==========

@@ -928,9 +928,20 @@ export async function generatePlan(goal, settings, context = {}) {
     jsonStr = jsonStr.replace(/[\x00-\x1f]/gu, '');  // eslint-disable-line no-control-regex
     try {
       const parsed = JSON.parse(jsonStr);
-      if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
+      // Some models (Z.AI/GLM) return a bare array ["step1","step2"] with no wrapper object
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const strs = parsed.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        if (strs.length > 0) return strs;
+      }
+      if (Array.isArray(parsed.plan) && parsed.plan.length > 0) {
+        const strs = parsed.plan.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        if (strs.length > 0) return strs;
+      }
       // Some models return { "steps": [...] } instead of { "plan": [...] }
-      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        const strs = parsed.steps.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        if (strs.length > 0) return strs;
+      }
     } catch (_) { /* fall through to strategy 2 */ }
 
     // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
@@ -953,40 +964,51 @@ export async function generatePlan(goal, settings, context = {}) {
         if (s2end !== -1) {
           try {
             const parsed = JSON.parse(content.substring(s2start, s2end + 1));
-            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
-            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+            const _norm = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm(parsed.plan); if (r.length > 0) return r; }
+            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm(parsed.steps); if (r.length > 0) return r; }
           } catch (_) { /* not valid JSON at this position, keep scanning */ }
           s2from = s2end + 1;
         } else { break; }
       }
     } catch (_) { /* fall through to strategy 3 */ }
 
-    // Strategy 3: find first { and last } and try that substring
+    // Strategy 3: find first { and last } and try that substring; also try bare array
     try {
-      const start = content.indexOf('{');
-      const end = content.lastIndexOf('}');
-      if (start !== -1 && end > start) {
-        const parsed = JSON.parse(content.slice(start, end + 1));
-        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) return parsed.plan;
-        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) return parsed.steps;
+      const _norm3 = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+      const objStart = content.indexOf('{');
+      const objEnd = content.lastIndexOf('}');
+      if (objStart !== -1 && objEnd > objStart) {
+        const parsed = JSON.parse(content.slice(objStart, objEnd + 1));
+        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm3(parsed.plan); if (r.length > 0) return r; }
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm3(parsed.steps); if (r.length > 0) return r; }
+      }
+      // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
+      const arrStart = content.indexOf('[');
+      const arrEnd = content.lastIndexOf(']');
+      if (arrStart !== -1 && arrEnd > arrStart && (objStart === -1 || arrStart < objStart)) {
+        const parsed = JSON.parse(content.slice(arrStart, arrEnd + 1));
+        if (Array.isArray(parsed) && parsed.length > 0) { const r = _norm3(parsed); if (r.length > 0) return r; }
       }
     } catch (_) { /* fall through to strategy 4 */ }
 
     // Strategy 4: extract numbered or bulleted steps from prose
-    // e.g. "1. Navigate to...\n2. Click..." or "- Navigate to...\n- Click..."
+    // Handles: "1. Step", "1) Step", "**1. Step**", "Step 1: text", "- Step", "* Step"
     {
-      const lines = content.split(/\n/).map(l => l.trim()).filter(Boolean);
-      const numberedLines = lines.filter(l => /^\d+[.)]\s+.{10,}/.test(l));
+      const lines = content.split(/\n/).map(l => l.trim().replace(/^\*{1,2}|\*{1,2}$/g, '').trim()).filter(Boolean);
+      // Numbered: "1. Step", "1) Step", "Step 1: Step"
+      const numberedLines = lines.filter(l => /^\d+[.)]\s+.{8,}/.test(l) || /^[Ss]tep\s+\d+[:.)\s]+.{8,}/.test(l));
       if (numberedLines.length >= 2) {
-        const steps = numberedLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim()).filter(Boolean);
+        const steps = numberedLines.map(l => l.replace(/^\d+[.)]\s+/, '').replace(/^[Ss]tep\s+\d+[:.)\s]+/, '').trim()).filter(s => s.length >= 8);
         if (steps.length >= 2) {
           console.warn('Plan generation: extracted ' + steps.length + ' numbered steps from prose');
           return steps;
         }
       }
-      const bulletLines = lines.filter(l => /^[-*•]\s+.{10,}/.test(l));
+      // Bulleted: "- Step", "* Step", "• Step"
+      const bulletLines = lines.filter(l => /^[-*•→]\s+.{8,}/.test(l));
       if (bulletLines.length >= 2) {
-        const steps = bulletLines.map(l => l.replace(/^[-*•]\s+/, '').trim()).filter(Boolean);
+        const steps = bulletLines.map(l => l.replace(/^[-*•→]\s+/, '').trim()).filter(s => s.length >= 8);
         if (steps.length >= 2) {
           console.warn('Plan generation: extracted ' + steps.length + ' bullet steps from prose');
           return steps;
