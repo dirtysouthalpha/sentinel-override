@@ -1807,8 +1807,7 @@ ${base64Image ? (function() {
   const dprLine = meta && meta.width
     ? `Viewport: ${meta.width}x${meta.height} CSS pixels, devicePixelRatio: ${meta.dpr}. `
     : '';
-  return metaLine +
-    // (v3.52) Gate click_at preference on actual vision capability.
+  // (v3.52) Gate click_at preference on actual vision capability.
     // Text-only models receive screenshots but can't process them for coordinates.
     // Forcing click_at on text models causes infinite click loops (glm-5 + CNN).
     const _visionCapable = supportsVision(agentState && agentState.model);
