@@ -3988,6 +3988,16 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }).catch(() => {});
       } catch (_) { /* non-fatal */ }
+      // (3.50.2) Show visual action feedback (cursor + banner) for ALL actions
+      try {
+        chrome.tabs.sendMessage(tab, {
+          action: 'show_action_feedback',
+          actionType: command.type,
+          label: describeAction(command).substring(0, 80),
+          target: command.url || command.selector || command.text || '',
+          step: stepCount
+        }).catch(() => {});
+      } catch (_) { /* non-fatal */ }
       sendSilentUpdate(`Executing: ${command.type}${agentPlan ? ` [${currentPlanStep + 1}/${agentPlan.length}]` : ''}`, stepCount);
 
       // Approval gate + CDP trusted input flag (#9)
@@ -4850,8 +4860,14 @@ async function runAgentLoop(goal, workingTabId) {
   if (reportData) {
     console.log('[Sentinel/REPORT-DEBUG] Starting report generation with keys:', Object.keys(reportData).join(','));
     sendSilentUpdate('Generating report...', stepCount);
+    // (3.50.2) Hard 45s timeout — MV3 SW can die during long LLM calls.
+    // If the report takes >45s, use the fallback instead.
+    const _reportTimeout = new Promise((_, rej) =>
+      setTimeout(() => rej(new Error('Report generation hard timeout (45s)')), 45000)
+    );
     try {
-      agentReport = await generateReport(reportData, CONFIG);
+      agentReport = await Promise.race([generateReport(reportData, CONFIG), _reportTimeout]);
+      console.error('[Sentinel/REPORT-DEBUG] Report generated OK, summary len:', (agentReport.summary || '').length);
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {

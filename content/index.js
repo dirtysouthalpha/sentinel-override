@@ -531,6 +531,58 @@ if (window.__sentinelInitialized) {
         return { ok: true };
       }
 
+      case 'show_action_feedback': {
+        // (3.50.2) Visual feedback for ALL agent actions — not just CDP clicks.
+        // Shows the cursor moving to center-screen with an action banner.
+        try {
+          const actionType = request.actionType || 'action';
+          const label = request.label || actionType;
+          const targetDesc = request.target || '';
+          const stepNum = request.step || 0;
+
+          // Animate cursor to center of viewport
+          if (window.__sentinelCursor && window.__sentinelCursor.moveTo) {
+            const cx = Math.round(window.innerWidth / 2);
+            const cy = Math.round(window.innerHeight / 2);
+            window.__sentinelCursor.moveTo(cx, cy, { duration: 400 });
+          }
+
+          // Show a brief action banner at top of page
+          let banner = document.getElementById('__sentinel_action_banner');
+          if (!banner) {
+            banner = document.createElement('div');
+            banner.id = '__sentinel_action_banner';
+            banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);' +
+              'z-index:2147483647;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);' +
+              'color:#e94560;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;' +
+              'padding:8px 20px;border-radius:8px;border:1px solid #e94560;' +
+              'box-shadow:0 4px 20px rgba(233,69,96,0.3);pointer-events:none;' +
+              'transition:opacity 0.3s,transform 0.3s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;';
+            document.body.appendChild(banner);
+          }
+
+          // Icon map for action types
+          const icons = {
+            navigate: '🧭', open_tab: '📂', close_tab: '🗑️', note: '📝',
+            execute_js: '⚡', click: '👆', type: '⌨️', scroll: '📜',
+            switch_tab: '🔄', finish: '✅', extract: '🔍', wait_for: '⏳',
+            screenshot: '📸', hover: '👀'
+          };
+          const icon = icons[actionType] || '▶️';
+          banner.textContent = `${icon} Step ${stepNum}: ${label}${targetDesc ? ' — ' + targetDesc.substring(0, 60) : ''}`;
+          banner.style.opacity = '1';
+          banner.style.transform = 'translateX(-50%) translateY(0)';
+
+          // Fade out after 2s
+          clearTimeout(banner._fadeTimer);
+          banner._fadeTimer = setTimeout(() => {
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateX(-50%) translateY(-10px)';
+          }, 2000);
+        } catch (_) { /* non-fatal visual feedback */ }
+        return { ok: true };
+      }
+
       case 'get_viewport_info': {
         // (#11) DPR-aware screenshots: report viewport in CSS pixels plus DPR
         // and scroll offsets so the background can attach metadata to each capture.
