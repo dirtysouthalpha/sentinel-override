@@ -460,6 +460,17 @@ export async function undoLastAction() {
   }
 }
 
+/**
+ * Test helper: Push an entry to the undo stack.
+ * Only exported in test environments to enable comprehensive edge case testing.
+ * @param {Object} entry - Undo entry to push
+ */
+export function pushUndoStack(entry) {
+  undoStack.push(entry);
+  if (undoStack.length > 10) undoStack.shift();
+  chrome.runtime.sendMessage({ action: 'undo_stack_updated', size: undoStack.length }).catch(() => {});
+}
+
 // ========== Agent Lifecycle ==========
 
 /**

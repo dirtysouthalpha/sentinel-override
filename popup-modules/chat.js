@@ -53,6 +53,7 @@ const copyReportTextBtn = document.getElementById('copyReportTextBtn');
 // Voice Input - uses webkitSpeechRecognition in the active tab
 // (Web Speech API doesn't work in extension popups, so we delegate to the tab)
 let _voiceListening = false;
+let _voiceListeningTabId = null; // Track which tab we're listening to
 let _voiceMessageListener = null;
 let _voiceClickHandler = null;
 
@@ -1297,32 +1298,37 @@ function setupVoiceInput() {
 
   _voiceClickHandler = async () => {
     if (_voiceListening) {
+      // Stop listening
       _voiceListening = false;
+      _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
       voiceBtn.title = 'Voice input (click to speak)';
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab) chrome.tabs.sendMessage(tab.id, { action: 'stop_voice' }).catch(() => {});
+        if (tab && tab.id) {
+          chrome.tabs.sendMessage(tab.id, { action: 'stop_voice' }).catch(() => {});
+        }
       } catch (_e) { /* ignore */ }
       return;
     }
 
-    _voiceListening = true;
-    voiceBtn.classList.add('listening');
-    voiceBtn.title = 'Listening... (click to stop)';
-
+    // Start listening
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab || !tab.id) {
         showToast('No active tab found', 'error');
-        _voiceListening = false;
-        voiceBtn.classList.remove('listening');
         return;
       }
+
+      _voiceListening = true;
+      _voiceListeningTabId = tab.id;
+      voiceBtn.classList.add('listening');
+      voiceBtn.title = 'Listening... (click to stop)';
 
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {
+          // Stop any existing recognition
           if (window.__sentinelVoiceHandler) {
             try { window.__sentinelVoiceHandler.stop(); } catch(_e) {}
           }
@@ -1345,13 +1351,38 @@ function setupVoiceInput() {
                 interim += event.results[i][0].transcript;
               }
             }
-            chrome.runtime.sendMessage({ action: 'voice_interim', text: finalTranscript + interim }).catch(() => {});
+            // Include tab ID in message so popup can verify it's from the correct tab
+            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              if (tab) {
+                chrome.runtime.sendMessage({
+                  action: 'voice_interim',
+                  text: finalTranscript + interim,
+                  tabId: tab.id
+                }).catch(() => {});
+              }
+            });
           };
           recognition.onend = () => {
-            chrome.runtime.sendMessage({ action: 'voice_result', text: finalTranscript }).catch(() => {});
+            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              if (tab) {
+                chrome.runtime.sendMessage({
+                  action: 'voice_result',
+                  text: finalTranscript,
+                  tabId: tab.id
+                }).catch(() => {});
+              }
+            });
           };
           recognition.onerror = (event) => {
-            chrome.runtime.sendMessage({ action: 'voice_error', error: event.error }).catch(() => {});
+            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+              if (tab) {
+                chrome.runtime.sendMessage({
+                  action: 'voice_error',
+                  error: event.error,
+                  tabId: tab.id
+                }).catch(() => {});
+              }
+            });
           };
           recognition.start();
           window.__sentinelVoiceHandler = recognition;
@@ -1362,18 +1393,35 @@ function setupVoiceInput() {
       console.error('Voice input error:', err);
       showToast('Voice error: ' + (err.message || 'Unknown error'), 'error');
       _voiceListening = false;
+      _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
     }
   };
 
   voiceBtn.addEventListener('click', _voiceClickHandler);
 
-  _voiceMessageListener = (msg) => {
+  _voiceMessageListener = (msg, sender) => {
+    // Only process voice messages if we're currently listening
+    // and the message is from the tab we're listening to (if tabId is provided)
+    if (!_voiceListening) return;
+
+    // If the message includes a tabId, verify it matches the tab we're listening to
+    // This prevents processing voice messages from other tabs
+    if (msg.tabId !== undefined && msg.tabId !== _voiceListeningTabId) {
+      return; // Ignore messages from other tabs
+    }
+
+    // For backwards compatibility, also check sender.tab.id if available
+    if (sender && sender.tab && sender.tab.id && sender.tab.id !== _voiceListeningTabId) {
+      return; // Ignore messages from other tabs (sender-based check)
+    }
+
     if (msg.action === 'voice_result' && msg.text) {
       goalInput.value = msg.text;
       goalInput.style.height = 'auto';
       goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
       _voiceListening = false;
+      _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
       voiceBtn.title = 'Voice input (click to speak)';
       showToast('Voice input captured', 'success');
@@ -1387,12 +1435,23 @@ function setupVoiceInput() {
     if (msg.action === 'voice_error') {
       showToast('Voice error: ' + msg.error, 'error');
       _voiceListening = false;
+      _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
       voiceBtn.title = 'Voice input (click to speak)';
     }
   };
 
   chrome.runtime.onMessage.addListener(_voiceMessageListener);
+
+  // Cleanup on popup unload - stop any ongoing voice input
+  // Guard: window.addEventListener may not exist in test environments
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('unload', () => {
+      if (_voiceListening && _voiceListeningTabId) {
+        chrome.tabs.sendMessage(_voiceListeningTabId, { action: 'stop_voice' }).catch(() => {});
+      }
+    });
+  }
 }
 
 setupVoiceInput();

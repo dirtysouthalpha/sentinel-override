@@ -30,6 +30,7 @@ globalThis.chrome = {
     query: jest.fn(async () => [{ id: 1 }]),
     goBack: jest.fn(async () => {}),
     update: jest.fn(async () => {}),
+    sendMessage: jest.fn(async () => {}),
   },
   runtime: {
     sendMessage: jest.fn(async () => {}),
@@ -61,7 +62,7 @@ jest.unstable_mockModule('../background/tab-manager.js', () => ({
   waitForPageLoad: jest.fn(async () => {}),
   waitForPageReady: jest.fn(async () => {}),
   injectContentScript: jest.fn(async () => {}),
-  sendMessageWithRetry: jest.fn(async () => ({ result: 'ok' })),
+  sendMessageWithRetry: jest.fn(async () => 'JS Result: ok'),
   takeScreenshot: jest.fn(async () => 'data:image/png;base64,abc'),
   isValidUrl: jest.fn(() => true),
   getTabInfo: jest.fn(async () => ({ url: 'https://example.com', title: 'Test' })),
@@ -196,14 +197,130 @@ describe('undoLastAction', () => {
     expect(result.reason).toBe('Nothing to undo');
   });
 
-  // NOTE: The following test cases require the undoStack to be populated,
-  // which happens during agent execution. Full coverage requires integration
-  // tests that run the agent loop. The paths covered here are:
-  // - Empty undo stack (tested above)
-  // - Navigate undo with/without previousUrl (requires agent run)
-  // - Type undo with/without selector (requires agent run)
-  // - Unknown entry type (requires stack manipulation)
-  //
-  // For full coverage, see agent-engine-integration.test.js which runs
-  // the full agent loop and can test the undo stack population.
+  test('handles navigate undo with previousUrl', async () => {
+    // Manually populate undoStack with a navigate entry
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({ type: 'navigate', tabId: 1, previousUrl: 'https://example.com/previous' });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(true);
+    expect(result.description).toContain('Navigated back to');
+    expect(result.description).toContain('https://example.com/previous');
+    expect(chrome.tabs.update).toHaveBeenCalledWith(1, { url: 'https://example.com/previous' });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'undo_stack_updated', size: 0 });
+  });
+
+  test('handles navigate undo without previousUrl (goBack)', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({ type: 'navigate', tabId: 1, previousUrl: null });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(true);
+    expect(result.description).toContain('Navigated back');
+    expect(chrome.tabs.goBack).toHaveBeenCalledWith(1);
+  });
+
+  test('handles type undo with selector', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({
+      type: 'type',
+      tabId: 1,
+      selector: '#username',
+      previousValue: 'olduser'
+    });
+
+    const result = await undoLastAction();
+    console.log('Type undo result:', result); // Debug
+    expect(result.success).toBe(true);
+    expect(result.description).toContain('Restored field');
+    expect(result.description).toContain('#username');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'undo_stack_updated', size: 0 });
+  });
+
+  test('handles type undo with empty previousValue', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({
+      type: 'type',
+      tabId: 1,
+      selector: '#search',
+      previousValue: ''
+    });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(true);
+    expect(result.description).toContain('Restored field');
+  });
+
+  test('handles type undo without selector', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({
+      type: 'type',
+      tabId: 1,
+      selector: null,
+      previousValue: 'oldvalue'
+    });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('no selector recorded');
+  });
+
+  test('handles unknown undo entry type', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({ type: 'unknown_action', tabId: 1 });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Unknown undo entry type');
+  });
+
+  test('handles malformed undo entry (missing type)', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({ tabId: 1 }); // Missing type field
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Unknown undo entry type');
+  });
+
+  test('handles sendMessageWithRetry failure during type undo', async () => {
+    const { pushUndoStack } = agentEngine;
+
+    // Mock chrome.tabs.sendMessage to throw for this test
+    chrome.tabs.sendMessage.mockImplementationOnce(async () => {
+      throw new Error('Tab not found');
+    });
+
+    pushUndoStack({
+      type: 'type',
+      tabId: 1,
+      selector: '#field',
+      previousValue: 'old'
+    });
+
+    const result = await undoLastAction();
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('Could not restore field');
+  });
+
+  test('handles multiple undo operations in sequence', async () => {
+    const { pushUndoStack } = agentEngine;
+    pushUndoStack({ type: 'navigate', tabId: 1, previousUrl: 'https://first.com' });
+    pushUndoStack({ type: 'navigate', tabId: 1, previousUrl: 'https://second.com' });
+
+    // First undo
+    let result = await undoLastAction();
+    expect(result.success).toBe(true);
+    expect(chrome.tabs.update).toHaveBeenLastCalledWith(1, { url: 'https://second.com' });
+
+    // Second undo
+    result = await undoLastAction();
+    expect(result.success).toBe(true);
+    expect(chrome.tabs.update).toHaveBeenLastCalledWith(1, { url: 'https://first.com' });
+
+    // Third undo (empty stack)
+    result = await undoLastAction();
+    expect(result.success).toBe(false);
+    expect(result.reason).toBe('Nothing to undo');
+  });
 });
