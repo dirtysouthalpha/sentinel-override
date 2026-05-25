@@ -1322,6 +1322,14 @@ async function _cdpObservePage(tabId) {
     + '} catch(e) { results.error = e.message; }'
     + 'return results;';
 
+  // SPEED: Check cache — if same URL observed recently, reuse
+  const tabInfo = await getTabInfo(tabId);
+  const currentUrl = tabInfo ? tabInfo.url : '';
+  if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < 3000) {
+    _observeCacheHits++;
+    console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', url);
+    return _cachedObservation;
+  }
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: 5000 });
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
@@ -1461,6 +1469,8 @@ async function _cdpDismissOverlays(tabId, overlays) {
 let _cdpFallbackActive = false;
 let _lastNukeClean = false; // Track if last nuke found nothing to remove
 let _pageWasReady = false; // Skip ready check if previous observe succeeded
+let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
+let _observeCacheHits = 0;
 
 
 
@@ -2867,6 +2877,7 @@ async function runAgentLoop(goal, workingTabId) {
               await chrome.tabs.update(tab, { url: goalUrl });
               await waitForPageLoad(tab);
               await waitForPageReady(tab);
+              _cachedObservation = null; // Invalidate cache after navigation
               const reinjected = await injectContentScript(tab);
               console.log('[Sentinel/DEBUG] injectContentScript result:', reinjected);
               if (reinjected) {
@@ -2918,8 +2929,13 @@ async function runAgentLoop(goal, workingTabId) {
         sendTabStateUpdate(allTabContexts);
       }
 
-      // Inject content script
-      const scriptReady = await injectContentScript(tab);
+      // SPEED: Skip content script injection after repeated failures
+      let scriptReady = false;
+      if (consecutiveInjectionFailures < 3) {
+        scriptReady = await injectContentScript(tab);
+      } else {
+        console.log('[Sentinel/SPEED] Skipping content script injection (' + consecutiveInjectionFailures + ' failures)');
+      }
       _cdpFallbackActive = false;
       if (!scriptReady) {
         consecutiveInjectionFailures++;
@@ -4553,6 +4569,7 @@ async function runAgentLoop(goal, workingTabId) {
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
           await waitForPageReady(tab);
+          _cachedObservation = null; // Invalidate cache after navigate action
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
