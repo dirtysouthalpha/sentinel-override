@@ -54,6 +54,7 @@ const copyReportTextBtn = document.getElementById('copyReportTextBtn');
 // (Web Speech API doesn't work in extension popups, so we delegate to the tab)
 let _voiceListening = false;
 let _voiceMessageListener = null;
+let _voiceClickHandler = null;
 
 
 // ========== Tenant Chip (3.7.0) ==========
@@ -1278,7 +1279,7 @@ function updateAttachmentPreview() {
 
 // ========== Voice Input (tab-based) ==========
 function setupVoiceInput() {
-  // Remove previous listener if exists (prevent duplicates on popup reopen)
+  // Remove previous listeners if exists (prevent duplicates on popup reopen)
   if (_voiceMessageListener) {
     try {
       chrome.runtime.onMessage.removeListener(_voiceMessageListener);
@@ -1286,7 +1287,15 @@ function setupVoiceInput() {
     _voiceMessageListener = null;
   }
 
-  voiceBtn.addEventListener('click', async () => {
+  // Remove previous click handler to prevent duplicates
+  if (_voiceClickHandler) {
+    try {
+      voiceBtn.removeEventListener('click', _voiceClickHandler);
+    } catch (_e) { /* ignore */ }
+    _voiceClickHandler = null;
+  }
+
+  _voiceClickHandler = async () => {
     if (_voiceListening) {
       _voiceListening = false;
       voiceBtn.classList.remove('listening');
@@ -1355,7 +1364,9 @@ function setupVoiceInput() {
       _voiceListening = false;
       voiceBtn.classList.remove('listening');
     }
-  });
+  };
+
+  voiceBtn.addEventListener('click', _voiceClickHandler);
 
   _voiceMessageListener = (msg) => {
     if (msg.action === 'voice_result' && msg.text) {

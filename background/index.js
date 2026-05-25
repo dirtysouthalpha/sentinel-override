@@ -759,6 +759,18 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'content_script_ready':
       return null;
 
+    // ========== Voice Input Message Forwarding (Bug #3 fix) ==========
+    // Content scripts send voice messages via chrome.runtime.sendMessage;
+    // we forward them to the popup so the voice input UI can update.
+    case 'voice_result':
+    case 'voice_interim':
+    case 'voice_error':
+      // Forward to popup - chrome.runtime.sendMessage broadcasts to all contexts
+      chrome.runtime.sendMessage(request).catch(() => {
+        // Popup might not be open, that's fine
+      });
+      return null;
+
     // ========== Context Menu Actions (v3.44) ==========
     case 'context_menu_analyze':
     case 'context_menu_extract':

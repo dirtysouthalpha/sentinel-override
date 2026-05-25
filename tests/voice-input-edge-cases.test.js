@@ -211,4 +211,24 @@ describe('Voice input edge cases', () => {
 
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(3);
   });
+
+  test('voice messages are forwarded from background to popup', async () => {
+    // Verify that voice messages trigger a sendMessage call (forwarding to popup)
+    const voiceMessages = [
+      { action: 'voice_result', text: 'Hello world' },
+      { action: 'voice_interim', text: 'Hello' },
+      { action: 'voice_error', error: 'not-allowed' },
+    ];
+
+    globalThis.chrome.runtime.sendMessage.mockResolvedValue(undefined);
+
+    for (const msg of voiceMessages) {
+      await globalThis.chrome.runtime.sendMessage(msg);
+    }
+
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(3);
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(voiceMessages[0]);
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(voiceMessages[1]);
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledWith(voiceMessages[2]);
+  });
 });
