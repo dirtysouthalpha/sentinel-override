@@ -229,6 +229,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         c.classList.remove('dimmed');
         c.style.left = clamped.x + 'px';
         c.style.top = clamped.y + 'px';
+        console.error('[Sentinel/CURSOR] moveTo:', clamped.x, clamped.y);
         lastX = clamped.x;
         lastY = clamped.y;
         scheduleAutoHide();
@@ -337,5 +338,9 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   window.__sentinelUtils.cursor = window.__sentinelCursor;
 
   // (3.8.1) Make the cursor visible immediately on script load.
-  try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor init:', e && e.message); }
+  try {
+    ensureCursor();
+    const _c = document.getElementById(CURSOR_ID);
+    console.error('[Sentinel/CURSOR] Initialized. Element:', !!_c, 'Connected:', _c && _c.isConnected, 'keepVisible:', keepVisibleMode);
+  } catch (e) { console.error('[Sentinel/CURSOR] Init failed:', e && e.message); }
 })();

@@ -2802,10 +2802,13 @@ async function runAgentLoop(goal, workingTabId) {
       let screenshotMeta = null;
       const screenshotProviderConfig = await getActiveProvider();
       const modelForScreenshot = screenshotProviderConfig.model || 'glm-5.1';
-      if (supportsVision(modelForScreenshot)) {
+      const _visionOk = supportsVision(modelForScreenshot);
+      console.error('[Sentinel/SCREENSHOT] model:', modelForScreenshot, 'vision:', _visionOk, 'provider:', screenshotProviderConfig.id);
+      if (_visionOk) {
         try {
           const shotResult = await takeScreenshot(tab, freshTabInfo.windowId, currentUrl, screenshotCache, CONFIG, stepCount, sendSilentUpdate);
           if (shotResult) {
+            console.error('[Sentinel/SCREENSHOT] ✓ Captured screenshot', shotResult.width + 'x' + shotResult.height, 'DPR:', shotResult.dpr);
             base64Image = shotResult.base64Image;
             screenshotMeta = {
               width: shotResult.width,
