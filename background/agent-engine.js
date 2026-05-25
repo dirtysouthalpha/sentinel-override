@@ -2152,6 +2152,179 @@ const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|e
 
 // Returns { matched: true, host, evidence } when a sign-in wall is detected,
 // or null. Evidence describes WHY we matched (URL + password-field selector
+
+
+// ========== CAPTCHA / Bot Detection (v3.65) ==========
+const CAPTCHA_URL_PATTERNS = [
+  /validateCaptcha/i,
+  /\/captcha[/?#]/i,
+  /\/challenge[/?#]/i,
+  /\/bot-detect/i,
+  /\/verify[/?#]/i,
+  /captcha\./i,
+  /recaptcha/i,
+  /hcaptcha/i,
+  /turnstile/i,
+  /cf-chl/i,
+  /\/errors\//i,        // Amazon /errors/ pages
+  /blocked/i,
+  /\/access.denied/i,
+  /\/security.check/i,
+];
+
+const CAPTCHA_TEXT_PATTERNS = [
+  /verify.{0,10}(you are|you.re).{0,5}human/i,
+  /not.a.robot/i,
+  /prove.{0,10}(you are|you.re).{0,5}human/i,
+  /are you a robot/i,
+  /complete.the.security/i,
+  /enter.the.characters/i,
+  /type.the.characters/i,
+  /solve.this.puzzle/i,
+  /please.complete.this/i,
+  /sorry.{0,20}interrupt/i,
+  /automated.access/i,
+  /bot.detect/i,
+  /unusual.traffic/i,
+  /our.systems.have.detected/i,
+  /sorry.we.just.need/i,
+  /checking.your.browser/i,
+  /before.we.proceed/i,
+  /human.verification/i,
+  /are.you.human/i,
+];
+
+const CAPTCHA_HOST_MAP = {
+  'amazon': { altUrl: 'https://www.amazon.com', searchPath: '/s?k=' },
+  'google': { altUrl: 'https://www.google.com', searchPath: '/search?q=' },
+  'reddit': { altUrl: 'https://www.reddit.com', searchPath: '/search/?q=' },
+};
+
+function detectCaptcha(currentUrl, pageText, elementsCount) {
+  if (!currentUrl) return null;
+  
+  // URL-based detection
+  const urlHit = CAPTCHA_URL_PATTERNS.find(p => p.test(currentUrl));
+  if (urlHit) {
+    // Also check if page text confirms it
+    const textHit = pageText && CAPTCHA_TEXT_PATTERNS.find(p => p.test(pageText));
+    // Low element count on a flagged URL is strong signal
+    const lowElements = elementsCount !== undefined && elementsCount <= 5;
+    return {
+      matched: true,
+      type: 'captcha_url',
+      url: currentUrl,
+      pattern: urlHit.source,
+      textConfirm: !!textHit,
+      lowElements: !!lowElements,
+      confidence: (textHit ? 0.9 : 0.0) + (lowElements ? 0.1 : 0.0)
+    };
+  }
+  
+  // Content-based detection (only if strong signal)
+  if (pageText) {
+    const textHit = CAPTCHA_TEXT_PATTERNS.find(p => p.test(pageText));
+    if (textHit && elementsCount !== undefined && elementsCount <= 10) {
+      return {
+        matched: true,
+        type: 'captcha_text',
+        url: currentUrl,
+        pattern: textHit.source,
+        textConfirm: true,
+        lowElements: elementsCount <= 5,
+        confidence: 0.85
+      };
+    }
+  }
+  
+  return null;
+}
+
+// Attempt to auto-solve CAPTCHA or navigate around it
+async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal) {
+  console.log('[Sentinel/CAPTCHA] Detected:', captchaInfo.type, 'url:', currentUrl);
+  
+  // Strategy 1: Try to click CAPTCHA checkbox/button via CDP
+  try {
+    const clickCode = `
+      // reCAPTCHA checkbox
+      const rcFrame = document.querySelector('iframe[src*="recaptcha"]');
+      if (rcFrame) {
+        const rcDoc = rcFrame.contentDocument || rcFrame.contentWindow.document;
+        const cb = rcDoc && rcDoc.querySelector('.recaptcha-checkbox');
+        if (cb) { cb.click(); return 'recaptcha_clicked'; }
+      }
+      // hCaptcha checkbox  
+      const hcFrame = document.querySelector('iframe[src*="hcaptcha"]');
+      if (hcFrame) {
+        const hcDoc = hcFrame.contentDocument || hcFrame.contentWindow.document;
+        const cb = hcDoc && hcDoc.querySelector('#checkbox');
+        if (cb) { cb.click(); return 'hcaptcha_clicked'; }
+      }
+      // Cloudflare Turnstile
+      const cfChk = document.querySelector('.cf-turnstile input, [name="cf-turnstile-response"]');
+      if (cfChk) { cfChk.click(); return 'turnstile_clicked'; }
+      // Generic checkbox
+      const chk = document.querySelector('input[type="checkbox"]');
+      if (chk && document.body.innerText.length < 500) { chk.click(); return 'generic_checkbox'; }
+      // Amazon CAPTCHA - try the input field
+      const amzInput = document.querySelector('#captchacharacters');
+      if (amzInput) return 'amazon_captcha_needs_input';
+      return null;
+    `;
+    const result = await cdpExecuteJs(tab.id, clickCode, { timeout: 3000 });
+    if (result && result !== 'null' && result !== 'amazon_captcha_needs_input') {
+      console.log('[Sentinel/CAPTCHA] Auto-solved:', result);
+      sendSilentUpdate('🤖 CAPTCHA auto-solved (' + result + ')', stepCount);
+      await sleep(2000); // wait for page to process
+      return 'solved';
+    }
+  } catch (e) {
+    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', e.message);
+  }
+  
+  // Strategy 2: Navigate to an alternative URL for the same site
+  let host;
+  try { host = new URL(currentUrl).hostname.replace(/^www\./, ''); } catch { host = ''; }
+  
+  for (const [key, info] of Object.entries(CAPTCHA_HOST_MAP)) {
+    if (host.includes(key) && goal) {
+      // Try to extract search query from goal and go directly to search results
+      const searchMatch = goal.match(/(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i);
+      if (searchMatch && info.searchPath) {
+        const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
+        console.log('[Sentinel/CAPTCHA] Navigating around CAPTCHA to:', searchUrl);
+        sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
+        await chrome.tabs.update(tab.id, { url: searchUrl });
+        await sleep(3000);
+        return 'bypassed';
+      }
+      // No search query - just go to homepage
+      console.log('[Sentinel/CAPTCHA] Navigating to homepage:', info.altUrl);
+      sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
+      await chrome.tabs.update(tab.id, { url: info.altUrl });
+      await sleep(3000);
+      return 'bypassed';
+    }
+  }
+  
+  // Strategy 3: Go back and try again
+  try {
+    console.log('[Sentinel/CAPTCHA] Going back to previous page');
+    sendSilentUpdate('⬅️ CAPTCHA detected, going back', stepCount);
+    await chrome.tabs.goBack(tab.id);
+    await sleep(2000);
+    return 'went_back';
+  } catch (e) {
+    console.log('[Sentinel/CAPTCHA] Go back failed:', e.message);
+  }
+  
+  // Strategy 4: Pause for user
+  return 'needs_user';
+}
+
+
+
 // or text cue) so the banner can show useful context.
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
@@ -3359,6 +3532,34 @@ async function runAgentLoop(goal, workingTabId) {
           continue; // re-observe the page now that MFA is presumably handled
         }
       } catch (_) { /* never crash the loop on detection issues */ }
+
+            // (3.65) CAPTCHA / bot detection. If the page is a known CAPTCHA page,
+      // try to auto-solve or navigate around it before proceeding.
+      try {
+        const _captchaHit = detectCaptcha(currentUrl, pageText, elements.length);
+        if (_captchaHit && _captchaHit.confidence >= 0.5) {
+          const _captchaResult = await recoverFromCaptcha({id: workingTabId}, _captchaHit, currentUrl, goal);
+          if (_captchaResult === 'solved' || _captchaResult === 'bypassed' || _captchaResult === 'went_back') {
+            // Page should be in a different state now, re-observe
+            continue;
+          }
+          // If we can't auto-solve, pause and notify user
+          if (_captchaResult === 'needs_user') {
+            agentPaused = true;
+            sendSilentUpdate('⏸ CAPTCHA requires manual solve — agent paused', stepCount);
+            notifyIfEnabled('captcha_' + Date.now(), {
+              type: 'basic',
+              iconUrl: chrome.runtime.getURL('icon-48.png'),
+              title: 'Sentinel Override — CAPTCHA Detected',
+              message: 'Solve the CAPTCHA on ' + (currentUrl || 'the page') + ', then click Resume.'
+            });
+            while (agentPaused && agentRunning) await sleep(500);
+            if (!agentRunning) break;
+            sendSilentUpdate('▶ Resumed after CAPTCHA', stepCount);
+            continue;
+          }
+        }
+      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', _captchaErr.message); }
 
       // Rate limiting
       await enforceRateLimit();
