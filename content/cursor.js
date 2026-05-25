@@ -42,21 +42,22 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       style.textContent =
         '#' + CURSOR_ID + ' {' +
           'position: fixed !important;' +
-          'z-index: 2147483647 !important;' +  // (3.8.1) max int — beats Entra/M365 stacking contexts
+          'z-index: 2147483647 !important;' +
           'pointer-events: none !important;' +
-          'width: 32px !important;' +
-          'height: 32px !important;' +
-          'transform: translate(-4px, -2px);' +
+          'width: 48px !important;' +
+          'height: 48px !important;' +
+          'transform: translate(-6px, -3px);' +
           'transition: left 380ms cubic-bezier(0.4, 0, 0.2, 1),' +
           '            top 380ms cubic-bezier(0.4, 0, 0.2, 1),' +
           '            opacity 200ms ease;' +
-          'opacity: 0.92 !important;' +  // (3.8.1) visible by default during runs
+          'opacity: 1 !important;' +
           'will-change: left, top, opacity;' +
-          'isolation: isolate;' +  // (3.8.1) creates own stacking context so SPA contexts can\'t bury it
+          'isolation: isolate;' +
           'contain: layout style;' +
+          'filter: drop-shadow(0 0 6px #ff0000) drop-shadow(0 0 12px #ff4444) !important;' +
           'animation: sentinelCursorBreathe 2.4s ease-in-out infinite;' +
         '}' +
-        '#' + CURSOR_ID + '.dimmed { opacity: 0.45 !important; }' +
+        '#' + CURSOR_ID + '.dimmed { opacity: 1 !important; }' +
         '#' + CURSOR_ID + ' .sentinel-cursor-halo {' +
           'position: absolute;' +
           'top: 50%;' +
