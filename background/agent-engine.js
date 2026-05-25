@@ -5105,7 +5105,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-      } else if (useTrustedInput && (command.type === 'click' || command.type === 'click_at' || command.type === 'type' || command.type === 'press_key')) {
+      } else if (useTrustedInput && (command.type === 'click' || command.type === 'click_at' || command.type === 'type' || command.type === 'press_key' || command.type === 'select')) {
         // (#9) CDP trusted-input dispatch path. Opt-in via settings.
         // On any CDP failure we fall back to the synthetic content-script
         // path so existing flows aren't broken.
@@ -5167,6 +5167,36 @@ async function runAgentLoop(goal, workingTabId) {
             const r = await cdpDispatchKey(tab, command.key);
             if (r.ok) { result = 'Pressed ' + command.key + ' via CDP'; cdpDone = true; }
             else { console.warn('[CDP] dispatchKey failed, falling back:', r.error); }
+          } else if (command.type === 'select') {
+            // v3.66: CDP select - find the <select> element and set its value
+            try {
+              const selCode = '(function(){'
+                + 'var el = document.querySelector(' + JSON.stringify(command.selector || '') + ');'
+                + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
+                + 'if (!el) return { ok: false, error: "No select element found" };'
+                + 'var opts = el.options; var found = false;'
+                + 'for (var i = 0; i < opts.length; i++) {'
+                + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase()) {'
+                + '    el.selectedIndex = i; el.value = opts[i].value;'
+                + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
+                + '    el.dispatchEvent(new Event("input", { bubbles: true }));'
+                + '    found = true; break;'
+                + '  }'
+                + '}'
+                + 'if (!found) return { ok: false, error: "Option not found: " + ' + JSON.stringify(command.value || '') + ' };'
+                + 'return { ok: true, value: el.value };'
+                + '})()';
+              const selResult = await cdpExecuteJs(tab, selCode, { timeout: 3000 });
+              if (selResult && selResult.ok && selResult.value && selResult.value.ok) {
+                result = 'Selected "' + command.value + '" via CDP fallback';
+                cdpDone = true;
+                sendSilentUpdate('[CDP] Selected ' + command.value + ' in ' + (command.selector || 'dropdown'), stepCount);
+              } else {
+                console.warn('[CDP] Select failed:', selResult);
+              }
+            } catch (selErr) {
+              console.warn('[CDP] Select error:', selErr && selErr.message);
+            }
           }
         } catch (err) {
           console.warn('[CDP] dispatch threw, falling back:', err && err.message);
@@ -5271,6 +5301,32 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_) { /* CDP click fallback non-fatal */ }
       }
+      // (v3.66) CDP fallback for select: when content script is dead, set dropdown via CDP JS
+      if (actionFailed && _cdpFallbackActive && command.type === 'select') {
+        try {
+          const selJs = '(function(){'
+            + 'var el = document.querySelector(' + JSON.stringify(command.selector || '') + ');'
+            + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
+            + 'if (!el) return null;'
+            + 'var opts = el.options;'
+            + 'for (var i = 0; i < opts.length; i++) {'
+            + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase()) {'
+            + '    el.selectedIndex = i; el.value = opts[i].value;'
+            + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
+            + '    return el.value;'
+            + '  }'
+            + '}'
+            + 'return null;'
+            + '})()';
+          const selRes = await cdpExecuteJs(tab, selJs, { timeout: 3000 });
+          if (selRes && selRes.ok && selRes.value != null) {
+            result = 'Selected "' + command.value + '" via CDP fallback';
+            actionFailed = false;
+            sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
+          }
+        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', _selErr.message); }
+      }
+
       // (v3.66) CDP fallback for type: when content script can't inject,
       // resolve the input element via CDP, focus it, and dispatch keyboard events.
       if (actionFailed && _cdpFallbackActive && command.type === 'type') {
