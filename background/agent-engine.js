@@ -2241,6 +2241,289 @@ function detectCaptcha(currentUrl, pageText, elementsCount) {
 }
 
 // Attempt to auto-solve CAPTCHA or navigate around it
+async 
+
+// ═══════════════════════════════════════════════════════════════════
+// (v3.69) Smart Recovery Engine — "MacGyver Mode"
+// When the agent is stuck (repeated failures, no progress), this analyzes
+// the page state, the goal, and generates a creative solution on the fly.
+// It can: construct URLs, write custom JS, find alternative selectors,
+// and suggest completely different strategies.
+// ═══════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════
+// (v3.69) Smart Recovery Engine — "MacGyver Mode"
+// When stuck, analyzes page + goal and generates creative solutions.
+// Can construct URLs, suggest execute_js, find alternative approaches.
+// ═══════════════════════════════════════════════════════════════════
+function _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount) {
+  var strategies = [];
+  var url = currentUrl || '';
+  var text = pageText || '';
+  var els = (observation && observation.elements) || [];
+
+  // URL manipulation strategies
+  if (/amazon/i.test(url)) {
+    if (/\/s\?/i.test(url)) {
+      if (!/s=review-rank/.test(url)) strategies.push('Sort by rating: add "&s=review-rank" to URL via smart_navigate');
+      if (!/s=price-asc-rank/.test(url)) strategies.push('Sort by price: add "&s=price-asc-rank" to URL via smart_navigate');
+      if (!/s=date-desc-rank/.test(url)) strategies.push('Sort by newest: add "&s=date-desc-rank" to URL via smart_navigate');
+    }
+    strategies.push('Extract products via execute_js: document.querySelectorAll(".s-result-item") for title/price/rating/link');
+  }
+  if (/reddit/i.test(url)) {
+    strategies.push('Extract posts via execute_js: document.querySelectorAll("[data-testid=\\"post-container\\"]")');
+    if (/search/i.test(url)) strategies.push('Add "&sort=top" or "&sort=relevance" to URL');
+  }
+  if (/google/i.test(url) && /search/i.test(url)) {
+    strategies.push('Extract results via execute_js: document.querySelectorAll(".g") for title/link/snippet');
+  }
+  if (/youtube/i.test(url)) {
+    strategies.push('Extract videos via execute_js: document.querySelectorAll("ytd-video-renderer")');
+  }
+  if (/cnn|bbc|nytimes|reuters/i.test(url)) {
+    strategies.push('Extract articles via execute_js: document.querySelectorAll("article, h2, h3, [class*=headline]")');
+  }
+
+  // Goal-based strategies
+  if (/top \d|find.*\d|list.*\d|best/i.test(goal)) {
+    strategies.push('Use execute_js to extract all matching items from the page in one shot');
+  }
+  if (/then go to|also check|compare/i.test(goal)) {
+    strategies.push('Use navigate with direct URL instead of clicking through pages');
+  }
+
+  // Direct URL construction for multi-site goals
+  var siteUrls = {
+    amazon: 'amazon.com/s?k=',
+    reddit: 'reddit.com/search/?q=',
+    youtube: 'youtube.com/results?search_query=',
+    google: 'google.com/search?q='
+  };
+  for (var site in siteUrls) {
+    var re = new RegExp(site, 'i');
+    if (re.test(goal) && !re.test(url)) {
+      var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
+      if (qm) {
+        strategies.push('Navigate directly to https://www.' + siteUrls[site] + encodeURIComponent(qm[1].trim()));
+      }
+    }
+  }
+
+  // Fallback strategies
+  if (text.length > 1000) {
+    strategies.push('Read the page text — you may already have enough data');
+  }
+  if (strategies.length === 0) {
+    strategies.push('Use execute_js to inspect DOM and find alternative approach');
+    strategies.push('Try read_page to get full content and extract what you need');
+    strategies.push('Use navigate_back and try a different path');
+  }
+
+  return strategies;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// (v3.69) Universal CDP Fallback Engine — "Nothing Stops the Agent"
+// When content script is dead AND per-action CDP fallbacks fail,
+// this translates ANY action into equivalent JavaScript via CDP.
+// Includes fuzzy selector resolution (by text, aria, role, class).
+// ═══════════════════════════════════════════════════════════════════
+async function _universalCdpFallback(tab, cmd, opts) {
+  var timeout = (opts && opts.timeout) || 5000;
+  var sel = cmd.selector || (cmd.ref ? cmd.ref.replace(/^ref_/, '#') : '') || '';
+  var textHint = cmd.text || cmd.value || '';
+  
+  // Build the fuzzy element finder as a self-contained JS string
+  // This gets embedded into each action's JS code
+  var finderCode = '(function(){'
+    + 'var _s=' + JSON.stringify(sel) + ',_t=' + JSON.stringify(textHint) + ';'
+    + 'var el=null;'
+    + 'try{el=document.querySelector(_s)}catch(e){}'
+    + 'if(el&&el.offsetParent!==null)return el;'
+    + 'if(_t){'
+    +   'var _tl=_t.toLowerCase();'
+    +   'var _cands=document.querySelectorAll("button,a,input,select,[role=button],[role=link],span,div");'
+    +   'for(var i=0;i<_cands.length;i++){'
+    +     'if(_cands[i].textContent&&_cands[i].textContent.trim().toLowerCase().indexOf(_tl)>=0&&_cands[i].offsetParent!==null)return _cands[i]'
+    +   '}'
+    + '}'
+    + 'if(_s){'
+    +   'var _parts=_s.replace(/[.#\\[\\]]/g," ").trim().split(/\\s+/);'
+    +   'for(var p=0;p<_parts.length;p++){'
+    +     'if(_parts[p].length>3){'
+    +       'var _w=document.querySelectorAll("[class*="+_parts[p]+"],[id*="+_parts[p]+"]");'
+    +       'for(var w=0;w<_w.length;w++){if(_w[w].offsetParent!==null)return _w[w]}'
+    +     '}'
+    +   '}'
+    + '}'
+    + 'return null'
+    + '})()';
+
+  var jsCode = '';
+  
+  switch (cmd.type) {
+    case 'click':
+    case 'double_click':
+    case 'right_click': {
+      var btn = cmd.type === 'right_click' ? '2' : '0';
+      var detail = cmd.type === 'double_click' ? '2' : '1';
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(!el)return JSON.stringify({ok:false,error:"not found"});'
+        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
+        + 'el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,button:' + btn + ',detail:' + detail + '}));'
+        + 'if(typeof el.click==="function")try{el.click()}catch(e){}'
+        + 'return JSON.stringify({ok:true,result:"clicked "+el.tagName});'
+        + '})()';
+      break;
+    }
+    case 'type': {
+      var safeText = (cmd.text || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(!el)return JSON.stringify({ok:false,error:"input not found"});'
+        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
+        + 'el.focus();'
+        + 'var _s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");'
+        + 'if(_s)_s.set.call(el,"' + safeText + '");else el.value="' + safeText + '";'
+        + 'el.dispatchEvent(new Event("input",{bubbles:true}));'
+        + 'el.dispatchEvent(new Event("change",{bubbles:true}));'
+        + 'return JSON.stringify({ok:true,result:"typed ' + safeText.length + ' chars"});'
+        + '})()';
+      break;
+    }
+    case 'select': {
+      var safeVal = (cmd.value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
+        // Native select
+        + 'if(el.tagName==="SELECT"&&el.options){'
+        +   'for(var i=0;i<el.options.length;i++){'
+        +     'if(el.options[i].value==="' + safeVal + '"||el.options[i].text.trim().toLowerCase()==="' + safeVal.toLowerCase() + '"){'
+        +       'el.selectedIndex=i;el.value=el.options[i].value;'
+        +       'el.dispatchEvent(new Event("change",{bubbles:true}));'
+        +       'return JSON.stringify({ok:true,result:"selected ' + safeVal + '"})'
+        +     '}'
+        +   '}'
+        + '}'
+        // Custom dropdown - click to open, then find option
+        + 'el.click();'
+        + 'var _vl="' + safeVal + '".toLowerCase();'
+        + 'var _opts=document.querySelectorAll("[role=option],li,[data-value],.option,[class*=option],[class*=item]");'
+        + 'for(var j=0;j<_opts.length;j++){'
+        +   'if(_opts[j].textContent&&_opts[j].textContent.trim().toLowerCase().indexOf(_vl)>=0&&_opts[j].offsetParent!==null){'
+        +     '_opts[j].click();'
+        +     'return JSON.stringify({ok:true,result:"selected custom: ' + safeVal + '"})'
+        +   '}'
+        + '}'
+        // Try aria listbox
+        + 'var _lb=document.querySelector("[role=listbox]");'
+        + 'if(_lb){var _li=_lb.querySelectorAll("[role=option]");for(var k=0;k<_li.length;k++){'
+        +   'if(_li[k].textContent&&_li[k].textContent.trim().toLowerCase().indexOf(_vl)>=0){_li[k].click();return JSON.stringify({ok:true,result:"selected listbox: ' + safeVal + '"})}'
+        + '}}'
+        + 'return JSON.stringify({ok:false,error:"option not found: ' + safeVal + '"});'
+        + '})()';
+      break;
+    }
+    case 'check':
+    case 'check_all': {
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});'
+        + 'if(el.type==="checkbox"||el.type==="radio"){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"checked"})}'
+        + 'el.click();return JSON.stringify({ok:true,result:"toggled"})'
+        + '})()';
+      break;
+    }
+    case 'hover': {
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(!el)return JSON.stringify({ok:false,error:"hover target not found"});'
+        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
+        + 'el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));'
+        + 'el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));'
+        + 'return JSON.stringify({ok:true,result:"hovered"})'
+        + '})()';
+      break;
+    }
+    case 'scroll_to': {
+      jsCode = '(function(){'
+        + 'var el=' + finderCode + ';'
+        + 'if(el){el.scrollIntoView({block:"center",behavior:"instant"});return JSON.stringify({ok:true,result:"scrolled to element"})}'
+        + 'window.scrollBy(0,window.innerHeight*0.8);'
+        + 'return JSON.stringify({ok:true,result:"scrolled down"})'
+        + '})()';
+      break;
+    }
+    case 'wait_for_element':
+    case 'wait_for_text': {
+      var searchFor = cmd.text || cmd.value || cmd.selector || '';
+      jsCode = '(function(){'
+        + 'var body=document.body.innerText||"";'
+        + 'var _s=' + JSON.stringify(searchFor) + ';'
+        + 'if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});'
+        + 'if(_s&&body.toLowerCase().indexOf(_s.toLowerCase())>=0)return JSON.stringify({ok:true,result:"found case-insensitive"});'
+        // Also try finding by selector
+        + 'var _el=document.querySelector(' + JSON.stringify(cmd.selector || '') + ');'
+        + 'if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});'
+        + 'return JSON.stringify({ok:false,error:"not found: "+_s.slice(0,50)})'
+        + '})()';
+      break;
+    }
+    case 'extract':
+    case 'extract_list': {
+      jsCode = '(function(){'
+        + 'var sel=' + JSON.stringify(cmd.selector || '') + ';'
+        + 'if(sel){var els=document.querySelectorAll(sel);if(els.length){'
+        +   'var items=[];for(var i=0;i<els.length;i++)items.push(els[i].textContent.trim().slice(0,200));'
+        +   'return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})'
+        + '}}'
+        + 'return JSON.stringify({ok:false,error:"nothing to extract"})'
+        + '})()';
+      break;
+    }
+    case 'verify': {
+      jsCode = '(function(){'
+        + 'var body=document.body.innerText||"";'
+        + 'var _c=' + JSON.stringify(cmd.text || cmd.value || '') + ';'
+        + 'if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});'
+        + 'if(_c&&body.toLowerCase().indexOf(_c.toLowerCase())>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"});'
+        + 'return JSON.stringify({ok:false,error:"verification failed"})'
+        + '})()';
+      break;
+    }
+    default: {
+      if (sel) {
+        jsCode = '(function(){'
+          + 'var el=' + finderCode + ';'
+          + 'if(!el)return JSON.stringify({ok:false,error:"not found for ' + cmd.type + '"});'
+          + 'el.scrollIntoView({block:"center",behavior:"instant"});'
+          + 'el.click();'
+          + 'return JSON.stringify({ok:true,result:"generic fallback clicked for ' + cmd.type + '"})'
+          + '})()';
+      }
+      break;
+    }
+  }
+  
+  if (!jsCode) return { ok: false, result: 'No UFB for: ' + cmd.type };
+  
+  var ufbRes = await cdpExecuteJs(tab, jsCode, { timeout: timeout });
+  if (ufbRes && ufbRes.ok && ufbRes.value != null) {
+    try {
+      var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
+      return { ok: parsed.ok !== false, result: parsed.result || parsed.error || 'UFB done', value: parsed.value };
+    } catch(e) {
+      return { ok: true, result: String(ufbRes.value).slice(0, 200) };
+    }
+  }
+  return { ok: false, result: 'UFB returned no result' };
+}
+
+
 async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal) {
   console.log('[Sentinel/CAPTCHA] Detected:', captchaInfo.type, 'url:', currentUrl);
   
@@ -5378,6 +5661,30 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', _typeErr.message); }
       }
 
+      //       // ═══════════════════════════════════════════════════════════════
+      // (v3.69) UNIVERSAL CDP ACTION FALLBACK — "No-Excuses" Layer
+      // If ANY action fails through content script AND existing CDP paths,
+      // this catches it and executes the equivalent via CDP Runtime.evaluate.
+      // Handles: click, type, select, check, hover, scroll_to, wait_for_*,
+      // extract, verify, and any unknown action type. Nothing stops the agent.
+      // ═══════════════════════════════════════════════════════════════
+      if (actionFailed && _cdpFallbackActive) {
+        try {
+          const _ufbResult = await _universalCdpFallback(tab, command, { timeout: 5000 });
+          if (_ufbResult && _ufbResult.ok) {
+            result = _ufbResult.result || 'Executed via universal CDP fallback';
+            actionFailed = false;
+            sendSilentUpdate('[CDP-UFB] ' + command.type + ' success', stepCount);
+            console.log('[Sentinel/UFB] Universal fallback succeeded for', command.type);
+          } else if (_ufbResult && _ufbResult.result) {
+            result = _ufbResult.result;
+            // Don't mark success but LLM gets useful feedback about what happened
+          }
+        } catch (_ufbErr) {
+          console.log('[Sentinel/UFB] Universal fallback error:', _ufbErr && _ufbErr.message);
+        }
+      }
+
       // (7.1) Automatic bbox fallback: if a click fails due to selector issues,
       // resolve the element's bbox from the page and retry as click_at.
       if (actionFailed && command.type === 'click' && !command._bboxFallback) {
@@ -5567,7 +5874,13 @@ async function runAgentLoop(goal, workingTabId) {
         _recoveryMsg += '- Use execute_js to extract data or interact with the DOM directly\n';
         _recoveryMsg += '- Use click with a specific selector to interact with elements\n';
         _recoveryMsg += '- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n';
-        _recoveryMsg += '- Read the page text content and extract what you need without interacting';
+        _recoveryMsg += '- Read the page text content and extract what you need without interacting\n\n';
+        // (v3.69) Smart Recovery: generate site-specific strategies
+        const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
+        if (_smartStrats.length > 0) {
+          _recoveryMsg += 'SMART STRATEGIES for this page:\n';
+          for (const s of _smartStrats) { _recoveryMsg += '→ ' + s + '\n'; }
+        }
         historyPush({
           step: stepCount,
           action: { type: 'note', text: _recoveryMsg },
