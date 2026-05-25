@@ -1303,108 +1303,106 @@ async function _cdpObservePage(tabId) {
 }
 
 async function _cdpDismissOverlays(tabId, overlays) {
-  if (!overlays || overlays.length === 0) return 0;
-  let dismissed = 0;
+  // (v3.56) Nuclear overlay annihilator — 3 phases, no mercy
+  let totalRemoved = 0;
 
-  // Phase 1: Click accept/agree buttons first (zero-friction policy)
-  for (const overlay of overlays) {
-    const acceptBtn = overlay.buttons.find(b =>
-      /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure|understand/i.test(b.text)
-    );
-    const dismissBtn = acceptBtn || overlay.buttons.find(b => b.text.length > 0) || overlay.buttons[0];
-    if (dismissBtn && dismissBtn.x && dismissBtn.y) {
-      console.log('[Sentinel/CDP] Clicking overlay button:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
-      const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
-      if (r && r.ok) { dismissed++; }
-      await new Promise(r => setTimeout(r, 600));
+  // Phase 1: Click accept/agree buttons if we have overlay detection data
+  if (overlays && overlays.length > 0) {
+    for (const overlay of overlays) {
+      const acceptBtn = overlay.buttons.find(b =>
+        /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i.test(b.text)
+      );
+      const dismissBtn = acceptBtn || overlay.buttons.find(b => b.text && b.text.length > 0) || overlay.buttons[0];
+      if (dismissBtn && dismissBtn.x && dismissBtn.y) {
+        console.log('[Sentinel/CDP] Phase1 clicking:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
+        const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
+        if (r && r.ok) totalRemoved++;
+        await new Promise(r => setTimeout(r, 600));
+      }
     }
   }
 
-  // Phase 2: Nuclear — remove ALL overlay-like elements from DOM via CDP
-  // This handles cases where clicking didn't work (iframe overlays, shadow DOM, etc.)
-  const nukeCode = [
-    '(function() {',
-    '  var removed = 0;',
-    '  // Common overlay selectors',
-    '  var selectors = [',
-    '    "[class*=consent i]", "[class*=cookie i]", "[class*=gdpr i]",',
-    '    "[class*=overlay i]", "[class*=popup i]", "[class*=modal i]",',
-    '    "[class*=dialog i]", "[class*=interstitial i]", "[class*=paywall i]",',
-    '    "[class*=banner i]", "[class*=privacy i]", "[class*=wall i]",',
-    '    "[id*=consent i]", "[id*=cookie i]", "[id*=gdpr i]",',
-    '    "[id*=onetrust i]", "[id*=overlay i]", "[id*=popup i]",',
-    '    "[id*=modal i]", "[id*=dialog i]", "[id*=interstitial i]",',
-    '    "[id*=paywall i]", "[id*=banner i]", "[id*=privacy i]",',
-    '    "[id*=sp_message i]", "[id*=sp_message_id i]",',
-    '    ".sp_message", ".message-container",',
-    '    "[aria-modal*=true i]", "[role=dialog]",',
-    '    "div[id^=sp_message]", "div.sp_veil",',
-    '    "#onetrust-consent-sdk", "#onetrust-banner-sdk",',
-    '    "#cookieConsent", "#cookie-notice", "#cookie-banner",',
-    '    ".cky-consent-container", ".cky-modal",',
-    '    ".cc-window", ".cc-banner", ".cc-floating",',
-    '    "#__next + div[class*=fixed]", "div[class*=fixed][class*=inset]"',
-    '  ];',
-    '  for (var s = 0; s < selectors.length; s++) {',
-    '    try {',
-    '      var els = document.querySelectorAll(selectors[s]);',
-    '      for (var i = 0; i < els.length; i++) {',
-    '        var el = els[i];',
-    '        var style = window.getComputedStyle(el);',
-    '        if (style.display !== "none" && style.visibility !== "hidden") {',
-    '          // Check if it covers significant screen area',
-    '          var rect = el.getBoundingClientRect();',
-    '          var area = rect.width * rect.height;',
-    '          var screenArea = window.innerWidth * window.innerHeight;',
-    '          if (area > screenArea * 0.05) {',
-    '            el.remove();',
-    '            removed++;',
-    '          }',
-    '        }',
-    '      }',
-    '    } catch(e) {}',
-    '  }',
-    '  // Remove backdrop/mask elements (dark overlays behind popups)',
-    '  try {',
-    '    var masks = document.querySelectorAll("div, section, aside");',
-    '    for (var m = 0; m < masks.length; m++) {',
-    '      var st = window.getComputedStyle(masks[m]);',
-    '      var bg = st.backgroundColor || st.background || "";',
-    '      var pos = st.position || "";',
-    '      var z = parseInt(st.zIndex) || 0;',
-    '      var rect = masks[m].getBoundingClientRect();',
-    '      if ((pos === "fixed" || pos === "absolute") && z >= 1000',
-    '        && rect.width > window.innerWidth * 0.8',
-    '        && rect.height > window.innerHeight * 0.8',
-    '        && !masks[m].querySelector("input, textarea, select, [contenteditable]")) {',
-    '        // This is likely a backdrop mask — remove it',
-    '        masks[m].remove();',
-    '        removed++;',
-    '      }',
-    '    }',
-    '  } catch(e) {}',
-    '  // Restore scrolling',
-    '  try {',
-    '    document.body.style.overflow = "";',
-    '    document.documentElement.style.overflow = "";',
-    '    document.body.style.position = "";',
-    '    document.body.style.width = "";',
-    '  } catch(e) {}',
-    '  return removed;',
-    '})()'
-  ].join('\n');
+  // Phase 2: Remove ALL iframes (consent dialogs are almost always in iframes)
+  // and remove ANY fixed/absolute element with high z-index covering significant screen area
+  const nukeCode = '(function(){'
+    + 'var n = 0;'
+    // Step A: Nuke ALL iframes unconditionally — consent CMPs load in cross-origin iframes
+    + 'var iframes = document.querySelectorAll("iframe");'
+    + 'for (var i = iframes.length - 1; i >= 0; i--) {'
+    + '  iframes[i].remove(); n++;'
+    + '}'
+    // Step B: Nuke elements with overlay-like class/id patterns
+    + 'var sels = ["[class*=consent]","[class*=cookie]","[class*=gdpr]","[class*=overlay]","[class*=popup]","[class*=modal]","[class*=interstitial]","[class*=paywall]","[class*=banner]","[class*=privacy]","[class*=wall]","[id*=consent]","[id*=cookie]","[id*=gdpr]","[id*=onetrust]","[id*=overlay]","[id*=popup]","[id*=modal]","[id*=interstitial]","[id*=paywall]","[id*=banner]","[id*=privacy]","[id*=sp_message]","[id*=sp_message_id]",".sp_message",".message-container","[aria-modal=true]","[role=dialog]","div[id^=sp_message]","div.sp_veil","#onetrust-consent-sdk","#onetrust-banner-sdk","#cookieConsent","#cookie-notice","#cookie-banner",".cky-consent-container",".cky-modal",".cc-window",".cc-banner",".cc-floating"];'
+    + 'for (var s = 0; s < sels.length; s++) {'
+    + '  try {'
+    + '    var els = document.querySelectorAll(sels[s]);'
+    + '    for (var j = 0; j < els.length; j++) {'
+    + '      els[j].remove(); n++;'
+    + '    }'
+    + '  } catch(e) {}'
+    + '}'
+    // Step C: Nuclear — remove ANY fixed/absolute element with z-index >= 100
+    // covering >20% of viewport. This catches dynamically-named overlays.
+    + 'var allDivs = document.querySelectorAll("div, section, aside, dialog, custom-element");'
+    + 'for (var k = 0; k < allDivs.length; k++) {'
+    + '  try {'
+    + '    var st = window.getComputedStyle(allDivs[k]);'
+    + '    var pos = st.position || "";'
+    + '    var z = parseInt(st.zIndex) || 0;'
+    + '    if ((pos === "fixed" || pos === "absolute") && z >= 100) {'
+    + '      var r = allDivs[k].getBoundingClientRect();'
+    + '      var area = r.width * r.height;'
+    + '      var screen = window.innerWidth * window.innerHeight;'
+    + '      if (area > screen * 0.1) {'
+    + '        allDivs[k].remove(); n++;'
+    + '      }'
+    + '    }'
+    + '  } catch(e) {}'
+    + '}'
+    // Step D: Remove backdrop masks (semi-transparent overlays behind popups)
+    + 'var masks = document.querySelectorAll("div");'
+    + 'for (var m = 0; m < masks.length; m++) {'
+    + '  try {'
+    + '    var mst = window.getComputedStyle(masks[m]);'
+    + '    var mpos = mst.position || "";'
+    + '    var mz = parseInt(mst.zIndex) || 0;'
+    + '    var mr = masks[m].getBoundingClientRect();'
+    + '    if ((mpos === "fixed" || mpos === "absolute") && mz >= 100'
+    + '      && mr.width > window.innerWidth * 0.8'
+    + '      && mr.height > window.innerHeight * 0.8'
+    + '      && !masks[m].querySelector("input, textarea, select, [contenteditable], article, main")'
+    + '    ) { masks[m].remove(); n++; }'
+    + '  } catch(e) {}'
+    + '}'
+    // Step E: Restore scrolling
+    + 'document.body.style.overflow = "";'
+    + 'document.documentElement.style.overflow = "";'
+    + 'document.body.style.position = "";'
+    + 'document.body.style.width = "";'
+    + 'return n;'
+    + '})()';
 
   try {
-    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 5000 });
-    if (nukeResult && nukeResult.ok && nukeResult.value > 0) {
-      console.log('[Sentinel/CDP] Nuclear overlay removal:', nukeResult.value, 'elements removed');
-      dismissed += nukeResult.value;
+    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 8000 });
+    if (nukeResult && nukeResult.ok) {
+      console.log('[Sentinel/CDP] Phase2 nuclear removal:', nukeResult.value, 'elements removed');
+      totalRemoved += (nukeResult.value || 0);
+    } else {
+      console.warn('[Sentinel/CDP] Phase2 nuke returned:', nukeResult);
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Nuclear overlay removal failed:', e && e.message);
+    console.warn('[Sentinel/CDP] Phase2 nuke failed:', e && e.message);
   }
 
-  return dismissed;
+  // Phase 3: If still blocked, try scrolling the page to check if overlay is really gone
+  try {
+    await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
+    await new Promise(r => setTimeout(r, 300));
+    await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
+  } catch(_) {}
+
+  console.log('[Sentinel/CDP] Overlay dismissal complete. Total removed:', totalRemoved);
+  return totalRemoved;
 }
 
 // Track whether we're in CDP fallback mode for the current step
