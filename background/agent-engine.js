@@ -2937,6 +2937,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      _lastLoopUrl = currentUrl;
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
@@ -5544,20 +5545,32 @@ async function runAgentLoop(goal, workingTabId) {
       // inject a recovery note telling it to switch strategy.
       if (typeof _lastCmdType === 'undefined') { var _lastCmdType = ''; }
       if (typeof _sameCmdCount === 'undefined') { var _sameCmdCount = 0; }
+      if (typeof _lastLoopUrl === 'undefined') { var _lastLoopUrl = ''; }
       if (command.type === _lastCmdType) {
         _sameCmdCount++;
       } else {
         _sameCmdCount = 0;
         _lastCmdType = command.type;
       }
-      if (_sameCmdCount >= 3 && !['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list'].includes(command.type)) {
-        console.warn('[Sentinel/RECOVERY] Same-command loop:', command.type, 'used', _sameCmdCount + 1, 'times. Forcing strategy shift.');
+      // v3.68: Trigger on 2 repeats (not 3), cover ALL action types, and be more specific
+      const _loopExcludeTypes = new Set(['finish', 'navigate', 'extract', 'extract_list']);
+      if (_sameCmdCount >= 2 && !_loopExcludeTypes.has(command.type)) {
+        const _pageUnchanged = currentUrl === (_lastLoopUrl || '');
+        console.warn('[Sentinel/RECOVERY] Same-command loop:', command.type, 'used', _sameCmdCount + 1, 'times. Page unchanged:', _pageUnchanged);
+        let _recoveryMsg = 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row';
+        if (_pageUnchanged) _recoveryMsg += ' with NO page change';
+        _recoveryMsg += '. STOP using ' + command.type + '. ';
+        if (_cdpFallbackActive) {
+          _recoveryMsg += 'The content script is NOT available on this page (CDP fallback active). ';
+        }
+        _recoveryMsg += 'Switch to a completely different approach. Examples:\n';
+        _recoveryMsg += '- Use execute_js to extract data or interact with the DOM directly\n';
+        _recoveryMsg += '- Use click with a specific selector to interact with elements\n';
+        _recoveryMsg += '- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n';
+        _recoveryMsg += '- Read the page text content and extract what you need without interacting';
         historyPush({
           step: stepCount,
-          action: { type: 'note', text: 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row without progress. ' +
-            'STOP using ' + command.type + '. The content script is NOT available on this page. ' +
-            'Instead use execute_js to interact with the page via JavaScript. ' +
-            'For example: { "type": "execute_js", "code": "document.querySelector(\'select\').value = \'X\'; document.querySelector(\'select\').dispatchEvent(new Event(\'change\'))" }' },
+          action: { type: 'note', text: _recoveryMsg },
           result: 'Recovery from ' + command.type + ' loop'
         });
         await persistHistory();
