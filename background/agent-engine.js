@@ -1237,14 +1237,17 @@ async function _cdpObservePage(tabId) {
     + 'return { hasBody: !!document.body, title: title, childCount: childCount, '
     + '  url: window.location.href, readyState: document.readyState };';
 
-  try {
-    const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 3000 });
+  // SPEED: Skip ready check if previous observe found page was loaded
+  if (_pageWasReady) {
+    console.log('[Sentinel/CDP] Skipping page ready check — previous observe confirmed loaded');
+  } else try {
+    const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 2000 });
     console.log('[Sentinel/CDP] Page ready check:', JSON.stringify(readyState && readyState.value));
     if (readyState && readyState.ok && readyState.value) {
       const r = readyState.value;
       // If page has no body and no children, wait a moment and try again
       if (!r.hasBody && r.childCount === 0) {
-        console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
+        console.log('[Sentinel/CDP] Page has no body — waiting 800ms for DOM...');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       // If title is empty and URL is still about:blank or loading, wait
@@ -1324,6 +1327,7 @@ async function _cdpObservePage(tabId) {
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
   if (result && result.ok && result.value) {
     console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
+    _pageWasReady = true; // Mark page as ready for next step
     return result.value;
   }
   return null;
@@ -1406,13 +1410,18 @@ async function _cdpDismissOverlays(tabId, overlays) {
         'return n;'
       ].join('\n');
 
-  try {
+  // SPEED: Skip nuke entirely when no overlays detected AND last nuke was clean
+  if (overlays.length === 0 && _lastNukeClean) {
+    console.log('[Sentinel/CDP] Skipping nuke — no overlays and last nuke was clean');
+  } else try {
     console.log('[Sentinel/CDP] Phase2: sending surgical nuke (' + nukeCode.length + ' chars) to tab', tabId);
-    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 8000 });
+    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 5000 });
     console.log('[Sentinel/CDP] Phase2 raw result:', JSON.stringify(nukeResult));
     if (nukeResult && nukeResult.ok) {
-      console.log('[Sentinel/CDP] Phase2 surgical removal:', nukeResult.value, 'elements affected');
-      totalRemoved += (nukeResult.value || 0);
+      const removed = (nukeResult.value || 0);
+      console.log('[Sentinel/CDP] Phase2 surgical removal:', removed, 'elements affected');
+      totalRemoved += removed;
+      _lastNukeClean = (removed === 0); // Track for skip optimization
       // (v3.59) Post-nuke integrity check: verify page still has content
       if ((nukeResult.value || 0) > 0) {
         const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: 3000 });
@@ -1437,10 +1446,10 @@ async function _cdpDismissOverlays(tabId, overlays) {
     console.warn('[Sentinel/CDP] Phase2 threw:', e && e.message);
   }
 
-  // Phase 3: If still blocked, try scrolling the page to check if overlay is really gone
-  try {
+  // Phase 3: Quick scroll test (only if overlays were found)
+  if (totalRemoved > 0) try {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 200));
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
   } catch(_) {}
 
@@ -1450,6 +1459,8 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
 // Track whether we're in CDP fallback mode for the current step
 let _cdpFallbackActive = false;
+let _lastNukeClean = false; // Track if last nuke found nothing to remove
+let _pageWasReady = false; // Skip ready check if previous observe succeeded
 
 
 
