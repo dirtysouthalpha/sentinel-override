@@ -2799,6 +2799,35 @@ if (document.readyState === 'loading') {
   checkResumeOnLoad();
 }
 
+// v3.61.1: Load last report from storage on panel open.
+// The agent saves the report to chrome.storage.local but the sidePanel
+// may refresh during cleanup (closeAllAgentTabs triggers tab switch).
+// Without this, the report card DOM is lost and the user sees nothing.
+async function loadLastReport() {
+  try {
+    const stored = await chrome.storage.local.get(['last_agent_report']);
+    const report = stored.last_agent_report;
+    if (!report || typeof report !== 'object') return;
+    // Only show if report is less than 5 minutes old
+    const age = Date.now() - new Date(report.timestamp).getTime();
+    if (age > 5 * 60 * 1000) return; // older than 5 min
+    // Don't show if there's already a report card in the chat
+    if (chatContainer.querySelector('.report-card-title')) return;
+    addReportCard(report);
+    // Clear so it doesn't show again on next panel open
+    await chrome.storage.local.remove(['last_agent_report']);
+  } catch (e) {
+    console.warn('[Sentinel] loadLastReport failed:', e);
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(loadLastReport, 500));
+} else {
+  setTimeout(loadLastReport, 500);
+}
+
+
 // ========== Source Tag Chips (3.10.0) ==========
 // Convert inline [src:memory_key] markers in agent finish summaries into
 // clickable chips that expand the underlying memory entry inline. Builds
