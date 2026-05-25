@@ -91,10 +91,16 @@ jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendScreenshotUpdate: jest.fn(),
   sendAgentActivity: jest.fn(),
   sendAgentStepStart: jest.fn(),
+  sendAgentStatus: jest.fn(),
+  sendHeartbeat: jest.fn(),
+  sendCostUpdate: jest.fn(),
+  sendClientKnowledgePreview: jest.fn(),
+  sendPlanPreview: jest.fn(),
 }));
 
 jest.unstable_mockModule('../background/report-generator.js', () => ({
   generateReport: jest.fn(async () => '## Report'),
+  buildFallbackReport: jest.fn(() => 'Fallback report'),
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
