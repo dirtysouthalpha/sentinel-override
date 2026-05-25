@@ -1961,3 +1961,126 @@ describe('LLM rate limiter', () => {
     setLLMRateLimit(120, 60000);
   });
 });
+
+// ==========================
+// Bug #2 regression tests: generatePlan prose fallback
+// ==========================
+describe('Bug #2 regression: generatePlan prose fallback', () => {
+  test('extracts numbered steps from prose when JSON parsing fails', async () => {
+    // Each line must have at least 10 characters after the number for regex to match
+    const proseResponse = `Here's the plan:
+1. Navigate to the account settings page and find security
+2. Click on the two-factor authentication option
+3. Scan the QR code with your authenticator app`;
+
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: proseResponse } }] }),
+    });
+
+    const { generatePlan } = await import('../background/llm-client.js');
+    const result = await generatePlan('Enable 2FA', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.test.com/v1/chat/completions',
+      model: 'test-model',
+    });
+
+    // Should extract numbered steps from prose
+    expect(result).toEqual([
+      'Navigate to the account settings page and find security',
+      'Click on the two-factor authentication option',
+      'Scan the QR code with your authenticator app',
+    ]);
+  });
+
+  test('extracts bullet steps from prose when JSON parsing fails', async () => {
+    // Each line must have at least 10 characters after the bullet for regex to match
+    const proseResponse = `Plan:
+- Navigate to the admin panel and log in with credentials
+- Select the users management option from sidebar
+- Add a new user with email and temporary password`;
+
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: proseResponse } }] }),
+    });
+
+    const { generatePlan } = await import('../background/llm-client.js');
+    const result = await generatePlan('Add user', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.test.com/v1/chat/completions',
+      model: 'test-model',
+    });
+
+    // Should extract bullet steps from prose
+    expect(result).toEqual([
+      'Navigate to the admin panel and log in with credentials',
+      'Select the users management option from sidebar',
+      'Add a new user with email and temporary password',
+    ]);
+  });
+
+  test('falls back to single-step plan when prose parsing fails', async () => {
+    const gibberishResponse = 'This is not valid JSON or prose steps';
+
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: gibberishResponse } }] }),
+    });
+
+    const { generatePlan } = await import('../background/llm-client.js');
+    const result = await generatePlan('Do something complex', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.test.com/v1/chat/completions',
+      model: 'test-model',
+    });
+
+    // Should fall back to single-step plan from goal
+    expect(result).toEqual(['Do something complex']);
+  });
+
+  test('handles JSON with steps instead of plan key', async () => {
+    const stepsKeyResponse = `{"steps": ["Navigate to the page", "Click the button", "Verify result"]}`;
+
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: stepsKeyResponse } }] }),
+    });
+
+    const { generatePlan } = await import('../background/llm-client.js');
+    const result = await generatePlan('Test goal', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.test.com/v1/chat/completions',
+      model: 'test-model',
+    });
+
+    // Should handle both "plan" and "steps" keys
+    expect(result).toEqual(['Navigate to the page', 'Click the button', 'Verify result']);
+  });
+
+  test('handles Z.AI endpoint without JSON mode', async () => {
+    // Z.AI endpoint should NOT receive response_format:json_object
+    // to avoid 400 errors
+    const mockFn = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"plan": ["Step 1", "Step 2"]}' } }] }),
+    }));
+
+    _mockFetch = mockFn;
+
+    const { generatePlan } = await import('../background/llm-client.js');
+    const result = await generatePlan('Test goal', {
+      api_key: 'test-key',
+      api_endpoint: 'https://token-plan-sgp.xiaomimimo.com/v1/chat/completions',
+      model: 'MiMo-V2.5',
+    });
+
+    // Verify the request was made without jsonMode causing 400
+    expect(mockFn).toHaveBeenCalled();
+    expect(result).toEqual(['Step 1', 'Step 2']);
+
+    // Verify response_format is not sent (would cause 400 on Z.AI)
+    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    expect(body.response_format).toBeUndefined();
+  });
+});
