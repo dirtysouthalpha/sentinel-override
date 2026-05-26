@@ -5201,10 +5201,30 @@ async function runAgentLoop(goal, workingTabId) {
         if (_viEl) {
           try {
             if (command.type === 'click_at') {
-              // Method 1: CDP dispatchMouseEvent at element center
-              if (_viEl.rect) {
-                const _cx = Math.round(_viEl.rect.x + _viEl.rect.w / 2);
-                const _cy = Math.round(_viEl.rect.y + _viEl.rect.h / 2);
+              // (v4.2) Refresh element rect from live DOM — stored rect can go
+              // stale between discover and click (overlay re-renders, layout
+              // shifts). Look up via window.__sentinelElements Map which
+              // VISION_CLEAR preserves (it only removes the canvas overlay +
+              // data-sentinel-index attrs).
+              let _liveRect = null;
+              try {
+                const _rectRes = await cdpExecuteJs(tab,
+                  '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()',
+                  { timeout: 3000 });
+                if (_rectRes && _rectRes.value) {
+                  const _parsed = typeof _rectRes.value === 'string' ? JSON.parse(_rectRes.value) : _rectRes.value;
+                  if (_parsed && _parsed.visible) _liveRect = _parsed;
+                }
+              } catch (_re) { /* fall back to stored rect */ }
+
+              const _rect = _liveRect || _viEl.rect;
+              if (_rect) {
+                // CDP Input.dispatchMouseEvent uses CSS pixels (see
+                // cdpDispatchClick docstring in tab-manager.js), so no DPR
+                // scaling needed.
+                const _cx = Math.round(_rect.x + _rect.w / 2);
+                const _cy = Math.round(_rect.y + _rect.h / 2);
+                let _cdpClickOk = false;
                 try {
                   // Full mouse event chain: moved -> pressed -> released (mimics real click)
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: _cx, y: _cy });
@@ -5212,26 +5232,39 @@ async function runAgentLoop(goal, workingTabId) {
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: _cx, y: _cy, button: 'left', clickCount: 1 });
                   await new Promise(r => setTimeout(r, 30));
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: _cx, y: _cy, button: 'left', clickCount: 1 });
-                  result = 'Clicked [' + command._visionIndex + '] at (' + _cx + ',' + _cy + ')';
+                  result = 'Clicked [' + command._visionIndex + '] at (' + _cx + ',' + _cy + ')' + (_liveRect ? ' [live-rect]' : ' [cached-rect]');
                   console.log('[Sentinel/v4]', result);
-                  // ALSO fire a JS .click() as backup — overlays can intercept CDP mouse events
-                  try {
-                    await cdpExecuteJs(tab,
-                      '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(e){e.click();return"js-clicked";}return"no-js-ref";})()',
-                      { timeout: 3000 });
-                  } catch (_jsE) { /* non-fatal backup */ }
-                } catch (_cme) {
-                  // Method 2: CDP evaluate click
-                  try {
-                    const _clickRes = await cdpExecuteJs(tab, 
-                      '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
-                      { timeout: 5000 });
-                    result = 'Clicked [' + command._visionIndex + '] via CDP selector: ' + (_clickRes && _clickRes.value || 'unknown');
-                  } catch (_cme2) {
-                    result = 'Click failed for [' + command._visionIndex + ']';
-                    actionFailed = true;
+                  _cdpClickOk = true;
+                } catch (_cme) { /* fall through to JS .click() */ }
+
+                // (v4.2) Verify dismissal — short delay, then check if the same
+                // element is still present + visible. If yes, the CDP mouse
+                // event was absorbed by an overlay; fire a JS .click() on the
+                // stored element reference (bypasses pointer-events and
+                // overlay interception).
+                await new Promise(r => setTimeout(r, 100));
+                try {
+                  const _jsClickRes = await cdpExecuteJs(tab,
+                    '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()',
+                    { timeout: 3000 });
+                  const _val = _jsClickRes && _jsClickRes.value;
+                  if (_val === 'js-clicked') {
+                    result = (result || 'Clicked [' + command._visionIndex + ']') + ' + js-fallback';
+                  } else if (!_cdpClickOk && _val !== 'dismissed') {
+                    // CDP failed AND JS fallback couldn't find element — last
+                    // resort: try by old attribute (only works if VISION_CLEAR
+                    // hasn't run yet on this step).
+                    try {
+                      const _attrRes = await cdpExecuteJs(tab,
+                        '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
+                        { timeout: 3000 });
+                      result = 'Clicked [' + command._visionIndex + '] via attr selector: ' + (_attrRes && _attrRes.value || 'unknown');
+                    } catch (_cme2) {
+                      result = 'Click failed for [' + command._visionIndex + ']';
+                      actionFailed = true;
+                    }
                   }
-                }
+                } catch (_jsE) { /* non-fatal — CDP click likely already worked */ }
               }
             } else if (command.type === 'type') {
               // Type into indexed element
@@ -6134,9 +6167,14 @@ async function runAgentLoop(goal, workingTabId) {
         _clickAtLoopCount++;
         if (_clickAtLoopCount >= 3 && productiveSteps === 0) {
           console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with 0 productive steps');
-          // Auto-dismiss common overlay patterns
+          // Auto-dismiss common overlay patterns. Two passes:
+          //   1. selector-based: known consent libraries (OneTrust, Didomi,
+          //      Sourcepoint, etc.) and aria-label heuristics.
+          //   2. text-based fallback: any visible button whose text matches
+          //      Accept/Agree/OK/Continue/I agree/Got it (handles bespoke
+          //      overlays like CNN's that don't use a known framework).
           try {
-            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0;i<p.length;i++){var es=document.querySelectorAll(p[i]);for(var j=0;j<es.length;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}return d?"dismissed":"no-overlay";})()', { timeout: 5000 });
+            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0;i<p.length;i++){var es=document.querySelectorAll(p[i]);for(var j=0;j<es.length;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}if(!d){var rx=/^(accept(\\s+all)?|i\\s+agree|agree|allow(\\s+all)?|got\\s+it|ok|okay|continue|yes,?\\s+i\\s+(agree|accept)|consent)$/i;var btns=document.querySelectorAll(\'button, [role="button"], a.button, input[type="submit"], input[type="button"]\');for(var k=0;k<btns.length;k++){var b=btns[k];var t=((b.innerText||b.value||b.getAttribute("aria-label")||"")+"").trim();if(!t||t.length>40)continue;if(!rx.test(t))continue;var br=b.getBoundingClientRect();if(br.width<=0||br.height<=0)continue;var cs=window.getComputedStyle(b);if(cs.visibility==="hidden"||cs.display==="none")continue;try{b.click();d=true;break;}catch(_e){}}}return d?"dismissed":"no-overlay";})()', { timeout: 5000 });
           } catch(_oe) { /* non-fatal */ }
           historyPush({
             step: stepCount,
