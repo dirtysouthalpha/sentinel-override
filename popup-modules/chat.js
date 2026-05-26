@@ -3486,8 +3486,7 @@ chrome.runtime.onMessage.addListener((message) => {
                       if (inputBox && typeof inputBox.value !== 'undefined') {
                         inputBox.value = originalGoal;
                       }
-                      if (typeof sendGoal === 'function') sendGoal();
-                      else chrome.runtime.sendMessage({ action: 'start_agent', goal: originalGoal });
+                      if (typeof sendMessage === 'function') sendMessage();
                     } catch { /* DOM write or message may fail */ }
                   }
                   sCard.style.opacity = '0.5';
