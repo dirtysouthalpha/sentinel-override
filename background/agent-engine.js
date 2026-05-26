@@ -3464,7 +3464,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
             console.debug('[Sentinel/DEBUG] Already on right page, skipping navigation');
             // Already on the right page - skip navigation
-          } catch (navErr) { console.warn('[Sentinel/DEBUG] auto-navigate error:', navErr && navErr.message); /* URL parse error, skip auto-navigate */ }
+          } catch (navErr) { console.warn('[Sentinel] auto-navigate error:', navErr && navErr.message); /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -6139,12 +6139,12 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('[Sentinel/DEBUG] Agent loop CAUGHT error:', err, err.message, err.stack);
+      console.error('[Sentinel] Agent loop error:', err, err.message, err.stack);
       sendSilentUpdate(`Loop error: ${err.message}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
       if (err.message.includes('was closed')) {
-        console.warn('[Sentinel/DEBUG] Tab was closed, attempting recovery...');
+        console.warn('[Sentinel] Tab was closed, attempting recovery...');
         // Try to find another tab or the same tab re-created
         try {
           const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
@@ -6153,12 +6153,12 @@ async function runAgentLoop(goal, workingTabId) {
             registerInitialTab(recoveryTab.id, recoveryTab.url || '');
             console.debug('[Sentinel/DEBUG] Recovered to tab:', recoveryTab.id, recoveryTab.url);
           } else {
-            console.error('[Sentinel/DEBUG] No tabs available, stopping agent');
+            console.error('[Sentinel] No tabs available, stopping agent');
             agentRunning = false;
             break;
           }
         } catch (recoveryErr) {
-          console.error('[Sentinel/DEBUG] Recovery failed:', recoveryErr);
+          console.error('[Sentinel] Recovery failed:', recoveryErr);
           agentRunning = false;
           break;
         }
@@ -6173,7 +6173,7 @@ async function runAgentLoop(goal, workingTabId) {
   // first, THEN stop the keepalive and do cleanup.
 
   console.debug('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
-  console.log('[Sentinel/REPORT-DEBUG] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
+  console.debug('[Sentinel/report] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
   // reportData is already a snapshot, so cleanup order doesn't affect its content.
@@ -6181,7 +6181,7 @@ async function runAgentLoop(goal, workingTabId) {
   let agentReport = null;
   // (3.50.1) Force-capture reportData if somehow null at this point.
   if (!reportData && finished) {
-    console.error('[Sentinel/REPORT-DEBUG] reportData was NULL — force-capturing');
+    console.warn('[Sentinel/report] reportData was NULL — force-capturing');
     reportData = {
       goal: _lastGoal || '',
       history: history.slice(),
@@ -6193,7 +6193,7 @@ async function runAgentLoop(goal, workingTabId) {
     };
   }
   if (reportData) {
-    console.error('[Sentinel/REPORT-DEBUG] reportData keys:', Object.keys(reportData).join(','));
+    console.debug('[Sentinel/report] reportData keys:', Object.keys(reportData).join(','));
 
     // ═══════════════════════════════════════════════════════════════
     // (3.50.3) SAVE FALLBACK REPORT FIRST — before any LLM call.
@@ -6211,9 +6211,9 @@ async function runAgentLoop(goal, workingTabId) {
     try {
       await chrome.storage.local.set({ last_agent_report: _fbReport });
       sendReportUpdate('ready', _fbReport);
-      console.error('[Sentinel/REPORT-DEBUG] ✓ Fallback report saved (' + _fbReport.fullReport.length + ' chars)');
+      console.debug('[Sentinel/report] ✓ Fallback report saved (' + _fbReport.fullReport.length + ' chars)');
     } catch (e) {
-      console.error('[Sentinel/REPORT-DEBUG] Fallback save failed:', e);
+      console.error('[Sentinel/report] Fallback save failed:', e);
     }
 
     // Now try the fancy LLM-generated report — if SW dies here, fallback is already saved
@@ -6226,20 +6226,20 @@ async function runAgentLoop(goal, workingTabId) {
       // LLM succeeded — overwrite fallback with the polished version
       // (3.50.4) Defensive: if generateReport returns malformed data, fall back
       if (typeof agentReport !== 'object' || !agentReport || typeof agentReport.fullReport !== 'string') {
-        console.error('[Sentinel/REPORT-DEBUG] generateReport returned malformed data, using fallback');
+        console.warn('[Sentinel/report] generateReport returned malformed data, using fallback');
         agentReport = _fbReport;
       } else {
-        console.error('[Sentinel/REPORT-DEBUG] ✓ LLM report OK, summary:', (agentReport.summary || '').length, 'chars');
+        console.debug('[Sentinel/report] ✓ LLM report OK, summary:', (agentReport.summary || '').length, 'chars');
         agentReport._isFallback = false;
       }
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
-      console.error('[Sentinel/REPORT-DEBUG] LLM report failed (fallback already saved):', err.message);
+      console.error('[Sentinel/report] LLM report failed (fallback already saved):', err.message);
       agentReport = _fbReport;
     }
   } else {
-    console.error('[Sentinel/REPORT-DEBUG] No reportData — skipping report');
+    console.warn('[Sentinel/report] No reportData — skipping report');
     sendReportUpdate('error', null, 'Agent finished without collecting execution data');
   }
 
