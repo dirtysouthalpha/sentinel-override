@@ -3598,7 +3598,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           // Don't continue — fall through to observation with CDP data
         } else {
-          await sleep(2000);
+          await sleep(1000); // SPEED: reduced from 2000ms — one retry, recover faster
           continue; // retry injection on first failure
         }
       } else {

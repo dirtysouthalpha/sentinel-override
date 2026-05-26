@@ -1299,16 +1299,22 @@ function setupVoiceInput() {
   _voiceClickHandler = async () => {
     if (_voiceListening) {
       // Stop listening
+      const stoppingTabId = _voiceListeningTabId;
       _voiceListening = false;
       _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
       voiceBtn.title = 'Voice input (click to speak)';
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab && tab.id) {
-          chrome.tabs.sendMessage(tab.id, { action: 'stop_voice' }).catch(() => {});
-        }
-      } catch (_e) { /* ignore */ }
+      if (stoppingTabId) {
+        chrome.scripting.executeScript({
+          target: { tabId: stoppingTabId },
+          func: () => {
+            if (window.__sentinelVoiceHandler) {
+              try { window.__sentinelVoiceHandler.stop(); } catch(_e) {}
+              window.__sentinelVoiceHandler = null;
+            }
+          }
+        }).catch(() => {});
+      }
       return;
     }
 
@@ -1436,7 +1442,15 @@ function setupVoiceInput() {
   if (typeof window !== 'undefined' && window.addEventListener) {
     window.addEventListener('unload', () => {
       if (_voiceListening && _voiceListeningTabId) {
-        chrome.tabs.sendMessage(_voiceListeningTabId, { action: 'stop_voice' }).catch(() => {});
+        chrome.scripting.executeScript({
+          target: { tabId: _voiceListeningTabId },
+          func: () => {
+            if (window.__sentinelVoiceHandler) {
+              try { window.__sentinelVoiceHandler.stop(); } catch(_e) {}
+              window.__sentinelVoiceHandler = null;
+            }
+          }
+        }).catch(() => {});
       }
     });
   }
