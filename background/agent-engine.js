@@ -4130,7 +4130,7 @@ async function runAgentLoop(goal, workingTabId) {
       let _visionElements = null;
       let _visionElementTree = '';
       let _visionMode = false;
-      if (_cdpFallbackActive || consecutiveInjectionFailures >= 2) {
+      if (true) {  // v4.0: Vision-first ALWAYS active
         try {
           console.log('[Sentinel/v4] Vision observation starting...');
           const visionResult = await _visionObserve(tab, currentUrl);
@@ -4210,6 +4210,149 @@ async function runAgentLoop(goal, workingTabId) {
         _lastAiCallMs = 0;
       } else {
         const _aiStart = Date.now();
+
+      // ═══════════════════════════════════════════════════════════
+      // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
+      // ═══════════════════════════════════════════════════════════
+      if (_visionMode && _visionElements) {
+        const _visionHistory = promptHistory.slice(-6).map(h => {
+          if (!h || !h.action) return '';
+          const a = h.action;
+          return 'Step ' + (h.step||'?') + ': ' + a.type + (a.index ? '(' + a.index + ')' : '') + (a.text ? ' "' + a.text.substring(0,40) + '"' : '') + ' -> ' + (h.result||'').substring(0,80);
+        }).filter(Boolean).join('\n');
+
+        const _visionSystemPrompt = [
+          'You are Sentinel, an AI agent that automates browser tasks by looking at screenshots with numbered elements.',
+          '',
+          '<rules>',
+          '1. Interactive elements on the page have [index] numbers shown as green labels.',
+          '2. You MUST reference elements by their [index] number.',
+          '3. Handle popups, cookie banners, and overlays FIRST before proceeding.',
+          '4. If an action fails 2 times, CHANGE your approach entirely.',
+          '5. After each action, evaluate whether the page changed.',
+          '6. Be concise — one action per response.',
+          '</rules>',
+          '',
+          '<actions>',
+          'click(index) — Click element by index',
+          'input(index, text) — Type text into input element',  
+          'scroll(direction) — Scroll up or down',
+          'navigate(url) — Go to URL',
+          'go_back() — Go back in browser history',
+          'extract(query) — Read current page text',
+          'execute_js(code) — Run custom JavaScript',
+          'done(text) — Task complete, provide final answer',
+          '</actions>',
+          '',
+          '<output_format>',
+          'Respond with ONLY valid JSON, no markdown:',
+          '{"thinking":"what you see and why","evaluation":"previous action success/fail/partial","memory":"progress notes","next_goal":"one clear goal","action":{"type":"...","index":N,"text":"...","direction":"up|down","url":"...","code":"..."}}',
+          '</output_format>'
+        ].join('\n');
+
+        const _visionUserContent = [
+          'Goal: ' + goal,
+          'URL: ' + currentUrl,
+          'Step: ' + stepCount + '/' + dynamicMaxSteps,
+          '',
+          'Elements:',
+          _visionElementTree || '(none)',
+          '',
+          'History:',
+          _visionHistory || '(first step)',
+          '',
+          'What is your next action?'
+        ].join('\n');
+
+        // Build messages with screenshot
+        const _visionMessages = [
+          { role: 'system', content: _visionSystemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: _visionUserContent },
+              ...(base64Image ? [{ type: 'image_url', image_url: { url: 'data:image/png;base64,' + base64Image } }] : [])
+            ]
+          }
+        ];
+
+        try {
+          const _vResponse = await fetch(
+            (CONFIG.apiEndpoint || 'https://api.zai.chat/v1/chat/completions'),
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (CONFIG.apiKey || '')
+              },
+              body: JSON.stringify({
+                model: CONFIG.model || 'glm-5-turbo',
+                messages: _visionMessages,
+                max_tokens: 600,
+                temperature: 0.1
+              }),
+              signal: AbortSignal.timeout(45000)
+            }
+          );
+          if (_vResponse.ok) {
+            const _vData = await _vResponse.json();
+            const _vRaw = _vData.choices && _vData.choices[0] && _vData.choices[0].message
+              ? _vData.choices[0].message.content || '' : '';
+            
+            // Parse structured JSON output
+            let _vParsed = null;
+            try { _vParsed = JSON.parse(_vRaw); } catch(e) {
+              // Try extracting from code block
+              const _m = _vRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
+              if (_m) try { _vParsed = JSON.parse(_m[1].trim()); } catch(e2) {}
+            }
+            
+            if (_vParsed && _vParsed.action) {
+              const _va = _vParsed.action;
+              // Map vision action types to legacy command format
+              switch (_va.type) {
+                case 'click':
+                  command = { type: 'click_at', _visionIndex: _va.index, _visionAction: true };
+                  break;
+                case 'input':
+                  command = { type: 'type', text: _va.text || '', _visionIndex: _va.index, _visionAction: true };
+                  break;
+                case 'scroll':
+                  command = { type: 'scroll', direction: _va.direction || 'down', _visionAction: true };
+                  break;
+                case 'navigate':
+                  command = { type: 'navigate', url: _va.url, _visionAction: true };
+                  break;
+                case 'go_back':
+                  command = { type: 'go_back', _visionAction: true };
+                  break;
+                case 'extract':
+                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 8000)', _visionAction: true };
+                  break;
+                case 'execute_js':
+                  command = { type: 'execute_js', code: _va.code || '', _visionAction: true };
+                  break;
+                case 'done':
+                  command = { type: 'done', text: _va.text || _vParsed.memory || 'Task complete', success: _va.success !== false, _visionAction: true };
+                  break;
+                default:
+                  command = { type: 'note', text: 'Vision: unknown action ' + _va.type, _visionAction: true };
+              }
+              // Store thinking/evaluation for logging
+              if (_vParsed.thinking) sendSilentUpdate('[Vision] ' + _vParsed.thinking, stepCount);
+              console.log('[Sentinel/v4] Vision decided:', _va.type, 'index:', _va.index || 'N/A');
+            } else {
+              // Fallback: couldn't parse structured output, try the legacy LLM path
+              console.warn('[Sentinel/v4] Vision: could not parse structured output, falling back to legacy');
+            }
+          }
+        } catch (e) {
+          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e.message);
+        }
+      }
+      
+      // Legacy LLM fallback (only if vision didn't produce a command)
+      if (!command || !command.type) {
         try {
           command = await callLLMWithRetry(
             trimmedElements, allElements.length, pageText, base64Image,
@@ -4232,6 +4375,8 @@ async function runAgentLoop(goal, workingTabId) {
               sendCostUpdate(_cost, agentState.totalInputTokens || 0, agentState.totalOutputTokens || 0, agentState.apiCallCount || 0);
             }
           } catch (_e) { /* non-fatal */ }
+          // v4.0: Clear SoM overlay so it doesn't interfere with action execution
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch(_e) {}
           base64Image = null; // release screenshot memory after LLM call
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
@@ -5046,14 +5191,77 @@ async function runAgentLoop(goal, workingTabId) {
       let result;
       let actionFailed = false;
 
-      // (3.20.1) Fail-fast for targetable actions with NO target. The LLM
+      // ═══════════════════════════════════════════════════════════
+      // v4.0 VISION INDEX-BASED ACTION EXECUTION
+      // ═══════════════════════════════════════════════════════════
+      if (command._visionAction && command._visionIndex !== undefined) {
+        const _viEl = _visionElements ? _visionElements.find(e => e.index === command._visionIndex) : null;
+        if (_viEl) {
+          try {
+            if (command.type === 'click_at') {
+              // Method 1: CDP dispatchMouseEvent at element center
+              if (_viEl.rect) {
+                const _cx = Math.round(_viEl.rect.x + _viEl.rect.w / 2);
+                const _cy = Math.round(_viEl.rect.y + _viEl.rect.h / 2);
+                try {
+                  await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: _cx, y: _cy, button: 'left', clickCount: 1 });
+                  await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: _cx, y: _cy, button: 'left', clickCount: 1 });
+                  result = 'Clicked [' + command._visionIndex + '] at (' + _cx + ',' + _cy + ')';
+                  console.log('[Sentinel/v4]', result);
+                } catch (_cme) {
+                  // Method 2: CDP evaluate click
+                  try {
+                    const _clickRes = await cdpExecuteJs(tab, 
+                      '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
+                      { timeout: 5000 });
+                    result = 'Clicked [' + command._visionIndex + '] via CDP selector: ' + (_clickRes && _clickRes.value || 'unknown');
+                  } catch (_cme2) {
+                    result = 'Click failed for [' + command._visionIndex + ']';
+                    actionFailed = true;
+                  }
+                }
+              }
+            } else if (command.type === 'type') {
+              // Type into indexed element
+              const _safeText = (command.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+              try {
+                const _typeRes = await cdpExecuteJs(tab,
+                  '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
+                  { timeout: 5000 });
+                result = 'Typed into [' + command._visionIndex + ']: ' + (_typeRes && _typeRes.value || 'unknown');
+                console.log('[Sentinel/v4]', result);
+              } catch (_te) {
+                result = 'Type failed for [' + command._visionIndex + ']';
+                actionFailed = true;
+              }
+            }
+          } catch (_ve) {
+            result = 'Vision action error: ' + _ve.message;
+            actionFailed = true;
+          }
+          // Skip the legacy execution path for this action
+          command._visionExecuted = true;
+        } else {
+          result = 'Element [' + command._visionIndex + '] not found in vision elements';
+          actionFailed = true;
+          command._visionExecuted = true;
+        }
+      }
+      // Handle non-indexed vision actions (scroll, navigate, go_back, execute_js, done)
+      else if (command._visionAction && !command._visionIndex) {
+        // These fall through to normal execution — just clear the flag
+        // scroll, navigate, execute_js, done are all handled by the legacy switch
+        command._visionExecuted = false;  // let legacy handle it
+      }
+      
+            // (3.20.1) Fail-fast for targetable actions with NO target. The LLM
       // sometimes emits {type: 'click'} with no selector / ref / coords —
       // the content script then can't find anything to click, dispatches a
       // no-op, and the result is "Click: undefined" with no useful feedback.
       // Catch it here and return a clear error to the LLM so it picks a
       // different strategy next step.
       const _targetableActions = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
-      if (_targetableActions.has(command.type)) {
+      if (_targetableActions.has(command.type) && !command._visionAction) {
         const _hasSelector = typeof command.selector === 'string' && command.selector.length > 0;
         const _hasRef      = typeof command.ref === 'string' && command.ref.length > 0;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
