@@ -685,17 +685,20 @@ describe('generateHeuristicPlan via startAgent', () => {
 // ==========================
 describe('post-loop cleanup paths', () => {
   test('handles report generation failure gracefully', async () => {
+    // null-tab exit path: getActiveTabId() returns null (default), getAllTabContexts() returns []
+    // The loop breaks on the first iteration without any LLM calls or sleeps.
+    // Fallback is saved to storage BEFORE generateReport is called, so the catch block
+    // finds the fallback already written even after generateReport rejects.
     mockGenerateReport.mockRejectedValueOnce(new Error('Report template missing'));
 
-    // Using mockCallLLMWithRetry variable
-    mockCallLLMWithRetry.mockResolvedValueOnce({ type: 'finish', summary: 'All tasks completed' });
+    await startAgent('Test goal', makeSender());
 
-    await expect(startAgent('Test goal', makeSender())).resolves.toBeDefined();
+    // No macrotask sleeps in this path — just awaited Promise.resolve()s.
+    // 500ms is far more than enough for all the mocked async calls to settle.
+    await new Promise(r => setTimeout(r, 500));
 
-    // Fallback report should have been sent as 'ready' (new behavior: save fallback before LLM attempt)
-    const { sendReportUpdate } = await import('../background/message-protocol.js');
-    expect(sendReportUpdate).toHaveBeenCalledWith('ready', expect.objectContaining({ _isFallback: true }));
-  });
+    expect(storageData.last_agent_report).toMatchObject({ _isFallback: true });
+  }, 5000);
 
   test('handles post-loop storage clear failure', async () => {
     const origSet = chrome.storage.local.set;

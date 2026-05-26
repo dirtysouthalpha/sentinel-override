@@ -1450,6 +1450,7 @@ ${pageContent}
 
 AVAILABLE INTERACTIVE ELEMENTS (use ONLY these selectors -- ${trimmedElements.length} of ${totalElementCount} shown, prioritized by type):
 ${JSON.stringify(trimmedElements, null, 2)}
+${agentState && agentState.visionMode && agentState.visionElementTree ? '\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n' + agentState.visionElementTree : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows numbered labels [1], [2], etc. on interactive elements. Use click(index:N) to interact with element N. The element tree above shows what each index corresponds to.\n' : ''}
 
 RECENT HISTORY (last ${historyWindowSize} steps${isRunbook ? ' -- extended for runbook context' : ''}, screenshots from prior steps stripped):
 ${JSON.stringify(sanitizedHistory, null, 2)}

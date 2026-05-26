@@ -108,6 +108,7 @@ function createSandbox() {
           get(keys, cb) { if (cb) cb({}); },
           set(data, cb) { if (cb) cb(); },
         },
+        onChanged: { addListener() {} },
       },
       tabs: { query: () => Promise.resolve([]), update: () => Promise.resolve(), get: () => Promise.resolve() },
       windows: { update: () => Promise.resolve() },

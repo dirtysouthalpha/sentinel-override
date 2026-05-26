@@ -5,6 +5,174 @@
 import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
+
+// v4.0 VISION-FIRST MODULES
+const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    // Determine interactivity\n    var clickableTags = new Set(['a', 'button', 'summary']);\n    var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; __sentinel_discoverElements();";
+const VISION_SOM = "const __sentinel_drawSoMOverlay = function() {\n  'use strict';\n\n  // ---- Remove any existing overlay ----\n  var existing = document.getElementById('sentinel-som-overlay');\n  if (existing) existing.remove();\n\n  // ---- Create canvas ----\n  var canvas = document.createElement('canvas');\n  canvas.id = 'sentinel-som-overlay';\n  canvas.style.position = 'fixed';\n  canvas.style.top = '0';\n  canvas.style.left = '0';\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n  canvas.style.zIndex = '2147483647';\n  canvas.style.pointerEvents = 'none';\n  canvas.width = window.innerWidth * (window.devicePixelRatio || 1);\n  canvas.height = window.innerHeight * (window.devicePixelRatio || 1);\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n\n  var ctx = canvas.getContext('2d');\n  var dpr = window.devicePixelRatio || 1;\n  ctx.scale(dpr, dpr);\n\n  // ---- Guard ----\n  if (!window.__sentinelElements || typeof window.__sentinelElements.forEach !== 'function') {\n    document.body.appendChild(canvas);\n    return 'ok';\n  }\n\n  var vw = window.innerWidth;\n  var vh = window.innerHeight;\n\n  // ---- Draw boxes and labels ----\n  window.__sentinelElements.forEach(function(el, idx) {\n    if (!el || !el.getBoundingClientRect) return;\n\n    var cRect = el.getBoundingClientRect();\n    var x = cRect.left;\n    var y = cRect.top;\n    var w = cRect.width;\n    var h = cRect.height;\n\n    // Skip zero-size\n    if (w <= 0 || h <= 0) return;\n\n    // Draw bounding box\n    ctx.strokeStyle = '#00ff88';\n    ctx.lineWidth = 2;\n    ctx.strokeRect(x, y, w, h);\n\n    // ---- Label dimensions ----\n    var lw = 24;\n    var lh = 18;\n    var lx = x;\n    var ly = y - lh;\n\n    // If label would go above the viewport, move it inside the box\n    if (ly < 0) {\n      ly = y;\n    }\n    // If label would go off the left edge, nudge right\n    if (lx < 0) {\n      lx = 0;\n    }\n    // If label would go off the right edge, nudge left\n    if (lx + lw > vw) {\n      lx = vw - lw;\n    }\n\n    // Draw label background\n    ctx.fillStyle = '#00ff88';\n    ctx.fillRect(lx, ly, lw, lh);\n\n    // Draw label text\n    ctx.fillStyle = '#000000';\n    ctx.font = 'bold 12px monospace';\n    ctx.textAlign = 'center';\n    ctx.textBaseline = 'middle';\n    ctx.fillText(String(idx), lx + lw / 2, ly + lh / 2);\n  });\n\n  document.body.appendChild(canvas);\n  return 'ok';\n}; __sentinel_drawSoMOverlay();";
+const VISION_EXECUTE = "const __sentinel_executeByIndex = function() {\n  'use strict';\n\n  // Parse arguments \u2014 when called via CDP Runtime.evaluate with an expression\n  // wrapper, we read from closure variables: __idx, __act, __val\n  // The actual CDP string is built by the extension like:\n  //   (function(){ var __idx=5, __act='click', __val='';\n  //                <function body>\n  //                return JSON.stringify(result); })()\n  // But since we wrap as a self-executing function, we accept args differently.\n  //\n  // We'll define the inner function that takes (index, action, value) and call\n  // it with closure vars injected by the extension.\n  // For standalone invocation, we use the parameters passed to the outer fn.\n\n  // When injected as:\n  //   const __sentinel_executeByIndex = function() { ... }; __sentinel_executeByIndex();\n  // The extension should wrap it with the index/action/value like:\n  //   (function(){ var __idx=N, __act='...', __val='...'; <body> })()\n  // We read from window.__sentinelExecArgs or from global vars.\n\n  var index, action, value;\n\n  // Try to read from globals that the extension sets before evaluating\n  if (typeof __idx !== 'undefined') {\n    index = __idx;\n    action = __act || '';\n    value = __val || '';\n  } else if (window.__sentinelExecArgs) {\n    index = window.__sentinelExecArgs.index;\n    action = window.__sentinelExecArgs.action || '';\n    value = window.__sentinelExecArgs.value || '';\n  } else {\n    return JSON.stringify({ success: false, error: 'No arguments provided' });\n  }\n\n  // ---- Element lookup ----\n  if (!window.__sentinelElements) {\n    return JSON.stringify({ success: false, error: 'Element map not found. Run discoverElements first.' });\n  }\n\n  var el = window.__sentinelElements.get(index);\n  if (!el) {\n    return JSON.stringify({ success: false, error: 'Element not found for index: ' + index });\n  }\n\n  // ---- Helper: dispatch mouse events ----\n  function fireMouse(type, target, extra) {\n    var opts = { bubbles: true, cancelable: true, view: window };\n    if (extra) {\n      for (var k in extra) { if (extra.hasOwnProperty(k)) opts[k] = extra[k]; }\n    }\n    var evt = new MouseEvent(type, opts);\n    target.dispatchEvent(evt);\n  }\n\n  // ---- Helper: dispatch generic event ----\n  function fire(type, target, bubbles) {\n    var evt = new Event(type, { bubbles: !!bubbles, cancelable: true });\n    target.dispatchEvent(evt);\n  }\n\n  try {\n    switch (action) {\n\n      // ---- CLICK ----\n      case 'click': {\n        el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        var r = el.getBoundingClientRect();\n        var cx = r.left + r.width / 2;\n        var cy = r.top + r.height / 2;\n        var mouseExtra = { clientX: cx, clientY: cy };\n        fireMouse('mousedown', el, mouseExtra);\n        fireMouse('mouseup', el, mouseExtra);\n        fireMouse('click', el, mouseExtra);\n        // Backup: native click\n        try { el.click(); } catch(e) {}\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- INPUT / TYPE ----\n      case 'input': {\n        el.focus();\n        fire('focus', el, true);\n\n        // Use native setter to trigger React/Vue change detection\n        var proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype\n                  : el.tagName === 'INPUT'   ? HTMLInputElement.prototype\n                  : null;\n        if (proto) {\n          var desc = Object.getOwnPropertyDescriptor(proto, 'value');\n          if (desc && desc.set) {\n            desc.set.call(el, value || '');\n          } else {\n            el.value = value || '';\n          }\n        } else {\n          el.textContent = value || '';\n        }\n\n        fire('input', el, true);\n        fire('change', el, true);\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- SELECT ----\n      case 'select': {\n        if (el.tagName === 'SELECT') {\n          // Native <select>\n          el.value = value;\n          // If no exact match, try finding by option text\n          if (el.value !== value) {\n            var opts = el.options;\n            for (var oi = 0; oi < opts.length; oi++) {\n              if (opts[oi].textContent.trim() === value || opts[oi].value === value) {\n                el.selectedIndex = oi;\n                break;\n              }\n            }\n          }\n          fire('change', el, true);\n          return JSON.stringify({ success: true });\n        } else {\n          // Custom dropdown \u2014 click to open, then find option\n          el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n          fireMouse('mousedown', el);\n          fireMouse('mouseup', el);\n          fireMouse('click', el);\n          try { el.click(); } catch(e) {}\n\n          // Wait 300ms then look for matching option\n          return new Promise(function(resolve) {\n            setTimeout(function() {\n              // Search for option-like elements\n              var candidates = document.querySelectorAll(\n                '[role=\"option\"], [role=\"listbox\"] li, .dropdown-item, .menu-item, '\n                + 'li[class*=\"option\"], div[class*=\"option\"], [class*=\"select-option\"]'\n              );\n              for (var ci = 0; ci < candidates.length; ci++) {\n                if (candidates[ci].textContent.trim() === value) {\n                  fireMouse('mousedown', candidates[ci]);\n                  fireMouse('mouseup', candidates[ci]);\n                  fireMouse('click', candidates[ci]);\n                  try { candidates[ci].click(); } catch(e) {}\n                  break;\n                }\n              }\n              resolve(JSON.stringify({ success: true }));\n            }, 300);\n          });\n        }\n      }\n\n      // ---- CHECK (checkbox / radio) ----\n      case 'check': {\n        if (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {\n          el.checked = !el.checked;\n          fire('change', el, true);\n          fire('input', el, true);\n        } else if (el.getAttribute('role') === 'checkbox' || el.getAttribute('role') === 'switch') {\n          // Custom toggle \u2014 click it\n          fireMouse('mousedown', el);\n          fireMouse('mouseup', el);\n          fireMouse('click', el);\n          try { el.click(); } catch(e) {}\n        }\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- HOVER ----\n      case 'hover': {\n        fireMouse('mouseover', el);\n        fireMouse('mouseenter', el);\n        fireMouse('mousemove', el);\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- SCROLL INTO VIEW ----\n      case 'scroll_into_view': {\n        el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- DOUBLE CLICK ----\n      case 'double_click': {\n        el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        var r2 = el.getBoundingClientRect();\n        var cx2 = r2.left + r2.width / 2;\n        var cy2 = r2.top + r2.height / 2;\n        var dblEvt = new MouseEvent('dblclick', {\n          bubbles: true, cancelable: true, view: window,\n          clientX: cx2, clientY: cy2\n        });\n        el.dispatchEvent(dblEvt);\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- RIGHT CLICK ----\n      case 'right_click': {\n        el.scrollIntoView({ behavior: 'smooth', block: 'center' });\n        var r3 = el.getBoundingClientRect();\n        var cx3 = r3.left + r3.width / 2;\n        var cy3 = r3.top + r3.height / 2;\n        var ctxEvt = new MouseEvent('contextmenu', {\n          bubbles: true, cancelable: true, view: window,\n          clientX: cx3, clientY: cy3, button: 2\n        });\n        fireMouse('mousedown', el, { button: 2 });\n        fireMouse('mouseup', el, { button: 2 });\n        el.dispatchEvent(ctxEvt);\n        return JSON.stringify({ success: true });\n      }\n\n      // ---- GET TEXT ----\n      case 'get_text': {\n        return JSON.stringify({ success: true, text: el.innerText || '' });\n      }\n\n      // ---- GET HTML ----\n      case 'get_html': {\n        return JSON.stringify({ success: true, html: el.outerHTML.substring(0, 2000) });\n      }\n\n      default:\n        return JSON.stringify({ success: false, error: 'Unknown action: ' + action });\n    }\n  } catch (err) {\n    return JSON.stringify({ success: false, error: err.message || String(err) });\n  }\n}; __sentinel_executeByIndex();";
+const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
+
+// ═══════════════════════════════════════════════════════════════
+// v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
+// ═══════════════════════════════════════════════════════════════
+async function _visionObserve(tab, currentUrl) {
+  try {
+    // Step 1: Discover interactive elements via CDP
+    const discoverResult = await cdpExecuteJs(tab, VISION_DISCOVER, { timeout: 8000 });
+    let indexedElements = [];
+    if (discoverResult && discoverResult.ok && discoverResult.value) {
+      try {
+        const parsed = typeof discoverResult.value === 'string'
+          ? JSON.parse(discoverResult.value) : discoverResult.value;
+        indexedElements = Array.isArray(parsed) ? parsed : [];
+      } catch (e) { console.warn('[Sentinel/v4] Element parse error:', e); }
+    }
+    console.log('[Sentinel/v4] Discovered ' + indexedElements.length + ' interactive elements');
+
+    // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
+    try { await cdpExecuteJs(tab, VISION_SOM, { timeout: 5000 }); }
+    catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', e); }
+
+    // Step 3: Small delay for canvas to render
+    await new Promise(r => setTimeout(r, 200));
+
+    // Step 4: Get page text via CDP
+    let pageText = '';
+    try {
+      const textResult = await cdpExecuteJs(tab,
+        'return document.body ? document.body.innerText.substring(0, 30000) : "";',
+        { timeout: 5000 });
+      pageText = (textResult && textResult.value) || '';
+    } catch (e) { console.warn('[Sentinel/v4] Page text failed:', e); }
+
+    // Step 5: Build element tree text for LLM
+    let elementTree = '';
+    for (const el of indexedElements) {
+      const tag = el.tag || 'div';
+      let attrs = '';
+      if (el.type) attrs += ' type=' + el.type;
+      if (el.role) attrs += ' role=' + el.role;
+      if (el.ariaLabel) attrs += ' aria-label=' + JSON.stringify((el.ariaLabel || '').substring(0, 40));
+      if (el.placeholder) attrs += ' placeholder=' + JSON.stringify((el.placeholder || '').substring(0, 40));
+      if (el.href && el.href.length > 5 && el.href.length < 100) attrs += ' href=' + JSON.stringify(el.href.substring(0, 80));
+      const text = el.text ? '>' + (el.text || '').substring(0, 60) : '/>';
+      const closing = el.text ? '</' + tag + '>' : '';
+      elementTree += '[' + el.index + ']<' + tag + attrs + text + closing + '\n';
+    }
+
+    return { elements: indexedElements, elementTree, pageText };
+  } catch (e) {
+    console.error('[Sentinel/v4] Vision observe error:', e);
+    return { elements: [], elementTree: '', pageText: '' };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.0 Vision Execute — executes action by element index via CDP
+// ═══════════════════════════════════════════════════════════════
+async function _visionExecuteAction(tab, action) {
+  const actionType = action.action_type || action.type;
+
+  // Non-element actions
+  if (actionType === 'navigate') {
+    try { await chrome.tabs.update(tab, { url: action.url }); return { success: true, result: 'Navigated to ' + action.url }; }
+    catch (e) { return { success: false, result: 'Navigate failed: ' + e.message }; }
+  }
+  if (actionType === 'scroll') {
+    const dir = action.direction || 'down';
+    const amount = dir === 'up' ? '-600' : '600';
+    try { await cdpExecuteJs(tab, 'window.scrollBy(0, ' + amount + ');', { timeout: 3000 }); return { success: true, result: 'Scrolled ' + dir }; }
+    catch (e) { return { success: false, result: 'Scroll failed' }; }
+  }
+  if (actionType === 'go_back') {
+    try { await cdpExecuteJs(tab, 'history.back();', { timeout: 3000 }); return { success: true, result: 'Went back' }; }
+    catch (e) { return { success: false, result: 'Back failed' }; }
+  }
+  if (actionType === 'extract') {
+    try {
+      const result = await cdpExecuteJs(tab, 'return document.body ? document.body.innerText.substring(0, 15000) : "";', { timeout: 5000 });
+      return { success: true, result: (result && result.value) || '' };
+    } catch (e) { return { success: false, result: 'Extract failed' }; }
+  }
+  if (actionType === 'execute_js') {
+    try {
+      const result = await cdpExecuteJs(tab, action.code || '', { timeout: 10000 });
+      return { success: true, result: JSON.stringify((result && result.value) || 'ok') };
+    } catch (e) { return { success: false, result: 'JS failed: ' + e.message }; }
+  }
+  if (actionType === 'done') {
+    return { success: true, result: action.result || action.text || 'Task complete', isDone: true };
+  }
+
+  // Element-based actions: click, input, select, check, hover, etc.
+  const index = action.index;
+  if (index === undefined || index === null) {
+    return { success: false, result: 'No element index for ' + actionType };
+  }
+
+  // Build the execution expression for VISION_EXECUTE
+  const value = (action.text || action.value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const setupGlobals = "window.__sentinelExecArgs = { index: " + index + ", action: '" + actionType + "', value: '" + value + "' };";
+
+  try {
+    const execResult = await cdpExecuteJs(tab, setupGlobals + '\n' + VISION_EXECUTE, { timeout: 8000 });
+    if (execResult && execResult.ok && execResult.value) {
+      let parsed;
+      try {
+        parsed = typeof execResult.value === 'string' ? JSON.parse(execResult.value) : execResult.value;
+      } catch (e) {
+        return { success: true, result: String(execResult.value).substring(0, 500) };
+      }
+      return { success: parsed.success !== false, result: parsed.error || parsed.text || parsed.html || 'ok' };
+    }
+    return { success: true, result: 'Action executed' };
+  } catch (e) {
+    return { success: false, result: 'Index action failed: ' + e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v4.0 Vision Parse — Parse structured JSON response from LLM
+// ═══════════════════════════════════════════════════════════════
+function _visionParseResponse(responseText) {
+  if (!responseText || typeof responseText !== 'string') return null;
+  let parsed = null;
+  // Try 1: Direct JSON
+  try { parsed = JSON.parse(responseText); } catch (e) {}
+  // Try 2: Code fence
+  if (!parsed) {
+    const fenceMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) { try { parsed = JSON.parse(fenceMatch[1].trim()); } catch (e) {} }
+  }
+  // Try 3: Outermost braces
+  if (!parsed) {
+    const braceMatch = responseText.match(/\{[\s\S]*\}/);
+    if (braceMatch) { try { parsed = JSON.parse(braceMatch[0]); } catch (e) {} }
+  }
+  if (!parsed) return null;
+
+  const actions = parsed.actions || (parsed.action ? [parsed.action] : []);
+  const firstAction = actions[0] || {};
+  return {
+    type: firstAction.action_type || firstAction.type || 'note',
+    index: firstAction.index,
+    text: firstAction.text,
+    url: firstAction.url,
+    direction: firstAction.direction,
+    code: firstAction.code,
+    query: firstAction.query,
+    result: firstAction.result || firstAction.text,
+    success: firstAction.success,
+    thinking: parsed.thinking || '',
+    evaluation: parsed.evaluation || '',
+    memory: parsed.memory || '',
+    next_goal: parsed.next_goal || '',
+    allActions: actions,
+    selector: null, ref: null, coordinates: null
+  };
+}
+
+
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate } from './message-protocol.js';
 import { generateReport, buildFallbackReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
@@ -2240,17 +2408,6 @@ function detectCaptcha(currentUrl, pageText, elementsCount) {
   return null;
 }
 
-// Attempt to auto-solve CAPTCHA or navigate around it
-async 
-
-// ═══════════════════════════════════════════════════════════════════
-// (v3.69) Smart Recovery Engine — "MacGyver Mode"
-// When the agent is stuck (repeated failures, no progress), this analyzes
-// the page state, the goal, and generates a creative solution on the fly.
-// It can: construct URLs, write custom JS, find alternative selectors,
-// and suggest completely different strategies.
-// ═══════════════════════════════════════════════════════════════════
-
 // ═══════════════════════════════════════════════════════════════════
 // (v3.69) Smart Recovery Engine — "MacGyver Mode"
 // When stuck, analyzes page + goal and generates creative solutions.
@@ -3220,7 +3377,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-      _lastLoopUrl = currentUrl;
+      _lastLoopUrl = _lastObservedUrl;
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
@@ -4074,7 +4231,41 @@ async function runAgentLoop(goal, workingTabId) {
         ' (' + _stepsRemaining + ' remaining; ' + productiveSteps + ' productive bumps so far). ' +
         'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
         'Aimless read_page / scroll = unproductive (does not extend).';
-      const agentState = { apiCallCount, agentMemory, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
+      
+      // v4.0 Vision-First Observation Override
+      let _visionElements = null;
+      let _visionElementTree = '';
+      let _visionMode = false;
+      if (_cdpFallbackActive || consecutiveInjectionFailures >= 2) {
+        try {
+          console.log('[Sentinel/v4] Vision observation starting...');
+          const visionResult = await _visionObserve(tab, currentUrl);
+          if (visionResult.elements.length > 0) {
+            _visionElements = visionResult.elements;
+            _visionElementTree = visionResult.elementTree;
+            _visionMode = true;
+            if (visionResult.pageText && visionResult.pageText.length > pageText.length) {
+              pageText = visionResult.pageText;
+            }
+            trimmedElements = visionResult.elements.slice(0, CONFIG.maxElements).map(e => ({
+              selector: '[data-sentinel-index="' + e.index + '"]',
+              text: e.text || '',
+              type: e.tag || 'div',
+              index: e.index,
+              rect: e.rect,
+              isClickable: e.isClickable,
+              isInput: e.isInput
+            }));
+            allElements.length = 0;
+            allElements.push(...trimmedElements);
+            console.log('[Sentinel/v4] Vision: ' + _visionElements.length + ' indexed elements');
+          }
+        } catch (e) {
+          console.warn('[Sentinel/v4] Vision observe failed:', e);
+        }
+      }
+
+const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -5217,7 +5408,54 @@ async function runAgentLoop(goal, workingTabId) {
           actionFailed = !freshContent;
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (command.type === 'extract' || command.type === 'extract_list') {
-        const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
+        
+      // v4.0 Vision Action Dispatch — execute by element index
+      let _visionActionResult = null;
+      if (_visionMode && command) {
+        // Try parsing as structured vision response
+        const visionCmd = _visionParseResponse(command._rawResponse || command.text || '');
+        if (visionCmd && visionCmd.type) command = visionCmd;
+
+        // Element-indexed actions (click, input, select, check, hover, etc.)
+        if (command.index !== undefined && command.index !== null) {
+          try {
+            console.log('[Sentinel/v4] Action: ' + command.type + ' [' + command.index + ']');
+            // Clear SoM overlay before action
+            try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 2000 }); } catch(_) {}
+            _visionActionResult = await _visionExecuteAction(tab, {
+              action_type: command.type, index: command.index,
+              text: command.text, value: command.value,
+              code: command.code, url: command.url,
+              direction: command.direction, query: command.query
+            });
+            if (_visionActionResult) {
+              command._visionResult = _visionActionResult.result;
+              command._visionSuccess = _visionActionResult.success;
+              if (_visionActionResult.isDone) { command.type = 'done'; command.result = _visionActionResult.result; }
+              command._visionHandled = true;
+            }
+          } catch (e) { console.warn('[Sentinel/v4] Vision action error:', e); }
+        }
+        // Non-element actions handled by vision executor
+        else if (['navigate','scroll','go_back','extract','execute_js','done'].includes(command.type)) {
+          try {
+            try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 2000 }); } catch(_) {}
+            _visionActionResult = await _visionExecuteAction(tab, {
+              action_type: command.type, url: command.url,
+              direction: command.direction, code: command.code,
+              query: command.query, result: command.result || command.text, text: command.text
+            });
+            if (_visionActionResult) {
+              command._visionResult = _visionActionResult.result;
+              command._visionSuccess = _visionActionResult.success;
+              if (_visionActionResult.isDone) { command.type = 'done'; command.result = _visionActionResult.result; }
+              command._visionHandled = true;
+            }
+          } catch (e) { console.warn('[Sentinel/v4] Vision action error:', e); }
+        }
+      }
+
+const res = (command._visionHandled) ? { success: true, result: command._visionResult } : await sendMessageWithRetry(tab, { action: 'execute_command', command });
         result = res || 'Done';
         let extractSucceeded = false;
         try {
