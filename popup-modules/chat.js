@@ -1327,14 +1327,14 @@ function setupVoiceInput() {
 
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => {
+        func: (capturedTabId) => {
           // Stop any existing recognition
           if (window.__sentinelVoiceHandler) {
             try { window.__sentinelVoiceHandler.stop(); } catch(_e) {}
           }
           const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
           if (!SpeechRecognition) {
-            chrome.runtime.sendMessage({ action: 'voice_error', error: 'Speech recognition not supported in this tab' });
+            chrome.runtime.sendMessage({ action: 'voice_error', error: 'Speech recognition not supported in this tab', tabId: capturedTabId });
             return;
           }
           const recognition = new SpeechRecognition();
@@ -1351,42 +1351,30 @@ function setupVoiceInput() {
                 interim += event.results[i][0].transcript;
               }
             }
-            // Include tab ID in message so popup can verify it's from the correct tab
-            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-              if (tab) {
-                chrome.runtime.sendMessage({
-                  action: 'voice_interim',
-                  text: finalTranscript + interim,
-                  tabId: tab.id
-                }).catch(() => {});
-              }
-            });
+            chrome.runtime.sendMessage({
+              action: 'voice_interim',
+              text: finalTranscript + interim,
+              tabId: capturedTabId
+            }).catch(() => {});
           };
           recognition.onend = () => {
-            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-              if (tab) {
-                chrome.runtime.sendMessage({
-                  action: 'voice_result',
-                  text: finalTranscript,
-                  tabId: tab.id
-                }).catch(() => {});
-              }
-            });
+            chrome.runtime.sendMessage({
+              action: 'voice_result',
+              text: finalTranscript,
+              tabId: capturedTabId
+            }).catch(() => {});
           };
           recognition.onerror = (event) => {
-            chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-              if (tab) {
-                chrome.runtime.sendMessage({
-                  action: 'voice_error',
-                  error: event.error,
-                  tabId: tab.id
-                }).catch(() => {});
-              }
-            });
+            chrome.runtime.sendMessage({
+              action: 'voice_error',
+              error: event.error,
+              tabId: capturedTabId
+            }).catch(() => {});
           };
           recognition.start();
           window.__sentinelVoiceHandler = recognition;
-        }
+        },
+        args: [tab.id]
       });
       showToast('Listening... speak now', 'success');
     } catch (err) {

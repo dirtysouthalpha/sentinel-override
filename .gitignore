@@ -35,3 +35,4 @@ test-output.txt
 *-output.txt
 scripts/analyze-functions.js
 scripts/check-coverage.js
+background/agent-engine.js.v*
