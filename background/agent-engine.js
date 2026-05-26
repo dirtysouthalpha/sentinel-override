@@ -4227,10 +4227,12 @@ async function runAgentLoop(goal, workingTabId) {
           '<rules>',
           '1. Interactive elements on the page have [index] numbers shown as green labels.',
           '2. You MUST reference elements by their [index] number.',
-          '3. Handle popups, cookie banners, and overlays FIRST before proceeding.',
-          '4. If an action fails 2 times, CHANGE your approach entirely.',
-          '5. After each action, evaluate whether the page changed.',
-          '6. Be concise — one action per response.',
+          '3. CRITICAL: If you see a popup, cookie banner, consent dialog, or overlay — dismiss it FIRST. Look for buttons with text like Accept, Agree, OK, Continue, I agree, Got it, Close, or Dismiss.',
+          '4. Overlays often use role="button" or specific aria-labels. Check the element list for these patterns.',
+          '5. If clicking an index does not dismiss the overlay after 2 attempts, try a DIFFERENT index — the correct button might be behind another element.',
+          '6. If an action fails 2 times, CHANGE your approach entirely.',
+          '7. After each action, evaluate whether the page changed. If not, try a different element.',
+          '8. Be concise — one action per response.',
           '</rules>',
           '',
           '<actions>',
@@ -5204,10 +5206,20 @@ async function runAgentLoop(goal, workingTabId) {
                 const _cx = Math.round(_viEl.rect.x + _viEl.rect.w / 2);
                 const _cy = Math.round(_viEl.rect.y + _viEl.rect.h / 2);
                 try {
+                  // Full mouse event chain: moved -> pressed -> released (mimics real click)
+                  await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: _cx, y: _cy });
+                  await new Promise(r => setTimeout(r, 50));
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: _cx, y: _cy, button: 'left', clickCount: 1 });
+                  await new Promise(r => setTimeout(r, 30));
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: _cx, y: _cy, button: 'left', clickCount: 1 });
                   result = 'Clicked [' + command._visionIndex + '] at (' + _cx + ',' + _cy + ')';
                   console.log('[Sentinel/v4]', result);
+                  // ALSO fire a JS .click() as backup — overlays can intercept CDP mouse events
+                  try {
+                    await cdpExecuteJs(tab,
+                      '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(e){e.click();return"js-clicked";}return"no-js-ref";})()',
+                      { timeout: 3000 });
+                  } catch (_jsE) { /* non-fatal backup */ }
                 } catch (_cme) {
                   // Method 2: CDP evaluate click
                   try {
@@ -6120,15 +6132,19 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'click_at') {
         if (typeof _clickAtLoopCount === 'undefined') { var _clickAtLoopCount = 0; }
         _clickAtLoopCount++;
-        if (_clickAtLoopCount >= 4 && productiveSteps === 0) {
+        if (_clickAtLoopCount >= 3 && productiveSteps === 0) {
           console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with 0 productive steps');
+          // Auto-dismiss common overlay patterns
+          try {
+            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0;i<p.length;i++){var es=document.querySelectorAll(p[i]);for(var j=0;j<es.length;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}return d?"dismissed":"no-overlay";})()', { timeout: 5000 });
+          } catch(_oe) { /* non-fatal */ }
           historyPush({
             step: stepCount,
-            action: { type: 'note', text: 'SYSTEM: click_at loop detected! You have used click_at ' + _clickAtLoopCount + ' times without progress. ' +
-              'STOP using click_at. Instead: (1) Look at the element list for overlay/consent buttons. ' +
-              '(2) Use { "type": "click", "ref": "ref_N" } to click by element reference. ' +
-              '(3) Or use { "type": "execute_js", "code": "document.querySelector(\'button.accept\').click()" } to dismiss overlays.' },
-            result: 'Recovery from click_at loop'
+            action: { type: 'note', text: 'SYSTEM: click_at loop detected! ' + _clickAtLoopCount + ' clicks with no progress. Auto-dismissed common overlays. ' +
+              'If the overlay is still visible: (1) Check the element list for consent/agree buttons. ' +
+              '(2) Use execute_js with a CSS selector to click it. ' +
+              '(3) Try scrolling to reveal the button.' },
+            result: 'Recovery from click_at loop + auto-overlay-dismiss'
           });
           await persistHistory();
           _clickAtLoopCount = 0;
