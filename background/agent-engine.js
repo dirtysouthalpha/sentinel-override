@@ -131,47 +131,6 @@ async function _visionExecuteAction(tab, action) {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// v4.0 Vision Parse — Parse structured JSON response from LLM
-// ═══════════════════════════════════════════════════════════════
-function _visionParseResponse(responseText) {
-  if (!responseText || typeof responseText !== 'string') return null;
-  let parsed = null;
-  // Try 1: Direct JSON
-  try { parsed = JSON.parse(responseText); } catch (e) {}
-  // Try 2: Code fence
-  if (!parsed) {
-    const fenceMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) { try { parsed = JSON.parse(fenceMatch[1].trim()); } catch (e) {} }
-  }
-  // Try 3: Outermost braces
-  if (!parsed) {
-    const braceMatch = responseText.match(/\{[\s\S]*\}/);
-    if (braceMatch) { try { parsed = JSON.parse(braceMatch[0]); } catch (e) {} }
-  }
-  if (!parsed) return null;
-
-  const actions = parsed.actions || (parsed.action ? [parsed.action] : []);
-  const firstAction = actions[0] || {};
-  return {
-    type: firstAction.action_type || firstAction.type || 'note',
-    index: firstAction.index,
-    text: firstAction.text,
-    url: firstAction.url,
-    direction: firstAction.direction,
-    code: firstAction.code,
-    query: firstAction.query,
-    result: firstAction.result || firstAction.text,
-    success: firstAction.success,
-    thinking: parsed.thinking || '',
-    evaluation: parsed.evaluation || '',
-    memory: parsed.memory || '',
-    next_goal: parsed.next_goal || '',
-    allActions: actions,
-    selector: null, ref: null, coordinates: null
-  };
-}
-
 
 import { sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate } from './message-protocol.js';
 import { generateReport, buildFallbackReport } from './report-generator.js';
@@ -3105,13 +3064,13 @@ function generateHeuristicPlan(goal, currentUrl) {
       const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
       if (_bareSiteMap[_siteKey]) {
         _urlMatch = ['go to ' + _bareMatch[1], 'https://' + _bareSiteMap[_siteKey]];
-        console.log('[Sentinel/DEBUG] Bare site matched:', _bareMatch[1], '->', _bareSiteMap[_siteKey]);
+        console.debug('[Sentinel/DEBUG] Bare site matched:', _bareMatch[1], '->', _bareSiteMap[_siteKey]);
       } else {
         // Try partial match
         for (const [k, v] of Object.entries(_bareSiteMap)) {
           if (_siteKey.includes(k) || k.includes(_siteKey)) {
             _urlMatch = ['go to ' + _bareMatch[1], 'https://' + v];
-            console.log('[Sentinel/DEBUG] Partial site matched:', _bareMatch[1], '->', v);
+            console.debug('[Sentinel/DEBUG] Partial site matched:', _bareMatch[1], '->', v);
             break;
           }
         }
@@ -3338,10 +3297,10 @@ async function runAgentLoop(goal, workingTabId) {
   const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
   try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', e); }
 
-  console.log('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
+  console.debug('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
   let command;  // v3.66: Moved declaration here so batch skip can assign it
   while (!finished && agentRunning) {
-    console.log('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
+    console.debug('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
 
     // SPEED (v3.60): If batch commands are queued, skip observe+LLM and execute directly
     if (_pendingCommandQueue.length > 0) {
@@ -3440,10 +3399,10 @@ async function runAgentLoop(goal, workingTabId) {
         const allCtx = getAllTabContexts();
         if (allCtx.length > 0) {
           tab = allCtx[0].tabId;
-          console.log('[Sentinel/DEBUG] Step', stepCount, 'Recovered tab from context:', tab);
+          console.debug('[Sentinel/DEBUG] Step', stepCount, 'Recovered tab from context:', tab);
         }
       }
-      console.log('[Sentinel/DEBUG] Step', stepCount, 'tab:', tab);
+      console.debug('[Sentinel/DEBUG] Step', stepCount, 'tab:', tab);
       if (!tab) {
         sendSilentUpdate('No active tab -- stopping', stepCount);
         finished = true;
@@ -3457,7 +3416,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Get tab info
       let tabInfo = await getTabInfo(tab);
-      console.log('[Sentinel/DEBUG] Step', stepCount, 'tabInfo:', tabInfo ? {url: tabInfo.url, status: tabInfo.status} : null);
+      console.debug('[Sentinel/DEBUG] Step', stepCount, 'tabInfo:', tabInfo ? {url: tabInfo.url, status: tabInfo.status} : null);
 
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
@@ -3486,7 +3445,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
       // EXCEPTION: chrome://newtab/ is a blank tab — the auto-navigate code below
       // will navigate it to the goal URL, so don't block it here.
-      console.log('[Sentinel/DEBUG] Step', stepCount, 'checking URL:', tabInfo.url);
+      console.debug('[Sentinel/DEBUG] Step', stepCount, 'checking URL:', tabInfo.url);
       const _isNewTab = tabInfo.url === 'chrome://newtab/' || tabInfo.url === 'chrome://newtab'
         || tabInfo.url === 'about:blank' || tabInfo.url === 'about:newtab' || tabInfo.url === 'about:newtab/'
         || tabInfo.url === 'edge://newtab/' || tabInfo.url === 'edge://newtab';
@@ -3508,7 +3467,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Auto-navigate to URL found in goal (first iteration only)
       // Smart: checks current page hostname before navigating
-      console.log('[Sentinel/DEBUG] Step', stepCount, 'checking auto-navigate, stepCount===1:', stepCount === 1, 'goal:', !!goal);
+      console.debug('[Sentinel/DEBUG] Step', stepCount, 'checking auto-navigate, stepCount===1:', stepCount === 1, 'goal:', !!goal);
       if (stepCount === 1 && goal) {
         // Strip email addresses before URL extraction so "support@example.com" is
         // never mistaken for a navigation target.
@@ -3530,26 +3489,26 @@ async function runAgentLoop(goal, workingTabId) {
             const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
             if (_step1BareMap[_step1Key]) {
               urlMatch = ['go to ' + _step1Bare[1], _step1BareMap[_step1Key]];
-              console.log('[Sentinel/DEBUG] Step 1 bare site matched:', _step1Bare[1], '->', _step1BareMap[_step1Key]);
+              console.debug('[Sentinel/DEBUG] Step 1 bare site matched:', _step1Bare[1], '->', _step1BareMap[_step1Key]);
             } else {
               for (const [k, v] of Object.entries(_step1BareMap)) {
                 if (_step1Key.includes(k) || k.includes(_step1Key)) {
                   urlMatch = ['go to ' + _step1Bare[1], v];
-                  console.log('[Sentinel/DEBUG] Step 1 partial site matched:', _step1Bare[1], '->', v);
+                  console.debug('[Sentinel/DEBUG] Step 1 partial site matched:', _step1Bare[1], '->', v);
                   break;
                 }
               }
             }
           }
         }
-        console.log('[Sentinel/DEBUG] urlMatch:', urlMatch ? urlMatch[0] : null);
+        console.debug('[Sentinel/DEBUG] urlMatch:', urlMatch ? urlMatch[0] : null);
         if (urlMatch) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
             const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
             if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
-              console.log('[Sentinel/DEBUG] Navigating to:', goalUrl, 'tab:', tab);
+              console.debug('[Sentinel/DEBUG] Navigating to:', goalUrl, 'tab:', tab);
               sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
               sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
               await chrome.tabs.update(tab, { url: goalUrl });
@@ -3557,24 +3516,24 @@ async function runAgentLoop(goal, workingTabId) {
               await waitForPageReady(tab);
               _cachedObservation = null; // Invalidate cache after navigation
               const reinjected = await injectContentScript(tab);
-              console.log('[Sentinel/DEBUG] injectContentScript result:', reinjected);
+              console.debug('[Sentinel/DEBUG] injectContentScript result:', reinjected);
               if (reinjected) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
                 await persistHistory();
               }
-              console.log('[Sentinel/DEBUG] auto-navigate done, re-registering tab');
+              console.debug('[Sentinel/DEBUG] auto-navigate done, re-registering tab');
               // Defensive: re-register the tab after navigation in case the tab
               // lifecycle events cleared the context during page load
               try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', e); }
               continue;
             }
-            console.log('[Sentinel/DEBUG] Already on right page, skipping navigation');
+            console.debug('[Sentinel/DEBUG] Already on right page, skipping navigation');
             // Already on the right page - skip navigation
           } catch (navErr) { console.warn('[Sentinel/DEBUG] auto-navigate error:', navErr && navErr.message); /* URL parse error, skip auto-navigate */ }
         }
       }
 
-      console.log('[Sentinel/DEBUG] About to observe page...');
+      console.debug('[Sentinel/DEBUG] About to observe page...');
       sendSilentUpdate('Observing page...', stepCount);
 
       // Send page context to popup so user can see where the agent is
@@ -4265,7 +4224,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -5311,7 +5270,7 @@ const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionE
           const activeId = getActiveTabId();
           if (allCtx.length > 1 && activeId) {
             targetId = activeId;
-            console.log('[Sentinel/DEBUG] close_tab: no target specified, defaulting to active tab', targetId);
+            console.debug('[Sentinel/DEBUG] close_tab: no target specified, defaulting to active tab', targetId);
           }
         }
         if (!targetId) {
@@ -6257,7 +6216,7 @@ const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionE
           if (allTabs.length > 0) {
             const recoveryTab = allTabs[0];
             registerInitialTab(recoveryTab.id, recoveryTab.url || '');
-            console.log('[Sentinel/DEBUG] Recovered to tab:', recoveryTab.id, recoveryTab.url);
+            console.debug('[Sentinel/DEBUG] Recovered to tab:', recoveryTab.id, recoveryTab.url);
           } else {
             console.error('[Sentinel/DEBUG] No tabs available, stopping agent');
             agentRunning = false;
@@ -6278,7 +6237,7 @@ const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionE
   // cause the SW to terminate mid-fetch on MV3. Now we generate the report
   // first, THEN stop the keepalive and do cleanup.
 
-  console.log('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
+  console.debug('[Sentinel/DEBUG] Loop exited. finished:', finished, 'agentRunning:', agentRunning, 'stepCount:', stepCount);
   console.log('[Sentinel/REPORT-DEBUG] reportData type:', typeof reportData, 'isTruthy:', !!reportData, 'keys:', reportData ? Object.keys(reportData).join(',') : 'NULL');
 
   // Generate report BEFORE destructive cleanup (tab closing, debugger detaching).
