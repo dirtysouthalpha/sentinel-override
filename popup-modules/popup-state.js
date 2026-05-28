@@ -6,10 +6,16 @@
 //   const state = getState();            // returns the reactive proxy
 //   subscribe('activeProviderId', cb);   // cb(newValue, key) on change
 
-// ========== Subscriber Registry ==========
+/**
+ * Subscriber registry mapping state keys to sets of callbacks.
+ * @typedef {Object.<string, Set<Function>>} SubscriberRegistry
+ */
 const _subscribers = {}; // key -> Set<callback>
 
-// ========== Default State Shape ==========
+/**
+ * Default state shape for the popup.
+ * @typedef {Object} InitialState
+ */
 const _initialState = {
   conversationHistory: [],
   selectedAttachments: [],
@@ -22,7 +28,11 @@ const _initialState = {
   pendingStepLogs: {},
 };
 
-// ========== Proxy Factory ==========
+/**
+ * Creates a reactive proxy for a target object.
+ * @param {Object} target - The object to make reactive.
+ * @returns {Object} A Proxy that notifies subscribers on property changes.
+ */
 function _createReactiveProxy(target) {
   return new Proxy(target, {
     set(obj, prop, value) {
@@ -44,14 +54,11 @@ function _createReactiveProxy(target) {
   });
 }
 
-// ========== Public API ==========
-
 /**
  * Initialize (or re-initialize) the shared popup state.
  * Sets window.__popupState to a new reactive proxy.
  * Safe to call once at startup.
  */
-// eslint-disable-next-line no-unused-vars
 function initPopupState() {
   // Deep-clone defaults so each init is independent
   const fresh = JSON.parse(JSON.stringify(_initialState));
@@ -60,19 +67,18 @@ function initPopupState() {
 
 /**
  * Returns the reactive state proxy (window.__popupState).
+ * @returns {Object} The reactive state proxy.
  */
-// eslint-disable-next-line no-unused-vars
 function getState() {
   return window.__popupState;
 }
 
 /**
  * Subscribe to changes on a specific state key.
- * @param {string} key       - State property name to watch.
+ * @param {string} key - State property name to watch.
  * @param {Function} callback - Called with (newValue, key, oldValue).
  * @returns {Function} Unsubscribe function.
  */
-// eslint-disable-next-line no-unused-vars
 function subscribe(key, callback) {
   if (!_subscribers[key]) {
     _subscribers[key] = new Set();
