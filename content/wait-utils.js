@@ -32,40 +32,44 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
     const startTime = Date.now();
 
     return new Promise((resolve) => {
-      if (wait.checkCondition(condition)) {
-        resolve('Condition met immediately');
-        return;
-      }
-
-      const observer = new MutationObserver(() => {
+      try {
         if (wait.checkCondition(condition)) {
-          observer.disconnect();
-          clearTimeout(timer);
-          resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
+          resolve('Condition met immediately');
+          return;
         }
-      });
 
-      const observeTarget = document.body || document.documentElement;
-      if (!observeTarget) {
-        resolve('No document body to observe');
-        return;
-      }
-      observer.observe(observeTarget, { childList: true, subtree: true });
+        const observer = new MutationObserver(() => {
+          if (wait.checkCondition(condition)) {
+            observer.disconnect();
+            clearTimeout(timer);
+            resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
+          }
+        });
 
-      const pollInterval = setInterval(() => {
-        if (wait.checkCondition(condition)) {
+        const observeTarget = document.body || document.documentElement;
+        if (!observeTarget) {
+          resolve('No document body to observe');
+          return;
+        }
+        observer.observe(observeTarget, { childList: true, subtree: true });
+
+        const pollInterval = setInterval(() => {
+          if (wait.checkCondition(condition)) {
+            observer.disconnect();
+            clearInterval(pollInterval);
+            clearTimeout(timer);
+            resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
+          }
+        }, 500);
+
+        const timer = setTimeout(() => {
           observer.disconnect();
           clearInterval(pollInterval);
-          clearTimeout(timer);
-          resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
-        }
-      }, 500);
-
-      const timer = setTimeout(() => {
-        observer.disconnect();
-        clearInterval(pollInterval);
-        resolve('Timeout waiting for condition (' + timeout + 'ms)');
-      }, timeout);
+          resolve('Timeout waiting for condition (' + timeout + 'ms)');
+        }, timeout);
+      } catch (error) {
+        resolve('Error during condition check: ' + error.message);
+      }
     });
   };
 
@@ -79,9 +83,10 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
   wait.checkCondition = function(condition) {
     if (condition.type === 'wait_for_text') {
       const body = document.body;
-      return body ? body.innerText.includes(condition.text) : false;
+      if (!body) return false;
+      return body.innerText.includes(condition.text);
     } else if (condition.type === 'wait_for_element') {
-      // (#10) Prefer ref when provided. A ref that resolves means the element
+      // Prefer ref when provided. A ref that resolves means the element
       // is still in the live DOM. If the ref is stale, fall through to selector.
       const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
       if (condition.ref && dom && dom.findElementByRef) {

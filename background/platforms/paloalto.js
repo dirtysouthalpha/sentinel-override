@@ -1,15 +1,21 @@
-// background/platforms/paloalto.js
-// Palo Alto Networks (PAN-OS / Panorama) — v3.44.0 (new)
-//
-// Covers PAN-OS web UI and Panorama management console. Key gotcha:
-// every config change requires an explicit Commit step. Dropdowns are
-// Ext JS widgets needing click-arrow-then-click-option.
-
+/**
+ * Palo Alto Networks (PAN-OS / Panorama) — v3.44.0 (new)
+ *
+ * Covers PAN-OS web UI and Panorama management console. Key gotcha:
+ * every config change requires an explicit Commit step. Dropdowns are
+ * Ext JS widgets needing click-arrow-then-click-option.
+ */
 export const paloalto = {
   id: 'paloalto',
   label: 'Palo Alto Networks (PAN-OS / Panorama)',
   memoryKeyPrefix: 'pa_',
 
+  /**
+   * Detects if the current URL or goal matches Palo Alto Networks.
+   * @param {string} url - The URL to check.
+   * @param {string} goal - The goal text to check.
+   * @returns {boolean} - True if it's a Palo Alto Networks instance, false otherwise.
+   */
   detect(url, goal) {
     if (!url && !goal) return false;
     try {
@@ -17,7 +23,9 @@ export const paloalto = {
       if (/paloalto/i.test(u.hostname)) return true;
       if (/panorama/i.test(u.hostname)) return true;
       if (/\/php\/rest\/pan/i.test(u.href)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
+    } catch (e) {
+      console.warn('[Sentinel] URL parse failed:', e?.message);
+    }
     const t = String(goal || '').toLowerCase();
     return /\b(palo\s*alto|pan-os|panorama)\b/i.test(t);
   },

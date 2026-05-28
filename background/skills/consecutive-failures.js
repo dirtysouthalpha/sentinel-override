@@ -11,30 +11,57 @@ export const consecutiveFailures = {
   priority: 40,
 
   matches(ctx) {
-    if (!ctx) return false;
-    return (ctx.consecutiveFailures || 0) >= 3;
+    try {
+      if (!ctx) return false;
+      return (ctx.consecutiveFailures || 0) >= 3;
+    } catch (error) {
+      console.error('Error in consecutiveFailures.matches:', error);
+      return false;
+    }
   },
 
   autoApply(_ctx) {
-    // Don't auto-apply at 3 failures — give the LLM one more chance with
-    // the directive. If failures keep climbing past 5, the existing stall
-    // detector takes over with RESCAN_AND_REPLAN.
-    return null;
+    try {
+      // Don't auto-apply at 3 failures — give the LLM one more chance with
+      // the directive. If failures keep climbing past 5, the existing stall
+      // detector takes over with RESCAN_AND_REPLAN.
+      return null;
+    } catch (error) {
+      console.error('Error in consecutiveFailures.autoApply:', error);
+      return null;
+    }
   },
 
   promptInjection(ctx) {
-    const fcount = ctx.consecutiveFailures || 0;
-    const stepsRemaining = Math.max(0, (ctx.dynamicMaxSteps || 100) - (ctx.stepCount || 0));
-    return `You have failed ${fcount} consecutive steps. The pattern you're trying is not working. STOP and pick a fundamentally different approach:
+    try {
+      const failureCount = ctx.consecutiveFailures || 0;
+      const maxSteps = ctx.dynamicMaxSteps || 100;
+      const currentStep = ctx.stepCount || 0;
+      const stepsRemaining = Math.max(0, maxSteps - currentStep);
 
-1. **Step back from the page.** Use \`execute_js\` to inspect the page structure: \`{type:'execute_js', key:'page_struct', code:'return Array.from(document.querySelectorAll("main, [role=main], section, article, [class*=container]")).map(e=>({tag:e.tagName, cls:e.className.substring(0,80), text:e.innerText.substring(0,100)})).slice(0,15)'}\` — this gives you a structural map you can reason over.
+      return `You have failed ${failureCount} consecutive steps. The pattern you're trying is not working. STOP and pick a fundamentally different approach:
 
-2. **Check the network.** The data you want may be in an API response, not the DOM: \`{type:'read_network_requests', limit:30, filter:'json'}\`.
+1. **Step back from the page.** Use \`execute_js\` to inspect the page structure: 
+   \`${JSON.stringify({
+     type: 'execute_js',
+     key: 'page_struct',
+     code: 'return Array.from(document.querySelectorAll("main, [role=main], section, article, [class*=container]")).map(e=>({tag:e.tagName, cls:e.className.substring(0,80), text:e.innerText.substring(0,100)})).slice(0,15)'}\` — this gives you a structural map you can reason over.
+
+2. **Check the network.** The data you want may be in an API response, not the DOM: 
+   \`${JSON.stringify({
+     type: 'read_network_requests',
+     limit: 30,
+     filter: 'json'
+   })}\`.
 
 3. **Re-read the goal.** Is there a part you've been ignoring? Are you on the right URL for this step?
 
 4. **Finish honestly.** You have ${stepsRemaining} steps remaining. If the remaining budget can't realistically complete the goal, call \`finish\` with what you've collected and clear "[MISSING DATA — X]" markers for the gaps. Better to ship a partial honest report than burn the budget flailing.
 
 Do NOT repeat the action that just failed. The user can see the failure pattern in the activity stream and will judge progress by your next move.`;
+    } catch (error) {
+      console.error('Error in consecutiveFailures.promptInjection:', error);
+      return 'Error generating prompt for consecutive failures recovery.';
+    }
   }
 };

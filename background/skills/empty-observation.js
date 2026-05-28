@@ -12,43 +12,62 @@ export const emptyObservation = {
   priority: 55,
 
   matches(ctx) {
-    if (!ctx) return false;
-    // Only fire when the last action actually failed to produce useful results
-    // (observe_page or a navigation that should have populated the page).
-    // Skip if the previous action succeeded normally — an empty page after a
-    // successful click/extract is expected, not a recovery scenario.
-    const lastType = ctx.lastCommand && ctx.lastCommand.type;
-    const lastFailed = !!ctx.lastActionFailed;
-    const isPostObserve = lastType === 'read_page' || lastType === 'navigate';
-    if (!isPostObserve && !lastFailed) return false;
-    // Only fire when we have an observation but it's nearly empty
-    const elemCount = Array.isArray(ctx.allElements) ? ctx.allElements.length : 0;
-    const textLen = (ctx.pageText || '').length;
-    // Empty + on-a-real-url qualifies; if URL is about: / chrome: / data: skip
-    const url = ctx.currentUrl || '';
-    if (/^(about:|chrome:|data:|file:)/i.test(url)) return false;
-    return elemCount < 5 && textLen < 200;
+    try {
+      if (!ctx) return false;
+      // Only fire when the last action actually failed to produce useful results
+      // (observe_page or a navigation that should have populated the page).
+      // Skip if the previous action succeeded normally — an empty page after a
+      // successful click/extract is expected, not a recovery scenario.
+      const lastCommand = ctx.lastCommand;
+      const lastFailed = !!ctx.lastActionFailed;
+      const isPostObserve = lastCommand && ['read_page', 'navigate'].includes(lastCommand.type);
+      if (!isPostObserve || !lastFailed) return false;
+      // Only fire when we have an observation but it's nearly empty
+      const elementCount = Array.isArray(ctx.allElements) ? ctx.allElements.length : 0;
+      const textLength = (ctx.pageText || '').length;
+      // Empty + on-a-real-url qualifies; if URL is about: / chrome: / data: skip
+      const currentUrl = ctx.currentUrl || '';
+      if (/^(about:|chrome:|data:|file:)/i.test(currentUrl)) return false;
+      return elementCount < 5 && textLength < 200;
+    } catch (error) {
+      console.error('Error in emptyObservation matches:', error);
+      return false;
+    }
   },
 
   autoApply(ctx) {
-    // If the previous action was a navigate, the page is probably still
-    // loading. Auto-apply wait_for_navigation with a moderate timeout.
-    if (ctx.lastCommand && ctx.lastCommand.type === 'navigate') {
-      return { type: 'wait_for_navigation', timeout: 8000, _autoAppliedBy: 'empty-observation' };
+    try {
+      // If the previous action was a navigate, the page is probably still
+      // loading. Auto-apply wait_for_navigation with a moderate timeout.
+      if (ctx.lastCommand && ctx.lastCommand.type === 'navigate') {
+        return { 
+          type: 'wait_for_navigation', 
+          timeout: 8000, 
+          _autoAppliedBy: 'empty-observation' 
+        };
+      }
+      // Otherwise let the LLM choose between waiting and inspecting via JS.
+      return null;
+    } catch (error) {
+      console.error('Error in emptyObservation autoApply:', error);
+      return null;
     }
-    // Otherwise let the LLM choose between waiting and inspecting via JS.
-    return null;
   },
 
   promptInjection(_ctx) {
-    return `The page observation came back nearly empty (< 5 interactive elements, < 200 chars of text). The page is either still loading or its content is rendered by an SPA framework that the standard scanner can't see yet. Strategies:
+    try {
+      return `The page observation came back nearly empty (< 5 interactive elements, < 200 chars of text). The page is either still loading or its content is rendered by an SPA framework that the standard scanner can't see yet. Strategies:
 
-1. **Wait** — if you just navigated, give it more time: \`{type:'wait_for_text', text:'<expected loaded-state text>', timeout:10000}\` or \`{type:'wait_for_navigation', timeout:8000}\`.
+1. **Wait** — if you just navigated, give it more time: \`${type:'wait_for_text', text:'<expected loaded-state text>', timeout:10000}\` or \`${type:'wait_for_navigation', timeout:8000}\`.
 
-2. **Inspect via JS** — bypass the scanner and read the DOM directly: \`{type:'execute_js', key:'page_audit', code:'return {tag:document.body.tagName, charCount:document.body.innerText.length, headings:Array.from(document.querySelectorAll("h1,h2,h3")).map(h=>h.innerText).slice(0,10), links:Array.from(document.querySelectorAll("a[href]")).map(a=>({t:a.innerText.trim(),h:a.href})).slice(0,15)}'}\`.
+2. **Inspect via JS** — bypass the scanner and read the DOM directly: \`${type:'execute_js', key:'page_audit', code:'return {tag:document.body.tagName, charCount:document.body.innerText.length, headings:Array.from(document.querySelectorAll("h1,h2,h3")).map(h=>h.innerText).slice(0,10), links:Array.from(document.querySelectorAll("a[href]")).map(a=>({t:a.innerText.trim(),h:a.href})).slice(0,15)}'}\`.
 
 3. **Different URL** — if the page is rendered behind a route guard or shows a login wall, the URL might not be the right surface. Try a parent or sibling URL.
 
 4. **Honest finish** — if multiple wait + JS-inspect attempts return empty, the data may simply not be reachable from this page. Finish with "[MISSING DATA — page did not populate]" and recommend a manual check.`;
+    } catch (error) {
+      console.error('Error in emptyObservation promptInjection:', error);
+      return '';
+    }
   }
 };

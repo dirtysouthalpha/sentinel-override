@@ -26,6 +26,7 @@ function escapeHtml(text) {
  */
 // eslint-disable-next-line no-unused-vars
 function sanitizeHtml(dirtyHtml) {
+  if (!dirtyHtml) return '';
   const doc = new DOMParser().parseFromString(dirtyHtml, 'text/html');
   // Remove dangerous elements (includes SVG/MathML foreign content vectors)
   const dangerous = doc.querySelectorAll('script, iframe, object, embed, form, link[rel="import"], base, meta, svg, math');
@@ -63,6 +64,7 @@ function sanitizeHtml(dirtyHtml) {
  */
 // eslint-disable-next-line no-unused-vars
 function isValidUrl(url) {
+  if (!url) return false;
   try {
     new URL(url);
     return true;
@@ -79,13 +81,16 @@ function isValidUrl(url) {
  */
 // eslint-disable-next-line no-unused-vars
 function showToast(message, type = 'success') {
+  if (!message) return;
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;
   document.body.appendChild(toast);
 
   setTimeout(() => {
-    toast.remove();
+    if (toast.parentNode) {
+      toast.remove();
+    }
   }, 3000);
 }
 
