@@ -12,11 +12,14 @@ export const networkDevice = {
   memoryKeyPrefix: 'netdev_',
 
   detect(url, goal) {
-    // URL-based detection: skip — this is a goal-text-only catch-all.
-    // More-specific profiles (SonicWall, FortiGate, Palo Alto, Cisco, etc.)
-    // handle known URLs. Only fire on generic goal keywords.
-    const t = String(goal || '').toLowerCase();
-    return /\b(firewall|router|switch|access\s+point|management\s+ui|admin\s+panel|web\s+ui)\b/i.test(t);
+    try {
+      const goalText = String(goal || '').toLowerCase();
+      const keywords = new Set(['firewall', 'router', 'switch', 'access point', 'management ui', 'admin panel', 'web ui']);
+      return keywords.some(keyword => /\b${keyword}\b/i.test(goalText));
+    } catch (error) {
+      console.error('Error in networkDevice detect:', error);
+      return false;
+    }
   },
 
   pageTypes: [],
