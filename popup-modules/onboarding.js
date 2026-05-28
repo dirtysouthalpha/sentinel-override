@@ -9,25 +9,47 @@
   const TOTAL_STEPS = 4;
   let currentStep = 1;
 
-  function _qs(id) { return document.getElementById(id); }
+  function _qs(id) { 
+    const element = document.getElementById(id);
+    if (!element) console.warn(`Element with ID "${id}" not found`);
+    return element;
+  }
 
-  function showStep(n) {
+  function showStep(stepNumber) {
     document.querySelectorAll('.onboarding-step').forEach(el => {
-      el.style.display = (parseInt(el.dataset.step, 10) === n) ? '' : 'none';
+      el.style.display = (parseInt(el.dataset.step, 10) === stepNumber) ? '' : 'none';
     });
-    const ind = _qs('onboardingStepIndicator');
-    if (ind) ind.textContent = `Step ${n} of ${TOTAL_STEPS}`;
-    const prev = _qs('onboardingPrevBtn');
-    const next = _qs('onboardingNextBtn');
-    if (prev) prev.style.display = n > 1 ? '' : 'none';
-    if (next) next.textContent = n < TOTAL_STEPS ? 'Next →' : 'Get started';
-    currentStep = n;
+
+    const indicator = _qs('onboardingStepIndicator');
+    if (indicator) {
+      indicator.textContent = `Step ${stepNumber} of ${TOTAL_STEPS}`;
+    }
+
+    const prevButton = _qs('onboardingPrevBtn');
+    const nextButton = _qs('onboardingNextBtn');
+
+    if (prevButton) {
+      prevButton.style.display = stepNumber > 1 ? '' : 'none';
+    }
+
+    if (nextButton) {
+      nextButton.textContent = stepNumber < TOTAL_STEPS ? 'Next →' : 'Get started';
+    }
+
+    currentStep = stepNumber;
   }
 
   async function markDone() {
-    try { await chrome.storage.local.set({ sentinelOnboardingDone: true }); } catch { /* storage may fail */ }
+    try {
+      await chrome.storage.local.set({ sentinelOnboardingDone: true });
+    } catch (error) {
+      console.error('Failed to mark onboarding as done:', error);
+    }
+
     const modal = _qs('onboarding-modal');
-    if (modal) modal.classList.remove('show');
+    if (modal) {
+      modal.classList.remove('show');
+    }
   }
 
   function nextStep() {
@@ -39,29 +61,44 @@
   }
 
   function prevStep() {
-    if (currentStep > 1) showStep(currentStep - 1);
+    if (currentStep > 1) {
+      showStep(currentStep - 1);
+    }
   }
 
   // Wire buttons (defensive -- modal may not exist on some popup states)
-  const next = _qs('onboardingNextBtn');
-  const prev = _qs('onboardingPrevBtn');
-  const skip = _qs('onboardingSkipBtn');
-  if (next) next.addEventListener('click', nextStep);
-  if (prev) prev.addEventListener('click', prevStep);
-  if (skip) skip.addEventListener('click', markDone);
+  const nextButton = _qs('onboardingNextBtn');
+  const prevButton = _qs('onboardingPrevBtn');
+  const skipButton = _qs('onboardingSkipBtn');
+
+  if (nextButton) {
+    nextButton.addEventListener('click', nextStep);
+  }
+
+  if (prevButton) {
+    prevButton.addEventListener('click', prevStep);
+  }
+
+  if (skipButton) {
+    skipButton.addEventListener('click', markDone);
+  }
 
   // Auto-show on first run
   (async function maybeShow() {
     try {
       const stored = await chrome.storage.local.get({ sentinelOnboardingDone: false });
       if (stored.sentinelOnboardingDone === true) return;
+
       const modal = _qs('onboarding-modal');
       if (!modal) return;
+
       // Small delay so the popup paints first
       setTimeout(() => {
         showStep(1);
         modal.classList.add('show');
       }, 250);
-    } catch { /* non-fatal */ }
+    } catch (error) {
+      console.error('Error checking onboarding state:', error);
+    }
   })();
 })();
