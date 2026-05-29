@@ -14,10 +14,9 @@ export const networkDevice = {
   detect(url, goal) {
     try {
       const goalText = String(goal || '').toLowerCase();
-      const keywords = new Set(['firewall', 'router', 'switch', 'access point', 'management ui', 'admin panel', 'web ui']);
-      return keywords.some(keyword => /\b${keyword}\b/i.test(goalText));
+      return /\b(firewall|router|switch|access point|management ui|admin panel|web ui)\b/i.test(goalText);
     } catch (error) {
-      console.error('Error in networkDevice detect:', error);
+      console.error('[Sentinel] Error in networkDevice detect:', error);
       return false;
     }
   },

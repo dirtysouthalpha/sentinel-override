@@ -1840,7 +1840,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     if (choice && choice.finish_reason === 'tool_calls') {
       const _intentText = ((choice.message && choice.message.content) || '') + ' ' + ((choice.message && choice.message.reasoning_content) || '');
       // Detect smart_navigate intent from content
-      if (/smart[._\-]?navigate/i.test(_intentText)) {
+      if (/smart[._-]?navigate/i.test(_intentText)) {
         let _site = 'google', _query = '';
         if (/weather\.gov/i.test(goal)) _site = 'weather.gov';
         else if (/wikipedia/i.test(goal)) _site = 'wikipedia';

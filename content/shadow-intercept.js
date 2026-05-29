@@ -25,13 +25,14 @@
   window.__sentinelShadowRoots = new Set();
 
   const originalAttachShadow = Element.prototype.attachShadow;
-  Element.prototype.attachShadow = async function(init) {
+  Element.prototype.attachShadow = function(init) {
     try {
-      const shadowRoot = await originalAttachShadow.call(this, init);
+      const shadowRoot = originalAttachShadow.call(this, init);
       window.__sentinelCapturedRoots.set(this, shadowRoot);
       window.__sentinelShadowRoots.add(shadowRoot);
+      return shadowRoot;
     } catch (error) {
-      console.error('Failed to intercept shadow root:', error);
+      console.error('[Sentinel] Failed to intercept shadow root:', error);
     }
   };
 })();

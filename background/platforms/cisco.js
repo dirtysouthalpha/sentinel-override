@@ -16,7 +16,7 @@ export const cisco = {
       const u = new URL(url);
       const host = u.hostname.toLowerCase();
       const path = u.pathname.toLowerCase();
-      if (/cisco\.com/i.test(host)) return true;
+      if (/cisco/i.test(host)) return true;
       if (/meraki\.com/i.test(host)) return true;
       if (path.includes('/asdm') || path.includes('/fmc')) return true;
       if (/\.ise\./i.test(host)) return true;

@@ -21,7 +21,7 @@ export const emptyObservation = {
       const lastCommand = ctx.lastCommand;
       const lastFailed = !!ctx.lastActionFailed;
       const isPostObserve = lastCommand && ['read_page', 'navigate'].includes(lastCommand.type);
-      if (!isPostObserve || !lastFailed) return false;
+      if (!isPostObserve && !lastFailed) return false;
       // Only fire when we have an observation but it's nearly empty
       const elementCount = Array.isArray(ctx.allElements) ? ctx.allElements.length : 0;
       const textLength = (ctx.pageText || '').length;
@@ -55,19 +55,14 @@ export const emptyObservation = {
   },
 
   promptInjection(_ctx) {
-    try {
-      return `The page observation came back nearly empty (< 5 interactive elements, < 200 chars of text). The page is either still loading or its content is rendered by an SPA framework that the standard scanner can't see yet. Strategies:
+    return `The page observation came back nearly empty (< 5 interactive elements, < 200 chars of text). The page is either still loading or its content is rendered by an SPA framework that the standard scanner can't see yet. Strategies:
 
-1. **Wait** — if you just navigated, give it more time: \`${type:'wait_for_text', text:'<expected loaded-state text>', timeout:10000}\` or \`${type:'wait_for_navigation', timeout:8000}\`.
+1. **Wait** — if you just navigated, give it more time: \`{type:'wait_for_text', text:'<expected loaded-state text>', timeout:10000}\` or \`{type:'wait_for_navigation', timeout:8000}\`.
 
-2. **Inspect via JS** — bypass the scanner and read the DOM directly: \`${type:'execute_js', key:'page_audit', code:'return {tag:document.body.tagName, charCount:document.body.innerText.length, headings:Array.from(document.querySelectorAll("h1,h2,h3")).map(h=>h.innerText).slice(0,10), links:Array.from(document.querySelectorAll("a[href]")).map(a=>({t:a.innerText.trim(),h:a.href})).slice(0,15)}'}\`.
+2. **Inspect via JS** — bypass the scanner and read the DOM directly: \`{type:'execute_js', key:'page_audit', code:'return {tag:document.body.tagName, charCount:document.body.innerText.length, headings:Array.from(document.querySelectorAll("h1,h2,h3")).map(h=>h.innerText).slice(0,10), links:Array.from(document.querySelectorAll("a[href]")).map(a=>({t:a.innerText.trim(),h:a.href})).slice(0,15)}'}\`.
 
 3. **Different URL** — if the page is rendered behind a route guard or shows a login wall, the URL might not be the right surface. Try a parent or sibling URL.
 
 4. **Honest finish** — if multiple wait + JS-inspect attempts return empty, the data may simply not be reachable from this page. Finish with "[MISSING DATA — page did not populate]" and recommend a manual check.`;
-    } catch (error) {
-      console.error('Error in emptyObservation promptInjection:', error);
-      return '';
-    }
   }
 };

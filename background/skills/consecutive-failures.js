@@ -21,15 +21,10 @@ export const consecutiveFailures = {
   },
 
   autoApply(_ctx) {
-    try {
-      // Don't auto-apply at 3 failures — give the LLM one more chance with
-      // the directive. If failures keep climbing past 5, the existing stall
-      // detector takes over with RESCAN_AND_REPLAN.
-      return null;
-    } catch (error) {
-      console.error('Error in consecutiveFailures.autoApply:', error);
-      return null;
-    }
+    // Don't auto-apply at 3 failures — give the LLM one more chance with
+    // the directive. If failures keep climbing past 5, the existing stall
+    // detector takes over with RESCAN_AND_REPLAN.
+    return null;
   },
 
   promptInjection(ctx) {
@@ -41,18 +36,9 @@ export const consecutiveFailures = {
 
       return `You have failed ${failureCount} consecutive steps. The pattern you're trying is not working. STOP and pick a fundamentally different approach:
 
-1. **Step back from the page.** Use \`execute_js\` to inspect the page structure: 
-   \`${JSON.stringify({
-     type: 'execute_js',
-     key: 'page_struct',
-     code: 'return Array.from(document.querySelectorAll("main, [role=main], section, article, [class*=container]")).map(e=>({tag:e.tagName, cls:e.className.substring(0,80), text:e.innerText.substring(0,100)})).slice(0,15)'}\` — this gives you a structural map you can reason over.
+1. **Step back from the page.** Use \`execute_js\` to inspect the page structure: \`{type:'execute_js', key:'page_struct', code:'return Array.from(document.querySelectorAll("main, [role=main], section, article, [class*=container]")).map(e=>({tag:e.tagName, cls:e.className.substring(0,80), text:e.innerText.substring(0,100)})).slice(0,15)'}\` — this gives you a structural map you can reason over.
 
-2. **Check the network.** The data you want may be in an API response, not the DOM: 
-   \`${JSON.stringify({
-     type: 'read_network_requests',
-     limit: 30,
-     filter: 'json'
-   })}\`.
+2. **Check the network.** The data you want may be in an API response, not the DOM: \`{type:'read_network_requests', limit:30, filter:'json'}\`.
 
 3. **Re-read the goal.** Is there a part you've been ignoring? Are you on the right URL for this step?
 

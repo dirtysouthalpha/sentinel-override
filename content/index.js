@@ -252,8 +252,8 @@ if (window.__sentinelInitialized) {
       '[role="dialog"],[role="alertdialog"],[aria-modal="true"],' +
       '[class*="modal"],[class*="overlay"],[class*="popup"],' +
       '[class*="backdrop"],[class*="lightbox"],[class*="cookie"],' +
-      '[class*="dialog"],[class*="drawer"],[class*="sheet"],'
-      '[class*="consent"],[class*="policy"],[class*="notice"],[class*="gdpr"],'
+      '[class*="dialog"],[class*="drawer"],[class*="sheet"],' +
+      '[class*="consent"],[class*="policy"],[class*="notice"],[class*="gdpr"],' +
       '[id*="consent"],[id*="cookie"],[id*="policy"]'
     );
     for (const el of allEls) {

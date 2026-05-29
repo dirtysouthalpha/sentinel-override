@@ -14,7 +14,7 @@ const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use st
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
-async function _visionObserve(tab, currentUrl) {
+async function _visionObserve(tab, _currentUrl) {
   try {
     // Step 1: Discover interactive elements via CDP
     const discoverResult = await cdpExecuteJs(tab, VISION_DISCOVER, { timeout: 8000 });
@@ -1392,7 +1392,7 @@ async function _cdpObservePage(tabId) {
   const _cacheTTL = _inBatchMode ? 60000 : 30000; // 60s in batch mode, 30s normal
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
-    console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', url);
+    console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', currentUrl);
     return _cachedObservation;
   }
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
@@ -2307,11 +2307,10 @@ function detectCaptcha(currentUrl, pageText, elementsCount) {
 // When stuck, analyzes page + goal and generates creative solutions.
 // Can construct URLs, suggest execute_js, find alternative approaches.
 // ═══════════════════════════════════════════════════════════════════
-function _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount) {
+function _generateSmartRecovery(goal, currentUrl, pageText, observation, _history, _stepCount) {
   var strategies = [];
   var url = currentUrl || '';
   var text = pageText || '';
-  var els = (observation && observation.elements) || [];
 
   // URL manipulation strategies
   if (/amazon/i.test(url)) {
@@ -2567,7 +2566,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
     try {
       var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
       return { ok: parsed.ok !== false, result: parsed.result || parsed.error || 'UFB done', value: parsed.value };
-    } catch(e) {
+    } catch(_e) {
       return { ok: true, result: String(ufbRes.value).slice(0, 200) };
     }
   }
@@ -2575,7 +2574,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
 }
 
 
-async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal) {
+async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount = 0) {
   console.log('[Sentinel/CAPTCHA] Detected:', captchaInfo.type, 'url:', currentUrl);
   
   // Strategy 1: Try to click CAPTCHA checkbox/button via CDP
@@ -3793,7 +3792,7 @@ async function runAgentLoop(goal, workingTabId) {
       const priorityTypes = ['button', 'input', 'select', 'textarea'];
       const priorityEls = allElements.filter(e => priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
       const otherEls    = allElements.filter(e => !priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
-      const trimmedElements = [...priorityEls, ...otherEls]
+      let trimmedElements = [...priorityEls, ...otherEls]
         .slice(0, CONFIG.maxElements)
         .map(e => ({
           ...e,
@@ -4130,7 +4129,8 @@ async function runAgentLoop(goal, workingTabId) {
       let _visionElements = null;
       let _visionElementTree = '';
       let _visionMode = false;
-      if (true) {  // v4.0: Vision-first ALWAYS active
+      // v4.0: Vision-first ALWAYS active
+      {
         try {
           console.log('[Sentinel/v4] Vision observation starting...');
           const visionResult = await _visionObserve(tab, currentUrl);
@@ -4293,7 +4293,7 @@ async function runAgentLoop(goal, workingTabId) {
                 max_tokens: 600,
                 temperature: 0.1
               }),
-              signal: AbortSignal.timeout(45000)
+              signal: (() => { const _c = new AbortController(); setTimeout(() => _c.abort(), 45000); return _c.signal; })()
             }
           );
           if (_vResponse.ok) {
@@ -4303,10 +4303,10 @@ async function runAgentLoop(goal, workingTabId) {
             
             // Parse structured JSON output
             let _vParsed = null;
-            try { _vParsed = JSON.parse(_vRaw); } catch(e) {
+            try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
               // Try extracting from code block
               const _m = _vRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
-              if (_m) try { _vParsed = JSON.parse(_m[1].trim()); } catch(e2) {}
+              if (_m) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
             }
             
             if (_vParsed && _vParsed.action) {
@@ -4397,6 +4397,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }
       }
+      } // closes } else { at line 4211 (aiStart/LLM call block)
 
       // apiCallCount is now synced in the finally block above (handles both success and failure).
 
@@ -5965,7 +5966,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (focusResult && focusResult.ok && focusResult.value) {
               // Type each character via CDP Input.dispatchKeyEvent
               const text = command.text || '';
-              const target = chrome.debugger && chrome.debugger.detach ? tab : tab;
+              // Note: no additional reference used - CDP sends directly to tab
               for (let ci = 0; ci < text.length; ci++) {
                 const ch = text[ci];
                 try {
@@ -5984,7 +5985,7 @@ async function runAgentLoop(goal, workingTabId) {
                       code: 'Key' + ch.toUpperCase()
                     }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
                   });
-                } catch (keyErr) {
+                } catch (_keyErr) {
                   // Fallback: set value directly via CDP JS
                   const setCode = 'var el = document.querySelector(' + JSON.stringify(sel) + '); if (el) { el.value = ' + JSON.stringify(text) + '; el.dispatchEvent(new Event("input",{bubbles:true})); }';
                   await cdpExecuteJs(tab, setCode, { timeout: 2000 });

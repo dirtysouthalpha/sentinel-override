@@ -587,14 +587,6 @@ export const PROVIDER_CATALOG = [
     docsUrl: 'https://lmstudio.ai/docs/api'
   },
   {
-    id: 'local-gpu', label: 'Local Qwen3-8B (GPU)', kind: 'openai',
-    endpoint: 'http://100.70.240.55:8181/v1/chat/completions',
-    modelsUrl: 'http://100.70.240.55:8181/v1/models',
-    defaultModel: 'Qwen3-8B-abliterated-v2-i1-Q4_K_M.gguf',
-    auth: 'none',
-    docsUrl: ''
-  },
-  {
     id: 'custom', label: 'Custom (OpenAI-compatible)', kind: 'openai',
     endpoint: '',
     modelsUrl: '',

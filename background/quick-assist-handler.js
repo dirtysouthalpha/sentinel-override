@@ -13,70 +13,62 @@ import { getActiveProvider, resolveProvider } from './provider-registry.js';
  * @param {string} prompt - The fully constructed prompt (system instruction + page context + selected text)
  * @returns {Promise<string>} The LLM response text
  */
-export function handleQuickAssist(prompt) {
-  return new Promise((resolve, reject) => {
-    try {
-      const config = getActiveProvider();
-      if (!config || !config.apiKey) {
-        reject(new Error('No API key configured. Open Sentinel Override settings to set up an LLM provider.'));
-        return;
-      }
+export async function handleQuickAssist(prompt) {
+  const config = await getActiveProvider();
+  if (!config || !config.apiKey) {
+    throw new Error('No API key configured. Open Sentinel Override settings to set up an LLM provider.');
+  }
 
-      const provider = resolveProvider(config.endpoint);
-      const headers = provider.buildHeaders(config.apiKey);
+  const provider = resolveProvider(config.endpoint);
+  const headers = provider.buildHeaders(config.apiKey);
 
-      // Build the request body. For Quick Assist we want a simple single-turn
-      // completion — no system prompt separation needed since the prompt already
-      // contains the system instruction as part of the user message.
-      let body;
+  let body;
+  if (config.id === 'anthropic') {
+    const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
+    body = {
+      model: config.model,
+      max_tokens: 2000,
+      temperature: 0.3,
+      system: [{ type: 'text', text: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' }],
+      messages: [{ role: 'user', content: userPart || prompt }]
+    };
+  } else {
+    body = {
+      model: config.model,
+      max_tokens: 2000,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' },
+        { role: 'user', content: prompt }
+      ]
+    };
+  }
 
-      if (config.id === 'anthropic') {
-        // Anthropic uses system field + messages array
-        const systemPart = prompt.split('\n---\n')[0] || prompt.substring(0, 500);
-        const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
-        body = {
-          model: config.model,
-          max_tokens: 2000,
-          temperature: 0.3,
-          system: [{ type: 'text', text: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' }],
-          messages: [{ role: 'user', content: userPart || prompt }]
-        };
-      } else {
-        // OpenAI-compatible: system message + user message
-        body = {
-          model: config.model,
-          max_tokens: 2000,
-          temperature: 0.3,
-          messages: [
-            { role: 'system', content: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' },
-            { role: 'user', content: prompt }
-          ]
-        };
-      }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      fetch(config.endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
-      }).then(response => {
-        if (!response.ok) {
-          response.text().then(errorText => {
-            reject(new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`));
-          }).catch(() => {
-            reject(new Error(`API error ${response.status}`));
-          });
-        } else {
-          response.json().then(data => {
-            resolve(provider.parseResponse(data));
-          }).catch(() => {
-            reject(new Error('Failed to parse API response'));
-          });
-        }
-      }).catch(error => {
-        reject(error);
-      });
-    } catch (error) {
-      reject(error);
+  try {
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      let errorText = '';
+      try { errorText = await response.text(); } catch (_) {}
+      throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
     }
-  });
+
+    const data = await response.json();
+    return provider.parseResponse(data);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out after 30 seconds');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
