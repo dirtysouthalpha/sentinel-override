@@ -3534,11 +3534,11 @@ async function runAgentLoop(goal, workingTabId) {
       // inject a recovery hint to break the loop.
       try {
         const recentFailures = history.slice(-4);
-        const lastActionTypes = recentFailures.map(h => h.action && h.action.type).filter(Boolean);
-        const lastFailureFlags = recentFailures.map(h => h.actionFailed);
+        const recentActionEntries = recentFailures.filter(h => h.action && h.action.type);
+        const lastActionTypes = recentActionEntries.map(h => h.action.type);
         if (lastActionTypes.length >= 3) {
           const allSame = lastActionTypes.every(t => t === lastActionTypes[0]);
-          const allFailed = lastFailureFlags.every(f => f === true);
+          const allFailed = recentActionEntries.every(h => h.actionFailed === true);
           if (allSame && allFailed) {
             const stuckAction = lastActionTypes[0];
             console.warn('[Sentinel/stuck] Detected stuck loop: ' + stuckAction + ' failed ' + lastActionTypes.length + ' times');
@@ -5238,7 +5238,10 @@ async function runAgentLoop(goal, workingTabId) {
               } catch (_re) { /* fall back to stored rect */ }
 
               const _rect = _liveRect || _viEl.rect;
-              if (_rect) {
+              if (!_rect) {
+                result = 'Click failed for [' + command._visionIndex + ']: no bounding rect available';
+                actionFailed = true;
+              } else if (_rect) {
                 // CDP Input.dispatchMouseEvent uses CSS pixels (see
                 // cdpDispatchClick docstring in tab-manager.js), so no DPR
                 // scaling needed.
@@ -5860,7 +5863,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = true;
           }
         }
-      } else {
+      } else if (!command._visionExecuted) {
         try {
           // CSP-bypass: for execute_js without a key, also prefer CDP
           // Runtime.evaluate so strict-CSP sites work. (Same reason as the
