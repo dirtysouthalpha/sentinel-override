@@ -1,19 +1,27 @@
-// background/skills/csp-blocked.js
-// Fires when an execute_js attempt was blocked by the page's Content-
-// Security-Policy. The content-script path uses inline <script> injection,
-// which strict-CSP sites (SentinelOne, GitHub, banks, etc.) deny. The
-// content script returns "CSP_BLOCKED: page denies inline scripts..." so we
-// can pattern-match it here and steer the agent to alternative actions.
-//
-// CDP Runtime.evaluate normally bypasses page CSP, but if the user has
-// dismissed the debugger banner mid-run, the agent falls back to the
-// content-script path. This skill catches that scenario.
-
+/**
+ * Handles recovery when execute_js is denied by the page's Content-Security-Policy.
+ */
 export const cspBlocked = {
+  /**
+   * Identifier for this skill.
+   */
   id: 'csp-blocked',
+
+  /**
+   * Description of this skill's purpose.
+   */
   description: 'Recovery when execute_js is denied by the page Content-Security-Policy',
+
+  /**
+   * Priority level for this skill.
+   */
   priority: 95,
 
+  /**
+   * Determines if this skill matches the current context.
+   * @param {Object} ctx - The current context.
+   * @returns {boolean} - Whether the context matches the skill.
+   */
   matches(ctx) {
     try {
       if (!ctx || !ctx.lastResult) return false;
@@ -24,9 +32,11 @@ export const cspBlocked = {
     }
   },
 
-  // Deterministic recovery: read the page so the agent sees what's actually
-  // rendered without needing to inject JS. The next LLM call can then pick
-  // a CSP-friendly action (extract, extract_list, read_network_requests).
+  /**
+   * Auto-applies a recovery action when the skill is matched.
+   * @param {Object} ctx - The current context.
+   * @returns {Object} - The recovery action to apply.
+   */
   autoApply(_ctx) {
     try {
       return { type: 'read_page', _autoAppliedBy: 'csp-blocked' };
@@ -36,9 +46,14 @@ export const cspBlocked = {
     }
   },
 
+  /**
+   * Generates a prompt injection for the user to guide them through recovery options.
+   * @param {Object} ctx - The current context.
+   * @returns {string} - The prompt injection message.
+   */
   promptInjection(ctx) {
     try {
-      const lastKey = (ctx.lastCommand && ctx.lastCommand.key) || '(no key)';
+      const lastKey = (ctx.lastCommand?.key) || '(no key)';
       const cspBlockedMessage = 'CSP_BLOCKED: page denies inline scripts...';
       const cspBlockedRegex = /^CSP_BLOCKED:/i;
 
