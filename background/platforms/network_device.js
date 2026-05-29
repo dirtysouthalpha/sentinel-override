@@ -13,6 +13,7 @@ export const networkDevice = {
 
   detect(url, goal) {
     try {
+      if (!url && !goal) return false;
       const goalText = String(goal || '').toLowerCase();
       return /\b(firewall|router|switch|access point|management ui|admin panel|web ui)\b/i.test(goalText);
     } catch (error) {

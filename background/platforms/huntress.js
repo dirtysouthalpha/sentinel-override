@@ -1,18 +1,24 @@
-// background/platforms/huntress.js
-// Huntress MDR console — v3.44.0 (new)
-//
-// Covers the Huntress managed detection and response platform.
-// Standard React UI with custom dropdowns.
-
+/**
+ * Huntress MDR console — v3.44.0 (new)
+ *
+ * Covers the Huntress managed detection and response platform.
+ * Standard React UI with custom dropdowns.
+ */
 export const huntress = {
   id: 'huntress',
   label: 'Huntress MDR',
   memoryKeyPrefix: 'huntress_',
 
+  /**
+   * Detects if the given URL or goal matches Huntress.
+   * @param {string} url - The URL to check.
+   * @param {string} goal - The goal text to check.
+   * @returns {boolean} True if Huntress is detected, false otherwise.
+   */
   detect(url, goal) {
     if (!url && !goal) return false;
     try {
-      const host = new URL(url).host.toLowerCase();
+      const host = (new URL(url)).host.toLowerCase();
       if (/huntress/i.test(host)) return true;
     } catch (e) {
       console.error('[Sentinel] URL parse failed:', e.message);

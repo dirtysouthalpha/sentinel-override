@@ -13,7 +13,8 @@ export const consecutiveFailures = {
   matches(ctx) {
     try {
       if (!ctx) return false;
-      return (ctx.consecutiveFailures || 0) >= 3;
+      const failureCount = ctx.consecutiveFailures || 0;
+      return failureCount >= MIN_CONSECUTIVE_FAILURES;
     } catch (error) {
       console.error('Error in consecutiveFailures.matches:', error);
       return false;
@@ -30,7 +31,7 @@ export const consecutiveFailures = {
   promptInjection(ctx) {
     try {
       const failureCount = ctx.consecutiveFailures || 0;
-      const maxSteps = ctx.dynamicMaxSteps || 100;
+      const maxSteps = ctx.dynamicMaxSteps || DEFAULT_MAX_STEPS;
       const currentStep = ctx.stepCount || 0;
       const stepsRemaining = Math.max(0, maxSteps - currentStep);
 
@@ -51,3 +52,7 @@ Do NOT repeat the action that just failed. The user can see the failure pattern 
     }
   }
 };
+
+// Constants for better readability and maintainability
+const MIN_CONSECUTIVE_FAILURES = 3;
+const DEFAULT_MAX_STEPS = 100;

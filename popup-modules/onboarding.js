@@ -101,4 +101,13 @@
       console.error('Error checking onboarding state:', error);
     }
   })();
+
+  // Cleanup event listeners on popup unload
+  if (window.addEventListener) {
+    window.addEventListener('unload', () => {
+      if (nextButton) nextButton.removeEventListener('click', nextStep);
+      if (prevButton) prevButton.removeEventListener('click', prevStep);
+      if (skipButton) skipButton.removeEventListener('click', markDone);
+    });
+  }
 })();

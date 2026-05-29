@@ -33,7 +33,7 @@ export const cspBlocked = {
 
   promptInjection(ctx) {
     try {
-      const lastKey = (ctx.lastCommand && ctx.lastCommand.key) || '(no key)';
+      const lastKey = (ctx.lastCommand?.key) || '(no key)';
 
       return `Your previous execute_js was blocked by the page's Content-Security-Policy (script-src directive). The page does not allow inline scripts — DO NOT retry execute_js on this page in this manner. Available alternatives:
 
