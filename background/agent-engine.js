@@ -2565,6 +2565,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
   if (ufbRes && ufbRes.ok && ufbRes.value != null) {
     try {
       var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
+      if (!parsed || typeof parsed !== 'object') return { ok: true, result: String(parsed != null ? parsed : 'UFB done') };
       return { ok: parsed.ok !== false, result: parsed.result || parsed.error || 'UFB done', value: parsed.value };
     } catch(_e) {
       return { ok: true, result: String(ufbRes.value).slice(0, 200) };
@@ -4423,6 +4424,13 @@ async function runAgentLoop(goal, workingTabId) {
       } // closes } else { at line 4211 (aiStart/LLM call block)
 
       // apiCallCount is now synced in the finally block above (handles both success and failure).
+
+      // Guard: callLLM returns null when no API key is configured (early return at
+      // llm-client.js:904). Downstream code accesses command.type/.text/etc unconditionally,
+      // so synthesize a note rather than crashing on null dereference.
+      if (!command) {
+        command = { type: 'note', text: 'No response from AI — check API key and provider settings.' };
+      }
 
       // Advance plan step if the LLM signalled it's done with the current step
       if (command.advance_plan && agentPlan && currentPlanStep < agentPlan.length - 1) {
