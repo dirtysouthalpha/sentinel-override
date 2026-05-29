@@ -309,9 +309,10 @@
           (e.payload ? '  ' + JSON.stringify(e.payload) : '')
         ).join('\n');
         try {
-          navigator.clipboard.writeText(text).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', e); });
-          copyBtn.textContent = 'Copied!';
-          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
+          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', e); });
         } catch { /* clipboard API may be restricted */ }
       });
     }
@@ -396,6 +397,7 @@
     try {
       runs = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: 'list_persisted_telemetry_runs' }, (response) => {
+          if (chrome.runtime.lastError) { resolve([]); return; }
           resolve(Array.isArray(response) ? response : []);
         });
       });

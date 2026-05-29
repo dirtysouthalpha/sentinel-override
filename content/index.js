@@ -487,7 +487,7 @@ if (window.__sentinelInitialized) {
         // If still empty after retries, try scrolling down to trigger lazy load
         if (content.length < 200) {
           try {
-            window.scrollTo(0, document.body.scrollHeight / 3);
+            if (document.body) window.scrollTo(0, document.body.scrollHeight / 3);
             await new Promise(r => setTimeout(r, 1000));
             const bodyText = (document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             if (bodyText.length > content.length) content = bodyText;
@@ -516,7 +516,7 @@ if (window.__sentinelInitialized) {
         const iframes = document.querySelectorAll('iframe');
         if (!iframes[frameIndex]) throw new Error('Iframe not found at index ' + frameIndex);
         try {
-          const iframeDoc = iframes[frameIndex].contentWindow.document;
+          const iframeDoc = iframes[frameIndex].contentWindow && iframes[frameIndex].contentWindow.document;
           const title = iframeDoc.title || '';
           const url = iframes[frameIndex].src || '';
           let content = '';
@@ -854,7 +854,7 @@ if (window.__sentinelInitialized) {
           100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
         }
       `;
-      document.head.appendChild(style);
+      (document.head || document.documentElement).appendChild(style);
 
       overlay = document.createElement('div');
       overlay.id = SENTINEL_OVERLAY_ID;
@@ -999,7 +999,6 @@ if (window.__sentinelInitialized) {
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (chrome.runtime.lastError) { sendResponse({ ok: false, error: chrome.runtime.lastError.message }); return; }
     handleMessage(request)
       .then(data => {
         // If handleMessage returned null the action is unrecognised — do NOT

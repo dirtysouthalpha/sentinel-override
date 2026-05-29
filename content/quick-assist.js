@@ -573,6 +573,7 @@
     if (!text) return;
 
     navigator.clipboard.writeText(text).then(function() {
+      if (!shadow) return;
       var btn = shadow.querySelector('.qa-footer-btn');
       if (btn) {
         var orig = btn.textContent;
@@ -602,6 +603,7 @@
     if (!text) return;
 
     chrome.runtime.sendMessage({ action: 'set_goal', goal: text }, function() {
+      if (chrome.runtime.lastError || !shadow) return;
       var btn = shadow.querySelector('.qa-send-btn');
       if (btn) {
         var orig = btn.textContent;

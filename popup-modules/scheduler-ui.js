@@ -16,7 +16,7 @@ function showSchedulesPanel() {
   document.getElementById('input-area').style.display = 'none';
   document.getElementById('templates-panel').style.display = 'none';
   document.getElementById('templatesBtn')?.classList.remove('active');
-  document.getElementById('schedulerBtn').classList.add('active');
+  document.getElementById('schedulerBtn')?.classList.add('active');
 
   // Load templates for the create form dropdown
   loadTemplatesCache();
@@ -38,7 +38,7 @@ function hideSchedulesPanel() {
   document.getElementById('schedules-panel').style.display = 'none';
   document.getElementById('chat-container').style.display = 'flex';
   document.getElementById('input-area').style.display = 'flex';
-  document.getElementById('schedulerBtn').classList.remove('active');
+  document.getElementById('schedulerBtn')?.classList.remove('active');
   document.getElementById('templates-panel').style.display = 'none';
   document.getElementById('templatesBtn')?.classList.remove('active');
 
@@ -61,6 +61,7 @@ function loadTemplatesCache() {
 // ========== Schedule List ==========
 async function loadAndRenderSchedules() {
   const container = document.getElementById('schedule-list');
+  if (!container) return;
 
   try {
     const response = await new Promise((resolve, reject) => {
