@@ -1054,9 +1054,8 @@ export async function generatePlan(goal, settings, context = {}) {
   } catch (e) {
     console.warn('Plan generation failed (non-fatal):', e && e.message);
     // Even on hard exception, return a minimal fallback so the loop has a plan.
-    if (goal) return [goal.substring(0, 300)];
+    return goal ? [goal.substring(0, 300)] : ['Complete the task'];
   }
-  return null;
 }
 
 // ========== Anthropic Tool Definitions ==========

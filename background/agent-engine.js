@@ -4307,7 +4307,7 @@ async function runAgentLoop(goal, workingTabId) {
           } finally {
             clearTimeout(_vTimeoutId);
           }
-          if (_vResponse.ok) {
+          if (_vResponse && _vResponse.ok) {
             const _vData = await _vResponse.json();
             const _vRaw = _vData.choices && _vData.choices[0] && _vData.choices[0].message
               ? _vData.choices[0].message.content || '' : '';
