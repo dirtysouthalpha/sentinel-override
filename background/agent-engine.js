@@ -4360,9 +4360,17 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-      // If vision produced a command, clear the progress timer now (the legacy
-      // path's finally block won't run since we skip it below).
-      if (command && command.type) clearInterval(progressTimer);
+      // If vision produced a command, do the bookkeeping that the legacy path's
+      // finally block would have done (it won't run since we skip it below).
+      if (command && command.type) {
+        clearInterval(progressTimer);
+        _lastAiCallMs = Date.now() - _aiStart;
+        try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
+        base64Image = null; // release screenshot memory
+        apiCallCount = agentState.apiCallCount;
+        activityDone(stepCount, 'consult-ai', 'Vision decided: ' + command.type, null);
+        tel.info('llm', 'Vision LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type });
+      }
 
       // Legacy LLM fallback (only if vision didn't produce a command)
       if (!command || !command.type) {
