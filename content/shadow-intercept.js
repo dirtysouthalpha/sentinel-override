@@ -26,13 +26,13 @@
 
   const originalAttachShadow = Element.prototype.attachShadow;
   Element.prototype.attachShadow = function(init) {
+    const shadowRoot = originalAttachShadow.call(this, init);
     try {
-      const shadowRoot = originalAttachShadow.call(this, init);
       window.__sentinelCapturedRoots.set(this, shadowRoot);
       window.__sentinelShadowRoots.add(shadowRoot);
-      return shadowRoot;
     } catch (error) {
       console.error('[Sentinel] Failed to intercept shadow root:', error);
     }
+    return shadowRoot;
   };
 })();

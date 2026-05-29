@@ -167,7 +167,7 @@ export function startMonitorLoop() {
 
   chrome.alarms.onAlarm.addListener(alarm => {
     if (alarm.name === 'sentinel-monitor-check') {
-      runMonitorCycle();
+      runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', e && e.message));
     }
   });
 
