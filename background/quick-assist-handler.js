@@ -25,30 +25,34 @@ export function handleQuickAssist(prompt) {
       const provider = resolveProvider(config.endpoint);
       const headers = provider.buildHeaders(config.apiKey);
 
-      // Build the request body. For Quick Assist we want a simple single-turn
-      // completion — no system prompt separation needed since the prompt already
-      // contains the system instruction as part of the user message.
-      let body;
+      // Constants for request configuration
+      const MAX_TOKENS = 2000;
+      const TEMPERATURE = 0.3;
+      const SYSTEM_PROMPT = 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.';
+      
+      let requestBody;
 
       if (config.id === 'anthropic') {
-        // Anthropic uses system field + messages array
-        const systemPart = prompt.split('\n---\n')[0] || prompt.substring(0, 500);
-        const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
-        body = {
+        // Split prompt into system and user parts
+        const splitIndex = prompt.indexOf('\n---\n');
+        const systemPart = splitIndex !== -1 ? prompt.substring(0, splitIndex) : prompt.substring(0, 500);
+        const userPart = splitIndex !== -1 ? prompt.substring(splitIndex + 4) : prompt;
+
+        requestBody = {
           model: config.model,
-          max_tokens: 2000,
-          temperature: 0.3,
-          system: [{ type: 'text', text: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' }],
+          max_tokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
+          system: [{ type: 'text', text: SYSTEM_PROMPT }],
           messages: [{ role: 'user', content: userPart || prompt }]
         };
       } else {
-        // OpenAI-compatible: system message + user message
-        body = {
+        // OpenAI-compatible format
+        requestBody = {
           model: config.model,
-          max_tokens: 2000,
-          temperature: 0.3,
+          max_tokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
           messages: [
-            { role: 'system', content: 'You are Sentinel Quick Assist, an AI assistant for MSP technicians. Be concise, actionable, and professional.' },
+            { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: prompt }
           ]
         };
@@ -57,7 +61,7 @@ export function handleQuickAssist(prompt) {
       fetch(config.endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify(body)
+        body: JSON.stringify(requestBody)
       }).then(response => {
         if (!response.ok) {
           response.text().then(errorText => {

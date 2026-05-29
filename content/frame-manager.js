@@ -26,7 +26,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch {
+    } catch (error) {
+      console.error('Error selecting iframes:', error);
       return { elements, iframeCount: 0, crossOriginCount: 0 };
     }
 
@@ -50,19 +51,20 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
             elements.push(el);
           });
         }
-      } catch {
+      } catch (error) {
         // Cross-origin: add placeholder
         crossOriginCount++;
         elements.push({
           index: elements.length,
           tag: 'IFRAME',
-          text: 'Cross-origin iframe: ' + src,
-          selector: 'frame:' + index + ':',
+          text: `Cross-origin iframe: ${src}`,
+          selector: `frame:${index}:`,
           role: 'cross-origin-iframe',
           type: 'none',
           frameUrl: src,
           frameId: null
         });
+        console.error(`Error scanning iframe ${index}:`, error);
       }
     });
 
@@ -90,7 +92,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch {
+    } catch (error) {
+      console.error('Error selecting iframes:', error);
       return null;
     }
 
@@ -109,8 +112,9 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         }
         return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src };
       }
-    } catch {
+    } catch (error) {
       // Cross-origin
+      console.error(`Error accessing iframe ${frameIndex} content:`, error);
     }
 
     // Cross-origin iframe
@@ -136,7 +140,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     let iframes;
     try {
       iframes = doc.querySelectorAll('iframe');
-    } catch {
+    } catch (error) {
+      console.error('Error selecting iframes:', error);
       return info;
     }
 
@@ -148,21 +153,24 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         if (iframe.contentWindow && iframe.contentWindow.document) {
           sameOrigin = true;
         }
-      } catch {
-        sameOrigin = false;
+      } catch (error) {
+        console.error(`Error checking origin for iframe ${index}:`, error);
       }
 
       let rect;
       try {
         rect = iframe.getBoundingClientRect();
-      } catch {
+      } catch (error) {
+        console.error(`Error getting dimensions for iframe ${index}:`, error);
         rect = { width: 0, height: 0 };
       }
 
       let visible = false;
       try {
         visible = dom && dom.isVisible(iframe);
-      } catch { /* isVisible may fail on detached elements */ }
+      } catch (error) {
+        console.error(`Error checking visibility for iframe ${index}:`, error);
+      }
 
       info.push({
         index,

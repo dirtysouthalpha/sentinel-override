@@ -39,16 +39,27 @@
     currentStep = stepNumber;
   }
 
-  async function markDone() {
+  function markDone() {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set({ sentinelOnboardingDone: true }, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  async function handleMarkDone() {
     try {
-      await chrome.storage.local.set({ sentinelOnboardingDone: true });
+      await markDone();
+      const modal = _qs('onboarding-modal');
+      if (modal) {
+        modal.classList.remove('show');
+      }
     } catch (error) {
       console.error('Failed to mark onboarding as done:', error);
-    }
-
-    const modal = _qs('onboarding-modal');
-    if (modal) {
-      modal.classList.remove('show');
     }
   }
 
@@ -56,7 +67,7 @@
     if (currentStep < TOTAL_STEPS) {
       showStep(currentStep + 1);
     } else {
-      markDone();
+      handleMarkDone();
     }
   }
 
@@ -80,7 +91,7 @@
   }
 
   if (skipButton) {
-    skipButton.addEventListener('click', markDone);
+    skipButton.addEventListener('click', handleMarkDone);
   }
 
   // Auto-show on first run
@@ -101,4 +112,11 @@
       console.error('Error checking onboarding state:', error);
     }
   })();
+
+  // Cleanup event listeners on popup unload
+  window.addEventListener('unload', () => {
+    if (nextButton) nextButton.removeEventListener('click', nextStep);
+    if (prevButton) prevButton.removeEventListener('click', prevStep);
+    if (skipButton) skipButton.removeEventListener('click', handleMarkDone);
+  });
 })();

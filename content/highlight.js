@@ -25,7 +25,9 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
         '}';
       // Append to head if available, else documentElement
       (document.head || document.documentElement).appendChild(style);
-    } catch { /* non-fatal */ }
+    } catch (e) {
+      console.error('[Sentinel] Failed to inject highlight style:', e.message);
+    }
   }
 
   /**
@@ -34,12 +36,15 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
    * corrupting user CSS on error.
    * @param {HTMLElement} el - Element to highlight.
    */
-  hl.highlightElement = function(el) {
+  hl.highlightElement = async function(el) {
     try {
       if (!el || !el.classList) return;
       ensureStyleInjected();
       el.classList.add(HIGHLIGHT_CLASS);
-    } catch (e) { console.warn('[Sentinel] highlight element:', e && e.message); }
+    } catch (e) {
+      console.error('[Sentinel] Failed to highlight element:', e.message);
+      throw e;
+    }
   };
 
   /**
@@ -47,13 +52,20 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
    * user can see what was acted upon.
    * @param {HTMLElement} el - Element to remove highlight from.
    */
-  hl.removeHighlight = function(el) {
+  hl.removeHighlight = async function(el) {
     try {
       if (!el || !el.classList) return;
       // Keep highlight visible briefly so the user can see what was acted upon.
       setTimeout(() => {
-        try { el.classList.remove(HIGHLIGHT_CLASS); } catch (e) { console.warn('[Sentinel] remove highlight class:', e && e.message); }
+        try {
+          el.classList.remove(HIGHLIGHT_CLASS);
+        } catch (e) {
+          console.error('[Sentinel] Failed to remove highlight class:', e.message);
+        }
       }, 500);
-    } catch (e) { console.warn('[Sentinel] removeHighlight:', e && e.message); }
+    } catch (e) {
+      console.error('[Sentinel] Failed to schedule highlight removal:', e.message);
+      throw e;
+    }
   };
 })();

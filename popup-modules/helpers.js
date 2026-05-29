@@ -12,11 +12,17 @@ window.Helpers = {};
  * @returns {string} Human-readable countdown.
  */
 Helpers.formatCountdown = function formatCountdown(timestamp) {
-  if (!timestamp) return 'Not scheduled';
+  if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+    console.error('Invalid timestamp input to formatCountdown:', timestamp);
+    return 'Not scheduled';
+  }
   const now = Date.now();
   const diff = timestamp - now;
 
-  if (diff <= 0) return 'Overdue';
+  if (diff <= 0) {
+    console.warn('Timestamp is in the past for formatCountdown:', timestamp);
+    return 'Overdue';
+  }
 
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
@@ -38,7 +44,10 @@ Helpers.formatCountdown = function formatCountdown(timestamp) {
  * @returns {string} Human-readable relative time.
  */
 Helpers.relativeTime = function relativeTime(timestamp) {
-  if (!timestamp) return 'Never';
+  if (typeof timestamp !== 'number' || isNaN(timestamp)) {
+    console.error('Invalid timestamp input to relativeTime:', timestamp);
+    return 'Never';
+  }
   const now = Date.now();
   const diff = now - timestamp;
   const minutes = Math.floor(diff / 60000);
@@ -59,7 +68,11 @@ Helpers.relativeTime = function relativeTime(timestamp) {
  * @returns {string} Human-readable duration.
  */
 Helpers.formatDuration = function formatDuration(startedAt, completedAt) {
-  if (!startedAt || !completedAt) return '';
+  if (typeof startedAt !== 'number' || isNaN(startedAt) ||
+      typeof completedAt !== 'number' || isNaN(completedAt)) {
+    console.error('Invalid timestamps input to formatDuration:', startedAt, completedAt);
+    return '';
+  }
   const diff = completedAt - startedAt;
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
