@@ -1120,7 +1120,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
 
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
-    const allSameType = recent.every(h => h.action.type === recent[0].action.type);
+    const allSameType = recent.every(h => h.action && h.action.type === (recent[0].action && recent[0].action.type));
     const allSameResult = recent.every(h => h.result === recent[0].result);
     const allFailed = recent.every(h =>
       h.result.includes('not found') ||
@@ -3979,7 +3979,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
-      const recentTabActions = history.slice(-5).filter(h => ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
+      const recentTabActions = history.slice(-5).filter(h => h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
       const isMakingProgress = recentTabActions > 0 || Object.keys(agentMemory).length > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
@@ -4485,7 +4485,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_) { /* completeness check failure is non-fatal */ }
 
         const memCount = Object.keys(agentMemory).length;
-        const noteCount = history.filter(h => h.action.type === 'note').length;
+        const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
         const hasData = memCount > 0 || noteCount > 0;
 
         // Block finish if no real data was extracted and we haven't tried enough
@@ -6570,7 +6570,7 @@ async function saveLearnedPattern(goal, history, success) {
       .replace(/'[^']{2,60}'/g, "'[client]'");
     patterns.push({
       goal: _scrubPii(goal.substring(0, 100)),
-      steps: history.map(h => ({ type: h.action.type, selector: h.action.selector })),
+      steps: history.filter(h => h.action).map(h => ({ type: h.action.type, selector: h.action.selector })),
       success,
       timestamp: Date.now()
     });
