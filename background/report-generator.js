@@ -244,8 +244,8 @@ export async function generateReport(executionData, CONFIG) {
   // Long runs produce massive prompts that timeout small-context LLMs.
   const _allHistory = history.map(h => ({
     step: h.step,
-    action: h.action.type,
-    detail: h.action.selector ? h.action.selector.substring(0, 80) : (h.action.url || h.action.text || ''),
+    action: h.action ? h.action.type : 'unknown',
+    detail: h.action && h.action.selector ? h.action.selector.substring(0, 80) : (h.action && (h.action.url || h.action.text) || ''),
     result: typeof h.result === 'string' ? h.result.substring(0, 150) : String(h.result)
   }));
   const condensedHistory = _allHistory.length > 14
