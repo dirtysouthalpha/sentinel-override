@@ -63,7 +63,7 @@ user types goal → generatePlan → parsePlan → runAgentLoop → each step ca
 5. **VERIFY EVERY FIX** — After each fix:
    - Read the changed code
    - Trace the execution path mentally
-   - Run `npm test` if tests exist
+   - Run `npm test` — tests MUST pass before committing. NEVER use --detectOpenHandles (it hangs). If a test fails, fix it immediately.
    - Commit with conventional commit message
 
 6. **PUSH every 3-5 commits**

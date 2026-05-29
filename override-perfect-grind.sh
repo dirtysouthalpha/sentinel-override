@@ -12,12 +12,15 @@ while true; do
     cd "$REPO_DIR"
     git pull origin "$BRANCH" 2>&1 | tee -a "$LOGFILE"
     rm -rf .aider.chat.history.md .aider.input.history .aider.tags.cache.v4/ coverage/ 2>/dev/null
-    claude -p "Read CLAUDE.md and follow the instructions. Start with Phase 1 (tests), then Phase 2 (big files). Be thorough and aggressive — fix everything you find. Run tests after EVERY change. Do not skip any phase." \
-        --dangerously-skip-permissions \
-        --max-turns 500 \
-        --model claude-sonnet-4-6 \
-        --allowedTools "Bash,Read,Write,Edit,MultiEdit" \
-        2>&1 | tee -a "$LOGFILE"
+    claude -p "Read CLAUDE.md and follow ALL instructions. Start with Phase 1 (tests), then Phase 2 (big files). Be thorough and aggressive — fix everything you find. Run tests after EVERY change with: npm test. NEVER use --detectOpenHandles (it hangs). If a test fails, fix it immediately. Push after every 3-5 commits."         --dangerously-skip-permissions         --max-turns 500         --model claude-sonnet-4-6         --allowedTools "Bash,Read,Write,Edit,MultiEdit"         2>&1 | tee -a "$LOGFILE"
+
+    # Post-session verification
+    echo "[$(date)] Running post-session test verification..." | tee -a "$LOGFILE"
+    npm test 2>&1 | tail -5 | tee -a "$LOGFILE"
+
+    # Push any unpushed commits
+    git push origin "$BRANCH" 2>&1 | tee -a "$LOGFILE"
+
     echo "[$(date)] Session ended. Restarting in 60s..." | tee -a "$LOGFILE"
     cd "$LOG_DIR" && ls -t override-perfect-*.log | tail -n +11 | xargs -r rm
     sleep 60
