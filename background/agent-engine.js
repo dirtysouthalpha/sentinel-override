@@ -5834,7 +5834,7 @@ async function runAgentLoop(goal, workingTabId) {
           } else if (command.type === 'select') {
             // v3.66: CDP select - find the <select> element and set its value
             try {
-              const selCode = '(function(){'
+              const selCode = 'return (function(){'
                 + 'var el = document.querySelector(' + JSON.stringify(command.selector || '') + ');'
                 + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
                 + 'if (!el) return { ok: false, error: "No select element found" };'
