@@ -220,7 +220,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       if (resultEl) {
         resultEl.className = 'hud-result';
         if (opts.result) {
-          resultEl.textContent = opts.result.substring(0, 80);
+          resultEl.textContent = (typeof opts.result === 'string' ? opts.result : String(opts.result)).substring(0, 80);
           if (opts.resultSuccess) resultEl.classList.add('success');
           if (opts.resultError) resultEl.classList.add('error');
         } else {

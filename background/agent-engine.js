@@ -1108,7 +1108,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       '📊 PROGRESS UPDATE — step ' + stepCount,
       'Portals visited: ' + (portalsSeen.size > 0 ? Array.from(portalsSeen).join(', ') : '(none yet)'),
       'Data points in memory: ' + memCount,
-      'Recent action: ' + (history.length > 0 ? (history[history.length - 1].action.type) : '(none)')
+      'Recent action: ' + (history.length > 0 && history[history.length - 1].action ? history[history.length - 1].action.type : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
   } catch (_) { /* non-fatal */ }

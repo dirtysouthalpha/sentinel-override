@@ -38,7 +38,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       try {
         // Same-origin check: try to access contentWindow.document
         const iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
-        if (iframeDoc) {
+        if (iframeDoc && dom) {
           // Same-origin: scan the iframe's document
           const iframeElements = [];
           const selectorMap = new Map();
@@ -105,7 +105,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     try {
       // Same-origin
       const iframeDoc = iframe.contentWindow && iframe.contentWindow.document;
-      if (iframeDoc) {
+      if (iframeDoc && dom) {
         const element = dom.findElementBySelector(iframeDoc, remainingSelector);
         if (element) {
           return { element, frameDoc: iframeDoc, frameIndex, frameUrl: src };
