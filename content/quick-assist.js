@@ -541,6 +541,7 @@
   }
 
   function setResponseLoading() {
+    if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-loading-indicator">' +
@@ -549,12 +550,14 @@
   }
 
   function setResponse(text) {
+    if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-response">' + renderMarkdown(text) + '</div>';
   }
 
   function setResponseHTML(html) {
+    if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-response">' + html + '</div>';

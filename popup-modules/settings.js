@@ -426,7 +426,7 @@ if (quickModeToggle) {
           ? 'ON — Fast execution, no planning'
           : 'OFF - Standard pace';
       }
-      showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success');
+      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch { /* showToast may fail in detached popup */ }
     });
   });
 }
