@@ -5242,7 +5242,7 @@ async function runAgentLoop(goal, workingTabId) {
               let _liveRect = null;
               try {
                 const _rectRes = await cdpExecuteJs(tab,
-                  '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()',
+                  'return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()',
                   { timeout: 3000 });
                 if (_rectRes && _rectRes.value) {
                   const _parsed = typeof _rectRes.value === 'string' ? JSON.parse(_rectRes.value) : _rectRes.value;
@@ -5281,7 +5281,7 @@ async function runAgentLoop(goal, workingTabId) {
                 await new Promise(r => setTimeout(r, 100));
                 try {
                   const _jsClickRes = await cdpExecuteJs(tab,
-                    '(function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()',
+                    'return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()',
                     { timeout: 3000 });
                   const _val = _jsClickRes && _jsClickRes.value;
                   if (_val === 'js-clicked') {
@@ -5292,7 +5292,7 @@ async function runAgentLoop(goal, workingTabId) {
                     // hasn't run yet on this step).
                     try {
                       const _attrRes = await cdpExecuteJs(tab,
-                        '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
+                        'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
                         { timeout: 3000 });
                       result = 'Clicked [' + command._visionIndex + '] via attr selector: ' + (_attrRes && _attrRes.value || 'unknown');
                     } catch (_cme2) {
