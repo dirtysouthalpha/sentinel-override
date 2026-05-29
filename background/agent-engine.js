@@ -4272,20 +4272,28 @@ async function runAgentLoop(goal, workingTabId) {
         ];
 
         try {
+          const _vProviderConfig = await getActiveProvider().catch(() => null);
+          const _vEndpoint = (_vProviderConfig && _vProviderConfig.endpoint) || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
+          const _vApiKey = (_vProviderConfig && _vProviderConfig.apiKey) || '';
+          const _vModel = (_vProviderConfig && _vProviderConfig.model) || 'glm-5';
+          // Skip vision LLM call for Anthropic — its image format differs from OpenAI
+          if (_vEndpoint.includes('api.anthropic.com')) {
+            throw new Error('Vision LLM not supported for Anthropic provider');
+          }
           const _vCtrl = new AbortController();
           const _vTimeoutId = setTimeout(() => _vCtrl.abort(), 45000);
           let _vResponse;
           try {
             _vResponse = await fetch(
-              (CONFIG.apiEndpoint || 'https://api.zai.chat/v1/chat/completions'),
+              _vEndpoint,
               {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + (CONFIG.apiKey || '')
+                  'Authorization': 'Bearer ' + _vApiKey
                 },
                 body: JSON.stringify({
-                  model: CONFIG.model || 'glm-5-turbo',
+                  model: _vModel,
                   messages: _visionMessages,
                   max_tokens: 600,
                   temperature: 0.1
