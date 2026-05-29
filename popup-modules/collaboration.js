@@ -15,6 +15,7 @@ async function exportTemplateFile(templateId) {
     if (!response.ok) throw new Error(response.error || 'Export failed');
 
     const data = response.data;
+    if (!data || !data.template) throw new Error('Malformed export response');
     const filename = sanitizeFilename(data.template.name) + '.json';
     downloadJson(data, filename);
     showToast('Template exported', 'success');
@@ -84,7 +85,7 @@ function openImportDialog() {
     } catch (err) {
       showToast('Failed to read file: ' + ((err && err.message) || String(err)), 'error');
     } finally {
-      document.body.removeChild(input);
+      if (document.body && document.body.contains(input)) document.body.removeChild(input);
     }
   });
 
@@ -211,7 +212,7 @@ async function executeImport() {
     if (result.overwritten > 0) parts.push(`${result.overwritten} overwritten`);
     if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
 
-    showToast(`Import complete: ${parts.join(', ')}`, 'success');
+    showToast(`Import complete: ${parts.length ? parts.join(', ') : 'nothing changed'}`, 'success');
 
     // Refresh template list if templates panel is visible
     if (typeof loadTemplates === 'function') loadTemplates();

@@ -241,6 +241,8 @@
         const ok = await restoreChat(b.dataset.id);
         if (ok) {
           _closeModal();
+        } else {
+          try { showToast('Failed to restore chat', 'error'); } catch { /* showToast may fail in detached popup */ }
         }
       });
     });

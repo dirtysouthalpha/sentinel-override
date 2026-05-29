@@ -147,7 +147,7 @@ async function refreshClientList() {
           }
         } catch (err) {
           console.error('[client-knowledge] action error:', err);
-          alert('Action failed: ' + (err && err.message) || String(err));
+          alert('Action failed: ' + ((err && err.message) || String(err)));
         }
       });
     });
@@ -258,7 +258,7 @@ async function exportClientToFile(clientId) {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (err) {
     console.error('[client-knowledge] exportClientToFile error:', err);
-    alert('Export failed: ' + (err && err.message) || String(err));
+    alert('Export failed: ' + ((err && err.message) || String(err)));
   }
 }
 
@@ -276,12 +276,12 @@ function importClientFromFile() {
       if (res.ok) {
         await refreshClientPicker();
         await refreshClientList();
-        try { window.showToast && showToast('Client imported: ' + res.client.displayName, 'success'); } catch { /* showToast may fail in detached popup */ }
+        try { window.showToast && showToast('Client imported: ' + ((res.data && (res.data.displayName || (res.data.client && res.data.client.displayName))) || 'client'), 'success'); } catch { /* showToast may fail in detached popup */ }
       } else {
         alert(res.error || 'Import failed');
       }
     } catch (err) {
-      alert('Import failed: ' + (err && err.message) || String(err));
+      alert('Import failed: ' + ((err && err.message) || String(err)));
     }
   };
   input.click();
@@ -321,7 +321,7 @@ _on('clientAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add client error:', err);
-    alert('Create failed: ' + (err && err.message) || String(err));
+    alert('Create failed: ' + ((err && err.message) || String(err)));
   }
 });
 
@@ -341,7 +341,7 @@ _on('clientDetailSaveBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] save client error:', err);
-    alert('Save failed: ' + (err && err.message) || String(err));
+    alert('Save failed: ' + ((err && err.message) || String(err)));
   }
 });
 
@@ -360,7 +360,7 @@ _on('clientDetailDeleteBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] delete client error:', err);
-    alert('Delete failed: ' + (err && err.message) || String(err));
+    alert('Delete failed: ' + ((err && err.message) || String(err)));
   }
 });
 
@@ -389,7 +389,7 @@ _on('clientEntryAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add entry error:', err);
-    alert('Add failed: ' + (err && err.message) || String(err));
+    alert('Add failed: ' + ((err && err.message) || String(err)));
   }
 });
 

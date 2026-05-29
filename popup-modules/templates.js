@@ -176,10 +176,14 @@ function saveNewTemplate() {
   }
 
   const tags = parseTags(tagsStr);
+  const params = [];
+  document.querySelectorAll('#tmpl-params-container input[data-param-key]').forEach(inp => {
+    params.push({ key: inp.dataset.paramKey, defaultValue: inp.value });
+  });
 
   chrome.runtime.sendMessage({
     action: 'template_save',
-    template: { name, goal, tags }
+    template: { name, goal, tags, params }
   }, (response) => {
     if (chrome.runtime.lastError) {
       showToast(chrome.runtime.lastError.message || 'Error saving template', 'error');
@@ -247,11 +251,15 @@ function saveEditedTemplate() {
   }
 
   const tags = parseTags(tagsStr);
+  const params = [];
+  document.querySelectorAll('#tmpl-params-container input[data-param-key]').forEach(inp => {
+    params.push({ key: inp.dataset.paramKey, defaultValue: inp.value });
+  });
 
   chrome.runtime.sendMessage({
     action: 'template_update',
     id: editingTemplateId,
-    updates: { name, goal, tags }
+    updates: { name, goal, tags, params }
   }, (response) => {
     if (chrome.runtime.lastError) {
       showToast(chrome.runtime.lastError.message || 'Error updating template', 'error');

@@ -83,7 +83,7 @@ export function auditLogToCsv(log) {
   const header = 'timestamp,step,type,target,outcome';
   const rows = (log || []).map(e => {
     const ts = new Date(e.ts || 0).toISOString();
-    return [ts, e.step ?? '', e.type, e.target, e.outcome]
+    return [ts, e.step ?? '', e.type ?? '', e.target ?? '', e.outcome ?? '']
       .map(v => '"' + String(v).replace(/"/g, '""') + '"')
       .join(',');
   });
