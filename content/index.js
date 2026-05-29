@@ -56,7 +56,7 @@ if (window.__sentinelInitialized) {
   const hl = window.__sentinelUtils.highlight;
   const wait = window.__sentinelUtils.wait;
   const dd = window.__sentinelUtils.dropdown;
-  // const si = window.__sentinelUtils.specialInputs; // Not yet used
+  const si = window.__sentinelUtils.specialInputs;
   const ov = window.__sentinelUtils.overlay;
   const fm = window.__sentinelUtils.frame;
 
@@ -1542,9 +1542,9 @@ if (window.__sentinelInitialized) {
 
         // intermediate mousemove steps for smooth drag appearance
         var steps = 6;
-        for (var si = 1; si <= steps; si++) {
-          var mx = Math.round(srcX + (dstX - srcX) * (si / steps));
-          var my = Math.round(srcY + (dstY - srcY) * (si / steps));
+        for (var dragStep = 1; dragStep <= steps; dragStep++) {
+          var mx = Math.round(srcX + (dstX - srcX) * (dragStep / steps));
+          var my = Math.round(srcY + (dstY - srcY) * (dragStep / steps));
           dragEl.dispatchEvent(mkMouse('mousemove', mx, my));
           try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch { /* non-fatal */ }
           await humanDelay(20, 40);
