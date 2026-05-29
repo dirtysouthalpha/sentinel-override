@@ -3674,7 +3674,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (_) {}
         } catch (err) {
           activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
-          sendSilentUpdate(`Error reading page: ${err.message}`, stepCount);
+          sendSilentUpdate(`Error reading page: ${(err && err.message) || String(err)}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection
           // between each attempt. By the time we reach here the page is truly unreachable
           // for this step. Proceeding with empty observation lets the LLM fire and issue
@@ -4840,7 +4840,7 @@ async function runAgentLoop(goal, workingTabId) {
             let _resolved;
             try { _resolved = JSON.parse(_resolvedStr); } catch (e) {
               console.error('[Sentinel] Error in agent-engine.js:', e);
-              historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${e.message}` });
+              historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${(e && e.message) || String(e)}` });
               continue;
             }
             _pendingCommandQueue.push(_resolved);
@@ -5936,7 +5936,7 @@ async function runAgentLoop(goal, workingTabId) {
               + 'var r = el.getBoundingClientRect();'
               + 'return { x: r.left + r.width/2, y: r.top + r.height/2, w: r.width, h: r.height };'
             const cdpBbox = await cdpExecuteJs(tab, cdpCode, { timeout: 3000 });
-            if (cdpBbox && cdpBbox.ok && cdpBbox.value && cdpBbox.value.x != null) {
+            if (cdpBbox && cdpBbox.ok && cdpBbox.value && cdpBbox.value.x != null && cdpBbox.value.y != null) {
               const cx = Math.round(cdpBbox.value.x);
               const cy = Math.round(cdpBbox.value.y);
               const r = await cdpDispatchClick(tab, cx, cy, {
@@ -6114,7 +6114,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'click' || command.type === 'click_at' || command.type === 'double_click') {
         await sleep(1000);
         try {
-          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t)); });
+          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
           const newTabs = allTabs.filter(t => t.openerTabId === tab && t.id !== tab);
           if (newTabs.length > 0) {
             const newTab = newTabs[0];

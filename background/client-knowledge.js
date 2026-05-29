@@ -170,6 +170,7 @@ export async function createClient({ displayName, tenant }) {
  */
 export async function updateClient(id, updates) {
   if (!id) return { ok: false, error: 'Client id required' };
+  if (!updates || typeof updates !== 'object') return { ok: false, error: 'Updates required' };
   const state = await _read();
   const c = state.clients[id];
   if (!c) return { ok: false, error: 'Client not found' };
@@ -235,6 +236,7 @@ export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
  * @returns {Promise<{ok: boolean, entry?: object, error?: string}>}
  */
 export async function updateEntry(clientId, entryId, updates) {
+  if (!updates || typeof updates !== 'object') return { ok: false, error: 'Updates required' };
   const state = await _read();
   const c = state.clients[clientId];
   if (!c) return { ok: false, error: 'Client not found' };

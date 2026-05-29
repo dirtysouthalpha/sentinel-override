@@ -2173,7 +2173,7 @@ export function parseLLMResponse(content) {
         }
       } catch (_) { /* fall through */ }
     }
-    return { type: 'note', text: `Parse error (will retry): ${err.message}` };
+    return { type: 'note', text: `Parse error (will retry): ${(err && err.message) || String(err)}` };
   }
 }
 
