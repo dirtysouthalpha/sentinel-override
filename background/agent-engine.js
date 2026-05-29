@@ -1534,7 +1534,6 @@ async function _cdpDismissOverlays(tabId, overlays) {
 let _cdpFallbackActive = false;
 let _lastNukeClean = false; // Track if last nuke found nothing to remove
 let _pageWasReady = false; // Skip ready check if previous observe succeeded
-let _skipObserveThisStep = false; // Batch mode: skip observe+LLM when commands queued
 let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
 let _observeCacheHits = 0;
 
@@ -3236,20 +3235,10 @@ async function runAgentLoop(goal, workingTabId) {
   while (!finished && agentRunning) {
     console.debug('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
 
-    // SPEED (v3.60): If batch commands are queued, skip observe+LLM and execute directly
-    if (_pendingCommandQueue.length > 0) {
-      try {
-        command = _pendingCommandQueue.shift();
-        console.log('[Sentinel/SPEED] Batch skip: executing queued ' + command.type + ' (' + _pendingCommandQueue.length + ' remaining)');
-        activityDone(stepCount, 'speed', 'Batch: ' + command.type, null);
-        _lastAiCallMs = 0;
-        // Skip directly to action execution by jumping past the observe+LLM block
-        // We'll set a flag and the observe block will check it
-        _skipObserveThisStep = true;
-      } catch (e) { console.warn('[Sentinel/SPEED] Batch skip error:', e); }
-    } else {
-      _skipObserveThisStep = false;
-    }
+    // (v3.60 / fixed): Batch commands are drained just before the LLM consult
+    // at the end of this iteration (see _pendingCommandQueue check near callLLM).
+    // The early-shift block was removed — it caused a double-pop that dropped
+    // commands when two or more were queued simultaneously.
 
     try {
       // Pause check — wait until resumed
@@ -3785,7 +3774,8 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Build capped element list (needed before empty page check)
-      const allElements = (observation && observation.elements) ? observation.elements : [];
+      // Use let so vision mode can reassign to new array without mutating cached observation.elements
+      let allElements = (observation && observation.elements) ? observation.elements : [];
 
       // Detect empty page (SPA not rendered, anti-bot, or loading failure)
       const pageIsEmpty = pageText.length < 150 || (pageText.includes('Page Title:') && pageText.length < 300);
@@ -4154,8 +4144,7 @@ async function runAgentLoop(goal, workingTabId) {
               isClickable: e.isClickable,
               isInput: e.isInput
             }));
-            allElements.length = 0;
-            allElements.push(...trimmedElements);
+            allElements = [...trimmedElements]; // reassign (not mutate) so cached observation.elements stays intact
             console.log('[Sentinel/v4] Vision: ' + _visionElements.length + ' indexed elements');
           }
         } catch (e) {

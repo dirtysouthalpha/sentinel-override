@@ -896,6 +896,10 @@ export async function generatePlan(goal, settings, context = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
+    if (!provider) {
+      console.warn('[Sentinel] generatePlan: unknown provider for endpoint', endpoint, '— using single-step fallback');
+      return [goal.substring(0, 300)];
+    }
     // Only send response_format:json_object to OpenAI proper — Z.AI and other
     // compatible providers may reject or ignore it, causing 400 errors.
     // The fallback strategies in the parse block below handle non-JSON responses.

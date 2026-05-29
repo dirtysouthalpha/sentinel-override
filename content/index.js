@@ -1750,6 +1750,7 @@ if (window.__sentinelInitialized) {
             return 'Scrolled element ' + describeTarget(cmd) + ' by ' + scrollAmount;
           }
         }
+        if (!targetDoc.defaultView) return 'Cannot scroll: no window context for target document';
         targetDoc.defaultView.scrollBy({ top: scrollAmount, behavior: 'smooth' });
         await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll animation
         return 'Scrolled ' + scrollAmount;

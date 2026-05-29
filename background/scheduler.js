@@ -509,6 +509,10 @@ export async function executeScheduledTask(alarmName) {
   try { tabInfo = await getTabInfo(tabId); } catch { tabInfo = null; }
   registerInitialTab(tabId, tabInfo?.url || '');
 
+  // Register listener BEFORE startAgent so agent_loop_complete can't fire and be missed
+  // if startAgent ever completes synchronously in a fast-path (e.g. cached single-step plan).
+  const completionPromise = _waitForAgentCompletion(5 * 60 * 1000);
+
   try {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
@@ -517,7 +521,7 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
 
-  const completionResult = await _waitForAgentCompletion(5 * 60 * 1000);
+  const completionResult = await completionPromise;
   const completedAt = Date.now();
 
   const finalResult = {

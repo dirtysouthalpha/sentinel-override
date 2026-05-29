@@ -1145,6 +1145,18 @@ describe('generatePlan', () => {
     expect(result.length).toBeGreaterThanOrEqual(3);
     expect(result[0]).toMatch(/navigate/i);
   });
+
+  test('returns single-step fallback when fetch throws (network error to any endpoint)', async () => {
+    // Verifies the catch-all fallback at the end of generatePlan covers hard failures
+    // (e.g. provider.buildBody crash, network error, AbortError from timeout).
+    _mockFetch = () => Promise.reject(new Error('Network unreachable'));
+    const result = await generatePlan('Do something important', {
+      api_key: 'test-key',
+      api_endpoint: 'https://api.openai.com/v1/chat/completions',
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]).toContain('Do something important');
+  });
 });
 
 // ========== callLLMWithRetry ==========
