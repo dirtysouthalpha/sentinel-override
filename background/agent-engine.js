@@ -4325,10 +4325,10 @@ async function runAgentLoop(goal, workingTabId) {
               // Map vision action types to legacy command format
               switch (_va.type) {
                 case 'click':
-                  command = { type: 'click_at', _visionIndex: _va.index, _visionAction: true };
+                  command = { type: 'click_at', _visionIndex: Number(_va.index), _visionAction: true };
                   break;
                 case 'input':
-                  command = { type: 'type', text: _va.text || '', _visionIndex: _va.index, _visionAction: true };
+                  command = { type: 'type', text: _va.text || '', _visionIndex: Number(_va.index), _visionAction: true };
                   break;
                 case 'scroll':
                   command = { type: 'scroll', direction: _va.direction || 'down', _visionAction: true };
