@@ -207,7 +207,6 @@ function _scheduleFlush() {
 
 async function _flushRunBuffer() {
   if (!_persistEnabled || !_currentRunId || _runBuffer.length === 0) return;
-  _pendingPersistFlush = false;
   const key = 'telemetry_run_' + _currentRunId;
   try {
     const stored = await chrome.storage.local.get(key);
@@ -217,10 +216,12 @@ async function _flushRunBuffer() {
       ? merged.slice(-PERSIST_MAX_EVENTS_PER_RUN)
       : merged;
     await chrome.storage.local.set({ [key]: capped });
+    _pendingPersistFlush = false;
     _runBuffer = [];
   } catch (e) {
-    // Preserve buffer on error — retry on next flush cycle
-    console.warn('[Sentinel/telemetry] flush error:', e && e.message);
+    // Re-enable so the interval timer retries on the next tick
+    _pendingPersistFlush = true;
+    console.warn('[Sentinel/telemetry] flush error (will retry):', e && e.message);
   }
 }
 

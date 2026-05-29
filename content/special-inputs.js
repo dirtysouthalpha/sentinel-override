@@ -100,9 +100,9 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     // Strategy 1: Native date input
     if (el.type === 'date' || el.type === 'datetime-local' || el.type === 'month') {
       try {
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype, 'value'
-        ).set;
+        const _desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        const nativeSetter = _desc && _desc.set;
+        if (!nativeSetter) throw new Error('no native value setter');
         nativeSetter.call(el, nativeDate);
         el.dispatchEvent(new Event('input', eventOpts));
         el.dispatchEvent(new Event('change', eventOpts));

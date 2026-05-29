@@ -225,7 +225,8 @@ export function sendActionMessage(command, stepNumber, observation) {
  * @param {boolean} isError
  */
 export function sendActionResult(stepNumber, result, isError) {
-  const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+  let resultStr;
+  try { resultStr = typeof result === 'string' ? result : JSON.stringify(result); } catch (_e) { resultStr = String(result); }
   chrome.runtime.sendMessage({
     action: 'agent_action_result',
     stepNumber,

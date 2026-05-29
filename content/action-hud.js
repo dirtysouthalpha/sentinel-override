@@ -239,8 +239,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       clearTimeout(hideTimer);
       hideTimer = setTimeout(() => {
         if (currentAction === 'finish') {
-          // Keep finish visible for 5s then fade
-          setTimeout(() => { el.classList.remove('visible'); }, 5000);
+          // Keep finish visible for 5s then fade; re-query el in case DOM changed
+          setTimeout(() => {
+            const hudEl = document.getElementById(HUD_ID);
+            if (hudEl) hudEl.classList.remove('visible');
+          }, 5000);
         }
       }, 15000);
 
