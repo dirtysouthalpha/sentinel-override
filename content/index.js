@@ -2254,7 +2254,7 @@ if (window.__sentinelInitialized) {
                     '}}' +
                     'var __s = typeof __r === "object" && __r !== null' +
                       ' ? JSON.stringify(__r).substring(0, 3000)' +
-                      ' : String(__r || "").substring(0, 3000);' +
+                      ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
                   '} catch(e) {' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (e && e.message) ? e.message : String(e) }, "*");' +
@@ -2269,7 +2269,7 @@ if (window.__sentinelInitialized) {
                     'const __r = await (async () => { ' + __safeCode + '\n })();' +
                     'const __s = typeof __r === "object" && __r !== null' +
                       ' ? JSON.stringify(__r).substring(0, 3000)' +
-                      ' : String(__r || "").substring(0, 3000);' +
+                      ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
                   '} catch(e) {' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (e && e.message) ? e.message : String(e) }, "*");' +
