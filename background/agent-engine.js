@@ -6081,7 +6081,7 @@ async function runAgentLoop(goal, workingTabId) {
             _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');'
               + 'if(!el){var ss=document.querySelectorAll("select");for(var i=0;i<ss.length;i++){if(ss[i].offsetParent!==null){el=ss[i];break;}}}'
               + 'if(!el)return null;var opts=el.options;'
-              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + JSON.stringify(command.value) + '||opts[i].text.toLowerCase().includes(' + JSON.stringify(command.value.toLowerCase()) + ')){'
+              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + JSON.stringify(command.value) + '||opts[i].text.toLowerCase().includes(' + JSON.stringify(String(command.value).toLowerCase()) + ')){'
               + 'el.selectedIndex=i;el.value=opts[i].value;el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;}}return null;})()';
           } else if (command.type === 'check' && _sel) {
             _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(!el)el=document.querySelector("[type=checkbox]");if(el){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));return"checked";}return null;})()';

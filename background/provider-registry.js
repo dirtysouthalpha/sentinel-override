@@ -446,7 +446,10 @@ export const PROVIDERS = {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
       const choice = data.choices && data.choices[0];
-      const msg = choice.message;
+      const msg = choice && choice.message;
+      if (!msg) {
+        throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
+      }
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         const tc = msg.tool_calls[0];
         if (tc.function && tc.function.name) {

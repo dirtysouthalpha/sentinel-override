@@ -2191,7 +2191,7 @@ export async function getRelevantPatterns(goal) {
       .filter(p => p.success)
       .map(p => ({
         pattern: p,
-        score: goalWords.reduce((acc, w) => acc + (p.goal.toLowerCase().includes(w) ? 1 : 0), 0)
+        score: goalWords.reduce((acc, w) => acc + ((p.goal && p.goal.toLowerCase().includes(w)) ? 1 : 0), 0)
       }))
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
