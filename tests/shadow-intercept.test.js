@@ -165,4 +165,63 @@ describe('shadow-intercept', () => {
     expect(sandbox.window.__sentinelCapturedRoots.get(el)).toBe(sr);
     expect(sandbox.window.__sentinelShadowRoots.has(sr)).toBe(true);
   });
+
+  function createBasicSandbox() {
+    const sandbox = {
+      window: {},
+      console,
+      Error,
+      WeakMap: globalThis.WeakMap,
+      Set: globalThis.Set,
+      Element: class {
+        constructor() { this._shadowRoot = null; }
+        attachShadow(init) {
+          this._shadowRoot = { mode: init.mode, host: this };
+          return this._shadowRoot;
+        }
+      },
+    };
+    sandbox.window = sandbox;
+    sandbox.window.__sentinelShadowIntercepted = false;
+    vm.createContext(sandbox);
+    const source = readFileSync(join(__dirname, '../content/shadow-intercept.js'), 'utf8');
+    new vm.Script(source, { filename: 'shadow-intercept.js' }).runInContext(sandbox);
+    return sandbox;
+  }
+
+  test('attachShadow returns the shadow root synchronously', () => {
+    const sandbox = createBasicSandbox();
+    const el = new sandbox.Element();
+    const sr = el.attachShadow({ mode: 'open' });
+    expect(sr).toBeDefined();
+    expect(typeof sr.then).toBe('undefined'); // must NOT be a Promise
+  });
+
+  test('__sentinelShadowRoots is a Set instance', () => {
+    const sandbox = createBasicSandbox();
+    expect(sandbox.window.__sentinelShadowRoots).toBeInstanceOf(sandbox.Set);
+  });
+
+  test('__sentinelCapturedRoots is a WeakMap instance', () => {
+    const sandbox = createBasicSandbox();
+    expect(sandbox.window.__sentinelCapturedRoots).toBeInstanceOf(sandbox.WeakMap);
+  });
+
+  test('captures multiple shadow roots from different elements', () => {
+    const sandbox = createBasicSandbox();
+    const el1 = new sandbox.Element();
+    const el2 = new sandbox.Element();
+    const sr1 = el1.attachShadow({ mode: 'open' });
+    const sr2 = el2.attachShadow({ mode: 'closed' });
+    expect(sandbox.window.__sentinelCapturedRoots.get(el1)).toBe(sr1);
+    expect(sandbox.window.__sentinelCapturedRoots.get(el2)).toBe(sr2);
+    expect(sandbox.window.__sentinelShadowRoots.has(sr1)).toBe(true);
+    expect(sandbox.window.__sentinelShadowRoots.has(sr2)).toBe(true);
+    expect(sandbox.window.__sentinelShadowRoots.size).toBe(2);
+  });
+
+  test('__sentinelShadowIntercepted flag is true after patch', () => {
+    const sandbox = createBasicSandbox();
+    expect(sandbox.window.__sentinelShadowIntercepted).toBe(true);
+  });
 });
