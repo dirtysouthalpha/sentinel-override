@@ -252,6 +252,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     }
 
     const data = await response.json();
+    if (!data) { result.error = 'rewriter returned null response body'; return result; }
     const content = provider.parseResponse(data);
     if (!content) {
       result.error = 'rewriter returned empty content';

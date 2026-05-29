@@ -924,6 +924,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     console.error('[Sentinel/provider-registry] Models JSON parse error:', e);
     throw new Error('Models endpoint did not return JSON: ' + ((e && e.message) || String(e)));
   }
+  if (!data) throw new Error('Models endpoint returned null response body');
 
   // Normalize across the common response shapes.
   let ids = [];

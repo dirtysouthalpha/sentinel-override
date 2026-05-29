@@ -355,6 +355,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       } catch {
         throw new Error('Report LLM returned invalid JSON');
       }
+      if (!data) throw new Error('Report LLM returned null response body');
       const responseText = provider.parseResponse(data) || '';
 
       let cleaned = responseText.trim();

@@ -62,6 +62,7 @@ export async function handleQuickAssist(prompt) {
     }
 
     const data = await response.json();
+    if (!data) throw new Error('Quick Assist API returned null response body');
     return provider.parseResponse(data);
   } catch (err) {
     if (err.name === 'AbortError') {
