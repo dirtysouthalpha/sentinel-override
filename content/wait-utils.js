@@ -28,7 +28,8 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
    * @returns {Promise<string>} Description of the result (met, timeout, etc.).
    */
   wait.handleWaitFor = function(condition) {
-    const timeout = condition.timeout || 10000;
+    const DEFAULT_TIMEOUT = 10000;
+    const timeout = condition.timeout || DEFAULT_TIMEOUT;
     const startTime = Date.now();
 
     return new Promise((resolve) => {
@@ -42,7 +43,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
           if (wait.checkCondition(condition)) {
             observer.disconnect();
             clearTimeout(timer);
-            resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
+            resolve(`Condition met after ${Date.now() - startTime}ms`);
           }
         });
 
@@ -58,17 +59,17 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
             observer.disconnect();
             clearInterval(pollInterval);
             clearTimeout(timer);
-            resolve('Condition met after ' + (Date.now() - startTime) + 'ms');
+            resolve(`Condition met after ${Date.now() - startTime}ms`);
           }
         }, 500);
 
         const timer = setTimeout(() => {
           observer.disconnect();
           clearInterval(pollInterval);
-          resolve('Timeout waiting for condition (' + timeout + 'ms)');
+          resolve(`Timeout waiting for condition (${timeout}ms)`);
         }, timeout);
       } catch (error) {
-        resolve('Error during condition check: ' + error.message);
+        resolve(`Error during condition check: ${error.message}`);
       }
     });
   };
@@ -86,26 +87,28 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
       if (!body) return false;
       return body.innerText.includes(condition.text);
     } else if (condition.type === 'wait_for_element') {
-      // Prefer ref when provided. A ref that resolves means the element
-      // is still in the live DOM. If the ref is stale, fall through to selector.
       const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
+      const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
+
       if (condition.ref && dom && dom.findElementByRef) {
         const el = dom.findElementByRef(condition.ref);
         if (el) return true;
         if (!condition.selector) return false;
       }
+
       try {
         if (document.querySelector(condition.selector)) return true;
       } catch {
         return false;
       }
-      const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
+
       if (shadow && shadow.queryDeep) {
         try {
           const found = shadow.queryDeep(document, condition.selector);
           return !!(found && found.length > 0);
         } catch { /* invalid selector or shadow traversal error */ }
       }
+
       return false;
     } else if (condition.type === 'wait_for_navigation') {
       return condition.currentUrl !== window.location.href;
