@@ -1130,7 +1130,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     if (allSameType && allSameResult && allFailed) {
       return {
         stalled: true,
-        reason: `Repeated "${recent[0].action.type}" with same failure: "${recent[0].result}"`,
+        reason: `Repeated "${recent[0].action?.type}" with same failure: "${recent[0].result}"`,
         recoveryAction: 'RESCAN_AND_REPLAN'
       };
     }

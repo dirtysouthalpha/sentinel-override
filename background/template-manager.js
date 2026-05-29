@@ -235,7 +235,7 @@ export async function resolveTemplateGoal(templateId, paramValues) {
       return values[key];
     }
     // Check for default value in template params
-    const paramDef = template.params.find(p => p.key === key);
+    const paramDef = (template.params || []).find(p => p.key === key);
     if (paramDef && paramDef.defaultValue && paramDef.defaultValue.trim() !== '') {
       return paramDef.defaultValue;
     }
