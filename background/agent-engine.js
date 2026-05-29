@@ -2561,7 +2561,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
   
   if (!jsCode) return { ok: false, result: 'No UFB for: ' + cmd.type };
   
-  var ufbRes = await cdpExecuteJs(tab, jsCode, { timeout: timeout });
+  var ufbRes = await cdpExecuteJs(tab, 'return ' + jsCode, { timeout: timeout });
   if (ufbRes && ufbRes.ok && ufbRes.value != null) {
     try {
       var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
@@ -5982,7 +5982,7 @@ async function runAgentLoop(goal, workingTabId) {
             + '}'
             + 'return null;'
             + '})()';
-          const selRes = await cdpExecuteJs(tab, selJs, { timeout: 3000 });
+          const selRes = await cdpExecuteJs(tab, 'return ' + selJs, { timeout: 3000 });
           if (selRes && selRes.ok && selRes.value != null) {
             result = 'Selected "' + command.value + '" via CDP fallback';
             actionFailed = false;
@@ -6112,7 +6112,7 @@ async function runAgentLoop(goal, workingTabId) {
             _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
           }
           if (_universalJs) {
-            const _uniRes = await cdpExecuteJs(tab, _universalJs, { timeout: 3000 });
+            const _uniRes = await cdpExecuteJs(tab, 'return ' + _universalJs, { timeout: 3000 });
             if (_uniRes && _uniRes.ok && _uniRes.value != null && _uniRes.value !== 'not_found') {
               result = command.type + ' via CDP universal fallback';
               actionFailed = false;
