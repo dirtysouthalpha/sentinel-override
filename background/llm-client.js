@@ -1283,7 +1283,7 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
       '- Long log loads: use wait_for_text with 30000ms timeout.\n';
   }
   return '\nSTRATEGY SHIFT REQUIRED -- You have failed ' + agentState.consecutiveFailures + ' times in a row.\n' +
-    'Approaches already tried: ' + agentState.currentStrategies.join(', ') + '\n' +
+    'Approaches already tried: ' + (agentState.currentStrategies || []).join(', ') + '\n' +
     'You MUST try a COMPLETELY DIFFERENT approach. Consider:\n' +
     '- Using "execute_js" to write custom JavaScript to accomplish the task\n' +
     '- Using "read_network_requests" to read the underlying API response\n' +
