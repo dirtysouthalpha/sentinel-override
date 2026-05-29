@@ -2015,7 +2015,7 @@ if (window.__sentinelInitialized) {
         activeEl.dispatchEvent(new KeyboardEvent('keydown', keyOpts));
         activeEl.dispatchEvent(new KeyboardEvent('keypress', keyOpts));
         activeEl.dispatchEvent(new KeyboardEvent('keyup', keyOpts));
-        const modStr = [modifiers.ctrl && 'Ctrl', modifiers.shift && 'Shift', modifiers.alt && 'Alt', modifiers.meta && 'Meta'].filter(Boolean).join('+');
+        const modStr = [(modifiers.ctrl || modifiers.control) && 'Ctrl', modifiers.shift && 'Shift', modifiers.alt && 'Alt', (modifiers.meta || modifiers.cmd) && 'Meta'].filter(Boolean).join('+');
         return 'Pressed key: ' + (modStr ? modStr + '+' : '') + key;
       }
 

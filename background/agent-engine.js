@@ -4504,7 +4504,7 @@ async function runAgentLoop(goal, workingTabId) {
           const s = typeof v === 'string' ? v : JSON.stringify(v);
           return s.length > 10 && s !== 'Done';
         });
-        if (!hasRealData && !hasData && stepCount < 15) {
+        if (!hasRealData && hasData && stepCount < 15) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
@@ -6430,11 +6430,11 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('[Sentinel] Agent loop error:', err, err.message, err.stack);
-      sendSilentUpdate(`Loop error: ${err.message}`, stepCount);
+      console.error('[Sentinel] Agent loop error:', err, err && err.message, err && err.stack);
+      sendSilentUpdate(`Loop error: ${err && err.message || String(err)}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
-      if (err.message.includes('was closed')) {
+      if (err && err.message && err.message.includes('was closed')) {
         console.warn('[Sentinel] Tab was closed, attempting recovery...');
         // Try to find another tab or the same tab re-created
         try {
@@ -6526,7 +6526,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
-      console.error('[Sentinel/report] LLM report failed (fallback already saved):', err.message);
+      console.error('[Sentinel/report] LLM report failed (fallback already saved):', err && err.message || String(err));
       agentReport = _fbReport;
     }
   } else {
