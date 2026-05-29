@@ -2750,7 +2750,7 @@ async function exportRunLog(format) {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
-    try { showToast('Export failed: ' + e.message, 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Export failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2932,7 +2932,7 @@ async function toggleSourceChipExpansion(chip) {
       exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value, null, 2).slice(0, 4000);
     }
   } catch (e) {
-    exp.textContent = 'Error reading source: ' + e.message;
+    exp.textContent = 'Error reading source: ' + ((e && e.message) || String(e));
   }
   chip.parentNode.insertBefore(exp, chip.nextSibling);
 }

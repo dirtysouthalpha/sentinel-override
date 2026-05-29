@@ -1038,7 +1038,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       useBtn.disabled = false;
       try { showToast('Detected ' + models.length + ' models', 'success'); } catch { /* showToast may fail in detached popup */ }
     } catch (e) {
-      try { showToast('Error: ' + e.message, 'error'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Error: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;

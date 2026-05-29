@@ -514,6 +514,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (!activeTab) throw new Error('No agent tab specified');
       const tab = activeTab;
       const cmd = request.command;
+      if (!cmd || typeof cmd !== 'object') throw new Error('execute_command: missing or invalid command object');
 
       // Handle navigate inline (no content script needed)
       if (cmd.type === 'navigate') {
