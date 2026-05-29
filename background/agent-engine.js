@@ -3011,7 +3011,8 @@ function generateHeuristicPlan(goal, currentUrl) {
   const urlMatchFinal = _urlMatch;
   const targetUrl = urlMatchFinal ? urlMatchFinal[1] : null;
   const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
-  const alreadyThere = targetHost && currentHost.includes(targetHost);
+  const _normHost = currentHost.replace(/^www\./, '');
+  const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
 
   // Extract search query from goal
   const searchMatch = goal.match(/(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i)
