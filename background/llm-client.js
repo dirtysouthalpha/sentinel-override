@@ -2117,6 +2117,9 @@ export function parseLLMResponse(content) {
       throw new Error('Empty or null response from API');
     }
     let jsonStr = content.trim();
+    // Strip <think>...</think> blocks (GLM/DeepSeek) so JSON inside them
+    // isn't mistaken for the real action. Same fix as in generatePlan.
+    jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (jsonStr.includes('```')) {
       const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       if (match && match[1]) jsonStr = match[1].trim();
