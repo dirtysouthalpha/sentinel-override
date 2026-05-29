@@ -90,7 +90,7 @@ async function loadAndRenderSchedules() {
       container.appendChild(card);
     });
   } catch (err) {
-    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml(err.message)}</div>`;
+    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml((err && err.message) || String(err))}</div>`;
   }
 }
 
@@ -442,7 +442,7 @@ async function handleSaveSchedule() {
     loadAndRenderSchedules();
     showToast('Schedule created', 'success');
   } catch (err) {
-    showToast('Error creating schedule: ' + err.message, 'error');
+    showToast('Error creating schedule: ' + ((err && err.message) || String(err)), 'error');
   }
 }
 
@@ -467,7 +467,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
     loadAndRenderSchedules();
     showToast(enabled ? 'Schedule enabled' : 'Schedule disabled', 'success');
   } catch (err) {
-    showToast('Error toggling schedule: ' + err.message, 'error');
+    showToast('Error toggling schedule: ' + ((err && err.message) || String(err)), 'error');
   }
 }
 
@@ -496,7 +496,7 @@ async function handleDeleteSchedule(scheduleId, name) {
     loadAndRenderSchedules();
     showToast('Schedule deleted', 'success');
   } catch (err) {
-    showToast('Error deleting schedule: ' + err.message, 'error');
+    showToast('Error deleting schedule: ' + ((err && err.message) || String(err)), 'error');
   }
 }
 

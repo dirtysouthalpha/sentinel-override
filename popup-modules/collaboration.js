@@ -82,7 +82,7 @@ function openImportDialog() {
         showImportPreview(result, []);
       }
     } catch (err) {
-      showToast('Failed to read file: ' + err.message, 'error');
+      showToast('Failed to read file: ' + ((err && err.message) || String(err)), 'error');
     } finally {
       document.body.removeChild(input);
     }
