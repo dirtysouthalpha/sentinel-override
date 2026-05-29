@@ -441,7 +441,7 @@
             });
             if (_viewingPastRun && _viewingPastRun.runId === run.runId) _loadLiveStream();
             menu.remove();
-            _togglePastRunsMenu();
+            await _togglePastRunsMenu();
           } catch { /* message may fail if background not ready */ }
         });
         item.appendChild(delBtn);
@@ -505,7 +505,7 @@
     banner.style.cssText = 'position:sticky; top:0; padding:6px 10px; background:rgba(255,107,0,0.18); border-bottom:1px solid var(--accent-primary, #ff6b00); font-size:11px; color:var(--text-primary, #fff); display:flex; justify-content:space-between; align-items:center; z-index:5;';
     const startStr = _viewingPastRun.startedAt ? new Date(_viewingPastRun.startedAt).toLocaleString() : '(unknown)';
     banner.innerHTML = '<span>Viewing past run · ' + _esc((_viewingPastRun.goal || '(no goal)').substring(0, 60)) + ' · ' + startStr + '</span><button id="telemBackToLive" style="padding:2px 8px; font-size:10px; background:var(--accent-primary, #ff6b00); color:#fff; border:none; border-radius:3px; cursor:pointer;">Back to Live</button>';
-    list.parentNode.insertBefore(banner, list);
+    if (list.parentNode) list.parentNode.insertBefore(banner, list);
     const back = document.getElementById('telemBackToLive');
     if (back) back.addEventListener('click', _loadLiveStream);
   }
