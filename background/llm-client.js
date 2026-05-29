@@ -932,6 +932,11 @@ export async function generatePlan(goal, settings, context = {}) {
       return [goal.substring(0, 300)];
     }
     const data = await response.json();
+    // Early detection of auth errors from providers that return HTTP 200 with error payloads
+    if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
+      const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
+      throw new Error(`🔑 API Authentication Failed: ${errMsg}. Check your API key in extension settings.`);
+    }
     const content = provider.parseResponse(data);
     if (!content) {
       console.warn('Plan generation: empty response content — using single-step fallback');
@@ -1843,6 +1848,12 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     data = await response.json();
   } catch (e) {
     throw new Error('API returned invalid JSON: ' + (e && e.message ? e.message : String(e)));
+  }
+
+  // Early detection of auth errors from providers that return HTTP 200 with error payloads
+  if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
+    const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
+    throw new Error(`🔑 API Authentication Failed: ${errMsg}. Check your API key in extension settings.`);
   }
 
   // Extract real token usage (provider-normalised).
