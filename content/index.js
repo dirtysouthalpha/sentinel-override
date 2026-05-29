@@ -2314,7 +2314,7 @@ if (window.__sentinelInitialized) {
           return 'JS Result: ' + (execResult.__value || '');
         } catch (err) {
           try { ctel.error('page', 'execute_js outer failure', { error: err.message || String(err), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', e && e.message); }
-          return 'JS Error: ' + err.message;
+          return 'JS Error: ' + (err && err.message || String(err));
         }
       }
 

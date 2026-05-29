@@ -4356,7 +4356,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         } catch (e) {
-          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e.message);
+          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e && e.message);
         }
       }
 

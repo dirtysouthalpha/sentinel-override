@@ -291,7 +291,7 @@ export async function generateReport(executionData, CONFIG) {
 async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const MAX_ATTEMPTS = 2;
   const REPORT_TIMEOUT = CONFIG.reportTimeout || 90000;
-  let lastError = null;
+  let lastError = new Error('Report generation failed');
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -355,7 +355,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       } catch {
         throw new Error('Report LLM returned invalid JSON');
       }
-      const responseText = provider.parseResponse(data);
+      const responseText = provider.parseResponse(data) || '';
 
       let cleaned = responseText.trim();
       if (cleaned.startsWith('```')) {
