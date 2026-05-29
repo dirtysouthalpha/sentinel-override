@@ -1122,13 +1122,10 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
     const allSameType = recent.every(h => h.action && h.action.type === (recent[0].action && recent[0].action.type));
     const allSameResult = recent.every(h => h.result === recent[0].result);
-    const allFailed = recent.every(h =>
-      h.result.includes('not found') ||
-      h.result.startsWith('Error') ||
-      h.result.includes('timed out') ||
-      h.result.includes('Element not found') ||
-      h.result.includes('No element')
-    );
+    const allFailed = recent.every(h => {
+      const r = typeof h.result === 'string' ? h.result : '';
+      return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.includes('Element not found') || r.includes('No element');
+    });
 
     if (allSameType && allSameResult && allFailed) {
       return {
