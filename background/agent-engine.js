@@ -2307,7 +2307,7 @@ function detectCaptcha(currentUrl, pageText, elementsCount) {
 // When stuck, analyzes page + goal and generates creative solutions.
 // Can construct URLs, suggest execute_js, find alternative approaches.
 // ═══════════════════════════════════════════════════════════════════
-function _generateSmartRecovery(goal, currentUrl, pageText, observation, _history, _stepCount) {
+function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _history, _stepCount) {
   var strategies = [];
   var url = currentUrl || '';
   var text = pageText || '';
