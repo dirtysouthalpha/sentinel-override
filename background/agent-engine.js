@@ -6737,6 +6737,7 @@ async function requestApproval(command, stepNumber) {
       // The listener is still active so a user response still resolves early.
       const hardRejectId = setTimeout(() => {
         chrome.runtime.onMessage.removeListener(listener);
+        chrome.runtime.onMessage.removeListener(hardTimeoutListener);
         agentPaused = false; // unblock loop so it can clean up
         finish({ approved: false, skipped: false, rejected: true, reason: 'approval_hard_timeout' });
       }, 240000);
