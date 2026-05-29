@@ -46,6 +46,9 @@ export async function waitForPageLoad(tabId) {
 /**
  * Count in-flight network requests for a tab using CDP Network domain.
  * Returns the number of requests that have started but not yet completed or failed.
+ *
+ * @param {number} tabId - Chrome tab ID to count in-flight requests for.
+ * @returns {number} Count of requests started but not yet finished (within timeout window).
  */
 function getInFlightRequestCount(tabId) {
   const buf = networkBuffers.get(tabId);
@@ -62,9 +65,11 @@ function getInFlightRequestCount(tabId) {
 
 /**
  * Query the tab's content script for DOM readiness state.
- * Returns true if readyState=complete, body has content, and no spinner is visible.
- * @param {number} tabId
- * @returns {Promise<boolean>}
+ * Returns true if readyState is 'complete', body has content (>50 chars),
+ * and no spinner/loading element is visible.
+ *
+ * @param {number} tabId - Chrome tab ID to check.
+ * @returns {Promise<boolean>} True if the page DOM appears fully loaded and rendered.
  */
 async function _checkDomReadyState(tabId) {
   try {
@@ -267,6 +272,14 @@ const observabilityListenersInstalled = new Set(); // tabIds
 const CONSOLE_BUFFER_MAX = 200;
 const NETWORK_BUFFER_MAX = 200;
 
+/**
+ * Append a console log entry to the tab's console buffer.
+ * Evicts oldest entries when the buffer exceeds CONSOLE_BUFFER_MAX.
+ *
+ * @param {number} tabId - Chrome tab ID.
+ * @param {{ level: string, text: string, url: string, line: number, ts: number }} entry -
+ *   Console entry with severity level, message text, source URL, line number, and timestamp.
+ */
 function pushConsoleEntry(tabId, entry) {
   let buf = consoleBuffers.get(tabId);
   if (!buf) { buf = []; consoleBuffers.set(tabId, buf); }
@@ -274,6 +287,17 @@ function pushConsoleEntry(tabId, entry) {
   while (buf.length > CONSOLE_BUFFER_MAX) buf.shift();
 }
 
+/**
+ * Record the start of a network request in the tab's network buffer.
+ * Creates a new tracked entry with method, URL, type, and start timestamp.
+ * Evicts oldest entries when the buffer exceeds NETWORK_BUFFER_MAX.
+ *
+ * @param {number} tabId - Chrome tab ID.
+ * @param {object} params - CDP Network.requestWillBeSent event params.
+ * @param {string} params.requestId - Unique request identifier.
+ * @param {{ method: string, url: string }} [params.request] - HTTP request info.
+ * @param {string} [params.type] - Resource type (Document, XHR, Script, etc.).
+ */
 function recordNetworkStart(tabId, params) {
   let buf = networkBuffers.get(tabId);
   if (!buf) { buf = new Map(); networkBuffers.set(tabId, buf); }
@@ -299,6 +323,15 @@ function recordNetworkStart(tabId, params) {
     }
   }
 }
+/**
+ * Record a network response in the tab's network buffer.
+ * Updates the matching request entry with status code, end timestamp, and duration.
+ *
+ * @param {number} tabId - Chrome tab ID.
+ * @param {object} params - CDP Network.responseReceived event params.
+ * @param {string} params.requestId - Unique request identifier.
+ * @param {{ status: number }} [params.response] - HTTP response with status code.
+ */
 function recordNetworkResponse(tabId, params) {
   const buf = networkBuffers.get(tabId);
   if (!buf || !params || !params.requestId) return;
@@ -308,6 +341,15 @@ function recordNetworkResponse(tabId, params) {
   e.endTs = Date.now();
   e.duration = e.endTs - e.startTs;
 }
+/**
+ * Record a failed network request in the tab's network buffer.
+ * Marks the request entry with a failure flag and error text.
+ *
+ * @param {number} tabId - Chrome tab ID.
+ * @param {object} params - CDP Network.loadingFailed event params.
+ * @param {string} params.requestId - Unique request identifier.
+ * @param {string} [params.errorText] - Failure reason text.
+ */
 function recordNetworkFailure(tabId, params) {
   const buf = networkBuffers.get(tabId);
   if (!buf || !params || !params.requestId) return;
@@ -321,6 +363,15 @@ function recordNetworkFailure(tabId, params) {
 
 // Install Log + Network listeners on a tab once. Caller must already have
 // chrome.debugger attached (we just enable the domains and wire the events).
+/**
+ * Enable CDP Log, Runtime, and Network domains on an attached tab.
+ * Marks the tab as having observability listeners installed so domains
+ * aren't re-enabled on subsequent calls. Errors from individual domain
+ * enables are silently caught (some targets may not support all domains).
+ *
+ * @param {number} tabId - Chrome tab ID with an active debugger attachment.
+ * @returns {Promise<void>}
+ */
 async function ensureObservabilityListeners(tabId) {
   if (observabilityListenersInstalled.has(tabId)) return;
   try {
@@ -338,6 +389,12 @@ async function ensureObservabilityListeners(tabId) {
 // Single global event hook: chrome.debugger fires onEvent for every attached
 // target. We dispatch into per-tab buffers based on source.tabId.
 let __obsEventHookInstalled = false;
+/**
+ * Install a global chrome.debugger.onEvent listener that dispatches CDP events
+ * into per-tab console and network buffers. Handles Log.entryAdded,
+ * Runtime.consoleAPICalled, Runtime.exceptionThrown, and Network domain events.
+ * Only installs once; subsequent calls are no-ops.
+ */
 function installObservabilityEventHook() {
   if (__obsEventHookInstalled) return;
   try {
@@ -469,6 +526,11 @@ export function clearObservabilityBuffers(tabId) {
 }
 
 
+/**
+ * Install a one-time chrome.debugger.onDetach listener.
+ * On detach, cleans up the tab's attached state, observability buffers,
+ * and records that the user manually detached so a re-attach warning can be shown.
+ */
 function installDetachListenerOnce() {
   if (onDetachListenerInstalled) return;
   onDetachListenerInstalled = true;
@@ -507,6 +569,15 @@ export async function detachAllDebuggees() {
 // Reuses the `attachedDebuggees` set above so we don't double-attach. We
 // never detach here -- detachAllDebuggees() handles cleanup at agent end.
 
+/**
+ * Ensure the Chrome DevTools Protocol debugger is attached to a tab.
+ * If already attached, just re-enables observability listeners. On first attach,
+ * sets up the detach listener, observability event hook, and CDP domains.
+ * Sends a warning message to the UI if re-attaching after a user-initiated detach.
+ *
+ * @param {number} tabId - Chrome tab ID to attach the debugger to.
+ * @returns {Promise<void>}
+ */
 async function ensureDebuggerAttached(tabId) {
   installDetachListenerOnce();
   installObservabilityEventHook();
@@ -585,6 +656,14 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
 
 // Map a key name to CDP key params. Returns null when unknown so caller
 // can fall through to insertText / synthetic dispatch.
+/**
+ * Map a key name to CDP Input.dispatchKeyEvent parameters.
+ * Handles special keys (Enter, Tab, arrows, etc.) and single printable characters.
+ * Returns null for unrecognized multi-character strings so the caller can fall back.
+ *
+ * @param {string} key - Key name (e.g. 'Enter', 'Tab', 'ArrowDown', 'a').
+ * @returns {{ key: string, code: string, windowsVirtualKeyCode: number, text?: string } | null}
+ */
 function cdpKeyParamsFor(key) {
   if (!key) return null;
   const k = String(key);
@@ -914,4 +993,10 @@ export async function getTabInfo(tabId) {
 }
 
 // ========== Utilities ==========
+/**
+ * Resolve a Promise after a given delay.
+ *
+ * @param {number} ms - Milliseconds to wait.
+ * @returns {Promise<void>} Resolves after the specified delay.
+ */
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
