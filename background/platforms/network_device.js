@@ -13,6 +13,10 @@ export const networkDevice = {
 
   detect(url, goal) {
     try {
+      if (typeof url !== 'string' || typeof goal !== 'string') {
+        console.error('Invalid input types for networkDevice detect:', { url, goal });
+        return false;
+      }
       const goalText = String(goal || '').toLowerCase();
       const keywords = new Set(['firewall', 'router', 'switch', 'access point', 'management ui', 'admin panel', 'web ui']);
       return keywords.some(keyword => /\b${keyword}\b/i.test(goalText));
