@@ -5279,8 +5279,14 @@ async function runAgentLoop(goal, workingTabId) {
                 const _typeRes = await cdpExecuteJs(tab,
                   '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
                   { timeout: 5000 });
-                result = 'Typed into [' + command._visionIndex + ']: ' + (_typeRes && _typeRes.value || 'unknown');
-                console.log('[Sentinel/v4]', result);
+                const _typeVal = _typeRes && _typeRes.value;
+                if (_typeVal === 'not found') {
+                  result = 'Type failed for [' + command._visionIndex + ']: element not found';
+                  actionFailed = true;
+                } else {
+                  result = 'Typed into [' + command._visionIndex + ']: ' + (_typeVal || 'unknown');
+                  console.log('[Sentinel/v4]', result);
+                }
               } catch (_te) {
                 result = 'Type failed for [' + command._visionIndex + ']';
                 actionFailed = true;
