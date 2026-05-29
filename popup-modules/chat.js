@@ -1629,10 +1629,10 @@ window.executeCommand = (action) => {
       toggleTheme();
       break;
     case 'settings':
-      settingsBtn.click();
+      document.getElementById('settingsBtn')?.click();
       break;
     case 'theme':
-      themeModal.classList.add('show');
+      document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
       try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', e); try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ } }
@@ -1859,9 +1859,9 @@ function openReportModalInline(markdown) {
   const state = getState();
   state.currentReportMarkdown = markdown;
 
-  // Close other modals
-  settingsModal.classList.remove('show');
-  themeModal.classList.remove('show');
+  // Close other modals (use getElementById to avoid cross-module variable dependency)
+  document.getElementById('settings-modal')?.classList.remove('show');
+  document.getElementById('theme-modal')?.classList.remove('show');
 
   // Render markdown with sanitization
   try {

@@ -2513,7 +2513,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
     case 'wait_for_text': {
       var searchFor = cmd.text || cmd.value || cmd.selector || '';
       jsCode = '(function(){'
-        + 'var body=document.body.innerText||"";'
+        + 'var body=(document.body&&document.body.innerText)||"";'
         + 'var _s=' + JSON.stringify(searchFor) + ';'
         + 'if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});'
         + 'if(_s&&body.toLowerCase().indexOf(_s.toLowerCase())>=0)return JSON.stringify({ok:true,result:"found case-insensitive"});'
@@ -2538,7 +2538,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
     }
     case 'verify': {
       jsCode = '(function(){'
-        + 'var body=document.body.innerText||"";'
+        + 'var body=(document.body&&document.body.innerText)||"";'
         + 'var _c=' + JSON.stringify(cmd.text || cmd.value || '') + ';'
         + 'if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});'
         + 'if(_c&&body.toLowerCase().indexOf(_c.toLowerCase())>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"});'
@@ -3237,6 +3237,12 @@ async function runAgentLoop(goal, workingTabId) {
 
   console.debug('[Sentinel/DEBUG] Entering main loop. agentRunning:', agentRunning, 'finished:', finished, 'workingTabId:', workingTabId);
   let command;  // v3.66: Moved declaration here so batch skip can assign it
+  // Loop-detector state — declared here so they survive across iterations without
+  // relying on `var` hoisting inside the loop body (fragile in strict mode).
+  let _clickAtLoopCount = 0;
+  let _lastCmdType = '';
+  let _sameCmdCount = 0;
+  let _lastLoopUrl = '';
   while (!finished && agentRunning) {
     console.debug('[Sentinel/DEBUG] Loop iteration. stepCount:', stepCount, 'finished:', finished, 'agentRunning:', agentRunning);
 
@@ -4373,6 +4379,7 @@ async function runAgentLoop(goal, workingTabId) {
         _lastAiCallMs = Date.now() - _aiStart;
         try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
         base64Image = null; // release screenshot memory
+        agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
         activityDone(stepCount, 'consult-ai', 'Vision decided: ' + command.type, null);
         tel.info('llm', 'Vision LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type });
@@ -6222,7 +6229,6 @@ async function runAgentLoop(goal, workingTabId) {
       // keeps generating click_at with wrong coordinates (e.g., CNN overlay with glm-5).
       // If we see 4+ consecutive click_at commands with no progress, inject recovery.
       if (command.type === 'click_at') {
-        if (typeof _clickAtLoopCount === 'undefined') { var _clickAtLoopCount = 0; }
         _clickAtLoopCount++;
         if (_clickAtLoopCount >= 3 && productiveSteps === 0) {
           console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with 0 productive steps');
@@ -6250,15 +6256,12 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } else {
         // Reset on any non-click_at action
-        if (typeof _clickAtLoopCount !== 'undefined') _clickAtLoopCount = 0;
+        _clickAtLoopCount = 0;
       }
 
       // (v3.67) Same-command loop detector — if the LLM emits 3+ consecutive
       // commands of the same type (select, wait_for_text, etc.) with no page change,
       // inject a recovery note telling it to switch strategy.
-      if (typeof _lastCmdType === 'undefined') { var _lastCmdType = ''; }
-      if (typeof _sameCmdCount === 'undefined') { var _sameCmdCount = 0; }
-      if (typeof _lastLoopUrl === 'undefined') { var _lastLoopUrl = ''; }
       if (command.type === _lastCmdType) {
         _sameCmdCount++;
       } else {
