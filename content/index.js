@@ -1684,6 +1684,7 @@ if (window.__sentinelInitialized) {
         // Standard INPUT / TEXTAREA — full key sequence per character with native
         // setter so React/Vue/MUI controlled inputs sync (#8).
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          if (!targetDoc.defaultView) return 'Error: no window context for input typing';
           const proto = el.tagName === 'TEXTAREA'
             ? targetDoc.defaultView.HTMLTextAreaElement.prototype
             : targetDoc.defaultView.HTMLInputElement.prototype;
