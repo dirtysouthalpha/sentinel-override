@@ -272,6 +272,10 @@ chrome.tabs.onCreated.addListener((tab) => {
 // ========== Unified Message Handler ==========
 chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
   switch (request.action) {
+    // Diagnostic ping — remove after startup bug is fixed
+    case 'ping': {
+      return { pong: true, ts: Date.now(), agentRunning: typeof agentRunning !== 'undefined' ? agentRunning : 'unknown' };
+    }
     // (3.26.0) Content-script telemetry bridge. The content script can't
     // import telemetry.js (different execution context, no module access in
     // MAIN world), so it sends `content_telemetry_event` messages and we
