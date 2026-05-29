@@ -125,20 +125,21 @@ export async function switchToTab(tabId) {
 export async function closeTab(tabId) {
   if (!tabContexts.has(tabId)) return;
 
-  // If it was the active tab, switch to another
-  if (tabId === activeTabId) {
-    const others = Array.from(tabContexts.keys()).filter(id => id !== tabId);
-    activeTabId = others.length > 0 ? others[0] : null;
-    if (activeTabId !== null) {
-      tabContexts.get(activeTabId).isActive = true;
-    }
-  }
-
+  const wasActive = (tabId === activeTabId);
   const ctx = tabContexts.get(tabId);
   if (ctx && ctx.isAgentCreated) {
     try { await chrome.tabs.remove(tabId); } catch (_e) { /* tab may already be closed */ }
   }
   tabContexts.delete(tabId);
+
+  if (wasActive) {
+    const remaining = Array.from(tabContexts.keys());
+    if (remaining.length > 0) {
+      setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
+      return;
+    }
+    activeTabId = null;
+  }
   notifyStateChange();
 }
 
@@ -242,16 +243,17 @@ export function findTabByLabel(label) {
 export function handleTabRemoved(tabId) {
   if (!tabContexts.has(tabId)) return;
 
-  // If it was the active tab, switch to another
-  if (tabId === activeTabId) {
-    const others = Array.from(tabContexts.keys()).filter(id => id !== tabId);
-    activeTabId = others.length > 0 ? others[0] : null;
-    if (activeTabId !== null) {
-      tabContexts.get(activeTabId).isActive = true;
-    }
-  }
-
+  const wasActive = (tabId === activeTabId);
   tabContexts.delete(tabId);
+
+  if (wasActive) {
+    const remaining = Array.from(tabContexts.keys());
+    if (remaining.length > 0) {
+      setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
+      return;
+    }
+    activeTabId = null;
+  }
   notifyStateChange();
 }
 

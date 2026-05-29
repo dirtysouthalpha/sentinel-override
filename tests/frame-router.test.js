@@ -653,37 +653,37 @@ describe('runCommandInFrame', () => {
 
   // --- Error cases ---
 
-  test('returns error when utils not loaded', () => {
+  test('returns error when utils not loaded', async () => {
     globalThis.window.__sentinelUtils = null;
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('utilities not loaded');
   });
 
-  test('returns error when utils.dom not present', () => {
+  test('returns error when utils.dom not present', async () => {
     globalThis.window.__sentinelUtils = {};
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('utilities not loaded');
   });
 
   // --- click command ---
 
-  test('click returns error when element not found', () => {
+  test('click returns error when element not found', async () => {
     mockDom.findElementBySelector.mockReturnValue(null);
-    const result = runCmd({ type: 'click', selector: '#missing' });
+    const result = await runCmd({ type: 'click', selector: '#missing' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Element not found');
   });
 
-  test('click succeeds on found element', () => {
+  test('click succeeds on found element', async () => {
     const el = {
       scrollIntoView: jest.fn(),
       click: jest.fn(),
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Clicked');
     expect(el.click).toHaveBeenCalled();
@@ -691,43 +691,43 @@ describe('runCommandInFrame', () => {
     expect(mockHl.removeHighlight).toHaveBeenCalledWith(el);
   });
 
-  test('click blocked by dismissible overlay', () => {
+  test('click blocked by dismissible overlay', async () => {
     const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
     mockDom.findElementBySelector.mockReturnValue(el);
     mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
     mockOv.dismissOverlay.mockReturnValue(true);
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(true);
   });
 
-  test('click blocked by non-dismissible overlay returns error', () => {
+  test('click blocked by non-dismissible overlay returns error', async () => {
     const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
     mockDom.findElementBySelector.mockReturnValue(el);
     mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
     mockOv.dismissOverlay.mockReturnValue(false);
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('blocked by overlay');
   });
 
-  test('click skips overlay check when ov is null', () => {
+  test('click skips overlay check when ov is null', async () => {
     globalThis.window.__sentinelUtils.overlay = null;
     const el = { scrollIntoView: jest.fn(), click: jest.fn(), dispatchEvent: jest.fn() };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(true);
   });
 
   // --- type command ---
 
-  test('type returns error when element not found', () => {
+  test('type returns error when element not found', async () => {
     mockDom.findElementBySelector.mockReturnValue(null);
-    const result = runCmd({ type: 'type', selector: '#input', text: 'hello' });
+    const result = await runCmd({ type: 'type', selector: '#input', text: 'hello' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Element not found');
   });
 
-  test('type into INPUT element', () => {
+  test('type into INPUT element', async () => {
     const el = {
       tagName: 'INPUT',
       value: '',
@@ -736,13 +736,13 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#input', text: 'hi' });
+    const result = await runCmd({ type: 'type', selector: '#input', text: 'hi' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Typed into');
     expect(mockHl.removeHighlight).toHaveBeenCalledWith(el);
   });
 
-  test('type into TEXTAREA element', () => {
+  test('type into TEXTAREA element', async () => {
     const el = {
       tagName: 'TEXTAREA',
       value: '',
@@ -751,12 +751,12 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#textarea', text: 'hello world' });
+    const result = await runCmd({ type: 'type', selector: '#textarea', text: 'hello world' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Typed into');
   });
 
-  test('type into contenteditable element', () => {
+  test('type into contenteditable element', async () => {
     const el = {
       tagName: 'DIV',
       isContentEditable: true,
@@ -766,12 +766,12 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#editor', text: 'abc' });
+    const result = await runCmd({ type: 'type', selector: '#editor', text: 'abc' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('contenteditable');
   });
 
-  test('type into rich text editor', () => {
+  test('type into rich text editor', async () => {
     const el = {
       tagName: 'DIV',
       scrollIntoView: jest.fn(),
@@ -781,12 +781,12 @@ describe('runCommandInFrame', () => {
     mockDom.findElementBySelector.mockReturnValue(el);
     mockSi.isRichTextEditor.mockReturnValue(true);
     mockSi.setRichTextValue.mockReturnValue({ success: true, value: 'hello' });
-    const result = runCmd({ type: 'type', selector: '#rte', text: 'hello' });
+    const result = await runCmd({ type: 'type', selector: '#rte', text: 'hello' });
     expect(result.ok).toBe(true);
     expect(mockSi.setRichTextValue).toHaveBeenCalledWith(el, 'hello');
   });
 
-  test('type into rich text editor with failure', () => {
+  test('type into rich text editor with failure', async () => {
     const el = {
       tagName: 'DIV',
       scrollIntoView: jest.fn(),
@@ -796,11 +796,11 @@ describe('runCommandInFrame', () => {
     mockDom.findElementBySelector.mockReturnValue(el);
     mockSi.isRichTextEditor.mockReturnValue(true);
     mockSi.setRichTextValue.mockReturnValue({ success: false, error: 'unsupported' });
-    const result = runCmd({ type: 'type', selector: '#rte', text: 'hello' });
+    const result = await runCmd({ type: 'type', selector: '#rte', text: 'hello' });
     expect(result.ok).toBe(false);
   });
 
-  test('type into date input', () => {
+  test('type into date input', async () => {
     const el = {
       tagName: 'INPUT',
       scrollIntoView: jest.fn(),
@@ -810,12 +810,12 @@ describe('runCommandInFrame', () => {
     mockDom.findElementBySelector.mockReturnValue(el);
     mockSi.isDateInput.mockReturnValue(true);
     mockSi.setDatePickerValue.mockReturnValue({ success: true, value: '2024-01-15' });
-    const result = runCmd({ type: 'type', selector: '#date', text: '2024-01-15' });
+    const result = await runCmd({ type: 'type', selector: '#date', text: '2024-01-15' });
     expect(result.ok).toBe(true);
     expect(mockSi.setDatePickerValue).toHaveBeenCalledWith(el, '2024-01-15');
   });
 
-  test('type fallback for non-input element', () => {
+  test('type fallback for non-input element', async () => {
     const el = {
       tagName: 'SPAN',
       value: '',
@@ -824,12 +824,12 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#span', text: 'val' });
+    const result = await runCmd({ type: 'type', selector: '#span', text: 'val' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Typed into');
   });
 
-  test('type with empty text defaults to empty string', () => {
+  test('type with empty text defaults to empty string', async () => {
     const el = {
       tagName: 'INPUT',
       value: '',
@@ -838,11 +838,11 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#input' });
+    const result = await runCmd({ type: 'type', selector: '#input' });
     expect(result.ok).toBe(true);
   });
 
-  test('type blocked by non-dismissible overlay returns error', () => {
+  test('type blocked by non-dismissible overlay returns error', async () => {
     const el = {
       tagName: 'INPUT',
       value: '',
@@ -853,12 +853,12 @@ describe('runCommandInFrame', () => {
     mockDom.findElementBySelector.mockReturnValue(el);
     mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
     mockOv.dismissOverlay.mockReturnValue(false);
-    const result = runCmd({ type: 'type', selector: '#input', text: 'hi' });
+    const result = await runCmd({ type: 'type', selector: '#input', text: 'hi' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('blocked by overlay');
   });
 
-  test('type uses native setter when available', () => {
+  test('type uses native setter when available', async () => {
     const setter = jest.fn();
     const proto = {};
     Object.defineProperty(proto, 'value', { set: setter, configurable: true });
@@ -871,39 +871,39 @@ describe('runCommandInFrame', () => {
       dispatchEvent: jest.fn(),
     };
     mockDom.findElementBySelector.mockReturnValue(el);
-    const result = runCmd({ type: 'type', selector: '#input', text: 'ab' });
+    const result = await runCmd({ type: 'type', selector: '#input', text: 'ab' });
     expect(result.ok).toBe(true);
   });
 
   // --- observe_page command ---
 
-  test('observe_page returns scanned elements', () => {
+  test('observe_page returns scanned elements', async () => {
     mockDom.scanDocument.mockImplementation((doc, arr, map, prefix) => {
       arr.push({ ref: 'ref_1', tag: 'button' });
     });
-    const result = runCmd({ type: 'observe_page' });
+    const result = await runCmd({ type: 'observe_page' });
     expect(result.ok).toBe(true);
     expect(result.data.elements).toHaveLength(1);
     expect(result.data.elements[0].ref).toBe('ref_1');
   });
 
-  test('observe_page returns empty when no elements', () => {
+  test('observe_page returns empty when no elements', async () => {
     mockDom.scanDocument.mockImplementation(() => {});
-    const result = runCmd({ type: 'observe_page' });
+    const result = await runCmd({ type: 'observe_page' });
     expect(result.ok).toBe(true);
     expect(result.data.elements).toEqual([]);
   });
 
   // --- read_page command ---
 
-  test('read_page returns title, URL, and body content', () => {
-    const result = runCmd({ type: 'read_page' });
+  test('read_page returns title, URL, and body content', async () => {
+    const result = await runCmd({ type: 'read_page' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Test Page');
     expect(result.data).toContain('https://example.com/page');
   });
 
-  test('read_page uses main element when available', () => {
+  test('read_page uses main element when available', async () => {
     const mainEl = {
       cloneNode: jest.fn(() => ({
         innerText: 'Main content area text '.repeat(10),
@@ -916,12 +916,12 @@ describe('runCommandInFrame', () => {
       if (sel === 'main') return mainEl;
       return null;
     });
-    const result = runCmd({ type: 'read_page' });
+    const result = await runCmd({ type: 'read_page' });
     expect(result.ok).toBe(true);
     expect(result.data).toContain('Main content');
   });
 
-  test('read_page falls back to body when main has short content', () => {
+  test('read_page falls back to body when main has short content', async () => {
     const mainEl = {
       cloneNode: jest.fn(() => ({
         innerText: 'short',
@@ -941,11 +941,11 @@ describe('runCommandInFrame', () => {
         remove: jest.fn(),
       })),
     };
-    const result = runCmd({ type: 'read_page' });
+    const result = await runCmd({ type: 'read_page' });
     expect(result.ok).toBe(true);
   });
 
-  test('read_page skips nav/header/footer from content', () => {
+  test('read_page skips nav/header/footer from content', async () => {
     const navEl = { remove: jest.fn() };
     const scriptEl = { remove: jest.fn() };
     const mainEl = {
@@ -963,23 +963,23 @@ describe('runCommandInFrame', () => {
       if (sel === 'main') return mainEl;
       return null;
     });
-    const result = runCmd({ type: 'read_page' });
+    const result = await runCmd({ type: 'read_page' });
     expect(result.ok).toBe(true);
   });
 
   // --- unknown command ---
 
-  test('unknown command type returns error', () => {
-    const result = runCmd({ type: 'scroll_to_bottom' });
+  test('unknown command type returns error', async () => {
+    const result = await runCmd({ type: 'scroll_to_bottom' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Unknown command type');
   });
 
   // --- exception handling ---
 
-  test('catches exception during command execution', () => {
+  test('catches exception during command execution', async () => {
     mockDom.findElementBySelector.mockImplementation(() => { throw new Error('DOM crash'); });
-    const result = runCmd({ type: 'click', selector: '#btn' });
+    const result = await runCmd({ type: 'click', selector: '#btn' });
     expect(result.ok).toBe(false);
     expect(result.error).toContain('Frame command error');
     expect(result.error).toContain('DOM crash');

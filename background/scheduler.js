@@ -702,40 +702,6 @@ async function storeResult(schedule, result) {
   return fullResult;
 }
 
-// ========== Report Retrieval ==========
-
-/**
- * Wait for the report from the last agent run to be written to storage.
- * The agent engine stores it under 'last_agent_report' after generation.
- * @param {number} timeoutMs - Max time to wait for report
- * @returns {Promise<object|null>} Report object or null if unavailable
- */
- 
-function _waitForReport(timeoutMs) {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const poll = setInterval(async () => {
-      try {
-        const stored = await chrome.storage.local.get(['last_agent_report']);
-        if (stored.last_agent_report) {
-          clearInterval(poll);
-          await chrome.storage.local.remove('last_agent_report');
-          resolve(stored.last_agent_report);
-          return;
-        }
-        if (Date.now() - start > timeoutMs) {
-          clearInterval(poll);
-          resolve(null);
-        }
-      } catch (e) {
-        console.warn('[Sentinel] _waitForReport poll error:', e && e.message);
-        clearInterval(poll);
-        resolve(null);
-      }
-    }, 2000);
-  });
-}
-
 // ========== Result Queries ==========
 
 /**

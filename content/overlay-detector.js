@@ -68,14 +68,16 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     for (let i = 0; i < candidates.length; i++) {
       const el = candidates[i];
       try {
-        const style = doc.defaultView.getComputedStyle(el);
+        const view = doc.defaultView;
+        if (!view) continue;
+        const style = view.getComputedStyle(el);
         if (style.position !== 'fixed' && style.position !== 'absolute') continue;
         const zIndex = parseInt(style.zIndex) || 0;
         if (zIndex <= MIN_BLOCKING_Z_INDEX) continue;
         if (style.pointerEvents === 'none') continue;
         const rect = el.getBoundingClientRect();
-        const viewportW = doc.defaultView.innerWidth || doc.documentElement.clientWidth;
-        const viewportH = doc.defaultView.innerHeight || doc.documentElement.clientHeight;
+        const viewportW = view.innerWidth || doc.documentElement.clientWidth;
+        const viewportH = view.innerHeight || doc.documentElement.clientHeight;
         // Check if overlay covers most of the viewport
         if (rect.width >= viewportW * VIEWPORT_COVERAGE_THRESHOLD && rect.height >= viewportH * VIEWPORT_COVERAGE_THRESHOLD) {
           if (dom && dom.isVisible(el)) return el;

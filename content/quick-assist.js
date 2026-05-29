@@ -494,7 +494,7 @@
       selectedText = window.getSelection().toString().trim();
     }
     if (!selectedText) {
-      setResponse('<span class="qa-error">No text selected. Select text on the page first, then try again.</span>');
+      setResponseHTML('<span class="qa-error">No text selected. Select text on the page first, then try again.</span>');
       return;
     }
 
@@ -513,16 +513,16 @@
       function(response) {
         setButtonsLoading(false);
         if (chrome.runtime.lastError) {
-          setResponse('<span class="qa-error">Error: ' + (chrome.runtime.lastError.message || 'Unknown error') + '</span>');
+          setResponseHTML('<span class="qa-error">Error: ' + (chrome.runtime.lastError.message || 'Unknown error') + '</span>');
           return;
         }
-        var text = response && (response.data && response.data.text || response.text);
+        var text = response && response.data && response.data.text;
         if (text) {
           setResponse(text);
         } else if (response && response.ok === false) {
-          setResponse('<span class="qa-error">Error: ' + (response.error || 'Unknown error') + '</span>');
+          setResponseHTML('<span class="qa-error">Error: ' + (response.error || 'Unknown error') + '</span>');
         } else {
-          setResponse('<span class="qa-error">No response received.</span>');
+          setResponseHTML('<span class="qa-error">No response received.</span>');
         }
       }
     );
@@ -552,6 +552,12 @@
     var area = shadow.getElementById('qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-response">' + renderMarkdown(text) + '</div>';
+  }
+
+  function setResponseHTML(html) {
+    var area = shadow.getElementById('qa-response-area');
+    if (!area) return;
+    area.innerHTML = '<div class="qa-response">' + html + '</div>';
   }
 
   function copyResponse() {

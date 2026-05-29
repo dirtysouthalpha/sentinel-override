@@ -202,7 +202,7 @@ export async function executeInFrame(tabId, frameId, command) {
  * @param {{type: string, [key: string]: any}} command - The DOM command to execute.
  * @returns {{ok: boolean, error?: string, [key: string]: any}} Command result.
  */
-function runCommandInFrame(command) {
+async function runCommandInFrame(command) {
   const utils = window.__sentinelUtils;
   if (!utils || !utils.dom) {
     return { ok: false, error: 'Sentinel utilities not loaded in frame' };
@@ -233,7 +233,7 @@ function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              // Wait for overlay to be dismissed, then retry
+              await new Promise(resolve => setTimeout(resolve, 300));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
@@ -260,7 +260,7 @@ function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              // Wait for overlay to be dismissed, then retry
+              await new Promise(resolve => setTimeout(resolve, 300));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
