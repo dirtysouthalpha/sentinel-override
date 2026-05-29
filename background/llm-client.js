@@ -897,6 +897,7 @@ export async function generatePlan(goal, settings, context = {}) {
     const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
     if (!provider) {
+      clearTimeout(timeout);
       console.warn('[Sentinel] generatePlan: unknown provider for endpoint', endpoint, '— using single-step fallback');
       return [goal.substring(0, 300)];
     }
@@ -918,7 +919,6 @@ export async function generatePlan(goal, settings, context = {}) {
       return [goal.substring(0, 300)];
     }
     const data = await response.json();
-    console.log("[Sentinel/DEBUG-PLAN] response status:", response.status, "data:", JSON.stringify(data).substring(0, 200));
     const content = provider.parseResponse(data);
     if (!content) {
       console.warn('Plan generation: empty response content — using single-step fallback');
@@ -1598,7 +1598,6 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   const { endpoint, apiKey } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
-  console.log("[Sentinel/DEBUG] endpoint:", endpoint, "keyLen:", (apiKey||"").length, "keyStart:", (apiKey||"").substring(0,8)+"...", "providerId:", provider.id);
   if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
@@ -1625,15 +1624,15 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 ` : '';
 
   // Navigation fatigue detection -- DISABLED in runbook mode.
-  const navigateCount = history.filter(h => h.action.type === 'navigate').length;
-  const extractCount = history.filter(h => ['extract', 'extract_list'].includes(h.action.type)).length;
-  const noteCount = history.filter(h => h.action.type === 'note').length;
+  const navigateCount = history.filter(h => h.action && h.action.type === 'navigate').length;
+  const extractCount = history.filter(h => h.action && ['extract', 'extract_list'].includes(h.action.type)).length;
+  const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
 
   const finishCtx = isRunbook ? '' :
-    (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
-    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
-    : (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
+    (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
     ? `\nFINISH NOW -- ${navigateCount} navigates with nothing recorded. Use your memory and finish with a comprehensive answer. Include ACTUAL content.\n`
+    : (navigateCount >= 3 && extractCount === 0 && noteCount === 0)
+    ? `\nHARD STOP -- You navigated ${navigateCount} times without extracting or noting anything. You MUST use "extract", "note", or "finish" NOW. Do NOT navigate again.\n`
     : '';
 
   // (3.45.0) Quick Mode — action-oriented prompt injection
@@ -1800,7 +1799,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _in;
     agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _out;
     // (9.2) Update running cost estimate
-    agentState.estimatedCostUsd = estimateCostUsd(agentState.totalInputTokens, agentState.totalOutputTokens, providerConfig.model);
+    agentState.estimatedCostUsd = estimateCostUsd(agentState.totalInputTokens, agentState.totalOutputTokens, model);
   }
   if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
   if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;
@@ -1912,7 +1911,7 @@ export function extractFirstJsonObject(str) {
   // Try every '{' position to find a valid JSON object with a "type" field.
   // This handles models that prepend reasoning text before the actual JSON.
   const validTypes = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
-    'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+    'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
     'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
     'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
     'navigate_back', 'navigate_forward',
@@ -2061,7 +2060,7 @@ export function parseLLMResponse(content) {
     if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
     if (!parsed.type) throw new Error('Missing type field');
     const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
-      'extract', 'extract_list', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+      'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
       'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
       'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
       'navigate_back', 'navigate_forward',
@@ -2152,7 +2151,6 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
       throw new Error(`API Error ${response.status}: ${errText.substring(0, 200)}`);
     }
     const data = await response.json();
-    console.log("[Sentinel/DEBUG-LLM] response status:", response.status, "data:", JSON.stringify(data).substring(0, 200));
     const text = provider.parseResponse(data);
     if (!text) throw new Error('Empty response from API');
     return text;

@@ -2602,9 +2602,10 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       return null;
     `;
     const result = await cdpExecuteJs(tab.id, clickCode, { timeout: 3000 });
-    if (result && result !== 'null' && result !== 'amazon_captcha_needs_input') {
-      console.log('[Sentinel/CAPTCHA] Auto-solved:', result);
-      sendSilentUpdate('🤖 CAPTCHA auto-solved (' + result + ')', stepCount);
+    const clickedWhat = (result && result.ok) ? result.value : null;
+    if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
+      console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
+      sendSilentUpdate('🤖 CAPTCHA auto-solved (' + clickedWhat + ')', stepCount);
       await sleep(2000); // wait for page to process
       return 'solved';
     }
@@ -3940,7 +3941,7 @@ async function runAgentLoop(goal, workingTabId) {
         const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
         let consecutiveNonProductive = 0;
         for (let i = history.length - 1; i >= 0; i--) {
-          if (nonProductive.has(history[i].action.type)) {
+          if (history[i].action && nonProductive.has(history[i].action.type)) {
             consecutiveNonProductive++;
           } else {
             break;
@@ -4331,7 +4332,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'navigate', url: _va.url, _visionAction: true };
                   break;
                 case 'go_back':
-                  command = { type: 'go_back', _visionAction: true };
+                  command = { type: 'navigate_back', _visionAction: true };
                   break;
                 case 'extract':
                   command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 8000)', _visionAction: true };
@@ -4340,7 +4341,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'execute_js', code: _va.code || '', _visionAction: true };
                   break;
                 case 'done':
-                  command = { type: 'done', text: _va.text || _vParsed.memory || 'Task complete', success: _va.success !== false, _visionAction: true };
+                  command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
                   break;
                 default:
                   command = { type: 'note', text: 'Vision: unknown action ' + _va.type, _visionAction: true };
@@ -4357,7 +4358,11 @@ async function runAgentLoop(goal, workingTabId) {
           console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e.message);
         }
       }
-      
+
+      // If vision produced a command, clear the progress timer now (the legacy
+      // path's finally block won't run since we skip it below).
+      if (command && command.type) clearInterval(progressTimer);
+
       // Legacy LLM fallback (only if vision didn't produce a command)
       if (!command || !command.type) {
         try {
@@ -4888,6 +4893,15 @@ async function runAgentLoop(goal, workingTabId) {
         productiveSteps++;
         await persistHistory();
         await sleep(400);
+        continue;
+      }
+
+      if (command.type === 'wait') {
+        const waitMs = Math.min(Math.max(command.ms || 1000, 100), 30000);
+        sendSilentUpdate(`Waiting ${waitMs}ms...`, stepCount);
+        await sleep(waitMs);
+        historyPush({ step: stepCount, action: command, result: `Waited ${waitMs}ms` });
+        await persistHistory();
         continue;
       }
 
@@ -5658,7 +5672,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Extract the JS result value
         let jsValue = result;
         if (result.startsWith('JS Result: ')) {
-          jsValue = result.substring(10);
+          jsValue = result.substring(11);
         }
         if (result === 'Done' || result.startsWith('JS Error: ')) {
           // JS execution failed or returned nothing — do NOT save to memory

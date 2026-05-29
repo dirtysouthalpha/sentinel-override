@@ -208,9 +208,9 @@ if (window.__sentinelInitialized) {
       /^no,?\s*thanks$/i, /^i understand$/i, /^got it$/i, /^close$/i, /^skip$/i,
       /^show\s+me\s+the\s+content$/i, /^let\s+me\s+in$/i, /^x$/i, /^✕$/i, /^×$/i,
       // (v3.52) Zero-friction: accept/agree for consent overlays (CNN, news sites, etc.)
-      /^i\\s+agree$/i, /^agree$/i, /^accept$/i, /^accept\\s+all$/i, /^accept\\s+cookies$/i,
-      /^yes,?\\s*i\\s+agree$/i, /^ok$/i, /^okay$/i, /^sure$/i, /^allow\\s+all$/i,
-      /^agree\\s+and\\s+continue$/i, /^accept\\s+and\\s+continue$/i, /^agree\\s+to\\s+all$/i];
+      /^i\s+agree$/i, /^agree$/i, /^accept$/i, /^accept\s+all$/i, /^accept\s+cookies$/i,
+      /^yes,?\s*i\s+agree$/i, /^ok$/i, /^okay$/i, /^sure$/i, /^allow\s+all$/i,
+      /^agree\s+and\s+continue$/i, /^accept\s+and\s+continue$/i, /^agree\s+to\s+all$/i];
     try {
       // Find all visible fixed-position containers that look like overlays
       const _candidates = document.querySelectorAll(
@@ -2548,10 +2548,14 @@ if (window.__sentinelInitialized) {
       }
     });
 
-    domObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    const _startSPAObserving = () => {
+      if (document.body) {
+        domObserver.observe(document.body, { childList: true, subtree: true });
+      } else {
+        setTimeout(_startSPAObserving, 50);
+      }
+    };
+    _startSPAObserving();
 
     let lastUrl = window.location.href;
 

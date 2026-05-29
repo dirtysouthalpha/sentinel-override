@@ -909,7 +909,10 @@ function sendInjectedContext() {
   const note = injectContextInput.value.trim();
   if (!note) return;
   chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
-    if (chrome.runtime.lastError || (resp && resp.ok === false)) return;
+    if (chrome.runtime.lastError || (resp && resp.ok === false)) {
+      if (typeof showToast === 'function') showToast('Failed to send note: ' + (chrome.runtime.lastError?.message || resp?.error || 'Unknown'), 'error');
+      return;
+    }
     injectContextInput.value = '';
     addMessage('📌 Note sent to agent: ' + note, 'user');
   });
@@ -1142,11 +1145,13 @@ function highlightSearchResults() {
   });
 
   const searchCount = document.getElementById('searchCount');
-  if (matchCount > 0) {
-    searchCount.textContent = `${matchCount} match${matchCount !== 1 ? 'es' : ''}`;
-    searchCount.style.display = 'inline';
-  } else {
-    searchCount.style.display = 'none';
+  if (searchCount) {
+    if (matchCount > 0) {
+      searchCount.textContent = `${matchCount} match${matchCount !== 1 ? 'es' : ''}`;
+      searchCount.style.display = 'inline';
+    } else {
+      searchCount.style.display = 'none';
+    }
   }
 }
 
@@ -2954,6 +2959,7 @@ function showTenantOverrideCard(payload) {
   card.className = 'safety-banner';
   card.style.cssText = 'border: 2px solid #C00000; background: rgba(192,0,0,0.12); margin: 8px 14px; padding: 14px 16px; border-radius: 8px;';
   card.innerHTML = `
+    <div class="safety-banner-header" style="display:flex; align-items:center; gap:8px; font-weight:600; color:#C00000; margin-bottom:8px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
         <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -3354,6 +3360,22 @@ chrome.runtime.onMessage.addListener((message) => {
       // top-level helper to this file (chat.js has had recurring truncation
       // issues during large edits). All UI for the score is contained here.
       try {
+        // Define _trustRow here so it's available before card.innerHTML uses it below.
+        const _trustRow = (label, comp) => {
+          if (!comp) return '';
+          const pts = (typeof comp.points === 'number') ? comp.points : 0;
+          const max = (typeof comp.max === 'number') ? comp.max : 0;
+          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
+          const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
+          const widthPct = Math.min(100, Math.round(ratio * 100));
+          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
+                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
+                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
+                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
+                   '</div>' +
+                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
+                 '</div>';
+        };
         const ts = message.trustScore;
         if (ts && typeof ts.score === 'number') {
           const bandColor = ts.band === 'high' ? '#9ece6a'
@@ -3524,21 +3546,6 @@ chrome.runtime.onMessage.addListener((message) => {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
-        function _trustRow(label, comp) {
-          if (!comp) return '';
-          const pts = (typeof comp.points === 'number') ? comp.points : 0;
-          const max = (typeof comp.max === 'number') ? comp.max : 0;
-          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
-          const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
-          const widthPct = Math.min(100, Math.round(ratio * 100));
-          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
-                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
-                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
-                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
-                   '</div>' +
-                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
-                 '</div>';
-        }
       } catch { /* trust-score render non-fatal */ }
     } catch (err) {
       console.error('Error displaying completion message:', err);
