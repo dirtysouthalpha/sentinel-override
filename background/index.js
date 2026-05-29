@@ -483,14 +483,8 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
           // Soft timeout: 60s — pause and notify
           const timeoutId = setTimeout(() => {
-            // Hard-reject after 5 min total
-            hardRejectId = setTimeout(() => {
-              chrome.runtime.onMessage.removeListener(listener);
-              finish({ approved: false, reason: 'approval_hard_timeout' });
-            }, 240000);
+            chrome.runtime.onMessage.removeListener(listener);
 
-            const origListener = listener;
-            chrome.runtime.onMessage.removeListener(origListener);
             const replacementListener = (message) => {
               if (message && message.action === 'approval_response' && message.requestId === requestId) {
                 if (hardRejectId) clearTimeout(hardRejectId);
@@ -501,6 +495,13 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
                 });
               }
             };
+
+            // Hard-reject after 5 min total — must be defined after replacementListener
+            hardRejectId = setTimeout(() => {
+              chrome.runtime.onMessage.removeListener(replacementListener);
+              finish({ approved: false, reason: 'approval_hard_timeout' });
+            }, 240000);
+
             chrome.runtime.onMessage.addListener(replacementListener);
           }, 60000);
         });
