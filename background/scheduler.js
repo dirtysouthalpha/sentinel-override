@@ -511,11 +511,12 @@ export async function executeScheduledTask(alarmName) {
 
   // Register listener BEFORE startAgent so agent_loop_complete can't fire and be missed
   // if startAgent ever completes synchronously in a fast-path (e.g. cached single-step plan).
-  const completionPromise = _waitForAgentCompletion(5 * 60 * 1000);
+  const { promise: completionPromise, cancel: cancelCompletion } = _waitForAgentCompletion(5 * 60 * 1000);
 
   try {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
+    cancelCompletion(); // Clean up the timer + listener so they don't leak
     console.error('Failed to start agent:', err);
     await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${err.message}` });
     return;
@@ -598,25 +599,36 @@ async function _getOrCreateTab() {
 
 /**
  * Wait for the agent to send an agent_loop_complete message, with a timeout.
+ * Returns the promise AND a cancel() function that cleans up the timer and
+ * listener if the caller needs to abort early (e.g. startAgent threw before
+ * the agent ever ran).
  * @param {number} timeoutMs
- * @returns {Promise<{ status: string, error: string|null, report: string|null }>}
+ * @returns {{ promise: Promise<{ status: string, error: string|null, report: string|null }>, cancel: () => void }}
  */
 function _waitForAgentCompletion(timeoutMs) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
-    }, timeoutMs);
+  let _resolve;
+  const promise = new Promise((resolve) => { _resolve = resolve; });
 
-    const listener = (msg) => {
-      if (msg.action === 'agent_loop_complete') {
-        clearTimeout(timer);
-        chrome.runtime.onMessage.removeListener(listener);
-        resolve({ status: 'success', error: null, report: msg.report || null });
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-  });
+  const timer = setTimeout(() => {
+    chrome.runtime.onMessage.removeListener(listener);
+    _resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
+  }, timeoutMs);
+
+  const listener = (msg) => {
+    if (msg.action === 'agent_loop_complete') {
+      clearTimeout(timer);
+      chrome.runtime.onMessage.removeListener(listener);
+      _resolve({ status: 'success', error: null, report: msg.report || null });
+    }
+  };
+  chrome.runtime.onMessage.addListener(listener);
+
+  const cancel = () => {
+    clearTimeout(timer);
+    chrome.runtime.onMessage.removeListener(listener);
+  };
+
+  return { promise, cancel };
 }
 
 /**

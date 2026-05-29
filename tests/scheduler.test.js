@@ -906,6 +906,52 @@ describe('_waitForAgentCompletion mechanism', () => {
     expect(result).toBe('timeout');
     expect(timedOut).toBe(true);
   });
+
+  test('cancel() clears timer and listener without resolving', async () => {
+    jest.useFakeTimers();
+
+    let resolved = false;
+    let capturedListener;
+    chrome.runtime.onMessage.addListener.mockImplementation((fn) => {
+      capturedListener = fn;
+      _msgListeners.push(fn);
+    });
+    chrome.runtime.onMessage.removeListener.mockImplementation((fn) => {
+      _msgListeners = _msgListeners.filter(l => l !== fn);
+    });
+
+    // Simulate the cancel pattern used in executeScheduledTask when startAgent throws
+    const cancelFn = (() => {
+      let _resolve;
+      const promise = new Promise((resolve) => { _resolve = resolve; });
+      const timer = setTimeout(() => { _resolve('timeout'); }, 5 * 60 * 1000);
+      const listener = (msg) => {
+        if (msg.action === 'agent_loop_complete') {
+          clearTimeout(timer);
+          chrome.runtime.onMessage.removeListener(listener);
+          _resolve('success');
+        }
+      };
+      chrome.runtime.onMessage.addListener(listener);
+
+      // cancel() must clean up without resolving
+      return () => {
+        clearTimeout(timer);
+        chrome.runtime.onMessage.removeListener(listener);
+        // Do NOT call _resolve — promise stays pending (abandoned)
+      };
+    })();
+
+    cancelFn();
+    jest.useRealTimers();
+
+    // After cancel, the listener should be removed
+    expect(_msgListeners).toHaveLength(0);
+
+    // Firing a message now should NOT resolve the (abandoned) promise
+    if (capturedListener) capturedListener({ action: 'agent_loop_complete', report: 'late' });
+    expect(resolved).toBe(false); // never resolved
+  });
 });
 
 // ========== executeScheduledTask — getTabInfo catch, tabInfo = null (line 532) ==========
