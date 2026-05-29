@@ -5446,12 +5446,14 @@ async function runAgentLoop(goal, workingTabId) {
           const _arrivedUrl = _arrivedInfo?.url || '';
           result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
           if (_arrivedUrl && command.url) {
-            const _intendedPath = new URL(command.url).pathname.replace(/\/$/, '');
-            const _arrivedPath = new URL(_arrivedUrl).pathname.replace(/\/$/, '');
-            if (_intendedPath !== _arrivedPath) {
-              result += ` — WARNING: redirected to ${_arrivedUrl}. The page may not contain the expected content. Check the URL and try a different link.`;
-              console.warn('[Sentinel/open_tab] URL mismatch. Intended:', command.url, 'Arrived:', _arrivedUrl);
-            }
+            try {
+              const _intendedPath = new URL(command.url).pathname.replace(/\/$/, '');
+              const _arrivedPath = new URL(_arrivedUrl).pathname.replace(/\/$/, '');
+              if (_intendedPath !== _arrivedPath) {
+                result += ` — WARNING: redirected to ${_arrivedUrl}. The page may not contain the expected content. Check the URL and try a different link.`;
+                console.warn('[Sentinel/open_tab] URL mismatch. Intended:', command.url, 'Arrived:', _arrivedUrl);
+              }
+            } catch (_urlE) { /* non-standard URL (e.g. chrome://newtab) — skip path comparison */ }
           }
         }
         sendActionResult(stepCount, result, actionFailed);
