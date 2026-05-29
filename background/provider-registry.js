@@ -6,7 +6,13 @@
 // Each provider defines how to build headers, request bodies, parse responses,
 // and handle vision (base64 image) content for its specific API format.
 
-// Adds cache_control to the last tool so Anthropic caches the full tool list.
+/**
+ * Add cache_control (ephemeral) to the last tool in the array so Anthropic
+ * caches the full tool list, reducing input token cost on subsequent requests.
+ *
+ * @param {Array<object>} tools - Array of Anthropic tool definitions.
+ * @returns {Array<object>} Shallow copy of tools with cache_control added to the last entry.
+ */
 function _cacheLastTool(tools) {
   if (!tools || tools.length === 0) return tools;
   const copy = tools.slice();
@@ -21,7 +27,14 @@ export const PROVIDERS = {
     defaultEndpoint: 'https://api.anthropic.com/v1/messages',
     defaultModel: 'claude-sonnet-4-6',
 
-    /** Build HTTP headers for Anthropic Messages API. */
+    /**
+     * Build HTTP headers for Anthropic Messages API.
+     *
+     * @param {string} apiKey - Anthropic API key.
+     * @param {object} [opts] - Optional overrides.
+     * @param {boolean} [opts.thinking] - If true, include the interleaved-thinking beta header.
+     * @returns {object} Headers object for the fetch request.
+     */
     buildHeaders: (apiKey, opts = {}) => ({
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
@@ -29,7 +42,17 @@ export const PROVIDERS = {
       ...(opts.thinking ? { 'anthropic-beta': 'interleaved-thinking-2025-05-14' } : {})
     }),
 
-    /** Build request body for Anthropic Messages API (text-output path, e.g. planning/reports). */
+    /**
+     * Build request body for Anthropic Messages API (text-output path, e.g. planning/reports).
+     *
+     * @param {string} model - Model ID (e.g. 'claude-sonnet-4-6').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content.
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens (default 8000).
+     * @param {number} [opts.temperature] - Sampling temperature (default 0.3).
+     * @returns {object} Request body for Anthropic Messages API.
+     */
     buildBody: (model, systemPrompt, userContent, opts = {}) => ({
       model,
       max_tokens: opts.maxTokens || 8000,
@@ -38,20 +61,45 @@ export const PROVIDERS = {
       messages: [{ role: 'user', content: userContent }]
     }),
 
-    /** Parse Anthropic Messages API response and extract text content. */
+    /**
+     * Parse Anthropic Messages API response and extract text content.
+     *
+     * @param {object} data - Parsed JSON response from Anthropic Messages API.
+     * @returns {string} Extracted text content from the first text block.
+     * @throws {Error} If the response contains no text block.
+     */
     parseResponse: (data) => {
       const block = data.content && data.content.find(b => b.type === 'text');
       if (!block) throw new Error(`Anthropic API returned no text block: ${JSON.stringify(data).slice(0, 500)}`);
       return block.text;
     },
 
-    /** Build vision content array for Anthropic Messages API. */
+    /**
+     * Build vision content array for Anthropic Messages API.
+     * Combines a text message with a base64-encoded JPEG image.
+     *
+     * @param {string} text - Text instruction or prompt to accompany the image.
+     * @param {string} base64Image - Base64-encoded JPEG image data (no prefix).
+     * @returns {Array<object>} Content array with text and image blocks.
+     */
     buildVisionContent: (text, base64Image) => [
       { type: 'text', text },
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } }
     ],
 
-    /** Build request body using Anthropic tool use for structured action selection. */
+    /**
+     * Build request body using Anthropic tool use for structured action selection.
+     * Forces the model to call one of the provided tools.
+     *
+     * @param {string} model - Model ID (e.g. 'claude-sonnet-4-6').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content (may include vision blocks).
+     * @param {Array<object>} tools - Array of Anthropic tool definitions.
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens (default 8000).
+     * @param {number} [opts.temperature] - Sampling temperature (default 0.1).
+     * @returns {object} Request body for Anthropic Messages API with tool use.
+     */
     buildBodyWithTools: (model, systemPrompt, userContent, tools, opts = {}) => ({
       model,
       max_tokens:  opts.maxTokens  || 8000,
@@ -62,7 +110,19 @@ export const PROVIDERS = {
       messages:    [{ role: 'user', content: userContent }]
     }),
 
-    /** Build request body with extended thinking + tool use (requires temperature: 1). */
+    /**
+     * Build request body with extended thinking + tool use (requires temperature: 1).
+     * Combines Anthropic's thinking feature with forced tool selection.
+     *
+     * @param {string} model - Model ID (e.g. 'claude-sonnet-4-6').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content (may include vision blocks).
+     * @param {Array<object>} tools - Array of Anthropic tool definitions.
+     * @param {number} thinkingBudget - Token budget for extended thinking (added to max_tokens).
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens excluding thinking budget (default 8000).
+     * @returns {object} Request body for Anthropic Messages API with thinking and tool use.
+     */
     buildBodyWithThinking: (model, systemPrompt, userContent, tools, thinkingBudget, opts = {}) => ({
       model,
       max_tokens:  (opts.maxTokens || 8000) + thinkingBudget,
@@ -74,14 +134,32 @@ export const PROVIDERS = {
       messages:    [{ role: 'user', content: userContent }]
     }),
 
-    /** Parse Anthropic tool_use response into the command object agent-engine expects. */
+    /**
+     * Parse Anthropic tool_use response into the command object agent-engine expects.
+     * Extracts the tool name and input from the first tool_use content block.
+     *
+     * @param {object} data - Parsed JSON response from Anthropic Messages API.
+     * @returns {object} Command object with `type` (tool name) and tool input properties.
+     * @throws {Error} If the response contains no tool_use block.
+     */
     parseToolUseResponse: (data) => {
       const block = data.content && data.content.find(b => b.type === 'tool_use');
       if (!block) throw new Error(`Anthropic response had no tool_use block: ${JSON.stringify(data).slice(0, 300)}`);
       return { type: block.name, ...block.input };
     },
 
-    /** Build request body with extended thinking for text (non-tool) responses (adaptive-prompts). */
+    /**
+     * Build request body with extended thinking for text (non-tool) responses (adaptive-prompts).
+     * Used when planning/reporting without tool use but with thinking enabled.
+     *
+     * @param {string} model - Model ID (e.g. 'claude-sonnet-4-6').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content.
+     * @param {number} thinkingBudget - Token budget for extended thinking (added to max_tokens).
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens excluding thinking budget (default 4000).
+     * @returns {object} Request body for Anthropic Messages API with thinking but no tools.
+     */
     buildBodyTextWithThinking: (model, systemPrompt, userContent, thinkingBudget, opts = {}) => ({
       model,
       max_tokens:  (opts.maxTokens || 4000) + thinkingBudget,
@@ -104,13 +182,29 @@ export const PROVIDERS = {
     defaultEndpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o',
 
-    /** Build HTTP headers for OpenAI-compatible API. */
+    /**
+     * Build HTTP headers for OpenAI-compatible API.
+     *
+     * @param {string} apiKey - API key for Bearer authentication.
+     * @returns {object} Headers object with Content-Type and Authorization.
+     */
     buildHeaders: (apiKey) => ({
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     }),
 
-    /** Build request body for OpenAI Chat Completions API. */
+    /**
+     * Build request body for OpenAI Chat Completions API.
+     *
+     * @param {string} model - Model ID (e.g. 'gpt-4o').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content.
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens (default 8000).
+     * @param {number} [opts.temperature] - Sampling temperature (default 0.3).
+     * @param {boolean} [opts.jsonMode] - If true, request JSON object output format.
+     * @returns {object} Request body for OpenAI Chat Completions API.
+     */
     buildBody: (model, systemPrompt, userContent, opts = {}) => {
       const body = {
         model,
@@ -125,7 +219,14 @@ export const PROVIDERS = {
       return body;
     },
 
-    /** Parse OpenAI Chat Completions response and extract text content. */
+    /**
+     * Parse OpenAI Chat Completions response and extract text content.
+     * Falls back to reasoning_content if the main content field is null.
+     *
+     * @param {object} data - Parsed JSON response from OpenAI-compatible API.
+     * @returns {string} Extracted text or reasoning content from the first choice.
+     * @throws {Error} If the response has no valid choices or null content with no reasoning.
+     */
     parseResponse: (data) => {
       // Detect API gateway auth errors (Z.AI platform, proxies) that return 200 OK with error body
       if (data.code === 1000 || data.code === 1001) {
@@ -144,13 +245,26 @@ export const PROVIDERS = {
       return content;
     },
 
-    /** Build vision content array for OpenAI Chat Completions API. */
+    /**
+     * Build vision content array for OpenAI Chat Completions API.
+     * Combines a text message with a base64-encoded JPEG image as a data URI.
+     *
+     * @param {string} text - Text instruction or prompt to accompany the image.
+     * @param {string} base64Image - Base64-encoded JPEG image data (no prefix).
+     * @returns {Array<object>} Content array with text and image_url blocks.
+     */
     buildVisionContent: (text, base64Image) => [
       { type: 'text', text },
       { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
     ],
 
-    /** Convert Anthropic-format SENTINEL_TOOLS to OpenAI function calling format. */
+    /**
+     * Convert Anthropic-format SENTINEL_TOOLS to OpenAI function calling format.
+     * Maps each tool's name, description, and input_schema to OpenAI's function structure.
+     *
+     * @param {Array<object>} tools - Array of Anthropic tool definitions with name, description, input_schema.
+     * @returns {Array<object>} Array of OpenAI-format tool objects with type: 'function'.
+     */
     convertToolsToOpenAIFormat(tools) {
       return tools.map(t => ({
         type: 'function',
@@ -162,7 +276,19 @@ export const PROVIDERS = {
       }));
     },
 
-    /** Build request body with tools/functions for OpenAI Chat Completions API. */
+    /**
+     * Build request body with tools/functions for OpenAI Chat Completions API.
+     * Converts tools to OpenAI format and includes tool_choice: 'auto'.
+     *
+     * @param {string} model - Model ID (e.g. 'gpt-4o').
+     * @param {string} systemPrompt - System prompt text.
+     * @param {string|Array} userContent - User message content (may include vision blocks).
+     * @param {Array<object>} tools - Array of Anthropic-format tool definitions (will be converted).
+     * @param {object} [opts] - Optional overrides.
+     * @param {number} [opts.maxTokens] - Max output tokens (default 8000).
+     * @param {number} [opts.temperature] - Sampling temperature (default 0.1).
+     * @returns {object} Request body for OpenAI Chat Completions API with tools.
+     */
     buildBodyWithTools(model, systemPrompt, userContent, tools, opts = {}) {
       const openaiTools = this.convertToolsToOpenAIFormat(tools);
       return {
@@ -178,7 +304,15 @@ export const PROVIDERS = {
       };
     },
 
-    /** Parse OpenAI tool_calls response into the command object agent-engine expects. */
+    /**
+     * Parse OpenAI tool_calls response into the command object agent-engine expects.
+     * Extracts the first tool call's function name and parsed arguments.
+     * Falls back to treating raw arguments as text if JSON parsing fails.
+     *
+     * @param {object} data - Parsed JSON response from OpenAI-compatible API.
+     * @returns {object} Command object with `type` (function name) and parsed arguments.
+     * @throws {Error} If the response has no valid choices or no tool_calls.
+     */
     parseToolUseResponse(data) {
       const choice = data.choices && data.choices[0];
       if (!choice || !choice.message) {
