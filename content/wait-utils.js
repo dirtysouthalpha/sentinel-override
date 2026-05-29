@@ -42,6 +42,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
         const observer = new MutationObserver(() => {
           if (wait.checkCondition(condition)) {
             observer.disconnect();
+            clearInterval(pollInterval);
             clearTimeout(timer);
             resolve(`Condition met after ${Date.now() - startTime}ms`);
           }

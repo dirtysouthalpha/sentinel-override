@@ -5307,7 +5307,7 @@ async function runAgentLoop(goal, workingTabId) {
               const _safeText = (command.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
               try {
                 const _typeRes = await cdpExecuteJs(tab,
-                  '(function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
+                  'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
                   { timeout: 5000 });
                 const _typeVal = _typeRes && _typeRes.value;
                 if (_typeVal === 'not found') {
