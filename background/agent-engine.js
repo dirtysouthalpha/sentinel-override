@@ -5434,6 +5434,10 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionMessage(command, stepCount, null); // Show action card in popup
           sendSilentUpdate(`Opening tab: ${command.label || command.url}`, stepCount);
           const ctx = await openTab(command.url, command.label);
+          if (!ctx) {
+            result = 'Failed to open tab: browser rejected chrome.tabs.create for ' + command.url;
+            actionFailed = true;
+          } else {
           // (3.7.2) Attach the new tab to the Sentinel group so the user
           // sees it linked in the tab bar.
           try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
@@ -5455,6 +5459,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             } catch (_urlE) { /* non-standard URL (e.g. chrome://newtab) — skip path comparison */ }
           }
+          } // close ctx null check else
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
