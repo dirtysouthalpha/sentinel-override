@@ -4266,7 +4266,7 @@ async function runAgentLoop(goal, workingTabId) {
             role: 'user',
             content: [
               { type: 'text', text: _visionUserContent },
-              ...(base64Image ? [{ type: 'image_url', image_url: { url: 'data:image/png;base64,' + base64Image } }] : [])
+              ...(base64Image ? [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64Image } }] : [])
             ]
           }
         ];
