@@ -68,8 +68,8 @@ export function getPlatformProfile(currentUrl, goal) {
   for (const p of PROFILES) {
     try {
       if (p && typeof p.detect === 'function' && p.detect(currentUrl, goal)) return p;
-    } catch {
-      // Detection regex failed — skip this profile, don't crash the lookup.
+    } catch (e) {
+      console.warn('[Sentinel] Platform detect error (profile:', p && p.id, '):', e && e.message);
       continue;
     }
   }

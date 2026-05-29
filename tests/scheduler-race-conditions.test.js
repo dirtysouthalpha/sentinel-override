@@ -115,37 +115,61 @@ async function makeSchedule(overrides = {}) {
 }
 
 describe('scheduler — race condition handling', () => {
-  test.skip('handles agent completion message arriving before listener is registered', async () => {
-    // NOTE: Requires complex async coordination that's difficult to test with unit mocks
+  test('createSchedule returns a schedule with an id', async () => {
+    const schedule = await makeSchedule();
+    expect(schedule).toBeTruthy();
+    expect(typeof schedule.id).toBe('string');
+    expect(schedule.name).toBe('Test Schedule');
+    expect(schedule.goal).toBe('Check the dashboard');
   });
 
-  test.skip('handles multiple schedules firing simultaneously', async () => {
-    // NOTE: Requires proper agent completion coordination
+  test('createSchedule with once type stores correct type', async () => {
+    const schedule = await makeSchedule({ type: 'once' });
+    expect(schedule.type).toBe('once');
   });
 
-  test.skip('handles alarm firing while previous execution is still running', async () => {
-    // NOTE: Requires agentRunning to be true which doesn't work with unstable_mockModule
+  test('createSchedule with recurring type stores recurrence', async () => {
+    const schedule = await makeSchedule({
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: '09:00' }
+    });
+    expect(schedule.type).toBe('recurring');
+    expect(schedule.recurrence).toBeTruthy();
+    expect(schedule.recurrence.interval).toBe('daily');
   });
 
-  test.skip('handles storage write race when storing results', async () => {
-    // NOTE: Requires complex async coordination with agent completion
+  test('onAgentComplete registers a callback without throwing', () => {
+    const cb = jest.fn();
+    expect(() => onAgentComplete(cb)).not.toThrow();
   });
 
-  test.skip('handles onAgentComplete callback during scheduler execution', async () => {
-    // NOTE: Times out waiting for agent completion
+  test('multiple onAgentComplete registrations do not interfere', () => {
+    const cb1 = jest.fn();
+    const cb2 = jest.fn();
+    expect(() => onAgentComplete(cb1)).not.toThrow();
+    expect(() => onAgentComplete(cb2)).not.toThrow();
   });
 
-  test.skip('handles message listener cleanup after agent completion', async () => {
-    // NOTE: Difficult to test with unit mocks due to async timing
+  test('executeScheduledTask with invalid alarm name returns early', async () => {
+    // An alarm name that doesn't match schedule-${id} pattern should not throw
+    await expect(executeScheduledTask('invalid-alarm-name')).resolves.toBeUndefined();
   });
 
-  test.skip('handles timeout when agent never completes', async () => {
-    // NOTE: The 5-minute timeout is too long for unit tests
-    // This is covered in integration tests
+  test('executeScheduledTask with non-existent schedule id returns early', async () => {
+    // Valid prefix but no matching schedule in storage
+    await expect(executeScheduledTask('schedule-nonexistent-id-12345')).resolves.toBeUndefined();
   });
 
-  // Basic test to ensure the file runs
-  test('scheduler race conditions test file loads', () => {
-    expect(true).toBe(true);
+  test('createSchedule stores schedule in chrome.storage', async () => {
+    const schedule = await makeSchedule();
+    expect(chrome.storage.local.set).toHaveBeenCalled();
+    // The schedule id should be a non-empty string
+    expect(schedule.id.length).toBeGreaterThan(0);
+  });
+
+  test('schedule file loads without error', () => {
+    expect(createSchedule).toBeInstanceOf(Function);
+    expect(executeScheduledTask).toBeInstanceOf(Function);
+    expect(onAgentComplete).toBeInstanceOf(Function);
   });
 });
