@@ -1058,10 +1058,10 @@ if (undoBtn) {
       }
       if (resp && resp.ok === false) {
         addMessage('Undo failed: ' + (resp.error || 'Unknown error'), 'assistant');
-      } else if (resp && resp.success === false) {
-        addMessage('Nothing to undo: ' + (resp.reason || ''), 'assistant');
-      } else if (resp && resp.success) {
-        addMessage('Undone: ' + (resp.description || 'Last action reversed'), 'assistant');
+      } else if (resp && resp.data && resp.data.success === false) {
+        addMessage('Nothing to undo: ' + (resp.data.reason || ''), 'assistant');
+      } else if (resp && resp.data && resp.data.success) {
+        addMessage('Undone: ' + (resp.data.description || 'Last action reversed'), 'assistant');
       }
     });
   });
