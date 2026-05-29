@@ -127,6 +127,10 @@ export const PROVIDERS = {
 
     /** Parse OpenAI Chat Completions response and extract text content. */
     parseResponse: (data) => {
+      // Detect API gateway auth errors (Z.AI platform, proxies) that return 200 OK with error body
+      if (data.code === 1000 || data.code === 1001) {
+        throw new Error(`API auth error (code ${data.code}): ${data.msg || data.message}. Your API key or endpoint may be wrong. Check settings.`);
+      }
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
         throw new Error(`API returned no valid response: ${data.error?.message || JSON.stringify(data).slice(0, 500)}`);
       }

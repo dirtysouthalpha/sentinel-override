@@ -918,6 +918,7 @@ export async function generatePlan(goal, settings, context = {}) {
       return [goal.substring(0, 300)];
     }
     const data = await response.json();
+    console.log("[Sentinel/DEBUG-PLAN] response status:", response.status, "data:", JSON.stringify(data).substring(0, 200));
     const content = provider.parseResponse(data);
     if (!content) {
       console.warn('Plan generation: empty response content — using single-step fallback');
@@ -1597,6 +1598,7 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   const { endpoint, apiKey } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
+  console.log("[Sentinel/DEBUG] endpoint:", endpoint, "keyLen:", (apiKey||"").length, "keyStart:", (apiKey||"").substring(0,8)+"...", "providerId:", provider.id);
   if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
@@ -2150,6 +2152,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
       throw new Error(`API Error ${response.status}: ${errText.substring(0, 200)}`);
     }
     const data = await response.json();
+    console.log("[Sentinel/DEBUG-LLM] response status:", response.status, "data:", JSON.stringify(data).substring(0, 200));
     const text = provider.parseResponse(data);
     if (!text) throw new Error('Empty response from API');
     return text;
