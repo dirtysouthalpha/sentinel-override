@@ -402,6 +402,7 @@ export async function importClient(payload, { rename } = {}) {
         })).filter(e => e.wisdom)
       : []
   };
-  await _write(state);
+  const written = await _write(state);
+  if (!written) return { ok: false, error: 'Failed to save imported client' };
   return { ok: true, client: state.clients[id] };
 }
