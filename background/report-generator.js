@@ -253,7 +253,7 @@ export async function generateReport(executionData, CONFIG) {
     : _allHistory;
   const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
   const planContext = agentPlan && agentPlan.length > 0
-    ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${s}`).join('\n')}`
+    ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => `${i + 1}. ${typeof s === 'string' ? s : (s && s.description) || JSON.stringify(s)}`).join('\n')}`
     : '\nNo formal plan was generated (direct execution mode).';
   const tabReferences = tabContexts.length > 0
     ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`

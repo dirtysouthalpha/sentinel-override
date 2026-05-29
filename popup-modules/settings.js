@@ -313,7 +313,7 @@ if (skillStatsResetBtn) {
   skillStatsResetBtn.addEventListener('click', () => {
     if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
     chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
-      if (chrome.runtime.lastError && !resp) return;
+      if (chrome.runtime.lastError) return;
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
@@ -325,9 +325,9 @@ if (skillStatsResetBtn) {
 const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
 if (skillStatsViewBtn) {
   skillStatsViewBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (skills) => {
+    chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (resp) => {
       if (chrome.runtime.lastError) return;
-      if (!Array.isArray(skills)) skills = [];
+      const skills = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.data) ? resp.data : []);
       _renderSkillStatsModal(skills);
     });
   });
@@ -399,7 +399,8 @@ function _renderSkillStatsModal(skills) {
   document.body.appendChild(modal);
 
   const close = () => modal.remove();
-  document.getElementById('skillStatsCloseBtn').addEventListener('click', close);
+  const skillStatsCloseBtn = document.getElementById('skillStatsCloseBtn');
+  if (skillStatsCloseBtn) skillStatsCloseBtn.addEventListener('click', close);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   const escClose = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escClose); } };
   document.addEventListener('keydown', escClose);
@@ -410,6 +411,7 @@ const quickModeToggle = document.getElementById('quickModeToggle');
 const quickModeLabel = document.getElementById('quickModeLabel');
 if (quickModeToggle) {
   chrome.storage.local.get(['quickMode'], (result) => {
+    if (chrome.runtime.lastError) return;
     const enabled = result.quickMode === true;
     quickModeToggle.checked = enabled;
     if (quickModeLabel) {
@@ -949,7 +951,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   const detectBtn = document.getElementById('detectModelsBtn');
   const modelsSel = document.getElementById('detectedModelsSelect');
   const useBtn = document.getElementById('useDetectedModelBtn');
-  if (!sel || !detectBtn) return;
+  if (!sel || !detectBtn || !modelsSel || !useBtn) return;
 
   let catalog = [];
 

@@ -576,7 +576,9 @@ export function getModelSupportsVision(providerId, model) {
   const m = String(model).toLowerCase();
 
   // 1) Per-model explicit override (highest precedence).
-  for (const key of Object.keys(MODEL_VISION_OVERRIDES)) {
+  // Sort by descending key length so more-specific keys (e.g. "glm-4.5v") win over
+  // shorter substrings (e.g. "glm-4") when one model ID contains another.
+  for (const key of Object.keys(MODEL_VISION_OVERRIDES).sort((a, b) => b.length - a.length)) {
     if (m === key.toLowerCase() || m.includes(key.toLowerCase())) {
       return MODEL_VISION_OVERRIDES[key];
     }
@@ -915,8 +917,8 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   }
   clearTimeout(timer);
   if (!resp.ok) {
-    const errText = (await resp.text()).slice(0, 240);
-    throw new Error('Models endpoint returned ' + resp.status + ': ' + errText);
+    const errText = await resp.text().catch(() => '(unreadable body)');
+    throw new Error('Models endpoint returned ' + resp.status + ': ' + errText.slice(0, 240));
   }
   let data;
   try { data = await resp.json(); }

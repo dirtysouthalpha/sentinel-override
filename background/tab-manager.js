@@ -931,7 +931,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     }
     try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[tab-manager] ensureObservabilityListeners failed:', e && e.message); }
     const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: CONFIG.screenshotQuality });
-    base64Image = screenshotResult.data;
+    base64Image = screenshotResult ? screenshotResult.data : null;
   } catch {
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
@@ -944,7 +944,9 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
           else resolve(dataUrl);
         });
       });
-      base64Image = screenshot_data_url.split(',')[1];
+      const _parts = screenshot_data_url ? screenshot_data_url.split(',') : [];
+      if (_parts.length < 2 || !_parts[1]) throw new Error('captureVisibleTab returned invalid data URL');
+      base64Image = _parts[1];
     } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
       return null;
