@@ -1052,7 +1052,7 @@ export async function generatePlan(goal, settings, context = {}) {
     console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', content.slice(0, 200));
     return [goal.substring(0, 300)];
   } catch (e) {
-    console.warn('Plan generation failed (non-fatal):', e.message);
+    console.warn('Plan generation failed (non-fatal):', e && e.message);
     // Even on hard exception, return a minimal fallback so the loop has a plan.
     if (goal) return [goal.substring(0, 300)];
   }
@@ -1885,7 +1885,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         return provider.parseToolUseResponse(data);
       } catch (e) {
         // parseToolUseResponse failed — fall through to text parsing
-        console.warn('[Sentinel] tool_use parse failed, falling back to text parsing:', e.message);
+        console.warn('[Sentinel] tool_use parse failed, falling back to text parsing:', e && e.message);
       }
     }
     // Fallback: model returned text instead of tool_calls (e.g. finish_reason !== 'tool_calls')

@@ -2610,7 +2610,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       return 'solved';
     }
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', e.message);
+    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', e && e.message);
   }
   
   // Strategy 2: Navigate to an alternative URL for the same site
@@ -2646,7 +2646,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     await sleep(2000);
     return 'went_back';
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Go back failed:', e.message);
+    console.log('[Sentinel/CAPTCHA] Go back failed:', e && e.message);
   }
   
   // Strategy 4: Pause for user
