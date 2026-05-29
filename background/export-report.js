@@ -237,7 +237,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
  * @returns {string} HTML-safe string.
  */
 function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const s = (str == null) ? '' : String(str);
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
@@ -247,5 +248,6 @@ function escapeHtml(str) {
  * @returns {string} Original or truncated string.
  */
 function truncate(str, max) {
-  return str.length > max ? str.slice(0, max) + '…' : str;
+  const s = (str == null) ? '' : String(str);
+  return s.length > max ? s.slice(0, max) + '…' : s;
 }
