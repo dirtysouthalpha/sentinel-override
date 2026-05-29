@@ -1128,7 +1128,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     const allSameResult = recent.every(h => h.result === recent[0].result);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';
-      return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.includes('Element not found') || r.includes('No element');
+      return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.startsWith('Timeout') || r.includes('Element not found') || r.includes('No element');
     });
 
     if (allSameType && allSameResult && allFailed) {
