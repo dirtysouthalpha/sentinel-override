@@ -932,6 +932,7 @@ export async function generatePlan(goal, settings, context = {}) {
       return [goal.substring(0, 300)];
     }
     const data = await response.json();
+    if (!data) throw new Error('Plan API returned null response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
     if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
       const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
@@ -1849,6 +1850,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     throw new Error('API returned invalid JSON: ' + (e && e.message ? e.message : String(e)));
   }
 
+  if (!data) throw new Error('API returned null response body');
   // Early detection of auth errors from providers that return HTTP 200 with error payloads
   if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
     const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
@@ -2238,6 +2240,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
       throw new Error(`API Error ${response.status}: ${errText.substring(0, 200)}`);
     }
     const data = await response.json();
+    if (!data) throw new Error('Quick Assist API returned null response body');
     const text = provider.parseResponse(data);
     if (!text) throw new Error('Empty response from API');
     return text;
