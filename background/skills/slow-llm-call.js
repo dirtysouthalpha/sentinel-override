@@ -12,19 +12,33 @@ export const slowLlmCall = {
   priority: 20,
 
   matches(ctx) {
-    if (!ctx) return false;
-    return typeof ctx.lastAiCallMs === 'number' && ctx.lastAiCallMs >= 25000;
+    if (!ctx) {
+      console.error('Invalid context in slowLlmCall matches');
+      return false;
+    }
+    if (typeof ctx.lastAiCallMs !== 'number') {
+      console.error('Invalid lastAiCallMs in slowLlmCall matches');
+      return false;
+    }
+    return ctx.lastAiCallMs >= 25000;
   },
 
-  autoApply(_ctx) { return null; },
+  autoApply(_ctx) { 
+    return null; 
+  },
 
   promptInjection(ctx) {
-    const sec = ctx.lastAiCallMs ? Math.round(ctx.lastAiCallMs / 1000) : '?';
-    return `Heads up: your last decision took ${sec} seconds. That's typically caused by prompt bloat. To keep the run moving:
+    try {
+      const sec = ctx.lastAiCallMs ? Math.round(ctx.lastAiCallMs / 1000) : '?';
+      return `Heads up: your last decision took ${sec} seconds. That's typically caused by prompt bloat. To keep the run moving:
 
 - Prefer **focused extract / extract_list** (with a specific selector + key) over broad read_page on large pages.
 - When using \`execute_js\`, scope the work tightly (one querySelector + one regex/slice) and keep \`code\` under ~300 chars. Long code in past history rides along in every subsequent prompt.
 - Don't re-emit the same page-read commands repeatedly — past observations are already in your context.
 - If the provider is genuinely slow (rate-limited / overloaded), wait it out — there's nothing the code can do about that.`;
+    } catch (error) {
+      console.error('Error generating prompt injection for slowLlmCall:', error);
+      return 'Error generating prompt injection for slow LLM call.';
+    }
   }
 };
