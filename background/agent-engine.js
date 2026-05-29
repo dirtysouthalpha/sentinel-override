@@ -4850,6 +4850,7 @@ async function runAgentLoop(goal, workingTabId) {
         const iterVar = command.item_var || 'item';
         for (const _item of items) {
           for (const _act of doActions) {
+            if (!_act || !_act.type) continue;
             // (3.41.0) Use structuredClone + JSON template substitution for
             // correctness (handles undefined fields, circular-ref-safe) and
             // speed (avoids double-parse on deeply nested action objects).
