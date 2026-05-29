@@ -5582,7 +5582,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (command.type === 'extract' || command.type === 'extract_list') {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        result = res || 'Done';
+        result = (typeof res === 'string' ? res : null) || 'Done';
         let extractSucceeded = false;
         try {
           const parsed = JSON.parse(result.replace('JS Result: ', ''));
@@ -5887,7 +5887,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-              result = res || 'Done';
+              result = (typeof res === 'string' ? res : null) || 'Done';
               actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.startsWith('JS Error') || result.includes('timed out') || result.includes(' not found');
             }
           } else {
@@ -5905,7 +5905,7 @@ async function runAgentLoop(goal, workingTabId) {
               } catch (_) { /* undo stack non-fatal */ }
             }
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-            result = res || 'Done';
+            result = (typeof res === 'string' ? res : null) || 'Done';
             actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           }
         } catch (err) {
