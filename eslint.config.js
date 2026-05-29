@@ -99,6 +99,7 @@ export default [
       'coverage/**',
       'marked.min.js',
       'scripts/**',
+      '.claude/**',
     ],
   },
   // popup-full.js loads popup-modules/* which define these as globals

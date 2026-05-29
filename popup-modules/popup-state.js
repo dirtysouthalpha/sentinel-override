@@ -90,3 +90,10 @@ function subscribe(key, callback) {
     _subscribers[key]?.delete(callback);
   };
 }
+
+// Export to global scope for popup-full.js
+if (typeof window !== 'undefined') {
+  window.initPopupState = initPopupState;
+  window.getState = getState;
+  window.subscribe = subscribe;
+}

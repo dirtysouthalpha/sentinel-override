@@ -1,7 +1,6 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-// eslint-disable-next-line no-unused-vars
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 // eslint-disable-next-line no-unused-vars
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
@@ -237,7 +236,7 @@ try {
 // is actively using (attached tabs). All other tabs have it disabled.
 // Mirrors Claude's computer-use behavior — panel follows the agent window.
 
-async function scopeSidePanelToAttachedTabs() {
+async function _scopeSidePanelToAttachedTabs() {
   try {
     const allTabs = await chrome.tabs.query({});
     const attached = getAttachedTabIds();
@@ -250,7 +249,7 @@ async function scopeSidePanelToAttachedTabs() {
   } catch (_) {}
 }
 
-async function enableSidePanelEverywhere() {
+async function _enableSidePanelEverywhere() {
   try {
     const allTabs = await chrome.tabs.query({});
     for (const tab of allTabs) {
