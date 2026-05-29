@@ -1962,7 +1962,13 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
   }
   // Fallback: text-JSON parsing (non-tool-use providers)
-  const responseText = provider.parseResponse(data);
+  let responseText;
+  try {
+    responseText = provider.parseResponse(data);
+  } catch (e) {
+    console.warn('[Sentinel/llm] parseResponse failed (non-tool-use path):', e && e.message);
+    return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
+  }
   if (!responseText) return { type: 'note', text: 'Empty LLM response — will retry on next step.' };
   return parseLLMResponse(responseText);
 }
@@ -2086,9 +2092,9 @@ function regexSalvageFinishOrNote(content) {
   if (finishIdx === -1 && noteIdx === -1) return null;
   const useFinish = finishIdx !== -1 && (noteIdx === -1 || finishIdx < noteIdx);
   const key = useFinish ? 'summary' : 'text';
-  // Greedy match from the key opening up to the LAST closing quote before the
-  // outermost '}'. Tolerates bare backticks, raw newlines, and other LLM crud.
-  const re = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)"\\s*\\}', 'm');
+  // Match the value up to the closing quote, handling escaped quotes (\") inside
+  // the string so "Found \"X\"" doesn't truncate at the first escaped quote.
+  const re = new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*\\}', 'm');
   const m = content.match(re);
   if (!m) return null;
   let raw = m[1];
