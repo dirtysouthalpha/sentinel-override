@@ -841,6 +841,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'context_menu_stop_recording': {
       if (!isRecording()) throw new Error('Not recording');
       const macro = await stopRecording(request.params?.name || 'Recorded Macro');
+      if (!macro) throw new Error('No steps recorded — nothing to save');
       return { macro };
     }
 
@@ -875,6 +876,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'macro_stop_recording': {
       if (!isRecording()) throw new Error('Not recording');
       const macro = await stopRecording(request.params?.name || 'Recorded Macro');
+      if (!macro) throw new Error('No steps recorded — nothing to save');
       return { macro };
     }
 
