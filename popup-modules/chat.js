@@ -372,6 +372,7 @@ function loadApprovalMode() {
 
 // eslint-disable-next-line no-unused-vars
 function setupApprovalModeToggle() {
+  if (!approvalModeToggle) return;
   approvalModeToggle.addEventListener('change', () => {
     const isApprovalMode = approvalModeToggle.checked;
 
@@ -1462,7 +1463,8 @@ function setupVoiceInput() {
   }
 }
 
-setupVoiceInput();
+// setupVoiceInput() is called from popup-full.js DOMContentLoaded; calling it
+// here too would register a duplicate chrome.runtime.onMessage listener.
 
 // ========== Conversation Export ==========
 exportBtn.addEventListener('click', () => {
@@ -2726,7 +2728,7 @@ async function exportRunLog(format) {
         const s = String(v).replace(/"/g, '""');
         return /[",\n\r]/.test(s) ? '"' + s + '"' : s;
       };
-      const rows = log.entries.map(e => [
+      const rows = (log.entries || []).map(e => [
         e.step, e.timestamp, e.kind, e.url || '', e.tenant || '',
         e.action_type || '',
         (e.action && (e.action.ref || e.action.selector)) || '',
@@ -3494,7 +3496,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     await new Promise((resolve) => chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, () => resolve()));
                   }
                   // Apply each (key, value) pair to chrome.storage.local.
-                  if (Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0) {
+                  if (Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0 && Array.isArray(sug.applyValues)) {
                     const updates = {};
                     for (let i = 0; i < sug.applyKeys.length; i++) {
                       updates[sug.applyKeys[i]] = sug.applyValues[i];
@@ -3552,5 +3554,25 @@ chrome.runtime.onMessage.addListener((message) => {
       console.error('Error displaying completion message:', err);
     }
     resetUI();
+  }
+  // Approval / pause / interrupt cards — the background sends these but the
+  // handler had no cases for them, leaving every approval-mode run deadlocked.
+  if (message.action === 'request_approval') {
+    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', e); }
+  }
+  if (message.action === 'mfa_pause') {
+    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', e); }
+  }
+  if (message.action === 'sign_in_wall_pause') {
+    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', e); }
+  }
+  if (message.action === 'adapted_goal_available') {
+    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', e); }
+  }
+  if (message.action === 'mode_mismatch_pause') {
+    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', e); }
+  }
+  if (message.action === 'download_captured') {
+    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', e); }
   }
 });

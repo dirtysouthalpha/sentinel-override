@@ -934,7 +934,7 @@ export async function generatePlan(goal, settings, context = {}) {
     const data = await response.json();
     if (!data) throw new Error('Plan API returned null response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
-    if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
+    if ((!data.choices || data.choices.length === 0) && (data.error || data.msg || (data.code && data.success === false))) {
       const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
       throw new Error(`🔑 API Authentication Failed: ${errMsg}. Check your API key in extension settings.`);
     }
@@ -1852,7 +1852,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 
   if (!data) throw new Error('API returned null response body');
   // Early detection of auth errors from providers that return HTTP 200 with error payloads
-  if (!data.choices && (data.error || data.msg || (data.code && data.success === false))) {
+  if ((!data.choices || data.choices.length === 0) && (data.error || data.msg || (data.code && data.success === false))) {
     const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
     throw new Error(`🔑 API Authentication Failed: ${errMsg}. Check your API key in extension settings.`);
   }

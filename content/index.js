@@ -2223,7 +2223,7 @@ if (window.__sentinelInitialized) {
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
-                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked access to "+String(p));' +
+                        'if(__blk.has(p)) return false;' +  // return false so `in`-checks on blocked props see "not present"
                         'return true;' +  // always return true so `with` delegates to the proxy
                       '}' +
                     '});' +
@@ -2239,7 +2239,7 @@ if (window.__sentinelInitialized) {
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
-                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked document access to "+String(p));' +
+                        'if(__blkDoc.has(p)) return false;' +  // return false so feature-detect checks on blocked doc props see "not present"
                         'return true;' +
                       '}' +
                     '});' +
