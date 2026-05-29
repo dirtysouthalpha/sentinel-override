@@ -123,6 +123,7 @@ function showImportPreview(validationResult, warnings) {
 
   // Clear and populate preview
   const list = document.getElementById('import-preview-list');
+  if (!list) return;
   list.innerHTML = '';
 
   templates.forEach(t => {
@@ -150,13 +151,15 @@ function showImportPreview(validationResult, warnings) {
 
   // Show version warning if any
   const warningEl = document.getElementById('import-version-warning');
-  if (warnings.length > 0) {
-    warningEl.style.display = 'block';
-    warningEl.innerHTML = warnings.map(w =>
-      `<div style="font-size:12px;color:var(--warning-color);padding:4px 0;">⚠ ${escapeHtml(w)}</div>`
-    ).join('');
-  } else {
-    warningEl.style.display = 'none';
+  if (warningEl) {
+    if (warnings.length > 0) {
+      warningEl.style.display = 'block';
+      warningEl.innerHTML = warnings.map(w =>
+        `<div style="font-size:12px;color:var(--warning-color);padding:4px 0;">⚠ ${escapeHtml(w)}</div>`
+      ).join('');
+    } else {
+      warningEl.style.display = 'none';
+    }
   }
 
   // Store templates for import

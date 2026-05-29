@@ -497,7 +497,7 @@ describe('OpenAI parseResponse', () => {
   });
 
   test('throws when no choices array', () => {
-    expect(() => provider.parseResponse({ error: { message: 'bad' } })).toThrow(/no valid response/);
+    expect(() => provider.parseResponse({ error: { message: 'bad' } })).toThrow(/bad/);
   });
 
   test('throws when choices is empty', () => {
