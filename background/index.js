@@ -309,7 +309,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return await loadPersistedRun(request.runId); } catch { return []; }
     }
     case 'delete_persisted_telemetry_run': {
-      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: e.message }; }
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: (e && e.message) || String(e) }; }
     }
 
     // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
@@ -322,7 +322,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
-      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: e.message }; }
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: (e && e.message) || String(e) }; }
     }
 
     case 'get_provider_catalog': {
@@ -359,7 +359,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             const base = u.protocol + '//' + u.host + u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '');
             modelsUrl = base.replace(/\/$/, '') + '/models';
           } catch (e) {
-            return { ok: false, error: 'Could not parse custom endpoint: ' + e.message };
+            return { ok: false, error: 'Could not parse custom endpoint: ' + ((e && e.message) || String(e)) };
           }
         }
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
@@ -405,7 +405,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         });
         return await startAgent(result.goal, sender);
       } catch (e) {
-        return { ok: false, error: e.message };
+        return { ok: false, error: (e && e.message) || String(e) };
       }
     }
     case 'execute_js_approval_request': {
@@ -505,7 +505,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           }, 60000);
         });
       } catch (e) {
-        return { approved: false, reason: e.message };
+        return { approved: false, reason: (e && e.message) || String(e) };
       }
     }
 

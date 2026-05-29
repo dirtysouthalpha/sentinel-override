@@ -274,7 +274,7 @@ export async function generateReport(executionData, CONFIG) {
     // (3.50.0) Build a better fallback that actually shows the collected data
     const fb = buildFallbackReport(executionData);
     // Prepend a note about the LLM failure
-    const fallbackReport = `> ⚠️ AI report formatting failed (${err.message}). Showing raw collected data.\n\n---\n\n${fb}`;
+    const fallbackReport = `> ⚠️ AI report formatting failed (${(err && err.message) || String(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
     return { summary: fb.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
@@ -313,7 +313,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
         requestHeaders = provider.buildHeaders(apiKey);
       } catch (err) {
         clearTimeout(timeout);
-        throw new Error('Failed to build report request: ' + err.message);
+        throw new Error('Failed to build report request: ' + ((err && err.message) || String(err)));
       }
 
       let response;
@@ -364,13 +364,14 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       return cleaned;
     } catch (err) {
       lastError = err;
-      const isNonRetryable = err.message === 'No active provider configured'
-        || err.message === 'API key not configured'
-        || err.message.startsWith('Failed to build report request')
-        || err.message === 'Report LLM returned invalid JSON';
+      const errMsg = (err && err.message) || '';
+      const isNonRetryable = errMsg === 'No active provider configured'
+        || errMsg === 'API key not configured'
+        || errMsg.startsWith('Failed to build report request')
+        || errMsg === 'Report LLM returned invalid JSON';
       if (isNonRetryable) break;
       if (attempt < MAX_ATTEMPTS) {
-        console.warn('[Sentinel/report] Attempt', attempt, 'failed:', err.message, 'retrying...');
+        console.warn('[Sentinel/report] Attempt', attempt, 'failed:', errMsg, 'retrying...');
         await new Promise(r => setTimeout(r, 1000));
       }
     }

@@ -601,7 +601,7 @@ async function ensureDebuggerAttached(tabId) {
       }).catch((e) => {
         console.error('[wasUserDetached] Unhandled rejection:', e);
       });
-    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', _e.message); }
+    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', _e && _e.message); }
   }
 }
 
@@ -929,14 +929,14 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
       await chrome.debugger.attach({ tabId }, '1.3');
       attachedDebuggees.add(tabId);
     }
-    try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[tab-manager] ensureObservabilityListeners failed:', e.message); }
+    try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[tab-manager] ensureObservabilityListeners failed:', e && e.message); }
     const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: CONFIG.screenshotQuality });
     base64Image = screenshotResult.data;
   } catch {
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
     attachedDebuggees.delete(tabId);
-    try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[tab-manager] Debugger detach failed in error path:', e.message); }
+    try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[tab-manager] Debugger detach failed in error path:', e && e.message); }
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {
