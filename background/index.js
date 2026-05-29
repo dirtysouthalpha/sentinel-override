@@ -43,7 +43,7 @@ import {
 } from './client-knowledge.js';
 import { handleMenuClick } from './context-menu.js';
 import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop } from './page-monitor.js';
-import { startRecording, stopRecording, isRecording, loadMacros, historyToMacro as _historyToMacro } from './macro-recorder.js';
+import { startRecording, stopRecording, isRecording, loadMacros } from './macro-recorder.js';
 import { generateHtmlReport, generateReplayReport } from './export-report.js';
 
 // ========== One-time migration ==========
