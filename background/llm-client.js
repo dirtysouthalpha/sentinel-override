@@ -635,6 +635,12 @@ UI-SPECIFIC RULES:
   },
 ];
 
+/**
+ * Match a platform spec from _PLATFORM_SPECS by URL and goal text, returning its prose guidance.
+ * @param {string} currentUrl - The current page URL to match against.
+ * @param {string} goal - The goal text to match against.
+ * @returns {string} Platform prose string, or empty string if no spec matches.
+ */
 function _getPlatformProseInternal(currentUrl, goal) {
   const url  = (currentUrl || '').toLowerCase();
   const text = (goal || '').toLowerCase();
@@ -648,6 +654,13 @@ function _getPlatformProseInternal(currentUrl, goal) {
 // pageTypes as a prose block for the agent's runtime system prompt. The LLM
 // gets "try these selectors first" hints which reduce trial-and-error
 // observe-and-flail loops on complex SPAs like SonicWall NSM 7.x.
+/**
+ * Format a platform profile's known selectors, wait strings, page types, and gotchas
+ * into a prose block for the agent's system prompt.
+ * @param {Object|null} profile - Platform profile object with knownSelectors, waitStrings, pageTypes, etc.
+ * @param {string} currentUrl - Current URL used to detect the active page type.
+ * @returns {string} Formatted prose block, or empty string if profile is null/empty.
+ */
 function _formatProfileSelectorsBlock(profile, currentUrl) {
   if (!profile) return '';
   const sel = profile.knownSelectors;
@@ -1233,6 +1246,14 @@ export function isSimpleStep(agentState, stepCount, history) {
 
 // Build the strategy-shift injection when the agent has failed consecutively.
 // Returns an empty string when below the failure threshold.
+/**
+ * Build a strategy-shift prompt injection when the agent has failed consecutively.
+ * Includes platform-specific recovery hints for M365, VirusTotal, SentinelOne, and network devices.
+ * @param {Object} agentState - Live agent state with consecutiveFailures and currentStrategies.
+ * @param {string} currentUrl - Current page URL for platform detection.
+ * @param {Object} CONFIG - Agent configuration with strategyShiftThreshold.
+ * @returns {string} Strategy-shift directive string, or empty string if below threshold.
+ */
 function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
   if (agentState.consecutiveFailures < CONFIG.strategyShiftThreshold) return '';
   const _u = (currentUrl || '').toLowerCase();
@@ -1270,6 +1291,13 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
 
 // Build the execution-plan status block injected before the prompt schema.
 // Returns empty string if no plan exists.
+/**
+ * Build an execution-plan status block showing done/current/pending steps.
+ * Instructs the LLM to set advance_plan:true when the current step is complete.
+ * @param {string[]|null} agentPlan - Array of plan step strings, or null.
+ * @param {number} currentPlanStep - Index of the currently active plan step.
+ * @returns {string} Rendered plan context block, or empty string if no plan.
+ */
 function _buildPlanCtx(agentPlan, currentPlanStep) {
   if (!agentPlan || !agentPlan.length) return '';
   const planLines = agentPlan.map((step, i) => {
@@ -1281,6 +1309,10 @@ function _buildPlanCtx(agentPlan, currentPlanStep) {
 
 // Build the multi-tab context block listing all managed tabs with snapshots.
 // Returns empty string when only one tab is managed.
+/**
+ * Build a multi-tab context block listing all managed tabs with their snapshots and tab rules.
+ * @returns {string} Tab context section with tab list and usage rules, or empty string if no tabs.
+ */
 function _buildTabCtx() {
   const allContexts = getAllTabContexts();
   const activeId = getActiveTabId();
@@ -1305,6 +1337,14 @@ function _buildTabCtx() {
 
 // Strip screenshot payloads from history entries beyond the most-recent step,
 // and trim the window to the configured size. Keeps token cost bounded.
+/**
+ * Sanitize conversation history: trim to window size, strip screenshots from older entries,
+ * and truncate long selectors and results to reduce token cost.
+ * @param {Array} history - Raw conversation history array.
+ * @param {boolean} isRunbook - Whether runbook mode is active (larger window).
+ * @param {Object} CONFIG - Agent configuration with historyWindow size.
+ * @returns {Array} Sanitized history array with bounded size and stripped images.
+ */
 function _sanitizeHistory(history, isRunbook, CONFIG) {
   const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
   const slicedHistory = history.slice(-historyWindowSize);
@@ -1590,6 +1630,22 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
 // ========== Main LLM Call ==========
 // trimmedElements: the capped/cleaned element list built in the main loop
 // totalElementCount: the raw count before trimming (for the prompt header)
+/**
+ * Main LLM call: builds the full system prompt, sends the request to the active provider,
+ * parses the response, and handles vision fallback on 400 errors. Increments apiCallCount
+ * and applies rate limiting before each call. Routes simple steps to the fast model when configured.
+ * @param {Array} trimmedElements - Capped list of interactive DOM elements.
+ * @param {number} totalElementCount - Raw element count before trimming.
+ * @param {string} pageContent - Extracted page text content.
+ * @param {string|null} base64Image - Screenshot as base64, or null.
+ * @param {string} goal - Current goal text.
+ * @param {Array} history - Conversation history messages.
+ * @param {number} stepCount - Current step number in the agent run.
+ * @param {string} currentUrl - Active tab URL.
+ * @param {Object} CONFIG - Agent configuration (timeouts, retries, model, etc.).
+ * @param {Object} agentState - Mutable agent state (apiCallCount, plan, memory, etc.).
+ * @returns {Promise<Object>} Parsed LLM response object.
+ */
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   _rateLimiter.check();
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
@@ -1955,6 +2011,12 @@ export function extractFirstJsonObject(str) {
 // literal control characters inside string values WITHOUT corrupting the
 // structural JSON. Operates only inside string contexts (between unescaped
 // double-quotes) so JSON syntax outside strings is left untouched.
+/**
+ * Sanitize LLM-emitted JSON by fixing invalid escape sequences and replacing
+ * literal control characters inside string values with valid JSON escapes.
+ * @param {string} jsonStr - Raw JSON string from the LLM.
+ * @returns {string} Sanitized JSON string safe for JSON.parse.
+ */
 function sanitizeLlmJson(jsonStr) {
   if (typeof jsonStr !== 'string') return jsonStr;
   const valid = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
@@ -1999,6 +2061,12 @@ function sanitizeLlmJson(jsonStr) {
 // (3.8.4) Last-ditch regex extraction for finish/note actions when JSON.parse
 // fails completely. Pulls the summary or text content via a permissive regex
 // that tolerates whatever malformed escapes the LLM emitted.
+/**
+ * Last-ditch regex extraction for finish/note actions when JSON.parse fails.
+ * Detects "summary" or "text" keys and extracts their values, tolerating malformed escapes.
+ * @param {string} content - Raw LLM response text.
+ * @returns {Object|null} Parsed action object {type: 'finish'|'note', summary|text}, or null if no match.
+ */
 function regexSalvageFinishOrNote(content) {
   if (typeof content !== 'string') return null;
   // Detect finish vs note by which marker appears first.
@@ -2161,4 +2229,9 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
 }
 
 // ========== Utilities ==========
+/**
+ * Promise-based sleep utility.
+ * @param {number} ms - Duration to sleep in milliseconds.
+ * @returns {Promise<void>} Resolves after the specified delay.
+ */
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
