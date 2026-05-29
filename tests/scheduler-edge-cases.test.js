@@ -76,6 +76,12 @@ import {
   createSchedule,
   executeScheduledTask,
   listSchedules,
+  getNextRunTime,
+  deleteSchedule,
+  toggleSchedule,
+  getScheduleResults,
+  getRecentResults,
+  clearScheduleResults,
 } from '../background/scheduler.js';
 
 beforeEach(() => {
@@ -265,5 +271,103 @@ describe('edge case — long error messages', () => {
 describe('edge case — disabled schedule with agent busy', () => {
   test.skip('does not re-register alarm for disabled schedule when agent busy', async () => {
     // NOTE: Requires agentRunning to be true, which doesn't work with unstable_mockModule
+  });
+});
+
+describe('getNextRunTime — edge cases', () => {
+  test('returns null for null schedule', () => {
+    expect(getNextRunTime(null)).toBeNull();
+  });
+
+  test('returns null for undefined schedule', () => {
+    expect(getNextRunTime(undefined)).toBeNull();
+  });
+
+  test('returns nextRunAt for once type', () => {
+    const ts = Date.now() + 3600000;
+    expect(getNextRunTime({ type: 'once', nextRunAt: ts })).toBe(ts);
+  });
+
+  test('returns nextRunAt for unknown type', () => {
+    const ts = Date.now() + 7200000;
+    expect(getNextRunTime({ type: 'custom', nextRunAt: ts })).toBe(ts);
+  });
+
+  test('returns a number for recurring schedule with recurrence', () => {
+    const result = getNextRunTime({
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: '09:00' }
+    });
+    expect(typeof result).toBe('number');
+    expect(result).toBeGreaterThan(Date.now() - 86400000);
+  });
+});
+
+describe('listSchedules — edge cases', () => {
+  test('returns empty object when no schedules exist', async () => {
+    const result = await listSchedules();
+    expect(typeof result === 'object' || Array.isArray(result)).toBe(true);
+  });
+
+  test('returns created schedule after creation', async () => {
+    const schedule = await createSchedule({
+      name: 'Listed Schedule',
+      goal: 'List me',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    const schedules = await listSchedules();
+    const found = schedules[schedule.id] || Object.values(schedules).find(s => s.id === schedule.id);
+    expect(found).toBeTruthy();
+  });
+});
+
+describe('deleteSchedule — edge cases', () => {
+  test('rejects when deleting non-existent schedule', async () => {
+    await expect(deleteSchedule('nonexistent-id-xyz')).rejects.toThrow();
+  });
+
+  test('can delete a created schedule', async () => {
+    const schedule = await createSchedule({
+      name: 'Delete Me',
+      goal: 'Delete this',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    await expect(deleteSchedule(schedule.id)).resolves.toBeUndefined();
+  });
+});
+
+describe('toggleSchedule — edge cases', () => {
+  test('rejects for non-existent schedule', async () => {
+    await expect(toggleSchedule('nonexistent', false)).rejects.toThrow();
+  });
+
+  test('can toggle an existing schedule', async () => {
+    const schedule = await createSchedule({
+      name: 'Toggle Me',
+      goal: 'Toggle this',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    await expect(toggleSchedule(schedule.id, false)).resolves.not.toThrow();
+    await expect(toggleSchedule(schedule.id, true)).resolves.not.toThrow();
+  });
+});
+
+describe('schedule results — edge cases', () => {
+  test('getScheduleResults returns empty array for unknown schedule', async () => {
+    const results = await getScheduleResults('nonexistent');
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBe(0);
+  });
+
+  test('getRecentResults returns an array', async () => {
+    const results = await getRecentResults(5);
+    expect(Array.isArray(results)).toBe(true);
+  });
+
+  test('clearScheduleResults does not throw for non-existent schedule', async () => {
+    await expect(clearScheduleResults('nonexistent')).resolves.toBeUndefined();
   });
 });

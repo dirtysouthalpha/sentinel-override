@@ -178,74 +178,73 @@ beforeEach(() => {
 });
 
 // ──────────────────────────────────────────────────────────────────────
+const {
+  injectContext, pushUndoStack, setAgentSpeed, isAgentAttachedTab, getAttachedTabIds,
+} = agentEngine;
+
 describe('Agent Engine Recovery Paths', () => {
-  // NOTE: Full recovery path testing requires running the agent loop,
-  // which is an integration test concern. These tests verify that
-  // the recovery mechanisms are in place and log appropriately.
-
-  test('resetAgentState clears all recovery-related state', () => {
-    // Reset should clear all state, including recovery counters
-    resetAgentState();
-    // Verify by checking that state is clean (no direct access to internal vars,
-    // but we can verify the function doesn't throw)
+  test('resetAgentState does not throw', () => {
     expect(() => resetAgentState()).not.toThrow();
   });
 
-  test('injectContentScript is called with retry logic', async () => {
-    // This verifies the recovery path for content script injection failures
-    const { injectContentScript } = await import('../background/tab-manager.js');
-
-    // Mock injectContentScript to fail twice then succeed
-    injectContentScript
-      .mockRejectedValueOnce(new Error('Injection failed'))
-      .mockRejectedValueOnce(new Error('Injection failed'))
-      .mockResolvedValueOnce(true);
-
-    // The agent loop should retry injection up to 3 times before proceeding
-    // with empty observation
-    const callCount = injectContentScript.mock.calls.length;
-    expect(callCount).toBe(0); // Initially not called
+  test('resetAgentState can be called multiple times', () => {
+    expect(() => {
+      resetAgentState();
+      resetAgentState();
+      resetAgentState();
+    }).not.toThrow();
   });
 
-  test('sendMessageWithRetry handles observe failures gracefully', async () => {
-    // This verifies the recovery path for observe failures
-    const { sendMessageWithRetry } = await import('../background/tab-manager.js');
-
-    // Mock sendMessageWithRetry to fail (simulating observe failure)
-    sendMessageWithRetry.mockRejectedValueOnce(new Error('Tab disconnected'));
-
-    // The agent should catch this and proceed with empty observation
-    // (verified by integration tests)
-    expect(sendMessageWithRetry).toBeDefined();
+  test('injectContext does not throw for valid note', () => {
+    expect(() => injectContext('Test note')).not.toThrow();
   });
 
-  test('navigation limit enforcement is in place', async () => {
-    // This verifies that consecutive navigates are tracked
-    // The actual enforcement happens in the agent loop (integration test)
-    const { getTabInfo } = await import('../background/tab-manager.js');
-
-    // Mock tab info to return a valid URL
-    getTabInfo.mockResolvedValue({
-      url: 'https://example.com',
-      title: 'Example'
-    });
-
-    const tabInfo = await getTabInfo(1);
-    expect(tabInfo.url).toBe('https://example.com');
+  test('injectContext does not throw for empty string', () => {
+    expect(() => injectContext('')).not.toThrow();
   });
 
-  test('stuck-loop detection logic is present', () => {
-    // This verifies that the stuck-loop detection mechanism exists
-    // The actual detection happens during agent execution (integration test)
+  test('injectContext does not throw for null', () => {
+    expect(() => injectContext(null)).not.toThrow();
+  });
+
+  test('setAgentSpeed accepts valid speed modes', () => {
+    expect(() => setAgentSpeed('turbo')).not.toThrow();
+    expect(() => setAgentSpeed('fast')).not.toThrow();
+    expect(() => setAgentSpeed('normal')).not.toThrow();
+    expect(() => setAgentSpeed('stealth')).not.toThrow();
+  });
+
+  test('setAgentSpeed with unknown mode does not crash', () => {
+    expect(() => setAgentSpeed('invalid-speed')).not.toThrow();
+  });
+
+  test('pushUndoStack does not throw for valid entry', () => {
+    expect(() => pushUndoStack({ type: 'click', tabId: 1, url: 'https://example.com' })).not.toThrow();
+  });
+
+  test('pushUndoStack does not throw for null entry', () => {
+    expect(() => pushUndoStack(null)).not.toThrow();
+  });
+
+  test('isAgentAttachedTab returns false for unknown tab', () => {
+    expect(isAgentAttachedTab(99999)).toBe(false);
+  });
+
+  test('isAgentAttachedTab returns false for null', () => {
+    expect(isAgentAttachedTab(null)).toBe(false);
+  });
+
+  test('getAttachedTabIds returns an array', () => {
+    const ids = getAttachedTabIds();
+    expect(Array.isArray(ids)).toBe(true);
+  });
+
+  test('all recovery functions are non-blocking', () => {
     expect(() => resetAgentState()).not.toThrow();
-  });
-
-  // Integration-level verification: these recovery mechanisms work together
-  test('all recovery mechanisms are non-blocking', () => {
-    // Recovery mechanisms should never crash the agent loop
-    // They should log warnings and allow the loop to continue
-
-    // Verify that recovery functions don't throw when called
-    expect(() => resetAgentState()).not.toThrow();
+    expect(() => injectContext('test')).not.toThrow();
+    expect(() => setAgentSpeed('normal')).not.toThrow();
+    expect(() => pushUndoStack({ type: 'navigate' })).not.toThrow();
+    expect(() => isAgentAttachedTab(0)).not.toThrow();
+    expect(() => getAttachedTabIds()).not.toThrow();
   });
 });
