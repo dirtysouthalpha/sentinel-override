@@ -3618,7 +3618,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_) { /* hash probe failed — assume cache miss */ }
       }
 
-      const _skipObserve = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation && (_currentDomHash === 0 || _currentDomHash === _lastObservedDomHash);
+      const _skipObserve = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
       if (_skipObserve) {
         observation = _cachedObservation;
         pageContent = _cachedPageContent;

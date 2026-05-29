@@ -33,7 +33,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (schedulerBtn) {
     schedulerBtn.addEventListener('click', () => {
       const panel = document.getElementById('schedules-panel');
-      if (panel && panel.style.display === 'none') {
+      if (panel && (panel.style.display === 'none' || !panel.style.display)) {
         window.showSchedulesPanel();
         schedulerBtn.classList.add('active');
         if (templatesBtn) templatesBtn.classList.remove('active');
