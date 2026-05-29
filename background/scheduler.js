@@ -494,6 +494,11 @@ export async function executeScheduledTask(alarmName) {
     return;
   }
 
+  if (!goal) {
+    console.error(`Schedule "${schedule.name}" resolved to empty goal — skipping`);
+    await _handleTaskFailure(schedule, scheduleId, schedules, { startedAt, error: 'Resolved goal was empty' });
+    return;
+  }
   tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });
 
   let tabId;

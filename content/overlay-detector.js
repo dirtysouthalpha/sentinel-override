@@ -242,7 +242,9 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       const centerY = rect.top + rect.height / 2;
 
       // Check if target is even in the viewport
-      if (centerX < 0 || centerY < 0 || centerX > doc.defaultView.innerWidth || centerY > doc.defaultView.innerHeight) {
+      const view = doc.defaultView;
+      if (!view) return null;
+      if (centerX < 0 || centerY < 0 || centerX > view.innerWidth || centerY > view.innerHeight) {
         return null;
       }
 

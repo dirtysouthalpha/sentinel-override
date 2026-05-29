@@ -541,7 +541,7 @@
   }
 
   function setResponseLoading() {
-    var area = shadow.getElementById('qa-response-area');
+    var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-loading-indicator">' +
       '<div class="qa-dots"><span></span><span></span><span></span></div>' +
@@ -549,20 +549,20 @@
   }
 
   function setResponse(text) {
-    var area = shadow.getElementById('qa-response-area');
+    var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-response">' + renderMarkdown(text) + '</div>';
   }
 
   function setResponseHTML(html) {
-    var area = shadow.getElementById('qa-response-area');
+    var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     area.innerHTML = '<div class="qa-response">' + html + '</div>';
   }
 
   function copyResponse() {
     if (!shadow) return;
-    var area = shadow.getElementById('qa-response-area');
+    var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     var responseEl = area.querySelector('.qa-response');
     if (!responseEl) return;
@@ -591,7 +591,7 @@
 
   function sendToAgent() {
     if (!shadow) return;
-    var area = shadow.getElementById('qa-response-area');
+    var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
     var responseEl = area.querySelector('.qa-response');
     if (!responseEl) return;
