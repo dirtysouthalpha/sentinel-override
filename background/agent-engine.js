@@ -475,6 +475,10 @@ export function resetAgentState() {
   _historyDirty = false;
   undoStack.length = 0;
   _stepScreenshots.clear(); // (9.3) reset replay screenshot ring buffer
+  // Reset CDP observe-path optimization flags so a new run always gets a fresh
+  // page ready check and overlay nuke on its first observation.
+  _pageWasReady = false;
+  _lastNukeClean = false;
   resetAllContexts();
 }
 
