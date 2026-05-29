@@ -3906,7 +3906,7 @@ async function runAgentLoop(goal, workingTabId) {
             continue;
           }
         }
-      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', _captchaErr.message); }
+      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', _captchaErr && _captchaErr.message); }
 
       // Rate limiting
       await enforceRateLimit();
@@ -5975,7 +5975,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = false;
             sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
           }
-        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', _selErr.message); }
+        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', _selErr && _selErr.message); }
       }
 
       // (v3.66) CDP fallback for type: when content script can't inject,
@@ -6025,7 +6025,7 @@ async function runAgentLoop(goal, workingTabId) {
               sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
             }
           }
-        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', _typeErr.message); }
+        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', _typeErr && _typeErr.message); }
       }
 
       //       // ═══════════════════════════════════════════════════════════════

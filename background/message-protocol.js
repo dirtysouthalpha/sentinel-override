@@ -78,7 +78,7 @@ export function wrapMessageHandler(asyncHandler) {
   return (request, sender, sendResponse) => {
     asyncHandler(request, sender)
       .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: err.message }));
+      .catch(err => sendResponse({ ok: false, error: (err && err.message) || String(err) }));
     return true; // keep message channel open
   };
 }
