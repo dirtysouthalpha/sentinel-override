@@ -3178,13 +3178,13 @@ async function _generateInitialPlan(goal, workingTabId) {
     relevantPatterns: patterns
   });
   if (plan) {
-    sendSilentUpdate(`📋 Plan ready (${plan.length} steps): ${plan[0]}`);
+    sendSilentUpdate(`📋 Plan ready (${plan.length} steps): ${plan[0] || ''}`);
     return plan;
   }
   // Fallback: heuristic plan from goal analysis
   plan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
   if (plan) {
-    sendSilentUpdate(`📋 Basic plan (${plan.length} steps): ${plan[0]}`);
+    sendSilentUpdate(`📋 Basic plan (${plan.length} steps): ${plan[0] || ''}`);
   } else {
     sendSilentUpdate('Running in direct mode');
   }

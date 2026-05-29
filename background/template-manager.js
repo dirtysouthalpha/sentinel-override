@@ -231,7 +231,7 @@ export async function resolveTemplateGoal(templateId, paramValues) {
 
   const resolvedGoal = template.goal.replace(PARAM_REGEX, (_, key) => {
     // If value provided and non-empty, use it
-    if (values[key] && values[key].trim() !== '') {
+    if (values[key] && typeof values[key] === 'string' && values[key].trim() !== '') {
       return values[key];
     }
     // Check for default value in template params
