@@ -5784,7 +5784,7 @@ async function runAgentLoop(goal, workingTabId) {
                 let cx = bbox.x, cy = bbox.y;
                 try {
                   const bbox2 = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
-                  if (bbox2 && typeof bbox2.x === 'number') { cx = bbox2.x; cy = bbox2.y; }
+                  if (bbox2 && typeof bbox2.x === 'number' && typeof bbox2.y === 'number') { cx = bbox2.x; cy = bbox2.y; }
                 } catch (_) { /* keep original */ }
                 const targetLabel = command.ref || command.selector || 'element';
                 const r = await cdpDispatchClick(tab, cx, cy, {
