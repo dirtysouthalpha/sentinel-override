@@ -68,6 +68,11 @@ describe('detectProviderFromEndpoint', () => {
     expect(detectProviderFromEndpoint('http://localhost:11434/v1/chat/completions')).toBe('openai');
   });
 
+  test('detects zai for Z.AI endpoints', () => {
+    expect(detectProviderFromEndpoint('https://api.z.ai/api/coding/paas/v4/chat/completions')).toBe('zai');
+    expect(detectProviderFromEndpoint('https://z.ai/api/v1/chat/completions')).toBe('zai');
+  });
+
   test('detects openai for null', () => {
     expect(detectProviderFromEndpoint(null)).toBe('openai');
   });

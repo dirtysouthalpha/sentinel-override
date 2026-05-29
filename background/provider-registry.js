@@ -622,7 +622,10 @@ export function resolveProvider(endpoint) {
  * @returns {string} Provider ID
  */
 export function detectProviderFromEndpoint(endpoint) {
-  return (endpoint && endpoint.includes('api.anthropic.com')) ? 'anthropic' : 'openai';
+  if (!endpoint) return 'openai';
+  if (endpoint.includes('api.anthropic.com')) return 'anthropic';
+  if (endpoint.includes('z.ai')) return 'zai';
+  return 'openai';
 }
 
 // ========== Active Provider Configuration ==========

@@ -1433,7 +1433,7 @@ function setupVoiceInput() {
       goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
     }
     if (msg.action === 'voice_error') {
-      showToast('Voice error: ' + msg.error, 'error');
+      showToast('Voice error: ' + (msg.error || 'Unknown error'), 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');

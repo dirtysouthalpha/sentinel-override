@@ -1900,7 +1900,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // One last attempt: try the raw tool_calls directly
     if (hasToolCalls) {
       const tc = choice.message.tool_calls[0];
-      if (tc.function && tc.function.name) {
+      if (tc && tc.function && tc.function.name) {
         try {
           const input = JSON.parse(tc.function.arguments || '{}');
           return { type: tc.function.name, ...input };

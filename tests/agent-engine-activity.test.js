@@ -580,8 +580,8 @@ describe('agent-engine checkpoint functionality', () => {
 
     test('maps tabContextUrls from getAllTabContexts', () => {
       mockGetAllTabContexts.mockReturnValueOnce([
-        [1, { url: 'https://example.com', label: 'Example' }],
-        [2, { url: 'https://other.com', label: 'Other' }],
+        { tabId: 1, url: 'https://example.com', label: 'Example' },
+        { tabId: 2, url: 'https://other.com', label: 'Other' },
       ]);
 
       const checkpoint = buildCheckpoint(5);
@@ -593,8 +593,8 @@ describe('agent-engine checkpoint functionality', () => {
 
     test('handles empty url in tabContext', () => {
       mockGetAllTabContexts.mockReturnValueOnce([
-        [1, { url: null, label: 'No URL' }],
-        [2, { url: '', label: 'Empty URL' }],
+        { tabId: 1, url: null, label: 'No URL' },
+        { tabId: 2, url: '', label: 'Empty URL' },
       ]);
 
       const checkpoint = buildCheckpoint(5);

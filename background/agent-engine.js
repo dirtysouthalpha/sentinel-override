@@ -185,7 +185,7 @@ function buildCheckpoint(stepCount) {
     currentPlanStep,
     // Tab context URLs for re-registration after SW restart
     tabContextUrls: Object.fromEntries(
-      getAllTabContexts().map(([id, ctx]) => [id, ctx.url || ''])
+      getAllTabContexts().map(tc => [tc.tabId, tc.url || ''])
     ),
   };
 }
