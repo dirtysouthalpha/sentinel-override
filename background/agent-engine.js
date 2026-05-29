@@ -3281,8 +3281,12 @@ async function runAgentLoop(goal, workingTabId) {
       // they don't choke on the first portal.
       let dynamicBaseline = CONFIG.maxSteps;
       try {
-        if (typeof goal === 'string' && /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b.*\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/i.test(goal)) {
-          dynamicBaseline = CONFIG.maxSteps + 50;
+        // Use global match to count distinct platform keywords safely (avoids ReDoS from .*  pattern)
+        if (typeof goal === 'string') {
+          const _multiPortalMatches = goal.match(/\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/gi);
+          if (_multiPortalMatches && _multiPortalMatches.length >= 2) {
+            dynamicBaseline = CONFIG.maxSteps + 50;
+          }
         }
       } catch (_) {}
       const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
@@ -4279,23 +4283,30 @@ async function runAgentLoop(goal, workingTabId) {
         ];
 
         try {
-          const _vResponse = await fetch(
-            (CONFIG.apiEndpoint || 'https://api.zai.chat/v1/chat/completions'),
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + (CONFIG.apiKey || '')
-              },
-              body: JSON.stringify({
-                model: CONFIG.model || 'glm-5-turbo',
-                messages: _visionMessages,
-                max_tokens: 600,
-                temperature: 0.1
-              }),
-              signal: (() => { const _c = new AbortController(); setTimeout(() => _c.abort(), 45000); return _c.signal; })()
-            }
-          );
+          const _vCtrl = new AbortController();
+          const _vTimeoutId = setTimeout(() => _vCtrl.abort(), 45000);
+          let _vResponse;
+          try {
+            _vResponse = await fetch(
+              (CONFIG.apiEndpoint || 'https://api.zai.chat/v1/chat/completions'),
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + (CONFIG.apiKey || '')
+                },
+                body: JSON.stringify({
+                  model: CONFIG.model || 'glm-5-turbo',
+                  messages: _visionMessages,
+                  max_tokens: 600,
+                  temperature: 0.1
+                }),
+                signal: _vCtrl.signal
+              }
+            );
+          } finally {
+            clearTimeout(_vTimeoutId);
+          }
           if (_vResponse.ok) {
             const _vData = await _vResponse.json();
             const _vRaw = _vData.choices && _vData.choices[0] && _vData.choices[0].message

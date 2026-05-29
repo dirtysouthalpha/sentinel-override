@@ -1821,8 +1821,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     try {
       const responseText = provider.parseResponse(data);
       if (responseText) return parseLLMResponse(responseText);
-    } catch (_) {
-      // parseResponse failed (e.g. null content with tool_calls we already tried)
+    } catch (e) {
+      console.warn('[Sentinel/llm] parseResponse fallback failed:', e && e.message);
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
     // One last attempt: try the raw tool_calls directly
@@ -1832,7 +1832,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         try {
           const input = JSON.parse(tc.function.arguments || '{}');
           return { type: tc.function.name, ...input };
-        } catch (_) { /* give up */ }
+        } catch (e) { console.warn('[Sentinel/llm] tool_calls JSON parse failed:', e && e.message); }
       }
     }
     // v3.61: z.ai sometimes returns finish_reason="tool_calls" with malformed/empty tool_calls
@@ -2113,7 +2113,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     return scored.map(s => s.pattern);
-  } catch (_) { return []; }
+  } catch (e) { console.error('[Sentinel/llm] getRelevantPatterns failed:', e && e.message); return []; }
 }
 
 // ========== Simple LLM Call (Quick Assist) ==========
