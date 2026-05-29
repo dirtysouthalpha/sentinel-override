@@ -490,13 +490,13 @@ export async function executeScheduledTask(alarmName) {
     goal = await _resolveGoalForSchedule(schedule);
   } catch (err) {
     console.error(`Failed to resolve goal for schedule ${schedule.name}:`, err);
-    await _handleTaskFailure(schedule, scheduleId, schedules, { startedAt, error: `Goal resolution failed: ${err.message}` });
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${err.message}` });
     return;
   }
 
   if (!goal) {
     console.error(`Schedule "${schedule.name}" resolved to empty goal — skipping`);
-    await _handleTaskFailure(schedule, scheduleId, schedules, { startedAt, error: 'Resolved goal was empty' });
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: 'Resolved goal was empty' });
     return;
   }
   tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });

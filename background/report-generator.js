@@ -249,7 +249,7 @@ export async function generateReport(executionData, CONFIG) {
     result: typeof h.result === 'string' ? h.result.substring(0, 150) : String(h.result)
   }));
   const condensedHistory = _allHistory.length > 14
-    ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 4} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]
+    ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 14} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]
     : _allHistory;
   const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
   const planContext = agentPlan && agentPlan.length > 0
@@ -301,6 +301,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       if (!apiKey) throw new Error('API key not configured');
 
       const provider = resolveProvider(endpoint);
+      if (!provider) throw new Error('Unsupported API endpoint for report generation: ' + endpoint);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), REPORT_TIMEOUT);
 
