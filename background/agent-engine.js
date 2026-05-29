@@ -268,7 +268,7 @@ export async function restoreFromCheckpoint() {
       memoryKeys: Object.keys(agentMemory)
     };
   } catch (e) {
-    return { restored: false, error: e.message };
+    return { restored: false, error: (e && e.message) || String(e) };
   }
 }
 

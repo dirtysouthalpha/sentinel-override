@@ -736,7 +736,7 @@ if (window.__sentinelInitialized) {
 
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: e.message };
+          return { ok: false, error: (e && e.message) || String(e) };
         }
       }
 
@@ -758,7 +758,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: e.message };
+          return { ok: false, error: (e && e.message) || String(e) };
         }
       }
 
@@ -775,7 +775,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: e.message };
+          return { ok: false, error: (e && e.message) || String(e) };
         }
       }
 

@@ -490,7 +490,7 @@ export async function executeScheduledTask(alarmName) {
     goal = await _resolveGoalForSchedule(schedule);
   } catch (err) {
     console.error(`Failed to resolve goal for schedule ${schedule.name}:`, err);
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${err.message}` });
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${(err && err.message) || String(err)}` });
     return;
   }
 
@@ -506,7 +506,7 @@ export async function executeScheduledTask(alarmName) {
     tabId = await _getOrCreateTab();
   } catch (err) {
     console.error('Failed to get/create tab:', err);
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${err.message}` });
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${(err && err.message) || String(err)}` });
     return;
   }
 
@@ -523,7 +523,7 @@ export async function executeScheduledTask(alarmName) {
   } catch (err) {
     cancelCompletion(); // Clean up the timer + listener so they don't leak
     console.error('Failed to start agent:', err);
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${err.message}` });
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${(err && err.message) || String(err)}` });
     return;
   }
 

@@ -69,7 +69,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
           resolve(`Timeout waiting for condition (${timeout}ms)`);
         }, timeout);
       } catch (error) {
-        resolve(`Error during condition check: ${error.message}`);
+        resolve(`Error during condition check: ${(error && error.message) || String(error)}`);
       }
     });
   };

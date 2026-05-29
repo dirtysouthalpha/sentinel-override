@@ -188,7 +188,7 @@ export async function executeInFrame(tabId, frameId, command) {
 
     return { ok: false, error: 'No result returned from frame command execution' };
   } catch (e) {
-    return { ok: false, error: 'Frame execution failed: ' + e.message };
+    return { ok: false, error: 'Frame execution failed: ' + ((e && e.message) || String(e)) };
   }
 }
 
@@ -373,7 +373,7 @@ async function runCommandInFrame(command) {
         return { ok: false, error: 'Unknown command type in frame: ' + command.type };
     }
   } catch (e) {
-    return { ok: false, error: 'Frame command error: ' + e.message };
+    return { ok: false, error: 'Frame command error: ' + ((e && e.message) || String(e)) };
   }
 }
 
