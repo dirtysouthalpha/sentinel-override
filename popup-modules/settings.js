@@ -498,7 +498,7 @@ if (ticketModeToggle) {
 
 if (ticketFormatSelect) {
   ticketFormatSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value });
+    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', e); });
   });
 }
 
@@ -910,10 +910,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     return;
   }
 
-  const btn = document.getElementById('testConnectionBtn');
-  const prevText = btn.textContent;
-  btn.textContent = 'Testing...';
-  btn.disabled = true;
+  const prevText = testConnectionBtn.textContent;
+  testConnectionBtn.textContent = 'Testing...';
+  testConnectionBtn.disabled = true;
 
   try {
     // Determine provider format from endpoint (popup context cannot import background modules)
@@ -937,8 +936,8 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   } catch (err) {
     showToast('Connection error: ' + (err && err.message ? err.message : String(err)), 'error');
   } finally {
-    btn.textContent = prevText;
-    btn.disabled = false;
+    testConnectionBtn.textContent = prevText;
+    testConnectionBtn.disabled = false;
   }
 });
 
