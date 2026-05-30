@@ -17,7 +17,6 @@ export const slowLlmCall = {
       return false;
     }
     if (typeof ctx.lastAiCallMs !== 'number') {
-      console.error('Invalid lastAiCallMs in slowLlmCall matches');
       return false;
     }
     return ctx.lastAiCallMs >= 25000;
@@ -29,7 +28,7 @@ export const slowLlmCall = {
 
   promptInjection(ctx) {
     try {
-      const sec = ctx.lastAiCallMs ? Math.round(ctx.lastAiCallMs / 1000) : '?';
+      const sec = typeof ctx.lastAiCallMs === 'number' ? Math.round(ctx.lastAiCallMs / 1000) : '?';
       return `Heads up: your last decision took ${sec} seconds. That's typically caused by prompt bloat. To keep the run moving:
 
 - Prefer **focused extract / extract_list** (with a specific selector + key) over broad read_page on large pages.

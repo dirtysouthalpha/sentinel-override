@@ -81,7 +81,7 @@ function isValidUrl(url) {
  */
 // eslint-disable-next-line no-unused-vars
 function showToast(message, type = 'success') {
-  if (!message) return;
+  if (!message || !document.body) return;
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.textContent = message;

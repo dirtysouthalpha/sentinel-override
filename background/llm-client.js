@@ -1239,7 +1239,6 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
 export function isSimpleStep(agentState, stepCount, history) {
   if (agentState.consecutiveFailures > 0) return false;
   if (agentState.quickMode) return false; // quick mode already uses fewer tokens
-  const _goal = (agentState.goal || '').toLowerCase();
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|runbook|investigation/i.test(agentState.goal || '');
   if (isRunbook) return false;
   if (stepCount > 6) return false;

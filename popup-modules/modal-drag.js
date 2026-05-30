@@ -52,9 +52,10 @@
         const rect = modalContent.getBoundingClientRect();
         const winW = window.innerWidth;
         const winH = window.innerHeight;
-        // Re-derive the natural (un-translated) center to compute bounds
-        const naturalLeft = rect.left - initialPos.tx;
-        const naturalTop = rect.top - initialPos.ty;
+        // Re-derive the natural (un-translated) position using last applied translation
+        const lastApplied = POSITIONS.get(modalContent) || { tx: 0, ty: 0 };
+        const naturalLeft = rect.left - lastApplied.tx;
+        const naturalTop = rect.top - lastApplied.ty;
         const minVisible = 80;
         const minTx = -(naturalLeft + rect.width - minVisible);
         const maxTx = winW - naturalLeft - minVisible;

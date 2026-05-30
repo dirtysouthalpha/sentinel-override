@@ -64,7 +64,8 @@ export async function openTab(url, label) {
   let tab;
   try {
     tab = await chrome.tabs.create({ url, active: false }); // Don't steal focus
-  } catch {
+  } catch (e) {
+    console.error('[Sentinel/tab-context] Failed to open tab for', url, ':', e && e.message);
     return null;
   }
   const ctx = {
@@ -226,7 +227,7 @@ export function findTabByLabel(label) {
   if (!label) return null;
   const lowerLabel = label.toLowerCase();
   for (const ctx of tabContexts.values()) {
-    if (ctx.label.toLowerCase().includes(lowerLabel)) {
+    if (String(ctx.label || '').toLowerCase().includes(lowerLabel)) {
       return ctx.tabId;
     }
   }

@@ -34,10 +34,13 @@ export async function appendAuditEntry(runId, entry) {
     const key = _storageKey(runId);
     let log = _cache.get(runId);
     if (!log) {
-      // Cold start: load from storage once, then keep in cache
-      const stored = await chrome.storage.local.get(key).catch(() => ({}));
-      log = Array.isArray(stored[key]) ? stored[key] : [];
+      // Reserve the cache slot synchronously before awaiting, so concurrent
+      // callers all push into the same array reference instead of stampeding.
+      log = [];
       _cache.set(runId, log);
+      const stored = await chrome.storage.local.get(key).catch(() => ({}));
+      const persisted = Array.isArray(stored[key]) ? stored[key] : [];
+      persisted.forEach(e => log.push(e));
     }
     log.push({
       ts:      entry.ts      || Date.now(),

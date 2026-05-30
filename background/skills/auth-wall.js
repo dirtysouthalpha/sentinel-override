@@ -14,12 +14,11 @@ export const authWall = {
   matches(ctx) {
     if (!ctx) return false;
     const url = String(ctx.currentUrl || '');
-    const text = String(ctx.pageText || '').toLowerCase();
+    const pageText = String(ctx.pageText || '');
     // Url-based detection: known auth/SSO endpoints
     if (_LOGIN_URL_RE.test(url)) return true;
     // Text-based detection: login/MFA language on a short page (< 3000 chars suggests a gate)
-    const textLen = text.length;
-    if (_LOGIN_TEXT_RE.test(ctx.pageText || '') && textLen < 3000) return true;
+    if (_LOGIN_TEXT_RE.test(pageText) && pageText.length < 3000) return true;
     return false;
   },
 
