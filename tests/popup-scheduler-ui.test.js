@@ -359,7 +359,14 @@ describe('scheduler-ui.js openCreateScheduleModalForTemplate', () => {
     result = runSchedulerUI(sandbox);
   });
 
-  test('pre-selects template in dropdown', () => {
+  test('pre-selects template in dropdown after async template list loads', () => {
+    // Mock sendMessage to synchronously invoke the callback with a template list
+    // that includes the target template — simulates populateTemplateDropdown completing.
+    sandbox.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (msg.action === 'template_list' && cb) {
+        cb({ ok: true, data: [{ id: 't1', name: 'My Template' }] });
+      }
+    });
     result.globals.window.openCreateScheduleModalForTemplate('t1', 'My Template');
     expect(sandbox.elements['sch-template-id'].value).toBe('t1');
   });

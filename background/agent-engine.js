@@ -3197,7 +3197,7 @@ async function runAgentLoop(goal, workingTabId) {
   // Observation skip cache — reused when previous step was non-mutating and
   // the URL/SPA-route hasn't changed. DOM content hash catches SPA changes
   // without URL changes.
-  let _cachedObservation = null;
+  _cachedObservation = null;
   let _cachedPageContent = null;
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
@@ -3536,10 +3536,11 @@ async function runAgentLoop(goal, workingTabId) {
             const stuckAction = lastActionTypes[0];
             console.warn('[Sentinel/stuck] Detected stuck loop: ' + stuckAction + ' failed ' + lastActionTypes.length + ' times');
             // Inject a forced recovery note into history
-            history.push({
+            historyPush({
               role: 'user',
               content: `[SYSTEM RECOVERY] The action "${stuckAction}" has failed ${lastActionTypes.length} times in a row. You are stuck in a loop. Try a COMPLETELY DIFFERENT approach. If close_tab isn't working, try navigate to the main page instead. If you can't close a tab, just navigate away from it. Do NOT repeat "${stuckAction}" again.`
             });
+            try { await persistHistory(); } catch (_) {}
           }
         }
       } catch (_e) { /* non-fatal */ }
@@ -4181,6 +4182,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (_pendingCommandQueue.length > 0) {
         clearInterval(progressTimer);
         base64Image = null;
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {} }
         command = _pendingCommandQueue.shift();
         activityDone(stepCount, 'consult-ai', 'Queued sub-command: ' + command.type, null);
         _lastAiCallMs = 0;
@@ -4190,6 +4192,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else if (_skillAutoCommand) {
         clearInterval(progressTimer);
         base64Image = null;
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {} }
         command = _skillAutoCommand;
         activityDone(stepCount, 'consult-ai', 'Skipped (skill auto-applied)', null);
         _lastAiCallMs = 0;

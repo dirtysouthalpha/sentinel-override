@@ -1258,13 +1258,15 @@ if (window.__sentinelInitialized) {
         }
 
         // Same-origin: use the iframe's document
+        if (!iframeResult.frameDoc) return 'Iframe document unavailable for selector: ' + selector;
         targetDoc = iframeResult.frameDoc;
         selector = iframeResult.remainingSelector || '';
         cmd = Object.assign({}, cmd, { selector });
       } else {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');
-        const frameIndex = parseInt(parts[1]);
+        const frameIndex = parseInt(parts[1], 10);
+        if (isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
         const iframeSelector = parts.slice(2).join(':');
         const iframes = document.querySelectorAll('iframe');
         if (iframes[frameIndex]) {
@@ -1358,6 +1360,7 @@ if (window.__sentinelInitialized) {
         // the visible "operator looking" travel time, so this is just a brief
         // settle before dispatching mouse events.
         await humanDelay(80, 160);
+        if (!targetDoc.defaultView) return 'Error: no window context for click dispatch';
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
@@ -1386,6 +1389,7 @@ if (window.__sentinelInitialized) {
         var rcRect = rcEl.getBoundingClientRect();
         var rcX = Math.round(rcRect.left + rcRect.width / 2);
         var rcY = Math.round(rcRect.top + rcRect.height / 2);
+        if (!targetDoc.defaultView) return 'Error: no window context for right_click dispatch';
         var rcView = targetDoc.defaultView;
         rcEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, buttons: 2, clientX: rcX, clientY: rcY }));
         rcEl.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, buttons: 0, clientX: rcX, clientY: rcY }));
@@ -1408,6 +1412,7 @@ if (window.__sentinelInitialized) {
             await window.__sentinelCursor.moveToElement(dcEl);
           }
         } catch (e) { console.warn('[Sentinel] cursor double_click:', e && e.message); }
+        if (!targetDoc.defaultView) return 'Error: no window context for double_click dispatch';
         var dcView = targetDoc.defaultView;
         var dcOpts = { bubbles: true, cancelable: true, composed: true, view: dcView };
         dcEl.dispatchEvent(new MouseEvent('mousedown', { ...dcOpts, detail: 1 }));
@@ -1480,6 +1485,7 @@ if (window.__sentinelInitialized) {
 
         // Short settle (cursor travel already provided the visible pause)
         await humanDelay(60, 140);
+        if (!targetDoc.defaultView) return 'Error: no window context for click_at dispatch';
         const mouseOpts = { bubbles: true, cancelable: true, composed: true, view: targetDoc.defaultView, clientX: x, clientY: y };
         el.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
         el.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
@@ -1507,6 +1513,7 @@ if (window.__sentinelInitialized) {
         var srcY = Math.round(srcRect.top + srcRect.height / 2);
         var dstX = Math.round(dstRect.left + dstRect.width / 2);
         var dstY = Math.round(dstRect.top + dstRect.height / 2);
+        if (!targetDoc.defaultView) return 'Error: no window context for drag_and_drop dispatch';
         var dView = targetDoc.defaultView;
         var mkMouse = function(type, x, y) { return new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, view: dView, clientX: x, clientY: y }); };
         var mkDrag  = function(type, x, y) { return new DragEvent(type, { bubbles: true, cancelable: true, composed: true, view: dView, clientX: x, clientY: y }); };

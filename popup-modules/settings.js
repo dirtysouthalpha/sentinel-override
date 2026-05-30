@@ -398,11 +398,12 @@ function _renderSkillStatsModal(skills) {
   modal.appendChild(inner);
   document.body.appendChild(modal);
 
-  const close = () => modal.remove();
+  const removeEscClose = () => document.removeEventListener('keydown', escClose);
+  const close = () => { modal.remove(); removeEscClose(); };
   const skillStatsCloseBtn = document.getElementById('skillStatsCloseBtn');
   if (skillStatsCloseBtn) skillStatsCloseBtn.addEventListener('click', close);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
-  const escClose = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escClose); } };
+  const escClose = (e) => { if (e.key === 'Escape') close(); };
   document.addEventListener('keydown', escClose);
 }
 

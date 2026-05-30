@@ -226,20 +226,17 @@ function openCreateScheduleModal() {
 function openCreateScheduleModalForTemplate(templateId, templateName) {
   openCreateScheduleModal();
 
-  // Pre-select the template
-  const dropdown = document.getElementById('sch-template-id');
-  dropdown.value = templateId;
-
-  // Pre-fill name
+  // Pre-fill name immediately (synchronous)
   if (templateName) {
     document.getElementById('sch-name').value = templateName + ' Schedule';
   }
 
-  // Trigger change to load template params
-  dropdown.dispatchEvent(new Event('change'));
+  // populateTemplateDropdown is async — pre-select after it finishes by
+  // passing the target id so the callback can set .value and fire 'change'.
+  populateTemplateDropdown(templateId);
 }
 
-function populateTemplateDropdown() {
+function populateTemplateDropdown(preselectId) {
   const dropdown = document.getElementById('sch-template-id');
   if (!dropdown) return;
   dropdown.innerHTML = '<option value="">-- Select a template --</option>';
@@ -265,6 +262,12 @@ function populateTemplateDropdown() {
 
     if (templates.length === 0) {
       dropdown.innerHTML = '<option value="">No templates available</option>';
+    }
+
+    // Apply pre-selection now that options exist
+    if (preselectId) {
+      dropdown.value = preselectId;
+      dropdown.dispatchEvent(new Event('change'));
     }
   });
 }
@@ -389,7 +392,7 @@ async function handleSaveSchedule() {
       return;
     }
     scheduleData.runAt = new Date(runAtValue).getTime();
-    if (scheduleData.runAt <= Date.now()) {
+    if (!scheduleData.runAt || isNaN(scheduleData.runAt) || scheduleData.runAt <= Date.now()) {
       showToast('Date and time must be in the future', 'error');
       return;
     }

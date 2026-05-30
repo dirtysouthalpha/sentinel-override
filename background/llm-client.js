@@ -1712,7 +1712,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     : '';
 
   // Memory context
-  const memoryKeys = Object.keys(agentState.agentMemory);
+  const memoryKeys = Object.keys(agentState.agentMemory || {});
   const memoryCtx = memoryKeys.length > 0
     ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState.agentMemory, null, 2)}\n`
     : '';
@@ -1774,7 +1774,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
 
-  const useThinking = provider.supportsToolUse && provider.id === 'anthropic' && typeof provider.buildBodyWithThinking === 'function' && (agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold);
+  const useThinking = provider.supportsToolUse && provider.id === 'anthropic'
+    && typeof provider.buildBodyWithThinking === 'function'
+    && CONFIG.strategyShiftThreshold > 0
+    && agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold;
   let requestBody;
   if (useThinking) {
     requestBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));

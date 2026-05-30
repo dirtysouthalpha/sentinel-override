@@ -2689,7 +2689,7 @@ async function clearAllRunLogs() {
   try {
     const stored = await chrome.storage.local.get('run_log_index');
     const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
-    const keys = list.map(e => 'run_log_' + e.runLogId).filter(Boolean);
+    const keys = list.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId);
     if (keys.length) {
       try { await chrome.storage.local.remove(keys); } catch { /* storage write may fail */ }
     }
@@ -2948,9 +2948,9 @@ async function toggleSourceChipExpansion(chip) {
   chip.parentNode.insertBefore(exp, chip.nextSibling);
 }
 
-// Hook: render chips after addMessage paints content. Patch addMessage.
- 
-const __originalAddMessage = (typeof addMessage === 'function') ? addMessage : null;
+// Note: renderSourceChipsIn is called explicitly at key render points
+// (openReportModalInline, agent_finished handler). A full addMessage patch
+// was planned here but was never completed; the dead assignment was removed.
 
 // ========== Tenant Override Card (3.11.0) ==========
 // Hard-stop modal-style card when the agent attempts a modifying action on
@@ -3583,5 +3583,8 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'download_captured') {
     try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', e); }
+  }
+  if (message.action === 'run_log_available') {
+    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', e); }
   }
 });

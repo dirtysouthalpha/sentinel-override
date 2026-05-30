@@ -579,7 +579,13 @@ export function getModelSupportsVision(providerId, model) {
   // Sort by descending key length so more-specific keys (e.g. "glm-4.5v") win over
   // shorter substrings (e.g. "glm-4") when one model ID contains another.
   for (const key of Object.keys(MODEL_VISION_OVERRIDES).sort((a, b) => b.length - a.length)) {
-    if (m === key.toLowerCase() || m.includes(key.toLowerCase())) {
+    const k = key.toLowerCase();
+    // Use substring matching only for keys long enough to avoid false positives (e.g. "o3", "o4").
+    // Short keys (< 5 chars) require an exact match or a clear word boundary.
+    const isExact = m === k;
+    const isSafeSubstring = k.length >= 5 && m.includes(k);
+    const isShortPrefix = k.length < 5 && (m === k || m.startsWith(k + '-') || m.startsWith(k + '.') || m.startsWith(k + '_'));
+    if (isExact || isSafeSubstring || isShortPrefix) {
       return MODEL_VISION_OVERRIDES[key];
     }
   }
@@ -717,6 +723,13 @@ export async function migrateLegacySettings() {
           api_key: providerId === 'openai' ? apiKey : '',
           model: model || 'gpt-4o',
           endpoint: endpoint || 'https://api.openai.com/v1/chat/completions',
+          max_tokens: 8000,
+          temperature: 0.3
+        },
+        zai: {
+          api_key: providerId === 'zai' ? apiKey : '',
+          model: model || 'glm-5',
+          endpoint: endpoint || 'https://api.z.ai/api/coding/paas/v4/chat/completions',
           max_tokens: 8000,
           temperature: 0.3
         }
