@@ -3605,6 +3605,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_) { /* hash probe failed — assume cache miss */ }
       }
 
+      const _observedHashBefore = _lastObservedDomHash;
       const _skipObserve = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
       if (_skipObserve) {
         observation = _cachedObservation;
@@ -4295,7 +4296,9 @@ async function runAgentLoop(goal, workingTabId) {
           } finally {
             clearTimeout(_vTimeoutId);
           }
-          if (_vResponse && _vResponse.ok) {
+          if (_vResponse && !_vResponse.ok) {
+            console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
+          } else if (_vResponse && _vResponse.ok) {
             const _vData = await _vResponse.json();
             const _vRaw = _vData.choices && _vData.choices[0] && _vData.choices[0].message
               ? _vData.choices[0].message.content || '' : '';
@@ -4358,6 +4361,8 @@ async function runAgentLoop(goal, workingTabId) {
         clearInterval(progressTimer);
         _lastAiCallMs = Date.now() - _aiStart;
         try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
+        // Clear SoM overlay so it doesn't interfere with action execution
+        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {}
         base64Image = null; // release screenshot memory
         agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
@@ -5139,21 +5144,6 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
 
-    // (3.50.0) Send HUD result feedback to the in-page overlay
-    function _updateHUDResult(tab, stepCount, result, isError) {
-      try {
-        const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-        chrome.tabs.sendMessage(tab, {
-          action: 'update_hud',
-          hudData: {
-            step: stepCount,
-            result: resultStr.substring(0, 80),
-            resultSuccess: !isError,
-            resultError: isError
-          }
-        }).catch(() => {});
-      } catch (_) { /* non-fatal */ }
-    }
 
       sendAgentStatus('executing', describeAction(command));
       // (3.50.0) Update the in-page action HUD so the user can see what's happening
@@ -5251,7 +5241,7 @@ async function runAgentLoop(goal, workingTabId) {
               if (!_rect) {
                 result = 'Click failed for [' + command._visionIndex + ']: no bounding rect available';
                 actionFailed = true;
-              } else if (_rect) {
+              } else {
                 // CDP Input.dispatchMouseEvent uses CSS pixels (see
                 // cdpDispatchClick docstring in tab-manager.js), so no DPR
                 // scaling needed.
@@ -6198,7 +6188,7 @@ async function runAgentLoop(goal, workingTabId) {
       // click/type, increment stagnation counter. Resets on navigate, extract,
       // or any page-changing action.
       const _isPageMutating = /^(navigate|click|click_at|type|press_key|select|check|check_all)$/.test(command.type);
-      const _pageChanged = _skipObserve === false; // fresh observation = page changed
+      const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
         _pageStagnation++;
       } else {
