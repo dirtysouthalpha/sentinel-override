@@ -1418,27 +1418,29 @@ function setupVoiceInput() {
     }
 
     if (msg.action === 'voice_result' && msg.text) {
-      goalInput.value = msg.text;
-      goalInput.style.height = 'auto';
-      goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+      if (goalInput) {
+        goalInput.value = msg.text;
+        goalInput.style.height = 'auto';
+        goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+        goalInput.focus();
+      }
       _voiceListening = false;
       _voiceListeningTabId = null;
-      voiceBtn.classList.remove('listening');
-      voiceBtn.title = 'Voice input (click to speak)';
+      if (voiceBtn) { voiceBtn.classList.remove('listening'); voiceBtn.title = 'Voice input (click to speak)'; }
       showToast('Voice input captured', 'success');
-      goalInput.focus();
     }
     if (msg.action === 'voice_interim' && msg.text) {
-      goalInput.value = msg.text;
-      goalInput.style.height = 'auto';
-      goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+      if (goalInput) {
+        goalInput.value = msg.text;
+        goalInput.style.height = 'auto';
+        goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+      }
     }
     if (msg.action === 'voice_error') {
       showToast('Voice error: ' + (msg.error || 'Unknown error'), 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
-      voiceBtn.classList.remove('listening');
-      voiceBtn.title = 'Voice input (click to speak)';
+      if (voiceBtn) { voiceBtn.classList.remove('listening'); voiceBtn.title = 'Voice input (click to speak)'; }
     }
   };
 

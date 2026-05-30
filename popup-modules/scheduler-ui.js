@@ -241,6 +241,7 @@ function openCreateScheduleModalForTemplate(templateId, templateName) {
 
 function populateTemplateDropdown() {
   const dropdown = document.getElementById('sch-template-id');
+  if (!dropdown) return;
   dropdown.innerHTML = '<option value="">-- Select a template --</option>';
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
@@ -310,6 +311,7 @@ document.getElementById('sch-interval')?.addEventListener('change', (e) => {
 document.getElementById('sch-template-id')?.addEventListener('change', (e) => {
   const templateId = e.target.value;
   const container = document.getElementById('sch-template-params');
+  if (!container) return;
 
   if (!templateId) {
     container.innerHTML = '';
@@ -327,6 +329,7 @@ document.getElementById('sch-template-id')?.addEventListener('change', (e) => {
 
 function renderTemplateParams(params) {
   const container = document.getElementById('sch-template-params');
+  if (!container) return;
   container.innerHTML = '';
 
   params.forEach(param => {
@@ -504,6 +507,7 @@ async function handleDeleteSchedule(scheduleId, name) {
 // ========== Run History ==========
 async function showRunHistory(scheduleId, scheduleName) {
   const container = document.getElementById('schedule-history-list');
+  if (!container) return;
   container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-tertiary);">Loading history...</div>';
 
   try {
