@@ -18,7 +18,8 @@ export const dattoRmm = {
     try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/centrastage\.net|dattormm\.com|datto\.com\/rmm/i.test(host)) return true;
+      if (/centrastage\.net|dattormm\.com/i.test(host)) return true;
+      if (/datto\.com/i.test(host) && /\/rmm/i.test(u.pathname)) return true;
       if (/autotask\.net|atask\.net/i.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
     return /\b(?:datto\s+rmm|autotask|centrastage)\b/i.test(String(goal || ''));
