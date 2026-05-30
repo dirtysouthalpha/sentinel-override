@@ -30,7 +30,7 @@ export const authWall = {
 
   promptInjection(ctx) {
     try {
-      const url = ctx.currentUrl || '(unknown)';
+      const url = String(ctx.currentUrl || '(unknown)').replace(/[`\\]/g, '_').substring(0, 200);
       const isMfa = /mfa|two.?factor|verif|authenticat|duo|approve/i.test(ctx.pageText || '');
       const isSso = /microsoftonline|okta|ping|auth0|saml|adfs/i.test(url);
 

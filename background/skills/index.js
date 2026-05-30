@@ -135,6 +135,7 @@ function _recordPendingOutcomes(context) {
  * @returns {Promise<void>}
  */
 export async function resetSkillStats() {
+  if (_saveStatsTimer) { clearTimeout(_saveStatsTimer); _saveStatsTimer = null; }
   _stats = {};
   _pendingOutcomeSkillIds = [];
   try { await chrome.storage.local.remove(STATS_KEY); } catch (_e) { console.warn('[Sentinel/skills] stats clear error:', _e && _e.message); }

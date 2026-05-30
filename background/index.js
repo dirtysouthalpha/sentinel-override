@@ -92,6 +92,9 @@ initScheduler();
               await startAgent(result.goal, { tab: tabs[0] });
             }
           }
+        } else {
+          // No checkpoint — clear stale session flags so next SW restart doesn't loop
+          await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']);
         }
       } else {
         // Stale run — clear the flag
@@ -141,10 +144,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.runtime.sendMessage({ action: 'export_html_report', params: {} })
       .then((resp) => {
         if (resp?.ok && resp.data?.html) {
-          const blob = new Blob([resp.data.html], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
+          const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(resp.data.html);
           chrome.downloads.download({
-            url,
+            url: dataUrl,
             filename: `sentinel-report-${Date.now()}.html`,
             saveAs: true,
           });
