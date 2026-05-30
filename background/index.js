@@ -208,7 +208,7 @@ try {
             totalBytes: dl.totalBytes || 0
           }
         }).catch((e) => {
-          console.error('[scheduleId] Unhandled rejection:', e);
+          console.error('[download_captured] Unhandled rejection:', e);
         });
       } catch (e) { console.warn('[Sentinel/index] download capture failed:', e && e.message); }
     });

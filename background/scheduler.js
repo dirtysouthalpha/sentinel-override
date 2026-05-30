@@ -665,7 +665,7 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
     schedule.nextRunAt = computeNextRun(schedule.recurrence);
     registerAlarm(schedule);
   }
-  sendNotification(schedule, { status: 'failure', error: resultPartial.error });
+  sendNotification(schedule, { status: 'failure', error: resultPartial.error, completedAt: Date.now() });
   setBadge('failure');
 }
 

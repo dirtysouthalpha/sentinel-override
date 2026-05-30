@@ -517,6 +517,7 @@ if (window.__sentinelInitialized) {
         if (!iframes[frameIndex]) throw new Error('Iframe not found at index ' + frameIndex);
         try {
           const iframeDoc = iframes[frameIndex].contentWindow && iframes[frameIndex].contentWindow.document;
+          if (!iframeDoc) throw new Error('Cannot access iframe document (detached or cross-origin)');
           const title = iframeDoc.title || '';
           const url = iframes[frameIndex].src || '';
           let content = '';
