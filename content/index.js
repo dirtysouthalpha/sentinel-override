@@ -859,7 +859,7 @@ if (window.__sentinelInitialized) {
       overlay = document.createElement('div');
       overlay.id = SENTINEL_OVERLAY_ID;
       overlay.textContent = 'Sentinel Override';
-      document.body.appendChild(overlay);
+      (document.body || document.documentElement).appendChild(overlay);
       return overlay;
     } catch {
       return null;
@@ -906,7 +906,7 @@ if (window.__sentinelInitialized) {
       indicator.id = '__sentinel_click_indicator__';
       indicator.style.left = x + 'px';
       indicator.style.top = y + 'px';
-      document.body.appendChild(indicator);
+      (document.body || document.documentElement).appendChild(indicator);
       setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', e && e.message); } }, 700);
     } catch { /* extension context may be invalidated */ }
   }
@@ -1684,9 +1684,10 @@ if (window.__sentinelInitialized) {
         // setter so React/Vue/MUI controlled inputs sync (#8).
         if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
           if (!targetDoc.defaultView) return 'Error: no window context for input typing';
-          const proto = el.tagName === 'TEXTAREA'
-            ? targetDoc.defaultView.HTMLTextAreaElement.prototype
-            : targetDoc.defaultView.HTMLInputElement.prototype;
+          const _dv = targetDoc.defaultView;
+          const _ProtoClass = el.tagName === 'TEXTAREA' ? _dv.HTMLTextAreaElement : _dv.HTMLInputElement;
+          if (!_ProtoClass) return 'Error: no HTMLInputElement prototype in this context';
+          const proto = _ProtoClass.prototype;
           const desc = Object.getOwnPropertyDescriptor(proto, 'value');
           const nativeSetter = desc && desc.set;
           if (!nativeSetter) return 'Error: unable to access native value setter';

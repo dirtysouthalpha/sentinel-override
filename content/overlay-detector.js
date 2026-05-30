@@ -249,6 +249,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       }
 
       const topElement = doc.elementFromPoint(centerX, centerY);
+      if (!topElement) return null;
 
       // If the topmost element IS the target (or a child of it), not blocked
       if (topElement === targetEl || targetEl.contains(topElement)) {

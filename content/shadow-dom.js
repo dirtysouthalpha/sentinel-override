@@ -55,7 +55,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   shadow.walkShadowTree = function(root, callback) {
     if (!root) return;
 
-    const walker = document.createTreeWalker(
+    const walker = (root.ownerDocument || document).createTreeWalker(
       root,
       NodeFilter.SHOW_ELEMENT,
       null,

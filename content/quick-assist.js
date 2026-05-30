@@ -350,7 +350,7 @@
 
     // Capture page info
     pageInfo = { title: document.title || '', url: window.location.href || '' };
-    selectedText = window.getSelection().toString().trim() || '';
+    selectedText = ((window.getSelection() || { toString: () => '' }).toString()).trim() || '';
 
     // Create host element
     panel = document.createElement('div');

@@ -116,9 +116,9 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     const childInput = el.querySelector('input[type="date"], input[type="datetime-local"], input[type="text"][placeholder*="date" i], input[placeholder*="Date" i]');
     if (childInput) {
       try {
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-          HTMLInputElement.prototype, 'value'
-        ).set;
+        const _childDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+        const nativeSetter = _childDesc && _childDesc.set;
+        if (!nativeSetter) throw new Error('no native value setter');
         nativeSetter.call(childInput, nativeDate);
         childInput.dispatchEvent(new Event('input', eventOpts));
         childInput.dispatchEvent(new Event('change', eventOpts));
