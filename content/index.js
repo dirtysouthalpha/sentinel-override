@@ -2006,6 +2006,7 @@ if (window.__sentinelInitialized) {
         };
         const keyVal = keyMap[key] || key;
         const activeEl = targetDoc.activeElement || targetDoc.body;
+        if (!activeEl) return 'Cannot press key: no active element or body in target document';
         const modifiers = cmd.modifiers || {};
         const keyOpts = {
           key: keyVal, bubbles: true, composed: true,
