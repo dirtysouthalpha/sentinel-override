@@ -126,8 +126,9 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     if (!overlay) return false;
 
     // 0. Escape key first — fastest path for enterprise modal dialogs (M365, Azure, etc.)
-    const activeEl = doc.activeElement || doc.body;
+    const activeEl = doc.activeElement || doc.body || doc.documentElement;
     const escOpts = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
+    if (!activeEl) return false;
     activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
     activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
     activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
@@ -213,6 +214,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       const outsideX = rect.right + 10;
       const outsideY = rect.bottom + 10;
       const clickOpts = { clientX: outsideX, clientY: outsideY, bubbles: true, cancelable: true, composed: true };
+      if (!doc.body) throw new Error('no body');
       doc.body.dispatchEvent(new MouseEvent('mousedown', clickOpts));
       doc.body.dispatchEvent(new MouseEvent('mouseup', clickOpts));
       doc.body.dispatchEvent(new MouseEvent('click', clickOpts));

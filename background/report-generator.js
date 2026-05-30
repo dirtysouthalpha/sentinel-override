@@ -404,7 +404,7 @@ function buildStructuredData(executionData, timestamp) {
     } else if (typeof val === 'object' && val !== null) {
       try {
         const str = JSON.stringify(val);
-        findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : val;
+        findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : str;
       } catch {
         findings[key] = String(val).substring(0, 2000);
       }

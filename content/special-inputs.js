@@ -207,21 +207,6 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     } catch {
       // CKEDITOR not defined or error
     }
-    // Also check CKEditor 5 (namespace: window.CKEDITOR with .instances)
-    try {
-      if (el.id && typeof CKEDITOR !== 'undefined' && CKEDITOR.instances && CKEDITOR.instances[el.id]) {
-        const editor = CKEDITOR.instances[el.id];
-        if (typeof editor.setData === 'function') {
-          editor.setData(text);
-          el.dispatchEvent(new Event('input', eventOpts));
-          el.dispatchEvent(new Event('change', eventOpts));
-          return { success: true, method: 'ckeditor5-api' };
-        }
-      }
-    } catch {
-      // CKEDITOR not available
-    }
-
     // Strategy 1: execCommand (broadest compatibility)
     try {
       el.focus();

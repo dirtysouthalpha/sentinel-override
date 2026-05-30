@@ -330,7 +330,7 @@
       showPanel();
     });
 
-    document.body.appendChild(triggerBtn);
+    (document.body || document.documentElement).appendChild(triggerBtn);
 
     // Auto-hide after 5 seconds
     setTimeout(function() { hideTrigger(); }, 5000);
@@ -356,7 +356,9 @@
     panel = document.createElement('div');
     panel.className = 'qa-panel';
 
-    // Position
+    // Position — must be set inline since shadow DOM CSS doesn't apply to host element
+    panel.style.position = 'fixed';
+    panel.style.zIndex = '2147483647';
     var pos = getPanelPosition();
     panel.style.left = pos.x + 'px';
     panel.style.top = pos.y + 'px';
@@ -376,7 +378,7 @@
     shadow.appendChild(buildResponseArea());
     shadow.appendChild(buildFooter());
 
-    document.body.appendChild(panel);
+    (document.body || document.documentElement).appendChild(panel);
     makeDraggable();
   }
 

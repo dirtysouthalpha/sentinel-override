@@ -17,7 +17,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
    */
   dom.isVisible = function(el) {
     try {
-      const _view = document.defaultView;
+      const _view = (el && el.ownerDocument && el.ownerDocument.defaultView) || document.defaultView;
       if (!_view) return true;
       const style = _view.getComputedStyle(el);
       if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;

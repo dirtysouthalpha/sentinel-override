@@ -248,6 +248,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
 
     if (!response.ok) {
       result.error = 'rewriter API ' + response.status;
+      response.body && response.body.cancel().catch(() => {});
       return result;
     }
 

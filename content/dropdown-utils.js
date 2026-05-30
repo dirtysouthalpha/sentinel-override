@@ -415,7 +415,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
     let wasOpen = false;
     openDropdowns.forEach(function(dropdown) {
-      if (dom.isVisible(dropdown)) {
+      if (dom.isVisible && dom.isVisible(dropdown)) {
         wasOpen = true;
       }
     });
