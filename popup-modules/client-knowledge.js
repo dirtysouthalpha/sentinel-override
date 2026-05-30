@@ -254,7 +254,9 @@ async function exportClientToFile(clientId) {
     a.href = url;
     const safeName = (res.data.client.displayName || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     a.download = `sentinel-client-${safeName}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (err) {
     console.error('[client-knowledge] exportClientToFile error:', err);
