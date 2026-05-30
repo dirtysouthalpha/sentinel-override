@@ -1047,10 +1047,10 @@ function summarizeHistoryBatch(batch) {
     if (!h || !h.action) continue;
     const t = h.action.type;
     counts[t] = (counts[t] || 0) + 1;
-    if (t === 'navigate' && h.action.url) navUrls.push(h.action.url.substring(0, 100));
+    if (t === 'navigate' && h.action.url) navUrls.push(String(h.action.url).substring(0, 100));
     if ((t === 'extract' || t === 'extract_list') && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
-    if (t === 'note' && h.action.text) notes.push(h.action.text.substring(0, 200));
+    if (t === 'note' && h.action.text) notes.push(String(h.action.text).substring(0, 200));
     const r = (h && typeof h.result === 'string') ? h.result : '';
     if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(t + ': ' + r.substring(0, 120));
   }
@@ -1725,7 +1725,7 @@ function _ticketStamp() {
 function _splitTriedSection(summary) {
   // Pull "what's been tried" candidates from the summary — anything that reads
   // like a remediation step. Falls back to a single line if nothing matches.
-  if (!summary) return ['Pending technician input.'];
+  if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
   const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
@@ -2863,7 +2863,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
   const noteText = history
     .filter(h => h && h.action && h.action.type === 'note' && h.action.text)
-    .map(h => h.action.text.toLowerCase())
+    .map(h => String(h.action.text).toLowerCase())
     .join(' ');
   const allEvidence = memorySerialized + ' ' + noteText;
 
