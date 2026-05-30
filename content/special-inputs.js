@@ -92,6 +92,8 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         const month = String(parsed.getMonth() + 1).padStart(2, '0');
         const day = String(parsed.getDate()).padStart(2, '0');
         nativeDate = year + '-' + month + '-' + day;
+      } else {
+        return { success: false, method: 'none', error: 'Cannot parse date: ' + dateStr };
       }
     }
 
@@ -214,10 +216,8 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
       document.execCommand('delete', false, null);
 
       // Insert text character by character for React/Vue compatibility
-      for (const char of text) {
-        document.execCommand('insertText', false, char);
-        el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
-      }
+      document.execCommand('insertText', false, text);
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: text }));
 
       el.dispatchEvent(new Event('change', eventOpts));
       el.dispatchEvent(new Event('blur', eventOpts));

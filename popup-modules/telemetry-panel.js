@@ -476,9 +476,9 @@
         });
       });
       if (!_viewingPastRun) _liveBuffer = events.slice();
+      _viewingPastRun = runMeta;
       events.length = 0;
       for (const ev of pastEvents) events.push(ev);
-      _viewingPastRun = runMeta;
       _renderAll();
       _renderViewingBanner();
     } catch { /* loading past run may fail gracefully */ }
@@ -527,13 +527,16 @@
     }
   }
 
-  try {
-    chrome.runtime.onMessage.addListener((message) => {
-      if (message && message.action === 'telemetry_event') {
-        _addEvent(message);
-      }
-    });
-  } catch { /* message listener registration may fail */ }
+  if (!window.__telemetryPanelListenerRegistered) {
+    window.__telemetryPanelListenerRegistered = true;
+    try {
+      chrome.runtime.onMessage.addListener((message) => {
+        if (message && message.action === 'telemetry_event') {
+          _addEvent(message);
+        }
+      });
+    } catch { /* message listener registration may fail */ }
+  }
 
   function init() {
     const railBtn = document.getElementById('telemetryRailBtn');

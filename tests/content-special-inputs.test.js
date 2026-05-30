@@ -742,8 +742,7 @@ describe('si.setRichTextValue', () => {
     // execCommand called: selectAll, delete, insertText ×2
     expect(globalThis.document.execCommand).toHaveBeenCalledWith('selectAll', false, null);
     expect(globalThis.document.execCommand).toHaveBeenCalledWith('delete', false, null);
-    expect(globalThis.document.execCommand).toHaveBeenCalledWith('insertText', false, 'a');
-    expect(globalThis.document.execCommand).toHaveBeenCalledWith('insertText', false, 'b');
+    expect(globalThis.document.execCommand).toHaveBeenCalledWith('insertText', false, 'ab');
 
     // Restore
     if (origExec !== undefined) {
@@ -751,7 +750,7 @@ describe('si.setRichTextValue', () => {
     }
   });
 
-  test('execCommand dispatches input events per character', () => {
+  test('execCommand dispatches single input event for full text', () => {
     delete globalThis.tinymce;
     delete globalThis.CKEDITOR;
     if (!globalThis.document) globalThis.document = {};
@@ -764,8 +763,6 @@ describe('si.setRichTextValue', () => {
     };
     const result = si.setRichTextValue(el, 'hi');
     expect(result.success).toBe(true);
-    // dispatchEvent called with: input(×2 chars), change, blur
-    // Plus the InputEvent constructor was called
     expect(el.dispatchEvent).toHaveBeenCalled();
   });
 

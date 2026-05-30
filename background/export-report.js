@@ -36,10 +36,10 @@ export function generateHtmlReport(auditLog, metadata) {
           .join(', ')
       : '';
     const screenshot = entry.screenshot
-      ? `<div class="screenshot"><img src="${entry.screenshot}" alt="Step ${i + 1}" loading="lazy" /></div>`
+      ? `<div class="screenshot"><img src="${escapeHtml(entry.screenshot)}" alt="Step ${i + 1}" loading="lazy" /></div>`
       : '';
     const result = entry.result
-      ? `<div class="result">${truncate(String(entry.result), 200)}</div>`
+      ? `<div class="result">${escapeHtml(truncate(String(entry.result), 200))}</div>`
       : '';
 
     return `
@@ -47,7 +47,7 @@ export function generateHtmlReport(auditLog, metadata) {
         <div class="step-header">
           <span class="step-icon">${icon}</span>
           <span class="step-num">#${i + 1}</span>
-          <span class="step-action">${actionName}</span>
+          <span class="step-action">${escapeHtml(String(actionName))}</span>
           ${params ? `<span class="step-params">${params}</span>` : ''}
           <span class="step-time">${entry.duration ? `${entry.duration}ms` : ''}</span>
         </div>

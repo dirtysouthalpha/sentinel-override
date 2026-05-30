@@ -40,7 +40,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     const startTime = Date.now();
 
     while (Date.now() - startTime < TIMEOUT) {
-      await wait.sleep(POLL_INTERVAL);
+      if (wait.sleep) await wait.sleep(POLL_INTERVAL);
       const options = dd.findDropdownOptions(doc, triggerEl);
       if (options && options.length > 0) {
         return options;
@@ -250,7 +250,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
           searchInput.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: char }));
         }
         // Wait for filtered results
-        await wait.sleep(300);
+        if (wait.sleep) await wait.sleep(300);
         const filteredOptions = dd.findDropdownOptions(doc, null);
         for (const opt of filteredOptions) {
           const optText = (opt.innerText || opt.textContent || '').trim().toLowerCase();
@@ -331,7 +331,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
       } catch { /* dispatch may fail */ }
 
       // Wait for submenu to appear (300ms hover delay, up to 500ms total)
-      await wait.sleep(300);
+      if (wait.sleep) await wait.sleep(300);
 
       // Check if submenu appeared
       const subItems = dd.findDropdownOptions(doc, matchedItem);
@@ -342,7 +342,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
           matchedItem.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true, view: view }));
           matchedItem.click();
         } catch { /* dispatch may fail */ }
-        await wait.sleep(200);
+        if (wait.sleep) await wait.sleep(200);
 
         // Check again after click
         const clickSubItems = dd.findDropdownOptions(doc, matchedItem);

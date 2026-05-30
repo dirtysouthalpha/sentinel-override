@@ -123,7 +123,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
    * @returns {boolean} True if the overlay was successfully dismissed (removed from DOM or hidden).
    */
   ov.dismissOverlay = function(doc, overlay) {
-    if (!overlay) return false;
+    if (!doc || !overlay) return false;
 
     // 0. Escape key first — fastest path for enterprise modal dialogs (M365, Azure, etc.)
     const activeEl = doc.activeElement || doc.body || doc.documentElement;
@@ -149,7 +149,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       try {
         const closeBtns = overlay.querySelectorAll(closeSelectors[i]);
         for (let j = 0; j < closeBtns.length; j++) {
-          if (dom && !dom.isVisible(closeBtns[j])) continue;
+          if (!dom || !dom.isVisible(closeBtns[j])) continue;
           closeBtns[j].click();
           closeBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
           closeBtns[j].dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
@@ -176,7 +176,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       try {
         const acceptBtns = overlay.querySelectorAll(acceptSelectors[i]);
         for (let j = 0; j < acceptBtns.length; j++) {
-          if (dom && !dom.isVisible(acceptBtns[j])) continue;
+          if (!dom || !dom.isVisible(acceptBtns[j])) continue;
           acceptBtns[j].click();
           acceptBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
           acceptBtns[j].dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
@@ -195,7 +195,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     const clickableEls = overlay.querySelectorAll('button, a, [role="button"]');
     for (let i = 0; i < clickableEls.length; i++) {
       const el = clickableEls[i];
-      if (dom && !dom.isVisible(el)) continue;
+      if (!dom || !dom.isVisible(el)) continue;
       const text = (el.innerText || el.textContent || '').trim();
       if (dismissTextPattern.test(text)) {
         el.click();

@@ -493,7 +493,7 @@
 
   function executeAction(action) {
     if (!selectedText) {
-      selectedText = window.getSelection().toString().trim();
+      selectedText = (window.getSelection() || { toString: () => '' }).toString().trim();
     }
     if (!selectedText) {
       setResponseHTML('<span class="qa-error">No text selected. Select text on the page first, then try again.</span>');
@@ -665,7 +665,7 @@
 
     // Small delay to let selection settle
     setTimeout(function() {
-      var text = window.getSelection().toString().trim();
+      var text = (window.getSelection() || { toString: () => '' }).toString().trim();
       if (text.length > 10) {
         showTrigger();
       } else {
