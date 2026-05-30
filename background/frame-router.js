@@ -130,15 +130,15 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
     const iframes = frames.filter(f => f.isIframe);
     if (frameIndex >= iframes.length) return null;
 
-  // Refresh cache from live data using the same positional convention.
-  const positional = new Map();
-  iframes
-    .slice()
-    .sort((a, b) => a.frameId - b.frameId)
-    .forEach((f, idx) => positional.set(idx, f.frameId));
-  frameIdsByTab.set(tabId, positional);
+    // Refresh cache from live data using the same positional convention.
+    const positional = new Map();
+    iframes
+      .slice()
+      .sort((a, b) => a.frameId - b.frameId)
+      .forEach((f, idx) => positional.set(idx, f.frameId));
+    frameIdsByTab.set(tabId, positional);
 
-  return positional.has(frameIndex) ? positional.get(frameIndex) : null;
+    return positional.has(frameIndex) ? positional.get(frameIndex) : null;
   } catch (e) {
     console.error('[Sentinel/frame-router] resolveFrameForSelector failed:', e && e.message);
     return null;

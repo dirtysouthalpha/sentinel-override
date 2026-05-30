@@ -20,6 +20,9 @@ export async function handleQuickAssist(prompt) {
   }
 
   const provider = resolveProvider(config.endpoint);
+  if (!provider) {
+    throw new Error('Unsupported API endpoint: ' + config.endpoint);
+  }
   const headers = provider.buildHeaders(config.apiKey);
 
   let body;

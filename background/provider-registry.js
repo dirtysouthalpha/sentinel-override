@@ -56,7 +56,7 @@ export const PROVIDERS = {
     buildBody: (model, systemPrompt, userContent, opts = {}) => ({
       model,
       max_tokens: opts.maxTokens || 8000,
-      temperature: opts.temperature || 0.3,
+      temperature: opts.temperature ?? 0.3,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userContent }]
     }),
@@ -212,7 +212,7 @@ export const PROVIDERS = {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent }
         ],
-        temperature: opts.temperature || 0.3,
+        temperature: opts.temperature ?? 0.3,
         max_tokens: opts.maxTokens || 8000
       };
       if (opts.jsonMode) body.response_format = { type: 'json_object' };
@@ -375,7 +375,7 @@ export const PROVIDERS = {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent }
         ],
-        temperature: opts.temperature || 0.3,
+        temperature: opts.temperature ?? 0.3,
         max_tokens: opts.maxTokens || 8000
       };
       if (opts.jsonMode) body.response_format = { type: 'json_object' };
@@ -699,7 +699,9 @@ export async function migrateLegacySettings() {
   const endpoint = stored.api_endpoint || '';
   const apiKey = stored.api_key || '';
   const model = stored.model || '';
-  const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic' : 'openai';
+  const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic'
+    : (endpoint.includes('z.ai') || endpoint.includes('api.z.ai')) ? 'zai'
+    : 'openai';
   try {
     await chrome.storage.local.set({
       active_provider: providerId,

@@ -34,7 +34,12 @@ export async function loadMonitors() {
 }
 
 async function saveMonitors(monitors) {
-  await chrome.storage.local.set({ [MONITOR_STORAGE_KEY]: monitors });
+  try {
+    await chrome.storage.local.set({ [MONITOR_STORAGE_KEY]: monitors });
+  } catch (e) {
+    console.error('[Sentinel/page-monitor] saveMonitors failed:', e && e.message);
+    throw e;
+  }
 }
 
 /**
@@ -156,11 +161,19 @@ export async function runMonitorCycle() {
   }
 }
 
+let _monitorLoopStarted = false;
+
+/** Reset idempotency guard — only for use in tests. */
+export function _resetMonitorLoop() { _monitorLoopStarted = false; }
+
 /**
  * Start the periodic monitor check loop.
- * @returns {number} Alarm name for reference
+ * @returns {string} Alarm name for reference
  */
 export function startMonitorLoop() {
+  if (_monitorLoopStarted) return 'sentinel-monitor-check';
+  _monitorLoopStarted = true;
+
   chrome.alarms.create('sentinel-monitor-check', {
     periodInMinutes: 0.5, // 30 seconds
   });

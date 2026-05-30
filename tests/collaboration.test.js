@@ -195,7 +195,7 @@ describe('exportReportAsMarkdown', () => {
     const md = exportReportAsMarkdown(report);
     expect(md).toContain('---');
     expect(md).toContain('generator: sentinel-override');
-    expect(md).toContain('goal: Test goal');
+    expect(md).toContain('goal: "Test goal"');
     expect(md).toContain('# Full Report');
   });
 
@@ -219,7 +219,7 @@ describe('exportReportAsMarkdown', () => {
   test('uses defaults for missing optional fields', () => {
     const report = { fullReport: 'Content' };
     const md = exportReportAsMarkdown(report);
-    expect(md).toContain('goal: Unknown');
+    expect(md).toContain('goal: "Unknown"');
     expect(md).toContain('Content');
   });
 });

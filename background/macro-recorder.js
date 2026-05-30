@@ -134,7 +134,12 @@ export async function exportMacro(id) {
  * @returns {Promise<Macro>}
  */
 export async function importMacro(jsonStr) {
-  const data = JSON.parse(jsonStr);
+  let data;
+  try {
+    data = JSON.parse(jsonStr);
+  } catch (e) {
+    throw new Error('Invalid macro JSON: ' + (e && e.message || String(e)));
+  }
   if (!data.sentinelMacro || !data.steps) {
     throw new Error('Invalid macro format');
   }

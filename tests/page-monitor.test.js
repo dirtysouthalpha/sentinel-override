@@ -63,10 +63,12 @@ import {
   checkMonitor,
   runMonitorCycle,
   startMonitorLoop,
+  _resetMonitorLoop,
 } from '../background/page-monitor.js';
 
 describe('page-monitor', () => {
   beforeEach(() => {
+    _resetMonitorLoop();
     Object.keys(mockStorage).forEach(key => delete mockStorage[key]);
     Object.keys(mockAlarms).forEach(key => delete mockAlarms[key]);
     Object.keys(mockNotifications).forEach(key => delete mockNotifications[key]);

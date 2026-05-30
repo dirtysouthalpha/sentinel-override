@@ -462,6 +462,7 @@ const RISKY_ACTION_PATTERN = /\b(submit|buy|send|transfer|wire|delete|publish|pu
 
 // eslint-disable-next-line no-unused-vars
 function showApprovalCard(payload) {
+  if (!approvalCardContainer) return;
   removeApprovalCard();
 
   const description = (payload && typeof payload.description === 'string') ? payload.description : '';
@@ -1218,9 +1219,9 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (markdownPreview && markdownPreview.classList.contains('show')) return;
-  // Find the top-most visible .modal-overlay.show — use the last one in DOM
+  // Find the top-most visible .modal.show — use the last one in DOM
   // order since modals stack visually with the last-added on top.
-  const openModals = document.querySelectorAll('.modal-overlay.show');
+  const openModals = document.querySelectorAll('.modal.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
   try { top.classList.remove('show'); } catch { /* DOM may be detached */ }
@@ -1232,7 +1233,7 @@ document.addEventListener('keydown', (e) => {
 // itself — those should be handled by interior buttons.
 document.addEventListener('mousedown', (e) => {
   const target = e.target;
-  if (!target || !target.classList || !target.classList.contains('modal-overlay')) return;
+  if (!target || !target.classList || !target.classList.contains('modal')) return;
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
@@ -3170,7 +3171,7 @@ chrome.runtime.onMessage.addListener((message) => {
     try {
       const facts = message.facts;
       if (Array.isArray(facts) && facts.length) {
-        const chatEl = document.getElementById('chat');
+        const chatEl = chatContainer;
         if (chatEl) {
           const existing = chatEl.querySelector('.ck-preview-card');
           if (existing) existing.remove();
@@ -3207,7 +3208,7 @@ chrome.runtime.onMessage.addListener((message) => {
     try {
       const steps = message.steps;
       if (Array.isArray(steps) && steps.length) {
-        const chatEl = document.getElementById('chat');
+        const chatEl = chatContainer;
         if (chatEl) {
           const existing = chatEl.querySelector('.plan-preview-card');
           if (existing) existing.remove();

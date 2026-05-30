@@ -145,14 +145,17 @@ export function validateImport(importedData) {
     }
 
     // Also scan tag values
+    let hasDangerousTag = false;
     if (Array.isArray(t.tags)) {
       t.tags.forEach(tag => {
         const tagScan = scanForDangerousPatterns(tag);
         if (tagScan.length > 0) {
           result.errors.push(`Template "${t.name}" tag "${tag}": ${tagScan.map(s => s.reason).join('; ')}`);
+          hasDangerousTag = true;
         }
       });
     }
+    if (hasDangerousTag) return;
 
     // Build clean template
     const params = Array.isArray(t.params) ? t.params : extractParameters(t.goal);
@@ -326,5 +329,5 @@ function parseVersion(version) {
  */
 function escapeYaml(str) {
   if (!str) return '""';
-  return String(str).replace(/"/g, '\\"');
+  return '"' + String(str).replace(/"/g, '\\"') + '"';
 }

@@ -436,8 +436,8 @@ async function handleSaveSchedule() {
       });
     });
 
-    if (response && response.error) {
-      showToast(response.error, 'error');
+    if (!response || !response.ok) {
+      showToast((response && response.error) || 'Failed to create schedule', 'error');
       return;
     }
 
@@ -463,8 +463,8 @@ async function handleToggleSchedule(scheduleId, enabled) {
       });
     });
 
-    if (response && response.error) {
-      showToast(response.error, 'error');
+    if (!response || !response.ok) {
+      showToast((response && response.error) || 'Failed to toggle schedule', 'error');
       return;
     }
 
@@ -492,8 +492,8 @@ async function handleDeleteSchedule(scheduleId, name) {
       });
     });
 
-    if (response && response.error) {
-      showToast(response.error, 'error');
+    if (!response || !response.ok) {
+      showToast((response && response.error) || 'Failed to delete schedule', 'error');
       return;
     }
 

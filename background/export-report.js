@@ -32,7 +32,7 @@ export function generateHtmlReport(auditLog, metadata) {
     const actionName = entry.action?.type || entry.action || 'unknown';
     const params = entry.action?.params
       ? Object.entries(entry.action.params)
-          .map(([k, v]) => `<span class="param"><strong>${k}:</strong> ${truncate(String(v), 60)}</span>`)
+          .map(([k, v]) => `<span class="param"><strong>${escapeHtml(k)}:</strong> ${escapeHtml(truncate(String(v), 60))}</span>`)
           .join(', ')
       : '';
     const screenshot = entry.screenshot
