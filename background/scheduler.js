@@ -624,6 +624,11 @@ function _waitForAgentCompletion(timeoutMs) {
       clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(listener);
       _resolve({ status: 'success', error: null, report: msg.report || null });
+    } else if (msg.action === 'agent_finished' && msg.summary && /crash|unexpected/i.test(msg.summary)) {
+      // runAgentLoop crashed — agent_loop_complete will never come; fail fast instead of waiting 5 min
+      clearTimeout(timer);
+      chrome.runtime.onMessage.removeListener(listener);
+      _resolve({ status: 'failure', error: msg.summary || 'Agent crashed unexpectedly', report: null });
     }
   };
   chrome.runtime.onMessage.addListener(listener);
