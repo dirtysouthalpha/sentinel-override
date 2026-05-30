@@ -212,10 +212,11 @@ async function refreshEntriesList(clientId) {
       </div>
     `).join('');
     container.querySelectorAll('[data-entry-action="delete"]').forEach(btn => {
+      const capturedClientId = _editingClientId;
       btn.addEventListener('click', async () => {
         try {
           const entryId = btn.dataset.entryId;
-          const r = await _send('client_entry_delete', { clientId: _editingClientId, entryId });
+          const r = await _send('client_entry_delete', { clientId: capturedClientId, entryId });
           if (r.ok) {
             await refreshEntriesList(_editingClientId);
             await refreshClientList();
@@ -252,7 +253,7 @@ async function exportClientToFile(clientId) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const safeName = (res.data.client.displayName || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const safeName = ((res.data.client && res.data.client.displayName) || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     a.download = `sentinel-client-${safeName}.json`;
     document.body.appendChild(a);
     a.click();

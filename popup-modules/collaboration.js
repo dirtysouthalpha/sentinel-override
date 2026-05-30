@@ -35,7 +35,7 @@ async function exportAllTemplatesFile() {
     const data = response.data;
     const filename = 'sentinel-templates-' + new Date().toISOString().slice(0, 10) + '.json';
     downloadJson(data, filename);
-    showToast(`${data.count} template(s) exported`, 'success');
+    showToast(`${data && data.count != null ? data.count : '?'} template(s) exported`, 'success');
   } catch (err) {
     showToast(err.message || 'Export failed', 'error');
   }
@@ -89,6 +89,9 @@ function openImportDialog() {
     }
   });
 
+  input.addEventListener('cancel', () => {
+    if (document.body && document.body.contains(input)) document.body.removeChild(input);
+  });
   input.click();
 }
 
@@ -229,10 +232,13 @@ function downloadJson(data, filename) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    try { document.body.removeChild(a); } catch (_e) {}
+    URL.revokeObjectURL(url);
+  }
 }
 
 function downloadText(content, filename, mimeType) {
@@ -241,10 +247,13 @@ function downloadText(content, filename, mimeType) {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    try { document.body.removeChild(a); } catch (_e) {}
+    URL.revokeObjectURL(url);
+  }
 }
 
 function sanitizeFilename(name) {
@@ -259,7 +268,7 @@ function sanitizeFilename(name) {
 
 function sendMessage(action, data) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ action, ...data }, (response) => {
+    chrome.runtime.sendMessage({ action, ...(data || {}) }, (response) => {
       if (chrome.runtime.lastError) {
         resolve({ ok: false, error: chrome.runtime.lastError.message });
         return;
