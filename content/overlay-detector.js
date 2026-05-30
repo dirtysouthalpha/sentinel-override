@@ -131,7 +131,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     activeEl.dispatchEvent(new KeyboardEvent('keydown', escOpts));
     activeEl.dispatchEvent(new KeyboardEvent('keypress', escOpts));
     activeEl.dispatchEvent(new KeyboardEvent('keyup', escOpts));
-    if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+    if (!(doc.body && doc.body.contains(overlay)) || !(dom && dom.isVisible(overlay))) {
       return true;
     }
 
@@ -153,7 +153,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
           closeBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
           closeBtns[j].dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
           closeBtns[j].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
-          if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+          if (!(doc.body && doc.body.contains(overlay)) || !(dom && dom.isVisible(overlay))) {
             return true;
           }
         }
@@ -180,7 +180,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
           acceptBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
           acceptBtns[j].dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
           acceptBtns[j].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
-          if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+          if (!(doc.body && doc.body.contains(overlay)) || !(dom && dom.isVisible(overlay))) {
             return true;
           }
         }
@@ -201,7 +201,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
         el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
         el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
         el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, composed: true }));
-        if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+        if (!(doc.body && doc.body.contains(overlay)) || !(dom && dom.isVisible(overlay))) {
           return true;
         }
       }
@@ -216,7 +216,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       doc.body.dispatchEvent(new MouseEvent('mousedown', clickOpts));
       doc.body.dispatchEvent(new MouseEvent('mouseup', clickOpts));
       doc.body.dispatchEvent(new MouseEvent('click', clickOpts));
-      if (!doc.body.contains(overlay) || !(dom && dom.isVisible(overlay))) {
+      if (!(doc.body && doc.body.contains(overlay)) || !(dom && dom.isVisible(overlay))) {
         return true;
       }
     } catch { /* backdrop click failed */ }
