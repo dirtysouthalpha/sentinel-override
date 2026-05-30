@@ -5,6 +5,9 @@
 // Recovery: tell the LLM to STEP BACK, reconsider the goal, and either
 // pick a fundamentally different approach OR finish honestly with what's known.
 
+const MIN_CONSECUTIVE_FAILURES = 3;
+const DEFAULT_MAX_STEPS = 100;
+
 export const consecutiveFailures = {
   id: 'consecutive-failures',
   description: 'Recovery when 3+ consecutive failures regardless of type — force strategy shift',
@@ -52,7 +55,3 @@ Do NOT repeat the action that just failed. The user can see the failure pattern 
     }
   }
 };
-
-// Constants for better readability and maintainability
-const MIN_CONSECUTIVE_FAILURES = 3;
-const DEFAULT_MAX_STEPS = 100;
