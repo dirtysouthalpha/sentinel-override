@@ -375,32 +375,6 @@ if (window.__sentinelInitialized) {
   // metadata) gets back { mfaDetected: true, hint: <matched phrase> } when
   // the page text matches one of the MFA patterns.
 
-  const __SENTINEL_MFA_PATTERNS = [
-    /verify\s+your\s+identity/i,
-    /enter\s+(?:the\s+)?(?:verification\s+)?code/i,
-    /approve\s+(?:the\s+)?sign.?in\s+request/i,
-    /we'?ve\s+sent.*?code/i,
-    /6.?digit\s+(?:code|number|verification)/i,
-    /two.?factor\s+(?:authentication|verification)/i,
-    /multi.?factor\s+authentication/i,
-    /authenticator\s+app/i,
-    /one.?time\s+(?:passcode|password|code)/i,
-    /\bOTP\b/,
-    /enter\s+your\s+code/i,
-    /check\s+your\s+phone/i
-  ];
-
-   
-  function _unused__sentinelDetectMFA(text) {
-    if (!text || typeof text !== 'string') return null;
-    const sample = text.substring(0, 4000);
-    for (const re of __SENTINEL_MFA_PATTERNS) {
-      const m = sample.match(re);
-      if (m) return m[0];
-    }
-    return null;
-  }
-
   // ========== Message Handler ==========
   async function handleMessage(request) {
     switch (request.action) {
@@ -1017,7 +991,7 @@ if (window.__sentinelInitialized) {
    
   const _EXECUTE_JS_ALLOWED_GLOBALS = new Set([
     'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
-    'getElementsByClassName', 'getElementsByTagName', 'getElementsByName',
+    'getElementsByTagName', 'getElementsByName',
     'createElement', 'createTextNode', 'createDocumentFragment', 'createComment',
     'getAttribute', 'setAttribute', 'removeAttribute', 'hasAttribute',
     'addEventListener', 'removeEventListener', 'dispatchEvent',
@@ -1286,6 +1260,7 @@ if (window.__sentinelInitialized) {
         // Same-origin: use the iframe's document
         targetDoc = iframeResult.frameDoc;
         selector = iframeResult.remainingSelector || '';
+        cmd = Object.assign({}, cmd, { selector });
       } else {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');

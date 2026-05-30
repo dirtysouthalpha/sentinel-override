@@ -47,7 +47,12 @@ export async function loadMacros() {
  * @param {Macro[]} macros
  */
 async function saveMacros(macros) {
-  await chrome.storage.local.set({ [STORAGE_KEY]: macros });
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEY]: macros });
+  } catch (e) {
+    console.error('[Sentinel/macro-recorder] saveMacros failed:', e && e.message);
+    throw e;
+  }
 }
 
 /**

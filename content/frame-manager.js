@@ -108,9 +108,9 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       if (iframeDoc && dom) {
         const element = dom.findElementBySelector(iframeDoc, remainingSelector);
         if (element) {
-          return { element, frameDoc: iframeDoc, frameIndex, frameUrl: src };
+          return { element, frameDoc: iframeDoc, frameIndex, frameUrl: src, remainingSelector };
         }
-        return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src };
+        return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src, remainingSelector };
       }
     } catch (error) {
       // Cross-origin

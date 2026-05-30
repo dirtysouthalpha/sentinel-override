@@ -1252,26 +1252,6 @@ export function isAgentAttachedTab(tabId) {
 }
 
 // ========== Side Panel Scoping (v3.53) ==========
-// During a run, only the agent's working tabs should show the side panel.
-// Other tabs get it disabled — mirrors Claude's computer-use behavior.
-
-async function _scopeSidePanelToAttachedTabs() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    const attachedIds = Array.from(agentAttachedTabs);
-    let disabled = 0;
-    for (const tab of allTabs) {
-      if (tab.id && !agentAttachedTabs.has(tab.id)) {
-        try {
-          await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' });
-          disabled++;
-        } catch (_) {}
-      }
-    }
-    console.log('[Sentinel/v3.55] Scoped sidePanel: attached=' + attachedIds.join(',') + ' disabled=' + disabled + ' of ' + allTabs.length + ' total tabs');
-  } catch (e) { console.warn('[Sentinel] scopeSidePanel failed:', e && e.message); }
-}
-
 async function _enableSidePanelEverywhere() {
   try {
     const allTabs = await chrome.tabs.query({});
@@ -1310,7 +1290,7 @@ async function _cdpObservePage(tabId) {
       const r = readyState.value;
       // If page has no body and no children, wait a moment and try again
       if (!r.hasBody && r.childCount === 0) {
-        console.log('[Sentinel/CDP] Page has no body — waiting 800ms for DOM...');
+        console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       // If title is empty and URL is still about:blank or loading, wait
