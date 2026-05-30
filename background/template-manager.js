@@ -74,7 +74,7 @@ export async function saveTemplates(templates) {
  */
 export async function listTemplates() {
   const templates = await loadTemplates();
-  return Object.values(templates).sort((a, b) => b.updatedAt - a.updatedAt);
+  return Object.values(templates).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
 /**

@@ -149,7 +149,7 @@ export function validateImport(importedData) {
       t.tags.forEach(tag => {
         const tagScan = scanForDangerousPatterns(tag);
         if (tagScan.length > 0) {
-          result.errors.push(`Template "${t.name}" tag "${tag}": ${tagScan[0].reason}`);
+          result.errors.push(`Template "${t.name}" tag "${tag}": ${tagScan.map(s => s.reason).join('; ')}`);
         }
       });
     }
