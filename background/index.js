@@ -369,7 +369,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
         return { ok: true, models };
       } catch (e) {
-        return { ok: false, error: e.message || String(e) };
+        return { ok: false, error: (e && e.message) || String(e) };
       }
     }
     case 'check_resume_available': {
@@ -564,7 +564,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const text = await callLLMSimple(qaSystem, qaPrompt, 1200);
         return { text };
       } catch (err) {
-        return { text: 'Error: ' + (err.message || String(err)) };
+        return { text: 'Error: ' + ((err && err.message) || String(err)) };
       }
     }
 
