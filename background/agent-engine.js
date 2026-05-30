@@ -6815,4 +6815,11 @@ export {
   maybePostProgressUpdate,
   _hostnameOf,
   _updateRunLogIndex,
+  // Coverage gap exports
+  detectCaptcha,
+  _generateSmartRecovery,
+  _universalCdpFallback,
+  recoverFromCaptcha,
+  _cdpDismissOverlays,
+  _cdpObservePage,
 };
