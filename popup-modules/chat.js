@@ -1502,7 +1502,9 @@ exportBtn.addEventListener('click', () => {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
   showToast(`Exported as ${format.toUpperCase()}`, 'success');
@@ -1925,7 +1927,9 @@ downloadReportBtn.addEventListener('click', () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Report downloaded', 'success');
   }
@@ -2751,7 +2755,9 @@ async function exportRunLog(format) {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'sentinel_run_log_' + __lastRunLogId.slice(0, 8) + '.' + ext;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
     try { showToast('Export failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }

@@ -611,7 +611,9 @@ if (downloadAuditLogBtn) {
       const a = document.createElement('a');
       a.href = url;
       a.download = 'sentinel-audit-log.csv';
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
       downloadAuditLogBtn.textContent = 'Error: ' + (e.message || 'unknown');
