@@ -4355,6 +4355,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (e) {
           console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e && e.message);
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {}
         }
       }
 
