@@ -455,7 +455,9 @@ export function buildFallbackReport(executionData) {
     const val = agentMemory[k];
     const valStr = Array.isArray(val)
       ? `${val.length} items: ${val.slice(0, 5).map(v => String(v).substring(0, 100)).join(', ')}`
-      : String(val).substring(0, 300);
+      : (val !== null && typeof val === 'object')
+        ? (() => { try { return JSON.stringify(val).substring(0, 300); } catch { return '[object]'; } })()
+        : String(val).substring(0, 300);
     return `- **${k}**: ${valStr}`;
   });
 

@@ -244,6 +244,9 @@ window.__sentinelUtils = window.__sentinelUtils || {};
             const hudEl = document.getElementById(HUD_ID);
             if (hudEl) hudEl.classList.remove('visible');
           }, 5000);
+        } else {
+          const hudEl = document.getElementById(HUD_ID);
+          if (hudEl) hudEl.classList.remove('visible');
         }
       }, 15000);
 

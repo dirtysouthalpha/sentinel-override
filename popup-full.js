@@ -22,6 +22,8 @@ window.addEventListener('DOMContentLoaded', () => {
       const panel = document.getElementById('templates-panel');
       if (panel && (panel.style.display === 'none' || !panel.style.display)) {
         showTemplatesPanel();
+        const schBtn = document.getElementById('schedulerBtn');
+        if (schBtn) schBtn.classList.remove('active');
       } else {
         hideTemplatesPanel();
       }
@@ -80,7 +82,7 @@ document.addEventListener('keydown', (e) => {
     document.getElementById('schedule-modal')?.classList.remove('show');
     document.getElementById('schedule-history-modal')?.classList.remove('show');
     document.getElementById('import-modal')?.classList.remove('show');
-    closeCommandPalette();
+    if (typeof closeCommandPalette === 'function') closeCommandPalette();
   }
 });
 

@@ -68,7 +68,7 @@ export async function createMacro(name, description, steps) {
   const macro = {
     id: generateId(),
     name: name.trim() || 'Untitled Macro',
-    description: description.trim(),
+    description: (description || '').trim(),
     steps: steps || [],
     createdAt: now,
     updatedAt: now,
@@ -167,8 +167,8 @@ export async function historyToMacro(history, name, description) {
   const steps = history
     .filter(h => h.action && !h.actionFailed)
     .map(h => ({
-      action: h.action.type || h.action,
-      params: h.action.params || {},
+      action: (typeof h.action === 'string' ? h.action : h.action.type) || 'unknown',
+      params: (typeof h.action === 'object' && h.action.params) || {},
       delay: h.duration || 1000,
     }));
 

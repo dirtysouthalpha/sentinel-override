@@ -40,7 +40,9 @@ export async function appendAuditEntry(runId, entry) {
       _cache.set(runId, log);
       const stored = await chrome.storage.local.get(key).catch(() => ({}));
       const persisted = Array.isArray(stored[key]) ? stored[key] : [];
-      persisted.forEach(e => log.push(e));
+      // Splice persisted entries to front so they precede any concurrent entries
+      // already pushed during the await (preserves chronological order).
+      if (persisted.length > 0) log.splice(0, 0, ...persisted);
     }
     log.push({
       ts:      entry.ts      || Date.now(),

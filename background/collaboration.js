@@ -148,7 +148,7 @@ export function validateImport(importedData) {
     let hasDangerousTag = false;
     if (Array.isArray(t.tags)) {
       t.tags.forEach(tag => {
-        const tagScan = scanForDangerousPatterns(tag);
+        const tagScan = scanForDangerousPatterns(typeof tag === 'string' ? tag : String(tag));
         if (tagScan.length > 0) {
           result.errors.push(`Template "${t.name}" tag "${tag}": ${tagScan.map(s => s.reason).join('; ')}`);
           hasDangerousTag = true;
@@ -182,7 +182,7 @@ export function validateImport(importedData) {
 export async function importTemplates(templates, conflictMode = 'skip') {
   const existing = await loadTemplates();
   const existingNames = new Map(
-    Object.values(existing).map(t => [t.name.toLowerCase(), t.id])
+    Object.values(existing).filter(t => t && t.name).map(t => [t.name.toLowerCase(), t.id])
   );
 
   const results = [];

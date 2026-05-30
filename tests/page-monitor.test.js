@@ -292,7 +292,7 @@ describe('page-monitor', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const result = await checkMonitor(testMonitor);
 
-      expect(result).toEqual({ changed: false, content: '' });
+      expect(result).toMatchObject({ changed: false, content: '' });
       expect(consoleSpy).toHaveBeenCalledWith(
         '[Sentinel/page-monitor] checkMonitor failed:',
         'Tab error'
@@ -308,7 +308,7 @@ describe('page-monitor', () => {
 
       const result = await checkMonitor(testMonitor);
 
-      expect(result).toEqual({ changed: false, content: '' });
+      expect(result).toMatchObject({ changed: false, content: '' });
     });
 
     it('should not detect change on first check (no lastContent)', async () => {
@@ -325,7 +325,7 @@ describe('page-monitor', () => {
       const result = await checkMonitor(testMonitor);
 
       // When lastContent is falsy (empty string), changed should be false
-      expect(result).toEqual({ changed: false, content: 'First content' });
+      expect(result).toMatchObject({ changed: false, content: 'First content' });
 
       const monitors = await loadMonitors();
       expect(monitors[0].lastContent).toBe('First content');
@@ -355,7 +355,7 @@ describe('page-monitor', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const result = await checkMonitor(testMonitor);
 
-      expect(result).toEqual({ changed: false, content: '' });
+      expect(result).toMatchObject({ changed: false, content: '' });
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });

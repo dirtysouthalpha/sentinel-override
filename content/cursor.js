@@ -57,7 +57,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
           'filter: drop-shadow(0 0 6px #ff0000) drop-shadow(0 0 12px #ff4444) !important;' +
           'animation: sentinelCursorBreathe 2.4s ease-in-out infinite;' +
         '}' +
-        '#' + CURSOR_ID + '.dimmed { opacity: 1 !important; }' +
+        '#' + CURSOR_ID + '.dimmed { opacity: 0 !important; }' +
         '#' + CURSOR_ID + ' .sentinel-cursor-halo {' +
           'position: absolute;' +
           'top: 50%;' +
@@ -168,7 +168,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       });
       const target = document.documentElement || document.body;
       if (target) {
-        observer.observe(target, { childList: true, subtree: false });
+        observer.observe(target, { childList: true, subtree: true });
       }
     } catch { /* MutationObserver unavailable in some test contexts */ }
   }

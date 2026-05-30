@@ -132,10 +132,10 @@ export async function checkMonitor(monitor) {
       await saveMonitors(monitors);
     }
 
-    return { changed, content };
+    return { changed, content, changeCount: mon ? mon.changeCount : monitor.changeCount };
   } catch (e) {
     console.error('[Sentinel/page-monitor] checkMonitor failed:', e && e.message);
-    return { changed: false, content: '' };
+    return { changed: false, content: '', changeCount: monitor.changeCount };
   }
 }
 
@@ -148,13 +148,13 @@ export async function runMonitorCycle() {
   const active = monitors.filter(m => m.active);
 
   for (const monitor of active) {
-    const { changed } = await checkMonitor(monitor);
+    const { changed, changeCount } = await checkMonitor(monitor);
     if (changed) {
       chrome.notifications.create(`sentinel-change-${monitor.id}`, {
         type: 'basic',
         iconUrl: chrome.runtime.getURL('icon-128.png'),
         title: 'Sentinel Override — Change Detected',
-        message: `"${monitor.label}" has changed! (${monitor.changeCount} changes total)`,
+        message: `"${monitor.label}" has changed! (${changeCount} changes total)`,
         priority: 2,
       });
     }
