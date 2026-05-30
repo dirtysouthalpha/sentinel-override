@@ -102,5 +102,5 @@ export function findMismatchHints(profile, goal) {
  * @returns {Array<{id: string, label: string, memoryKeyPrefix: string}>}
  */
 export function listAllProfiles() {
-  return PROFILES.map(p => ({ id: p.id, label: p.label, memoryKeyPrefix: p.memoryKeyPrefix }));
+  return PROFILES.filter(Boolean).map(p => ({ id: p.id, label: p.label, memoryKeyPrefix: p.memoryKeyPrefix }));
 }

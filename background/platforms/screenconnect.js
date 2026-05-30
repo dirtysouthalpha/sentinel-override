@@ -12,8 +12,8 @@ export const screenconnect = {
   memoryKeyPrefix: 'screenconnect_',
 
   detect(url, goal) {
-    if (!url) return false;
-    try {
+    if (!url && !goal) return false;
+    if (url) try {
       const u = new URL(url);
       const host = u.hostname;
       if (/screenconnect\.com|connectwisecontrol\.com/i.test(host)) return true;

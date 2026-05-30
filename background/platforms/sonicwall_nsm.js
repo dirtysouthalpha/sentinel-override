@@ -13,8 +13,8 @@ export const sonicwallNsm = {
   // Match the NSM SaaS hosts AND any goal text strongly hinting on-box menus
   // while the user is on an NSM URL (the mismatch case).
   detect(url, goal) {
-    if (!url) return false;
-    try {
+    if (!url && !goal) return false;
+    if (url) try {
       const host = new URL(url).host;
       if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$/i.test(host)) return true;
       if (/(^|\.)cloud\.sonicwall\.com$/i.test(host)) return true;
