@@ -66,6 +66,8 @@ const _initGetCallback = _initGetCalls.find(c =>
 )?.[1] || null;
 
 beforeEach(() => {
+  if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
+  if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
   storageData = {};
   jest.clearAllMocks();
   // Reset telemetry level to 'normal' and disable persistence via storage change listener
@@ -416,6 +418,8 @@ describe('persistence flow', () => {
     for (let i = 0; i < 5; i++) {
       existingIndex.push({ runId: 'old-' + i, goal: 'old', startedAt: Date.now(), finishedAt: null, count: 0 });
     }
+    if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
+    if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
     storageData['telemetry_runs_index'] = existingIndex;
 
     await startRun('run-new', 'Should evict');
@@ -459,6 +463,8 @@ describe('persistence flow', () => {
   });
 
   test('deletePersistedRun removes from index and storage', async () => {
+    if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
+    if (typeof _clearCacheForTests === 'function') _clearCacheForTests();
     storageData['telemetry_runs_index'] = [
       { runId: 'del-1', goal: 'g', startedAt: 0, finishedAt: null, count: 0 },
       { runId: 'del-2', goal: 'g', startedAt: 0, finishedAt: null, count: 0 },
