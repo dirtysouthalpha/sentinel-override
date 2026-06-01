@@ -72,13 +72,16 @@ describe('all skills conform to the skill interface', () => {
       stepCount: 10,
       dynamicMaxSteps: 50,
     };
+    let matchCount = 0;
     for (const skill of allSkills) {
       if (skill.matches(ctx)) {
+        matchCount++;
         const text = skill.promptInjection(ctx);
         expect(typeof text).toBe('string');
         expect(text.length).toBeGreaterThan(20);
       }
     }
+    expect(matchCount).toBeGreaterThan(0);
   });
 });
 

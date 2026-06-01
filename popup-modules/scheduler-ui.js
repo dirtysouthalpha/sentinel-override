@@ -110,7 +110,7 @@ function renderScheduleCard(schedule) {
       recurrenceText = `Daily at ${r.time || '09:00'}`;
     } else if (r.interval === 'weekly' && r.daysOfWeek && r.daysOfWeek.length > 0) {
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      const days = r.daysOfWeek.sort((a, b) => a - b).map(d => dayNames[d]).join(', ');
+      const days = [...r.daysOfWeek].sort((a, b) => a - b).map(d => dayNames[d]).join(', ');
       recurrenceText = `Weekly on ${days} at ${r.time || '09:00'}`;
     } else if (r.interval === 'custom') {
       recurrenceText = `Every ${r.periodInMinutes || 60} minutes`;
