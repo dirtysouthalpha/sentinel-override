@@ -128,7 +128,7 @@ export function generateHtmlReport(auditLog, metadata) {
         </div>
         <div class="meta-item">
           <div class="label">Status</div>
-          <div class="value">${status}</div>
+          <div class="value">${escapeHtml(status)}</div>
         </div>
         <div class="meta-item">
           <div class="label">Date</div>
@@ -179,7 +179,7 @@ export function generateReplayReport(entries, meta) {
     else if (a.selector) detail = truncate(a.selector, 60);
 
     const screenshotHtml = e.screenshot
-      ? `<div style="margin-top:8px;"><img src="data:image/jpeg;base64,${e.screenshot}" style="max-width:100%;border-radius:4px;border:1px solid #334155;" loading="lazy" alt="Step ${num}" /></div>`
+      ? `<div style="margin-top:8px;"><img src="data:image/jpeg;base64,${escapeHtml(e.screenshot)}" style="max-width:100%;border-radius:4px;border:1px solid #334155;" loading="lazy" alt="Step ${num}" /></div>`
       : '';
     const reasoningHtml = e.reasoning
       ? `<details style="margin-top:6px;font-size:11px;color:#94a3b8;"><summary style="cursor:pointer;">🧠 Reasoning</summary><div style="margin-top:4px;padding:6px;background:rgba(0,0,0,0.3);border-radius:4px;white-space:pre-wrap;">${escapeHtml(e.reasoning)}</div></details>`

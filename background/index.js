@@ -399,6 +399,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       // then start a new agent run that inherits the restored state.
       try {
         const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
+        if (agentRunning) return { ok: false, error: 'Agent already running' };
         const result = await restoreFromCheckpoint();
         if (!result.restored) {
           return { ok: false, error: 'Cannot resume: ' + (result.error || 'unknown') };
@@ -874,6 +875,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'monitor_toggle': {
       if (!request.params?.id) throw new Error('Monitor ID required');
+      if (typeof request.params?.active !== 'boolean') throw new Error('Active flag required');
       await toggleMonitor(request.params.id, request.params.active);
       return { toggled: true };
     }

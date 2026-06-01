@@ -503,3 +503,133 @@ describe('scheduler-ui.js event delegation', () => {
     expect(() => runSchedulerUI(sandboxNullPanel)).not.toThrow();
   });
 });
+
+describe('scheduler-ui.js showRunHistory', () => {
+  let sandbox, result;
+
+  beforeEach(() => {
+    sandbox = createSandbox();
+    result = runSchedulerUI(sandbox);
+  });
+
+  test('returns early without error when schedule-history-list is absent', async () => {
+    // Remove schedule-history-list from the DOM so getElementById returns null
+    delete sandbox.elements['schedule-history-list'];
+    sandbox.fakeDoc.getElementById = (id) => {
+      if (id === 'schedule-history-list') return null;
+      return sandbox.elements[id] || makeElement(id);
+    };
+
+    // Re-run in a sandbox where history-list is absent
+    const sb2 = createSandbox();
+    const originalGetById = sb2.fakeDoc.getElementById.bind(sb2.fakeDoc);
+    sb2.fakeDoc.getElementById = (id) => {
+      if (id === 'schedule-history-list') return null;
+      return originalGetById(id);
+    };
+    const r2 = runSchedulerUI(sb2);
+
+    // showRunHistory should return early (no sendMessage, no crash)
+    await expect(r2.ctx.showRunHistory('sched-1', 'My Schedule')).resolves.toBeUndefined();
+    expect(sb2.chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test('shows run history results when modal and list are present', async () => {
+    const results = [
+      {
+        id: 'r1', status: 'success',
+        startedAt: Date.now() - 5000, completedAt: Date.now(),
+        report: 'All checks passed',
+      },
+    ];
+
+    sandbox.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (msg.action === 'schedule_results') {
+        cb({ ok: true, data: results });
+      }
+    });
+
+    // Track what gets appended to the history list
+    const appended = [];
+    sandbox.elements['schedule-history-list'].appendChild = (child) => { appended.push(child); };
+    sandbox.elements['schedule-history-list'].querySelectorAll = () => [];
+
+    await result.ctx.showRunHistory('sched-1', 'My Schedule');
+
+    // Modal should have 'show' class added
+    expect(sandbox.elements['schedule-history-modal'].classList.contains('show')).toBe(true);
+    // One result item was appended
+    expect(appended.length).toBe(1);
+  });
+
+  test('shows empty state message when no results returned', async () => {
+    sandbox.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (msg.action === 'schedule_results') {
+        cb({ ok: true, data: [] });
+      }
+    });
+
+    await result.ctx.showRunHistory('sched-1', 'Empty History');
+
+    expect(sandbox.elements['schedule-history-list'].innerHTML).toContain('No run history yet');
+    expect(sandbox.elements['schedule-history-modal'].classList.contains('show')).toBe(true);
+  });
+
+  test('does not throw when schedule-history-modal is absent but list is present', async () => {
+    // Sandbox where modal is absent but history list exists
+    const sb3 = createSandbox();
+    const origGetById3 = sb3.fakeDoc.getElementById.bind(sb3.fakeDoc);
+    sb3.fakeDoc.getElementById = (id) => {
+      if (id === 'schedule-history-modal') return null;
+      return origGetById3(id);
+    };
+    const r3 = runSchedulerUI(sb3);
+
+    sb3.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (msg.action === 'schedule_results') {
+        cb({ ok: true, data: [] });
+      }
+    });
+
+    // Should complete without throwing even though the modal element is absent
+    await expect(r3.ctx.showRunHistory('sched-1', 'No Modal')).resolves.toBeUndefined();
+  });
+
+  test('catch block: does not throw when sendMessage fails and schedule-history-modal is absent', async () => {
+    // Sandbox where modal is absent — exercises the catch block's null guard
+    const sb4 = createSandbox();
+    const origGetById4 = sb4.fakeDoc.getElementById.bind(sb4.fakeDoc);
+    sb4.fakeDoc.getElementById = (id) => {
+      if (id === 'schedule-history-modal') return null;
+      return origGetById4(id);
+    };
+    const r4 = runSchedulerUI(sb4);
+
+    // Make sendMessage invoke the callback with a runtime error
+    sb4.chrome.runtime.lastError = { message: 'Extension context invalidated' };
+    sb4.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      // Do not call cb — simulates a rejected promise path
+      // Instead, force lastError so the reject branch fires
+      cb && cb(undefined);
+    });
+
+    // Should not throw
+    await expect(r4.ctx.showRunHistory('sched-fail', 'Crash Test')).resolves.toBeUndefined();
+    // history list should show an error message
+    expect(sb4.elements['schedule-history-list'].innerHTML).toMatch(/Error|error/);
+  });
+
+  test('catch block: shows error in list and opens modal when modal is present but sendMessage errors', async () => {
+    sandbox.chrome.runtime.lastError = { message: 'Context invalidated' };
+    sandbox.chrome.runtime.sendMessage.mockImplementation((_msg, cb) => {
+      cb && cb(undefined);
+    });
+
+    await result.ctx.showRunHistory('sched-err', 'Error Schedule');
+
+    // Error message written to history list
+    expect(sandbox.elements['schedule-history-list'].innerHTML).toMatch(/Error|error/);
+    // Modal still opens
+    expect(sandbox.elements['schedule-history-modal'].classList.contains('show')).toBe(true);
+  });
+});
