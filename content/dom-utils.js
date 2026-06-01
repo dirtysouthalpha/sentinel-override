@@ -223,7 +223,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     //    e.g. "div.container > ul > li > a.btn" → try "a.btn" alone.
     try {
       var _parts = selector.split(/[\s>+~]+/);
-      var _leaf = (_parts[_parts.length - 1] || '').trim();
+      var _leaf = _parts.length > 0 ? (_parts[_parts.length - 1] || '').trim() : '';
       if (_leaf && _leaf !== selector && _leaf.length > 1) {
         try {
           var _leafEl = doc.querySelector(_leaf);
@@ -386,10 +386,10 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       // Emit page-absolute coords so click_at remains accurate after scroll.
       // scrollX/scrollY convert viewport-relative rect to document-absolute position.
       bbox = {
-        x: Math.round(r.left + window.scrollX),
-        y: Math.round(r.top + window.scrollY),
-        w: Math.round(r.width),
-        h: Math.round(r.height)
+        x: Math.round((Number(r.left) || 0) + (Number(window.scrollX) || 0)),
+        y: Math.round((Number(r.top) || 0) + (Number(window.scrollY) || 0)),
+        w: Math.round(Number(r.width) || 0),
+        h: Math.round(Number(r.height) || 0)
       };
     } catch (e) { console.warn('[Sentinel] bbox getBoundingClientRect:', e && e.message); }
 

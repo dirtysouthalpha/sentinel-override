@@ -39,7 +39,7 @@
  * @returns {{score: number, band: string, breakdown: object}}
  */
 export function computeTrustScore(m) {
-  if (!m || typeof m !== 'object' || m === null) return { score: 0, band: 'unknown', breakdown: {} };
+  if (!m || typeof m !== 'object') return { score: 0, band: 'unknown', breakdown: {} };
   const totalSteps = Math.max(0, Number(m.totalSteps) || 0);
   const failedSteps = Math.max(0, Math.min(totalSteps, Number(m.failedSteps) || 0));
   const productiveSteps = Math.max(0, Math.min(totalSteps, Number(m.productiveSteps) || 0));
