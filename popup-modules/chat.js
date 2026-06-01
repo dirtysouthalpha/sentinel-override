@@ -399,7 +399,7 @@ function setupApprovalModeToggle() {
     }
 
     // Re-enabling approvals is always safe; persist immediately.
-    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
     updateApprovalModeUI(true);
   });
 }
@@ -1650,7 +1650,7 @@ window.executeCommand = (action) => {
       document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', e); try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -2864,7 +2864,7 @@ async function _tryShowReport() {
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
   } catch (e) {
-    console.warn('[Sentinel/report] _tryShowReport failed:', e);
+    console.warn('[Sentinel/report] _tryShowReport failed:', (e && e.message) || String(e));
   }
 }
 
@@ -3157,10 +3157,10 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   // (3.51) Report display — show report card in chat when report is ready
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', e); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'agent_loop_complete' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', e); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (e && e.message) || String(e)); }
   }
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
@@ -3586,24 +3586,24 @@ chrome.runtime.onMessage.addListener((message) => {
   // Approval / pause / interrupt cards — the background sends these but the
   // handler had no cases for them, leaving every approval-mode run deadlocked.
   if (message.action === 'request_approval') {
-    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', e); }
+    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'mfa_pause') {
-    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', e); }
+    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'sign_in_wall_pause') {
-    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', e); }
+    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'adapted_goal_available') {
-    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', e); }
+    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'mode_mismatch_pause') {
-    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', e); }
+    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'download_captured') {
-    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', e); }
+    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', (e && e.message) || String(e)); }
   }
   if (message.action === 'run_log_available') {
-    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', e); }
+    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', (e && e.message) || String(e)); }
   }
 });

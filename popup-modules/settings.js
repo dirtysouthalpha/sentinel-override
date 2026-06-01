@@ -241,7 +241,7 @@ if (adaptivePromptsModeSelect) {
 
 if (adaptiveExpansionModeSelect) {
   adaptiveExpansionModeSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
   });
 }
 
@@ -553,7 +553,7 @@ if (ticketModeToggle) {
 
 if (ticketFormatSelect) {
   ticketFormatSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', e); });
+    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', (e && e.message) || String(e)); });
   });
 }
 
@@ -568,7 +568,7 @@ if (ticketFormatSelect) {
         const el = __TECH_INPUTS[key];
         if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
       }
-      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
+      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
     }, 400);
   };
   for (const key of Object.keys(__TECH_INPUTS)) {
@@ -594,7 +594,7 @@ if (expectedTenantInput) {
     if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
     __tenantSaveTimer = setTimeout(() => {
       const v = (expectedTenantInput.value || '').trim();
-      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', e); });
+      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
     }, 350);
   });
 }
