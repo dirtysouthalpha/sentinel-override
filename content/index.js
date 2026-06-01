@@ -24,7 +24,7 @@ if (!window.__sentinelContentTel) {
       }).catch((e) => {
         console.error('[_ctel] Unhandled rejection:', e);
       });
-    } catch { /* chrome.runtime gone during shutdown */ }
+    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', e && e.message); }
   };
   // Per-level shorthands so call sites stay terse.
   window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
@@ -99,7 +99,7 @@ if (window.__sentinelInitialized) {
       }
     };
     startObserving();
-  } catch { /* observer unavailable, fall back to time-of-check only */ }
+  } catch (e) { console.warn('[Sentinel] Observer unavailable:', e && e.message); }
 
   function __sentinelHasPositiveModalSignal(el) {
     try {
@@ -197,7 +197,7 @@ if (window.__sentinelInitialized) {
             dismissed.push(btn.textContent.trim().substring(0, 40) || sel);
           }
         }
-      } catch { /* invalid selector, skip */ }
+      } catch (e) { console.warn('[Sentinel] Invalid selector:', e && e.message); }
     }
 
     // Text-based Continue/Dismiss button detection — catches buttons that don't
@@ -222,7 +222,7 @@ if (window.__sentinelInitialized) {
           const _style = window.getComputedStyle(_cand);
           if (_style.display === 'none' || _style.visibility === 'hidden') continue;
           if (_style.position !== 'fixed' && _style.position !== 'absolute') continue;
-          const _zi = parseInt(_style.zIndex);
+          const _zi = parseInt(_style.zIndex, 10);
           if (isNaN(_zi) || (_zi < 100 && _style.position !== 'fixed')) continue;
           // Find buttons and clickable elements inside this overlay
           const _btns = _cand.querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"], span[class*="btn"], div[class*="btn"], input[type="button"], input[type="submit"]');
@@ -265,7 +265,7 @@ if (window.__sentinelInitialized) {
         if (el.querySelector && el.querySelector('main')) continue;
 
         const style = window.getComputedStyle(el);
-        const zi = parseInt(style.zIndex);
+        const zi = parseInt(style.zIndex, 10);
         if (style.position !== 'fixed' || isNaN(zi) || zi <= 1000) continue;
 
         const rect = el.getBoundingClientRect();
@@ -303,7 +303,7 @@ if (window.__sentinelInitialized) {
           const backdrop = document.querySelector('[class*="backdrop" i], [class*="scrim" i]');
           if (backdrop) backdrop.style.display = 'none';
         }
-      } catch { /* skip */ }
+      } catch (e) { console.warn('[Sentinel] Overlay error:', e && e.message); }
     }
 
     return { dismissed, count: dismissed.length };
@@ -396,7 +396,7 @@ if (window.__sentinelInitialized) {
                 if (iframeResult.elements) {
                   iframeResult.elements.forEach(el => interactiveElements.push(el));
                 }
-              } catch { /* fallback: no iframe scanning */ }
+              } catch (e) { console.warn('[Sentinel] Iframe scan error:', e && e.message); }
             }
             // If we found elements, stop retrying
             if (interactiveElements.length >= 5) break;
@@ -466,7 +466,7 @@ if (window.__sentinelInitialized) {
             await new Promise(r => setTimeout(r, 1000));
             const bodyText = (document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             if (bodyText.length > content.length) content = bodyText;
-          } catch { /* page may have navigated away */ }
+          } catch (e) { console.warn('[Sentinel] Page navigation error:', e && e.message); }
         }
 
         return { content: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
@@ -785,7 +785,7 @@ if (window.__sentinelInitialized) {
           } else if (el.isContentEditable) {
             el.textContent = '';
           }
-        } catch { /* non-fatal */ }
+        } catch (e) { console.warn('[Sentinel] Non-fatal error:', e && e.message); }
         return { focused: true };
       }
 
@@ -864,7 +864,7 @@ if (window.__sentinelInitialized) {
       const label = escapeHtml(description || actionType);
       overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
       overlay.style.opacity = '1';
-    } catch { /* extension context may be invalidated */ }
+    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', e && e.message); }
   }
 
   function hideActionBanner() {
@@ -884,7 +884,7 @@ if (window.__sentinelInitialized) {
       indicator.style.top = y + 'px';
       (document.body || document.documentElement).appendChild(indicator);
       setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', e && e.message); } }, 700);
-    } catch { /* extension context may be invalidated */ }
+    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', e && e.message); }
   }
 
   // Make overlay functions available for the execute_command handler
@@ -1446,7 +1446,7 @@ if (window.__sentinelInitialized) {
           if (typeof cmd.dpr === 'number' && Math.abs(cmd.dpr - liveDpr) > 0.01) {
             console.warn('[sentinel] click_at dpr mismatch: cmd.dpr=' + cmd.dpr + ' live=' + liveDpr + ' (still treating x,y as CSS pixels)');
           }
-        } catch { /* non-fatal */ }
+        } catch (e) { console.warn('[Sentinel] Non-fatal error:', e && e.message); }
 
         // (#11) Defensive viewport clamp. If coordinates land outside the
         // visible viewport, refuse rather than silently clicking on nothing.
@@ -1527,7 +1527,7 @@ if (window.__sentinelInitialized) {
 
         // mousedown + dragstart on source
         dragEl.dispatchEvent(mkMouse('mousedown', srcX, srcY));
-        try { dragEl.dispatchEvent(mkDrag('dragstart', srcX, srcY)); } catch { /* DragEvent may be unavailable */ }
+        try { dragEl.dispatchEvent(mkDrag('dragstart', srcX, srcY)); } catch (e) { console.warn('[Sentinel] DragEvent unavailable:', e && e.message); }
 
         // intermediate mousemove steps for smooth drag appearance
         var steps = 6;
@@ -1541,7 +1541,7 @@ if (window.__sentinelInitialized) {
 
         // dragenter + drop + dragend on target
         try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch { /* non-fatal */ }
-        try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch { /* non-fatal */ }
+        try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch (e) { console.warn('[Sentinel] Drop event error:', e && e.message); }
         dragEl.dispatchEvent(mkMouse('mouseup', dstX, dstY));
         try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch { /* non-fatal */ }
 
@@ -2372,7 +2372,7 @@ if (window.__sentinelInitialized) {
               if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
                 try {
                   containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-                } catch { /* non-fatal */ }
+                } catch (e) { console.warn('[Sentinel] Non-fatal error:', e && e.message); }
               }
             } catch {
               return 'Element not found: ' + describeTarget(cmd);
@@ -2389,7 +2389,7 @@ if (window.__sentinelInitialized) {
             if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
               try {
                 containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-              } catch { /* non-fatal */ }
+              } catch (e) { console.warn('[Sentinel] Non-fatal error:', e && e.message); }
             }
           } catch {
             return 'Element not found: ' + cmd.selector;
@@ -2451,7 +2451,7 @@ if (window.__sentinelInitialized) {
         if (!ov) return 'Overlay utilities not available';
         // Try Escape globally first — handles enterprise dialogs that trap focus
         var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
-        try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch { /* safe */ }
+        try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', e && e.message); }
         try { document.body.dispatchEvent(new KeyboardEvent('keydown', escO)); } catch { /* safe */ }
         await new Promise(r => setTimeout(r, 200));
         var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;

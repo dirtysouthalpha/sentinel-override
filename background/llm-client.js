@@ -760,7 +760,7 @@ export function getPlatformContext(currentUrl, goal) {
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
-  } catch (_) { /* never crash prompt-building on profile lookup */ }
+  } catch (e) { console.warn('[Sentinel/llm] Profile lookup failed:', e && e.message); }
   const ctx = prose + selectorBlock;
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
   return ctx;
@@ -972,7 +972,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const strs = parsed.steps.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
         if (strs.length > 0) return strs;
       }
-    } catch (_) { /* fall through to strategy 2 */ }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', e && e.message); }
 
     // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
     // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
@@ -998,11 +998,11 @@ export async function generatePlan(goal, settings, context = {}) {
             const _norm = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
             if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm(parsed.plan); if (r.length > 0) return r; }
             if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm(parsed.steps); if (r.length > 0) return r; }
-          } catch (_) { /* not valid JSON at this position, keep scanning */ }
+          } catch (e) { /* not valid JSON at this position, keep scanning */ }
           s2from = s2end + 1;
         } else { break; }
       }
-    } catch (_) { /* fall through to strategy 3 */ }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', e && e.message); }
 
     // Strategy 3: find first { and last } and try that substring; also try bare array.
     // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
@@ -1022,7 +1022,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
         if (Array.isArray(parsed) && parsed.length > 0) { const r = _norm3(parsed); if (r.length > 0) return r; }
       }
-    } catch (_) { /* fall through to strategy 4 */ }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', e && e.message); }
 
     // Strategy 4: extract numbered or bulleted steps from prose.
     // Uses contentNoThink so think-block text isn't mistaken for real plan steps.
@@ -1740,7 +1740,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   // command. No extra API call -- this just sharpens the existing
   // observation cycle so silent failures (click registered but modal didn't
   // close, form filled but hidden validation rejected) get caught.
-  const _pv = agentState.pendingVerification;
+  const _pv = (agentState && agentState.pendingVerification) || null;
   const verificationCtx = (_pv && _pv.type)
     ? `\n## VERIFY YOUR LAST ACTION FIRST\nYour previous step was: **${_pv.type}** -> "${(_pv.description || '').replace(/"/g, '\\"').substring(0, 100)}".\n\nBefore proposing the next command, examine the current screenshot and confirm the action took effect. Look for evidence:\n- Click on a button -> Did the modal close? Did the page navigate? Did a success message appear?\n- Type in a field -> Does the field now contain the typed text?\n- Select a dropdown -> Did the selected value update?\n- Check / check_all -> Are the checkboxes now in the expected state?\n- press_key (Enter/Tab/etc.) -> Did the form submit / focus advance / dropdown open?\n\nIf the page state confirms the action took effect: proceed with the next planned step.\n\nIf the page does NOT reflect the action (button still highlighted, modal still open, field still empty, no navigation): treat the step as failed. Do NOT proceed as if it succeeded. Choose ONE recovery:\n1. Retry the same action with a different selector (often the click missed or hit a wrapper element).\n2. wait 1500ms, then re-observe -- some SPAs commit asynchronously.\n3. scroll_to the element first, then retry.\n4. Use execute_js to trigger the action programmatically (.click(), dispatchEvent('click'), HTMLElement.value setter + 'input' event).\n\nThis verification is mandatory -- never skip past a destructive action without confirming it landed.\n`
     : '';
@@ -2031,7 +2031,7 @@ export function extractFirstJsonObject(str) {
       try {
         const parsed = JSON.parse(candidate);
         if (parsed.type && validTypes.has(parsed.type)) return candidate;
-      } catch (_) { /* not valid JSON, try next */ }
+      } catch (e) { console.warn('[Sentinel/llm] JSON parse failed:', e && e.message); }
       searchFrom = end + 1;
     } else {
       break;
@@ -2195,14 +2195,14 @@ export function parseLLMResponse(content) {
           'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
           'smart_navigate', 'batch']);
         if (parsed && parsed.type && _validTypesSet.has(parsed.type)) return parsed;
-      } catch (_) { /* try regex salvage */ }
+      } catch (e) { console.warn('[Sentinel/llm] Regex salvage failed:', e && e.message); }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         if (salvaged) {
           console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
           return salvaged;
         }
-      } catch (_) { /* fall through */ }
+      } catch (e) { console.warn('[Sentinel/llm] Parse failed:', e && e.message); }
     }
     return { type: 'note', text: `Parse error (will retry): ${(err && err.message) || String(err)}` };
   }
