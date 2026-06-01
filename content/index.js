@@ -1348,6 +1348,7 @@ if (window.__sentinelInitialized) {
         // Get element center for click indicator
         try {
           const rect = el.getBoundingClientRect();
+          if (!rect) throw new Error('Unable to get element bounding rect');
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
         } catch (e) { console.warn('[Sentinel] click indicator rect:', e && e.message); }
 
@@ -1389,6 +1390,7 @@ if (window.__sentinelInitialized) {
           }
         } catch (e) { console.warn('[Sentinel] cursor right_click:', e && e.message); }
         var rcRect = rcEl.getBoundingClientRect();
+        if (!rcRect) return 'Error: unable to get bounding rect for right_click';
         var rcX = Math.round(rcRect.left + rcRect.width / 2);
         var rcY = Math.round(rcRect.top + rcRect.height / 2);
         if (!targetDoc.defaultView) return 'Error: no window context for right_click dispatch';
@@ -1494,7 +1496,9 @@ if (window.__sentinelInitialized) {
         el.click();
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         setTimeout(() => hl.removeHighlight(el), 2000);
-        return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + (el.className ? '.' + String(el.className).split(' ')[0] : '');
+        const classes = String(el.className || '').split(' ').filter(Boolean);
+        const classSuffix = classes.length > 0 ? '.' + classes[0] : '';
+        return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + classSuffix;
       }
 
       case 'drag_and_drop': {
@@ -1511,6 +1515,7 @@ if (window.__sentinelInitialized) {
 
         var srcRect = dragEl.getBoundingClientRect();
         var dstRect = dropEl.getBoundingClientRect();
+        if (!srcRect || !dstRect) return 'Error: unable to get bounding rects for drag_and_drop';
         var srcX = Math.round(srcRect.left + srcRect.width / 2);
         var srcY = Math.round(srcRect.top + srcRect.height / 2);
         var dstX = Math.round(dstRect.left + dstRect.width / 2);
@@ -2483,7 +2488,8 @@ if (window.__sentinelInitialized) {
 
         try {
           const r = el.getBoundingClientRect();
-          if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
+          if (!r) { console.warn('[Sentinel] scroll_to indicator: null rect'); }
+          else if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
         } catch (e) { console.warn('[Sentinel] scroll_to indicator:', e && e.message); }
         setTimeout(() => hl.removeHighlight(el), 1500);
         const note = resolvedScroll.staleRef ? ' (selector fallback after stale ref)' : '';
@@ -2495,7 +2501,9 @@ if (window.__sentinelInitialized) {
         var iframeEls = document.querySelectorAll('iframe');
         if (!iframeEls[frameIdx]) return 'Iframe not found at index ' + frameIdx;
         try {
-          var frameDoc = iframeEls[frameIdx].contentWindow.document;
+          const cw = iframeEls[frameIdx].contentWindow;
+          if (!cw) return 'Cannot access iframe ' + frameIdx + ' (no content window)';
+          var frameDoc = cw.document;
           __sentinelActiveFrameDoc = frameDoc;
           var frameTitle = frameDoc.title || '';
           var frameUrl = iframeEls[frameIdx].src || '';
