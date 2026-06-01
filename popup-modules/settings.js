@@ -130,6 +130,11 @@ if (quickAssistToggle) {
   quickAssistToggle.addEventListener('change', () => {
     const enabled = quickAssistToggle.checked;
     chrome.storage.local.set({ quickAssist: enabled }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save quickAssist:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       if (quickAssistLabel) {
         quickAssistLabel.textContent = enabled
           ? 'ON — Select text on any page'
@@ -153,6 +158,11 @@ if (useTrustedInputToggle) {
   useTrustedInputToggle.addEventListener('change', () => {
     const enabled = useTrustedInputToggle.checked;
     chrome.storage.local.set({ useTrustedInput: enabled }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save useTrustedInput:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(
           enabled
@@ -181,6 +191,11 @@ if (soundEnabledToggle) {
   soundEnabledToggle.addEventListener('change', () => {
     const enabled = soundEnabledToggle.checked;
     chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(
           enabled
@@ -211,6 +226,11 @@ if (adaptivePromptsModeSelect) {
   adaptivePromptsModeSelect.addEventListener('change', () => {
     const v = adaptivePromptsModeSelect.value;
     chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
@@ -237,6 +257,11 @@ if (telemetryLevelSelect) {
   });
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save telemetryLevel:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
@@ -256,6 +281,11 @@ if (telemetryPersistToggle) {
   });
   telemetryPersistToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save telemetryPersist:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
@@ -280,6 +310,11 @@ if (telemetryRedactToggle) {
   });
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save telemetryRedact:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
@@ -303,6 +338,11 @@ if (telemetrySkillAdaptToggle) {
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
@@ -428,6 +468,11 @@ if (quickModeToggle) {
   quickModeToggle.addEventListener('change', () => {
     const enabled = quickModeToggle.checked;
     chrome.storage.local.set({ quickMode: enabled }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save quickMode:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       if (quickModeLabel) {
         quickModeLabel.textContent = enabled
           ? 'ON — Fast execution, no planning'
@@ -489,6 +534,11 @@ if (ticketModeToggle) {
     const enabled = ticketModeToggle.checked;
     __setTicketFormatRowVisible(enabled);
     chrome.storage.local.set({ ticketMode: enabled }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('[Sentinel/settings] Failed to save ticketMode:', chrome.runtime.lastError.message);
+        showToast('Failed to save setting', 'error');
+        return;
+      }
       try {
         showToast(
           enabled
@@ -684,7 +734,8 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
   }
 
   // Save to per-provider structure
-  state.providerConfigs[state.activeProviderId] = {
+  const activeProviderId = state.activeProviderId || 'openai';
+  state.providerConfigs[activeProviderId] = {
     api_key: apiKey,
     model: model,
     endpoint: endpoint,
@@ -693,14 +744,18 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
   };
 
   chrome.storage.local.set({
-    active_provider: state.activeProviderId,
+    active_provider: activeProviderId,
     providers: state.providerConfigs,
     export_format: format,
     agent_context: agentContext
   }, () => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) {
+      console.error('[Sentinel/settings] Failed to save settings:', chrome.runtime.lastError.message);
+      showToast('Failed to save settings', 'error');
+      return;
+    }
     if (settingsModal) settingsModal.classList.remove('show');
-    showToast(`Settings saved (${state.activeProviderId})`, 'success');
+    showToast(`Settings saved (${activeProviderId})`, 'success');
   });
 });
 
