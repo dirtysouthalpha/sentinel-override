@@ -603,7 +603,7 @@ async function ensureDebuggerAttached(tabId) {
         tabId,
         message: 'Debugger re-attached after banner was dismissed. Trusted input is active. Dismiss this banner again to fall back to synthetic events.'
       }).catch((e) => {
-        console.error('[wasUserDetached] Unhandled rejection:', e);
+        console.error('[wasUserDetached] Unhandled rejection:', (e && e.message) || String(e));
       });
     } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', (_e && _e.message) || String(_e)); }
   }
