@@ -43,7 +43,11 @@ function loadThemePreference() {
 
 function updateThemeToggle() {
   const isDark = document.body.classList.contains('dark-mode');
-  localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
+  try {
+    localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
+  } catch (e) {
+    console.warn('[Sentinel/settings] Failed to save theme preference:', e && e.message);
+  }
 }
 
 function toggleTheme() {
@@ -846,7 +850,11 @@ function applyThemePreset(theme) {
 
   if (presets[theme]) {
     // Save to localStorage
-    localStorage.setItem('theme-named', theme);
+    try {
+      localStorage.setItem('theme-named', theme);
+    } catch (e) {
+      console.warn('[Sentinel/settings] Failed to save theme-named:', e && e.message);
+    }
     // Remove all theme glow classes
     document.body.className = document.body.className
       .replace(/theme-\S+/g, '')
@@ -879,7 +887,11 @@ if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
   document.documentElement.style.setProperty('--bg-primary', bg);
   document.documentElement.style.setProperty('--text-primary', text);
 
-  localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
+  try {
+    localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
+  } catch (e) {
+    console.warn('[Sentinel/settings] Failed to save custom theme:', e && e.message);
+  }
   if (themeModal) themeModal.classList.remove('show');
   showToast('Theme applied', 'success');
 });
