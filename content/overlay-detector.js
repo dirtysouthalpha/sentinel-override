@@ -72,7 +72,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
         if (!view) continue;
         const style = view.getComputedStyle(el);
         if (style.position !== 'fixed' && style.position !== 'absolute') continue;
-        const zIndex = parseInt(style.zIndex);
+        const zIndex = parseInt(style.zIndex, 10);
         if (isNaN(zIndex) || zIndex <= MIN_BLOCKING_Z_INDEX) continue;
         if (style.pointerEvents === 'none') continue;
         const rect = el.getBoundingClientRect();

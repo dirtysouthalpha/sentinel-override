@@ -87,7 +87,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     }
 
     const parts = selector.split(':');
-    const frameIndex = parseInt(parts[1]);
+    const frameIndex = parseInt(parts[1], 10);
     const remainingSelector = parts.slice(2).join(':');
 
     if (isNaN(frameIndex)) return null;
