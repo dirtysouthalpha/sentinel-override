@@ -912,7 +912,7 @@ export async function generatePlan(goal, settings, context = {}) {
     if (!provider) {
       clearTimeout(timeout);
       console.warn('[Sentinel] generatePlan: unknown provider for endpoint', endpoint, '— using single-step fallback');
-      return [goal.substring(0, 300)];
+      return [(goal || 'Complete the task').substring(0, 300)];
     }
     // Only send response_format:json_object to OpenAI proper — Z.AI and other
     // compatible providers may reject or ignore it, causing 400 errors.
@@ -929,7 +929,7 @@ export async function generatePlan(goal, settings, context = {}) {
     clearTimeout(timeout);
     if (!response.ok) {
       console.warn('Plan generation API returned', response.status, '— using goal as single-step fallback');
-      return [goal.substring(0, 300)];
+      return [(goal || 'Complete the task').substring(0, 300)];
     }
     const data = await response.json();
     if (!data) throw new Error('Plan API returned null response body');
@@ -941,7 +941,7 @@ export async function generatePlan(goal, settings, context = {}) {
     const content = provider.parseResponse(data);
     if (!content) {
       console.warn('Plan generation: empty response content — using single-step fallback');
-      return [goal.substring(0, 300)];
+      return [(goal || 'Complete the task').substring(0, 300)];
     }
     // Pre-process: strip <think>...</think> blocks that some GLM/DeepSeek models embed
     // directly in the content field. These must be removed BEFORE any JSON scanning so
