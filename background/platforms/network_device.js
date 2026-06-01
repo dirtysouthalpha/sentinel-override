@@ -17,7 +17,7 @@ export const networkDevice = {
       const goalText = String(goal || '').toLowerCase();
       return /\b(firewall|router|switch|access point|management ui|admin panel|web ui)\b/i.test(goalText);
     } catch (error) {
-      console.error('[Sentinel] Error in networkDevice detect:', error);
+      console.error('[Sentinel] Error in networkDevice detect:', error && error.message);
       return false;
     }
   },
