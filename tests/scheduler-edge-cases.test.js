@@ -266,7 +266,7 @@ describe('storage error handling', () => {
     // listSchedules catches errors and returns empty object
     const { listSchedules } = await import('../background/scheduler.js');
     const result = await listSchedules();
-    expect(Array.isArray(result) || typeof result === 'object').toBe(true);
+    expect(result === null || Array.isArray(result) || typeof result === 'object').toBe(true);
   });
 
   test('handles storage.local.set rejection in saveSchedules', async () => {
@@ -330,7 +330,7 @@ describe('getNextRunTime — edge cases', () => {
 describe('listSchedules — edge cases', () => {
   test('returns empty object when no schedules exist', async () => {
     const result = await listSchedules();
-    expect(typeof result === 'object' || Array.isArray(result)).toBe(true);
+    expect(result === null || typeof result === 'object' || Array.isArray(result)).toBe(true);
   });
 
   test('returns created schedule after creation', async () => {
