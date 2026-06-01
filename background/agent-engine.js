@@ -525,13 +525,13 @@ export async function undoLastAction() {
       try {
         await sendMessageWithRetry(entry.tabId, { action: 'execute_command', command: { type: 'execute_js', code } }, 1);
       } catch (e) {
-        return { success: false, reason: 'Could not restore field: ' + (e.message || String(e)) };
+        return { success: false, reason: 'Could not restore field: ' + ((e && e.message) ? e.message : String(e)) };
       }
       return { success: true, description: 'Restored field "' + selector + '" to previous value' };
     }
     return { success: false, reason: 'Unknown undo entry type: ' + entry.type };
   } catch (e) {
-    return { success: false, reason: 'Undo failed: ' + (e.message || String(e)) };
+    return { success: false, reason: 'Undo failed: ' + ((e && e.message) ? e.message : String(e)) };
   }
 }
 
@@ -4431,7 +4431,7 @@ async function runAgentLoop(goal, workingTabId) {
           );
         } catch (e) {
           _aiCallError = e;
-          command = { type: 'note', text: 'API call failed: ' + (e.message || String(e)) };
+          command = { type: 'note', text: 'API call failed: ' + ((e && e.message) ? e.message : String(e)) };
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
@@ -4452,8 +4452,8 @@ async function runAgentLoop(goal, workingTabId) {
           apiCallCount = agentState.apiCallCount;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
-            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (_aiCallError.message || 'unknown'), null);
-            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: _aiCallError.message || String(_aiCallError) });
+            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + ((_aiCallError && _aiCallError.message) ? _aiCallError.message : 'unknown'), null);
+            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: (_aiCallError && _aiCallError.message) ? _aiCallError.message : String(_aiCallError) });
           } else if (command && command.type) {
             activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
             tel.info('llm', 'LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
@@ -5007,8 +5007,8 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: e.message || String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-          sendActionResult(stepCount, 'Error reading console: ' + (e.message || 'unknown'), true);
+          try { tel.error('network', 'Error reading console', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          sendActionResult(stepCount, 'Error reading console: ' + ((e && e.message) ? e.message : 'unknown'), true);
         }
         await sleep(300);
         continue;
@@ -5033,8 +5033,8 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: e.message || String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
-          sendActionResult(stepCount, 'Error reading network: ' + (e.message || 'unknown'), true);
+          try { tel.error('network', 'Error reading network', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          sendActionResult(stepCount, 'Error reading network: ' + ((e && e.message) ? e.message : 'unknown'), true);
         }
         await sleep(300);
         continue;
@@ -5079,7 +5079,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
         } catch (e) {
-          const _r = 'lookup failed: ' + (e.message || String(e));
+          const _r = 'lookup failed: ' + ((e && e.message) ? e.message : String(e));
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
@@ -5160,7 +5160,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
         } catch (e) {
-          const _r = 'run_remote_command failed: ' + (e.message || String(e));
+          const _r = 'run_remote_command failed: ' + ((e && e.message) ? e.message : String(e));
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
