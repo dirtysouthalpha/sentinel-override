@@ -158,33 +158,36 @@ function renderScheduleCard(schedule) {
 }
 
 // ========== Event Delegation for Schedule List ==========
-document.getElementById('schedules-panel').addEventListener('click', (e) => {
-  const target = e.target.closest('[data-action]');
-  if (!target) return;
+const _schedulesPanel = document.getElementById('schedules-panel');
+if (_schedulesPanel) {
+  _schedulesPanel.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
 
-  const action = target.dataset.action;
-  const id = target.dataset.id;
+    const action = target.dataset.action;
+    const id = target.dataset.id;
 
-  if (action === 'toggle') {
-    // Checkbox change is handled separately below
-    return;
-  }
-  if (action === 'history') {
-    showRunHistory(id, target.dataset.name);
-  } else if (action === 'delete') {
-    handleDeleteSchedule(id, target.dataset.name);
-  }
-});
+    if (action === 'toggle') {
+      // Checkbox change is handled separately below
+      return;
+    }
+    if (action === 'history') {
+      showRunHistory(id, target.dataset.name);
+    } else if (action === 'delete') {
+      handleDeleteSchedule(id, target.dataset.name);
+    }
+  });
 
-// Handle toggle checkbox changes (change event)
-document.getElementById('schedules-panel').addEventListener('change', (e) => {
-  const target = e.target.closest('[data-action="toggle"]');
-  if (!target) return;
+  // Handle toggle checkbox changes (change event)
+  _schedulesPanel.addEventListener('change', (e) => {
+    const target = e.target.closest('[data-action="toggle"]');
+    if (!target) return;
 
-  const id = target.dataset.id;
-  const enabled = target.checked;
-  handleToggleSchedule(id, enabled);
-});
+    const id = target.dataset.id;
+    const enabled = target.checked;
+    handleToggleSchedule(id, enabled);
+  });
+}
 
 // ========== Create Schedule Modal ==========
 function openCreateScheduleModal() {
