@@ -1001,7 +1001,7 @@ export async function stopAgent() {
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', e && e.message); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1132,7 +1132,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       'Recent action: ' + (history.length > 0 && history[history.length - 1].action ? history[history.length - 1].action.type : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
-  } catch (_) { /* non-fatal */ }
+  } catch (e) { console.warn('[Sentinel] HUD update failed:', e && e.message); }
 }
 
 // ========== Stall Detection ==========
@@ -1141,6 +1141,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
 
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
+    if (recent.length === 0) return { stalled: false };
     const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
     const allSameResult = recent.every(h => h.result === recent[0]?.result);
     const allFailed = recent.every(h => {
@@ -1202,13 +1203,14 @@ async function attachTabToSentinelGroup(tabId) {
           color: SENTINEL_GROUP_COLOR,
           collapsed: false
         });
-      } catch (_) { /* tabGroups permission may be missing; non-fatal */ }
+      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', e && e.message); }
     } else {
       // Add to the existing group. tabs.group with groupId moves them in.
       try {
         await chrome.tabs.group({ tabIds: [tabId], groupId: agentTabGroupId });
-      } catch (_) {
+      } catch (e) {
         // Group may have been dissolved by the user — recreate.
+        console.warn('[Sentinel] Tab group failed, recreating:', e && e.message);
         const groupId = await chrome.tabs.group({ tabIds: [tabId] });
         agentTabGroupId = groupId;
         try {
@@ -1217,14 +1219,14 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (_e) { /* tab group update non-fatal */ }
+        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', e2 && e2.message); }
       }
     }
     agentAttachedTabs.add(tabId);
     // Ensure side panel is enabled on this attached tab.
     try {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
-    } catch (_e) { /* side panel API may not be available */ }
+    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', e && e.message); }
     // (v3.53) Re-scope: enable panel on this new tab, disable on others
     // (v3.57) sidePanel scoping removed from tab attach
   } catch (e) {
@@ -1376,7 +1378,7 @@ async function _cdpObservePage(tabId) {
     + '            results.overlays.push({ selector: "overlay", text: (node.textContent || "").substring(0, 100), buttons: btnList });'
     + '          }'
     + '        }'
-    + '      } catch(e) {}'
+    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", e && e.message); }'
     + '    }'
     + '  }'
     + '} catch(e) { results.error = e.message; }'
@@ -1523,7 +1525,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
     await new Promise(r => setTimeout(r, 200));
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
-  } catch(_) {}
+  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', e && e.message); }
 
   console.log('[Sentinel/CDP] Overlay dismissal complete. Total removed:', totalRemoved);
   return totalRemoved;
@@ -6600,7 +6602,7 @@ async function runAgentLoop(goal, workingTabId) {
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', e && e.message); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
