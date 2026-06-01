@@ -24,13 +24,13 @@ async function _visionObserve(tab, _currentUrl) {
         const parsed = typeof discoverResult.value === 'string'
           ? JSON.parse(discoverResult.value) : discoverResult.value;
         indexedElements = Array.isArray(parsed) ? parsed : [];
-      } catch (e) { console.warn('[Sentinel/v4] Element parse error:', e); }
+      } catch (e) { console.warn('[Sentinel/v4] Element parse error:', (e && e.message) || String(e)); }
     }
     console.log('[Sentinel/v4] Discovered ' + indexedElements.length + ' interactive elements');
 
     // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
     try { await cdpExecuteJs(tab, VISION_SOM, { timeout: 5000 }); }
-    catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', e); }
+    catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', (e && e.message) || String(e)); }
 
     // Step 3: Small delay for canvas to render
     await new Promise(r => setTimeout(r, 200));
@@ -42,7 +42,7 @@ async function _visionObserve(tab, _currentUrl) {
         'return document.body ? document.body.innerText.substring(0, 30000) : "";',
         { timeout: 5000 });
       pageText = (textResult && textResult.value) || '';
-    } catch (e) { console.warn('[Sentinel/v4] Page text failed:', e); }
+    } catch (e) { console.warn('[Sentinel/v4] Page text failed:', (e && e.message) || String(e)); }
 
     // Step 5: Build element tree text for LLM
     let elementTree = '';
@@ -252,7 +252,7 @@ export async function restoreFromCheckpoint() {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10) || 0;
         if (tabId > 0 && typeof url === 'string') {
-          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
         }
       }
     }
@@ -261,7 +261,7 @@ export async function restoreFromCheckpoint() {
 
     // Persist restored history to chrome.storage.local so it survives across
     // the boundary. The run loop reads it from there on the first step.
-    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
 
     return {
       restored: true,
@@ -328,7 +328,7 @@ async function _updateRunLogIndex(runLogId, fields) {
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
       const evictKeys = evict.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId).filter(Boolean);
-      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
   } catch (e) {
@@ -379,7 +379,7 @@ function activityFail(stepNumber, key, label, detail) {
 
 /** Update an in-progress item's label without changing state (e.g., elapsed counter). */
 function activityUpdate(stepNumber, key, label) {
-  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
 }
 
 // ========== Configuration ==========
