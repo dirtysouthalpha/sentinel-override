@@ -1758,7 +1758,7 @@ function addReportCard(report) {
   // (3.19.1) Defensive guard — some report-generation failure paths can call
   // this with undefined/null. Don't crash the popup; surface a non-blocking
   // toast and bail. The user can re-run the report from the modal.
-  if (!report || typeof report !== 'object') {
+  if (!report || typeof report !== 'object' || report === null) {
     try { showToast('Report data missing or malformed — skipped report card', 'error'); } catch { /* showToast may fail in detached popup */ }
     console.warn('[Sentinel] addReportCard called without a report object; ignoring.');
     return;
@@ -2840,7 +2840,7 @@ async function _tryShowReport() {
   try {
     const stored = await chrome.storage.local.get(['last_agent_report']);
     const report = stored.last_agent_report;
-    if (!report || typeof report !== 'object') return;
+    if (!report || typeof report !== 'object' || report === null) return;
     // Only show if report is less than 5 minutes old
     const age = Date.now() - new Date(report.timestamp).getTime();
     if (age > 5 * 60 * 1000) return;

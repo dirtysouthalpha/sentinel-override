@@ -2420,7 +2420,7 @@ if (window.__sentinelInitialized) {
         if (!containers.length) return 'Element not found: ' + describeTarget(cmd);
         const limit = cmd.limit || 20;
         const fields = cmd.fields || {};
-        if (typeof fields !== 'object' || Array.isArray(fields)) return 'Invalid fields parameter';
+        if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) return 'Invalid fields parameter';
         const items = containers.slice(0, limit).map(container => {
           const item = {};
           for (const [fieldName, fieldSelector] of Object.entries(fields)) {

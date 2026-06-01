@@ -90,7 +90,7 @@ async function _checkDomReadyState(tabId) {
     if (typeof data === 'string') {
       try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (_e) { /* parse failed */ }
     }
-    if (data && typeof data === 'object') {
+    if (data && typeof data === 'object' && data !== null) {
       let parsed;
       try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (_e) { parsed = null; }
       if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
@@ -240,7 +240,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       let data = response && response.data !== undefined ? response.data : response;
       // Unwrap inner execute_command wrapper: { result: <string> }
       // Content script returns { result } for execute_command actions
-      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 1 && 'result' in data) {
+      if (data && typeof data === 'object' && data !== null && !Array.isArray(data) && Object.keys(data).length === 1 && 'result' in data) {
         data = data.result;
       }
       return data;
@@ -914,7 +914,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
   let viewport = { width: 0, height: 0, dpr: 1, scrollX: 0, scrollY: 0 };
   try {
     const vp = await sendMessageWithRetry(tabId, { action: 'get_viewport_info' }, 1);
-    if (vp && typeof vp === 'object') {
+    if (vp && typeof vp === 'object' && vp !== null) {
       viewport = {
         width: Number(vp.width) || 0,
         height: Number(vp.height) || 0,
