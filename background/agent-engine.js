@@ -153,7 +153,7 @@ try {
       }
     });
   }
-} catch (checkpointErr) {
+} catch (_checkpointErr) {
   /* Non-fatal: chrome API may be unavailable in some contexts */
 }
 
@@ -198,7 +198,7 @@ async function writeCheckpoint(stepCount) {
     if (chrome.storage && chrome.storage.session && chrome.storage.session.set) {
       await chrome.storage.session.set({ agent_checkpoint: _lastCheckpoint });
     }
-  } catch (writeErr) {
+  } catch (_writeErr) {
     /* Non-fatal: checkpoint write failed, but agent loop continues */
   }
 }
@@ -508,7 +508,7 @@ export async function undoLastAction() {
       const prevUrl = entry.previousUrl;
       if (!prevUrl) {
         // No previous URL — try goBack
-        try { await chrome.tabs.goBack(entry.tabId); } catch (goBackErr) {
+        try { await chrome.tabs.goBack(entry.tabId); } catch (_goBackErr) {
           /* Non-fatal: goBack failed during undo */
         }
         return { success: true, description: 'Navigated back (no previous URL recorded)' };
@@ -649,7 +649,7 @@ export async function startAgent(goal, sender) {
 
   agentRunning = true;
   // Persist running state so SW restarts can detect an interrupted run
-  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(sessionErr) {
+  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(_sessionErr) {
     /* Non-fatal: session storage set failed */
   }
   resetAgentState();
