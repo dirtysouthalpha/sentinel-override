@@ -5646,7 +5646,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           actionFailed = false;
         } catch (e) {
-          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + (e.message || 'unknown');
+          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + (e?.message || 'unknown');
           actionFailed = true;
         }
       } else if (command.type === 'read_page') {
