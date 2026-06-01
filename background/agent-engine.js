@@ -1385,7 +1385,7 @@ async function _cdpObservePage(tabId) {
     + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", e && e.message); }'
     + '    }'
     + '  }'
-    + '} catch(e) { results.error = e.message; }'
+    + '} catch(e) { results.error = e && e.message ? e.message : String(e); }'
     + 'return results;';
 
   // SPEED: Check cache — if same URL observed recently, reuse

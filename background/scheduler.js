@@ -206,13 +206,13 @@ function sendNotification(schedule, result) {
 
   if (result.status === 'success') {
     message = `Completed successfully at ${new Date(result.completedAt).toLocaleTimeString()}.`;
-    if (result.report) {
+    if (result.report && typeof result.report === 'string') {
       const snippet = result.report.substring(0, 150).replace(/\n/g, ' ');
       message += ` ${snippet}${result.report.length > 150 ? '...' : ''}`;
     }
   } else {
     message = `Failed at ${new Date(result.completedAt).toLocaleTimeString()}.`;
-    if (result.error) {
+    if (result.error && typeof result.error === 'string') {
       message += ` Error: ${result.error.substring(0, 100)}`;
     }
   }
@@ -503,7 +503,7 @@ export async function executeScheduledTask(alarmName) {
     await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: 'Resolved goal was empty' });
     return;
   }
-  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: goal.substring(0, 80) });
+  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: String(goal).substring(0, 80) });
 
   let tabId;
   try {

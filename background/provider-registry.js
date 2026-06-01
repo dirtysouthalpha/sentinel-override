@@ -230,8 +230,9 @@ export const PROVIDERS = {
     parseResponse: (data) => {
       // Detect auth/API errors from providers that return HTTP 200 with error payloads
       // Z.AI returns {code:1000, msg:"Authentication Failed", success:false}
-      if (data.code === 1000 || data.code === 1001) {
-        throw new Error(`🔑 Authentication failed: ${data.msg || data.message || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
+      if (data && (data.code === 1000 || data.code === 1001)) {
+        const code = data.code || '?';
+        throw new Error(`🔑 Authentication failed: ${data.msg || data.message || 'Unknown error (code ' + code + ')'}. Check your API key in extension settings.`);
       }
       if (!data.choices || !data.choices.length) {
         const errMsg = data.error?.message || data.msg || data.message || null;
