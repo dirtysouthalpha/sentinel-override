@@ -1144,8 +1144,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
 
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
-    if (recent.length === 0) return { stalled: false };
-    const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
+    const allSameType = recent[0] && recent[0].action && recent.every(h => h.action && h.action.type === recent[0].action.type);
     const allSameResult = recent.every(h => h.result === recent[0]?.result);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';

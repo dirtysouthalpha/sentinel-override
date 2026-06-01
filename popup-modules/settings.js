@@ -624,7 +624,7 @@ function _renderLearnedPatterns(patterns) {
     btn.addEventListener('click', async () => {
       try {
         const idx = parseInt(btn.dataset.idx, 10);
-        if (isNaN(idx) || idx < 0) return;
+        if (Number.isNaN(idx) || idx < 0) return;
         const s = await chrome.storage.local.get(['learned_patterns']);
         const arr = s.learned_patterns || [];
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
