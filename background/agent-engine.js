@@ -329,11 +329,14 @@ async function _updateRunLogIndex(runLogId, fields) {
     // Drop overflow and evict detail records for those runs.
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
-      const evictKeys = evict.map(e => 'run_log_' + e.runLogId).filter(Boolean);
+      const evictKeys = evict.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId).filter(Boolean);
       try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
-  } catch (_) { /* non-fatal */ }
+  } catch (e) {
+    // Storage write failed non-fatally
+    console.warn('[Sentinel] Run log index save failed:', e && e.message);
+  }
 }
 
 // ========== Activity Phase Tracking (3.16.0) ==========
@@ -1278,10 +1281,14 @@ async function _enableSidePanelEverywhere() {
       if (tab.id) {
         try {
           await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
-        } catch (_) {}
+        } catch (e) {
+          // Side panel may not be available in all contexts
+        }
       }
     }
-  } catch (_) {}
+  } catch (e) {
+    // Side panel API call failed non-critically
+  }
 }
 
 
@@ -2028,7 +2035,9 @@ function _countEvidenceSources(agentMemory, history) {
     if (Array.isArray(history)) {
       count += history.filter(h => h && h.action && h.action.type === 'note').length;
     }
-  } catch (_) {}
+  } catch (e) {
+    // Context data read failed non-fatally
+  }
   return count;
 }
 
@@ -3232,7 +3241,9 @@ async function runAgentLoop(goal, workingTabId) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', e && e.message);
     agentPlan = null;
   }
-  try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_) {}
+  try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (e) {
+    // Plan preview send failed non-fatally
+  }
 
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
@@ -3292,7 +3303,9 @@ async function runAgentLoop(goal, workingTabId) {
             dynamicBaseline = CONFIG.maxSteps + 50;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        // Dynamic baseline calculation failed non-fatally
+      }
       const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
       // (3.36.1) Hotfix — telemetry emit moved AFTER `const dynamicMaxSteps`
       // declaration. Previously this line was above the const and tripped a
@@ -3564,7 +3577,9 @@ async function runAgentLoop(goal, workingTabId) {
               role: 'user',
               content: `[SYSTEM RECOVERY] The action "${stuckAction}" has failed ${lastActionTypes.length} times in a row. You are stuck in a loop. Try a COMPLETELY DIFFERENT approach. If close_tab isn't working, try navigate to the main page instead. If you can't close a tab, just navigate away from it. Do NOT repeat "${stuckAction}" again.`
             });
-            try { await persistHistory(); } catch (_) {}
+            try { await persistHistory(); } catch (e) {
+              // History persist failed non-fatally during recovery
+            }
           }
         }
       } catch (_e) { /* non-fatal */ }
@@ -3706,7 +3721,9 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const narration = _buildPageNarration(tabInfo && tabInfo.url, tabInfo && tabInfo.title, observation, pageContent);
             if (narration) sendAgentStatus('observing', narration);
-          } catch (_) {}
+          } catch (e) {
+            // Page narration failed non-fatally
+          }
         } catch (err) {
           activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
           sendSilentUpdate(`Error reading page: ${(err && err.message) || String(err)}`, stepCount);
@@ -3747,13 +3764,17 @@ async function runAgentLoop(goal, workingTabId) {
         // Context should have been registered in startAgent/registerInitialTab.
         // If it's missing (e.g., tab was replaced mid-run), re-register so the
         // loop can continue rather than spin forever on the continue below.
-        try { registerInitialTab(tab, currentUrl); } catch (_) {}
+        try { registerInitialTab(tab, currentUrl); } catch (e) {
+          // Tab registration failed non-fatally during recovery
+        }
         tabCtx = getTabContext(tab);
         // If still null after re-registration, create a minimal context and
         // proceed — never spin-loop here as it would keep apiCallCount at 0.
         if (!tabCtx) {
           console.warn('[Sentinel] tabCtx still null after re-register — creating minimal context for tab', tab);
-          try { registerInitialTab(tab, currentUrl); } catch (_) {}
+          try { registerInitialTab(tab, currentUrl); } catch (e) {
+          // Tab registration failed non-fatally during recovery
+        }
           tabCtx = getTabContext(tab);
           if (!tabCtx) {
             // Last resort: proceed with a synthetic screenshotCache object so
@@ -3990,7 +4011,7 @@ async function runAgentLoop(goal, workingTabId) {
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
 
         if (consecutiveNonProductive >= 3 || jsLoop) {
-          const memCount = Object.keys(agentMemory).length;
+          const memCount = Object.keys(agentMemory || {}).length;
           const reason = jsLoop
             ? recentJsCount + ' execute_js calls in last 8 steps with no data saved'
             : consecutiveNonProductive + ' non-productive steps in a row';
@@ -4014,11 +4035,11 @@ async function runAgentLoop(goal, workingTabId) {
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
       const recentTabActions = history.slice(-5).filter(h => h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
-      const isMakingProgress = recentTabActions > 0 || Object.keys(agentMemory).length > 0;
+      const isMakingProgress = recentTabActions > 0 || Object.keys(agentMemory || {}).length > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
       } else if (stepCount >= 20 && !loopDirective) {
-        const memCount = Object.keys(agentMemory).length;
+        const memCount = Object.keys(agentMemory || {}).length;
         loopDirective = memCount > 0
           ? '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. You have ' + memCount + ' extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n'
           : '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n';
@@ -4029,13 +4050,13 @@ async function runAgentLoop(goal, workingTabId) {
       //    from collected memory instead of just being broken out of.
       const _softCap = Math.max(40, dynamicMaxSteps - 5);
       if (stepCount >= _softCap) {
-        const memCount = Object.keys(agentMemory).length;
+        const memCount = Object.keys(agentMemory || {}).length;
         const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
           const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
           return '- ' + k + ': ' + vStr;
         }).join('\n');
         const summary = memCount > 0
-          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (Object.keys(agentMemory).length > 10 ? '\n...and ' + (Object.keys(agentMemory).length - 10) + ' more items.' : '')
+          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (Object.keys(agentMemory || {}).length > 10 ? '\n...and ' + (Object.keys(agentMemory || {}).length - 10) + ' more items.' : '')
           : 'Task timed out after ' + stepCount + ' steps without extracting useful data.';
         finished = true;
         sendSilentUpdate('Step limit reached -- finishing', stepCount);
@@ -4119,7 +4140,9 @@ async function runAgentLoop(goal, workingTabId) {
           loopDirective += _recovery.promptInjection;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (_) {}
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (_e) {
+          // Console logging failed non-fatally
+        }
       }
 
       // Progress indicator
@@ -4545,7 +4568,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_) { /* completeness check failure is non-fatal */ }
 
-        const memCount = Object.keys(agentMemory).length;
+        const memCount = Object.keys(agentMemory || {}).length;
         const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
         const hasData = memCount > 0 || noteCount > 0;
 
@@ -5684,7 +5707,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
-              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory).length });
+              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory || {}).length });
             } catch (_e) {}
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
@@ -5790,7 +5813,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' ? Object.keys(savedValue).length : null));
-                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory).length });
+                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory || {}).length });
               } catch (_e) {}
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
@@ -6357,7 +6380,9 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           activityDone(stepCount, 'dispatch', describeAction(command), { result: _resPreview });
         }
-      } catch (_) {}
+      } catch (e) {
+        // Activity emit failed non-fatally
+      }
       historyPush({ step: stepCount, action: command, result });
 
       // (3.40.0) Audit log: append a structured entry for MSP compliance.
@@ -6369,7 +6394,9 @@ async function runAgentLoop(goal, workingTabId) {
           target:  _describeTarget(command),
           outcome: typeof result === 'string' ? result.slice(0, 200) : (actionFailed ? 'failed' : 'ok'),
         });
-      } catch (_) {}
+      } catch (e) {
+        // Audit log append failed non-fatally
+      }
 
       // (3.12.0) Vision-based action verification flag. After every modifying
       // action that didn't fail outright, mark the next observation cycle to
@@ -6768,7 +6795,9 @@ async function requestApproval(command, stepNumber) {
           title: 'Sentinel Override — Approval needed',
           message: 'Step ' + stepNumber + ': ' + description.substring(0, 100) + '. Open Sentinel to approve or reject.'
         });
-      } catch (_) {}
+      } catch (e) {
+        // Notification create failed non-fatally
+      }
       // Hard-reject after 5 minutes total (4 more minutes from here).
       // The listener is still active so a user response still resolves early.
       const hardRejectId = setTimeout(() => {
