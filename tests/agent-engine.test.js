@@ -346,7 +346,7 @@ function _describeTargetRef(cmd) {
   if (cmd.label) return '"' + String(cmd.label).slice(0, 80) + '"';
   if (cmd.selector) return cmd.selector;
   if (cmd.ref) return 'ref:' + cmd.ref;
-  if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return '(' + cmd.x + ',' + cmd.y + ')';
+  if (cmd && typeof cmd.x === 'number' && typeof cmd.y === 'number') return '(' + cmd.x + ',' + cmd.y + ')';
   return '(no target)';
 }
 
@@ -574,10 +574,11 @@ describe('agent-engine — stall detection reference tests', () => {
   function detectStallRef(history, consecutiveFailures) {
     const recent = history.slice(-stallConfig.similarityWindow);
     if (recent.length >= stallConfig.similarityWindow) {
+      if (recent.length === 0) return { stalled: false };
       const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
       const allSameResult = recent.every(h => h.result === recent[0].result);
       const allFailed = recent.every(h => {
-        const r = typeof h.result === 'string' ? h.result : '';
+        const r = h?.result ? (typeof h.result === 'string' ? h.result : '') : '';
         return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.includes('Element not found') || r.includes('No element');
       });
       if (allSameType && allSameResult && allFailed) {
@@ -816,12 +817,12 @@ describe('agent-engine — sign-in wall detection reference tests', () => {
     try { host = new URL(url).host; } catch { return null; }
     if (!SIGN_IN_WALL_HOSTS_RE.test(host)) return null;
     const pwField = Array.isArray(elements)
-      ? elements.find(e => e && (e.type === 'password' || String(e.selector || '').toLowerCase().includes('password')))
+      ? elements.find(e => e && (e.type === 'password' || String(e?.selector || '').toLowerCase().includes('password')))
       : null;
     if (pwField) return { matched: true, host, evidence: 'password input on ' + host };
     if (pageText && SIGN_IN_WALL_TEXT_RE.test(pageText)) {
       const emailField = Array.isArray(elements)
-        ? elements.find(e => e && (e.type === 'email' || /(email|username)/i.test(String(e.selector || ''))))
+        ? elements.find(e => e && (e.type === 'email' || /(email|username)/i.test(String(e?.selector || ''))))
         : null;
       if (emailField) return { matched: true, host, evidence: 'email/username input on ' + host };
     }
