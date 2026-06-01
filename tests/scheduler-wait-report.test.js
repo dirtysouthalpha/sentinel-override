@@ -285,7 +285,7 @@ describe('executeScheduledTask — agent start failure (lines 571-584)', () => {
 
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Failed to start agent'),
-      expect.any(Error)
+      expect.any(String)
     );
 
     errorSpy.mockRestore();
@@ -326,7 +326,7 @@ describe('executeScheduledTask — tab creation failure (lines 542-556)', () => 
     // console.error for the tab failure
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Failed to get/create tab'),
-      expect.any(Error)
+      expect.any(String)
     );
 
     errorSpy.mockRestore();

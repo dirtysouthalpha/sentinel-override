@@ -52,7 +52,7 @@ export function startSwKeepalive(name) {
     try {
       if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.set) {
         chrome.storage.session.set({ ['_sw_keepalive_' + name]: Date.now() }).catch((e) => {
-          console.error('[tick] Unhandled rejection:', e);
+          console.error('[tick] Unhandled rejection:', (e && e.message) || String(e));
         });
       } else if (chrome && chrome.runtime && chrome.runtime.getPlatformInfo) {
         chrome.runtime.getPlatformInfo(() => {});
@@ -87,7 +87,7 @@ export function stopSwKeepalive(name) {
   try {
     if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.remove) {
       chrome.storage.session.remove('_sw_keepalive_' + name).catch((e) => {
-        console.error('[handle] Unhandled rejection:', e);
+        console.error('[handle] Unhandled rejection:', (e && e.message) || String(e));
       });
     }
   } catch (_e) { /* session storage may not be available */ }
