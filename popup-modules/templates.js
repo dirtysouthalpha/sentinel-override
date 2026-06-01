@@ -210,7 +210,7 @@ function parseTags(tagString) {
 function openEditTemplateModal(templateId) {
   chrome.runtime.sendMessage({ action: 'template_get', id: templateId }, (response) => {
     if (chrome.runtime.lastError) {
-      showToast(chrome.runtime.lastError.message || 'Error loading template', 'error');
+      showToast((chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Error loading template', 'error');
       return;
     }
     if (!response || !response.ok || !response.data) {
@@ -404,7 +404,7 @@ function deleteTemplate(templateId, templateName) {
     id: templateId
   }, (response) => {
     if (chrome.runtime.lastError) {
-      showToast(chrome.runtime.lastError.message || 'Error deleting template', 'error');
+      showToast((chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Error deleting template', 'error');
       return;
     }
     if (response && response.error) {

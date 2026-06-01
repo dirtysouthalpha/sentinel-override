@@ -1057,7 +1057,7 @@ if (undoBtn) {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
       if (chrome.runtime.lastError && !resp) {
-        addMessage('Undo failed: ' + (chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+        addMessage('Undo failed: ' + ((chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error'), 'assistant');
         return;
       }
       if (resp && resp.ok === false) {
@@ -1845,7 +1845,7 @@ function openReportModal(markdown) {
   try {
     chrome.storage.local.set({ _pendingViewReport: payload }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', chrome.runtime.lastError.message || 'Unknown error');
+        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         openReportModalInline(markdown);
         return;
       }

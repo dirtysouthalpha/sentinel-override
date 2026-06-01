@@ -227,7 +227,7 @@ if (adaptivePromptsModeSelect) {
     const v = adaptivePromptsModeSelect.value;
     chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -258,7 +258,7 @@ if (telemetryLevelSelect) {
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryLevel:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryLevel:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -282,7 +282,7 @@ if (telemetryPersistToggle) {
   telemetryPersistToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryPersist:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryPersist:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -311,7 +311,7 @@ if (telemetryRedactToggle) {
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryRedact:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryRedact:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -339,7 +339,7 @@ if (telemetrySkillAdaptToggle) {
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -469,7 +469,7 @@ if (quickModeToggle) {
     const enabled = quickModeToggle.checked;
     chrome.storage.local.set({ quickMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickMode:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save quickMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -535,7 +535,7 @@ if (ticketModeToggle) {
     __setTicketFormatRowVisible(enabled);
     chrome.storage.local.set({ ticketMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save ticketMode:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save ticketMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -750,7 +750,7 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
     agent_context: agentContext
   }, () => {
     if (chrome.runtime.lastError) {
-      console.error('[Sentinel/settings] Failed to save settings:', chrome.runtime.lastError.message);
+      console.error('[Sentinel/settings] Failed to save settings:', chrome.runtime.lastError && chrome.runtime.lastError.message);
       showToast('Failed to save settings', 'error');
       return;
     }
