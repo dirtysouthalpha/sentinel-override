@@ -1358,11 +1358,15 @@ function setupVoiceInput() {
           let finalTranscript = '';
           recognition.onresult = (event) => {
             let interim = '';
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
-              } else {
-                interim += event.results[i][0].transcript;
+            const results = event.results || [];
+            const resultIndex = event.resultIndex || 0;
+            for (let i = resultIndex; i < results.length; i++) {
+              if (results[i] && results[i][0] && results[i][0].transcript) {
+                if (results[i].isFinal) {
+                  finalTranscript += results[i][0].transcript;
+                } else {
+                  interim += results[i][0].transcript;
+                }
               }
             }
             chrome.runtime.sendMessage({
@@ -1381,7 +1385,7 @@ function setupVoiceInput() {
           recognition.onerror = (event) => {
             chrome.runtime.sendMessage({
               action: 'voice_error',
-              error: event.error,
+              error: (event && event.error) || 'unknown_error',
               tabId: capturedTabId
             }).catch(() => {});
           };
