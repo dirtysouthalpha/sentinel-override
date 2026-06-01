@@ -1080,9 +1080,8 @@ describe('_checkPreFinishCompleteness — new edge cases', () => {
     const result = _checkPreFinishCompleteness('Goal', undefined, []);
     expect(result).toBeNull();
   });
-  // FIX: throws TypeError on undefined history (calls .filter())
-  test('handles undefined history', () => {
-    expect(() => _checkPreFinishCompleteness('Goal', {}, undefined)).toThrow();
+  test('handles undefined history gracefully', () => {
+    expect(_checkPreFinishCompleteness('Goal', {}, undefined)).toBeNull();
   });
 });
 

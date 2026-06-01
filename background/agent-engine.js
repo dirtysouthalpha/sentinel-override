@@ -2859,6 +2859,7 @@ function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
 function _checkPreFinishCompleteness(goal, agentMemory, history) {
   if (!goal || typeof goal !== 'string') return null;
   if (!agentMemory || typeof agentMemory !== 'object') return null;
+  if (!Array.isArray(history)) history = [];
 
   const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
   const noteText = history
@@ -4545,11 +4546,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Block: haven't opened ANY article tabs AND no summaries written
             if (_openTabs === 0 && _summaryKeys.length === 0 && _notes === 0) {
               console.warn('[Sentinel/multi-article] Blocking premature finish —', _targetN, 'articles requested, 0 opened/read');
-              history.push({
-                role: 'user',
-                content: `[SYSTEM] DO NOT finish. The goal asks for ${_targetN} articles with summaries. You collected link URLs but have NOT read any article content. You MUST: 1) Use open_tab to open article URLs from your extracted data, 2) Read each page, 3) Use note with a summary for each. Call finish ONLY after reading at least ${Math.min(_targetN, 3)} articles.`
-              });
-              historyPush({ step: stepCount, action: command, result: 'BLOCKED: premature finish — must open and read articles first. Use open_tab on article URLs.' });
+              historyPush({ step: stepCount, action: command, result: `BLOCKED: premature finish — goal asks for ${_targetN} articles. Must open_tab article URLs and read each page before finishing.` });
               await persistHistory();
               sendSilentUpdate('Finish blocked — must read articles first', stepCount);
               await sleep(1000);
