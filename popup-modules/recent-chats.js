@@ -133,7 +133,7 @@
           : [];
         // Save to chat_history so future loads keep it
         try {
-          chrome.storage.local.set({ chat_history: state.conversationHistory });
+          await chrome.storage.local.set({ chat_history: state.conversationHistory });
         } catch { /* storage may fail */ }
       }
 

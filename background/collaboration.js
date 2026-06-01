@@ -319,7 +319,7 @@ function scanForDangerousPatterns(text) {
 function parseVersion(version) {
   const parts = (version || '0.0.0').split('.').map(p => {
     const num = parseInt(p, 10);
-    return isNaN(num) ? 0 : num;
+    return Number.isNaN(num) ? 0 : num;
   });
   return {
     major: parts[0] || 0,
