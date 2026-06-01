@@ -1362,7 +1362,7 @@ async function _cdpObservePage(tabId) {
     + '        var nst = window.getComputedStyle(node);'
     + '        if (nst.display === "none" || nst.visibility === "hidden") continue;'
     + '        var npos = nst.position || "";'
-    + '        var nz = parseInt(nst.zIndex) || 0;'
+    + '        var nz = parseInt(nst.zIndex, 10) || 0;'
     + '        if ((npos === "fixed" || npos === "absolute") && nz >= 100) {'
     + '          var nrect = node.getBoundingClientRect();'
     + '          if (nrect.width > 200 && nrect.height > 100) {'
@@ -1466,7 +1466,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
         '    try {',
         '      var st = window.getComputedStyle(allDivs[k]);',
         '      var pos = st.position || "";',
-        '      var z = parseInt(st.zIndex) || 0;',
+        '      var z = parseInt(st.zIndex, 10) || 0;',
         '      if ((pos === "fixed" || pos === "absolute") && z >= 100) {',
         '        var r = allDivs[k].getBoundingClientRect();',
         '        var area = r.width * r.height;',
@@ -3027,7 +3027,7 @@ function generateHeuristicPlan(goal, currentUrl) {
 
   // Extract count
   const countMatch = goal.match(/(?:top\s+)?(\d+)/);
-  const count = countMatch ? (parseInt(countMatch[1]) || 10) : 10;
+  const count = countMatch ? (parseInt(countMatch[1], 10) || 10) : 10;
 
   if (isMultiPage) {
     const steps = [];
