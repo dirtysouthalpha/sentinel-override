@@ -48,7 +48,6 @@ const {
 describe('shared-state edge cases', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSessionStorage.length = 0;
     Object.keys(mockSessionStorage).forEach(k => delete mockSessionStorage[k]);
     Object.keys(mockLocalStorage).forEach(k => delete mockLocalStorage[k]);
     // Reset chrome mock to ensure fresh state
