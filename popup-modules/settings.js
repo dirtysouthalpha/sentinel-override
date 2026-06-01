@@ -46,7 +46,7 @@ function updateThemeToggle() {
   try {
     localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to save theme preference:', e && e.message);
+    console.warn('[Sentinel/settings] Failed to save theme preference:', (e && e.message) || String(e));
   }
 }
 
@@ -131,7 +131,7 @@ if (quickAssistToggle) {
     const enabled = quickAssistToggle.checked;
     chrome.storage.local.set({ quickAssist: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickAssist:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+        console.error('[Sentinel/settings] Failed to save quickAssist:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -159,7 +159,7 @@ if (useTrustedInputToggle) {
     const enabled = useTrustedInputToggle.checked;
     chrome.storage.local.set({ useTrustedInput: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save useTrustedInput:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+        console.error('[Sentinel/settings] Failed to save useTrustedInput:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -170,7 +170,7 @@ if (useTrustedInputToggle) {
             : 'Trusted input OFF — using synthetic events',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast unavailable:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast unavailable:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -192,7 +192,7 @@ if (soundEnabledToggle) {
     const enabled = soundEnabledToggle.checked;
     chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -203,7 +203,7 @@ if (soundEnabledToggle) {
             : 'Sound notifications OFF — silent mode',
           'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -227,14 +227,14 @@ if (adaptivePromptsModeSelect) {
     const v = adaptivePromptsModeSelect.value;
     chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -258,7 +258,7 @@ if (telemetryLevelSelect) {
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryLevel:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryLevel:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -282,7 +282,7 @@ if (telemetryPersistToggle) {
   telemetryPersistToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryPersist:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryPersist:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -290,7 +290,7 @@ if (telemetryPersistToggle) {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
           : 'Telemetry persistence disabled', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -311,7 +311,7 @@ if (telemetryRedactToggle) {
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryRedact:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetryRedact:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -319,7 +319,7 @@ if (telemetryRedactToggle) {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
           : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -339,7 +339,7 @@ if (telemetrySkillAdaptToggle) {
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -347,7 +347,7 @@ if (telemetrySkillAdaptToggle) {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
           : 'Adaptive skill priority OFF — static priorities only', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -361,7 +361,7 @@ if (skillStatsResetBtn) {
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -469,7 +469,7 @@ if (quickModeToggle) {
     const enabled = quickModeToggle.checked;
     chrome.storage.local.set({ quickMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save quickMode:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -535,7 +535,7 @@ if (ticketModeToggle) {
     __setTicketFormatRowVisible(enabled);
     chrome.storage.local.set({ ticketMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save ticketMode:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save ticketMode:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -546,7 +546,7 @@ if (ticketModeToggle) {
             : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -630,7 +630,7 @@ function _renderLearnedPatterns(patterns) {
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         await chrome.storage.local.set({ learned_patterns: arr });
         _renderLearnedPatterns(arr);
-      } catch (e) { console.warn('[Sentinel] delete pattern failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (e && e.message) || String(e)); }
     });
   });
 }
@@ -641,7 +641,7 @@ if (clearAllPatternsBtn) {
     try {
       await chrome.storage.local.set({ learned_patterns: [] });
       _renderLearnedPatterns([]);
-    } catch (e) { console.warn('[Sentinel] clear patterns failed:', e && e.message); }
+    } catch (e) { console.warn('[Sentinel] clear patterns failed:', (e && e.message) || String(e)); }
   });
 }
 
@@ -671,7 +671,7 @@ if (downloadAuditLogBtn) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + ((e && e.message) || 'unknown');
+      downloadAuditLogBtn.textContent = 'Error: ' + ((e && e.message) || 'Unknown error');
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });
@@ -750,7 +750,7 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
     agent_context: agentContext
   }, () => {
     if (chrome.runtime.lastError) {
-      console.error('[Sentinel/settings] Failed to save settings:', chrome.runtime.lastError && chrome.runtime.lastError.message);
+      console.error('[Sentinel/settings] Failed to save settings:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
       showToast('Failed to save settings', 'error');
       return;
     }
@@ -1057,13 +1057,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
   });
 
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
-      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
+      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (e && e.message) || String(e)); }
       return;
     }
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
