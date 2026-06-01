@@ -393,6 +393,24 @@ describe('computeNextRun — custom interval', () => {
   });
 });
 
+describe('computeNextRun — non-string time guard', () => {
+  test('defaults to 09:00 when time is null', () => {
+    const result = getNextRunTime({
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: null },
+    });
+    expect(result).toBeGreaterThan(Date.now() - 1);
+  });
+
+  test('defaults to 09:00 when time is an object (malformed storage)', () => {
+    const result = getNextRunTime({
+      type: 'recurring',
+      recurrence: { interval: 'daily', time: {} },
+    });
+    expect(result).toBeGreaterThan(Date.now() - 1);
+  });
+});
+
 describe('computeNextRun — fallback', () => {
   test('returns nextRunAt when recurrence is null', () => {
     // getNextRunTime falls through to schedule.nextRunAt when recurrence is falsy

@@ -162,7 +162,7 @@ function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime)
 function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
-  const timeParts = (recurrence.time || '09:00').split(':').map(Number);
+  const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':').map(Number);
   const hours = (Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
   const minutes = (Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
   const now = new Date();
