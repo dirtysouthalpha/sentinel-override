@@ -61,3 +61,47 @@ describe('VISION_EXECUTE dead code removal', () => {
     expect(src).not.toContain('function _visionParseResponse');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Vision index guard — Number.isInteger + > 0 (Bug #3 fix)
+// ═══════════════════════════════════════════════════════════════════
+describe('vision index guard uses Number.isInteger and > 0', () => {
+  it('guard uses Number.isInteger to reject NaN and null-derived 0', () => {
+    expect(src).toContain(
+      'Number.isInteger(command._visionIndex) && command._visionIndex > 0'
+    );
+  });
+
+  it('old guard "command._visionIndex !== undefined" is no longer used alone', () => {
+    // Ensure the weaker form is not present — the fix replaces it entirely
+    expect(src).not.toContain('command._visionIndex !== undefined');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Vision type CDP string escaping — \r and \t (Bug #2 fix)
+// ═══════════════════════════════════════════════════════════════════
+describe('vision type action _safeText escaping includes \\r and \\t', () => {
+  // Find the _safeText assignment line in the vision type handler
+  const safeTextLine = src.split('\n').find(l => l.includes('const _safeText') && l.includes('replace'));
+
+  it('_safeText line exists', () => {
+    expect(safeTextLine).toBeTruthy();
+  });
+
+  it('escapes carriage return (\\r)', () => {
+    expect(safeTextLine).toContain('\\r');
+  });
+
+  it('escapes tab (\\t)', () => {
+    expect(safeTextLine).toContain('\\t');
+  });
+
+  it('escapes newline (\\n)', () => {
+    expect(safeTextLine).toContain('\\n');
+  });
+
+  it('escapes backslash', () => {
+    expect(safeTextLine).toContain('\\/g');
+  });
+});

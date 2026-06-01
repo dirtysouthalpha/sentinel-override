@@ -5221,7 +5221,7 @@ async function runAgentLoop(goal, workingTabId) {
       // ═══════════════════════════════════════════════════════════
       // v4.0 VISION INDEX-BASED ACTION EXECUTION
       // ═══════════════════════════════════════════════════════════
-      if (command._visionAction && command._visionIndex !== undefined) {
+      if (command._visionAction && Number.isInteger(command._visionIndex) && command._visionIndex > 0) {
         const _viEl = _visionElements ? _visionElements.find(e => e.index === command._visionIndex) : null;
         if (_viEl) {
           try {
@@ -5296,7 +5296,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             } else if (command.type === 'type') {
               // Type into indexed element
-              const _safeText = (command.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+              const _safeText = (command.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
               try {
                 const _typeRes = await cdpExecuteJs(tab,
                   'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
