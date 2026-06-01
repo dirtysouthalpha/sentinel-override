@@ -3629,7 +3629,8 @@ async function runAgentLoop(goal, workingTabId) {
                 val = (parsed && parsed.value !== undefined) ? parsed.value : val;
               } catch (_e) {}
             }
-            _currentDomHash = typeof val === 'number' ? val : parseInt(String(val), 10) || 0;
+            const parsed = typeof val === 'number' ? val : parseInt(String(val), 10);
+            _currentDomHash = (typeof parsed === 'number' && !Number.isNaN(parsed)) ? parsed : 0;
           }
         } catch (_) { /* hash probe failed — assume cache miss */ }
       }
@@ -3714,8 +3715,9 @@ async function runAgentLoop(goal, workingTabId) {
             // Page narration failed non-fatally
           }
         } catch (err) {
-          activityFail(stepCount, 'observe', 'Page read failed: ' + (err?.message || 'unknown'), null);
-          sendSilentUpdate(`Error reading page: ${(err && err.message) || String(err)}`, stepCount);
+          const errMsg = (typeof err === 'object' && err !== null && err.message) ? err.message : String(err);
+          activityFail(stepCount, 'observe', 'Page read failed: ' + errMsg, null);
+          sendSilentUpdate(`Error reading page: ${errMsg}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection
           // between each attempt. By the time we reach here the page is truly unreachable
           // for this step. Proceeding with empty observation lets the LLM fire and issue
