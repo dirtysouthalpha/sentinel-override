@@ -553,7 +553,7 @@ if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 function _renderLearnedPatterns(patterns) {
   const list = document.getElementById('learnedPatternsList');
   if (!list) return;
-  if (!patterns || patterns.length === 0) {
+  if (!patterns || !Array.isArray(patterns) || patterns.length === 0) {
     list.innerHTML = '<em style="color:var(--text-tertiary,#666);">No patterns saved yet.</em>';
     return;
   }
