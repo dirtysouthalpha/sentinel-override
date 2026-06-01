@@ -15,7 +15,7 @@ globalThis.chrome = {
           ? keys
           : typeof keys === 'string'
             ? [keys]
-            : Object.keys(keys);
+            : Object.keys(keys || {});
         const result = {};
         for (const k of keyList) {
           if (storageData[k] !== undefined) result[k] = storageData[k];

@@ -11,7 +11,7 @@ const mockGet = jest.fn(async (keys) => {
     return { [keys]: storageData[keys] !== undefined ? storageData[keys] : undefined };
   }
   const result = {};
-  for (const key of Array.isArray(keys) ? keys : Object.keys(keys)) {
+  for (const key of Array.isArray(keys) ? keys : Object.keys(keys || {})) {
     result[key] = storageData[key];
   }
   return result;
