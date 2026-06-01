@@ -363,8 +363,9 @@ describe('cursor ensureStyle', () => {
     const afterFirst = appendedTo.length;
     cursor.show();
     const afterSecond = appendedTo.length;
-    // Second show should not create additional style elements
-    // (may still create cursor elements if not found, but style is cached)
+    // Second show should not append any additional elements (style is cached)
+    expect(afterFirst).toBeGreaterThan(prevLen);
+    expect(afterSecond).toBe(afterFirst);
   });
 });
 

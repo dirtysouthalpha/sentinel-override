@@ -213,7 +213,7 @@ export function sendActionMessage(command, stepNumber, observation) {
         ? command.__reasoning.substring(0, 600) : undefined
     }
   }).catch((e) => {
-    console.error('[el] Unhandled rejection:', e);
+    console.error('[sendActionMessage] Unhandled rejection:', e);
   });
 }
 
@@ -233,7 +233,7 @@ export function sendActionResult(stepNumber, result, isError) {
     result: resultStr.substring(0, 300),
     isError: !!isError
   }).catch((e) => {
-    console.error('[resultStr] Unhandled rejection:', e);
+    console.error('[sendActionResult] Unhandled rejection:', e);
   });
 }
 
