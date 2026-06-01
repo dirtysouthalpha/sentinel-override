@@ -4114,6 +4114,7 @@ async function runAgentLoop(goal, workingTabId) {
       
       // v4.0 Vision-First Observation Override
       let _visionElements = null;
+      let _visionElementsMap = null;
       let _visionElementTree = '';
       let _visionMode = false;
       // v4.0: Vision-first ALWAYS active
@@ -4123,6 +4124,7 @@ async function runAgentLoop(goal, workingTabId) {
           const visionResult = await _visionObserve(tab, currentUrl);
           if (visionResult.elements.length > 0) {
             _visionElements = visionResult.elements;
+            _visionElementsMap = new Map(_visionElements.map(e => [e.index, e]));
             _visionElementTree = visionResult.elementTree;
             _visionMode = true;
             if (visionResult.pageText && visionResult.pageText.length > pageText.length) {
@@ -5221,7 +5223,7 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION INDEX-BASED ACTION EXECUTION
       // ═══════════════════════════════════════════════════════════
       if (command._visionAction && command._visionIndex !== undefined) {
-        const _viEl = _visionElements ? _visionElements.find(e => e.index === command._visionIndex) : null;
+        const _viEl = _visionElementsMap ? _visionElementsMap.get(command._visionIndex) : null;
         if (_viEl) {
           try {
             if (command.type === 'click_at') {
