@@ -665,7 +665,7 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
       error: resultPartial.error,
     });
   } catch (storeErr) {
-    console.error('Failed to store failure result:', storeErr);
+    console.error('Failed to store failure result:', (storeErr && storeErr.message) || String(storeErr));
   }
   schedule.lastRunStatus = 'failure';
   schedule.lastRunAt = Date.now();

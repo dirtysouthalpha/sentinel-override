@@ -80,6 +80,7 @@
   // --------- Buffer + Rendering ---------
 
   function _addEvent(ev) {
+    if (!ev || typeof ev !== 'object') return;
     // (3.27.0) While viewing a past run, the visible event list is frozen.
     // Route live events into _liveBuffer so they're available when the user
     // clicks "Back to Live" — no events are dropped on the floor.
