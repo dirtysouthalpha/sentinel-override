@@ -50,7 +50,7 @@ async function loadSchedules() {
     const result = await chrome.storage.local.get([SCHEDULES_KEY]);
     return result[SCHEDULES_KEY] || {};
   } catch (e) {
-    console.warn('[Sentinel/scheduler] loadSchedules failed:', e && e.message);
+    console.warn('[Sentinel/scheduler] loadSchedules failed:', (e && e.message) || String(e));
     return {};
   }
 }
@@ -63,7 +63,7 @@ async function saveSchedules(schedules) {
   try {
     await chrome.storage.local.set({ [SCHEDULES_KEY]: schedules });
   } catch (e) {
-    console.warn('[Sentinel/scheduler] saveSchedules failed:', e && e.message);
+    console.warn('[Sentinel/scheduler] saveSchedules failed:', (e && e.message) || String(e));
   }
 }
 
@@ -76,7 +76,7 @@ async function loadResults() {
     const result = await chrome.storage.local.get([RESULTS_KEY]);
     return result[RESULTS_KEY] || {};
   } catch (e) {
-    console.warn('[Sentinel/scheduler] loadResults failed:', e && e.message);
+    console.warn('[Sentinel/scheduler] loadResults failed:', (e && e.message) || String(e));
     return {};
   }
 }
@@ -89,7 +89,7 @@ async function saveResults(results) {
   try {
     await chrome.storage.local.set({ [RESULTS_KEY]: results });
   } catch (e) {
-    console.warn('[Sentinel/scheduler] saveResults failed:', e && e.message);
+    console.warn('[Sentinel/scheduler] saveResults failed:', (e && e.message) || String(e));
   }
 }
 
