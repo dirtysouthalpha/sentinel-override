@@ -21,9 +21,8 @@ Four spin-loop paths that prevented callLLM from firing were all addressed:
 ## Bug #3: Voice input mic button doesn't work
 **Symptom:** Clicking the mic button does nothing
 **Root cause:** setupVoiceInput() was defined but never called, AND Web Speech API doesn't work in Chrome extension popups
-**Status:** PARTIALLY FIXED — tab-based injection added but may have issues with permissions or messaging
+**Status: FIXED** — tab-based injection via chrome.scripting.executeScript; setupVoiceInput() called from popup-full.js DOMContentLoaded; full error handling + showToast feedback; listener cleanup on unload
 **File:** `popup-modules/chat.js` setupVoiceInput function
-**Fix:** Make sure the function is called, test the chrome.scripting.executeScript approach, add error handling and fallback
 
 ## Bug #4: Z.AI models not appearing in dropdown
 **Symptom:** User can't easily pick models
