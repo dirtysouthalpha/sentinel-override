@@ -335,7 +335,7 @@ function showCrosshair(x, y, viewportW, viewportH) {
   if (!panel) return;
   const svg = panel.querySelector('#mini-shot-crosshair');
   if (!svg) return;
-  if (!viewportW || !viewportH || typeof x !== 'number' || typeof y !== 'number') { svg.style.display = 'none'; return; }
+  if (!viewportW || !viewportH || viewportW <= 0 || viewportH <= 0 || typeof x !== 'number' || typeof y !== 'number') { svg.style.display = 'none'; return; }
   const px = (x / viewportW * 100).toFixed(2) + '%';
   const py = (y / viewportH * 100).toFixed(2) + '%';
   const h = svg.querySelector('#msc-h'); const v = svg.querySelector('#msc-v'); const dot = svg.querySelector('#msc-dot');
@@ -641,8 +641,9 @@ function addActionCard(payload) {
   chatContainer.appendChild(group);
 
   // Drain any log lines that arrived before this card was created
-  if (state.pendingStepLogs[payload.stepNumber]) {
-    state.pendingStepLogs[payload.stepNumber].forEach(text => appendLogLine(payload.stepNumber, text));
+  const logs = state.pendingStepLogs[payload.stepNumber];
+  if (logs && Array.isArray(logs) && logs.length > 0) {
+    logs.forEach(text => appendLogLine(payload.stepNumber, text));
     delete state.pendingStepLogs[payload.stepNumber];
   }
 
@@ -656,7 +657,8 @@ function appendLogLine(stepNumber, text) {
   if (!logArea) {
     // Card not created yet -- buffer it
     if (!state.pendingStepLogs[stepNumber]) state.pendingStepLogs[stepNumber] = [];
-    state.pendingStepLogs[stepNumber].push(text);
+    const arr = state.pendingStepLogs[stepNumber];
+    if (Array.isArray(arr)) arr.push(text);
     return;
   }
   const line = document.createElement('div');
@@ -1976,7 +1978,7 @@ if (exportReplayBtn) {
       const costEl = document.getElementById('run-cost');
       const costText = costEl ? costEl.title : '';
       const costMatch = costText.match(/\$[\d.]+/);
-      const estimatedCostUsd = costMatch ? parseFloat(costMatch[0].slice(1)) : 0;
+      const estimatedCostUsd = costMatch ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
       const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
       if (!resp || !resp.ok || !resp.data || !resp.data.html) {
         throw new Error((resp && resp.error) || 'No replay data available — run the agent first');
@@ -3357,7 +3359,7 @@ chrome.runtime.onMessage.addListener((message) => {
             const costEl = document.getElementById('run-cost');
             const costText = costEl ? costEl.title : '';
             const costMatch = costText.match(/\$[\d.]+/);
-            const estimatedCostUsd = costMatch ? parseFloat(costMatch[0].slice(1)) : 0;
+            const estimatedCostUsd = costMatch ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
             const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
             if (!resp || !resp.ok || !resp.data || !resp.data.html) throw new Error((resp && resp.error) || 'No replay data');
             const blob = new Blob([resp.data.html], { type: 'text/html' });
@@ -3385,7 +3387,7 @@ chrome.runtime.onMessage.addListener((message) => {
           if (!comp) return '';
           const pts = (typeof comp.points === 'number') ? comp.points : 0;
           const max = (typeof comp.max === 'number') ? comp.max : 0;
-          const ratio = max !== 0 ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
+          const ratio = (typeof max === 'number' && max !== 0 && !isNaN(max)) ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
           const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
           const widthPct = Math.min(100, Math.round(ratio * 100));
           return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
