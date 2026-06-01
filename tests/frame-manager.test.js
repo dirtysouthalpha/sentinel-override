@@ -69,8 +69,10 @@ function setupFrameManagerEnv() {
       }
     },
     findElementBySelector: (doc, selector) => {
-      if (doc && doc.mockElements) {
-        const idx = parseInt(selector.split(':')[1], 10);
+      if (doc && doc.mockElements && selector && typeof selector === 'string') {
+        const parts = selector.split(':');
+        if (parts.length < 2) return null;
+        const idx = parseInt(parts[1], 10);
         return doc.mockElements[idx] || null;
       }
       return null;

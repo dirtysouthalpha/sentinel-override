@@ -962,7 +962,7 @@ describe('generatePlan', () => {
     }));
     _mockFetch = mockFn;
     await generatePlan('Check firewall', { api_key: 'test-key' });
-    expect(mockFn.mock.calls[0][0]).toContain('z.ai');
+    expect(mockFn.mock.calls[0]?.[0]).toContain('z.ai');
   });
 
   test('uses default model when none provided', async () => {
@@ -977,7 +977,9 @@ describe('generatePlan', () => {
       api_key: 'test-key',
       api_endpoint: 'https://api.openai.com/v1/chat/completions'
     });
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     expect(body.model).toBe('glm-5');
   });
 
@@ -1010,7 +1012,9 @@ describe('generatePlan', () => {
       model: 'glm-5'
     });
     expect(result).toEqual(['Navigate to site', 'Extract articles']);
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     expect(body.response_format).toBeUndefined();
   });
 
@@ -2229,7 +2233,9 @@ describe('Bug #2 regression: generatePlan prose fallback', () => {
     expect(result).toEqual(['Step 1', 'Step 2']);
 
     // Verify response_format is not sent (would cause 400 on Z.AI)
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     expect(body.response_format).toBeUndefined();
   });
 });
@@ -2367,7 +2373,9 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('sys', 'user', 500);
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     expect(body.max_tokens).toBe(500);
   });
 
@@ -2379,7 +2387,9 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('sys', 'user');
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     expect(body.max_tokens).toBe(1200);
   });
 
@@ -2391,7 +2401,9 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('my system prompt', 'my user prompt');
-    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const callArgs = mockFn.mock.calls[0]?.[1];
+    expect(callArgs).toBeDefined();
+    const body = JSON.parse(callArgs.body);
     const msgs = body.messages;
     expect(msgs.some(m => m.role === 'system' && m.content === 'my system prompt')).toBe(true);
     expect(msgs.some(m => m.role === 'user' && m.content === 'my user prompt')).toBe(true);

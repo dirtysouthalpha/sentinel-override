@@ -302,14 +302,15 @@ describe('executeInFrame', () => {
     await executeInFrame(1, 5, { type: 'click', selector: '#btn' });
 
     // First call should be utility injection
-    const firstCall = chrome.scripting.executeScript.mock.calls[0][0];
+    const firstCall = chrome.scripting.executeScript.mock.calls[0]?.[0];
+    expect(firstCall).toBeDefined();
     expect(firstCall.target).toEqual({ tabId: 1, frameIds: [5] });
     expect(firstCall.files).toBeDefined();
     expect(Array.isArray(firstCall.files)).toBe(true);
     expect(firstCall.files.length).toBeGreaterThan(0);
 
     // Second call should be the command function
-    const secondCall = chrome.scripting.executeScript.mock.calls[1][0];
+    const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
     expect(secondCall.target).toEqual({ tabId: 1, frameIds: [5] });
     expect(secondCall.func).toBeDefined();
     expect(secondCall.args).toBeDefined();
@@ -343,7 +344,8 @@ describe('executeInFrame', () => {
     const cmd = { type: 'type', selector: 'input', text: 'hello' };
     await executeInFrame(1, 5, cmd);
 
-    const secondCall = chrome.scripting.executeScript.mock.calls[1][0];
+    const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
+    expect(secondCall).toBeDefined();
     expect(secondCall.args[0]).toEqual(cmd);
   });
 
@@ -515,7 +517,8 @@ describe('executeInFrame — utility injection', () => {
 
     await executeInFrame(1, 5, { type: 'observe_page' });
 
-    const utilityCall = chrome.scripting.executeScript.mock.calls[0][0];
+    const utilityCall = chrome.scripting.executeScript.mock.calls[0]?.[0];
+    expect(utilityCall).toBeDefined();
     expect(utilityCall.files).toEqual(
       expect.arrayContaining([
         'content/dom-utils.js',
@@ -537,7 +540,8 @@ describe('executeInFrame — utility injection', () => {
 
     await executeInFrame(1, 5, { type: 'read_page' });
 
-    const utilityCall = chrome.scripting.executeScript.mock.calls[0][0];
+    const utilityCall = chrome.scripting.executeScript.mock.calls[0]?.[0];
+    expect(utilityCall).toBeDefined();
     expect(utilityCall.files).not.toContain('content/index.js');
   });
 });
@@ -556,7 +560,8 @@ describe('runCommandInFrame', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ result: { ok: true } }]);
     await executeInFrame(9999, 99, { type: 'click', selector: 'x' });
-    const secondCall = chrome.scripting.executeScript.mock.calls[1][0];
+    const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
+    expect(secondCall).toBeDefined();
     runCmd = secondCall.func;
     expect(typeof runCmd).toBe('function');
   });
