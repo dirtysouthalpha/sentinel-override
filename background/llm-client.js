@@ -1144,7 +1144,7 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
   try {
     return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
   } catch (err) {
-    const msg = err.message || '';
+    const msg = (err && err.message) || '';
     const isRetryable = (msg.includes('429') || msg.includes('502') || msg.includes('503') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
       const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
