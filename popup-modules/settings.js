@@ -630,7 +630,7 @@ function _renderLearnedPatterns(patterns) {
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         await chrome.storage.local.set({ learned_patterns: arr });
         _renderLearnedPatterns(arr);
-      } catch (e) { console.warn('[Sentinel] delete pattern failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (e && e.message) || String(e)); }
     });
   });
 }
