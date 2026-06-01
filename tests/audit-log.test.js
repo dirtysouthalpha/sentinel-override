@@ -292,4 +292,21 @@ describe('clearAuditLog', () => {
     // Should not throw
     await clearAuditLog('run1');
   });
+
+  test('handles synchronous throw in storage.remove gracefully', async () => {
+    chrome.storage.local.remove.mockImplementationOnce(() => {
+      throw new Error('sync throw');
+    });
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Should not throw
+    await clearAuditLog('run1');
+
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[Sentinel/audit-log] clearAuditLog failed:',
+      'sync throw'
+    );
+
+    consoleWarnSpy.mockRestore();
+  });
 });
