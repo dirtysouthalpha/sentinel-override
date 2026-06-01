@@ -598,7 +598,8 @@ export function getModelSupportsVision(providerId, model) {
   const provCfg = providerId && VISION_MODELS[providerId];
   if (provCfg) {
     if (Array.isArray(provCfg.deny)) {
-      for (const re of provCfg.deny) {
+      const denyList = provCfg.deny; // Cache reference for safety
+      for (const re of denyList) {
         if (re instanceof RegExp ? re.test(m) : (re && m.includes(String(re).toLowerCase()))) {
           return false;
         }
