@@ -1275,6 +1275,7 @@ function updateAttachmentPreview() {
       removeBtn.className = 'attachment-remove';
       removeBtn.textContent = '×';
       removeBtn.addEventListener('click', () => {
+        if (!state.selectedAttachments) return;
         state.selectedAttachments.splice(index, 1);
         updateAttachmentPreview();
       });
@@ -1574,6 +1575,7 @@ function filterCommands() {
 }
 
 function renderCommandList(commands) {
+  if (!commandList) return;
   if (commands.length === 0) {
     commands = COMMANDS;
   }
