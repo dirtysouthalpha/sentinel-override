@@ -474,10 +474,12 @@ export async function executeScheduledTask(alarmName) {
     tel.info('scheduler', `Agent busy, skipping schedule ${schedule.name}`);
     schedule.lastRunStatus = 'skipped';
     schedule.lastRunAt = Date.now();
+    if (schedule.type === 'recurring' && schedule.recurrence) {
+      schedule.nextRunAt = computeNextRun(schedule.recurrence);
+    }
     schedules[scheduleId] = schedule;
     await saveSchedules(schedules);
     if (schedule.type === 'recurring' && schedule.recurrence) {
-      schedule.nextRunAt = computeNextRun(schedule.recurrence);
       registerAlarm(schedule);
     }
     return;
