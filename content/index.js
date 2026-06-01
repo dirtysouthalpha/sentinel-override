@@ -440,7 +440,7 @@ if (window.__sentinelInitialized) {
             }
 
             if (!content || content.length < 200) {
-              const bodyClone = document.body.cloneNode(true);
+              const bodyClone = (document.body || document.documentElement).cloneNode(true);
               ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
                 bodyClone.querySelectorAll(tag).forEach(el => el.remove());
               });

@@ -300,7 +300,7 @@ function ensureMiniShotPanel() {
   if (strip && strip.parentNode) {
     strip.parentNode.insertBefore(wrap, strip.nextSibling);
   } else {
-    document.body.insertBefore(wrap, document.body.firstChild);
+    if (document.body) document.body.insertBefore(wrap, document.body.firstChild);
   }
   // Toggle collapse on header click
   wrap.querySelector('.mini-shot-header').addEventListener('click', () => {
@@ -3241,7 +3241,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   // (6.0) New step starting — create activity stream card
   if (message.action === 'agent_step_start') {
-    _ensureActivityStream(message.stepNumber);
+    if (message.stepNumber && message.stepNumber >= 1) _ensureActivityStream(message.stepNumber);
     updateActiveTabStep(message.stepNumber, message.totalPlannedSteps || 0);
   }
   // (6.0) Activity item upsert (observe / consult-ai / dispatch)
@@ -3510,7 +3510,7 @@ chrome.runtime.onMessage.addListener((message) => {
                   if (Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0 && Array.isArray(sug.applyValues)) {
                     const updates = {};
                     for (let i = 0; i < sug.applyKeys.length; i++) {
-                      updates[sug.applyKeys[i]] = sug.applyValues[i];
+                      if (i < sug.applyValues.length) updates[sug.applyKeys[i]] = sug.applyValues[i];
                     }
                     await chrome.storage.local.set(updates);
                   }

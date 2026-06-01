@@ -180,6 +180,7 @@ export function validateImport(importedData) {
  * @returns {Promise<{ imported: number, skipped: number, renamed: number, overwritten: number, results: Array }>}
  */
 export async function importTemplates(templates, conflictMode = 'skip') {
+  if (!Array.isArray(templates)) return { imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] };
   const existing = await loadTemplates();
   const existingNames = new Map(
     Object.values(existing).filter(t => t && t.name).map(t => [t.name.toLowerCase(), t.id])

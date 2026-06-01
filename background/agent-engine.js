@@ -2411,7 +2411,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       break;
     }
     case 'type': {
-      var safeText = (cmd.text || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      var safeText = (cmd.text || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
       jsCode = '(function(){'
         + 'var el=' + finderCode + ';'
         + 'if(!el)return JSON.stringify({ok:false,error:"input not found"});'
@@ -2426,7 +2426,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       break;
     }
     case 'select': {
-      var safeVal = (cmd.value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      var safeVal = (cmd.value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
       jsCode = '(function(){'
         + 'var el=' + finderCode + ';'
         + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
@@ -2464,7 +2464,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       jsCode = '(function(){'
         + 'var el=' + finderCode + ';'
         + 'if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});'
-        + 'if(el.type==="checkbox"||el.type==="radio"){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"checked"})}'
+        + 'if(el.type==="checkbox"||el.type==="radio"){el.checked=' + (cmd.checked !== false) + ';el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"' + (cmd.checked !== false ? 'checked' : 'unchecked') + '"})}'
         + 'el.click();return JSON.stringify({ok:true,result:"toggled"})'
         + '})()';
       break;
@@ -3150,6 +3150,10 @@ async function _generateInitialPlan(goal, workingTabId) {
   sendSilentUpdate('Planning task...');
   sendAgentStatus('planning', 'Generating task plan...');
   const planProviderConfig = await getActiveProvider();
+  if (!planProviderConfig) {
+    sendSilentUpdate('No provider configured — cannot generate plan');
+    return null;
+  }
   const planSettings = {
     api_endpoint: planProviderConfig.endpoint,
     api_key: planProviderConfig.apiKey,

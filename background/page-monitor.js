@@ -29,8 +29,13 @@ function generateId() {
  * @returns {Promise<PageMonitor[]>}
  */
 export async function loadMonitors() {
-  const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
-  return result[MONITOR_STORAGE_KEY] || [];
+  try {
+    const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
+    return result[MONITOR_STORAGE_KEY] || [];
+  } catch (e) {
+    console.error('[Sentinel/page-monitor] loadMonitors failed:', e && e.message);
+    return [];
+  }
 }
 
 async function saveMonitors(monitors) {
@@ -54,10 +59,10 @@ export async function createMonitor(url, selector, label, interval = 30) {
   const monitors = await loadMonitors();
   const monitor = {
     id: generateId(),
-    url: url.trim(),
-    selector: selector.trim(),
+    url: (url || '').trim(),
+    selector: (selector || '').trim(),
     lastContent: '',
-    label: label.trim() || `Monitor: ${selector}`,
+    label: (label || '').trim() || `Monitor: ${selector}`,
     active: true,
     interval,
     createdAt: new Date().toISOString(),

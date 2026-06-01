@@ -67,7 +67,7 @@ export async function createMacro(name, description, steps) {
   const now = new Date().toISOString();
   const macro = {
     id: generateId(),
-    name: name.trim() || 'Untitled Macro',
+    name: (name || '').trim() || 'Untitled Macro',
     description: (description || '').trim(),
     steps: steps || [],
     createdAt: now,

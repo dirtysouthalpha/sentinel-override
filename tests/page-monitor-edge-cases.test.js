@@ -58,11 +58,13 @@ beforeEach(() => {
 describe('page-monitor — edge cases and race conditions', () => {
   describe('malformed inputs', () => {
     test('handles null URL', async () => {
-      await expect(createMonitor(null, '#content', 'Test')).rejects.toThrow();
+      const monitor = await createMonitor(null, '#content', 'Test');
+      expect(monitor.url).toBe('');
     });
 
     test('handles undefined URL', async () => {
-      await expect(createMonitor(undefined, '#content', 'Test')).rejects.toThrow();
+      const monitor = await createMonitor(undefined, '#content', 'Test');
+      expect(monitor.url).toBe('');
     });
 
     test('handles URL with spaces only', async () => {
@@ -119,8 +121,9 @@ describe('page-monitor — edge cases and race conditions', () => {
         throw new Error('Storage read failed');
       });
 
-      // loadMonitors doesn't handle errors, so it should reject
-      await expect(loadMonitors()).rejects.toThrow('Storage read failed');
+      // loadMonitors now catches storage errors and returns empty array
+      const result = await loadMonitors();
+      expect(result).toEqual([]);
     });
 
     test('handles storage.set failure during createMonitor', async () => {

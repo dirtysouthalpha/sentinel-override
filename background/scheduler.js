@@ -147,6 +147,7 @@ function clearAlarm(scheduleId) {
  * @returns {number} Days ahead until next matching day
  */
 function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime) {
+  if (!daysOfWeek || daysOfWeek.length === 0) return 7;
   const sortedDays = daysOfWeek.slice().sort((a, b) => a - b);
   let daysAhead = 0;
   for (const day of sortedDays) {
@@ -155,7 +156,7 @@ function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime)
     if (diff === 0 && candidateTime <= nowTime) diff = 7;
     if (daysAhead === 0 || diff < daysAhead) daysAhead = diff;
   }
-  return daysAhead;
+  return daysAhead || 7;
 }
 
 function computeNextRun(recurrence) {
@@ -596,7 +597,7 @@ async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
   });
-  if (tabs && tabs.length > 0) return tabs[0].id;
+  if (tabs && tabs.length > 0 && typeof tabs[0].id === 'number') return tabs[0].id;
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
   await new Promise(resolve => setTimeout(resolve, 500));
   return newTab.id;
@@ -620,6 +621,7 @@ function _waitForAgentCompletion(timeoutMs) {
   }, timeoutMs);
 
   const listener = (msg) => {
+    if (!msg || typeof msg !== 'object') return;
     if (msg.action === 'agent_loop_complete') {
       clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(listener);

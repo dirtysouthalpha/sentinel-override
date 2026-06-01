@@ -867,7 +867,7 @@ function applyThemePreset(theme) {
   }
 }
 
-saveThemeBtn.addEventListener('click', () => {
+if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
   const primaryEl = document.getElementById('colorPrimary');
   const bgEl = document.getElementById('colorBg');
   const textEl = document.getElementById('colorText');
@@ -880,12 +880,12 @@ saveThemeBtn.addEventListener('click', () => {
   document.documentElement.style.setProperty('--text-primary', text);
 
   localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
-  themeModal.classList.remove('show');
+  if (themeModal) themeModal.classList.remove('show');
   showToast('Theme applied', 'success');
 });
 
-closeThemeBtn.addEventListener('click', () => {
-  themeModal.classList.remove('show');
+if (closeThemeBtn) closeThemeBtn.addEventListener('click', () => {
+  if (themeModal) themeModal.classList.remove('show');
 });
 
 // ========== Preset Buttons ==========

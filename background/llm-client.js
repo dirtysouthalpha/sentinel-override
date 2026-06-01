@@ -1663,6 +1663,7 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
   const model = _useSimple ? providerConfig.fastModel : providerConfig.model;
+  agentState.model = model; // needed by _buildAgentPrompt → supportsVision
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
   const last_action = history.length > 0 ? history[history.length - 1].action : null;
