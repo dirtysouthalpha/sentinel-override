@@ -1058,7 +1058,7 @@ export async function generatePlan(goal, settings, context = {}) {
 
     // Strategy 5: single-step fallback from goal — guarantees a non-null plan
     // even when the model ignores the JSON instruction entirely.
-    console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', content.slice(0, 200));
+    console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', contentNoThink.slice(0, 200));
     return [(goal || 'Complete the task').substring(0, 300)];
   } catch (e) {
     clearTimeout(timeout);
