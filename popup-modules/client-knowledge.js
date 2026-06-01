@@ -31,7 +31,7 @@ function _send(action, body) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action, ...(body || {}) }, (res) => {
       if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        resolve({ ok: false, error: chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error' });
         return;
       }
       resolve(res || { ok: false, error: 'No response' });

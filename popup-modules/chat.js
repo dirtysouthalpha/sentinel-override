@@ -955,7 +955,7 @@ function sendMessage() {
   chrome.storage.local.get(['last_agent_goal', 'agent_history'], (stored) => {
     if (chrome.runtime.lastError) {
       removeTypingIndicator();
-      addMessage('Error reading stored goal: ' + (chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+      addMessage('Error reading stored goal: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
       resetUI();
       return;
     }
@@ -976,7 +976,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
-        addMessage('Error: ' + (chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+        addMessage('Error: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
         resetUI();
         return;
       }
@@ -1004,7 +1004,7 @@ function resetUI() {
 stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
     if (chrome.runtime.lastError && !response) {
-      addMessage('Error stopping agent: ' + (chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+      addMessage('Error stopping agent: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
     } else if (response && response.ok === false) {
       addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
     } else {

@@ -131,7 +131,7 @@ if (quickAssistToggle) {
     const enabled = quickAssistToggle.checked;
     chrome.storage.local.set({ quickAssist: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickAssist:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save quickAssist:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -159,7 +159,7 @@ if (useTrustedInputToggle) {
     const enabled = useTrustedInputToggle.checked;
     chrome.storage.local.set({ useTrustedInput: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save useTrustedInput:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save useTrustedInput:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -192,7 +192,7 @@ if (soundEnabledToggle) {
     const enabled = soundEnabledToggle.checked;
     chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', chrome.runtime.lastError.message);
+        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
         showToast('Failed to save setting', 'error');
         return;
       }
