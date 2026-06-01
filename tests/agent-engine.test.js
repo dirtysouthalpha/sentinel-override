@@ -574,15 +574,12 @@ describe('agent-engine — stall detection reference tests', () => {
   function detectStallRef(history, consecutiveFailures) {
     const recent = history.slice(-stallConfig.similarityWindow);
     if (recent.length >= stallConfig.similarityWindow) {
-      const allSameType = recent.every(h => h.action.type === recent[0].action.type);
+      const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
       const allSameResult = recent.every(h => h.result === recent[0].result);
-      const allFailed = recent.every(h =>
-        h.result.includes('not found') ||
-        h.result.startsWith('Error') ||
-        h.result.includes('timed out') ||
-        h.result.includes('Element not found') ||
-        h.result.includes('No element')
-      );
+      const allFailed = recent.every(h => {
+        const r = typeof h.result === 'string' ? h.result : '';
+        return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.includes('Element not found') || r.includes('No element');
+      });
       if (allSameType && allSameResult && allFailed) {
         return { stalled: true, reason: expect.any(String), recoveryAction: 'RESCAN_AND_REPLAN' };
       }
@@ -624,6 +621,17 @@ describe('agent-engine — stall detection reference tests', () => {
 
   test('no stall below consecutive failure threshold', () => {
     expect(detectStallRef([], 4)).toEqual({ stalled: false });
+  });
+
+  test('no stall when first history entry has null action', () => {
+    // recent[0].action is null — allSameType must be false (not a false positive)
+    const history = [
+      { action: null, result: 'Element not found' },
+      { action: { type: 'click' }, result: 'Element not found' },
+      { action: { type: 'click' }, result: 'Element not found' },
+    ];
+    const result = detectStallRef(history, 0);
+    expect(result.stalled).toBe(false);
   });
 });
 

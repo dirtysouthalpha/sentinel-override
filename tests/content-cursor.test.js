@@ -310,14 +310,13 @@ describe('cursor auto-hide', () => {
     cursor.setKeepVisible(false);
     cursor.show();
 
-    // Move to create a cursor element
+    // show() calls ensureCursor() which creates the element
     const createdEl = createdElements.find(e => e.id === '__sentinel_cursor__');
-    if (createdEl) {
-      // Advance past HIDE_AFTER_MS (12000)
-      jest.advanceTimersByTime(12001);
-      // The cursor should have dimmed class
-      expect(createdEl.classList.contains('dimmed')).toBe(true);
-    }
+    expect(createdEl).toBeDefined();
+    // Advance past HIDE_AFTER_MS (12000)
+    jest.advanceTimersByTime(12001);
+    // The cursor should have dimmed class
+    expect(createdEl.classList.contains('dimmed')).toBe(true);
     cursor.setKeepVisible(true);
   });
 
@@ -394,16 +393,14 @@ describe('cursor.setKeepVisible — undim', () => {
     cursor.show();
     cursor.hide();
 
+    // show() + hide() both call ensureCursor() which creates the element
     const createdEl = createdElements.find(e => e.id === '__sentinel_cursor__');
-    if (createdEl) {
-      expect(createdEl.classList.contains('dimmed')).toBe(true);
-    }
+    expect(createdEl).toBeDefined();
+    expect(createdEl.classList.contains('dimmed')).toBe(true);
 
     cursor.setKeepVisible(true);
 
-    if (createdEl) {
-      expect(createdEl.classList.contains('dimmed')).toBe(false);
-    }
+    expect(createdEl.classList.contains('dimmed')).toBe(false);
   });
 });
 
@@ -420,16 +417,14 @@ describe('cursor.press — class manipulation', () => {
   test('adds pressing class and removes after timeout', () => {
     cursor.press();
 
+    // press() calls ensureCursor() which creates the element
     const createdEl = createdElements.find(e => e.id === '__sentinel_cursor__');
-    if (createdEl) {
-      expect(createdEl.classList.contains('pressing')).toBe(true);
-    }
+    expect(createdEl).toBeDefined();
+    expect(createdEl.classList.contains('pressing')).toBe(true);
 
     jest.advanceTimersByTime(250);
 
-    if (createdEl) {
-      expect(createdEl.classList.contains('pressing')).toBe(false);
-    }
+    expect(createdEl.classList.contains('pressing')).toBe(false);
   });
 });
 
