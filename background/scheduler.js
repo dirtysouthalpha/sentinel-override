@@ -800,7 +800,7 @@ export async function initScheduler() {
         tel.debug('scheduler', `Re-registered alarm for schedule: ${schedule.name}`);
       }
     } catch (err) {
-      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, err);
+      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, err && err.message);
     }
   }
 
