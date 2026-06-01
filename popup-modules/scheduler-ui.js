@@ -11,10 +11,14 @@ let templatesCache = [];
 
 // ========== Panel Toggle ==========
 function showSchedulesPanel() {
-  document.getElementById('schedules-panel').style.display = 'flex';
-  document.getElementById('chat-container').style.display = 'none';
-  document.getElementById('input-area').style.display = 'none';
-  document.getElementById('templates-panel').style.display = 'none';
+  const sp = document.getElementById('schedules-panel');
+  if (sp) sp.style.display = 'flex';
+  const cc = document.getElementById('chat-container');
+  if (cc) cc.style.display = 'none';
+  const ia = document.getElementById('input-area');
+  if (ia) ia.style.display = 'none';
+  const tp = document.getElementById('templates-panel');
+  if (tp) tp.style.display = 'none';
   document.getElementById('templatesBtn')?.classList.remove('active');
   document.getElementById('schedulerBtn')?.classList.add('active');
 
@@ -35,11 +39,15 @@ function showSchedulesPanel() {
 }
 
 function hideSchedulesPanel() {
-  document.getElementById('schedules-panel').style.display = 'none';
-  document.getElementById('chat-container').style.display = 'flex';
-  document.getElementById('input-area').style.display = 'flex';
+  const sp = document.getElementById('schedules-panel');
+  if (sp) sp.style.display = 'none';
+  const cc = document.getElementById('chat-container');
+  if (cc) cc.style.display = 'flex';
+  const ia = document.getElementById('input-area');
+  if (ia) ia.style.display = 'flex';
   document.getElementById('schedulerBtn')?.classList.remove('active');
-  document.getElementById('templates-panel').style.display = 'none';
+  const tp = document.getElementById('templates-panel');
+  if (tp) tp.style.display = 'none';
   document.getElementById('templatesBtn')?.classList.remove('active');
 
   if (refreshIntervalId) {
@@ -194,39 +202,57 @@ if (_schedulesPanel) {
 
 // ========== Create Schedule Modal ==========
 function openCreateScheduleModal() {
-  document.getElementById('schedule-modal-title').textContent = 'New Schedule';
-  document.getElementById('sch-name').value = '';
-  document.getElementById('sch-source-type').value = 'template';
-  document.getElementById('sch-goal').value = '';
-  document.getElementById('sch-type').value = 'once';
-  document.getElementById('sch-run-at').value = '';
-  document.getElementById('sch-interval').value = 'daily';
-  document.getElementById('sch-time').value = '09:00';
-  document.getElementById('sch-period').value = '60';
-  document.getElementById('sch-template-params').innerHTML = '';
+  const titleEl = document.getElementById('schedule-modal-title');
+  if (titleEl) titleEl.textContent = 'New Schedule';
+  const nameEl = document.getElementById('sch-name');
+  if (nameEl) nameEl.value = '';
+  const sourceTypeEl = document.getElementById('sch-source-type');
+  if (sourceTypeEl) sourceTypeEl.value = 'template';
+  const goalEl = document.getElementById('sch-goal');
+  if (goalEl) goalEl.value = '';
+  const typeEl = document.getElementById('sch-type');
+  if (typeEl) typeEl.value = 'once';
+  const runAtEl = document.getElementById('sch-run-at');
+  if (runAtEl) runAtEl.value = '';
+  const intervalEl = document.getElementById('sch-interval');
+  if (intervalEl) intervalEl.value = 'daily';
+  const timeEl = document.getElementById('sch-time');
+  if (timeEl) timeEl.value = '09:00';
+  const periodEl = document.getElementById('sch-period');
+  if (periodEl) periodEl.value = '60';
+  const paramsEl = document.getElementById('sch-template-params');
+  if (paramsEl) paramsEl.innerHTML = '';
 
   // Reset day checkboxes
   document.querySelectorAll('.sch-day-check').forEach(cb => { cb.checked = false; });
 
   // Reset field visibility
-  document.getElementById('sch-template-field').style.display = '';
-  document.getElementById('sch-goal-field').style.display = 'none';
-  document.getElementById('sch-once-fields').style.display = '';
-  document.getElementById('sch-recurring-fields').style.display = 'none';
-  document.getElementById('sch-weekly-days').style.display = 'none';
-  document.getElementById('sch-custom-interval').style.display = 'none';
+  const templateFieldEl = document.getElementById('sch-template-field');
+  if (templateFieldEl) templateFieldEl.style.display = '';
+  const goalFieldEl = document.getElementById('sch-goal-field');
+  if (goalFieldEl) goalFieldEl.style.display = 'none';
+  const onceFieldsEl = document.getElementById('sch-once-fields');
+  if (onceFieldsEl) onceFieldsEl.style.display = '';
+  const recurringFieldsEl = document.getElementById('sch-recurring-fields');
+  if (recurringFieldsEl) recurringFieldsEl.style.display = 'none';
+  const weeklyDaysEl = document.getElementById('sch-weekly-days');
+  if (weeklyDaysEl) weeklyDaysEl.style.display = 'none';
+  const customIntervalEl = document.getElementById('sch-custom-interval');
+  if (customIntervalEl) customIntervalEl.style.display = 'none';
 
   // Set min datetime to now
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const minDatetime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  document.getElementById('sch-run-at').min = minDatetime;
+  const runAtMinEl = document.getElementById('sch-run-at');
+  if (runAtMinEl) runAtMinEl.min = minDatetime;
 
   // Populate template dropdown
   populateTemplateDropdown();
 
   // Show modal
-  document.getElementById('schedule-modal').classList.add('show');
+  const modalEl = document.getElementById('schedule-modal');
+  if (modalEl) modalEl.classList.add('show');
 }
 
 function openCreateScheduleModalForTemplate(templateId, templateName) {
@@ -234,7 +260,8 @@ function openCreateScheduleModalForTemplate(templateId, templateName) {
 
   // Pre-fill name immediately (synchronous)
   if (templateName) {
-    document.getElementById('sch-name').value = templateName + ' Schedule';
+    const nameEl = document.getElementById('sch-name');
+    if (nameEl) nameEl.value = templateName + ' Schedule';
   }
 
   // populateTemplateDropdown is async — pre-select after it finishes by
@@ -356,20 +383,28 @@ function renderTemplateParams(params) {
 
 // ========== Save Schedule ==========
 async function handleSaveSchedule() {
-  const name = document.getElementById('sch-name').value.trim();
+  const nameEl = document.getElementById('sch-name');
+  if (!nameEl) { showToast('Schedule name field not found', 'error'); return; }
+  const name = nameEl.value.trim();
   if (!name) {
     showToast('Schedule name is required', 'error');
     return;
   }
 
-  const sourceType = document.getElementById('sch-source-type').value;
-  const schType = document.getElementById('sch-type').value;
+  const sourceTypeEl = document.getElementById('sch-source-type');
+  if (!sourceTypeEl) { showToast('Source type field not found', 'error'); return; }
+  const sourceType = sourceTypeEl.value;
+  const schTypeEl = document.getElementById('sch-type');
+  if (!schTypeEl) { showToast('Schedule type field not found', 'error'); return; }
+  const schType = schTypeEl.value;
 
   // Build schedule data
   const scheduleData = { name, type: schType };
 
   if (sourceType === 'template') {
-    const templateId = document.getElementById('sch-template-id').value;
+    const templateIdEl = document.getElementById('sch-template-id');
+    if (!templateIdEl) { showToast('Template field not found', 'error'); return; }
+    const templateId = templateIdEl.value;
     if (!templateId) {
       showToast('Please select a template', 'error');
       return;
@@ -383,7 +418,9 @@ async function handleSaveSchedule() {
     });
     scheduleData.params = Object.keys(params).length > 0 ? params : null;
   } else {
-    const goal = document.getElementById('sch-goal').value.trim();
+    const goalEl = document.getElementById('sch-goal');
+    if (!goalEl) { showToast('Goal field not found', 'error'); return; }
+    const goal = goalEl.value.trim();
     if (!goal) {
       showToast('Goal is required', 'error');
       return;
@@ -393,7 +430,9 @@ async function handleSaveSchedule() {
 
   // Time configuration
   if (schType === 'once') {
-    const runAtValue = document.getElementById('sch-run-at').value;
+    const runAtEl = document.getElementById('sch-run-at');
+    if (!runAtEl) { showToast('Run-at field not found', 'error'); return; }
+    const runAtValue = runAtEl.value;
     if (!runAtValue) {
       showToast('Please select a date and time', 'error');
       return;
@@ -405,8 +444,11 @@ async function handleSaveSchedule() {
     }
   } else {
     // Recurring
-    const interval = document.getElementById('sch-interval').value;
-    const time = document.getElementById('sch-time').value || '09:00';
+    const intervalEl = document.getElementById('sch-interval');
+    if (!intervalEl) { showToast('Interval field not found', 'error'); return; }
+    const interval = intervalEl.value;
+    const timeEl = document.getElementById('sch-time');
+    const time = (timeEl ? timeEl.value : '') || '09:00';
 
     const recurrence = { interval, time };
 
@@ -423,7 +465,9 @@ async function handleSaveSchedule() {
     }
 
     if (interval === 'custom') {
-      const period = parseInt(document.getElementById('sch-period').value, 10);
+      const periodEl = document.getElementById('sch-period');
+      if (!periodEl) { showToast('Period field not found', 'error'); return; }
+      const period = parseInt(periodEl.value, 10);
       if (!period || period < 30) {
         showToast('Custom interval must be at least 30 minutes', 'error');
         return;
@@ -452,7 +496,8 @@ async function handleSaveSchedule() {
     }
 
     // Close modal and refresh
-    document.getElementById('schedule-modal').classList.remove('show');
+    const modalEl = document.getElementById('schedule-modal');
+    if (modalEl) modalEl.classList.remove('show');
     loadAndRenderSchedules();
     showToast('Schedule created', 'success');
   } catch (err) {
