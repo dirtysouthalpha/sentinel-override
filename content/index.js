@@ -22,7 +22,7 @@ if (!window.__sentinelContentTel) {
         message: String(message || '').substring(0, 500),
         payload: payload || null
       }).catch((e) => {
-        console.error('[_ctel] Unhandled rejection:', e);
+        console.error('[_ctel] Unhandled rejection:', e && e.message);
       });
     } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', e && e.message); }
   };
@@ -39,7 +39,9 @@ var ctel = window.__sentinelContentTel;
 // This prevents duplicate message listeners and duplicate MutationObservers
 // when content/index.js is injected multiple times (e.g., on page navigation).
 if (window.__sentinelInitialized) {
-  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', e && e.message); }
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
+    console.warn('[Sentinel] re-inject ready send failed:', e && e.message);
+  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', e && e.message); }
 } else {
   window.__sentinelInitialized = true;
 
@@ -1281,6 +1283,9 @@ if (window.__sentinelInitialized) {
         if (isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
         const iframeSelector = parts.slice(2).join(':');
         const iframes = document.querySelectorAll('iframe');
+        if (!iframes || !iframes[frameIndex]) {
+          return 'Iframe not found at index ' + frameIndex;
+        }
         if (iframes[frameIndex]) {
           try {
             if (!iframes[frameIndex].contentWindow) return 'Cannot access iframe (no content window)';
@@ -2411,6 +2416,7 @@ if (window.__sentinelInitialized) {
         if (!containers.length) return 'Element not found: ' + describeTarget(cmd);
         const limit = cmd.limit || 20;
         const fields = cmd.fields || {};
+        if (typeof fields !== 'object' || Array.isArray(fields)) return 'Invalid fields parameter';
         const items = containers.slice(0, limit).map(container => {
           const item = {};
           for (const [fieldName, fieldSelector] of Object.entries(fields)) {
@@ -2537,7 +2543,9 @@ if (window.__sentinelInitialized) {
   }
 
   function safeSendMessage(msg) {
-    try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch (e) { console.warn('[Sentinel] safe send msg:', e && e.message); }
+    try { chrome.runtime.sendMessage(msg).catch((e) => {
+      console.warn('[Sentinel] safe send failed:', e && e.message);
+    }); } catch (e) { console.warn('[Sentinel] safe send msg:', e && e.message); }
   }
 
   function setupSPAObservers() {
@@ -2608,6 +2616,8 @@ if (window.__sentinelInitialized) {
 
   setupSPAObservers();
 
-  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch(() => {}); } catch (e) { console.warn('[Sentinel] init ready signal:', e && e.message); }
+  try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
+    console.warn('[Sentinel] init ready send failed:', e && e.message);
+  }); } catch (e) { console.warn('[Sentinel] init ready signal:', e && e.message); }
 }
 // (3.26.0) End-of-file marker — sync flush. (v3.36.3 dedupe applied)
