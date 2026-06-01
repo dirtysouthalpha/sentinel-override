@@ -225,7 +225,7 @@ if (window.__sentinelInitialized) {
           if (_style.display === 'none' || _style.visibility === 'hidden') continue;
           if (_style.position !== 'fixed' && _style.position !== 'absolute') continue;
           const _zi = parseInt(_style.zIndex, 10);
-          if (isNaN(_zi) || (_zi < 100 && _style.position !== 'fixed')) continue;
+          if (Number.isNaN(_zi) || (_zi < 100 && _style.position !== 'fixed')) continue;
           // Find buttons and clickable elements inside this overlay
           const _btns = _cand.querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"], span[class*="btn"], div[class*="btn"], input[type="button"], input[type="submit"]');
           for (const _btn of _btns) {
@@ -274,7 +274,7 @@ if (window.__sentinelInitialized) {
 
         const style = window.getComputedStyle(el);
         const zi = parseInt(style.zIndex, 10);
-        if (style.position !== 'fixed' || isNaN(zi) || zi <= 1000) continue;
+        if (style.position !== 'fixed' || Number.isNaN(zi) || zi <= 1000) continue;
 
         const rect = el.getBoundingClientRect();
         const viewportArea = window.innerWidth * window.innerHeight;
@@ -1284,7 +1284,7 @@ if (window.__sentinelInitialized) {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');
         const frameIndex = parseInt(parts[1], 10);
-        if (isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
+        if (Number.isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
         const iframeSelector = parts.slice(2).join(':');
         const iframes = document.querySelectorAll('iframe');
         if (!iframes || !iframes[frameIndex]) {

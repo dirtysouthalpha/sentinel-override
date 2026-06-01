@@ -399,7 +399,7 @@ async function handleSaveSchedule() {
       return;
     }
     scheduleData.runAt = new Date(runAtValue).getTime();
-    if (!scheduleData.runAt || isNaN(scheduleData.runAt) || scheduleData.runAt <= Date.now()) {
+    if (!scheduleData.runAt || Number.isNaN(scheduleData.runAt) || scheduleData.runAt <= Date.now()) {
       showToast('Date and time must be in the future', 'error');
       return;
     }

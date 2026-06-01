@@ -3391,7 +3391,7 @@ chrome.runtime.onMessage.addListener((message) => {
           if (!comp) return '';
           const pts = (typeof comp.points === 'number') ? comp.points : 0;
           const max = (typeof comp.max === 'number') ? comp.max : 0;
-          const ratio = (typeof max === 'number' && max !== 0 && !isNaN(max)) ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
+          const ratio = (typeof max === 'number' && max !== 0 && !Number.isNaN(max)) ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
           const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
           const widthPct = Math.min(100, Math.round(ratio * 100));
           return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +

@@ -90,7 +90,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     const frameIndex = parseInt(parts[1], 10);
     const remainingSelector = parts.slice(2).join(':');
 
-    if (isNaN(frameIndex)) return null;
+    if (Number.isNaN(frameIndex)) return null;
 
     let iframes;
     try {

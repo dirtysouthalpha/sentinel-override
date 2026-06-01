@@ -221,7 +221,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
      */
     moveTo(x, y, options) {
       try {
-        if (typeof x !== 'number' || typeof y !== 'number' || isNaN(x) || isNaN(y)) {
+        if (typeof x !== 'number' || typeof y !== 'number' || Number.isNaN(x) || Number.isNaN(y)) {
           return Promise.resolve();
         }
         const clamped = clamp(x, y);
