@@ -1078,9 +1078,9 @@ function summarizeHistoryBatch(batch) {
   if (notes.length) summaryParts.push('Notes recorded: ' + notes.slice(0, 3).join(' || '));
   if (failures.length) summaryParts.push('Failures: ' + failures.slice(0, 3).join(' || '));
   return {
-    step: firstValid.step + '-' + lastValid.step,
+    step: (firstValid?.step || '?') + '-' + (lastValid?.step || '?'),
     action: { type: 'history_summary' },
-    result: '[ROLLED-UP SUMMARY of steps ' + firstValid.step + '-' + lastValid.step + '] ' + summaryParts.join(' • ')
+    result: '[ROLLED-UP SUMMARY of steps ' + (firstValid?.step || '?') + '-' + (lastValid?.step || '?') + '] ' + summaryParts.join(' • ')
   };
 }
 
@@ -1142,7 +1142,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
     const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
-    const allSameResult = recent.every(h => h.result === recent[0].result);
+    const allSameResult = recent.every(h => h.result === recent[0]?.result);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';
       return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.startsWith('Timeout') || r.includes('Element not found') || r.includes('No element');
@@ -1151,7 +1151,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     if (allSameType && allSameResult && allFailed) {
       return {
         stalled: true,
-        reason: `Repeated "${recent[0].action?.type}" with same failure: "${recent[0].result}"`,
+        reason: `Repeated "${recent[0]?.action?.type}" with same failure: "${recent[0]?.result || ''}"`,
         recoveryAction: 'RESCAN_AND_REPLAN'
       };
     }
@@ -3951,10 +3951,10 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.8.0) Tightened read_page loop guard: 2+ consecutive read_page on the
       // same URL is a stall (page hasn't changed; rereading achieves nothing).
       if (history.length >= 2) {
-        const last = history[history.length - 1];
-        const prior = history[history.length - 2];
+        const last = history[history.length - 1] || null;
+        const prior = history[history.length - 2] || null;
         const isReadPage = h => h && h.action && h.action.type === 'read_page';
-        if (isReadPage(last) && isReadPage(prior)) {
+        if (last && prior && isReadPage(last) && isReadPage(prior)) {
           loopDirective = '\n⚠ READ_PAGE LOOP DETECTED — Two consecutive read_page actions returned the same content. The page state has not changed. You MUST take a different approach now: use "extract" / "extract_list" with specific selectors, "execute_js" to query the DOM directly, "scroll" to reveal more content, or "click" to interact. Do NOT call read_page again on this same page.\n';
         }
       }
