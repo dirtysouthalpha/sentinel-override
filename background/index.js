@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 // eslint-disable-next-line no-unused-vars
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 // eslint-disable-next-line no-unused-vars
@@ -232,35 +232,6 @@ try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', e && e.message));
 } catch (_e) { /* non-fatal on older Chrome */ }
-
-// ========== Side Panel Tab-Scoping (v3.53) ==========
-// During an agent run, the side panel should ONLY appear on tabs the agent
-// is actively using (attached tabs). All other tabs have it disabled.
-// Mirrors Claude's computer-use behavior — panel follows the agent window.
-
-async function _scopeSidePanelToAttachedTabs() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    const attached = getAttachedTabIds();
-    const attachedSet = new Set(attached);
-    for (const tab of allTabs) {
-      if (tab.id && !attachedSet.has(tab.id)) {
-        try { await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' }); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-}
-
-async function _enableSidePanelEverywhere() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    for (const tab of allTabs) {
-      if (tab.id) {
-        try { await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' }); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-}
 
 // (v3.53) When user opens a new tab during agent run, immediately disable
 // the side panel on it — only agent-attached tabs should show the panel.
