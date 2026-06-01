@@ -1162,7 +1162,7 @@ const _rateLimiter = {
     // Drop timestamps outside the sliding window
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
     if (this.timestamps.length >= this.maxCalls && this.timestamps.length > 0) {
-      const oldestInWindow = this.timestamps[0];
+      const oldestInWindow = this.timestamps.length > 0 ? this.timestamps[0] : now;
       const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
       throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
     }
@@ -1223,6 +1223,9 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   let rates = [3.00, 15.00]; // default: Sonnet-class
   for (const [key, r] of Object.entries(_PRICING).sort((a,b) => b[0].length - a[0].length)) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
+  }
+  if (!rates || !Array.isArray(rates) || rates.length < 2) {
+    rates = [3.00, 15.00]; // fallback to default if pricing lookup fails
   }
   return ((inputTokens || 0) * rates[0] + (outputTokens || 0) * rates[1]) / 1_000_000;
 }
@@ -1909,7 +1912,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
     // One last attempt: try the raw tool_calls directly
-    if (hasToolCalls) {
+    if (hasToolCalls && choice.message && choice.message.tool_calls && choice.message.tool_calls.length > 0) {
       const tc = choice.message.tool_calls[0];
       if (tc && tc.function && tc.function.name) {
         try {
