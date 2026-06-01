@@ -168,7 +168,7 @@ export async function historyToMacro(history, name, description) {
     .filter(h => h.action && !h.actionFailed)
     .map(h => ({
       action: (typeof h.action === 'string' ? h.action : h.action.type) || 'unknown',
-      params: (typeof h.action === 'object' && h.action.params) || {},
+      params: (h.action && typeof h.action === 'object' && h.action.params) || {},
       delay: h.duration || 1000,
     }));
 
