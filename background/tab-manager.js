@@ -637,7 +637,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           action: 'cdp_pre_click_visual',
           x: Number(x) || 0,
           y: Number(y) || 0,
-          description: options.description || ('Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')')
+          description: options.description || ('Clicking at (' + Math.round(Number(x) || 0) + ', ' + Math.round(Number(y) || 0) + ')')
         });
       } catch (_e) { /* content script may not be ready on first frame */ }
       // Brief pause so the user sees the cursor arrive + element light up
@@ -838,7 +838,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
   if (typeof code !== 'string' || code.length === 0) {
     return { ok: false, error: 'No code provided' };
   }
-  const timeout = Math.max(500, Math.min(60000, Number(options.timeout) || 8000));
+  const timeout = Math.max(500, Math.min(60000, Number(options.timeout) || 8000)) || 8000;
   try {
     await ensureDebuggerAttached(tabId);
     const expression = '(async () => { ' + code + ' \n })()';
@@ -948,7 +948,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         });
       });
       const _parts = screenshot_data_url ? screenshot_data_url.split(',') : [];
-      if (_parts.length < 2 || !_parts[1]) throw new Error('captureVisibleTab returned invalid data URL');
+      if (_parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
