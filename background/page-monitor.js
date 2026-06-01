@@ -24,22 +24,52 @@ function generateId() {
   return `mon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+let _cachedMonitors = null;
+let _loadMonitorsPromise = null;
+
 /**
  * Load all monitors from storage.
  * @returns {Promise<PageMonitor[]>}
  */
 export async function loadMonitors() {
-  const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
-  return result[MONITOR_STORAGE_KEY] || [];
+  if (_cachedMonitors !== null) {
+    return _cachedMonitors;
+  }
+
+  if (_loadMonitorsPromise !== null) {
+    return _loadMonitorsPromise;
+  }
+
+  _loadMonitorsPromise = (async () => {
+    try {
+      const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
+      _cachedMonitors = result[MONITOR_STORAGE_KEY] || [];
+      return _cachedMonitors;
+    } finally {
+      _loadMonitorsPromise = null;
+    }
+  })();
+
+  return _loadMonitorsPromise;
 }
 
 async function saveMonitors(monitors) {
   try {
     await chrome.storage.local.set({ [MONITOR_STORAGE_KEY]: monitors });
+    _cachedMonitors = monitors;
   } catch (e) {
     console.error('[Sentinel/page-monitor] saveMonitors failed:', e && e.message);
     throw e;
   }
+}
+
+// Ensure the cache stays in sync if another script or extension page modifies the monitors
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes[MONITOR_STORAGE_KEY]) {
+      _cachedMonitors = changes[MONITOR_STORAGE_KEY].newValue || [];
+    }
+  });
 }
 
 /**
@@ -164,7 +194,11 @@ export async function runMonitorCycle() {
 let _monitorLoopStarted = false;
 
 /** Reset idempotency guard — only for use in tests. */
-export function _resetMonitorLoop() { _monitorLoopStarted = false; }
+export function _resetMonitorLoop() {
+  _monitorLoopStarted = false;
+  _cachedMonitors = null;
+  _loadMonitorsPromise = null;
+}
 
 /**
  * Start the periodic monitor check loop.
