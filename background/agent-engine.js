@@ -2574,7 +2574,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
   if (ufbRes && ufbRes.ok && ufbRes.value != null) {
     try {
       var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
-      if (!parsed || typeof parsed !== 'object') return { ok: true, result: String(parsed != null ? parsed : 'UFB done') };
+      if (!parsed || typeof parsed !== 'object' || parsed === null) return { ok: true, result: String(parsed != null ? parsed : 'UFB done') };
       return { ok: parsed.ok !== false, result: parsed.result || parsed.error || 'UFB done', value: parsed.value };
     } catch(_e) {
       return { ok: true, result: String(ufbRes.value).slice(0, 200) };
@@ -2746,7 +2746,7 @@ function _isUnproductiveJsResult(raw) {
     const p = JSON.parse(trim);
     if (p === null) return true;
     if (Array.isArray(p) && p.length === 0) return true;
-    if (typeof p === 'object' && Object.keys(p).length === 0) return true;
+    if (typeof p === 'object' && p !== null && Object.keys(p).length === 0) return true;
   } catch (_) { /* not JSON, that's fine */ }
 
   return false;
@@ -2886,7 +2886,7 @@ function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
  */
 function _checkPreFinishCompleteness(goal, agentMemory, history) {
   if (!goal || typeof goal !== 'string') return null;
-  if (!agentMemory || typeof agentMemory !== 'object') return null;
+  if (!agentMemory || typeof agentMemory !== 'object' || agentMemory === null) return null;
   if (!Array.isArray(history)) history = [];
 
   const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
@@ -4214,7 +4214,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
       const promptHistory = history.slice(-CONFIG.historyWindow).map(h => {
-        if (!h || typeof h !== 'object') return h;
+        if (!h || typeof h !== 'object' || h === null) return h;
         const cleaned = { ...h };
         // Strip screenshots (large) from past entries — only the most recent
         // observation needs the image (passed separately as base64Image).
@@ -5812,7 +5812,7 @@ async function runAgentLoop(goal, workingTabId) {
               // execute_js fell back to body_text / visible_text.
               try {
                 const _isArr = Array.isArray(savedValue);
-                const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' ? Object.keys(savedValue).length : null));
+                const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
                 tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory || {}).length });
               } catch (_e) {}
               const preview = String(jsValue).substring(0, 100);
@@ -6072,7 +6072,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const ch = text[ci];
                 try {
                   await new Promise((res, rej) => {
-                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' ? tab.id : tab }, 'Input.dispatchKeyEvent', {
+                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' && tab !== null ? tab.id : tab }, 'Input.dispatchKeyEvent', {
                       type: 'keyDown',
                       text: ch,
                       key: ch,
@@ -6080,7 +6080,7 @@ async function runAgentLoop(goal, workingTabId) {
                     }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
                   });
                   await new Promise((res, rej) => {
-                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' ? tab.id : tab }, 'Input.dispatchKeyEvent', {
+                    chrome.debugger.sendCommand({ tabId: typeof tab === 'object' && tab !== null ? tab.id : tab }, 'Input.dispatchKeyEvent', {
                       type: 'keyUp',
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
