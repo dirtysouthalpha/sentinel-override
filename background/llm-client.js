@@ -687,7 +687,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
     }
   }
 
-  if (sel && typeof sel === 'object') {
+  if (sel && typeof sel === 'object' && sel !== null) {
     parts.push('KNOWN SELECTORS (use as preferred targets):');
     for (const [k, v] of Object.entries(sel)) {
       if (typeof v === 'string') {
@@ -703,7 +703,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
     parts.push('');
   }
 
-  if (wait && typeof wait === 'object') {
+  if (wait && typeof wait === 'object' && wait !== null) {
     parts.push('WAIT-TEXT SIGNALS (use with wait_for_text):');
     for (const [k, v] of Object.entries(wait)) {
       if (Array.isArray(v) && v.length) {
@@ -935,7 +935,7 @@ export async function generatePlan(goal, settings, context = {}) {
       return [(goal || 'Complete the task').substring(0, 300)];
     }
     const data = await response.json();
-    if (!data || typeof data !== 'object') throw new Error('Plan API returned invalid response body');
+    if (!data || typeof data !== 'object' || data === null) throw new Error('Plan API returned invalid response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
     if ((!data.choices || data.choices.length === 0) && (data.error || data.msg || (data.code && data.success === false))) {
       const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
@@ -1379,7 +1379,7 @@ function _sanitizeHistory(history, isRunbook, CONFIG) {
     let safeResult;
     if (typeof h.result === 'string') {
       safeResult = h.result.substring(0, 200);
-    } else if (h.result && typeof h.result === 'object') {
+    } else if (h.result && typeof h.result === 'object' && h.result !== null) {
       const r = { ...h.result };
       if (!isMostRecent) {
         if ('base64Image' in r) r.base64Image = '[screenshot omitted from history]';
@@ -2173,9 +2173,9 @@ export function parseLLMResponse(content) {
     } catch (e) {
       throw new Error('Failed to parse action JSON: ' + (e && e.message));
     }
-    if (!parsed.type && parsed.action && typeof parsed.action === 'object') parsed = parsed.action;
-    if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
-    if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
+    if (!parsed.type && parsed.action && typeof parsed.action === 'object' && parsed.action !== null) parsed = parsed.action;
+    if (!parsed.type && parsed.command && typeof parsed.command === 'object' && parsed.command !== null) parsed = parsed.command;
+    if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object' && parsed.next_action !== null) parsed = parsed.next_action;
     if (!parsed.type) throw new Error('Missing type field');
     const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
       'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
