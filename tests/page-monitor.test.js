@@ -41,6 +41,7 @@ global.chrome = {
     }),
     onAlarm: {
       addListener: jest.fn(),
+      removeListener: jest.fn(),
     },
   },
   notifications: {

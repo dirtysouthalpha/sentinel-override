@@ -162,9 +162,16 @@ export async function runMonitorCycle() {
 }
 
 let _monitorLoopStarted = false;
+let _monitorAlarmHandler = null;
 
 /** Reset idempotency guard — only for use in tests. */
-export function _resetMonitorLoop() { _monitorLoopStarted = false; }
+export function _resetMonitorLoop() {
+  if (_monitorAlarmHandler) {
+    chrome.alarms.onAlarm.removeListener(_monitorAlarmHandler);
+    _monitorAlarmHandler = null;
+  }
+  _monitorLoopStarted = false;
+}
 
 /**
  * Start the periodic monitor check loop.
@@ -178,11 +185,12 @@ export function startMonitorLoop() {
     periodInMinutes: 0.5, // 30 seconds
   });
 
-  chrome.alarms.onAlarm.addListener(alarm => {
+  _monitorAlarmHandler = alarm => {
     if (alarm.name === 'sentinel-monitor-check') {
       runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', e && e.message));
     }
-  });
+  };
+  chrome.alarms.onAlarm.addListener(_monitorAlarmHandler);
 
   return 'sentinel-monitor-check';
 }

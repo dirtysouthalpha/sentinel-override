@@ -409,7 +409,7 @@ function buildStructuredData(executionData, timestamp) {
         findings[key] = String(val).substring(0, 2000);
       }
     } else {
-      const str = String(val || '');
+      const str = String(val != null ? val : '');
       findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : str;
     }
   }
