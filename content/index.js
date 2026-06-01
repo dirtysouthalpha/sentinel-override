@@ -52,13 +52,13 @@ if (window.__sentinelInitialized) {
   const _EXECUTE_JS_SANDBOX_ENABLED = true;
 
   // Shorthand references to utility modules
-  const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
-  const hl = window.__sentinelUtils && window.__sentinelUtils.highlight;
-  const wait = window.__sentinelUtils && window.__sentinelUtils.wait;
-  const dd = window.__sentinelUtils && window.__sentinelUtils.dropdown;
-  const si = window.__sentinelUtils && window.__sentinelUtils.specialInputs;
-  const ov = window.__sentinelUtils && window.__sentinelUtils.overlay;
-  const fm = window.__sentinelUtils && window.__sentinelUtils.frame;
+  const dom = (window.__sentinelUtils && window.__sentinelUtils.dom) || null;
+  const hl = (window.__sentinelUtils && window.__sentinelUtils.highlight) || null;
+  const wait = (window.__sentinelUtils && window.__sentinelUtils.wait) || null;
+  const dd = (window.__sentinelUtils && window.__sentinelUtils.dropdown) || null;
+  const si = (window.__sentinelUtils && window.__sentinelUtils.specialInputs) || null;
+  const ov = (window.__sentinelUtils && window.__sentinelUtils.overlay) || null;
+  const fm = (window.__sentinelUtils && window.__sentinelUtils.frame) || null;
 
   // ========== Overlay / Popup Dismissal ==========
   // Detects and auto-closes common overlays. (#14) Conservative behavior:
@@ -394,7 +394,9 @@ if (window.__sentinelInitialized) {
           try {
             interactiveElements = [];
             const selectorMap = new Map();
-            dom.scanDocument(document, interactiveElements, selectorMap, '');
+            if (dom && dom.scanDocument) {
+              dom.scanDocument(document, interactiveElements, selectorMap, '');
+            }
             // Scan iframes using frame-manager
             if (fm && fm.scanIframes) {
               try {
@@ -2056,11 +2058,13 @@ if (window.__sentinelInitialized) {
         if (!cmd.approvalGranted) {
           try {
             const approvalResult = await Promise.race([
-              chrome.runtime.sendMessage({
-                action: 'execute_js_approval_request',
-                code: code.substring(0, 2000),  // truncate for the approval card
-                key: cmd.key || null,
-                url: window.location.href
+              new Promise((resolve) => {
+                chrome.runtime.sendMessage({
+                  action: 'execute_js_approval_request',
+                  code: code.substring(0, 2000),  // truncate for the approval card
+                  key: cmd.key || null,
+                  url: window.location.href
+                }, (response) => resolve(response || null));
               }),
               new Promise((resolve) => setTimeout(() => resolve({ approved: false, reason: 'timeout' }), 60000))
             ]);
