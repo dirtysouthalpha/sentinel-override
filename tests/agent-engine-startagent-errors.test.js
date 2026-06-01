@@ -264,7 +264,8 @@ describe('agent-engine startAgent error paths', () => {
       // Mock storage.set to fail for run_log writes
       const originalSet = chrome.storage.local.set;
       chrome.storage.local.set = jest.fn(async (obj) => {
-        if (Object.keys(obj)[0].startsWith('run_log_')) {
+        const keys = Object.keys(obj);
+        if (keys.length > 0 && keys[0].startsWith('run_log_')) {
           throw new Error('Storage write failed');
         }
         await originalSet(obj);
@@ -369,7 +370,8 @@ describe('agent-engine startAgent error paths', () => {
       chrome.storage.local.set = jest.fn(async (obj) => {
         callCount++;
         // Fail on the run_log write for adapted goal
-        if (callCount >= 2 && Object.keys(obj)[0].startsWith('run_log_')) {
+        const keys = Object.keys(obj);
+        if (callCount >= 2 && keys.length > 0 && keys[0].startsWith('run_log_')) {
           throw new Error('Adapted goal storage failed');
         }
         await originalSet(obj);

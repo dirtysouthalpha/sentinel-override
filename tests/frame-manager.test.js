@@ -70,7 +70,7 @@ function setupFrameManagerEnv() {
     },
     findElementBySelector: (doc, selector) => {
       if (doc && doc.mockElements) {
-        const idx = parseInt(selector.split(':')[1]);
+        const idx = parseInt(selector.split(':')[1], 10);
         return doc.mockElements[idx] || null;
       }
       return null;

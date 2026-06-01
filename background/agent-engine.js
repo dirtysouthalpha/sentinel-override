@@ -5068,7 +5068,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (!_dohResp.ok) throw new Error('DoH HTTP ' + _dohResp.status);
           const _dohJson = await _dohResp.json();
           const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
-          const _status = _dohJson.Status === 0 ? 'NOERROR' : `RCODE ${_dohJson.Status}`;
+          const _status = (_dohJson.Status === 0 || _dohJson.Status === 'NOERROR') ? 'NOERROR' : `RCODE ${_dohJson.Status ?? 'UNKNOWN'}`;
           const _result = JSON.stringify({ domain: _domain, recordType: _type, preset: _preset || null, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
           if (_answers.length > 0) productiveSteps++;
           sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
