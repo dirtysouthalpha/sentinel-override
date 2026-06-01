@@ -5479,6 +5479,8 @@ async function runAgentLoop(goal, workingTabId) {
           result = `Opened tab "${command.label || command.url}" (ID: ${ctx.tabId})`;
           if (_arrivedUrl && command.url) {
             try {
+              if (!command.url || typeof command.url !== 'string') throw new Error('Invalid command.url');
+              if (!_arrivedUrl || typeof _arrivedUrl !== 'string') throw new Error('Invalid _arrivedUrl');
               const _intendedPath = new URL(command.url).pathname.replace(/\/$/, '');
               const _arrivedPath = new URL(_arrivedUrl).pathname.replace(/\/$/, '');
               if (_intendedPath !== _arrivedPath) {
