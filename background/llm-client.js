@@ -1241,6 +1241,7 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
  * @returns {boolean}
  */
 export function isSimpleStep(agentState, stepCount, history) {
+  if (!agentState) return false;
   if (agentState.consecutiveFailures > 0) return false;
   if (agentState.quickMode) return false; // quick mode already uses fewer tokens
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|runbook|investigation/i.test(agentState.goal || '');
@@ -1263,7 +1264,7 @@ export function isSimpleStep(agentState, stepCount, history) {
  * @returns {string} Strategy-shift directive string, or empty string if below threshold.
  */
 function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
-  if (agentState.consecutiveFailures < CONFIG.strategyShiftThreshold) return '';
+  if (!agentState || agentState.consecutiveFailures < CONFIG.strategyShiftThreshold) return '';
   const _u = (currentUrl || '').toLowerCase();
   let platformHints = '';
   if (/entra|admin\.microsoft|admin\.exchange|purview|defender|security\.microsoft|portal\.azure|intune|endpoint\.microsoft/.test(_u)) {
@@ -1655,6 +1656,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
  * @returns {Promise<Object>} Parsed LLM response object.
  */
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
+  if (!agentState) throw new Error('agentState is required');
   _rateLimiter.check();
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
