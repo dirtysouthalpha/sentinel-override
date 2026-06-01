@@ -163,8 +163,8 @@ function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
   const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':').map(Number);
-  const hours = (timeParts.length >= 1 && Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
-  const minutes = (timeParts.length >= 2 && Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
+  const hours = (timeParts.length >= 1 && timeParts[0] != null && Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
+  const minutes = (timeParts.length >= 2 && timeParts[1] != null && Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
   const now = new Date();
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 
@@ -205,13 +205,15 @@ function sendNotification(schedule, result) {
   let message;
 
   if (result.status === 'success') {
-    message = `Completed successfully at ${new Date(result.completedAt).toLocaleTimeString()}.`;
+    const completedDate = result.completedAt && !isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
+    message = `Completed successfully at ${completedDate.toLocaleTimeString()}.`;
     if (result.report && typeof result.report === 'string') {
       const snippet = result.report.substring(0, 150).replace(/\n/g, ' ');
       message += ` ${snippet}${result.report.length > 150 ? '...' : ''}`;
     }
   } else {
-    message = `Failed at ${new Date(result.completedAt).toLocaleTimeString()}.`;
+    const completedDate = result.completedAt && !isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
+    message = `Failed at ${completedDate.toLocaleTimeString()}.`;
     if (result.error && typeof result.error === 'string') {
       message += ` Error: ${result.error.substring(0, 100)}`;
     }
@@ -600,10 +602,11 @@ async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
   });
-  if (tabs && tabs.length > 0 && typeof tabs[0].id === 'number') return tabs[0].id;
+  if (tabs && tabs.length > 0 && tabs[0] != null && typeof tabs[0].id === 'number') return tabs[0].id;
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
   await new Promise(resolve => setTimeout(resolve, 500));
-  return newTab.id;
+  if (newTab && newTab.id) return newTab.id;
+  throw new Error('Failed to create tab');
 }
 
 /**

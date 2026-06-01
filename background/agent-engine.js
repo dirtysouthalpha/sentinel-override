@@ -638,7 +638,7 @@ export async function startAgent(goal, sender) {
   let startTabId;
   if (!sender.tab || !sender.tab.id) {
     const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t)); });
-    if (tabs && tabs.length > 0) {
+    if (tabs && tabs.length > 0 && tabs[0] != null && tabs[0].id) {
       startTabId = tabs[0].id;
     } else {
       throw new Error('No active tab found');
@@ -6179,10 +6179,10 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
           const newTabs = allTabs.filter(t => t.openerTabId === tab && t.id !== tab);
-          if (newTabs.length > 0) {
+          if (newTabs.length > 0 && newTabs[0] != null) {
             const newTab = newTabs[0];
             const newUrl = newTab.url;
-            if (getTabCount() > 1) {
+            if (getTabCount() > 1 && newTab.id) {
               // Multi-tab mode: register the new tab as a tracked context
               registerInitialTab(newTab.id, newUrl);
               // Mark it as agent-created since it was opened by page interaction

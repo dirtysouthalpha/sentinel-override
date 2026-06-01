@@ -961,15 +961,15 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   let ids = [];
   if (provider.tagsResponse && Array.isArray(data.models)) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
-    ids = (data.models || []).map(m => m.name).filter(Boolean);
+    ids = (data.models || []).filter(m => m != null).map(m => m.name).filter(Boolean);
   } else if (Array.isArray(data.data)) {
     // OpenAI-compatible: { data: [{ id: "gpt-4o" }] }
-    ids = (data.data || []).map(m => m.id || m.name).filter(Boolean);
+    ids = (data.data || []).filter(m => m != null).map(m => m.id || m.name).filter(Boolean);
   } else if (Array.isArray(data.models)) {
     // Some providers: { models: [{ id }] }
-    ids = (data.models || []).map(m => m.id || m.name).filter(Boolean);
+    ids = (data.models || []).filter(m => m != null).map(m => m.id || m.name).filter(Boolean);
   } else if (Array.isArray(data)) {
-    ids = (data || []).map(m => (typeof m === 'string') ? m : (m.id || m.name)).filter(Boolean);
+    ids = (data || []).filter(m => m != null).map(m => (typeof m === 'string') ? m : (m.id || m.name)).filter(Boolean);
   }
   if (ids.length === 0) {
     throw new Error('Could not parse models from response: ' + JSON.stringify(data).slice(0, 240));
