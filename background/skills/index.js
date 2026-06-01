@@ -174,7 +174,7 @@ export function getSkillStats() {
  */
 export function runRecoverySkills(context) {
   const result = { autoApply: null, promptInjection: '', appliedSkillIds: [] };
-  if (!context || typeof context !== 'object') return result;
+  if (!context || typeof context !== 'object' || context === null) return result;
 
   _recordPendingOutcomes(context);
 
@@ -208,7 +208,7 @@ export function runRecoverySkills(context) {
     if (typeof skill.autoApply === 'function') {
       try {
         const cmd = skill.autoApply(context);
-        if (cmd && typeof cmd === 'object' && cmd.type) {
+        if (cmd && typeof cmd === 'object' && cmd !== null && cmd.type) {
           result.autoApply = cmd;
           result.appliedSkillIds.push(skill.id);
           break;

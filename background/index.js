@@ -198,7 +198,7 @@ try {
     chrome.downloads.onCreated.addListener((dl) => {
       try {
         if (!agentRunning) return;
-        if (!dl || typeof dl !== 'object') return;
+        if (!dl || typeof dl !== 'object' || dl === null) return;
         chrome.runtime.sendMessage({
           action: 'download_captured',
           download: {
@@ -296,7 +296,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const cat = String(request.category || 'content');
         const lvl = ['error', 'warn', 'info', 'debug', 'trace'].includes(request.level) ? request.level : 'info';
         const msg = String(request.message || '');
-        const payload = (request.payload && typeof request.payload === 'object') ? { ...request.payload } : {};
+        const payload = (request.payload && typeof request.payload === 'object' && request.payload !== null) ? { ...request.payload } : {};
         // Auto-stamp the sender info so panel rows show which tab fired.
         if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
         if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);
@@ -524,7 +524,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (!activeTab) throw new Error('No agent tab specified');
       const tab = activeTab;
       const cmd = request.command;
-      if (!cmd || typeof cmd !== 'object') throw new Error('execute_command: missing or invalid command object');
+      if (!cmd || typeof cmd !== 'object' || cmd === null) throw new Error('execute_command: missing or invalid command object');
 
       // Handle navigate inline (no content script needed)
       if (cmd.type === 'navigate') {
@@ -642,7 +642,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (frameId == null) {
         return { ok: false, error: 'execute_in_frame: frame ' + frameIndex + ' not found in tab ' + tabId };
       }
-      if (!command || typeof command !== 'object') {
+      if (!command || typeof command !== 'object' || command === null) {
         return { ok: false, error: 'execute_in_frame: missing or invalid command' };
       }
       return await executeInFrame(tabId, frameId, command);
