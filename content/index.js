@@ -2473,7 +2473,7 @@ if (window.__sentinelInitialized) {
         // Try Escape globally first — handles enterprise dialogs that trap focus
         var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
         try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', e && e.message); }
-        try { document.body.dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (escDispatchErr) { /* Non-fatal: ESC dispatch to body failed */ }
+        try { (document.body || document.documentElement).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (escDispatchErr) { /* Non-fatal: ESC dispatch to body failed */ }
         await new Promise(r => setTimeout(r, 200));
         var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;
         if (!detectedOverlay) return 'Overlay dismissed (Escape key sent)';

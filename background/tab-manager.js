@@ -97,7 +97,7 @@ async function _checkDomReadyState(tabId) {
     } else if (typeof data === 'string') {
       try {
         const parsed = JSON.parse(data);
-        if (parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
+        if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
       } catch (_e) { /* parse failed */ }
     }
   } catch (_e) {
