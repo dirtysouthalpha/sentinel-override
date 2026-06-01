@@ -1398,7 +1398,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
       const acceptBtn = buttons.find(b =>
         b && /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i.test(b.text)
       );
-      const dismissBtn = acceptBtn || buttons.find(b => b && b.text && b.text.length > 0) || buttons[0];
+      const dismissBtn = acceptBtn || buttons.find(b => b && b.text && b.text.length > 0) || (buttons.length > 0 ? buttons[0] : null);
       if (dismissBtn && dismissBtn.x && dismissBtn.y) {
         console.log('[Sentinel/CDP] Phase1 clicking:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
         const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
@@ -1729,7 +1729,7 @@ function _splitTriedSection(summary) {
   const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
-  return matches.length ? matches : [(lines[0] || '').slice(0, 200)];
+  return matches.length ? matches : [(lines.length > 0 ? lines[0] : '').slice(0, 200)];
 }
 
 function formatTicketKickoff(summary, goal, tech, options) {
@@ -2899,7 +2899,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   // Don't fire on every gap -- only if MORE THAN HALF of asked fields are
   // missing. Otherwise the existing hallucination gate handles it via
   // [unverified] tagging.
-  if (missing.length / rawFields.length < 0.5) return null;
+  if (rawFields.length === 0 || missing.length / rawFields.length < 0.5) return null;
 
   return 'Goal asked for: ' + rawFields.join(', ') + '. Memory is missing token-evidence for: ' + missing.join(', ') + '. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.';
 }
@@ -3115,7 +3115,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
     if (pageTitle) parts.push(pageTitle);
     else if (host) parts.push(host);
 
-    if (headings.length > 0) {
+    if (headings.length > 0 && headings[0]) {
       const h = headings[0].length > 60 ? headings[0].substring(0, 57) + '...' : headings[0];
       if (h.toLowerCase() !== pageTitle.toLowerCase()) parts.push('"' + h + '"');
     }
