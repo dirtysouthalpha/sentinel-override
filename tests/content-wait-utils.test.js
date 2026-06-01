@@ -328,4 +328,22 @@ describe('wait.checkCondition — shadow DOM fallback', () => {
     expect(wait.checkCondition({ type: 'wait_for_element', selector: '#missing' })).toBe(false);
     globalThis.window.__sentinelUtils.shadow = origShadow;
   });
+
+  test('returns false for wait_for_element with ref set, dom absent, and no selector — does not throw', () => {
+    // Fixed bug: when condition.ref is set but dom utility is unavailable AND
+    // condition.selector is absent, undefined was passed to querySelector.
+    // Now returns false immediately without calling querySelector.
+    const origDom = globalThis.window.__sentinelUtils.dom;
+    globalThis.window.__sentinelUtils.dom = null;
+    const querySelectorSpy = jest.fn(() => null);
+    globalThis.document.querySelector = querySelectorSpy;
+    expect(() => {
+      const result = wait.checkCondition({ type: 'wait_for_element', ref: 'ref_abc' });
+      expect(result).toBe(false);
+    }).not.toThrow();
+    // querySelector must NOT have been called with undefined
+    expect(querySelectorSpy).not.toHaveBeenCalledWith(undefined);
+    globalThis.window.__sentinelUtils.dom = origDom;
+    globalThis.document.querySelector = () => null;
+  });
 });

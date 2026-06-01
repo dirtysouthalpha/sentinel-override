@@ -227,4 +227,28 @@ describe('subscribe', () => {
     // Should be called 100 times (each change, since we always change value)
     expect(cb).toHaveBeenCalledTimes(100);
   });
+
+  test('subscribe(key, null) returns a no-op unsubscribe function', () => {
+    // Fixed bug: subscribe() now returns a no-op thunk when callback is not a function.
+    const unsub = subscribe('activeProviderId', null);
+    expect(typeof unsub).toBe('function');
+    // Calling the no-op should not throw
+    expect(() => unsub()).not.toThrow();
+  });
+
+  test('subscribe(key, "not-a-function") returns a no-op unsubscribe function', () => {
+    const unsub = subscribe('activeProviderId', 'not-a-function');
+    expect(typeof unsub).toBe('function');
+    expect(() => unsub()).not.toThrow();
+  });
+
+  test('after subscribe(key, null), state changes do not cause errors', () => {
+    subscribe('activeProviderId', null);
+    subscribe('currentSearchQuery', null);
+    const state = getState();
+    expect(() => {
+      state.activeProviderId = 'openai';
+      state.currentSearchQuery = 'test query';
+    }).not.toThrow();
+  });
 });

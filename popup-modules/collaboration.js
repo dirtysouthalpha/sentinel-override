@@ -54,7 +54,7 @@ function openImportDialog() {
   document.body.appendChild(input);
 
   input.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
 
     try {
@@ -204,7 +204,7 @@ async function executeImport() {
       return;
     }
 
-    const result = response.data;
+    const result = response.data || {};
     const importModal = document.getElementById('import-modal');
     if (importModal) importModal.classList.remove('show');
     window.__importTemplates = null;
