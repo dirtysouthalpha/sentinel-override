@@ -61,7 +61,13 @@ function _createReactiveProxy(target) {
  */
 function initPopupState() {
   // Deep-clone defaults so each init is independent
-  const fresh = JSON.parse(JSON.stringify(_initialState));
+  let fresh;
+  try {
+    fresh = JSON.parse(JSON.stringify(_initialState));
+  } catch (cloneErr) {
+    console.error('[Sentinel/popup-state] Failed to deep-clone initial state, using shallow copy:', cloneErr && cloneErr.message);
+    fresh = { ..._initialState };
+  }
   window.__popupState = _createReactiveProxy(fresh);
 }
 
