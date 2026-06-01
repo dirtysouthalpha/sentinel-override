@@ -666,12 +666,12 @@ if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => {
 
 if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
   const state = getState();
-  const endpoint = setProviderEndpoint ? setProviderEndpoint.value.trim() : '';
-  const apiKey = setProviderKey ? setProviderKey.value.trim() : '';
-  const model = setProviderModel ? setProviderModel.value.trim() : '';
-  const format = exportFormatSelect ? exportFormatSelect.value : '';
+  const endpoint = setProviderEndpoint && setProviderEndpoint.value ? setProviderEndpoint.value.trim() : '';
+  const apiKey = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  const model = setProviderModel && setProviderModel.value ? setProviderModel.value.trim() : '';
+  const format = exportFormatSelect && exportFormatSelect.value ? exportFormatSelect.value : '';
   const agentContextEl = document.getElementById('set-agent-context');
-  const agentContext = agentContextEl ? agentContextEl.value.trim() : '';
+  const agentContext = agentContextEl && agentContextEl.value ? agentContextEl.value.trim() : '';
 
   if (!apiKey) {
     showToast('API key is required', 'error');
@@ -914,9 +914,9 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 // ========== Test Connection Button ==========
 const testConnectionBtn = document.getElementById('testConnectionBtn');
 if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
-  const endpoint = setProviderEndpoint ? setProviderEndpoint.value.trim() : '';
-  const apiKey = setProviderKey ? setProviderKey.value.trim() : '';
-  const model = setProviderModel ? setProviderModel.value.trim() : '';
+  const endpoint = setProviderEndpoint && setProviderEndpoint.value ? setProviderEndpoint.value.trim() : '';
+  const apiKey = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  const model = setProviderModel && setProviderModel.value ? setProviderModel.value.trim() : '';
 
   if (!endpoint || !apiKey || !model) {
     showToast('Fill in endpoint, API key, and model first', 'error');

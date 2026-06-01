@@ -597,7 +597,7 @@ export function getModelSupportsVision(providerId, model) {
   if (provCfg) {
     if (Array.isArray(provCfg.deny)) {
       for (const re of provCfg.deny) {
-        if (re instanceof RegExp ? re.test(m) : m.includes(String(re).toLowerCase())) {
+        if (re instanceof RegExp ? re.test(m) : (re && m.includes(String(re).toLowerCase()))) {
           return false;
         }
       }
