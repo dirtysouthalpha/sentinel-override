@@ -779,7 +779,7 @@ function addMessage(text, role = 'assistant') {
         copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
         copyBtn.classList.remove('copied');
       }, 2000);
-    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', e && e.message); });
+    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (e && e.message) || String(e)); });
   });
 
   wrapper.appendChild(msg);
@@ -815,7 +815,7 @@ function addCodeCopyButtons(messageElement) {
             copyBtn.textContent = 'Copy';
             copyBtn.classList.remove('copied');
           }, 2000);
-        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', e && e.message); });
+        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (e && e.message) || String(e)); });
       });
 
       header.appendChild(langSpan);
@@ -1185,7 +1185,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
+    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1226,7 +1226,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
+  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1239,7 +1239,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
+  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
 }, true);
 
 function updateMarkdownPreview() {
@@ -1857,12 +1857,12 @@ function openReportModal(markdown) {
         });
       } catch (e) {
         // Tab creation failed — fall back to the in-panel modal.
-        console.warn('[Sentinel] report-view tab failed, falling back to modal:', e && e.message);
+        console.warn('[Sentinel] report-view tab failed, falling back to modal:', (e && e.message) || String(e));
         openReportModalInline(markdown);
       }
     });
   } catch (e) {
-    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', e && e.message);
+    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', (e && e.message) || String(e));
     openReportModalInline(markdown);
   }
 }
@@ -2375,7 +2375,7 @@ function showModeMismatchCard(payload) {
         if (typeof updateApprovalModeUI === 'function') {
           updateApprovalModeUI(wantsApproval);
         }
-      } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
       sendResponse({ flip: true });
       card.remove();
     });
@@ -3540,7 +3540,7 @@ chrome.runtime.onMessage.addListener((message) => {
                         inputBox.value = originalGoal;
                       }
                       if (typeof sendMessage === 'function') sendMessage();
-                    } catch (e) { console.warn('[Sentinel] DOM write error:', e && e.message); }
+                    } catch (e) { console.warn('[Sentinel] DOM write error:', (e && e.message) || String(e)); }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
@@ -3566,7 +3566,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }
                   });
                 }
-              } catch (e) { console.warn('[Sentinel] DOM removal error:', e && e.message); }
+              } catch (e) { console.warn('[Sentinel] DOM removal error:', (e && e.message) || String(e)); }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);
