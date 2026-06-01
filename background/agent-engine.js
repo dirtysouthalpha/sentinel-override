@@ -3008,7 +3008,7 @@ function generateHeuristicPlan(goal, currentUrl) {
 
   // Extract count
   const countMatch = goal.match(/(?:top\s+)?(\d+)/);
-  const count = countMatch ? parseInt(countMatch[1]) : 10;
+  const count = countMatch ? (parseInt(countMatch[1]) || 10) : 10;
 
   if (isMultiPage) {
     const steps = [];
