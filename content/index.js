@@ -238,9 +238,15 @@ if (window.__sentinelInitialized) {
               }
             }
           }
-        } catch (_e) { /* skip */ }
+        } catch (skipErr) {
+          /* Element parsing failed - non-critical, skip this element */
+          console.debug('[Sentinel/content] Skip button text check failed:', skipErr && skipErr.message);
+        }
       }
-    } catch (_e) { /* non-fatal */ }
+    } catch (nonFatalErr) {
+      /* Dismissal loop failed - non-fatal, continue with overlay removal */
+      console.debug('[Sentinel/content] Dismissal check failed:', nonFatalErr && nonFatalErr.message);
+    }
 
     // Remove blocking overlays that cover the viewport — but only with strong
     // positive signals AND only if recently inserted. Skip structural roots.
@@ -575,7 +581,10 @@ if (window.__sentinelInitialized) {
             banner.style.opacity = '0';
             banner.style.transform = 'translateX(-50%) translateY(-10px)';
           }, 2000);
-        } catch (_) { /* non-fatal visual feedback */ }
+        } catch (visualErr) {
+          /* Non-fatal visual feedback error - banner update failed but action proceeds */
+          console.debug('[Sentinel/content] Banner update failed:', visualErr && visualErr.message);
+        }
         return { ok: true };
       }
 
@@ -1535,15 +1544,15 @@ if (window.__sentinelInitialized) {
           var mx = Math.round(srcX + (dstX - srcX) * (dragStep / steps));
           var my = Math.round(srcY + (dstY - srcY) * (dragStep / steps));
           dragEl.dispatchEvent(mkMouse('mousemove', mx, my));
-          try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch { /* non-fatal */ }
+          try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch (dragOverErr) { console.debug('[Sentinel/content] DragOver event failed:', dragOverErr && dragOverErr.message); }
           await humanDelay(20, 40);
         }
 
         // dragenter + drop + dragend on target
-        try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch { /* non-fatal */ }
+        try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch (dragEnterErr) { console.debug('[Sentinel/content] DragEnter event failed:', dragEnterErr && dragEnterErr.message); }
         try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch (e) { console.warn('[Sentinel] Drop event error:', e && e.message); }
         dragEl.dispatchEvent(mkMouse('mouseup', dstX, dstY));
-        try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch { /* non-fatal */ }
+        try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch (dragEndErr) { console.debug('[Sentinel/content] DragEnd event failed:', dragEndErr && dragEndErr.message); }
 
         setTimeout(() => { hl.removeHighlight(dragEl); hl.removeHighlight(dropEl); }, 1500);
         hl.highlightElement(dropEl);
@@ -2452,7 +2461,7 @@ if (window.__sentinelInitialized) {
         // Try Escape globally first — handles enterprise dialogs that trap focus
         var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
         try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', e && e.message); }
-        try { document.body.dispatchEvent(new KeyboardEvent('keydown', escO)); } catch { /* safe */ }
+        try { document.body.dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (escDispatchErr) { console.debug('[Sentinel/content] ESC dispatch to body failed:', escDispatchErr && escDispatchErr.message); }
         await new Promise(r => setTimeout(r, 200));
         var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;
         if (!detectedOverlay) return 'Overlay dismissed (Escape key sent)';

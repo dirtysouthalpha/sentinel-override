@@ -998,7 +998,12 @@ export async function generatePlan(goal, settings, context = {}) {
             const _norm = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
             if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm(parsed.plan); if (r.length > 0) return r; }
             if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm(parsed.steps); if (r.length > 0) return r; }
-          } catch (e) { /* not valid JSON at this position, keep scanning */ }
+          } catch (parseErr) {
+            /* Not valid JSON at this position - keep scanning for next { */
+            if (s2end === -1) {
+              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', parseErr && parseErr.message);
+            }
+          }
           s2from = s2end + 1;
         } else { break; }
       }
