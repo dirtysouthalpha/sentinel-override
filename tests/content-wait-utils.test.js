@@ -253,6 +253,19 @@ describe('wait.checkCondition — edge cases', () => {
     expect(wait.checkCondition({ type: 'wait_for_text', text: 'Hello' })).toBe(false);
     globalThis.document.body.innerText = origText;
   });
+
+  test('returns false for wait_for_text when condition.text is null', () => {
+    expect(wait.checkCondition({ type: 'wait_for_text', text: null })).toBe(false);
+  });
+
+  test('returns false for wait_for_text when condition.text is undefined', () => {
+    expect(wait.checkCondition({ type: 'wait_for_text', text: undefined })).toBe(false);
+  });
+
+  test('returns false for wait_for_text when condition.text is empty string', () => {
+    // Empty string would match everything via includes(''), but we treat it as no condition
+    expect(wait.checkCondition({ type: 'wait_for_text', text: '' })).toBe(false);
+  });
 });
 
 // ========== sleep edge cases ==========

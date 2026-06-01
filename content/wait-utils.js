@@ -85,7 +85,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
   wait.checkCondition = function(condition) {
     if (condition.type === 'wait_for_text') {
       const body = document.body;
-      if (!body) return false;
+      if (!body || !condition.text) return false;
       return body.innerText.includes(condition.text);
     } else if (condition.type === 'wait_for_element') {
       const dom = window.__sentinelUtils && window.__sentinelUtils.dom;

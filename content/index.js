@@ -1684,7 +1684,7 @@ if (window.__sentinelInitialized) {
             el.dispatchEvent(__sentinelKeyEventForChar('keydown', char));
             el.dispatchEvent(__sentinelKeyEventForChar('keypress', char));
 
-            const currentVal = el.value;
+            const currentVal = el.value || '';
             nativeSetter.call(el, currentVal + char);
             el.dispatchEvent(new InputEvent('input', {
               inputType: 'insertText', data: char,
