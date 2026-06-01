@@ -542,7 +542,7 @@ describe('saveLearnedPattern', () => {
     await saveLearnedPattern('Check server 192.168.1.100 for issues', [], true);
     const stored = storageData.learned_patterns;
     expect(stored[0].goal).not.toContain('192.168.1.100');
-    expect(stored[0].goal).toContain('XXX.XXX.XXX.XXX');
+    expect(stored[0].goal).toContain('[ip]');
   });
 
   test('scrubs email addresses from goal', async () => {
