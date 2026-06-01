@@ -403,7 +403,7 @@ export function sendCostUpdate(estimatedCostUsd, inputTokens, outputTokens, call
 }
 
 export function sendClientKnowledgePreview(clientName, entries) {
-  if (!entries || !entries.length) return;
+  if (!entries || !Array.isArray(entries) || !entries.length) return;
   chrome.runtime.sendMessage({
     action: 'client_knowledge_preview',
     clientName: clientName || 'Unknown Client',
