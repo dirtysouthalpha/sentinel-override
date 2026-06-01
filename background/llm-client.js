@@ -1939,17 +1939,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       // Detect smart_navigate intent from content
       if (/smart[._-]?navigate/i.test(_intentText)) {
         let _site = 'google', _query = '';
-        if (/weather\.gov/i.test(goal)) _site = 'weather.gov';
-        else if (/wikipedia/i.test(goal)) _site = 'wikipedia';
-        else if (/youtube/i.test(goal)) _site = 'youtube';
-        else if (/amazon/i.test(goal)) _site = 'amazon';
-        else if (/reddit/i.test(goal)) _site = 'reddit';
-        else if (/twitter\.com|x\.com/i.test(goal)) _site = 'twitter';
+        if (/weather\.gov/i.test(goal || '')) _site = 'weather.gov';
+        else if (/wikipedia/i.test(goal || '')) _site = 'wikipedia';
+        else if (/youtube/i.test(goal || '')) _site = 'youtube';
+        else if (/amazon/i.test(goal || '')) _site = 'amazon';
+        else if (/reddit/i.test(goal || '')) _site = 'reddit';
+        else if (/twitter\.com|x\.com/i.test(goal || '')) _site = 'twitter';
         // Extract query from goal text
-        const _qm = goal.match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
+        const _qm = (goal || '').match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
         if (_qm) _query = _qm[1].trim();
         else {
-          const _fm = goal.match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
+          const _fm = (goal || '').match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
           if (_fm) _query = _fm[1].trim();
         }
         if (_query) {
@@ -2240,7 +2240,7 @@ export async function getRelevantPatterns(goal) {
       .filter(p => p.success)
       .map(p => ({
         pattern: p,
-        score: goalWords.reduce((acc, w) => acc + ((p.goal && p.goal.toLowerCase().includes(w)) ? 1 : 0), 0)
+        score: goalWords.reduce((acc, w) => acc + ((p.goal && typeof p.goal === 'string' && p.goal.toLowerCase().includes(w)) ? 1 : 0), 0)
       }))
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
