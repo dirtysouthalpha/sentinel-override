@@ -103,7 +103,7 @@ initScheduler();
       }
     }
   } catch (e) {
-    console.warn('[Sentinel/self-heal] Auto-resume check failed:', e && e.message);
+    console.warn('[Sentinel/self-heal] Auto-resume check failed:', (e && e.message) || String(e));
   }
 })();
 
@@ -212,10 +212,10 @@ try {
         }).catch((e) => {
           console.error('[download_captured] Unhandled rejection:', e);
         });
-      } catch (e) { console.warn('[Sentinel/index] download capture failed:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel/index] download capture failed:', (e && e.message) || String(e)); }
     });
   }
-} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', e && e.message); }
+} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', (e && e.message) || String(e)); }
 
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -230,7 +230,7 @@ try {
 // two APIs coexist fine.
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', e && e.message));
+    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', (e && e.message) || String(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
 
 // ========== Side Panel Tab-Scoping (v3.53) ==========
@@ -609,7 +609,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         try { await chrome.windows.update(match.windowId, { focused: true }); } catch (_e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
-        return { ok: false, error: e && e.message ? e.message : 'unknown' };
+        return { ok: false, error: (e && e.message) || String(e) };
       }
     }
 
@@ -936,7 +936,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       await chrome.windows.update(win.id, { focused: true });
       sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', e && e.message); }
+  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (e && e.message) || String(e)); }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -970,7 +970,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', e && e.message); }
+  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (e && e.message) || String(e)); }
 });
 
 // ========== Keyboard Shortcut Commands ==========
