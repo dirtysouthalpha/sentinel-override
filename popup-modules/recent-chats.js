@@ -174,14 +174,20 @@
       const next = list.filter(c => c && c.id !== id);
       await chrome.storage.local.set({ [STORAGE_KEY]: next });
       return true;
-    } catch { return false; }
+    } catch (e) {
+      console.warn('[Sentinel] deleteRecentChat failed:', e && e.message);
+      return false;
+    }
   }
 
   async function clearAllRecent() {
     try {
       await chrome.storage.local.set({ [STORAGE_KEY]: [] });
       return true;
-    } catch { return false; }
+    } catch (e) {
+      console.warn('[Sentinel] clearAllRecent failed:', e && e.message);
+      return false;
+    }
   }
 
   // ========== Modal UI ==========
