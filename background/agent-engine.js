@@ -271,7 +271,7 @@ export async function restoreFromCheckpoint() {
       stepCount: cp.stepCount || 0,
       ageSeconds: Math.floor(age / 1000),
       historyLength: history.length,
-      memoryKeys: Object.keys(agentMemory)
+      memoryKeys: Object.keys(agentMemory || {})
     };
   } catch (e) {
     return { restored: false, error: (e && e.message) || String(e) };
@@ -1250,7 +1250,7 @@ async function detachAllSentinelTabs() {
     for (const id of ids) {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) {
         // Tab was already closed during the run — not an error, expected behavior
-        if (!_e2.message || !_e2.message.includes('No tab with id')) {
+        if (!_e2 || !_e2.message || !_e2.message.includes('No tab with id')) {
           console.error('[Sentinel] Error in agent-engine.js:', _e2);
         }
       }
@@ -4603,7 +4603,7 @@ async function runAgentLoop(goal, workingTabId) {
             const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
             const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
             const _notes = history.filter(h => h.action && h.action.type === 'note').length;
-            const _summaryKeys = Object.keys(agentMemory).filter(k =>
+            const _summaryKeys = Object.keys(agentMemory || {}).filter(k =>
               k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
             );
             // Block: haven't opened ANY article tabs AND no summaries written
@@ -4683,7 +4683,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('Task complete', stepCount);
 
         let finalSummary = command.summary || '';
-        const memKeys = Object.keys(agentMemory);
+        const memKeys = Object.keys(agentMemory || {});
 
         // Clean up memory — filter out failed/timed-out/empty entries
         const cleanMemory = {};
@@ -5692,7 +5692,7 @@ async function runAgentLoop(goal, workingTabId) {
               ? (_portalKey + '_' + parsed.key)
               : parsed.key;
             agentMemory[_finalKey] = parsed.value;
-            const memKeys = Object.keys(agentMemory);
+            const memKeys = Object.keys(agentMemory || {});
             if (memKeys.length > CONFIG.maxMemoryEntries) {
               delete agentMemory[memKeys[0]];
             }
@@ -5800,7 +5800,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
             if (savedValue !== null) {
               agentMemory[savedKey] = savedValue;
-              const memKeys = Object.keys(agentMemory);
+              const memKeys = Object.keys(agentMemory || {});
               if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
               try {
                 await chrome.storage.local.set({ agent_memory: agentMemory });
