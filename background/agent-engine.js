@@ -6188,7 +6188,9 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.46.1) Page stagnation detection — if the page didn't change after a
       // click/type, increment stagnation counter. Resets on navigate, extract,
       // or any page-changing action.
-      const _isPageMutating = /^(navigate|click|click_at|type|press_key|select|check|check_all)$/.test(command.type);
+      // navigate always changes the page, but its new DOM hash isn't captured until
+      // the next iteration's observation phase — exclude it to avoid false stagnation.
+      const _isPageMutating = /^(click|click_at|type|press_key|select|check|check_all)$/.test(command.type);
       const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
         _pageStagnation++;

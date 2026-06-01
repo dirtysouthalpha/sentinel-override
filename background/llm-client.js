@@ -905,9 +905,9 @@ export async function generatePlan(goal, settings, context = {}) {
 
   const planPrompt = _buildPlanPrompt(goal, context);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
     const provider = resolveProvider(endpoint);
     if (!provider) {
       clearTimeout(timeout);
@@ -1053,6 +1053,7 @@ export async function generatePlan(goal, settings, context = {}) {
     console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', content.slice(0, 200));
     return [goal.substring(0, 300)];
   } catch (e) {
+    clearTimeout(timeout);
     console.warn('Plan generation failed (non-fatal):', e && e.message);
     // Even on hard exception, return a minimal fallback so the loop has a plan.
     return goal ? [goal.substring(0, 300)] : ['Complete the task'];
