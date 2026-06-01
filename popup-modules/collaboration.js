@@ -20,7 +20,7 @@ async function exportTemplateFile(templateId) {
     downloadJson(data, filename);
     showToast('Template exported', 'success');
   } catch (err) {
-    showToast(err.message || 'Export failed', 'error');
+    showToast((err && err.message) || 'Export failed', 'error');
   }
 }
 
@@ -37,7 +37,7 @@ async function exportAllTemplatesFile() {
     downloadJson(data, filename);
     showToast(`${data && data.count != null ? data.count : '?'} template(s) exported`, 'success');
   } catch (err) {
-    showToast(err.message || 'Export failed', 'error');
+    showToast((err && err.message) || 'Export failed', 'error');
   }
 }
 
@@ -116,7 +116,7 @@ async function exportReportFile(report) {
     downloadText(markdown, filename, 'text/markdown');
     showToast('Report exported', 'success');
   } catch (err) {
-    showToast(err.message || 'Export failed', 'error');
+    showToast((err && err.message) || 'Export failed', 'error');
   }
 }
 
@@ -220,7 +220,7 @@ async function executeImport() {
     // Refresh template list if templates panel is visible
     if (typeof loadTemplates === 'function') loadTemplates();
   } catch (err) {
-    showToast(err.message || 'Import failed', 'error');
+    showToast((err && err.message) || 'Import failed', 'error');
   }
 }
 

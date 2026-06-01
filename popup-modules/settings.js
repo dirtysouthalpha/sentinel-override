@@ -671,7 +671,7 @@ if (downloadAuditLogBtn) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + (e.message || 'unknown');
+      downloadAuditLogBtn.textContent = 'Error: ' + ((e && e.message) || 'unknown');
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });

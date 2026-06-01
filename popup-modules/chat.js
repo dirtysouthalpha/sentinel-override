@@ -2849,7 +2849,7 @@ async function _tryShowReport() {
       _reportShown = true;
       return;
     }
-    console.log('[Sentinel/report] Loading report from storage:', report.summary?.substring(0, 60));
+    console.debug('[Sentinel/report] Loading report from storage:', report.summary?.substring(0, 60));
     addReportCard(report);
     _reportShown = true;
     // Auto-scroll to the report card
@@ -2865,7 +2865,7 @@ async function _tryShowReport() {
 // Storage change listener — fires in real-time when report is saved
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.last_agent_report && changes.last_agent_report.newValue) {
-    console.log('[Sentinel/report] Storage change detected — showing report');
+    console.debug('[Sentinel/report] Storage change detected — showing report');
     setTimeout(_tryShowReport, 100);
   }
 });

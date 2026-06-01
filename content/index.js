@@ -477,7 +477,7 @@ if (window.__sentinelInitialized) {
           try {
             if (document.body) window.scrollTo(0, document.body.scrollHeight / 3);
             await new Promise(r => setTimeout(r, 1000));
-            const bodyText = (document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+            const bodyText = (document.body && document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             if (bodyText.length > content.length) content = bodyText;
           } catch (e) { console.warn('[Sentinel] Page navigation error:', e && e.message); }
         }
