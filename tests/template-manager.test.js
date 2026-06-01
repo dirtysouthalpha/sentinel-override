@@ -22,7 +22,9 @@ globalThis.chrome = {
       set: jest.fn(async (obj) => {
         Object.assign(storageData, obj);
         for (const fn of storageListeners) {
-          try { fn({ sentinel_templates: { newValue: obj.sentinel_templates } }, 'local'); } catch (_) {}
+          try { fn({ sentinel_templates: { newValue: obj.sentinel_templates } }, 'local'); } catch (e) {
+            // Listener errors are expected in tests
+          }
         }
       }),
       remove: jest.fn(async (key) => {

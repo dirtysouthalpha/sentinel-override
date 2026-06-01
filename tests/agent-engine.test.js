@@ -1014,7 +1014,9 @@ describe('agent-engine — unproductive JS result reference tests', () => {
       if (p === null) return true;
       if (Array.isArray(p) && p.length === 0) return true;
       if (typeof p === 'object' && Object.keys(p).length === 0) return true;
-    } catch (e) {}
+    } catch (e) {
+      // Not valid JSON, so not unproductive
+    }
     return false;
   }
 

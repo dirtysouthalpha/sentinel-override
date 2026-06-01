@@ -156,7 +156,9 @@ describe('waitForPageLoad', () => {
     const promise = waitForPageLoad(1);
     await new Promise(r => setTimeout(r, 10));
     const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
-    if (listener) listener(1, { status: 'complete' });
+    if (listener) {
+      listener(1, { status: 'complete' });
+    }
     await expect(promise).resolves.toBeUndefined();
   });
 
@@ -168,7 +170,9 @@ describe('waitForPageLoad', () => {
     const promise = waitForPageLoad(1);
     await new Promise(r => setTimeout(r, 10));
     const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
-    if (listener) listener(2, { status: 'complete' });
+    if (listener) {
+      listener(2, { status: 'complete' });
+    }
     await expect(promise).resolves.toBeUndefined();
     setPageLoadConfig({ pageLoadTimeout: 25000 });
   });

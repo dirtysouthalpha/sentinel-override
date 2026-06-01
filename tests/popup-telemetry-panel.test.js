@@ -267,7 +267,9 @@ describe('telemetry-panel._eventMatchesSearch', () => {
     if (ev.payload) {
       try {
         if (JSON.stringify(ev.payload).toLowerCase().includes(q)) return true;
-      } catch (e) {}
+      } catch (e) {
+        // Payload cannot be stringified, skip search
+      }
     }
     return false;
   }
