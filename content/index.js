@@ -386,6 +386,9 @@ if (window.__sentinelInitialized) {
 
   // ========== Message Handler ==========
   async function handleMessage(request) {
+    if (!request || !request.action) {
+      return null;
+    }
     switch (request.action) {
       case 'observe_page': {
         // Scan for interactive elements. Retry up to 3 times for SPAs (React, Vue, Angular)
@@ -1237,6 +1240,7 @@ if (window.__sentinelInitialized) {
   }
 
   async function executeCommand(cmd) {
+    if (!cmd) return 'Invalid command: cmd is null';
     // Use active frame doc if switch_to_frame was called and no explicit frame: prefix
     let targetDoc = (__sentinelActiveFrameDoc && !(cmd.selector && cmd.selector.startsWith('frame:')))
       ? __sentinelActiveFrameDoc : document;
