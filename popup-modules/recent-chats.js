@@ -38,9 +38,8 @@
     // Fallback: parse from HTML
     if (typeof fallbackHtml === 'string') {
       try {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = fallbackHtml;
-        const firstUserMsg = tmp.querySelector('.message-group .user-msg, .message-group [class*="user"]');
+        const doc = new DOMParser().parseFromString(fallbackHtml, 'text/html');
+        const firstUserMsg = doc.querySelector('.message-group .user-msg, .message-group [class*="user"]');
         if (firstUserMsg) return (firstUserMsg.textContent || '').trim().substring(0, 200);
       } catch { /* DOM may be detached */ }
     }

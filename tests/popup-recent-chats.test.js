@@ -10,10 +10,27 @@ import vm from 'vm';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+import { parseHTML } from 'linkedom';
+
 function createSandbox() {
   const storage = {};
+
+  // Linkedom provides a full DOM environment needed for DOMParser
+  const { document, DOMParser, HTMLElement, Node } = parseHTML('<!DOCTYPE html><html><body></body></html>');
+
+  class MyDOMParser extends DOMParser {
+    parseFromString(string, type) {
+      if (type === 'text/html') {
+        const { document } = parseHTML(string);
+        return document;
+      }
+      return super.parseFromString(string, type);
+    }
+  }
+
   const sandbox = {
     window: {},
+    DOMParser: MyDOMParser,
     console,
     JSON,
     Error,
@@ -259,6 +276,14 @@ describe('_extractGoal', () => {
         }
       }
     }
+    // Fallback: parse from HTML
+    if (typeof fallbackHtml === 'string') {
+      try {
+        const { document } = parseHTML(fallbackHtml);
+        const firstUserMsg = document.querySelector('.message-group .user-msg, .message-group [class*="user"]');
+        if (firstUserMsg) return (firstUserMsg.textContent || '').trim().substring(0, 200);
+      } catch (e) { console.error(e); }
+    }
     return '(no goal)';
   }
 
@@ -322,6 +347,16 @@ describe('_extractGoal', () => {
   test('handles entries without text field', () => {
     const history = [{ role: 'user' }, { role: 'user', text: 'Goal' }];
     expect(extractGoal(history)).toBe('Goal');
+  });
+
+  test('falls back to parsing HTML safely with DOMParser', () => {
+    const html = '<div class="message-group"><div class="user-msg">Goal from HTML</div></div>';
+    expect(extractGoal([], html)).toBe('Goal from HTML');
+  });
+
+  test('returns no goal if fallback HTML is missing user-msg', () => {
+    const html = '<div class="message-group"><div class="agent-msg">Hello</div></div>';
+    expect(extractGoal([], html)).toBe('(no goal)');
   });
 });
 
