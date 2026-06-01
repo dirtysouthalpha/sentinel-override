@@ -652,7 +652,8 @@ export async function getActiveProvider() {
   let stored;
   try {
     stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
-  } catch (_) {
+  } catch (e) {
+    console.warn('[Sentinel/provider-registry] Storage read failed:', e && e.message);
     const provider = PROVIDERS.openai;
     return { id: 'openai', ...provider, endpoint: provider.defaultEndpoint, apiKey: '', model: provider.defaultModel, maxTokens: 8000, temperature: 0.3 };
   }
@@ -701,7 +702,10 @@ export async function migrateLegacySettings() {
   let stored;
   try {
     stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
-  } catch (_) { return; }
+  } catch (e) {
+    console.warn('[Sentinel/provider-registry] Storage read failed:', e && e.message);
+    return;
+  }
   if (stored.providers) return; // already migrated
 
   const endpoint = stored.api_endpoint || '';
@@ -737,13 +741,18 @@ export async function migrateLegacySettings() {
         }
       }
     });
-  } catch (_e) { return; }
+  } catch (e) {
+    console.warn('[Sentinel/provider-registry] Storage set failed:', e && e.message);
+    return;
+  }
 
   // CRITICAL: Remove old keys so stale values cannot cause confusion
   // callLLM() and other readers now use getActiveProvider() which reads the new structure
   try {
     await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
-  } catch (_e) { /* storage cleanup non-fatal */ }
+  } catch (e) {
+    console.warn('[Sentinel/provider-registry] Storage cleanup failed:', e && e.message);
+  }
 }
 
 // ========== Provider Catalog (3.10.0) ==========
@@ -949,15 +958,15 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   let ids = [];
   if (provider.tagsResponse && Array.isArray(data.models)) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
-    ids = data.models.map(m => m.name).filter(Boolean);
+    ids = (data.models || []).map(m => m.name).filter(Boolean);
   } else if (Array.isArray(data.data)) {
     // OpenAI-compatible: { data: [{ id: "gpt-4o" }] }
-    ids = data.data.map(m => m.id || m.name).filter(Boolean);
+    ids = (data.data || []).map(m => m.id || m.name).filter(Boolean);
   } else if (Array.isArray(data.models)) {
     // Some providers: { models: [{ id }] }
-    ids = data.models.map(m => m.id || m.name).filter(Boolean);
+    ids = (data.models || []).map(m => m.id || m.name).filter(Boolean);
   } else if (Array.isArray(data)) {
-    ids = data.map(m => (typeof m === 'string') ? m : (m.id || m.name)).filter(Boolean);
+    ids = (data || []).map(m => (typeof m === 'string') ? m : (m.id || m.name)).filter(Boolean);
   }
   if (ids.length === 0) {
     throw new Error('Could not parse models from response: ' + JSON.stringify(data).slice(0, 240));

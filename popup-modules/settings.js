@@ -1089,13 +1089,17 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         document.head.appendChild(el);
       }
       el.textContent = css || '';
-    } catch { /* CSS application may fail */ }
+    } catch (e) {
+      console.warn('[Sentinel/settings] CSS application failed:', e && e.message);
+    }
   }
 
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) applyCustomCss(saved);
-  } catch { /* localStorage may be restricted */ }
+  } catch (e) {
+    console.warn('[Sentinel/settings] localStorage access failed:', e && e.message);
+  }
 
   function wire() {
     const ta = document.getElementById('customCssTextarea');
@@ -1107,7 +1111,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) ta.value = saved;
-    } catch { /* localStorage may be restricted */ }
+    } catch (e) {
+      console.warn('[Sentinel/settings] localStorage access failed:', e && e.message);
+    }
 
     let saveTimer = null;
     const setStatus = (text, color) => {
@@ -1125,7 +1131,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       if (debounce) clearTimeout(debounce);
       debounce = setTimeout(() => {
         const css = ta.value || '';
-        try { localStorage.setItem(STORAGE_KEY, css); } catch { /* localStorage may be restricted */ }
+        try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
+        console.warn('[Sentinel/settings] localStorage save failed:', e && e.message);
+      }
         applyCustomCss(css);
         setStatus('saved', '#6fcf80');
       }, 350);
@@ -1133,13 +1141,17 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
     if (applyBtn) applyBtn.addEventListener('click', () => {
       const css = ta.value || '';
-      try { localStorage.setItem(STORAGE_KEY, css); } catch { /* localStorage may be restricted */ }
+      try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
+        console.warn('[Sentinel/settings] localStorage save failed:', e && e.message);
+      }
       applyCustomCss(css);
       setStatus('applied', '#6fcf80');
     });
     if (clearBtn) clearBtn.addEventListener('click', () => {
       ta.value = '';
-      try { localStorage.removeItem(STORAGE_KEY); } catch { /* localStorage may be restricted */ }
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {
+        console.warn('[Sentinel/settings] localStorage remove failed:', e && e.message);
+      }
       applyCustomCss('');
       setStatus('cleared', 'var(--text-tertiary)');
     });
@@ -1164,7 +1176,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         }
         if (theme === 'dark') document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
-        try { localStorage.setItem('theme-named', theme); } catch { /* localStorage may be restricted */ }
+        try { localStorage.setItem('theme-named', theme); } catch (e) {
+          console.warn('[Sentinel/settings] localStorage save failed:', e && e.message);
+        }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
         try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
       });
