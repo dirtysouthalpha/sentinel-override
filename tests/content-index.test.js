@@ -785,3 +785,39 @@ describe('Overlay dismissal cap', () => {
     expect(dismissCount).toBe(0);
   });
 });
+
+// ===================== Multi-select null guard =====================
+// Mirrors the multi-select loop in the 'select' command case of content/index.js.
+// Verifies null/undefined values in cmd.value array are skipped without crashing.
+
+function multiSelectOptions(optionValues, cmdValues) {
+  const options = optionValues.map(v => ({ value: v, textContent: v, selected: false }));
+  for (const val of cmdValues) {
+    if (val == null) continue;
+    const valStr = String(val);
+    const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === valStr.toLowerCase());
+    if (opt) opt.selected = true;
+  }
+  return options;
+}
+
+describe('Multi-select null guard', () => {
+  test('skips null values without throwing', () => {
+    expect(() => multiSelectOptions(['a', 'b', 'c'], [null, 'a'])).not.toThrow();
+  });
+
+  test('skips undefined values without throwing', () => {
+    expect(() => multiSelectOptions(['a', 'b'], [undefined, 'b'])).not.toThrow();
+  });
+
+  test('still selects valid string values alongside null entries', () => {
+    const opts = multiSelectOptions(['alpha', 'beta', 'gamma'], [null, 'beta', undefined]);
+    expect(opts.find(o => o.value === 'beta').selected).toBe(true);
+    expect(opts.find(o => o.value === 'alpha').selected).toBe(false);
+  });
+
+  test('selects by text content case-insensitively', () => {
+    const opts = multiSelectOptions(['Alpha', 'Beta'], ['ALPHA']);
+    expect(opts.find(o => o.value === 'Alpha').selected).toBe(true);
+  });
+});

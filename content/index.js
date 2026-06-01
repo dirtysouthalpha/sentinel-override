@@ -1797,7 +1797,9 @@ if (window.__sentinelInitialized) {
           // Multi-select: select multiple options by value or text
           const options = Array.from(el.options);
           for (const val of cmd.value) {
-            const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === val.toLowerCase());
+            if (val == null) continue;
+            const valStr = String(val);
+            const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === valStr.toLowerCase());
             if (opt) opt.selected = true;
           }
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
