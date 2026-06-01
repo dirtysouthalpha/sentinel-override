@@ -183,6 +183,8 @@ describe('entry CRUD', () => {
   test('addEntry caps wisdom at 1000 chars', async () => {
     const result = await addEntry(clientId, { wisdom: 'A'.repeat(1100) });
     expect(result.ok).toBe(true);
+    expect(result.entry).toBeDefined();
+    expect(result.entry.wisdom).toBeDefined();
     expect(result.entry.wisdom.length).toBe(1000);
   });
 
@@ -604,6 +606,8 @@ describe('client-knowledge edge cases', () => {
     const longWisdom = 'A'.repeat(2000);
     const result = await addEntry(client.id, { wisdom: longWisdom });
     expect(result.ok).toBe(true);
+    expect(result.entry).toBeDefined();
+    expect(result.entry.wisdom).toBeDefined();
     expect(result.entry.wisdom.length).toBe(1000);
   });
 

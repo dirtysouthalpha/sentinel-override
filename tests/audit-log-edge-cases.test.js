@@ -95,6 +95,8 @@ describe('audit-log edge cases', () => {
       await appendAuditEntry(runId, { type: 'test', target: longTarget, outcome: 'pass' });
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog[0]).toBeDefined();
+      expect(storedLog[0].target).toBeDefined();
       expect(storedLog[0].target.length).toBe(120);
     });
 
@@ -104,6 +106,8 @@ describe('audit-log edge cases', () => {
       await appendAuditEntry(runId, { type: 'test', target: 'foo', outcome: longOutcome });
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog[0]).toBeDefined();
+      expect(storedLog[0].outcome).toBeDefined();
       expect(storedLog[0].outcome.length).toBe(200);
     });
 
