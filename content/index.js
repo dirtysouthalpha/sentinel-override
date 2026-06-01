@@ -105,9 +105,9 @@ if (window.__sentinelInitialized) {
 
   function __sentinelHasPositiveModalSignal(el) {
     try {
-      const role = el.getAttribute && el.getAttribute('role');
+      const role = el && el.getAttribute ? el.getAttribute('role') : null;
       if (role === 'dialog' || role === 'alertdialog') return true;
-      if (el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
+      if (el && el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
       const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 500);
       // Core modal signals
       if (/\b(modal|dialog|sign in|subscribe)\b/.test(text)) return true;
@@ -329,21 +329,21 @@ if (window.__sentinelInitialized) {
     const parts = [];
     try {
       if (el.type === 'password') parts.push('password');
-      const ac = el.getAttribute && el.getAttribute('autocomplete');
+      const ac = el && el.getAttribute ? el.getAttribute('autocomplete') : null;
       if (ac) parts.push(ac);
       if (el.name) parts.push(el.name);
       if (el.id) parts.push(el.id);
       if (el.placeholder) parts.push(el.placeholder);
-      const al = el.getAttribute && el.getAttribute('aria-label');
+      const al = el && el.getAttribute ? el.getAttribute('aria-label') : null;
       if (al) parts.push(al);
-      const tt = el.getAttribute && el.getAttribute('title');
+      const tt = el && el.getAttribute ? el.getAttribute('title') : null;
       if (tt) parts.push(tt);
       // Associated <label for="id">
       if (el.id) {
         try {
-          const lbl = document.querySelector('label[for="' + CSS.escape(el.id) + '"]');
+          const lbl = document.querySelector('label[for="' + CSS.escape(String(el.id)) + '"]');
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] label lookup by id:', e && e.message); }
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', String(e)); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -352,6 +352,7 @@ if (window.__sentinelInitialized) {
       let depth = 0;
       while (p && depth < 3) {
         try {
+          if (!p) continue;
           const lbl = p.querySelector('label, .label, .form-label, [class*="label" i]');
           if (lbl && lbl !== el) {
             parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
@@ -359,7 +360,7 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] ancestor label walk:', e && e.message); }
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', String(e)); }
         p = p.parentElement;
         depth++;
       }
@@ -412,7 +413,7 @@ if (window.__sentinelInitialized) {
             // If we found elements, stop retrying
             if (interactiveElements.length >= 5) break;
           } catch (e) {
-            if (e.message && e.message.includes('Extension context invalidated')) throw e;
+            if (e && e.message && e.message.includes('Extension context invalidated')) throw e;
           }
           // Wait for SPA to render
           if (attempt < maxRetries - 1) {
@@ -462,7 +463,7 @@ if (window.__sentinelInitialized) {
             // If we got meaningful content, stop retrying
             if (content.length >= 200) break;
           } catch (e) {
-            if (e.message && e.message.includes('Extension context invalidated')) throw e;
+            if (e && e.message && e.message.includes('Extension context invalidated')) throw e;
           }
           // Wait for SPA to render before retrying
           if (attempt < maxRetries - 1) {
@@ -1145,7 +1146,7 @@ if (window.__sentinelInitialized) {
       // 1. aria-label match (most reliable stable identifier)
       if (cmd.ariaLabel) {
         try {
-          const byAria = targetDoc.querySelector('[aria-label="' + cmd.ariaLabel.replace(/"/g, '\\"') + '"]');
+          const byAria = targetDoc.querySelector('[aria-label="' + (cmd.ariaLabel || '').replace(/"/g, '\\"') + '"]');
           if (byAria) return { el: byAria, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] aria-label fallback:', e && e.message); }
       }
@@ -1451,7 +1452,7 @@ if (window.__sentinelInitialized) {
       case 'click_at': {
         const x = cmd.x;
         const y = cmd.y;
-        if (typeof x !== 'number' || typeof y !== 'number') return 'click_at requires numeric x and y coordinates';
+        if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) return 'click_at requires numeric x and y coordinates';
 
         // (#11) DPR sanity check. Coordinates from the agent are expected to be
         // in CSS pixels (the same coordinate system as elementFromPoint and bbox).
@@ -1460,7 +1461,7 @@ if (window.__sentinelInitialized) {
         // CSS pixels already.
         try {
           const liveDpr = window.devicePixelRatio || 1;
-          if (typeof cmd.dpr === 'number' && Math.abs(cmd.dpr - liveDpr) > 0.01) {
+          if (typeof cmd.dpr === 'number' && !Number.isNaN(cmd.dpr) && Math.abs(cmd.dpr - liveDpr) > 0.01) {
             console.warn('[sentinel] click_at dpr mismatch: cmd.dpr=' + cmd.dpr + ' live=' + liveDpr + ' (still treating x,y as CSS pixels)');
           }
         } catch (e) { console.warn('[Sentinel] Non-fatal error:', e && e.message); }
