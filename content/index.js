@@ -343,7 +343,7 @@ if (window.__sentinelInitialized) {
         try {
           const lbl = document.querySelector('label[for="' + CSS.escape(String(el.id)) + '"]');
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] label lookup by id:', String(e)); }
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', (e && e.message) || String(e)); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -360,7 +360,7 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] ancestor label walk:', String(e)); }
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', (e && e.message) || String(e)); }
         p = p.parentElement;
         depth++;
       }
