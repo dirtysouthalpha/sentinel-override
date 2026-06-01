@@ -312,7 +312,7 @@
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
-          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', e); });
+          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', e && e.message); });
         } catch { /* clipboard API may be restricted */ }
       });
     }
