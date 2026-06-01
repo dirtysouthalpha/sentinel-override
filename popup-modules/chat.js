@@ -188,7 +188,7 @@ function describeActionPlain(payload) {
     case 'press_key':   return 'Pressing ' + (payload.key || 'key');
     case 'execute_js':  return 'Running JavaScript' + (payload.key ? ' → memory["' + payload.key + '"]' : '');
     case 'extract':     return 'Extracting ' + (payload.attribute || 'text') + ' from ' + (desc || payload.selector || 'element');
-    case 'extract_list':return 'Extracting list of items' + (payload.fields ? ' (' + Object.keys(payload.fields).join(', ') + ')' : '');
+    case 'extract_list':return 'Extracting list of items' + (payload.fields && typeof payload.fields === 'object' ? ' (' + Object.keys(payload.fields).join(', ') + ')' : '');
     case 'read_page':   return 'Reading page content';
     case 'read_console_messages': return 'Reading console messages';
     case 'read_network_requests': return 'Reading network requests';
