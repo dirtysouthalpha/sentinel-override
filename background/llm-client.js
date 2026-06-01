@@ -849,7 +849,7 @@ function _buildPlanPrompt(goal, context) {
     : '';
   const platformContext = context.platformContext || '';
   const patternContext = context.relevantPatterns && context.relevantPatterns.length > 0
-    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(', ') : '(no steps)'}`).join('\n')}\n`
+    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
   return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
@@ -1059,7 +1059,7 @@ export async function generatePlan(goal, settings, context = {}) {
     // Strategy 5: single-step fallback from goal — guarantees a non-null plan
     // even when the model ignores the JSON instruction entirely.
     console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', content.slice(0, 200));
-    return [goal.substring(0, 300)];
+    return [(goal || 'Complete the task').substring(0, 300)];
   } catch (e) {
     clearTimeout(timeout);
     console.warn('Plan generation failed (non-fatal):', e && e.message);
@@ -1724,7 +1724,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   // Self-learning: inject relevant patterns
   const patterns = await getRelevantPatterns(goal);
   const patternCtx = patterns.length > 0
-    ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => `${i+1}. "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(' -> ') : '(no steps)'}`).join('\n')}\n`
+    ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => p && p.goal ? `${i+1}. "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(' -> ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
   // Memory context

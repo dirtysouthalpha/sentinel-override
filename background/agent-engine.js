@@ -252,7 +252,7 @@ export async function restoreFromCheckpoint() {
     // to re-initialize when the agent re-opens tabs.
     if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object') {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
-        const tabId = parseInt(tabIdStr, 10);
+        const tabId = parseInt(tabIdStr, 10) || 0;
         if (tabId > 0 && typeof url === 'string') {
           try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
         }
@@ -3032,11 +3032,11 @@ function generateHeuristicPlan(goal, currentUrl) {
   // Extract search query from goal
   const searchMatch = goal.match(/(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i)
     || goal.match(/(?:about|on|regarding)\s+([^,.\n]{10,60})/i);
-  const searchQuery = searchMatch ? searchMatch[1].trim() : null;
+  const searchQuery = searchMatch && searchMatch[1] ? searchMatch[1].trim() : null;
 
   // Extract count
   const countMatch = goal.match(/(?:top\s+)?(\d+)/);
-  const count = countMatch ? (parseInt(countMatch[1], 10) || 10) : 10;
+  const count = countMatch && countMatch[1] ? (parseInt(countMatch[1], 10) || 10) : 10;
 
   if (isMultiPage) {
     const steps = [];
@@ -4600,7 +4600,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _articleGoal = (typeof goal === 'string') ? goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i) : null;
           if (_articleGoal && !command.force) {
-            const _targetN = parseInt(_articleGoal[1], 10) || 10;
+            const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
             const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
             const _notes = history.filter(h => h.action && h.action.type === 'note').length;
             const _summaryKeys = Object.keys(agentMemory).filter(k =>

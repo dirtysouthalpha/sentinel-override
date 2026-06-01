@@ -1225,7 +1225,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       el.addEventListener('click', () => {
         const theme = el.dataset.theme;
         if (!theme) return;
-        document.body.className = document.body.className.split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
+        document.body.className = (document.body.className || '').split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
         if (theme !== 'light' && theme !== 'dark') {
           document.body.classList.add('theme-' + theme);
         }

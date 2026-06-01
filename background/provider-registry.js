@@ -69,7 +69,7 @@ export const PROVIDERS = {
      * @throws {Error} If the response contains no text block.
      */
     parseResponse: (data) => {
-      const block = data.content && data.content.find(b => b.type === 'text');
+      const block = Array.isArray(data.content) && data.content.find(b => b.type === 'text');
       if (!block) throw new Error(`Anthropic API returned no text block: ${JSON.stringify(data).slice(0, 500)}`);
       return block.text;
     },
@@ -143,7 +143,7 @@ export const PROVIDERS = {
      * @throws {Error} If the response contains no tool_use block.
      */
     parseToolUseResponse: (data) => {
-      const block = data.content && data.content.find(b => b.type === 'tool_use');
+      const block = Array.isArray(data.content) && data.content.find(b => b.type === 'tool_use');
       if (!block) throw new Error(`Anthropic response had no tool_use block: ${JSON.stringify(data).slice(0, 300)}`);
       return { type: block.name, ...block.input };
     },
@@ -939,7 +939,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
   } catch (e) {
     clearTimeout(timer);
-    throw new Error('Network error fetching models from ' + url + ': ' + (e.message || e));
+    throw new Error('Network error fetching models from ' + url + ': ' + ((e && e.message) || String(e)));
   }
   clearTimeout(timer);
   if (!resp.ok) {
