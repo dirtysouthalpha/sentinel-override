@@ -1393,12 +1393,25 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
   // Phase 1: Click accept/agree buttons if we have overlay detection data
   if (overlays && overlays.length > 0) {
+      const acceptRegex = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
     for (const overlay of overlays) {
       const buttons = overlay.buttons || [];
-      const acceptBtn = buttons.find(b =>
-        /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i.test(b.text)
-      );
-      const dismissBtn = acceptBtn || buttons.find(b => b.text && b.text.length > 0) || buttons[0];
+        let dismissBtn = buttons[0];
+        if (buttons.length > 0) {
+          let fallbackBtn = null;
+          for (let j = 0; j < buttons.length; j++) {
+            const b = buttons[j];
+            if (acceptRegex.test(b.text)) {
+              dismissBtn = b;
+              fallbackBtn = null;
+              break;
+            }
+            if (!fallbackBtn && b.text && b.text.length > 0) {
+              fallbackBtn = b;
+            }
+          }
+          if (fallbackBtn) dismissBtn = fallbackBtn;
+        }
       if (dismissBtn && dismissBtn.x && dismissBtn.y) {
         console.log('[Sentinel/CDP] Phase1 clicking:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
         const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
