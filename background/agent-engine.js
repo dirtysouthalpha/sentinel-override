@@ -5315,7 +5315,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             }
           } catch (_ve) {
-            result = 'Vision action error: ' + _ve.message;
+            result = 'Vision action error: ' + ((_ve && _ve.message) || String(_ve) || 'unknown');
             actionFailed = true;
           }
           // Skip the legacy execution path for this action

@@ -59,6 +59,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
    * @returns {string} The extracted label, or 'No label'.
    */
   dom.getLabel = function(el) {
+    if (!el) return 'No label';
     return (
       el.innerText ||
       el.placeholder ||

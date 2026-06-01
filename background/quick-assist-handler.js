@@ -27,7 +27,7 @@ export async function handleQuickAssist(prompt) {
 
   let body;
   if (config.id === 'anthropic') {
-    const userPart = prompt.includes('\n---\n') ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
+    const userPart = (prompt && prompt.includes('\n---\n')) ? prompt.split('\n---\n').slice(1).join('\n---\n') : prompt;
     body = {
       model: config.model,
       max_tokens: 2000,

@@ -414,3 +414,25 @@ describe('weekly schedule with empty daysOfWeek', () => {
     expect(schedule.nextRunAt).toBeGreaterThan(now);
   });
 });
+
+describe('scheduler results — null entry guards', () => {
+  test('getScheduleResults does not crash when results storage contains null entries', async () => {
+    // Simulate corrupted storage with a null entry
+    storageData['sentinel_schedule_results'] = { 'null-entry': null, 'bad-entry': undefined };
+    const results = await getScheduleResults('any-schedule');
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBe(0);
+  });
+
+  test('getRecentResults does not crash when results storage contains null entries', async () => {
+    storageData['sentinel_schedule_results'] = { 'null-entry': null };
+    const results = await getRecentResults(10);
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBe(0);
+  });
+
+  test('clearScheduleResults does not crash when results storage contains null entries', async () => {
+    storageData['sentinel_schedule_results'] = { 'null-entry': null };
+    await expect(clearScheduleResults('any-schedule')).resolves.toBeUndefined();
+  });
+});

@@ -162,6 +162,14 @@ describe('dom.getLabel', () => {
   test('trims whitespace from label', () => {
     expect(dom.getLabel(createElement('button', { innerText: '  padded  ' }))).toBe('padded');
   });
+
+  test('returns "No label" when el is null', () => {
+    expect(dom.getLabel(null)).toBe('No label');
+  });
+
+  test('returns "No label" when el is undefined', () => {
+    expect(dom.getLabel(undefined)).toBe('No label');
+  });
 });
 
 describe('dom.getUniqueSelector', () => {

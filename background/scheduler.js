@@ -362,7 +362,7 @@ export async function deleteSchedule(id) {
 
   // Clear all associated results
   const results = await loadResults();
-  const resultIds = Object.keys(results).filter(rid => results[rid].scheduleId === id);
+  const resultIds = Object.keys(results).filter(rid => results[rid] && results[rid].scheduleId === id);
   for (const rid of resultIds) {
     delete results[rid];
   }
@@ -702,7 +702,7 @@ async function storeResult(schedule, result) {
 
   // Enforce cap: keep only the most recent MAX_RESULTS per schedule
   const scheduleResultIds = Object.keys(results)
-    .filter(rid => results[rid].scheduleId === schedule.id)
+    .filter(rid => results[rid] && results[rid].scheduleId === schedule.id)
     .sort((a, b) => (results[b].completedAt || 0) - (results[a].completedAt || 0));
 
   if (scheduleResultIds.length > MAX_RESULTS) {
@@ -728,7 +728,7 @@ export async function getScheduleResults(scheduleId) {
 
   const results = await loadResults();
   return Object.values(results)
-    .filter(r => r.scheduleId === scheduleId)
+    .filter(r => r && r.scheduleId === scheduleId)
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
     .slice(0, 20);
 }
@@ -741,6 +741,7 @@ export async function getScheduleResults(scheduleId) {
 export async function getRecentResults(limit = 20) {
   const results = await loadResults();
   return Object.values(results)
+    .filter(r => r != null)
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0))
     .slice(0, limit);
 }
@@ -756,7 +757,7 @@ export async function clearScheduleResults(scheduleId) {
   }
 
   const results = await loadResults();
-  const toRemove = Object.keys(results).filter(rid => results[rid].scheduleId === scheduleId);
+  const toRemove = Object.keys(results).filter(rid => results[rid] && results[rid].scheduleId === scheduleId);
   for (const rid of toRemove) {
     delete results[rid];
   }

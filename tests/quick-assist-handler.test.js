@@ -60,6 +60,23 @@ describe('quick-assist-handler', () => {
       );
     });
 
+    it('should not crash with anthropic provider when prompt has no separator', async () => {
+      storageData = {
+        active_provider: 'anthropic',
+        api_key: 'test-key',
+        api_endpoint: 'https://api.anthropic.com/v1/messages',
+        model: 'claude-3-opus-20240229',
+      };
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+      // prompt has no '\n---\n' separator — must not crash with null guard
+      const result = await handleQuickAssist('plain prompt without separator');
+      expect(result).toBe('ok');
+    });
+
     it('should build Anthropic request correctly', async () => {
       storageData = {
         active_provider: 'anthropic',
