@@ -90,7 +90,7 @@ document.querySelectorAll('.provider-btn').forEach(btn => {
 function loadSettings() {
   const state = getState();
   chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to load settings:', chrome.runtime.lastError?.message); return; }
     // Handle both new provider structure and legacy keys
     if (result.providers) {
       state.providerConfigs = result.providers;
@@ -118,7 +118,7 @@ const quickAssistToggle = document.getElementById('quickAssistToggle');
 const quickAssistLabel = document.getElementById('quickAssistLabel');
 if (quickAssistToggle) {
   chrome.storage.local.get(['quickAssist'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickAssist:', chrome.runtime.lastError?.message); return; }
     const enabled = result.quickAssist !== false; // default ON
     quickAssistToggle.checked = enabled;
     if (quickAssistLabel) {
@@ -152,7 +152,7 @@ if (quickAssistToggle) {
 const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
 if (useTrustedInputToggle) {
   chrome.storage.local.get(['useTrustedInput'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', chrome.runtime.lastError?.message); return; }
     useTrustedInputToggle.checked = result.useTrustedInput === true;
   });
   useTrustedInputToggle.addEventListener('change', () => {
@@ -185,7 +185,7 @@ if (useTrustedInputToggle) {
 const soundEnabledToggle = document.getElementById('soundEnabledToggle');
 if (soundEnabledToggle) {
   chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', chrome.runtime.lastError?.message); return; }
     soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
   });
   soundEnabledToggle.addEventListener('change', () => {
@@ -217,7 +217,7 @@ const adaptiveExpansionModeSelect = document.getElementById('adaptiveExpansionMo
 
 if (adaptivePromptsModeSelect) {
   chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read adaptivePrompts:', chrome.runtime.lastError?.message); return; }
     adaptivePromptsModeSelect.value = result.adaptivePromptsMode || 'auto';
     if (adaptiveExpansionModeSelect) {
       adaptiveExpansionModeSelect.value = result.adaptiveExpansionMode || 'light';
@@ -252,7 +252,7 @@ if (adaptiveExpansionModeSelect) {
 const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
 if (telemetryLevelSelect) {
   chrome.storage.local.get(['telemetryLevel'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryLevel:', chrome.runtime.lastError?.message); return; }
     telemetryLevelSelect.value = result.telemetryLevel || 'normal';
   });
   telemetryLevelSelect.addEventListener('change', () => {
@@ -276,7 +276,7 @@ if (telemetryLevelSelect) {
 const telemetryPersistToggle = document.getElementById('telemetryPersistToggle');
 if (telemetryPersistToggle) {
   chrome.storage.local.get(['telemetryPersist'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryPersist:', chrome.runtime.lastError?.message); return; }
     telemetryPersistToggle.checked = !!result.telemetryPersist;
   });
   telemetryPersistToggle.addEventListener('change', () => {
@@ -304,7 +304,7 @@ if (telemetryPersistToggle) {
 const telemetryRedactToggle = document.getElementById('telemetryRedactToggle');
 if (telemetryRedactToggle) {
   chrome.storage.local.get(['telemetryRedact'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', chrome.runtime.lastError?.message); return; }
     // Default ON: only set false if explicitly stored as false.
     telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
   });
@@ -333,7 +333,7 @@ if (telemetryRedactToggle) {
 const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptToggle');
 if (telemetrySkillAdaptToggle) {
   chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', chrome.runtime.lastError?.message); return; }
     telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
@@ -357,7 +357,7 @@ if (skillStatsResetBtn) {
   skillStatsResetBtn.addEventListener('click', () => {
     if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
     chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to reset skill stats:', chrome.runtime.lastError?.message); return; }
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
@@ -370,7 +370,7 @@ const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
 if (skillStatsViewBtn) {
   skillStatsViewBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (resp) => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to list skills:', chrome.runtime.lastError?.message); return; }
       const skills = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.data) ? resp.data : []);
       _renderSkillStatsModal(skills);
     });
@@ -456,7 +456,7 @@ const quickModeToggle = document.getElementById('quickModeToggle');
 const quickModeLabel = document.getElementById('quickModeLabel');
 if (quickModeToggle) {
   chrome.storage.local.get(['quickMode'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickMode:', chrome.runtime.lastError?.message); return; }
     const enabled = result.quickMode === true;
     quickModeToggle.checked = enabled;
     if (quickModeLabel) {
@@ -516,7 +516,7 @@ function __setTicketFormatRowVisible(visible) {
 if (ticketModeToggle) {
   // Load saved state and prefill technician fields.
   chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read ticketMode:', chrome.runtime.lastError?.message); return; }
     const enabled = result.ticketMode === true;
     ticketModeToggle.checked = enabled;
     __setTicketFormatRowVisible(enabled);
@@ -583,7 +583,7 @@ if (ticketFormatSelect) {
 const expectedTenantInput = document.getElementById('expectedTenantInput');
 if (expectedTenantInput) {
   chrome.storage.local.get(['expectedTenant'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read expectedTenant:', chrome.runtime.lastError?.message); return; }
     if (typeof result.expectedTenant === 'string') {
       expectedTenantInput.value = result.expectedTenant;
     }
@@ -705,7 +705,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   if (settingsModal) settingsModal.classList.add('show');
   // Load and render learned patterns
   chrome.storage.local.get(['learned_patterns'], (s) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read learned patterns:', chrome.runtime.lastError?.message); return; }
     _renderLearnedPatterns(s.learned_patterns || []);
   });
 });
@@ -1026,7 +1026,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   function refreshCatalog() {
     chrome.runtime.sendMessage({ action: 'get_provider_catalog' }, (resp) => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to get provider catalog:', chrome.runtime.lastError?.message); return; }
       const data = (resp && resp.data) ? resp.data : resp;
       if (!Array.isArray(data)) return;
       catalog = data;

@@ -411,6 +411,7 @@ export const PROVIDERS = {
     ],
 
     convertToolsToOpenAIFormat(tools) {
+      if (!tools || !Array.isArray(tools)) return [];
       return tools.map(t => ({
         type: 'function',
         function: {
@@ -666,7 +667,7 @@ export async function getActiveProvider() {
       id: stored.active_provider,
       ...provider,
       endpoint: p.endpoint || provider.defaultEndpoint,
-      apiKey: p.api_key,
+      apiKey: p.api_key || '',
       model: p.model || provider.defaultModel,
       maxTokens: p.max_tokens || 8000,
       temperature: p.temperature || 0.3

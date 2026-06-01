@@ -1947,10 +1947,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         else if (/twitter\.com|x\.com/i.test(goal || '')) _site = 'twitter';
         // Extract query from goal text
         const _qm = (goal || '').match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
-        if (_qm) _query = _qm[1].trim();
+        if (_qm && _qm[1]) _query = _qm[1].trim();
         else {
           const _fm = (goal || '').match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
-          if (_fm) _query = _fm[1].trim();
+          if (_fm && _fm[1]) _query = _fm[1].trim();
         }
         if (_query) {
           console.log('[Sentinel/FALLBACK] Detected smart_navigate intent from content — site:', _site, 'query:', _query);
@@ -1959,7 +1959,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       }
       // Detect explicit navigate URL in content
       const _navUrl = _intentText.match(/navigate\s+(?:to\s+)?(?:the\s+)?(?:url\s+)?["']?(https?:\/\/[^\s"'\])\]]+)/i);
-      if (_navUrl) {
+      if (_navUrl && _navUrl[1]) {
         console.log('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
         return { type: 'navigate', url: _navUrl[1] };
       }
@@ -1970,7 +1970,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       }
       // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
       const _siteUrl = _intentText.match(/(?:go|navigate)\s+(?:to\s+)?(?:the\s+)?(amazon|reddit|youtube|google|twitter|github|wikipedia|hackernews|hacker\s+news|cnn|bbc|nytimes|weather\.gov|stackoverflow|facebook|instagram|linkedin)[\s.,)]/i);
-      if (_siteUrl) {
+      if (_siteUrl && _siteUrl[1]) {
         const _siteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', google: 'google.com', twitter: 'twitter.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', 'weather.gov': 'weather.gov', stackoverflow: 'stackoverflow.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com' };
         const _mapped = _siteMap[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
         if (_mapped) {
