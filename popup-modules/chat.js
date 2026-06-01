@@ -353,12 +353,12 @@ function showCrosshair(x, y, viewportW, viewportH) {
 // eslint-disable-next-line no-unused-vars
 function loadApprovalMode() {
   chrome.storage.local.get(['approvalMode'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadApprovalMode failed:', String(chrome.runtime.lastError)); return; }
     let isApprovalMode;
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
-      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
     } else {
       isApprovalMode = result.approvalMode === true;
     }
@@ -417,7 +417,7 @@ function updateApprovalModeUI(isApprovalMode) {
 // ========== First-run Safety Banner ==========
 function maybeShowSafetyBanner() {
   chrome.storage.local.get(['seenSafetyBanner'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] maybeShowSafetyBanner failed:', String(chrome.runtime.lastError)); return; }
     if (result.seenSafetyBanner) return;
 
     if (!chatContainer) return;
@@ -451,7 +451,7 @@ function maybeShowSafetyBanner() {
     }
 
     document.getElementById('dismissSafetyBanner').addEventListener('click', () => {
-      chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+      chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
       banner.remove();
     });
   });
@@ -546,7 +546,7 @@ function respondApproval(decision, context) {
   // pending request (per the contract with Agent A).
   if (ctx.requestId) message.requestId = ctx.requestId;
 
-  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
 
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
@@ -712,7 +712,7 @@ function updateActionCardResult(stepNumber, resultText, isError) {
 function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
-    if (chrome.runtime.lastError) return;
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', String(chrome.runtime.lastError)); return; }
     if (result.chat_history && result.chat_history.length > 0) {
       state.conversationHistory = result.chat_history;
       chatContainer.innerHTML = '';
@@ -727,7 +727,7 @@ function loadChatHistory() {
 function saveChatHistory() {
   try {
     const state = getState();
-    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
   } catch (_e) { /* storage unavailable */ }
 }
 
@@ -972,7 +972,7 @@ function sendMessage() {
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
@@ -1023,7 +1023,7 @@ document.querySelectorAll('[data-speed]').forEach(btn => {
   btn.addEventListener('click', () => {
     const mode = btn.getAttribute('data-speed');
     chrome.runtime.sendMessage({ action: 'set_agent_speed', mode }, (resp) => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setAgentSpeed failed:', String(chrome.runtime.lastError)); return; }
       if (resp && resp.ok !== false) {
         // Update active state on buttons
         document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
@@ -1104,7 +1104,7 @@ newChatBtn.addEventListener('click', () => {
       }
     } catch { /* recentChats archive is non-critical */ }
     chrome.storage.local.set({ chat_history: [] }, () => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] clearChatHistory failed:', String(chrome.runtime.lastError)); return; }
       const state = getState();
       state.conversationHistory = [];
       chatContainer.innerHTML = `
@@ -1704,7 +1704,7 @@ function renderTabBar(tabs) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
       tab.addEventListener('click', () => {
-        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
       });
     }
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
@@ -1967,7 +1967,7 @@ if (exportReportPdfBtn) {
       await chrome.tabs.create({ url });
       showToast('Print dialog opening — pick "Save as PDF" as destination', 'info');
     } catch (e) {
-      showToast('PDF export failed: ' + (e && e.message ? e.message : e), 'error');
+      showToast('PDF export failed: ' + String(e), 'error');
     }
   });
 }
@@ -1993,7 +1993,7 @@ if (exportReplayBtn) {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       showToast('Replay report downloading…', 'info');
     } catch (e) {
-      showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
+      showToast('Replay export failed: ' + String(e), 'error');
     } finally {
       exportReplayBtn.disabled = false;
       exportReplayBtn.textContent = 'Export Replay';
@@ -2035,7 +2035,11 @@ function showMfaBanner(url, hint, _stepNumber) {
   if (existing) existing.remove();
 
   let host = '';
-  try { host = new URL(url || '').hostname; } catch { host = url || 'the page'; }
+  if (url && typeof url === 'string') {
+    try { host = new URL(url).hostname; } catch { host = url; }
+  } else {
+    host = 'the page';
+  }
 
   const banner = document.createElement('div');
   banner.id = 'mfa-banner';
@@ -2064,7 +2068,7 @@ function showMfaBanner(url, hint, _stepNumber) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
   document.getElementById('mfaResumeBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
     banner.remove();
   });
   document.getElementById('mfaDismissBtn').addEventListener('click', () => {
@@ -2082,7 +2086,10 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   if (existing) existing.remove();
 
   let hostname = host || '';
-  try { if (!hostname) hostname = new URL(url || '').hostname; } catch { hostname = url || 'the page'; }
+  if (!hostname && url && typeof url === 'string') {
+    try { hostname = new URL(url).hostname; } catch { hostname = url; }
+  }
+  if (!hostname) hostname = 'the page';
 
   const banner = document.createElement('div');
   banner.id = 'sign-in-wall-banner';
@@ -2113,13 +2120,13 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
   document.getElementById('signInWallResumeBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
     banner.remove();
   });
   document.getElementById('signInWallFocusBtn').addEventListener('click', () => {
     // Best-effort: ask the background to focus the URL's tab via the existing
     // active-tab focus hook (re-uses focus_tab message handled by index.js).
-    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
   });
   document.getElementById('signInWallDismissBtn').addEventListener('click', () => {
     banner.remove();
@@ -2360,7 +2367,7 @@ function showModeMismatchCard(payload) {
     // Write the new setting from the popup side so updateApprovalModeUI and
     // the toggle reflect it without needing a separate broadcast.
     chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
-      if (chrome.runtime.lastError) return;
+      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', String(chrome.runtime.lastError)); return; }
       try {
         if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
           approvalModeToggle.checked = wantsApproval;
@@ -2766,13 +2773,13 @@ async function exportRunLog(format) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sentinel_run_log_' + __lastRunLogId.slice(0, 8) + '.' + ext;
+    a.download = 'sentinel_run_log_' + ((__lastRunLogId || '').slice(0, 8) || 'unknown') + '.' + ext;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
-    try { showToast('Export failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Export failed: ' + String(e), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2816,7 +2823,7 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   chatContainer.insertBefore(banner, chatContainer.firstChild);
 
   document.getElementById('resumeRunBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', e); });
+    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
     banner.remove();
   });
   document.getElementById('dismissResumeBtn').addEventListener('click', () => banner.remove());
@@ -2952,7 +2959,7 @@ async function toggleSourceChipExpansion(chip) {
       exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value, null, 2).slice(0, 4000);
     }
   } catch (e) {
-    exp.textContent = 'Error reading source: ' + ((e && e.message) || String(e));
+    exp.textContent = 'Error reading source: ' + String(e);
   }
   chip.parentNode.insertBefore(exp, chip.nextSibling);
 }
@@ -3370,7 +3377,7 @@ chrome.runtime.onMessage.addListener((message) => {
             setTimeout(() => URL.revokeObjectURL(url), 5000);
             showToast('Replay report downloading…', 'info');
           } catch (e) {
-            showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
+            showToast('Replay export failed: ' + String(e), 'error');
           } finally {
             replayBtn.disabled = false;
             replayBtn.textContent = '↓ Export Replay';
@@ -3456,7 +3463,7 @@ chrome.runtime.onMessage.addListener((message) => {
           const originalGoal = typeof message.originalGoal === 'string' ? message.originalGoal : '';
           // Fetch dismissed map, prune expired, filter incoming suggestions.
           chrome.storage.local.get('dismissed_suggestions', (stored) => {
-            if (chrome.runtime.lastError) return;
+            if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', String(chrome.runtime.lastError)); return; }
             const now = Date.now();
             const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
               ? stored.dismissed_suggestions : {};
@@ -3552,7 +3559,7 @@ chrome.runtime.onMessage.addListener((message) => {
                 sCard.remove();
                 if (sug && sug.id) {
                   chrome.storage.local.get('dismissed_suggestions', (stored) => {
-                    if (chrome.runtime.lastError) return;
+                    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', String(chrome.runtime.lastError)); return; }
                     const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
