@@ -223,7 +223,7 @@ export async function restoreFromCheckpoint() {
     if (!cp.lastGoal) return { restored: false, error: 'no goal in checkpoint' };
 
     // Restore in-memory state
-    if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object') {
+    if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object' && cp.agentMemorySnapshot !== null) {
       Object.assign(agentMemory, cp.agentMemorySnapshot);
     }
     if (Array.isArray(cp.historySnapshot)) {
@@ -237,10 +237,10 @@ export async function restoreFromCheckpoint() {
     if (cp.agentSpeed && ['turbo', 'normal', 'stealth'].includes(cp.agentSpeed)) agentSpeed = cp.agentSpeed;
     if (cp.expectedTenant) expectedTenant = cp.expectedTenant;
     if (cp.activeClientId) activeClientId = cp.activeClientId;
-    if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
+    if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object' && cp.runSettingsSnapshot !== null) {
       Object.assign(_runSettings, cp.runSettingsSnapshot);
     }
-    if (cp.trustCounters && typeof cp.trustCounters === 'object') {
+    if (cp.trustCounters && typeof cp.trustCounters === 'object' && cp.trustCounters !== null) {
       if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
       if (typeof cp.trustCounters.consecutiveFailureMax === 'number') consecutiveFailureMax = cp.trustCounters.consecutiveFailureMax;
     }
@@ -250,7 +250,7 @@ export async function restoreFromCheckpoint() {
     // Re-register tab contexts from URLs. After SW restart we don't have the
     // full context objects, just URLs, but that's enough for the tab manager
     // to re-initialize when the agent re-opens tabs.
-    if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object') {
+    if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object' && cp.tabContextUrls !== null) {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10) || 0;
         if (tabId > 0 && typeof url === 'string') {
@@ -1657,7 +1657,7 @@ async function getTechnicianInfo() {
   };
   try {
     const stored = await chrome.storage.local.get(['technicianInfo']);
-    if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object') {
+    if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object' && stored.technicianInfo !== null) {
       return { ...defaults, ...stored.technicianInfo };
     }
   } catch (_e) { /* storage read non-fatal */ }
@@ -3352,7 +3352,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (!tab) {
         // Try to recover from tab contexts before giving up
         const allCtx = getAllTabContexts();
-        if (allCtx.length > 0) {
+        if (allCtx && allCtx.length > 0 && allCtx[0]) {
           tab = allCtx[0].tabId;
           console.debug('[Sentinel/DEBUG] Step', stepCount, 'Recovered tab from context:', tab);
         }
@@ -4220,7 +4220,7 @@ async function runAgentLoop(goal, workingTabId) {
         // observation needs the image (passed separately as base64Image).
         delete cleaned.base64Image;
         delete cleaned.screenshot;
-        if (cleaned.action && typeof cleaned.action === 'object') {
+        if (cleaned.action && typeof cleaned.action === 'object' && cleaned.action !== null) {
           const a = { ...cleaned.action };
           delete a.base64Image;
           delete a.screenshot;
@@ -4367,8 +4367,8 @@ async function runAgentLoop(goal, workingTabId) {
             console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
           } else if (_vResponse && _vResponse.ok) {
             const _vData = await _vResponse.json();
-            const _vRaw = _vData.choices && _vData.choices[0] && _vData.choices[0].message
-              ? _vData.choices[0].message.content || '' : '';
+            const _vRaw = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0] && _vData.choices[0].message
+              ? (_vData.choices[0].message.content || '') : '';
             
             // Parse structured JSON output
             let _vParsed = null;

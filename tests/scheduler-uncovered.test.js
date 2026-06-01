@@ -154,7 +154,7 @@ function resetChromeMocks() {
   clearChromeMocks();
   // Restore storage mock implementations
   chrome.storage.local.get.mockImplementation(async (keys) => {
-    if (typeof keys === 'object' && !Array.isArray(keys)) {
+    if (keys && typeof keys === 'object' && !Array.isArray(keys)) {
       const result = {};
       for (const k of Object.keys(keys)) {
         result[k] = storageData[k] !== undefined ? storageData[k] : keys[k];

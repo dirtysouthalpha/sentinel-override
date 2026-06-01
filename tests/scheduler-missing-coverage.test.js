@@ -98,7 +98,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   chrome.storage.local.get.mockImplementation(async (keys) => {
     const key = Array.isArray(keys) ? keys[0] : keys;
-    const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+    const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
     return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
   });
 });

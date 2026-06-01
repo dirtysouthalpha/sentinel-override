@@ -96,7 +96,7 @@ beforeEach(() => {
   // Restore storage mock implementations after clearAllMocks resets them
   chrome.storage.local.get.mockImplementation(async (keys) => {
     const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
-    const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
+    const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
     return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
   });
   chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
@@ -1700,7 +1700,7 @@ describe('initScheduler — past nextRunAt with recurrence recomputes', () => {
 
     chrome.storage.local.get.mockImplementation(async (keys) => {
       const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
-      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
+      const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
       return { [key]: isolatedStorage[key] !== undefined ? isolatedStorage[key] : defaultVal };
     });
     chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(isolatedStorage, obj));
@@ -1788,7 +1788,7 @@ describe('loadResults — error handling', () => {
       if (key === 'sentinel_schedule_results') {
         throw new Error('Results storage corrupted');
       }
-      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
+      const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
       return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
     });
 
