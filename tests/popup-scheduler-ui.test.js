@@ -492,4 +492,14 @@ describe('scheduler-ui.js event delegation', () => {
     expect(el._listeners['change']).toBeDefined();
     expect(el._listeners['change'].length).toBeGreaterThan(0);
   });
+
+  test('does not throw when schedules-panel element is absent from DOM', () => {
+    // Simulate a DOM where schedules-panel doesn't exist (getElementById returns null)
+    const sandboxNullPanel = createSandbox();
+    sandboxNullPanel.fakeDoc.getElementById = (id) => {
+      if (id === 'schedules-panel') return null;
+      return sandboxNullPanel.elements[id] || null;
+    };
+    expect(() => runSchedulerUI(sandboxNullPanel)).not.toThrow();
+  });
 });

@@ -394,6 +394,12 @@ describe('_checkPreFinishCompleteness', () => {
     const history = [{ action: { type: 'note', text: 'Found username admin and email admin@test.com' } }];
     expect(_checkPreFinishCompleteness(goal, mem, history)).toBeNull();
   });
+
+  test('handles null history gracefully (does not throw)', () => {
+    // null history must not crash — returns null or a string gap message, never throws
+    const result = _checkPreFinishCompleteness('Extract: username, email', { username: 'admin', email: 'a@b.com' }, null);
+    expect(result === null || typeof result === 'string').toBe(true);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────
