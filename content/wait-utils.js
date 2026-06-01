@@ -91,9 +91,11 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
       const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
       const shadow = window.__sentinelUtils && window.__sentinelUtils.shadow;
 
-      if (condition.ref && dom && dom.findElementByRef) {
-        const el = dom.findElementByRef(condition.ref);
-        if (el) return true;
+      if (condition.ref) {
+        if (dom && dom.findElementByRef) {
+          const el = dom.findElementByRef(condition.ref);
+          if (el) return true;
+        }
         if (!condition.selector) return false;
       }
 

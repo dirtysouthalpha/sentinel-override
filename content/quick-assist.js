@@ -15,6 +15,7 @@
   var panel = null;
   var shadow = null;
   var triggerBtn = null;
+  var triggerAutoHideTimer = null;
   var selectedText = '';
   var pageInfo = { title: '', url: '' };
 
@@ -333,10 +334,12 @@
     (document.body || document.documentElement).appendChild(triggerBtn);
 
     // Auto-hide after 5 seconds
-    setTimeout(function() { hideTrigger(); }, 5000);
+    if (triggerAutoHideTimer) clearTimeout(triggerAutoHideTimer);
+    triggerAutoHideTimer = setTimeout(function() { hideTrigger(); }, 5000);
   }
 
   function hideTrigger() {
+    if (triggerAutoHideTimer) { clearTimeout(triggerAutoHideTimer); triggerAutoHideTimer = null; }
     if (triggerBtn && triggerBtn.parentNode) {
       triggerBtn.parentNode.removeChild(triggerBtn);
     }
@@ -588,10 +591,10 @@
       ta.value = text;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
-      document.body.appendChild(ta);
+      (document.body || document.documentElement).appendChild(ta);
       ta.select();
       document.execCommand('copy');
-      document.body.removeChild(ta);
+      if (ta.parentNode) ta.parentNode.removeChild(ta);
     });
   }
 

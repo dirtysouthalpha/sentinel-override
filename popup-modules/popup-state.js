@@ -80,6 +80,7 @@ function getState() {
  * @returns {Function} Unsubscribe function.
  */
 function subscribe(key, callback) {
+  if (typeof callback !== 'function') return () => {};
   if (!_subscribers[key]) {
     _subscribers[key] = new Set();
   }
