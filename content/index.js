@@ -52,13 +52,13 @@ if (window.__sentinelInitialized) {
   const _EXECUTE_JS_SANDBOX_ENABLED = true;
 
   // Shorthand references to utility modules
-  const dom = window.__sentinelUtils.dom;
-  const hl = window.__sentinelUtils.highlight;
-  const wait = window.__sentinelUtils.wait;
-  const dd = window.__sentinelUtils.dropdown;
-  const si = window.__sentinelUtils.specialInputs;
-  const ov = window.__sentinelUtils.overlay;
-  const fm = window.__sentinelUtils.frame;
+  const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
+  const hl = window.__sentinelUtils && window.__sentinelUtils.highlight;
+  const wait = window.__sentinelUtils && window.__sentinelUtils.wait;
+  const dd = window.__sentinelUtils && window.__sentinelUtils.dropdown;
+  const si = window.__sentinelUtils && window.__sentinelUtils.specialInputs;
+  const ov = window.__sentinelUtils && window.__sentinelUtils.overlay;
+  const fm = window.__sentinelUtils && window.__sentinelUtils.frame;
 
   // ========== Overlay / Popup Dismissal ==========
   // Detects and auto-closes common overlays. (#14) Conservative behavior:
