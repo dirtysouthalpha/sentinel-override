@@ -153,7 +153,10 @@ try {
       }
     });
   }
-} catch (_) { /* non-fatal: chrome API may be unavailable in some contexts */ }
+} catch (checkpointErr) {
+  /* Non-fatal: chrome API may be unavailable in some contexts */
+  console.debug('[Sentinel/agent] Checkpoint load failed:', checkpointErr && checkpointErr.message);
+}
 
 // ========== Service Worker Persistence Checkpoint (#16, lite → full) ==========
 // Module-level snapshot of the most recent loop state so onSuspend can flush it.
@@ -196,7 +199,10 @@ async function writeCheckpoint(stepCount) {
     if (chrome.storage && chrome.storage.session && chrome.storage.session.set) {
       await chrome.storage.session.set({ agent_checkpoint: _lastCheckpoint });
     }
-  } catch (_) { /* non-fatal */ }
+  } catch (writeErr) {
+    /* Non-fatal: checkpoint write failed, but agent loop continues */
+    console.debug('[Sentinel/agent] Checkpoint write failed:', writeErr && writeErr.message);
+  }
 }
 
 /**
@@ -501,7 +507,9 @@ export async function undoLastAction() {
       const prevUrl = entry.previousUrl;
       if (!prevUrl) {
         // No previous URL — try goBack
-        try { await chrome.tabs.goBack(entry.tabId); } catch (_) { /* goBack not always available */ }
+        try { await chrome.tabs.goBack(entry.tabId); } catch (goBackErr) {
+          console.debug('[Sentinel/agent] goBack failed during undo:', goBackErr && goBackErr.message);
+        }
         return { success: true, description: 'Navigated back (no previous URL recorded)' };
       }
       await chrome.tabs.update(entry.tabId, { url: prevUrl });
@@ -640,7 +648,9 @@ export async function startAgent(goal, sender) {
 
   agentRunning = true;
   // Persist running state so SW restarts can detect an interrupted run
-  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(_e) {}
+  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(sessionErr) {
+    console.debug('[Sentinel/agent] Session storage set failed during agent start:', sessionErr && sessionErr.message);
+  }
   resetAgentState();
   tel.info('lifecycle', 'Agent started', { goal: (goal || '').substring(0, 200), startTabId });
 
@@ -648,7 +658,10 @@ export async function startAgent(goal, sender) {
   try {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
     agentSpeed = speedSettings.agentSpeedMode || 'turbo';
-  } catch (_) { agentSpeed = 'turbo'; }
+  } catch (speedErr) {
+    console.debug('[Sentinel/agent] Speed mode load failed, using turbo:', speedErr && speedErr.message);
+    agentSpeed = 'turbo';
+  }
 
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
@@ -666,7 +679,9 @@ export async function startAgent(goal, sender) {
       clientKnowledgeUsedIds = relevantEntries.map(e => e.id);
       clientKnowledgeText = await formatPromptSection(activeClient.id, startUrl);
       // (9.1) Broadcast which facts are being injected so popup can show them
-      try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (_) {}
+      try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (previewErr) {
+        console.debug('[Sentinel/agent] Client knowledge preview send failed:', previewErr && previewErr.message);
+      }
     } else {
       activeClientId = null;
       clientKnowledgeText = '';
@@ -730,7 +745,9 @@ export async function startAgent(goal, sender) {
       agentRunning = false;
       try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (_) {} } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await _enableSidePanelEverywhere(); } catch (sidePanelErr) {
+      console.debug('[Sentinel/agent] Side panel re-enable failed on mode mismatch cancel:', sidePanelErr && sidePanelErr.message);
+    } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
       chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
         console.error('[startAgent] mode mismatch cancel sendMessage failed:', e);
       });
