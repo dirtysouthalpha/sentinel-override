@@ -1185,7 +1185,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch { /* DOM may be detached */ }
+    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1226,7 +1226,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch { /* DOM may be detached */ }
+  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1239,7 +1239,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch { /* DOM may be detached */ }
+  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
 }, true);
 
 function updateMarkdownPreview() {
@@ -2364,7 +2364,7 @@ function showModeMismatchCard(payload) {
         if (typeof updateApprovalModeUI === 'function') {
           updateApprovalModeUI(wantsApproval);
         }
-      } catch { /* DOM may be detached */ }
+      } catch (e) { console.warn('[Sentinel] DOM detach error:', e && e.message); }
       sendResponse({ flip: true });
       card.remove();
     });
@@ -3531,7 +3531,7 @@ chrome.runtime.onMessage.addListener((message) => {
                         inputBox.value = originalGoal;
                       }
                       if (typeof sendMessage === 'function') sendMessage();
-                    } catch { /* DOM write or message may fail */ }
+                    } catch (e) { console.warn('[Sentinel] DOM write error:', e && e.message); }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
@@ -3557,7 +3557,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }
                   });
                 }
-              } catch { /* DOM removal or storage write may fail */ }
+              } catch (e) { console.warn('[Sentinel] DOM removal error:', e && e.message); }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);

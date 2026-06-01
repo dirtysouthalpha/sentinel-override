@@ -160,7 +160,7 @@ if (useTrustedInputToggle) {
             : 'Trusted input OFF — using synthetic events',
           enabled ? 'success' : 'info'
         );
-      } catch { /* showToast may not be available */ }
+      } catch (e) { console.warn('[Sentinel] showToast unavailable:', e && e.message); }
     });
   });
 }
@@ -188,7 +188,7 @@ if (soundEnabledToggle) {
             : 'Sound notifications OFF — silent mode',
           'info'
         );
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -214,7 +214,7 @@ if (adaptivePromptsModeSelect) {
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -237,7 +237,7 @@ if (telemetryLevelSelect) {
   });
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
-      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -260,7 +260,7 @@ if (telemetryPersistToggle) {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
           : 'Telemetry persistence disabled', 'info');
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -284,7 +284,7 @@ if (telemetryRedactToggle) {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
           : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -307,7 +307,7 @@ if (telemetrySkillAdaptToggle) {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
           : 'Adaptive skill priority OFF — static priorities only', 'info');
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -321,7 +321,7 @@ if (skillStatsResetBtn) {
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -433,7 +433,7 @@ if (quickModeToggle) {
           ? 'ON — Fast execution, no planning'
           : 'OFF - Standard pace';
       }
-      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -496,7 +496,7 @@ if (ticketModeToggle) {
             : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
           enabled ? 'success' : 'info'
         );
-      } catch { /* showToast may fail in detached popup */ }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     });
   });
 }
@@ -1002,13 +1002,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
   });
 
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
-      try { showToast('Pick a provider first', 'error'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
       return;
     }
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
@@ -1029,14 +1029,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast('Detect failed: ' + msg, 'error'); } catch { /* showToast may fail in detached popup */ }
+        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
         modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
         modelsSel.innerHTML = '<option value="">(no models returned)</option>';
-        try { showToast('No models returned', 'error'); } catch { /* showToast may fail in detached popup */ }
+        try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
         return;
       }
       modelsSel.innerHTML = '';
@@ -1052,9 +1052,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       modelsSel.disabled = false;
       useBtn.disabled = false;
-      try { showToast('Detected ' + models.length + ' models', 'success'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     } catch (e) {
-      try { showToast('Error: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Error: ' + ((e && e.message) || String(e)), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
@@ -1065,13 +1065,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   useBtn.addEventListener('click', () => {
     const value = modelsSel.value;
     if (!value) {
-      try { showToast('Pick a model from the list first', 'error'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Pick a model from the list first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
       return;
     }
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
-      try { showToast('Model set to ' + value, 'success'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
     }
   });
 })();
@@ -1166,7 +1166,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         else document.body.classList.remove('dark-mode');
         try { localStorage.setItem('theme-named', theme); } catch { /* localStorage may be restricted */ }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch { /* showToast may fail in detached popup */ }
+        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', e && e.message); }
       });
     });
   }
