@@ -359,6 +359,12 @@ describe('getPlatformProfile — SentinelOne', () => {
     expect(profile.id).toBe('sentinelone');
   });
 
+  test('detects from bare sentinelone.com URL (no subdomain)', () => {
+    const profile = getPlatformProfile('https://sentinelone.com/dashboard', '');
+    expect(profile).not.toBeNull();
+    expect(profile.id).toBe('sentinelone');
+  });
+
   test('detects from s1.com URL', () => {
     const profile = getPlatformProfile('https://usea1.s1.com/dashboard', '');
     expect(profile).not.toBeNull();
