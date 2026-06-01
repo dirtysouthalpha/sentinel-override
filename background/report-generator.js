@@ -102,6 +102,9 @@ function _collectUrlsVisited(history) {
  * @returns {{ memorySummary: string, citableKeysList: string }}
  */
 function _buildMemorySummary(agentMemory) {
+  if (!agentMemory || typeof agentMemory !== 'object') {
+    return { memorySummary: 'No usable data was extracted.', citableKeysList: '(none)' };
+  }
   const memoryKeys = Object.keys(agentMemory);
   const usableKeys = memoryKeys.filter(k => {
     const v = agentMemory[k];
@@ -246,7 +249,7 @@ export async function generateReport(executionData, CONFIG) {
     step: h.step,
     action: h.action ? h.action.type : 'unknown',
     detail: h.action && h.action.selector ? h.action.selector.substring(0, 80) : (h.action && (h.action.url || h.action.text) || ''),
-    result: typeof h.result === 'string' ? h.result.substring(0, 150) : String(h.result)
+    result: typeof h.result === 'string' ? h.result.substring(0, 150) : (h.result != null ? String(h.result).substring(0, 150) : '')
   }));
   const condensedHistory = _allHistory.length > 14
     ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 14} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]

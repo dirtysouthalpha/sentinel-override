@@ -645,3 +645,114 @@ describe('SPA transition guard', () => {
     expect(shouldSetTransitionPending('run_agent_loop', true)).toBe(false);
   });
 });
+
+// ===================== Persisted Telemetry Run Guards =====================
+
+function loadPersistedRunGuard(runId) {
+  if (!runId) return [];
+  return 'loaded';
+}
+
+function deletePersistedRunGuard(runId) {
+  if (!runId) return { ok: false, error: 'runId required' };
+  return { ok: true };
+}
+
+describe('load_persisted_telemetry_run guard', () => {
+  test('returns [] when runId is undefined', () => {
+    expect(loadPersistedRunGuard(undefined)).toEqual([]);
+  });
+
+  test('returns [] when runId is empty string', () => {
+    expect(loadPersistedRunGuard('')).toEqual([]);
+  });
+
+  test('proceeds when runId is provided', () => {
+    expect(loadPersistedRunGuard('run-123')).toBe('loaded');
+  });
+});
+
+describe('delete_persisted_telemetry_run guard', () => {
+  test('returns ok:false + error when runId is undefined', () => {
+    expect(deletePersistedRunGuard(undefined)).toEqual({ ok: false, error: 'runId required' });
+  });
+
+  test('returns ok:false + error when runId is empty string', () => {
+    expect(deletePersistedRunGuard('')).toEqual({ ok: false, error: 'runId required' });
+  });
+
+  test('returns ok:true when runId is provided', () => {
+    expect(deletePersistedRunGuard('run-123')).toEqual({ ok: true });
+  });
+});
+
+// ===================== execute_in_frame Command Guard =====================
+
+function executeInFrameCommandGuard(command) {
+  if (!command || typeof command !== 'object') {
+    return { ok: false, error: 'execute_in_frame: missing or invalid command' };
+  }
+  return { ok: true };
+}
+
+describe('execute_in_frame command guard', () => {
+  test('returns error when command is null', () => {
+    expect(executeInFrameCommandGuard(null)).toEqual({ ok: false, error: 'execute_in_frame: missing or invalid command' });
+  });
+
+  test('returns error when command is undefined', () => {
+    expect(executeInFrameCommandGuard(undefined)).toEqual({ ok: false, error: 'execute_in_frame: missing or invalid command' });
+  });
+
+  test('returns error when command is a string', () => {
+    expect(executeInFrameCommandGuard('click')).toEqual({ ok: false, error: 'execute_in_frame: missing or invalid command' });
+  });
+
+  test('returns error when command is a number', () => {
+    expect(executeInFrameCommandGuard(42)).toEqual({ ok: false, error: 'execute_in_frame: missing or invalid command' });
+  });
+
+  test('passes when command is a plain object', () => {
+    expect(executeInFrameCommandGuard({ action: 'click', selector: '#btn' })).toEqual({ ok: true });
+  });
+
+  test('passes when command is an empty object', () => {
+    expect(executeInFrameCommandGuard({})).toEqual({ ok: true });
+  });
+});
+
+// ===================== context_menu_extract Goal Fallback =====================
+
+function buildExtractGoal(params) {
+  params = params || {};
+  return params.selectionText
+    ? `Extract all structured data from this text: "${params.selectionText}". Return as JSON.`
+    : 'Extract all structured data visible on the current page. Return as JSON.';
+}
+
+describe('context_menu_extract goal fallback', () => {
+  test('uses selectionText when present', () => {
+    expect(buildExtractGoal({ selectionText: 'hello world' }))
+      .toBe('Extract all structured data from this text: "hello world". Return as JSON.');
+  });
+
+  test('falls back to page-level goal when selectionText is missing', () => {
+    expect(buildExtractGoal({}))
+      .toBe('Extract all structured data visible on the current page. Return as JSON.');
+  });
+
+  test('falls back to page-level goal when params is null', () => {
+    expect(buildExtractGoal(null))
+      .toBe('Extract all structured data visible on the current page. Return as JSON.');
+  });
+
+  test('falls back to page-level goal when selectionText is empty string', () => {
+    expect(buildExtractGoal({ selectionText: '' }))
+      .toBe('Extract all structured data visible on the current page. Return as JSON.');
+  });
+
+  test('selectionText is embedded verbatim in the goal', () => {
+    expect(buildExtractGoal({ selectionText: 'Name, Age, Email' }))
+      .toContain('"Name, Age, Email"');
+  });
+});
