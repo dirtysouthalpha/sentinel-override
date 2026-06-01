@@ -211,7 +211,7 @@
       listEl.innerHTML = '<div style="text-align:center; color:var(--text-tertiary, #888); font-size:13px; padding:24px;">No recent chats yet. Start an agent run; it will be archived automatically when the side panel closes or the run finishes.</div>';
       return;
     }
-    const rowsHtml = chats.map(c => {
+    const rowsHtml = chats.filter(c => c).map(c => {
       const goal = _escapeHtml((c.goal || '(no goal)').substring(0, 200));
       const ageStr = _formatAge(c.createdAt);
       const stats = [

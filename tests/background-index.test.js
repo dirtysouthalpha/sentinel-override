@@ -275,11 +275,11 @@ function validateScheduleRequest(action, request) {
       if (!request.schedule) throw new Error('Schedule data required');
       break;
     case 'schedule_delete':
-    case 'schedule_toggle':
     case 'schedule_clear_results':
       if (!request.id) throw new Error('Schedule ID required');
       break;
     case 'schedule_toggle':
+      if (!request.id) throw new Error('Schedule ID required');
       if (typeof request.enabled !== 'boolean') throw new Error('Enabled flag required');
       break;
   }
@@ -349,6 +349,18 @@ describe('Schedule validation guards', () => {
 
   test('schedule_clear_results requires id', () => {
     expect(() => validateScheduleRequest('schedule_clear_results', {})).toThrow('Schedule ID required');
+  });
+
+  test('schedule_toggle requires id', () => {
+    expect(() => validateScheduleRequest('schedule_toggle', {})).toThrow('Schedule ID required');
+  });
+
+  test('schedule_toggle requires enabled boolean', () => {
+    expect(() => validateScheduleRequest('schedule_toggle', { id: 'abc' })).toThrow('Enabled flag required');
+  });
+
+  test('schedule_toggle passes with id and boolean enabled', () => {
+    expect(validateScheduleRequest('schedule_toggle', { id: 'abc', enabled: false })).toBe(true);
   });
 });
 
