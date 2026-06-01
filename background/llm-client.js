@@ -1228,6 +1228,7 @@ const _PRICING = {
  */
 export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   const m = (modelName || '').toLowerCase();
+  if (!m) return ((inputTokens || 0) * 3.00 + (outputTokens || 0) * 15.00) / 1_000_000;
   let rates = [3.00, 15.00]; // default: Sonnet-class
   for (const [key, r] of Object.entries(_PRICING).sort((a,b) => b[0].length - a[0].length)) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
@@ -1827,7 +1828,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // text-only. Some OpenAI-compatible endpoints (e.g. Z.AI for text-primary
     // GLM variants) reject image_url even though the protocol accepts it.
     if (response.status === 400 && _useVision) {
-      console.warn('[Sentinel] Vision request rejected (400) — retrying without image. Error:', errorData.slice(0, 200));
+      console.warn('[Sentinel] Vision request rejected (400) — retrying without image. Error:', (errorData || 'unknown error').slice(0, 200));
       _rateLimiter.check(); // rate-limit the fallback call just like the original
       agentState.apiCallCount++; // second attempt counts as its own call
       const _fbContent = prompt; // text-only
@@ -1869,7 +1870,9 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     throw new Error('API returned invalid JSON: ' + (e && e.message ? e.message : String(e)));
   }
 
-  if (!data) throw new Error('API returned null response body');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('API returned invalid response body (expected object)');
+  }
   // Early detection of auth errors from providers that return HTTP 200 with error payloads
   if ((!data.choices || data.choices.length === 0) && (data.error || data.msg || (data.code && data.success === false))) {
     const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
@@ -2233,7 +2236,7 @@ export function parseLLMResponse(content) {
 export async function getRelevantPatterns(goal) {
   try {
     if (!goal || typeof goal !== 'string') return [];
-    const stored = await chrome.storage.local.get(['learned_patterns']);
+    const stored = await chrome.storage.local.get(['learned_patterns']).catch(() => ({ learned_patterns: [] }));
     const patterns = stored.learned_patterns || [];
     const goalWords = goal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     const scored = patterns
@@ -2246,7 +2249,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     return scored.map(s => s.pattern);
-  } catch (e) { console.error('[Sentinel/llm] getRelevantPatterns failed:', e && e.message); return []; }
+  } catch (e) { console.error('[Sentinel/llm] getRelevantPatterns failed:', (e && e.message) || String(e)); return []; }
 }
 
 // ========== Simple LLM Call (Quick Assist) ==========
@@ -2277,7 +2280,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
     clearTimeout(timeout);
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      throw new Error(`API Error ${response.status}: ${errText.substring(0, 200)}`);
+      throw new Error(`API Error ${response?.status || 'unknown'}: ${errText.substring(0, 200)}`);
     }
     const data = await response.json();
     if (!data) throw new Error('Quick Assist API returned null response body');
