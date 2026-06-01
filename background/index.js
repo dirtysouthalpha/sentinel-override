@@ -214,7 +214,7 @@ try {
             totalBytes: dl.totalBytes || 0
           }
         }).catch((e) => {
-          console.error('[download_captured] Unhandled rejection:', e);
+          console.error('[download_captured] Unhandled rejection:', (e && e.message) || String(e));
         });
       } catch (e) { console.warn('[Sentinel/index] download capture failed:', (e && e.message) || String(e)); }
     });
@@ -321,7 +321,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     }
     case 'delete_persisted_telemetry_run': {
       if (!request.runId) return { ok: false, error: 'runId required' };
-      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: (e && e.message) || String(e) }; }
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (e && e.message) || String(e)); return { ok: false, error: (e && e.message) || String(e) }; }
     }
 
     // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
@@ -334,7 +334,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
-      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: (e && e.message) || String(e) }; }
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (e && e.message) || String(e)); return { ok: false, error: (e && e.message) || String(e) }; }
     }
 
     case 'get_provider_catalog': {
@@ -466,7 +466,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             },
             requestId
           }).catch((_e) => {
-            console.error('[finish] Unhandled rejection:', _e);
+            console.error('[finish] Unhandled rejection:', (_e && _e.message) || String(_e));
           });
 
           // Notify the user
@@ -787,7 +787,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'schedule_clear_badge':
       { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-        console.error('[_p] Unhandled rejection:', e);
+        console.error('[_p] Unhandled rejection:', (e && e.message) || String(e));
       }); }
       return { cleared: true };
 
@@ -993,7 +993,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab && typeof activeTab.id === 'number') {
               await chrome.sidePanel.open({ tabId: activeTab.id }).catch((e) => {
-                console.error('[attached] Unhandled rejection:', e);
+                console.error('[attached] Unhandled rejection:', (e && e.message) || String(e));
               });
             }
           } catch (_e) { /* no active tab — silently ignore */ }
@@ -1028,5 +1028,5 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
       }
     }
-  } catch (e) { console.warn('Command handler error:', e); }
+  } catch (e) { console.warn('Command handler error:', (e && e.message) || String(e)); }
 });
