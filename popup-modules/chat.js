@@ -2485,7 +2485,7 @@ function showAdaptedGoalCard(payload) {
     document.getElementById('adaptedGoalEditBtn').addEventListener('click', () => {
       // Replace the pre with a textarea, replace the buttons with Save/Cancel.
       const textEl = document.getElementById('adaptedGoalText');
-      if (!textEl) return;
+      if (!textEl || !textEl.parentElement) return;
       const ta = document.createElement('textarea');
       ta.value = adaptedGoal;
       ta.style.cssText = 'width: 100%; min-height: 200px; font-family: inherit; font-size: 11px; line-height: 1.45; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--accent-primary, #ff6b00); border-radius: 6px; color: var(--text-primary); box-sizing: border-box; resize: vertical;';
