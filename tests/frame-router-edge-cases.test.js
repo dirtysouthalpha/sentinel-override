@@ -95,6 +95,27 @@ describe('frame-router edge cases', () => {
       }
     });
 
+    test('should handle getAllFrames with non-object error', async () => {
+      const { resolveFrameForSelector } = await import('../background/frame-router.js');
+
+      // Test defensive error.message guard - reject with string error
+      chrome.webNavigation.getAllFrames.mockRejectedValueOnce('Tab closed');
+
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      try {
+        const result = await resolveFrameForSelector(123, 0);
+        expect(result).toBeNull();
+        // Should handle non-object errors gracefully with defensive pattern
+        expect(errorSpy).toHaveBeenCalledWith(
+          '[Sentinel/frame-router] enumerateFrames failed:',
+          'Tab closed'
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
     test('should handle webNavigation API throwing', async () => {
       const { resolveFrameForSelector } = await import('../background/frame-router.js');
 

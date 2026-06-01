@@ -71,7 +71,12 @@ function createSandbox(overrides = {}) {
     },
     setTimeout: (cb, ms) => cb(),
     console,
-    parseInt: (s, radix) => Number.parseInt(s, radix),
+    parseInt: (s, radix) => {
+      if (radix === undefined) {
+        throw new Error('parseInt called without radix - unsafe (line 74 in popup-onboarding.test.js)');
+      }
+      return Number.parseInt(s, radix);
+    },
     Promise,
     Object,
     Error,
