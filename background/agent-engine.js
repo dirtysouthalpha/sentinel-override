@@ -4541,7 +4541,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _articleGoal = (typeof goal === 'string') ? goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i) : null;
           if (_articleGoal && !command.force) {
-            const _targetN = parseInt(_articleGoal[1], 10);
+            const _targetN = parseInt(_articleGoal[1], 10) || 10;
             const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
             const _notes = history.filter(h => h.action && h.action.type === 'note').length;
             const _summaryKeys = Object.keys(agentMemory).filter(k =>
