@@ -6057,14 +6057,14 @@ async function runAgentLoop(goal, workingTabId) {
                       text: ch,
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
+                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError.message || chrome.runtime.lastError); else res(r); });
                   });
                   await new Promise((res, rej) => {
                     chrome.debugger.sendCommand({ tabId: typeof tab === 'object' && tab !== null ? tab.id : tab }, 'Input.dispatchKeyEvent', {
                       type: 'keyUp',
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError); else res(r); });
+                    }, (r) => { if (chrome.runtime.lastError) rej(chrome.runtime.lastError.message || chrome.runtime.lastError); else res(r); });
                   });
                 } catch (_keyErr) {
                   // Fallback: set value directly via CDP JS
