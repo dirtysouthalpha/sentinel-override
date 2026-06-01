@@ -341,3 +341,36 @@ describe('settings.js — switchProviderCard', () => {
     expect(model._attrs.placeholder).toContain('gpt-4o');
   });
 });
+
+describe('settings.js — settingsModal null guard', () => {
+  test('settingsBtn click handler does not throw when settings-modal element is absent', async () => {
+    const sb = createSandbox();
+    sb.Promise = Promise; // real Promise so await works in the async handler
+
+    // Capture the click handler registered on settingsBtn
+    let clickHandler = null;
+    const fakeBtnEl = makeElement('button');
+    fakeBtnEl.addEventListener = (event, handler) => {
+      if (event === 'click') clickHandler = handler;
+    };
+
+    // Return null for settings-modal to exercise the null guard
+    sb.document.getElementById = (id) => {
+      if (id === 'settingsBtn') return fakeBtnEl;
+      if (id === 'settings-modal') return null;
+      return makeElement('div');
+    };
+
+    // Mock storage.get to return a real Promise (handler uses await)
+    sb.chrome.storage.local.get = (keys, cb) => {
+      const result = {};
+      if (cb) cb(result);
+      return Promise.resolve(result);
+    };
+
+    loadModule(sb);
+    expect(clickHandler).not.toBeNull();
+    // Must not throw TypeError from settingsModal.classList.add
+    await expect(clickHandler()).resolves.toBeUndefined();
+  });
+});

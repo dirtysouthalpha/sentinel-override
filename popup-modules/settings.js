@@ -648,7 +648,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   }
 
   switchProviderCard(state.activeProviderId);
-  settingsModal.classList.add('show');
+  if (settingsModal) settingsModal.classList.add('show');
   // Load and render learned patterns
   chrome.storage.local.get(['learned_patterns'], (s) => {
     if (chrome.runtime.lastError) return;
