@@ -218,7 +218,7 @@ async function refreshEntriesList(clientId) {
           const entryId = btn.dataset.entryId;
           const r = await _send('client_entry_delete', { clientId: capturedClientId, entryId });
           if (r.ok) {
-            await refreshEntriesList(_editingClientId);
+            await refreshEntriesList(capturedClientId);
             await refreshClientList();
           } else {
             alert(r.error || 'Delete failed');
