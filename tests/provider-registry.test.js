@@ -181,8 +181,8 @@ describe('getModelSupportsVision', () => {
     expect(getModelSupportsVision('anthropic', 'claude-opus-4-5')).toBe(true);
   });
 
-  test('raw gpt-4 defaults to true (deny regex requires hyphen suffix)', () => {
-    expect(getModelSupportsVision('openai', 'gpt-4')).toBe(true);
+  test('raw gpt-4 is denied by deny list regex', () => {
+    expect(getModelSupportsVision('openai', 'gpt-4')).toBe(false);
   });
 
   test('gpt-4-0314 is denied (matches gpt-4- without vision/turbo/o)', () => {
@@ -204,9 +204,9 @@ describe('getModelSupportsVision', () => {
     expect(getModelSupportsVision('openai', 'text-davinci-003')).toBe(false);
   });
 
-  test('claude-3-haiku-text matches claude-3-haiku override (returns true)', () => {
-    // The substring match in MODEL_VISION_OVERRIDES catches this before deny list
-    expect(getModelSupportsVision('anthropic', 'claude-3-haiku-text')).toBe(true);
+  test('claude-3-haiku-text has explicit false override (longest key wins)', () => {
+    // claude-3-haiku-text (19 chars) sorts before claude-3-haiku (13 chars), exact match -> false
+    expect(getModelSupportsVision('anthropic', 'claude-3-haiku-text')).toBe(false);
   });
 
   test('unknown anthropic model defaults to true (Claude 3+)', () => {

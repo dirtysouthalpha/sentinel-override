@@ -17,7 +17,7 @@ export function generateHtmlReport(auditLog, metadata) {
     totalSteps = 0,
     status = 'completed',
     trustScore = null,
-  } = metadata;
+  } = metadata || {};
 
   const duration = startTime && endTime
     ? Math.round((new Date(endTime) - new Date(startTime)) / 1000)
@@ -26,7 +26,7 @@ export function generateHtmlReport(auditLog, metadata) {
     ? `${Math.floor(duration / 60)}m ${duration % 60}s`
     : `${duration}s`;
 
-  const steps = auditLog.map((entry, i) => {
+  const steps = (auditLog || []).map((entry, i) => {
     const stepClass = entry.actionFailed ? 'step-failed' : 'step-ok';
     const icon = entry.actionFailed ? '❌' : '✅';
     const actionName = entry.action?.type || entry.action || 'unknown';

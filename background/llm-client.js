@@ -1220,7 +1220,7 @@ const _PRICING = {
 export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   const m = (modelName || '').toLowerCase();
   let rates = [3.00, 15.00]; // default: Sonnet-class
-  for (const [key, r] of Object.entries(_PRICING)) {
+  for (const [key, r] of Object.entries(_PRICING).sort((a,b) => b[0].length - a[0].length)) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
   }
   return ((inputTokens || 0) * rates[0] + (outputTokens || 0) * rates[1]) / 1_000_000;

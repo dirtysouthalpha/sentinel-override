@@ -86,7 +86,7 @@ export async function exportAllTemplates() {
 export function validateImport(importedData) {
   const result = { safe: false, warnings: [], errors: [], version: null };
 
-  if (!importedData || typeof importedData !== 'object') {
+  if (!importedData || typeof importedData !== 'object' || Array.isArray(importedData)) {
     result.errors.push('Invalid file: not a JSON object');
     return result;
   }

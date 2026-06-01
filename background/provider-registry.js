@@ -502,7 +502,7 @@ export const VISION_MODELS = {
     default: true,
     deny: [
       /^gpt-3\.5/i,
-      /^gpt-4-(?!vision|turbo|o)/i, // raw gpt-4 / gpt-4-0314 etc.
+      /(?:^gpt-4$|^gpt-4-(?!vision|turbo|o))/i, // raw gpt-4 / gpt-4-0314 etc.
       /^text-/i,
       /^davinci/i,
       /^babbage/i
@@ -559,6 +559,7 @@ export const MODEL_VISION_OVERRIDES = {
   'llava': true,
   // Confirmed text-only
   'gpt-3.5-turbo': false,
+  'claude-3-haiku-text': false,
   'claude-2': false,
   'claude-instant': false
 };
