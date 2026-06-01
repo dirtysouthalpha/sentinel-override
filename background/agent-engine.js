@@ -6343,8 +6343,9 @@ async function runAgentLoop(goal, workingTabId) {
             description: (command.text || command.selector || command.value || command.url || command.key || '').toString().substring(0, 120),
             attemptedAt: stepCount
           };
-        } else if (command && !MODIFYING_ACTIONS.has(command.type)) {
-          // Non-modifying action consumes any pending flag implicitly.
+        } else {
+          // Non-modifying action or failed modifying action: clear stale verification
+          // so the same old action isn't re-verified in subsequent steps.
           pendingVerification = null;
         }
       } catch (_) { pendingVerification = null; }

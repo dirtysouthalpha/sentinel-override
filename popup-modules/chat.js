@@ -1980,6 +1980,7 @@ if (exportReplayBtn) {
       const blob = new Blob([resp.data.html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
       showToast('Replay report downloading…', 'info');
     } catch (e) {
       showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
@@ -3356,6 +3357,7 @@ chrome.runtime.onMessage.addListener((message) => {
             const blob = new Blob([resp.data.html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
             showToast('Replay report downloading…', 'info');
           } catch (e) {
             showToast('Replay export failed: ' + (e && e.message ? e.message : e), 'error');
