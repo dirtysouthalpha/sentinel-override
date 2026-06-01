@@ -155,7 +155,7 @@ export function getSkillStats() {
     const skill = SKILLS.find(s => s.id === k);
     out[k].basePriority = skill ? (skill.priority || 0) : null;
     out[k].effectivePriority = skill ? _effectivePriority(skill) : null;
-    out[k].successRate = v.fires > 0 ? v.successes / v.fires : null;
+    out[k].successRate = (v.fires > 0 && Number.isFinite(v.fires) && Number.isFinite(v.successes)) ? v.successes / v.fires : null;
   }
   return out;
 }
