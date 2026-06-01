@@ -2050,21 +2050,32 @@ describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-
 
 // ========== parseLLMResponse: sanitize-then-parse salvage with valid type (line 1913) ==========
 describe('parseLLMResponse: sanitize-then-parse catch-block salvage (line 1913)', () => {
-  test('returns parsed object with non-standard type via sanitize-then-parse salvage (line 1913)', () => {
+  test('returns Parse error note for non-standard type (salvage requires valid type)', () => {
     // Build a JSON object > 200 chars whose "type" is NOT in the validTypes set.
     // Flow through parseLLMResponse:
     //   1. extractFirstJsonObject → returns null (custom type not in validTypes)
     //   2. jsonStr stays as the full content (valid JSON)
     //   3. sanitizeLlmJson + JSON.parse succeeds; parsed.type = "my_custom_action"
     //   4. validTypes check throws "Invalid command type: my_custom_action"
-    //   5. Catch block (content.length > 200): sanitize-then-parse on content.trim()
-    //      succeeds again; parsed.type is truthy → line 1913 returns parsed.
+    //   5. Catch block salvage: sanitize-then-parse succeeds but type is not valid → not returned
+    //   6. Falls through to default Parse error note.
     const content = '{"type":"my_custom_action","data":"' + 'x'.repeat(200) + '"}';
     expect(content.length).toBeGreaterThan(200);
 
     const result = parseLLMResponse(content);
-    // The catch-block salvage at line 1913 returns the parsed object directly
-    expect(result.type).toBe('my_custom_action');
+    // Salvage correctly rejects invalid types — returns a Parse error note instead
+    expect(result.type).toBe('note');
+    expect(result.text).toContain('Parse error');
+  });
+
+  test('salvage path recovers valid action from short content with bad escape (< 200 chars)', () => {
+    // Verify the length guard was removed — short valid-action JSON with a sanitizable
+    // escape should be recovered even when < 200 chars.
+    const content = '{"type":"navigate","url":"https://example.com/path\\`end"}';
+    expect(content.length).toBeLessThan(200);
+    const result = parseLLMResponse(content);
+    expect(result.type).toBe('navigate');
+    expect(result.url).toBe('https://example.com/path`end');
   });
 });
 

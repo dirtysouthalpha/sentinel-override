@@ -312,9 +312,11 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return await listPersistedRuns(); } catch { return []; }
     }
     case 'load_persisted_telemetry_run': {
+      if (!request.runId) return [];
       try { return await loadPersistedRun(request.runId); } catch { return []; }
     }
     case 'delete_persisted_telemetry_run': {
+      if (!request.runId) return { ok: false, error: 'runId required' };
       try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', e); return { ok: false, error: (e && e.message) || String(e) }; }
     }
 
@@ -639,6 +641,9 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (frameId == null) {
         return { ok: false, error: 'execute_in_frame: frame ' + frameIndex + ' not found in tab ' + tabId };
       }
+      if (!command || typeof command !== 'object') {
+        return { ok: false, error: 'execute_in_frame: missing or invalid command' };
+      }
       return await executeInFrame(tabId, frameId, command);
     }
 
@@ -826,7 +831,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (agentRunning) throw new Error('Agent already running');
       const goalMap = {
         context_menu_analyze: (p) => `Analyze this page and ${p.selectionText ? `the selected text "${p.selectionText}"` : p.linkUrl ? `the link ${p.linkUrl}` : 'the current page content'}. Provide a detailed analysis.`,
-        context_menu_extract: (p) => `Extract all structured data from this text: "${p.selectionText}". Return as JSON.`,
+        context_menu_extract: (p) => p.selectionText ? `Extract all structured data from this text: "${p.selectionText}". Return as JSON.` : 'Extract all structured data visible on the current page. Return as JSON.',
         context_menu_fill_form: () => 'Look at the current page and fill in any forms with appropriate test data.',
         context_menu_screenshot: () => 'Take a full page screenshot of the current page.',
         context_menu_summarize: () => 'Summarize the current page content concisely.',

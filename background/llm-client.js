@@ -1881,7 +1881,12 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   if (provider.supportsToolUse) {
     // Anthropic: check stop_reason === 'tool_use'
     if (data.stop_reason === 'tool_use') {
-      return provider.parseToolUseResponse(data);
+      try {
+        return provider.parseToolUseResponse(data);
+      } catch (e) {
+        // Malformed Anthropic tool_use response — fall through to text parsing
+        console.warn('[Sentinel] Anthropic parseToolUseResponse failed, falling back to text parsing:', e && e.message);
+      }
     }
     // OpenAI-compatible: check for tool_calls in the response message
     const choice = data.choices && data.choices[0];
@@ -2171,11 +2176,20 @@ export function parseLLMResponse(content) {
     //  1. Try sanitize-then-parse on the raw content (in case extractFirstJsonObject
     //     truncated something we needed).
     //  2. If that fails, regex-extract finish/note content directly.
-    if (typeof content === 'string' && content.length > 200) {
+    if (typeof content === 'string' && content.length > 0) {
       try {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);
-        if (parsed && parsed.type) return parsed;
+        const _validTypesSet = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
+          'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+          'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
+          'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
+          'navigate_back', 'navigate_forward',
+          'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
+          'read_console_messages', 'read_network_requests',
+          'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
+          'smart_navigate', 'batch']);
+        if (parsed && parsed.type && _validTypesSet.has(parsed.type)) return parsed;
       } catch (_) { /* try regex salvage */ }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
