@@ -229,7 +229,7 @@ describe('quick-assist-handler', () => {
       try {
         await handleQuickAssist('test');
       } catch (e) {
-        expect(e.message.length).toBeLessThanOrEqual(200 + 'API error 500: '.length);
+        expect(e && e.message && e.message.length).toBeLessThanOrEqual(200 + 'API error 500: '.length);
       }
     });
 

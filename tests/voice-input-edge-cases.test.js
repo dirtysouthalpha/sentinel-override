@@ -55,7 +55,7 @@ describe('Voice input edge cases', () => {
       expect(true).toBe(false);
     } catch (e) {
       // Expected to throw permission error
-      expect(e.message).toContain('Cannot access');
+      expect(e && e.message).toContain('Cannot access');
     }
   });
 
@@ -80,7 +80,7 @@ describe('Voice input edge cases', () => {
         });
       } catch (e) {
         // Expected to fail for restricted pages
-        expect(e.message).toContain('Cannot access');
+        expect(e && e.message).toContain('Cannot access');
       }
     }
   });
@@ -112,7 +112,7 @@ describe('Voice input edge cases', () => {
       });
       expect(true).toBe(false);
     } catch (e) {
-      expect(e.message).toContain('Tab closed');
+      expect(e && e.message).toContain('Tab closed');
     }
   });
 

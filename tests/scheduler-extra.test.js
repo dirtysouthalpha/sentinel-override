@@ -297,7 +297,7 @@ describe('_waitForReport polling', () => {
     try {
       await chrome.storage.local.get(['last_agent_report']);
     } catch (e) {
-      expect(e.message).toBe('storage corrupted');
+      expect(e && e.message).toBe('storage corrupted');
     }
 
     errorSpy.mockRestore();
