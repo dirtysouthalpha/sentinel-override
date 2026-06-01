@@ -94,7 +94,7 @@ export async function getTemplate(id) {
  * @returns {Promise<object>} The complete template object
  */
 export async function saveTemplate(templateData) {
-  if (!templateData || typeof templateData !== 'object') {
+  if (!templateData || typeof templateData !== 'object' || templateData === null) {
     throw new Error('Template data must be an object');
   }
   if (!templateData.name || typeof templateData.name !== 'string' || templateData.name.trim() === '') {
@@ -140,7 +140,7 @@ export async function updateTemplate(id, updates) {
   if (!id || typeof id !== 'string') {
     throw new Error('Template ID is required');
   }
-  if (!updates || typeof updates !== 'object') {
+  if (!updates || typeof updates !== 'object' || updates === null) {
     throw new Error('Update data must be an object');
   }
 

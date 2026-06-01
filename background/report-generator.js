@@ -18,8 +18,8 @@ function _truncateMemoryValue(val, maxChars) {
   if (val == null) return '';
   let valStr;
   if (Array.isArray(val)) {
-    valStr = val.slice(0, 5).map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('\n');
-  } else if (typeof val === 'object') {
+    valStr = val.slice(0, 5).map(v => typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)).join('\n');
+  } else if (typeof val === 'object' && val !== null) {
     try { valStr = JSON.stringify(val); } catch { valStr = String(val); }
   } else {
     valStr = String(val);
@@ -102,7 +102,7 @@ function _collectUrlsVisited(history) {
  * @returns {{ memorySummary: string, citableKeysList: string }}
  */
 function _buildMemorySummary(agentMemory) {
-  if (!agentMemory || typeof agentMemory !== 'object') {
+  if (!agentMemory || typeof agentMemory !== 'object' || agentMemory === null) {
     return { memorySummary: 'No usable data was extracted.', citableKeysList: '(none)' };
   }
   const memoryKeys = Object.keys(agentMemory);
@@ -232,7 +232,7 @@ This is not optional. A report with specific numbers but no \`[src:*]\` tags is 
 }
 
 export async function generateReport(executionData, CONFIG) {
-  if (!executionData || typeof executionData !== 'object') {
+  if (!executionData || typeof executionData !== 'object' || executionData === null) {
     throw new Error('generateReport: executionData is required');
   }
   const { goal = '', agentPlan, stepCount = 0, apiCallCount = 0 } = executionData;
