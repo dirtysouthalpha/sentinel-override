@@ -1662,6 +1662,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
  */
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   if (!agentState) throw new Error('agentState is required');
+  if (!CONFIG) throw new Error('CONFIG is required');
   _rateLimiter.check();
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
@@ -1818,7 +1819,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     let errorData;
     try { errorData = await response.text(); } catch { errorData = 'unable to read error body'; }
     if (response.status === 429) throw new Error(`429 Rate limited. ${errorData}`);
-    if (response.status === 400 && errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
+    if (response.status === 400 && errorData && typeof errorData === 'string' && errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
     // (3.51.1) Vision fallback: if we sent image content and got a 400, retry
     // text-only. Some OpenAI-compatible endpoints (e.g. Z.AI for text-primary
     // GLM variants) reject image_url even though the protocol accepts it.
@@ -2223,6 +2224,7 @@ export function parseLLMResponse(content) {
  */
 export async function getRelevantPatterns(goal) {
   try {
+    if (!goal || typeof goal !== 'string') return [];
     const stored = await chrome.storage.local.get(['learned_patterns']);
     const patterns = stored.learned_patterns || [];
     const goalWords = goal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
@@ -2250,6 +2252,7 @@ export async function getRelevantPatterns(goal) {
  * @returns {Promise<string>} The LLM's text response.
  */
 export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) {
+  if (!systemPrompt || !userPrompt) throw new Error('systemPrompt and userPrompt are required');
   const providerConfig = await getActiveProvider();
   if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
   const { endpoint, apiKey, model } = providerConfig;
