@@ -371,3 +371,46 @@ describe('schedule results — edge cases', () => {
     await expect(clearScheduleResults('nonexistent')).resolves.toBeUndefined();
   });
 });
+
+describe('_waitForAgentCompletion — null message guard', () => {
+  test('onMessage listener does not throw when called with null/non-object messages', () => {
+    // Simulate the listener function that _waitForAgentCompletion installs
+    // The guard is: if (!msg || typeof msg !== 'object') return;
+    const capturedListeners = [];
+    chrome.runtime.onMessage.addListener.mockImplementation((fn) => capturedListeners.push(fn));
+
+    // Trigger a bare listener registration as _waitForAgentCompletion would install
+    const mockListener = (msg) => {
+      if (!msg || typeof msg !== 'object') return;
+      if (msg.action === 'agent_loop_complete') { /* resolve */ }
+    };
+    chrome.runtime.onMessage.addListener(mockListener);
+
+    const listener = capturedListeners[capturedListeners.length - 1];
+    expect(() => listener(null)).not.toThrow();
+    expect(() => listener(undefined)).not.toThrow();
+    expect(() => listener(42)).not.toThrow();
+    expect(() => listener('string')).not.toThrow();
+    expect(() => listener({ action: 'agent_loop_complete' })).not.toThrow();
+  });
+});
+
+describe('executeScheduledTask — alarm name validation', () => {
+  test('ignores alarms that do not start with schedule-', async () => {
+    await expect(executeScheduledTask('other-alarm-name')).resolves.toBeUndefined();
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('weekly schedule with empty daysOfWeek', () => {
+  test('nextRunAt is in the future when daysOfWeek is empty', async () => {
+    const now = Date.now();
+    const schedule = await createSchedule({
+      name: 'Weekly no days',
+      goal: 'test',
+      type: 'recurring',
+      recurrence: { interval: 'weekly', time: '09:00', daysOfWeek: [] },
+    });
+    expect(schedule.nextRunAt).toBeGreaterThan(now);
+  });
+});

@@ -1386,6 +1386,18 @@ describe('callLLMWithRetry', () => {
     expect(state.apiCallCount).toBe(1);
   });
 
+  test('writes resolved model to agentState.model so supportsVision works', async () => {
+    setupOpenAIStorage();
+    _mockFetch = () => Promise.resolve(makeOpenAIResponse('{"type":"note","text":"ok"}'));
+    const state = makeAgentState();
+    expect(state.model).toBeUndefined();
+    await callLLMWithRetry(
+      [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
+      0, defaultConfig, state
+    );
+    expect(state.model).toBe('gpt-4o');
+  });
+
   test('tracks token usage from OpenAI response', async () => {
     setupOpenAIStorage();
     _mockFetch = () => Promise.resolve({

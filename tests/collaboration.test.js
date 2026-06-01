@@ -290,4 +290,19 @@ describe('importTemplates', () => {
     expect(result.overwritten).toBe(1);
     expect(result.results[0].action).toBe('overwritten');
   });
+
+  test('returns empty result for null input', async () => {
+    const result = await importTemplates(null);
+    expect(result).toEqual({ imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] });
+  });
+
+  test('returns empty result for undefined input', async () => {
+    const result = await importTemplates(undefined);
+    expect(result).toEqual({ imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] });
+  });
+
+  test('returns empty result for non-array input', async () => {
+    const result = await importTemplates('not an array');
+    expect(result).toEqual({ imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] });
+  });
 });
