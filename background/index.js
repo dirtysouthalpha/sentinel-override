@@ -595,6 +595,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         let targetHost;
         try { targetHost = new URL(target).host; } catch { targetHost = ''; }
         const tabs = await chrome.tabs.query({});
+        if (!tabs || tabs.length === 0) return { ok: false, error: 'no tabs available' };
         // Prefer exact URL match, fall back to host match (Microsoft sign-in
         // walks the user through multiple URLs on the same host).
         let match = tabs.find(t => t && t.url === target);

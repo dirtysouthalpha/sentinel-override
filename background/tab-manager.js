@@ -318,8 +318,9 @@ function recordNetworkStart(tabId, params) {
     const it = buf.keys();
     let toRemove = buf.size - NETWORK_BUFFER_MAX;
     while (toRemove-- > 0) {
-      const k = it.next().value;
-      if (k !== undefined) buf.delete(k);
+      const { value: k, done } = it.next();
+      if (done || k === undefined) break;
+      buf.delete(k);
     }
   }
 }

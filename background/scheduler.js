@@ -181,6 +181,7 @@ function computeNextRun(recurrence) {
 
   if (recurrence.interval === 'custom') {
     const periodMs = (recurrence.periodInMinutes || 60) * 60 * 1000;
+    if (periodMs <= 0) return now.getTime() + 3600000;
     const nowMs = now.getTime();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const periodsElapsed = Math.floor((nowMs - midnight) / periodMs);

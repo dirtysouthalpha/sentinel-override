@@ -272,6 +272,7 @@ export const PROVIDERS = {
      * @returns {Array<object>} Array of OpenAI-format tool objects with type: 'function'.
      */
     convertToolsToOpenAIFormat(tools) {
+      if (!tools || !Array.isArray(tools)) return [];
       return tools.map(t => ({
         type: 'function',
         function: {

@@ -574,10 +574,10 @@ function _renderLearnedPatterns(patterns) {
     btn.addEventListener('click', async () => {
       try {
         const idx = parseInt(btn.dataset.idx, 10);
-        if (isNaN(idx)) return;
+        if (isNaN(idx) || idx < 0) return;
         const s = await chrome.storage.local.get(['learned_patterns']);
         const arr = s.learned_patterns || [];
-        arr.splice(idx, 1);
+        if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         await chrome.storage.local.set({ learned_patterns: arr });
         _renderLearnedPatterns(arr);
       } catch (e) { console.warn('[Sentinel] delete pattern failed:', e && e.message); }
