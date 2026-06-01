@@ -123,6 +123,6 @@ async function build() {
 }
 
 build().catch(err => {
-  console.error('   ❌ Build failed:', err.message);
+  console.error('   ❌ Build failed:', (err && err.message) || String(err));
   process.exit(1);
 });

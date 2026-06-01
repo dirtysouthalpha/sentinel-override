@@ -190,6 +190,11 @@ export async function importTemplates(templates, conflictMode = 'skip') {
   let imported = 0, skipped = 0, renamed = 0, overwritten = 0;
 
   for (const template of templates) {
+    if (!template || !template.name || typeof template.name !== 'string') {
+      results.push({ name: template?.name || '(unknown)', action: 'skipped', reason: 'Invalid template: missing or invalid name' });
+      skipped++;
+      continue;
+    }
     const nameKey = template.name.toLowerCase();
     const existingId = existingNames.get(nameKey);
 
