@@ -130,6 +130,21 @@ describe('macro-recorder', () => {
     });
   });
 
+  describe('saveMacros (internal)', () => {
+    it('should log and rethrow storage errors', async () => {
+      chrome.storage.local.set.mockImplementationOnce(() => Promise.reject(new Error('Storage set error')));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(createMacro('Test Error Macro', 'Desc', [])).rejects.toThrow('Storage set error');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Sentinel/macro-recorder] saveMacros failed:',
+        'Storage set error'
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
   describe('updateMacro', () => {
     beforeEach(async () => {
       await createMacro('Original', 'Original Desc', [{ action: 'click' }]);
