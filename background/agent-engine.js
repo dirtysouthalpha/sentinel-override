@@ -3381,6 +3381,14 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+
+      // Validate tabInfo.url before using it (needed for navigation checks below)
+      if (!tabInfo.url) {
+        sendSilentUpdate('Tab URL unavailable. Continuing with current page...', stepCount);
+        // Skip auto-navigate and restricted page checks - just proceed with current state
+        await sleep(500);
+        continue;
+      }
       // Wait for page load
       if (tabInfo.status !== 'complete') {
         sendSilentUpdate('Waiting for page to load...', stepCount);
@@ -5029,7 +5037,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const _failed = entries.filter(e => e.failed || (e.status >= 400)).length;
             tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
-          } catch (_e) {}
+          } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', (_e && _e.message) || String(_e)); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
@@ -5071,6 +5079,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _dohResp = await fetch(_dohUrl, { headers: { Accept: 'application/dns-json' } });
           if (!_dohResp.ok) throw new Error('DoH HTTP ' + _dohResp.status);
           const _dohJson = await _dohResp.json();
+          if (!_dohJson) throw new Error('Invalid DNS response');
           const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
           const _status = (_dohJson.Status === 0 || _dohJson.Status === 'NOERROR') ? 'NOERROR' : `RCODE ${_dohJson.Status ?? 'UNKNOWN'}`;
           const _result = JSON.stringify({ domain: _domain, recordType: _type, preset: _preset || null, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
