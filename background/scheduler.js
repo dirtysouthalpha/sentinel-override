@@ -163,8 +163,8 @@ function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
   const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':').map(Number);
-  const hours = (Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
-  const minutes = (Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
+  const hours = (timeParts.length >= 1 && Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
+  const minutes = (timeParts.length >= 2 && Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
   const now = new Date();
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
 

@@ -134,7 +134,7 @@ export function getMultiArticleDirective(goal) {
   if (!MULTI_ARTICLE_PATTERN.test(goal)) return '';
   // Try to extract N if present
   const m = goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i);
-  const n = m ? parseInt(m[1], 10) : 0;
+  const n = m ? (parseInt(m[1], 10) || 0) : 0;
   const nLabel = (n > 0) ? n : 'N';
 
   return `
@@ -1161,7 +1161,7 @@ const _rateLimiter = {
     const now = Date.now();
     // Drop timestamps outside the sliding window
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    if (this.timestamps.length >= this.maxCalls) {
+    if (this.timestamps.length >= this.maxCalls && this.timestamps.length > 0) {
       const oldestInWindow = this.timestamps[0];
       const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
       throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);

@@ -120,7 +120,7 @@ function _recordPendingOutcomes(context) {
         fires: _stats[skillId].fires,
         successes: _stats[skillId].successes,
         failures: _stats[skillId].failures,
-        successRate: _stats[skillId].successes / _stats[skillId].fires,
+        successRate: _stats[skillId].fires > 0 ? _stats[skillId].successes / _stats[skillId].fires : 0,
         adjustedPriority: _effectivePriority({ id: skillId, priority: (SKILLS.find(s => s.id === skillId) || {}).priority })
       });
     } catch (_e) { /* telemetry logging failure is non-critical */ }

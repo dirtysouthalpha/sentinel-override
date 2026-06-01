@@ -3095,7 +3095,9 @@ function _ensureHeartbeatDot() {
 function _updateHeartbeat(durationMs) {
   __heartbeat.samples.push(durationMs);
   if (__heartbeat.samples.length > 5) __heartbeat.samples.shift();
-  const avg = Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / __heartbeat.samples.length);
+  const avg = __heartbeat.samples.length > 0
+    ? Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / __heartbeat.samples.length)
+    : 0;
   const dot = _ensureHeartbeatDot();
   dot.style.background = avg < 3000 ? '#4caf50' : avg < 10000 ? '#e0af68' : '#f44336';
   dot.title = 'API: ' + (avg / 1000).toFixed(1) + 's avg (last ' + __heartbeat.samples.length + ' calls)';
