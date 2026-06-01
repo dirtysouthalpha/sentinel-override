@@ -581,14 +581,16 @@ async function showRunHistory(scheduleId, scheduleName) {
     }
 
     // Show modal
-    document.getElementById('schedule-history-modal').classList.add('show');
-
-    // Set title with schedule name
-    const _h2 = document.getElementById('schedule-history-modal').querySelector('h2');
-    if (_h2) _h2.textContent = `Run History: ${scheduleName}`;
+    const _histModal = document.getElementById('schedule-history-modal');
+    if (_histModal) {
+      _histModal.classList.add('show');
+      const _h2 = _histModal.querySelector('h2');
+      if (_h2) _h2.textContent = `Run History: ${scheduleName}`;
+    }
   } catch (err) {
     container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--error-color);">Error: ${escapeHtml((err && err.message) || String(err))}</div>`;
-    document.getElementById('schedule-history-modal').classList.add('show');
+    const _histModal = document.getElementById('schedule-history-modal');
+    if (_histModal) _histModal.classList.add('show');
   }
 }
 
