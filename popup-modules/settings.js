@@ -63,17 +63,17 @@ function switchProviderCard(providerId) {
 
   // Populate fields from provider config
   const config = state.providerConfigs[providerId] || {};
-  setProviderEndpoint.value = config.endpoint || '';
-  setProviderKey.value = config.api_key || '';
-  setProviderModel.value = config.model || '';
+  if (setProviderEndpoint) setProviderEndpoint.value = config.endpoint || '';
+  if (setProviderKey) setProviderKey.value = config.api_key || '';
+  if (setProviderModel) setProviderModel.value = config.model || '';
 
   // Auto-fill defaults if fields are empty
   const defaults = providerId === 'anthropic'
     ? { endpoint: 'https://api.anthropic.com/v1/messages', model: 'claude-haiku-4-5-20251001' }
     : { endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o' };
 
-  if (!setProviderEndpoint.value) setProviderEndpoint.placeholder = defaults.endpoint;
-  if (!setProviderModel.value) setProviderModel.placeholder = defaults.model;
+  if (setProviderEndpoint && !setProviderEndpoint.value) setProviderEndpoint.placeholder = defaults.endpoint;
+  if (setProviderModel && !setProviderModel.value) setProviderModel.placeholder = defaults.model;
 }
 
 // Wire up provider selector buttons
@@ -546,7 +546,7 @@ if (expectedTenantInput) {
 }
 
 // ========== Theme Toggle ==========
-themeToggle.addEventListener('click', toggleTheme);
+if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 
 // ========== Settings Modal ==========
 // ========== Learned Patterns Viewer ==========
@@ -623,7 +623,7 @@ if (downloadAuditLogBtn) {
   });
 }
 
-settingsBtn.addEventListener('click', async () => {
+if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   const state = getState();
   // Load provider settings from storage
   let stored;
@@ -656,16 +656,16 @@ settingsBtn.addEventListener('click', async () => {
   });
 });
 
-closeSettingsBtn.addEventListener('click', () => {
-  settingsModal.classList.remove('show');
+if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => {
+  if (settingsModal) settingsModal.classList.remove('show');
 });
 
-saveSettingsBtn.addEventListener('click', () => {
+if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
   const state = getState();
-  const endpoint = setProviderEndpoint.value.trim();
-  const apiKey = setProviderKey.value.trim();
-  const model = setProviderModel.value.trim();
-  const format = exportFormatSelect.value;
+  const endpoint = setProviderEndpoint ? setProviderEndpoint.value.trim() : '';
+  const apiKey = setProviderKey ? setProviderKey.value.trim() : '';
+  const model = setProviderModel ? setProviderModel.value.trim() : '';
+  const format = exportFormatSelect ? exportFormatSelect.value : '';
   const agentContextEl = document.getElementById('set-agent-context');
   const agentContext = agentContextEl ? agentContextEl.value.trim() : '';
 
@@ -695,7 +695,7 @@ saveSettingsBtn.addEventListener('click', () => {
     agent_context: agentContext
   }, () => {
     if (chrome.runtime.lastError) return;
-    settingsModal.classList.remove('show');
+    if (settingsModal) settingsModal.classList.remove('show');
     showToast(`Settings saved (${state.activeProviderId})`, 'success');
   });
 });
@@ -893,8 +893,8 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
     switchProviderCard(provider);
-    setProviderEndpoint.value = btn.dataset.endpoint;
-    setProviderModel.value = btn.dataset.model;
+    if (setProviderEndpoint) setProviderEndpoint.value = btn.dataset.endpoint || '';
+    if (setProviderModel) setProviderModel.value = btn.dataset.model || '';
     showToast(`Preset loaded: ${btn.textContent}`, 'success');
   });
 });
@@ -902,9 +902,9 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 // ========== Test Connection Button ==========
 const testConnectionBtn = document.getElementById('testConnectionBtn');
 if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
-  const endpoint = setProviderEndpoint.value.trim();
-  const apiKey = setProviderKey.value.trim();
-  const model = setProviderModel.value.trim();
+  const endpoint = setProviderEndpoint ? setProviderEndpoint.value.trim() : '';
+  const apiKey = setProviderKey ? setProviderKey.value.trim() : '';
+  const model = setProviderModel ? setProviderModel.value.trim() : '';
 
   if (!endpoint || !apiKey || !model) {
     showToast('Fill in endpoint, API key, and model first', 'error');

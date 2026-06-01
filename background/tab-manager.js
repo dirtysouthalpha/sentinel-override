@@ -937,6 +937,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
     attachedDebuggees.delete(tabId);
+    observabilityListenersInstalled.delete(tabId);
     try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[tab-manager] Debugger detach failed in error path:', e && e.message); }
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {

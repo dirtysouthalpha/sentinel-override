@@ -472,6 +472,7 @@
     try {
       const pastEvents = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: 'load_persisted_telemetry_run', runId: runMeta.runId }, (response) => {
+          if (chrome.runtime.lastError) { resolve([]); return; }
           resolve(Array.isArray(response) ? response : []);
         });
       });
