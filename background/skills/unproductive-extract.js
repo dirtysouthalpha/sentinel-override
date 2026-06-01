@@ -24,7 +24,7 @@ export const unproductiveExtract = {
     const t = ctx.lastCommand.type;
     if (t !== 'extract' && t !== 'extract_list' && t !== 'execute_js') return false;
     const r = String(ctx.lastResult);
-    return UNPRODUCTIVE_PATTERNS.some(re => re.test(r));
+    return Array.isArray(UNPRODUCTIVE_PATTERNS) && UNPRODUCTIVE_PATTERNS.some(re => re.test(r));
   },
 
   autoApply(_ctx) {

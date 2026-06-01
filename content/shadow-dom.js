@@ -107,7 +107,9 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     // Fast path: try normal querySelectorAll on the root
     try {
       const direct = root.querySelectorAll(selector);
-      direct.forEach(function(el) { results.push(el); });
+      if (direct && typeof direct.forEach === 'function') {
+        direct.forEach(function(el) { if (el) results.push(el); });
+      }
     } catch { /* invalid selector */ }
 
     // Walk the tree looking for shadow roots

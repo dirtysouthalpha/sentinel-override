@@ -340,10 +340,12 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     ].join(', ');
 
     const elements = doc.querySelectorAll(interactiveSelectors);
-    elements.forEach((el) => {
-      if (!dom.isVisible(el)) return;
-      dom._addElement(el, interactiveElements, selectorMap, prefix, false);
-    });
+    if (elements && typeof elements.forEach === 'function') {
+      elements.forEach((el) => {
+        if (!el || !dom.isVisible(el)) return;
+        dom._addElement(el, interactiveElements, selectorMap, prefix, false);
+      });
+    }
 
     if (shadow && shadow.walkShadowTree && shadow.isInShadowDOM) {
       shadow.walkShadowTree(doc, function(el) {

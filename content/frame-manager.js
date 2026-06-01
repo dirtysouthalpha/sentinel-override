@@ -31,8 +31,10 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       return { elements, iframeCount: 0, crossOriginCount: 0 };
     }
 
-    iframes.forEach(function(iframe, index) {
-      iframeCount++;
+    if (iframes && typeof iframes.forEach === 'function') {
+      iframes.forEach(function(iframe, index) {
+        if (!iframe) return;
+        iframeCount++;
       const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
 
       try {
@@ -66,7 +68,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         });
         console.error(`Error scanning iframe ${index}:`, error);
       }
-    });
+      });
+    }
 
     return { elements, iframeCount, crossOriginCount };
   };
