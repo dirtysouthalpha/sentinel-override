@@ -3670,10 +3670,27 @@ async function runAgentLoop(goal, workingTabId) {
           } else {
           // (3.41.0) observe_page and read_page are independent read-only DOM
           // operations; run them in parallel to save 100-300ms per step.
-          [observation, pageContent] = await Promise.all([
-            sendMessageWithRetry(tab, { action: 'observe_page' }),
-            sendMessageWithRetry(tab, { action: 'read_page' })
-          ]);
+          try {
+            [observation, pageContent] = await Promise.all([
+              sendMessageWithRetry(tab, { action: 'observe_page' }),
+              sendMessageWithRetry(tab, { action: 'read_page' })
+            ]);
+          } catch (parallelErr) {
+            // If parallel observation fails, fall back to sequential with better error recovery
+            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', parallelErr && parallelErr.message);
+            try {
+              observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
+            } catch (obsErr) {
+              observation = { elements: [] };
+              console.warn('[Sentinel/agent] Sequential observe_page failed:', obsErr && obsErr.message);
+            }
+            try {
+              pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
+            } catch (readErr) {
+              pageContent = { content: '' };
+              console.warn('[Sentinel/agent] Sequential read_page failed:', readErr && readErr.message);
+            }
+          }
           }
           const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
           const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
