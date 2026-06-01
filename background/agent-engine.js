@@ -185,7 +185,7 @@ function buildCheckpoint(stepCount) {
     currentPlanStep,
     // Tab context URLs for re-registration after SW restart
     tabContextUrls: Object.fromEntries(
-      getAllTabContexts().map(tc => [tc.tabId, tc.url || ''])
+      (getAllTabContexts() || []).map(tc => [tc.tabId, tc.url || ''])
     ),
   };
 }
@@ -433,7 +433,7 @@ async function persistHistory() {
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
-  try { tabCtxData = getAllTabContexts().map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   return {
     goal,
     history: history.slice(),
