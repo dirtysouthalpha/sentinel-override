@@ -518,7 +518,7 @@
       function(response) {
         setButtonsLoading(false);
         if (chrome.runtime.lastError) {
-          setResponseHTML('<span class="qa-error">Error: ' + (chrome.runtime.lastError.message || 'Unknown error') + '</span>');
+          setResponseHTML('<span class="qa-error">Error: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error') + '</span>');
           return;
         }
         var text = response && response.data && response.data.text;

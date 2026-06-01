@@ -1259,7 +1259,7 @@ if (window.__sentinelInitialized) {
                 command: cmd
               }, (response) => {
                 if (chrome.runtime.lastError) {
-                  resolve('Cross-origin iframe error: ' + chrome.runtime.lastError.message);
+                  resolve('Cross-origin iframe error: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'));
                 } else if (response && response.ok) {
                   resolve(JSON.stringify(response.data || response));
                 } else {
