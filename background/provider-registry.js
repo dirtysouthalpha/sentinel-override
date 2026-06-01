@@ -656,7 +656,7 @@ export async function getActiveProvider() {
   try {
     stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage read failed:', e && e.message);
+    console.warn('[Sentinel/provider-registry] Storage read failed:', (e && e.message) || String(e));
     const provider = PROVIDERS.openai;
     return { id: 'openai', ...provider, endpoint: provider.defaultEndpoint, apiKey: '', model: provider.defaultModel, maxTokens: 8000, temperature: 0.3 };
   }
@@ -706,7 +706,7 @@ export async function migrateLegacySettings() {
   try {
     stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage read failed:', e && e.message);
+    console.warn('[Sentinel/provider-registry] Storage read failed:', (e && e.message) || String(e));
     return;
   }
   if (stored.providers) return; // already migrated
@@ -745,7 +745,7 @@ export async function migrateLegacySettings() {
       }
     });
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage set failed:', e && e.message);
+    console.warn('[Sentinel/provider-registry] Storage set failed:', (e && e.message) || String(e));
     return;
   }
 
@@ -754,7 +754,7 @@ export async function migrateLegacySettings() {
   try {
     await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage cleanup failed:', e && e.message);
+    console.warn('[Sentinel/provider-registry] Storage cleanup failed:', (e && e.message) || String(e));
   }
 }
 

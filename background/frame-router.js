@@ -76,7 +76,7 @@ export async function enumerateFrames(tabId) {
       try {
         mainOrigin = new URL(mainFrame.url).origin;
       } catch (e) {
-        console.warn('[Sentinel/frame-router] URL parse failed for main frame:', e && e.message);
+        console.warn('[Sentinel/frame-router] URL parse failed for main frame:', (e && e.message) || String(e));
         mainOrigin = mainFrame.url;
       }
     }
@@ -86,7 +86,7 @@ export async function enumerateFrames(tabId) {
       try {
         frameOrigin = new URL(f.url).origin;
       } catch (e) {
-        console.warn('[Sentinel/frame-router] URL parse failed for frame:', e && e.message);
+        console.warn('[Sentinel/frame-router] URL parse failed for frame:', (e && e.message) || String(e));
         frameOrigin = f.url || '';
       }
 
@@ -141,7 +141,7 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
 
     return positional.has(frameIndex) ? positional.get(frameIndex) : null;
   } catch (e) {
-    console.error('[Sentinel/frame-router] resolveFrameForSelector failed:', e && e.message);
+    console.error('[Sentinel/frame-router] resolveFrameForSelector failed:', (e && e.message) || String(e));
     return null;
   }
 }
@@ -357,7 +357,7 @@ async function runCommandInFrame(command) {
         if (mainEl) {
           const clone = mainEl.cloneNode(true);
           const skip = ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript', 'svg'];
-          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel/frame-router] DOM cleanup failed for', s, ':', e && e.message); } });
+          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel/frame-router] DOM cleanup failed for', s, ':', (e && e.message) || String(e)); } });
           content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
         }
         if ((!content || content.length < 200) && doc.body) {
