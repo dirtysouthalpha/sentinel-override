@@ -205,14 +205,14 @@ function sendNotification(schedule, result) {
   let message;
 
   if (result.status === 'success') {
-    const completedDate = result.completedAt && !isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
+    const completedDate = result.completedAt && !Number.isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
     message = `Completed successfully at ${completedDate.toLocaleTimeString()}.`;
     if (result.report && typeof result.report === 'string') {
       const snippet = result.report.substring(0, 150).replace(/\n/g, ' ');
       message += ` ${snippet}${result.report.length > 150 ? '...' : ''}`;
     }
   } else {
-    const completedDate = result.completedAt && !isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
+    const completedDate = result.completedAt && !Number.isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
     message = `Failed at ${completedDate.toLocaleTimeString()}.`;
     if (result.error && typeof result.error === 'string') {
       message += ` Error: ${result.error.substring(0, 100)}`;
