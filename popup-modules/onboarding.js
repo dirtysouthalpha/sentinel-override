@@ -52,11 +52,11 @@
     }
   }
 
-  function nextStep() {
+  async function nextStep() {
     if (currentStep < TOTAL_STEPS) {
       showStep(currentStep + 1);
     } else {
-      markDone();
+      await markDone();
     }
   }
 
