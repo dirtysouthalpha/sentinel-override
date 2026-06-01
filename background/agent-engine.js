@@ -3457,7 +3457,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
         console.debug('[Sentinel/DEBUG] urlMatch:', urlMatch ? urlMatch[0] : null);
         if (urlMatch) {
-          const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : 'https://' + urlMatch[1];
+          const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : ('https://' + (urlMatch[1] || urlMatch[0]));
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
             const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
