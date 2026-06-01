@@ -230,7 +230,6 @@ describe('undoLastAction', () => {
     });
 
     const result = await undoLastAction();
-    console.log('Type undo result:', result); // Debug
     expect(result.success).toBe(true);
     expect(result.description).toContain('Restored field');
     expect(result.description).toContain('#username');

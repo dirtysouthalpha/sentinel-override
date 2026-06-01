@@ -76,11 +76,6 @@ describe('quick-assist-handler edge cases', () => {
     });
 
     test('AbortError is caught and rethrown with user-friendly message', async () => {
-      // Debug: check if mock is set up correctly
-      console.log('[DEBUG] mockGetActiveProvider:', mockGetActiveProvider);
-      console.log('[DEBUG] mockConfig:', mockConfig);
-      console.log('[DEBUG] mockGetActiveProvider.mock.calls:', mockGetActiveProvider.mock.calls);
-
       globalThis.fetch = jest.fn(async () => {
         throw new DOMException('Aborted', 'AbortError');
       });

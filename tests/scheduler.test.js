@@ -1384,20 +1384,15 @@ describe.skip('executeScheduledTask — once schedule auto-disables', () => {
     let execError = null;
     const execPromise = executeScheduledTask('schedule-' + schedule.id).catch(err => {
       execError = err;
-      console.error('[TEST] executeScheduledTask error:', err);
     });
 
     // Wait for listener to be set up
     await new Promise(r => setTimeout(r, 100));
 
     const listener = getMsgListener();
-    console.log('[TEST] Listener:', listener ? 'SET' : 'NOT SET');
-    console.log('[TEST] execError:', execError);
 
     if (listener) {
       fireAgentCompletion(listener, 'Done');
-    } else {
-      console.error('[TEST] Listener was not set up!');
     }
 
     await execPromise;
