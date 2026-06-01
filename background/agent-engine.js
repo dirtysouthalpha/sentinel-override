@@ -3724,7 +3724,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Page narration failed non-fatally
           }
         } catch (err) {
-          activityFail(stepCount, 'observe', 'Page read failed: ' + (err.message || 'unknown'), null);
+          activityFail(stepCount, 'observe', 'Page read failed: ' + (err?.message || 'unknown'), null);
           sendSilentUpdate(`Error reading page: ${(err && err.message) || String(err)}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection
           // between each attempt. By the time we reach here the page is truly unreachable
@@ -5931,7 +5931,7 @@ async function runAgentLoop(goal, workingTabId) {
             result = res || 'Done';
             actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           } catch (err) {
-            result = 'Content script error: ' + (err.message || 'command failed to reach page');
+            result = 'Content script error: ' + (err?.message || 'command failed to reach page');
             actionFailed = true;
           }
         }
@@ -5984,7 +5984,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           }
         } catch (err) {
-          result = 'Content script error: ' + (err.message || 'command failed to reach page');
+          result = 'Content script error: ' + (err?.message || 'command failed to reach page');
           actionFailed = true;
         }
       }
