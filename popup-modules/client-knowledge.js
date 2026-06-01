@@ -60,7 +60,7 @@ async function refreshHeaderChip() {
       chip.title = 'No active client. Click to set one.';
     }
   } catch (err) {
-    console.error('[client-knowledge] refreshHeaderChip error:', err);
+    console.error('[client-knowledge] refreshHeaderChip error:', (err && err.message) || String(err));
   }
 }
 
@@ -72,7 +72,7 @@ async function openClientModal() {
     const modal = _get('client-modal');
     if (modal) modal.classList.add('show');
   } catch (err) {
-    console.error('[client-knowledge] openClientModal error:', err);
+    console.error('[client-knowledge] openClientModal error:', (err && err.message) || String(err));
   }
 }
 function closeClientModal() {
@@ -90,7 +90,7 @@ async function refreshClientPicker() {
     sel.innerHTML = '<option value="">— No client (default behavior) —</option>'
       + list.map(c => `<option value="${_safeEsc(c.id)}" ${active && active.id === c.id ? 'selected' : ''}>${_safeEsc(c.displayName)} (${(c.entries || []).length} entries)</option>`).join('');
   } catch (err) {
-    console.error('[client-knowledge] refreshClientPicker error:', err);
+    console.error('[client-knowledge] refreshClientPicker error:', (err && err.message) || String(err));
   }
 }
 
@@ -146,7 +146,7 @@ async function refreshClientList() {
             }
           }
         } catch (err) {
-          console.error('[client-knowledge] action error:', err);
+          console.error('[client-knowledge] action error:', (err && err.message) || String(err));
           alert('Action failed: ' + ((err && err.message) || String(err)));
         }
       });

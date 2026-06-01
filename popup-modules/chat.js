@@ -3579,7 +3579,7 @@ chrome.runtime.onMessage.addListener((message) => {
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
       } catch { /* trust-score render non-fatal */ }
     } catch (err) {
-      console.error('Error displaying completion message:', err);
+      console.error('Error displaying completion message:', (err && err.message) || String(err));
     }
     resetUI();
   }
