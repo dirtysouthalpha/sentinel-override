@@ -760,7 +760,10 @@ export function getPlatformContext(currentUrl, goal) {
   try {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
-  } catch (e) { console.warn('[Sentinel/llm] Profile lookup failed:', e && e.message); }
+  } catch (e) {
+    console.warn('[Sentinel/llm] Profile lookup failed:', e && e.message);
+    // Continue without selector block - non-fatal
+  }
   const ctx = prose + selectorBlock;
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
   return ctx;
@@ -932,7 +935,7 @@ export async function generatePlan(goal, settings, context = {}) {
       return [(goal || 'Complete the task').substring(0, 300)];
     }
     const data = await response.json();
-    if (!data) throw new Error('Plan API returned null response body');
+    if (!data || typeof data !== 'object') throw new Error('Plan API returned invalid response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
     if ((!data.choices || data.choices.length === 0) && (data.error || data.msg || (data.code && data.success === false))) {
       const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
@@ -1725,9 +1728,9 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     : '';
 
   // Memory context
-  const memoryKeys = Object.keys(agentState.agentMemory || {});
+  const memoryKeys = Object.keys(agentState?.agentMemory || {});
   const memoryCtx = memoryKeys.length > 0
-    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState.agentMemory, null, 2)}\n`
+    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState?.agentMemory || {}, null, 2)}\n`
     : '';
 
   // (3.12.0) Client knowledge context. agent-engine.js pre-formats this
@@ -2164,7 +2167,12 @@ export function parseLLMResponse(content) {
     // string values BEFORE parsing. Replaces the old "strip 0x00-0x1f" pass
     // which destroyed newlines and broke the salvage path.
     jsonStr = sanitizeLlmJson(jsonStr);
-    let parsed = JSON.parse(jsonStr);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      throw new Error('Failed to parse action JSON: ' + (e && e.message));
+    }
     if (!parsed.type && parsed.action && typeof parsed.action === 'object') parsed = parsed.action;
     if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
     if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
