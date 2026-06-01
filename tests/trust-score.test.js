@@ -443,8 +443,7 @@ describe('suggestRetryActions', () => {
       }
     };
     const suggestions = suggestRetryActions(result);
-    if (suggestions.length > 0) {
-      expect(suggestions[0].severity).toBe('medium');
-    }
+    expect(suggestions.length).toBeGreaterThan(0);
+    expect(suggestions[0].severity).toBe('medium');
   });
 });

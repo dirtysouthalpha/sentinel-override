@@ -973,12 +973,14 @@ describe('formatTicketFinalNotes — new edge cases', () => {
     const longSummary = 'Word '.repeat(100) + '. Second sentence.';
     const result = formatTicketFinalNotes(longSummary, 'Goal', tech, {});
     const match = result.match(/^- (.+)$/m);
-    if (match) expect(match[1].length).toBeLessThanOrEqual(240);
+    expect(match).not.toBeNull();
+    expect(match[1].length).toBeLessThanOrEqual(240);
   });
   test('two sentences extracted for action taken', () => {
     const result = formatTicketFinalNotes('First sentence. Second sentence. Third sentence.', 'Goal', tech, {});
     const match = result.match(/^- (.+)$/m);
-    if (match) expect(match[1]).toContain('Second sentence.');
+    expect(match).not.toBeNull();
+    expect(match[1]).toContain('Second sentence.');
   });
   test('includes UTC timestamp', () => {
     const result = formatTicketFinalNotes('Done.', 'Goal', tech, {});

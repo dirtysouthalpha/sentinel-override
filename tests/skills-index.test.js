@@ -112,10 +112,8 @@ describe('runRecoverySkills', () => {
       consecutiveFailures: 1,
     };
     const result = runRecoverySkills(ctx);
-    if (result.appliedSkillIds.length > 0) {
-      // At least one skill matched — promptInjection may be populated
-      expect(typeof result.promptInjection).toBe('string');
-    }
+    expect(result.appliedSkillIds.length).toBeGreaterThan(0);
+    expect(typeof result.promptInjection).toBe('string');
   });
 
   test('records pending outcomes when skills applied', () => {
