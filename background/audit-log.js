@@ -72,8 +72,9 @@ export async function getAuditLog(runId) {
     const key = _storageKey(runId);
     const stored = await chrome.storage.local.get(key).catch(() => ({}));
     return Array.isArray(stored[key]) ? stored[key] : [];
-  } catch {
+  } catch (e) {
     /* storage read failed — return empty log rather than crashing */
+    console.warn('[Sentinel/audit-log] storage read failed:', e && e.message);
     return [];
   }
 }
