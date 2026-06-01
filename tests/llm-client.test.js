@@ -66,7 +66,8 @@ describe('extractFirstJsonObject', () => {
   test('extracts a valid action JSON string from clean input', () => {
     const result = extractFirstJsonObject('{"type":"click","selector":"#btn"}');
     expect(result).toBeTruthy();
-    expect(JSON.parse(result).type).toBe('click');
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('click');
   });
 
   test('extracts JSON string from text with leading prose', () => {
@@ -95,13 +96,15 @@ describe('extractFirstJsonObject', () => {
     const nested = '{"type":"execute_js","code":"var x=1;","key":"result"}';
     const result = extractFirstJsonObject(nested);
     expect(result).toBeTruthy();
-    expect(JSON.parse(result).type).toBe('execute_js');
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('execute_js');
   });
 
   test('picks first valid object when multiple JSON objects present', () => {
     const input = '{"type":"note","text":"first"} and {"type":"finish","summary":"done"}';
     const result = extractFirstJsonObject(input);
-    expect(JSON.parse(result).type).toBe('note');
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('note');
   });
 
   test('skips object without valid type and finds valid object later', () => {
@@ -109,7 +112,8 @@ describe('extractFirstJsonObject', () => {
     const input = '{"foo":"bar"} some text {"type":"click","selector":"#btn"}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    expect(JSON.parse(result).type).toBe('click');
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('click');
   });
 
   test('handles all valid action types', () => {
@@ -124,7 +128,8 @@ describe('extractFirstJsonObject', () => {
     for (const t of types) {
       const result = extractFirstJsonObject(`{"type":"${t}"}`);
       expect(result).not.toBeNull();
-      expect(JSON.parse(result).type).toBe(t);
+      const parsed = JSON.parse(result);
+      expect(parsed.type).toBe(t);
     }
   });
 
@@ -136,14 +141,16 @@ describe('extractFirstJsonObject', () => {
     const input = '{"type":"type","text":"he said \\"hello\\""}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    expect(JSON.parse(result).text).toBe('he said "hello"');
+    const parsed = JSON.parse(result);
+    expect(parsed.text).toBe('he said "hello"');
   });
 
   test('handles deeply nested JSON braces', () => {
     const input = '{"type":"execute_js","code":"if(true){return{a:1}}","key":"result"}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    expect(JSON.parse(result).type).toBe('execute_js');
+    const parsed = JSON.parse(result);
+    expect(parsed.type).toBe('execute_js');
   });
 });
 

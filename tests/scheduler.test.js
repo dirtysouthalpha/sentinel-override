@@ -11,8 +11,8 @@ globalThis.chrome = {
   storage: {
     local: {
       get: jest.fn(async (keys) => {
-        const key = Array.isArray(keys) ? keys[0] : keys;
-        const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+        const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
+        const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
         return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
       }),
       set: jest.fn(async (obj) => Object.assign(storageData, obj)),
@@ -95,8 +95,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   // Restore storage mock implementations after clearAllMocks resets them
   chrome.storage.local.get.mockImplementation(async (keys) => {
-    const key = Array.isArray(keys) ? keys[0] : keys;
-    const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+    const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
+    const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
     return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
   });
   chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));
@@ -871,25 +871,32 @@ describe('_waitForAgentCompletion mechanism', () => {
       _msgListeners.push(fn);
     });
     chrome.runtime.onMessage.removeListener.mockImplementation((fn) => {
-      _msgListeners = _msgListeners.filter(l => l !== fn);
+      if (_msgListeners) {
+        _msgListeners = _msgListeners.filter(l => l !== fn);
+      }
     });
 
     // Import the scheduler and exercise _waitForAgentCompletion indirectly by
     // verifying the listener is captured after onAgentComplete registration.
     // Directly: simulate the onMessage listener pattern that _waitForAgentCompletion uses.
     const listenerFiredWithSuccess = await new Promise((resolve) => {
-      const timer = setTimeout(() => resolve('timeout'), 5 * 60 * 1000);
-      const listener = (msg) => {
-        if (msg.action === 'agent_loop_complete') {
-          clearTimeout(timer);
-          chrome.runtime.onMessage.removeListener(listener);
-          resolve('success');
-        }
-      };
-      chrome.runtime.onMessage.addListener(listener);
+      let timer;
+      try {
+        timer = setTimeout(() => resolve('timeout'), 5 * 60 * 1000);
+        const listener = (msg) => {
+          if (msg.action === 'agent_loop_complete') {
+            clearTimeout(timer);
+            chrome.runtime.onMessage.removeListener(listener);
+            resolve('success');
+          }
+        };
+        chrome.runtime.onMessage.addListener(listener);
 
-      // Simulate startAgent firing the message synchronously AFTER listener is attached
-      capturedListener({ action: 'agent_loop_complete', report: 'done' });
+        // Simulate startAgent firing the message synchronously AFTER listener is attached
+        capturedListener({ action: 'agent_loop_complete', report: 'done' });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     });
 
     jest.useRealTimers();
@@ -935,7 +942,9 @@ describe('_waitForAgentCompletion mechanism', () => {
       _msgListeners.push(fn);
     });
     chrome.runtime.onMessage.removeListener.mockImplementation((fn) => {
-      _msgListeners = _msgListeners.filter(l => l !== fn);
+      if (_msgListeners) {
+        _msgListeners = _msgListeners.filter(l => l !== fn);
+      }
     });
 
     // Simulate the cancel pattern used in executeScheduledTask when startAgent throws
@@ -1690,8 +1699,8 @@ describe('initScheduler — past nextRunAt with recurrence recomputes', () => {
     const isolatedStorage = {};
 
     chrome.storage.local.get.mockImplementation(async (keys) => {
-      const key = Array.isArray(keys) ? keys[0] : keys;
-      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+      const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
+      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
       return { [key]: isolatedStorage[key] !== undefined ? isolatedStorage[key] : defaultVal };
     });
     chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(isolatedStorage, obj));
@@ -1775,11 +1784,11 @@ describe('loadResults — error handling', () => {
     // Make storage.get reject when fetching results
     const originalGet = chrome.storage.local.get;
     chrome.storage.local.get = jest.fn(async (keys) => {
-      const key = Array.isArray(keys) ? keys[0] : keys;
+      const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
       if (key === 'sentinel_schedule_results') {
         throw new Error('Results storage corrupted');
       }
-      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
+      const defaultVal = typeof keys === 'object' && !Array.isArray(keys) && key ? keys[key] : undefined;
       return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
     });
 

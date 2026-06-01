@@ -955,6 +955,7 @@ describe('_waitForAdaptedGoalDecision', () => {
     await new Promise(r => setTimeout(r, 10));
 
     // Find the requestId from the sent message
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     expect(sentMsg.action).toBe('adapted_goal_available');
     expect(sentMsg.mode).toBe('approval');
@@ -983,6 +984,7 @@ describe('_waitForAdaptedGoalDecision', () => {
     const promise = _waitForAdaptedGoalDecision(rewriteResult, 1);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'adapted_goal_response',
@@ -1007,6 +1009,7 @@ describe('_waitForAdaptedGoalDecision', () => {
     const promise = _waitForAdaptedGoalDecision(rewriteResult, 1);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'adapted_goal_response',
@@ -1050,6 +1053,7 @@ describe('_waitForModeMismatchDecision', () => {
     const promise = _waitForModeMismatchDecision(info);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     expect(sentMsg.action).toBe('mode_mismatch_pause');
 
@@ -1071,6 +1075,7 @@ describe('_waitForModeMismatchDecision', () => {
     const promise = _waitForModeMismatchDecision(info);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'mode_mismatch_response',
@@ -1088,6 +1093,7 @@ describe('_waitForModeMismatchDecision', () => {
     const promise = _waitForModeMismatchDecision(info);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'mode_mismatch_response',
@@ -1181,6 +1187,7 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
     mockSendAgentActivity.mockClear();
 
     activityDone(1, 'step', 'Step', { extra: 'data', count: 5 });
+    expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
     const call = mockSendAgentActivity.mock.calls[0];
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('extra', 'data');
@@ -1193,6 +1200,7 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
     mockSendAgentActivity.mockClear();
 
     activityDone(2, 'test', 'Test');
+    expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
     const call = mockSendAgentActivity.mock.calls[0];
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('durationMs');
@@ -1235,6 +1243,7 @@ describe('history helpers', () => {
     historyPush({ step: 1, action: { type: 'navigate' }, result: 'loaded' });
     await persistHistory();
 
+    expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
     const setCall = chrome.storage.local.set.mock.calls[0];
     const stored = setCall[0].agent_history;
     expect(stored).toHaveLength(1);
@@ -1272,6 +1281,7 @@ describe('history helpers', () => {
     }
     await persistHistory();
 
+    expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
     const setCall = chrome.storage.local.set.mock.calls[0];
     const stored = setCall[0].agent_history;
     expect(stored.length).toBeLessThanOrEqual(40);
@@ -1294,6 +1304,7 @@ describe('history helpers', () => {
     historyPush({ step: 3, action: { type: 'navigate' }, result: 'c' });
 
     await persistHistory();
+    expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
     const setCall = chrome.storage.local.set.mock.calls[0];
     expect(setCall[0].agent_history).toHaveLength(3);
   });
@@ -1333,6 +1344,7 @@ describe('checkpoint helpers', () => {
 
   test('writeCheckpoint stores the checkpoint object', async () => {
     await writeCheckpoint(25);
+    expect(chrome.storage.session.set.mock.calls.length).toBeGreaterThan(0);
     const setCall = chrome.storage.session.set.mock.calls[0];
     const cp = setCall[0].agent_checkpoint;
     expect(cp.stepCount).toBe(25);
@@ -1350,6 +1362,7 @@ describe('requestApproval', () => {
     const promise = requestApproval(command, 3);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     expect(sentMsg.action).toBe('request_approval');
     expect(sentMsg.payload.description).toContain('Click');
@@ -1370,6 +1383,7 @@ describe('requestApproval', () => {
     const promise = requestApproval(command, 3);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'approval_response',
@@ -1388,6 +1402,7 @@ describe('requestApproval', () => {
     const promise = requestApproval(command, 5);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     simulateOnMessage({
       action: 'approval_response',
@@ -1410,6 +1425,7 @@ describe('requestApproval', () => {
     // Agent should be paused now, waiting for hard timeout at 5 min
     // The 60s timeout replaces the listener with a new one
     // Simulate approval from the replacement listener
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     simulateOnMessage({
       action: 'approval_response',
       requestId: chrome.runtime.sendMessage.mock.calls[0][0].requestId,
@@ -1440,6 +1456,7 @@ describe('requestApproval', () => {
     const promise = requestApproval(command, 1);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     expect(sentMsg.payload.description).toBe('Navigate to https://example.com');
     expect(sentMsg.payload.action).toBe('navigate');
@@ -1464,6 +1481,7 @@ describe('requestApproval', () => {
     const promise = requestApproval(command, 2);
     await new Promise(r => setTimeout(r, 10));
 
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0][0];
     expect(sentMsg.payload.ariaLabel).toBe('Submit Button');
     expect(sentMsg.payload.elementText).toBe('Click Me');
@@ -1484,7 +1502,9 @@ describe('requestApproval', () => {
 describe('tab group management', () => {
   beforeEach(async () => {
     // Clear tab group state so tests don't pollute each other
-    await detachAllSentinelTabs().catch(() => {});
+    await detachAllSentinelTabs().catch((error) => {
+      console.error('detachAllSentinelTabs failed in beforeEach:', error);
+    });
     resetAgentState();
   });
 
