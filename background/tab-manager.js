@@ -462,6 +462,7 @@ function installObservabilityEventHook() {
 export function readConsoleMessages(tabId, options) {
   const buf = consoleBuffers.get(tabId) || [];
   const limit = (options && Number(options.limit)) || 50;
+  if (!isFinite(limit) || limit < 0) return [];
   const filter = options && options.filter;
   let out = buf.slice();
   if (filter === 'error' || filter === 'errors') {
@@ -488,6 +489,7 @@ export function readNetworkRequests(tabId, options) {
   const buf = networkBuffers.get(tabId);
   if (!buf) return [];
   const limit = (options && Number(options.limit)) || 30;
+  if (!isFinite(limit) || limit < 0) return [];
   const filter = options && options.filter;
   const urlIncludes = options && options.url_includes;
   let arr = Array.from(buf.values());
