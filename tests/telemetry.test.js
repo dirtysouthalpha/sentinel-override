@@ -26,10 +26,22 @@ globalThis.chrome = {
         if (typeof callback === 'function') callback(result);
         return result;
       }),
-      set: jest.fn(async (obj) => Object.assign(storageData, obj)),
+      set: jest.fn(async (obj) => {
+        Object.assign(storageData, obj);
+        if (listeners.storageChanged) {
+          const changes = {};
+          for (const k in obj) changes[k] = { newValue: obj[k] };
+          listeners.storageChanged(changes, 'local');
+        }
+      }),
       remove: jest.fn(async (keys) => {
         const toRemove = Array.isArray(keys) ? keys : [keys];
         for (const k of toRemove) delete storageData[k];
+        if (listeners.storageChanged) {
+          const changes = {};
+          for (const k of toRemove) changes[k] = { newValue: undefined };
+          listeners.storageChanged(changes, 'local');
+        }
       }),
     },
     onChanged: {
@@ -53,6 +65,7 @@ const {
   listPersistedRuns,
   loadPersistedRun,
   deletePersistedRun,
+  _resetCacheForTesting
 } = await import('../background/telemetry.js');
 
 // Capture the loadLevel IIFE's init callback before clearAllMocks wipes the call history.
@@ -409,6 +422,7 @@ describe('persistence flow', () => {
   });
 
   test('startRun evicts old runs beyond MAX_PERSISTED_RUNS', async () => {
+    _resetCacheForTesting();
     listeners.storageChanged({ telemetryPersist: { newValue: true } }, 'local');
 
     // Pre-populate with 5 runs
@@ -459,6 +473,7 @@ describe('persistence flow', () => {
   });
 
   test('deletePersistedRun removes from index and storage', async () => {
+    _resetCacheForTesting();
     storageData['telemetry_runs_index'] = [
       { runId: 'del-1', goal: 'g', startedAt: 0, finishedAt: null, count: 0 },
       { runId: 'del-2', goal: 'g', startedAt: 0, finishedAt: null, count: 0 },
@@ -627,6 +642,7 @@ describe('redaction error fallback', () => {
 
 describe('storage error paths', () => {
   test('listPersistedRuns returns [] when storage.get throws (line 278)', async () => {
+    _resetCacheForTesting();
     const origGet = globalThis.chrome.storage.local.get;
     globalThis.chrome.storage.local.get = jest.fn(async () => { throw new Error('storage broken'); });
     const runs = await listPersistedRuns();
