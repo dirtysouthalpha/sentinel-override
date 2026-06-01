@@ -42,6 +42,7 @@ import {
   callLLMWithRetry,
   getRelevantPatterns,
   resetLLMRateLimiter,
+  callLLMSimple,
 } from '../background/llm-client.js';
 
 import { PROVIDERS } from '../background/provider-registry.js';
@@ -2200,5 +2201,182 @@ describe('Bug #2 regression: generatePlan prose fallback', () => {
     // Verify response_format is not sent (would cause 400 on Z.AI)
     const body = JSON.parse(mockFn.mock.calls[0][1].body);
     expect(body.response_format).toBeUndefined();
+  });
+});
+
+// ========== callLLMSimple ==========
+describe('callLLMSimple', () => {
+  const openAiProvider = {
+    active_provider: 'openai',
+    providers: {
+      openai: {
+        api_key: 'sk-test123',
+        model: 'gpt-4o',
+        endpoint: 'https://api.openai.com/v1/chat/completions'
+      }
+    }
+  };
+
+  test('returns parsed text on success (OpenAI)', async () => {
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: 'Hello from the model' } }] })
+    });
+    const result = await callLLMSimple('system prompt', 'user prompt');
+    expect(result).toBe('Hello from the model');
+  });
+
+  test('returns parsed text on success (Anthropic)', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'sk-ant-test',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ content: [{ type: 'text', text: 'Anthropic response' }] })
+    });
+    const result = await callLLMSimple('sys', 'user');
+    expect(result).toBe('Anthropic response');
+  });
+
+  test('throws when API key is missing (empty storage → legacy fallback with no key)', async () => {
+    _storageData = {};
+    // getActiveProvider() always returns a provider — empty storage triggers legacy
+    // fallback with apiKey: '' which hits the "API key not configured" guard.
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('API key not configured');
+  });
+
+  test('throws when API key is missing (explicit empty key)', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: { api_key: '', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions' }
+      }
+    };
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('API key not configured');
+  });
+
+  test('throws when API returns non-ok status', async () => {
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => Promise.resolve({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve('Unauthorized')
+    });
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('API Error 401');
+  });
+
+  test('throws when API response body is null', async () => {
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(null)
+    });
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('null response body');
+  });
+
+  test('throws "Empty response from API" when Anthropic returns empty text block', async () => {
+    // Anthropic parseResponse returns block.text; '' is falsy so callLLMSimple
+    // throws its own "Empty response" guard (not the provider's error).
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'sk-ant-test',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ content: [{ type: 'text', text: '' }] })
+    });
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('Empty response from API');
+  });
+
+  test('throws provider error when OpenAI returns null content', async () => {
+    // OpenAI parseResponse throws "API returned null content" before callLLMSimple
+    // can check for empty text — the provider error propagates as-is.
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: null } }] })
+    });
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('API returned null content');
+  });
+
+  test('converts AbortError to timeout message', async () => {
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => {
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      return Promise.reject(err);
+    };
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('timed out after 30s');
+  });
+
+  test('re-throws non-abort errors as-is', async () => {
+    _storageData = { ...openAiProvider };
+    _mockFetch = () => Promise.reject(new Error('Network failure'));
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('Network failure');
+  });
+
+  test('passes maxTokens parameter to provider buildBody', async () => {
+    _storageData = { ...openAiProvider };
+    const mockFn = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: 'ok' } }] })
+    }));
+    _mockFetch = mockFn;
+    await callLLMSimple('sys', 'user', 500);
+    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    expect(body.max_tokens).toBe(500);
+  });
+
+  test('uses default maxTokens of 1200 when not provided', async () => {
+    _storageData = { ...openAiProvider };
+    const mockFn = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: 'ok' } }] })
+    }));
+    _mockFetch = mockFn;
+    await callLLMSimple('sys', 'user');
+    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    expect(body.max_tokens).toBe(1200);
+  });
+
+  test('passes system and user prompts to the API correctly', async () => {
+    _storageData = { ...openAiProvider };
+    const mockFn = jest.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: 'done' } }] })
+    }));
+    _mockFetch = mockFn;
+    await callLLMSimple('my system prompt', 'my user prompt');
+    const body = JSON.parse(mockFn.mock.calls[0][1].body);
+    const msgs = body.messages;
+    expect(msgs.some(m => m.role === 'system' && m.content === 'my system prompt')).toBe(true);
+    expect(msgs.some(m => m.role === 'user' && m.content === 'my user prompt')).toBe(true);
+  });
+
+  test('includes error text in API error message (truncated to 200 chars)', async () => {
+    _storageData = { ...openAiProvider };
+    const longError = 'x'.repeat(300);
+    _mockFetch = () => Promise.resolve({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve(longError)
+    });
+    const err = await callLLMSimple('sys', 'user').catch(e => e);
+    expect(err.message).toContain('API Error 500');
+    expect(err.message.length).toBeLessThan(220);
   });
 });
