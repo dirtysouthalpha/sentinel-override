@@ -254,7 +254,7 @@ describe('suggestRetryActions', () => {
       score: 15,
       band: 'low',
       breakdown: {
-        failure: { points: 2, max: 40, rate: 0.9, streakPenalty: 10 },
+        failure: { points: 2, max: 40, rate: 0.9, streakPenalty: 10, consecutiveFailureMax: 4 },
         productivity: { points: 2, max: 20, rate: 0.1 },
         recovery: { points: 15, max: 15, rate: 1, fires: 0, successes: 0 },
         plan: { points: 10, max: 10, rate: 1, planLength: 0, planCompleted: 0 },
@@ -393,7 +393,7 @@ describe('suggestRetryActions', () => {
       score: 5,
       band: 'low',
       breakdown: {
-        failure: { points: 2, max: 40, rate: 0.9, streakPenalty: 10 },
+        failure: { points: 2, max: 40, rate: 0.9, streakPenalty: 10, consecutiveFailureMax: 4 },
         productivity: { points: 2, max: 20, rate: 0.1 },
         recovery: { points: 2, max: 15, rate: 0.1, fires: 5, successes: 1 },
         plan: { points: 2, max: 10, rate: 0.2, planLength: 10, planCompleted: 2 },

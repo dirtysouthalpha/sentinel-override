@@ -113,7 +113,7 @@ export function computeTrustScore(m) {
   const safetyPenalty = Math.min(5, safetyBlocks * 2);
 
   const breakdown = {
-    failure: { points: round(failurePts), max: 40, rate: round(failureRate, 3), streakPenalty: round(streakPenalty) },
+    failure: { points: round(failurePts), max: 40, rate: round(failureRate, 3), streakPenalty: round(streakPenalty), consecutiveFailureMax },
     productivity: { points: round(productivityPts), max: 20, rate: round(productivityRate, 3) },
     recovery: { points: round(recoveryPts), max: 15, rate: round(recoveryRate, 3), fires: totalSkillFires, successes: totalSkillSuccesses },
     plan: { points: round(planPts), max: 10, rate: round(planRate, 3), planLength, planCompleted },
@@ -221,8 +221,8 @@ export function suggestRetryActions(scoreResult) {
   const safetyBlocks = (bd.safety && bd.safety.blocks) || 0;
 
   if (failureGap > 0.4) {
-    const streak = bd.failure && bd.failure.streakPenalty ? bd.failure.streakPenalty : 0;
-    const streakNote = streak > 0 ? ' with a ' + Math.ceil(streak / 5 + 2) + '+ failure streak' : '';
+    const streakLen = (bd.failure && bd.failure.consecutiveFailureMax) || 0;
+    const streakNote = streakLen > 2 ? ' with a ' + streakLen + '+ failure streak' : '';
     suggestions.push({
       id: 'retry-approval-mode',
       label: 'Re-run with approval mode',
