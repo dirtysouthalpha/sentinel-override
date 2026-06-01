@@ -40,17 +40,39 @@ export function extractParameters(goalText) {
 
 // ========== Storage Helpers ==========
 
+let templatesCache = null;
+
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes[STORAGE_KEY]) {
+      templatesCache = changes[STORAGE_KEY].newValue || null;
+    }
+  });
+}
+
 /**
  * Read the full templates object from chrome.storage.local.
  * @returns {Promise<Object<string, object>>}
  */
 export async function loadTemplates() {
+  if (templatesCache !== null) {
+    return templatesCache;
+  }
   try {
     const result = await chrome.storage.local.get([STORAGE_KEY]);
-    return result[STORAGE_KEY] || {};
+    templatesCache = result[STORAGE_KEY] || {};
+    return templatesCache;
   } catch {
     return {};
   }
+}
+
+/**
+ * Clear the internal template cache (used for testing).
+ * @internal
+ */
+export function _clearCacheForTesting() {
+  templatesCache = null;
 }
 
 /**
