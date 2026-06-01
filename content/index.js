@@ -222,8 +222,8 @@ if (window.__sentinelInitialized) {
           const _style = window.getComputedStyle(_cand);
           if (_style.display === 'none' || _style.visibility === 'hidden') continue;
           if (_style.position !== 'fixed' && _style.position !== 'absolute') continue;
-          const _zi = parseInt(_style.zIndex) || 0;
-          if (_zi < 100 && _style.position !== 'fixed') continue;
+          const _zi = parseInt(_style.zIndex);
+          if (isNaN(_zi) || (_zi < 100 && _style.position !== 'fixed')) continue;
           // Find buttons and clickable elements inside this overlay
           const _btns = _cand.querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"], span[class*="btn"], div[class*="btn"], input[type="button"], input[type="submit"]');
           for (const _btn of _btns) {
@@ -265,7 +265,8 @@ if (window.__sentinelInitialized) {
         if (el.querySelector && el.querySelector('main')) continue;
 
         const style = window.getComputedStyle(el);
-        if (style.position !== 'fixed' || (parseInt(style.zIndex) || 0) <= 1000) continue;
+        const zi = parseInt(style.zIndex);
+        if (style.position !== 'fixed' || isNaN(zi) || zi <= 1000) continue;
 
         const rect = el.getBoundingClientRect();
         const viewportArea = window.innerWidth * window.innerHeight;
