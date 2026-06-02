@@ -560,7 +560,7 @@ describe('sendAgentStatus', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendAgentStatus('observing', 'Reading page...');
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
-    const call = chrome.runtime.sendMessage.mock.calls[0][0];
+    const call = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(call.timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
 
