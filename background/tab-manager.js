@@ -611,7 +611,7 @@ async function ensureDebuggerAttached(tabId) {
       }).catch((e) => {
         console.error('[wasUserDetached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       });
-    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', (typeof _e.message === 'string' ? _e.message : String(_e))); }
+    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
   }
 }
 
@@ -645,7 +645,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           action: 'cdp_pre_click_visual',
           x: Number(x) || 0,
           y: Number(y) || 0,
-          description: options.description || ('Clicking at (' + Math.round(Number(x) || 0) + ', ' + Math.round(Number(y) || 0) + ')')
+          description: (typeof options.description === 'string' ? options.description : ('Clicking at (' + Math.round(Number(x) || 0) + ', ' + Math.round(Number(y) || 0) + ')'))
         });
       } catch (_e) { /* content script may not be ready on first frame */ }
       // Brief pause so the user sees the cursor arrive + element light up
@@ -951,11 +951,14 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {
-          if (chrome.runtime.lastError) reject(new Error((typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Screenshot capture failed'));
+          if (chrome.runtime.lastError) {
+            const err = typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError);
+            reject(new Error(err || 'Screenshot capture failed'));
+          }
           else resolve(dataUrl);
         });
       });
-      const _parts = screenshot_data_url ? screenshot_data_url.split(',') : [];
+      const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
       if (_parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
