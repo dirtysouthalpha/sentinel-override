@@ -1087,14 +1087,14 @@ describe('agent-engine — tenant lockdown reference tests', () => {
 
   function shouldLockoutRef(command, url, detected, expected) {
     if (!command || !MODIFYING_ACTIONS.has(command.type)) return null;
-    if (!expected || !expected.trim()) return null;
+    if (!expected || typeof expected !== 'string' || !expected.trim()) return null;
     let host;
     try { host = new URL(url).hostname; } catch { return null; }
     if (!host || !TENANT_LOCKED_HOSTS_RE.test(host)) return null;
     // Simplified match check
     if (detected && expected) {
       const exp = expected.trim().toLowerCase();
-      const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => s.toLowerCase());
+      const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
       if (signals.some(s => s && (s.includes(exp) || exp.includes(s)))) return null;
     }
     return { expected, detected: detected || '(none)', host, actionType: command.type };
