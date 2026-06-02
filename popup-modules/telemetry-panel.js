@@ -313,8 +313,8 @@
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
-          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); });
-        } catch (clipboardErr) { console.warn('[Sentinel] clipboard API may be restricted:', (typeof clipboardErr === 'object' && clipboardErr !== null && 'message' in clipboardErr && typeof clipboardErr.message === 'string' ? clipboardErr.message : String(clipboardErr))); }
+          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); });
+        } catch (clipboardErr) { console.warn('[Sentinel] clipboard API may be restricted:', (typeof clipboardErr === 'object' && clipboardErr !== null && typeof clipboardErr.message === 'string' ? clipboardErr.message : String(clipboardErr))); }
       });
     }
     const clearBtn = document.getElementById('telemClearBtn');
