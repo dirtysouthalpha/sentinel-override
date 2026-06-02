@@ -911,7 +911,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       const { runLogId: reqRunId, estimatedCostUsd } = request.params || {};
       const runId = reqRunId || (await chrome.storage.local.get('run_log_index').then(r => {
         const idx = (r.run_log_index || []);
-        return idx.length > 0 ? idx[0].runLogId : null;
+        return idx.length > 0 && idx[0] ? idx[0].runLogId : null;
       }).catch(() => null));
       if (!runId) throw new Error('No run log available to export');
       const logData = await chrome.storage.local.get('run_log_' + runId).then(r => r['run_log_' + runId]).catch(() => null);

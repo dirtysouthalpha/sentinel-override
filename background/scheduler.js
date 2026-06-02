@@ -36,7 +36,7 @@ export function onAgentComplete(callback) {
 function _fireAgentCompleteCallbacks() {
   const cbs = agentCompleteCallbacks.slice();
   agentCompleteCallbacks = [];
-  cbs.forEach(cb => { try { cb(); } catch (e) { console.error('Agent complete callback error:', (e && e.message) || String(e)); } });
+  cbs.forEach(cb => { if (cb) { try { cb(); } catch (e) { console.error('Agent complete callback error:', (e && e.message) || String(e)); } } });
 }
 
 // ========== Storage Helpers ==========
@@ -173,7 +173,7 @@ function computeNextRun(recurrence) {
     return candidate.getTime();
   }
 
-  if (recurrence.interval === 'weekly' && recurrence.daysOfWeek && recurrence.daysOfWeek.length > 0) {
+  if (recurrence.interval === 'weekly' && recurrence.daysOfWeek && Array.isArray(recurrence.daysOfWeek) && recurrence.daysOfWeek.length > 0) {
     const daysAhead = _computeWeeklyDaysAhead(recurrence.daysOfWeek, now.getDay(), candidate.getTime(), now.getTime());
     candidate.setDate(candidate.getDate() + daysAhead);
     return candidate.getTime();
