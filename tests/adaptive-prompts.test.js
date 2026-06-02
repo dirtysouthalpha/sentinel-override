@@ -480,7 +480,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
       { name: 'Brandon Goolsby', company: 'Premier Networx', phone: '706-426-6313', email: 'support@test.com' }
     );
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[0].content).toContain('Brandon Goolsby');
     expect(body.messages[0].content).toContain('Premier Networx');
     expect(body.messages[0].content).toContain('706-426-6313');
@@ -504,7 +504,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('MENU MISMATCHES');
     expect(body.messages[1].content).toContain('Manage > Firewall');
     expect(body.messages[1].content).toContain('Security > Firewall');
@@ -529,7 +529,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('NAVIGATION SIGNALS');
     expect(body.messages[1].content).toContain('Dashboard');
   });
@@ -553,7 +553,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('KNOWN SUB-PAGES');
     expect(body.messages[1].content).toContain('Main overview page');
   });
@@ -579,7 +579,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('WORKFLOW SCAFFOLD');
     expect(body.messages[1].content).toContain('Phase 1: Navigate to Firewall');
   });
@@ -605,7 +605,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).not.toContain('WORKFLOW SCAFFOLD');
   });
 
@@ -626,7 +626,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('PRE-FLIGHT');
     expect(body.messages[1].content).toContain('Phase 0: Select the target device');
   });
@@ -648,7 +648,7 @@ describe.skip('rewriteGoalForPlatform — expansion modes', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com', {}, 'light');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[0].content).toContain('EXPANSION: LIGHT');
   });
 
@@ -665,7 +665,7 @@ describe.skip('rewriteGoalForPlatform — expansion modes', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com', {}, 'full');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[0].content).toContain('EXPANSION: FULL');
   });
 
@@ -775,7 +775,7 @@ describe.skip('rewriteGoalForPlatform — anthropic provider', () => {
     const longGoal = 'Investigate the firewall configuration on the network appliance and generate a comprehensive compliance report covering all security policies, NAT rules, VPN tunnels, and access control lists with detailed findings for each section';
     await rewriteGoalForPlatform(longGoal, 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     // Complex goals (>200 chars) with thinking-capable provider should use thinking
     expect(body.thinking).toBeDefined();
     expect(body.thinking.type).toBe('enabled');
@@ -824,7 +824,7 @@ describe.skip('rewriteGoalForPlatform — edge cases', () => {
     const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
     expect(result.adapted).toBe(true);
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[1].content).toContain('Valid: valid hint');
   });
 
@@ -877,7 +877,7 @@ describe.skip('rewriteGoalForPlatform — edge cases', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
     expect(body.messages[0].content).toContain('EXPANSION: LIGHT');
   });
 });
