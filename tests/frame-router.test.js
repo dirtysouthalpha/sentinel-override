@@ -346,7 +346,7 @@ describe('executeInFrame', () => {
 
     const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
     expect(secondCall).toBeDefined();
-    expect(secondCall.args[0]).toEqual(cmd);
+    expect(secondCall.args?.[0]).toEqual(cmd);
   });
 
   test('scripting error includes original error message', async () => {

@@ -453,7 +453,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    const [url, opts] = globalThis.fetch.mock.calls[0];
+    const [url, opts] = globalThis.fetch.mock.calls[0] || [];
     expect(url).toBe('https://api.test.com/v1/chat/completions');
     const body = JSON.parse(opts.body);
     // System prompt should contain rewriter instructions
@@ -756,7 +756,7 @@ describe.skip('rewriteGoalForPlatform — anthropic provider', () => {
     const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
     expect(result.adapted).toBe(true);
 
-    const [url, opts] = globalThis.fetch.mock.calls[0];
+    const [url, opts] = globalThis.fetch.mock.calls[0] || [];
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     expect(opts.headers['x-api-key']).toBe('ant-key');
   });
