@@ -2386,32 +2386,41 @@ function showModeMismatchCard(payload) {
     } catch { /* message may fail if background not ready */ }
   };
 
-  document.getElementById('modeMismatchFlipBtn').addEventListener('click', () => {
-    const wantsApproval = (goalWants === 'approval');
-    // Write the new setting from the popup side so updateApprovalModeUI and
-    // the toggle reflect it without needing a separate broadcast.
-    chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
-      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', String(chrome.runtime.lastError)); return; }
-      try {
-        if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
-          approvalModeToggle.checked = wantsApproval;
-        }
-        if (typeof updateApprovalModeUI === 'function') {
-          updateApprovalModeUI(wantsApproval);
-        }
-      } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
-      sendResponse({ flip: true });
+  const modeMismatchFlipBtn = document.getElementById('modeMismatchFlipBtn');
+  if (modeMismatchFlipBtn) {
+    modeMismatchFlipBtn.addEventListener('click', () => {
+      const wantsApproval = (goalWants === 'approval');
+      // Write the new setting from the popup side so updateApprovalModeUI and
+      // the toggle reflect it without needing a separate broadcast.
+      chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
+        if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', String(chrome.runtime.lastError)); return; }
+        try {
+          if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
+            approvalModeToggle.checked = wantsApproval;
+          }
+          if (typeof updateApprovalModeUI === 'function') {
+            updateApprovalModeUI(wantsApproval);
+          }
+        } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
+        sendResponse({ flip: true });
+        card.remove();
+      });
+    });
+  }
+  const modeMismatchContinueBtn = document.getElementById('modeMismatchContinueBtn');
+  if (modeMismatchContinueBtn) {
+    modeMismatchContinueBtn.addEventListener('click', () => {
+      sendResponse({ continue: true });
       card.remove();
     });
-  });
-  document.getElementById('modeMismatchContinueBtn').addEventListener('click', () => {
-    sendResponse({ continue: true });
-    card.remove();
-  });
-  document.getElementById('modeMismatchCancelBtn').addEventListener('click', () => {
-    sendResponse({ cancel: true });
-    card.remove();
-  });
+  }
+  const modeMismatchCancelBtn = document.getElementById('modeMismatchCancelBtn');
+  if (modeMismatchCancelBtn) {
+    modeMismatchCancelBtn.addEventListener('click', () => {
+      sendResponse({ cancel: true });
+      card.remove();
+    });
+  }
 }
 
 // ========== Adapted Goal Card (3.15.0) ==========
@@ -2515,41 +2524,56 @@ function showAdaptedGoalCard(payload) {
         }, payload)).catch(() => {});
       } catch { /* message may fail if background not ready */ }
     };
-    document.getElementById('adaptedGoalAcceptBtn').addEventListener('click', () => {
-      sendResponse({ approved: true });
-      card.remove();
-    });
-    document.getElementById('adaptedGoalOriginalBtn').addEventListener('click', () => {
-      sendResponse({ useOriginal: true });
-      card.remove();
-    });
-    document.getElementById('adaptedGoalEditBtn').addEventListener('click', () => {
-      // Replace the pre with a textarea, replace the buttons with Save/Cancel.
-      const textEl = document.getElementById('adaptedGoalText');
-      if (!textEl || !textEl.parentElement) return;
-      const ta = document.createElement('textarea');
-      ta.value = adaptedGoal;
-      ta.style.cssText = 'width: 100%; min-height: 200px; font-family: inherit; font-size: 11px; line-height: 1.45; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--accent-primary, #ff6b00); border-radius: 6px; color: var(--text-primary); box-sizing: border-box; resize: vertical;';
-      textEl.parentElement.replaceChild(ta, textEl);
-      const actions = card.querySelector('.safety-banner-actions');
-      if (actions) {
-        actions.innerHTML = `
-          <button class="safety-banner-dismiss" id="adaptedGoalSaveEditBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Save & Run</button>
-          <button class="safety-banner-dismiss" id="adaptedGoalCancelEditBtn" style="margin-left: 6px;">Cancel</button>
-        `;
-        document.getElementById('adaptedGoalSaveEditBtn').addEventListener('click', () => {
-          sendResponse({ edited: true, editedGoal: ta.value });
-          card.remove();
-        });
-        document.getElementById('adaptedGoalCancelEditBtn').addEventListener('click', () => {
-          // Restore the buttons to their original state by removing the card
-          // and re-rendering — simplest path that keeps the original adapted
-          // text intact for a second look.
-          card.remove();
-          showAdaptedGoalCard(payload);
-        });
-      }
-    });
+    const adaptedGoalAcceptBtn = document.getElementById('adaptedGoalAcceptBtn');
+    if (adaptedGoalAcceptBtn) {
+      adaptedGoalAcceptBtn.addEventListener('click', () => {
+        sendResponse({ approved: true });
+        card.remove();
+      });
+    }
+    const adaptedGoalOriginalBtn = document.getElementById('adaptedGoalOriginalBtn');
+    if (adaptedGoalOriginalBtn) {
+      adaptedGoalOriginalBtn.addEventListener('click', () => {
+        sendResponse({ useOriginal: true });
+        card.remove();
+      });
+    }
+    const adaptedGoalEditBtn = document.getElementById('adaptedGoalEditBtn');
+    if (adaptedGoalEditBtn) {
+      adaptedGoalEditBtn.addEventListener('click', () => {
+        // Replace the pre with a textarea, replace the buttons with Save/Cancel.
+        const textEl = document.getElementById('adaptedGoalText');
+        if (!textEl || !textEl.parentElement) return;
+        const ta = document.createElement('textarea');
+        ta.value = adaptedGoal;
+        ta.style.cssText = 'width: 100%; min-height: 200px; font-family: inherit; font-size: 11px; line-height: 1.45; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--accent-primary, #ff6b00); border-radius: 6px; color: var(--text-primary); box-sizing: border-box; resize: vertical;';
+        textEl.parentElement.replaceChild(ta, textEl);
+        const actions = card.querySelector('.safety-banner-actions');
+        if (actions) {
+          actions.innerHTML = `
+            <button class="safety-banner-dismiss" id="adaptedGoalSaveEditBtn" style="background: var(--accent-primary, #ff6b00); color: white; border-color: var(--accent-primary, #ff6b00);">Save & Run</button>
+            <button class="safety-banner-dismiss" id="adaptedGoalCancelEditBtn" style="margin-left: 6px;">Cancel</button>
+          `;
+          const adaptedGoalSaveEditBtn = document.getElementById('adaptedGoalSaveEditBtn');
+          if (adaptedGoalSaveEditBtn) {
+            adaptedGoalSaveEditBtn.addEventListener('click', () => {
+              sendResponse({ edited: true, editedGoal: ta.value });
+              card.remove();
+            });
+          }
+          const adaptedGoalCancelEditBtn = document.getElementById('adaptedGoalCancelEditBtn');
+          if (adaptedGoalCancelEditBtn) {
+            adaptedGoalCancelEditBtn.addEventListener('click', () => {
+              // Restore the buttons to their original state by removing the card
+              // and re-rendering — simplest path that keeps the original adapted
+              // text intact for a second look.
+              card.remove();
+              showAdaptedGoalCard(payload);
+            });
+          }
+        }
+      });
+    }
   }
 }
 
@@ -3038,24 +3062,30 @@ function showTenantOverrideCard(payload) {
   chatContainer.appendChild(card);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  document.getElementById('tenantOverrideApproveBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({
-      action: 'tenant_override_response',
-      requestId,
-      approved: true,
-      rejected: false
-    }).catch(() => {});
-    card.remove();
-  });
-  document.getElementById('tenantOverrideRejectBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({
-      action: 'tenant_override_response',
-      requestId,
-      approved: false,
-      rejected: true
-    }).catch(() => {});
-    card.remove();
-  });
+  const tenantOverrideApproveBtn = document.getElementById('tenantOverrideApproveBtn');
+  if (tenantOverrideApproveBtn) {
+    tenantOverrideApproveBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({
+        action: 'tenant_override_response',
+        requestId,
+        approved: true,
+        rejected: false
+      }).catch(() => {});
+      card.remove();
+    });
+  }
+  const tenantOverrideRejectBtn = document.getElementById('tenantOverrideRejectBtn');
+  if (tenantOverrideRejectBtn) {
+    tenantOverrideRejectBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({
+        action: 'tenant_override_response',
+        requestId,
+        approved: false,
+        rejected: true
+      }).catch(() => {});
+      card.remove();
+    });
+  }
 }
 
 
