@@ -1417,8 +1417,8 @@ function setupVoiceInput() {
       });
       showToast('Listening... speak now', 'success');
     } catch (err) {
-      console.error('Voice input error:', (err && err.message) || String(err));
-      showToast('Voice error: ' + ((err && err.message) || 'Unknown error'), 'error');
+      console.error('Voice input error:', (typeof err.message === 'string' ? err.message : String(err)));
+      showToast('Voice error: ' + (typeof err.message === 'string' ? err.message : 'Unknown error'), 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');
@@ -3648,7 +3648,7 @@ chrome.runtime.onMessage.addListener((message) => {
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
       } catch { /* trust-score render non-fatal */ }
     } catch (err) {
-      console.error('Error displaying completion message:', (err && err.message) || String(err));
+      console.error('Error displaying completion message:', (typeof err.message === 'string' ? err.message : String(err)));
     }
     resetUI();
   }

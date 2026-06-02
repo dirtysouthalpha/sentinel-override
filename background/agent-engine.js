@@ -775,11 +775,11 @@ export async function startAgent(goal, sender) {
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
   runAgentLoop(finalGoal, startTabId).catch(err => {
-    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', err && err.message);
+    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', (typeof err.message === 'string' ? err.message : String(err)));
     agentRunning = false;
     chrome.runtime.sendMessage({
       action: 'agent_finished',
-      summary: 'Agent crashed unexpectedly: ' + (err && err.message ? err.message : String(err))
+      summary: 'Agent crashed unexpectedly: ' + (typeof err.message === 'string' ? err.message : String(err))
     }).catch(() => {});
   });
   return 'Agent started in background';
@@ -5942,7 +5942,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         } catch (err) {
-          console.warn('[CDP] dispatch threw, falling back:', (err && err.message) || String(err));
+          console.warn('[CDP] dispatch threw, falling back:', (typeof err.message === 'string' ? err.message : String(err)));
         }
         if (!cdpDone) {
           // CDP path failed -- fall back to the synthetic content-script path.
@@ -6534,11 +6534,11 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('[Sentinel] Agent loop error:', err, err && err.message, err && err.stack);
-      sendSilentUpdate(`Loop error: ${err && err.message || String(err)}`, stepCount);
+      console.error('[Sentinel] Agent loop error:', err, (typeof err.message === 'string' ? err.message : String(err)), (typeof err.stack === 'string' ? err.stack : '[no stack]'));
+      sendSilentUpdate(`Loop error: ${typeof err.message === 'string' ? err.message : String(err)}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
-      if (err && err.message && err.message.includes('was closed')) {
+      if (typeof err.message === 'string' && err.message.includes('was closed')) {
         console.warn('[Sentinel] Tab was closed, attempting recovery...');
         // Try to find another tab or the same tab re-created
         try {
@@ -6631,7 +6631,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
-      console.error('[Sentinel/report] LLM report failed (fallback already saved):', err && err.message || String(err));
+      console.error('[Sentinel/report] LLM report failed (fallback already saved):', (typeof err.message === 'string' ? err.message : String(err)));
       agentReport = _fbReport;
     }
   } else {

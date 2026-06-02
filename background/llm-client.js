@@ -1145,7 +1145,7 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
   try {
     return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
   } catch (err) {
-    const msg = (err && err.message) || String(err);
+    const msg = (typeof err.message === 'string' ? err.message : String(err));
     const isRetryable = (msg.includes('429') || msg.includes('502') || msg.includes('503') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
       const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
@@ -2199,7 +2199,7 @@ export function parseLLMResponse(content) {
     if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;
   } catch (err) {
-    console.error('Failed to parse LLM response:', (err && err.message) || String(err), 'Content:', content);
+    console.error('Failed to parse LLM response:', (typeof err.message === 'string' ? err.message : String(err)), 'Content:', content);
     // (3.8.4) Two-tier salvage:
     //  1. Try sanitize-then-parse on the raw content (in case extractFirstJsonObject
     //     truncated something we needed).
@@ -2227,7 +2227,7 @@ export function parseLLMResponse(content) {
         }
       } catch (e) { console.warn('[Sentinel/llm] Parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
-    return { type: 'note', text: `Parse error (will retry): ${(err && err.message) || String(err)}` };
+    return { type: 'note', text: `Parse error (will retry): ${typeof err.message === 'string' ? err.message : String(err)}` };
   }
 }
 
