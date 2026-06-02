@@ -188,10 +188,12 @@ describe('page-monitor', () => {
 
       await toggleMonitor(monitor.id, false);
       let monitors = await loadMonitors();
+      expect(monitors.length).toBeGreaterThan(0);
       expect(monitors[0].active).toBe(false);
 
       await toggleMonitor(monitor.id, true);
       monitors = await loadMonitors();
+      expect(monitors.length).toBeGreaterThan(0);
       expect(monitors[0].active).toBe(true);
     });
 
@@ -246,6 +248,7 @@ describe('page-monitor', () => {
       expect(result.content).toBe('New content');
 
       const monitors = await loadMonitors();
+      expect(monitors.length).toBeGreaterThan(0);
       expect(monitors[0].lastContent).toBe('New content');
       expect(monitors[0].lastChangedAt).toBeDefined();
       expect(monitors[0].changeCount).toBe(1);
@@ -264,6 +267,7 @@ describe('page-monitor', () => {
       expect(result.content).toBe('Same content');
 
       const monitors = await loadMonitors();
+      expect(monitors.length).toBeGreaterThan(0);
       expect(monitors[0].changeCount).toBe(0);
     });
 
@@ -329,6 +333,7 @@ describe('page-monitor', () => {
       expect(result).toMatchObject({ changed: false, content: 'First content' });
 
       const monitors = await loadMonitors();
+      expect(monitors.length).toBeGreaterThan(0);
       expect(monitors[0].lastContent).toBe('First content');
       expect(monitors[0].changeCount).toBe(0);
     });

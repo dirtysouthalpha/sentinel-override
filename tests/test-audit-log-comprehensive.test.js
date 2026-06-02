@@ -97,6 +97,7 @@ describe('auditLogToCsv', () => {
     const log = [{ ts: Date.now(), step: 1, type: 'click', target: '#btn', outcome: 'ok' }];
     const result = auditLogToCsv(log);
     const lines = result.split('\r\n');
+    expect(lines.length).toBeGreaterThanOrEqual(2);
     const dataLine = lines[1];
     // Each field should be quoted
     expect(dataLine).toMatch(/^".*",".*",".*",".*",".*"$/);
@@ -129,6 +130,7 @@ describe('auditLogToCsv', () => {
     const result = auditLogToCsv(log);
     // step should be empty string
     const lines = result.split('\r\n');
+    expect(lines.length).toBeGreaterThanOrEqual(2);
     const dataLine = lines[1];
     const fields = dataLine.match(/"([^"]*)"/g);
     expect(fields[1]).toBe('""'); // step field
@@ -169,6 +171,7 @@ describe('auditLogToCsv', () => {
     const log = [{ ts: Date.now(), step: 1, type: 'click', target: 'button, submit', outcome: 'ok' }];
     const result = auditLogToCsv(log);
     const lines = result.split('\r\n');
+    expect(lines.length).toBeGreaterThanOrEqual(2);
     // The comma should be inside quotes, so we still have 5 fields
     const fields = lines[1].match(/"[^"]*"/g);
     expect(fields).toHaveLength(5);
