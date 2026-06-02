@@ -435,7 +435,7 @@ function installObservabilityEventHook() {
           });
         } else if (method === 'Runtime.exceptionThrown' && params && params.exceptionDetails) {
           const ex = params.exceptionDetails;
-          const txt = (ex.exception && (ex.exception.description || ex.exception.value)) || ex.text || 'exception';
+          const txt = ((ex.exception && typeof ex.exception === 'object') && (ex.exception.description || ex.exception.value)) || ex.text || 'exception';
           pushConsoleEntry(tabId, {
             level: 'error',
             text: (typeof txt === 'string' ? txt : '').substring(0, 1000),
@@ -876,7 +876,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
     });
     if (result && result.exceptionDetails) {
       const ex = result.exceptionDetails;
-      const msg = (ex.exception && (ex.exception.description || ex.exception.value)) || ex.text || 'Runtime exception';
+      const msg = ((ex.exception && typeof ex.exception === 'object') && (ex.exception.description || ex.exception.value)) || ex.text || 'Runtime exception';
       return { ok: false, error: typeof msg === 'string' ? msg.slice(0, 500) : String(msg) };
     }
     const value = result && result.result ? result.result.value : undefined;

@@ -775,11 +775,11 @@ export async function startAgent(goal, sender) {
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
   runAgentLoop(finalGoal, startTabId).catch(err => {
-    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', (typeof err.message === 'string' ? err.message : String(err)));
+    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)));
     agentRunning = false;
     chrome.runtime.sendMessage({
       action: 'agent_finished',
-      summary: 'Agent crashed unexpectedly: ' + (typeof err.message === 'string' ? err.message : String(err))
+      summary: 'Agent crashed unexpectedly: ' + (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err))
     }).catch(() => {});
   });
   return 'Agent started in background';
@@ -3753,7 +3753,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Page narration failed non-fatally
           }
         } catch (err) {
-          const errMsg = (typeof err.message === 'string') ? err.message : String(err);
+          const errMsg = (typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err);
           activityFail(stepCount, 'observe', 'Page read failed: ' + errMsg, null);
           sendSilentUpdate(`Error reading page: ${errMsg}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection
@@ -6548,10 +6548,10 @@ async function runAgentLoop(goal, workingTabId) {
 
     } catch (err) {
       console.error('[Sentinel] Agent loop error:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)), (typeof err.stack === 'string' ? err.stack : '[no stack]'));
-      sendSilentUpdate(`Loop error: ${typeof err.message === 'string' ? err.message : String(err)}`, stepCount);
+      sendSilentUpdate(`Loop error: ${typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
-      if (typeof err.message === 'string' && err.message.includes('was closed')) {
+      if (typeof err === 'object' && err !== null && typeof err.message === 'string' && err.message.includes('was closed')) {
         console.warn('[Sentinel] Tab was closed, attempting recovery...');
         // Try to find another tab or the same tab re-created
         try {
@@ -6644,7 +6644,7 @@ async function runAgentLoop(goal, workingTabId) {
       sendReportUpdate('ready', agentReport);
       await chrome.storage.local.set({ last_agent_report: agentReport });
     } catch (err) {
-      console.error('[Sentinel/report] LLM report failed (fallback already saved):', (typeof err.message === 'string' ? err.message : String(err)));
+      console.error('[Sentinel/report] LLM report failed (fallback already saved):', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)));
       agentReport = _fbReport;
     }
   } else {

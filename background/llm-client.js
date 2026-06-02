@@ -850,7 +850,7 @@ function _buildPlanPrompt(goal, context) {
     : '';
   const platformContext = context.platformContext || '';
   const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length > 0
-    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(', ') : '(no steps)'}` : '').join('\n')}\n`
+    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal && typeof p === 'object' ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && typeof s === 'object' && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
   return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
@@ -967,12 +967,12 @@ export async function generatePlan(goal, settings, context = {}) {
         const strs = parsed.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
         if (strs.length > 0) return strs;
       }
-      if (Array.isArray(parsed.plan) && parsed.plan.length > 0) {
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.plan) && parsed.plan.length > 0) {
         const strs = parsed.plan.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
         if (strs.length > 0) return strs;
       }
       // Some models return { "steps": [...] } instead of { "plan": [...] }
-      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
         const strs = parsed.steps.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
         if (strs.length > 0) return strs;
       }
@@ -1340,7 +1340,7 @@ function _buildTabCtx() {
   for (const ctx of allContexts) {
     const isActive = ctx.tabId === activeId;
     const marker = isActive ? '[ACTIVE] ' : '';
-    const snapSummary = ctx.snapshot
+    const snapSummary = ctx.snapshot && typeof ctx.snapshot === 'object'
       ? `Last seen: "${(ctx.snapshot.pageContent || '').substring(0, 300)}..." (${(() => {
           const ts = ctx.snapshot.timestamp;
           if (!ts) return 'No timestamp';
@@ -1757,7 +1757,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   // observation cycle so silent failures (click registered but modal didn't
   // close, form filled but hidden validation rejected) get caught.
   const _pv = (agentState && agentState.pendingVerification) || null;
-  const verificationCtx = (_pv && _pv.type)
+  const verificationCtx = (_pv && _pv.type && typeof _pv === 'object')
     ? `\n## VERIFY YOUR LAST ACTION FIRST\nYour previous step was: **${_pv.type}** -> "${(_pv.description || '').replace(/"/g, '\\"').substring(0, 100)}".\n\nBefore proposing the next command, examine the current screenshot and confirm the action took effect. Look for evidence:\n- Click on a button -> Did the modal close? Did the page navigate? Did a success message appear?\n- Type in a field -> Does the field now contain the typed text?\n- Select a dropdown -> Did the selected value update?\n- Check / check_all -> Are the checkboxes now in the expected state?\n- press_key (Enter/Tab/etc.) -> Did the form submit / focus advance / dropdown open?\n\nIf the page state confirms the action took effect: proceed with the next planned step.\n\nIf the page does NOT reflect the action (button still highlighted, modal still open, field still empty, no navigation): treat the step as failed. Do NOT proceed as if it succeeded. Choose ONE recovery:\n1. Retry the same action with a different selector (often the click missed or hit a wrapper element).\n2. wait 1500ms, then re-observe -- some SPAs commit asynchronously.\n3. scroll_to the element first, then retry.\n4. Use execute_js to trigger the action programmatically (.click(), dispatchEvent('click'), HTMLElement.value setter + 'input' event).\n\nThis verification is mandatory -- never skip past a destructive action without confirming it landed.\n`
     : '';
 
