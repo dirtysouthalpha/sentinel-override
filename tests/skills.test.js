@@ -303,7 +303,7 @@ describe('cspBlocked', () => {
 
   test('promptInjection tells agent not to retry execute_js', () => {
     const text = cspBlocked.promptInjection({ lastCommand: { key: 'x' } });
-    expect(text.toLowerCase()).toContain('do not');
+    expect(typeof text === 'string' && text.toLowerCase()).toContain('do not');
   });
 });
 
