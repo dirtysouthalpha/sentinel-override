@@ -115,7 +115,7 @@ async function _checkDomReadyState(tabId) {
  * @returns {Promise<void>}
  */
 export async function waitForPageReady(tabId, maxWaitMs = 5000) {
-  const cap = Math.min(maxWaitMs, pageLoadConfig.pageLoadTimeout);
+  const cap = Math.min(Math.max(0, Number(maxWaitMs) || 5000), pageLoadConfig.pageLoadTimeout);
   const startTime = Date.now();
   const pollInterval = 200;
   const networkIdleMs = 500;
@@ -467,9 +467,9 @@ function installObservabilityEventHook() {
  */
 export function readConsoleMessages(tabId, options) {
   const buf = consoleBuffers.get(tabId) || [];
-  const limit = (options && Number(options.limit)) || 50;
+  const limit = (options && typeof options === 'object' && Number(options.limit)) || 50;
   if (!isFinite(limit) || limit < 0) return [];
-  const filter = options && options.filter;
+  const filter = options && typeof options === 'object' ? options.filter : undefined;
   let out = buf.slice();
   if (filter === 'error' || filter === 'errors') {
     out = out.filter(e => /error|severe|critical/i.test(e.level));
@@ -494,10 +494,10 @@ export function readConsoleMessages(tabId, options) {
 export function readNetworkRequests(tabId, options) {
   const buf = networkBuffers.get(tabId);
   if (!buf) return [];
-  const limit = (options && Number(options.limit)) || 30;
+  const limit = (options && typeof options === 'object' && Number(options.limit)) || 30;
   if (!isFinite(limit) || limit < 0) return [];
-  const filter = options && options.filter;
-  const urlIncludes = options && options.url_includes;
+  const filter = options && typeof options === 'object' ? options.filter : undefined;
+  const urlIncludes = options && typeof options === 'object' ? options.url_includes : undefined;
   let arr = Array.from(buf.values());
   if (filter === 'failed') {
     arr = arr.filter(e => e.failed || (e.status >= 400));

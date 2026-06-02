@@ -1420,8 +1420,8 @@ function setupVoiceInput() {
       });
       showToast('Listening... speak now', 'success');
     } catch (err) {
-      console.error('Voice input error:', (typeof err.message === 'string' ? err.message : String(err)));
-      showToast('Voice error: ' + (typeof err.message === 'string' ? err.message : 'Unknown error'), 'error');
+      console.error('Voice input error:', ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)));
+      showToast('Voice error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : 'Unknown error'), 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');

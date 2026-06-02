@@ -2629,7 +2629,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       if (cfChk) { cfChk.click(); return 'turnstile_clicked'; }
       // Generic checkbox
       const chk = document.querySelector('input[type="checkbox"]');
-      if (chk && document.body.innerText.length < 500) { chk.click(); return 'generic_checkbox'; }
+      if (chk && document.body && document.body.innerText && document.body.innerText.length < 500) { chk.click(); return 'generic_checkbox'; }
       // Amazon CAPTCHA - try the input field
       const amzInput = document.querySelector('#captchacharacters');
       if (amzInput) return 'amazon_captcha_needs_input';
