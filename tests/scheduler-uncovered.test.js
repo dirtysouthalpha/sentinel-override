@@ -612,7 +612,7 @@ describe('sendNotification — success path with report truncation', () => {
     const callArgs = sharedState.notifyIfEnabled.mock.calls[0];
     // Second arg is the notification options
     const notifOpts = callArgs[1];
-    expect(notifOpts.message.length).toBeLessThanOrEqual(500);
+    expect(typeof notifOpts.message === 'string' && notifOpts.message.length).toBeLessThanOrEqual(500);
   });
 });
 

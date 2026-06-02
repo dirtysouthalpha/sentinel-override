@@ -2419,7 +2419,7 @@ describe('callLLMSimple', () => {
     });
     const err = await callLLMSimple('sys', 'user').catch(e => e);
     expect(err).toBeInstanceOf(Error);
-    expect(err.message).toContain('API Error 500');
-    expect(err.message.length).toBeLessThan(220);
+    expect(typeof err.message === 'string' && err.message).toContain('API Error 500');
+    expect(typeof err.message === 'string' && err.message.length).toBeLessThan(220);
   });
 });

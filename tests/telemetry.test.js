@@ -125,7 +125,7 @@ describe('emit', () => {
     const longMsg = 'A'.repeat(600);
     emit('test', 'info', longMsg);
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message.length).toBeLessThanOrEqual(500);
+    expect(typeof event.message === 'string' && event.message.length).toBeLessThanOrEqual(500);
   });
 
   test('error level always emits even in quiet mode', () => {
