@@ -16,7 +16,9 @@
 function _cacheLastTool(tools) {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return tools;
   const copy = tools.slice();
-  copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
+  if (copy.length > 0) {
+    copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
+  }
   return copy;
 }
 
@@ -232,7 +234,8 @@ export const PROVIDERS = {
       // Z.AI returns {code:1000, msg:"Authentication Failed", success:false}
       if (data && (data.code === 1000 || data.code === 1001)) {
         const code = data.code || '?';
-        throw new Error(`🔑 Authentication failed: ${data.msg || data.message || 'Unknown error (code ' + code + ')'}. Check your API key in extension settings.`);
+        const msg = (typeof data.msg === 'string' ? data.msg : null) || (typeof data.message === 'string' ? data.message : null);
+        throw new Error(`🔑 Authentication failed: ${msg || 'Unknown error (code ' + code + ')'}. Check your API key in extension settings.`);
       }
       if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
@@ -243,7 +246,11 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (!data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (data.choices.length > 0 && data.choices[0] && data.choices[0].message) {
+        // Valid choice exists
+      } else {
+        throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      }
       const content = data.choices[0].message.content || '';
       if (!content) {
         // Some APIs (OpenRouter, Z.ai) return null content for tool calls or empty responses
@@ -332,6 +339,9 @@ export const PROVIDERS = {
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
+        throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
+      }
+      if (data.choices.length === 0) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
       const choice = data.choices[0];
@@ -461,8 +471,12 @@ export const PROVIDERS = {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         if (data.code && data.success === false) {
-          throw new Error(`🔑 API Authentication Failed: ${data.msg || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
+          const msg = (typeof data.msg === 'string' ? data.msg : null) || (typeof data.message === 'string' ? data.message : null);
+          throw new Error(`🔑 API Authentication Failed: ${msg || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
         }
+        throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
+      }
+      if (data.choices.length === 0) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
       const choice = data.choices[0];
