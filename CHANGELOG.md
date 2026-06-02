@@ -647,7 +647,7 @@ Three-tier scrub applied to every emit, before broadcast + before persistence:
 - AWS access key: `AKIA[16 chars]`
 - Google API key: `AIza[35 chars]`
 - Slack: `xoxb-*` / `xoxp-*` / `xoxr-*` / `xoxs-*` / `xoxa-*`
-- Stripe live keys: `sk_live_*`, `pk_live_*`, `rk_live_*`
+- Stripe live keys: `sk_live_****`, `pk_live_*`, `rk_live_*`
 - Bearer / Basic auth headers (scheme preserved, credential redacted)
 - JWT-shaped tokens (`eyJ*.eyJ*.*`)
 
@@ -695,7 +695,7 @@ Every regex was selected based on real values that have appeared in telemetry du
 - Microsoft tenant bearer tokens captured during `read_network_requests` on Entra portals.
 - OAuth `?code=` values in M365 sign-in redirects.
 - SentinelOne JWTs in execute_js CSP-block error messages.
-- Stripe `sk_live_*` keys mistakenly pasted into ticket descriptions during testing.
+- Stripe `sk_live_****` keys mistakenly pasted into ticket descriptions during testing.
 
 ### Files touched
 
