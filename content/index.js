@@ -1262,7 +1262,7 @@ if (window.__sentinelInitialized) {
                 command: cmd
               }, (response) => {
                 if (chrome.runtime.lastError) {
-                  resolve('Cross-origin iframe error: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+                  resolve('Cross-origin iframe error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                 } else if (response && response.ok) {
                   resolve(JSON.stringify(response.data || response));
                 } else {
@@ -2075,7 +2075,7 @@ if (window.__sentinelInitialized) {
                   url: window.location.href
                 }, (response) => {
                   if (chrome.runtime.lastError) {
-                    resolve({ approved: false, reason: 'extension error: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) });
+                    resolve({ approved: false, reason: 'extension error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) });
                   } else {
                     resolve(response || null);
                   }

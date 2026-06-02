@@ -519,7 +519,7 @@
       function(response) {
         setButtonsLoading(false);
         if (chrome.runtime.lastError) {
-          setResponseHTML('<span class="qa-error">Error: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error') + '</span>');
+          setResponseHTML('<span class="qa-error">Error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error') + '</span>');
           return;
         }
         var text = response && response.data && response.data.text;
@@ -728,7 +728,7 @@
   // Check if Quick Assist is enabled
   try {
     chrome.storage.local.get(['quickAssist'], function(result) {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/quick-assist] init failed:', (typeof chrome.runtime.lastError.message === 'string') ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)); return; }
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/quick-assist] init failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string') ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)); return; }
       enabled = result.quickAssist !== false; // default ON
     });
   } catch (_e) {

@@ -24,7 +24,7 @@
   log('Testing chrome.runtime.sendMessage...', null);
   chrome.runtime.sendMessage({ action: 'ping' }, (response) => {
     if (chrome.runtime.lastError) {
-      log('SW NOT REACHABLE: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'), false);
+      log('SW NOT REACHABLE: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'), false);
       log('The service worker is crashed or not running. Try:', null);
       log('1. Remove extension completely', null);
       log('2. Close ALL Chrome windows', null);
@@ -37,7 +37,7 @@
   // Test 2: Can we read settings?
   chrome.storage.local.get(['active_provider', 'providers', 'api_key', 'api_endpoint', 'model'], (stored) => {
     if (chrome.runtime.lastError) {
-      log('Storage read failed: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'), false);
+      log('Storage read failed: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'), false);
       return;
     }
     const provider = stored.active_provider || 'none';

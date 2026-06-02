@@ -270,7 +270,7 @@ function sendMessage(action, data) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action, ...(data || {}) }, (response) => {
       if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Unknown error' });
+        resolve({ ok: false, error: (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Unknown error' });
         return;
       }
       resolve(response || { ok: false, error: 'No response' });
