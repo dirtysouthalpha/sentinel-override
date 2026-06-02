@@ -25,7 +25,7 @@ function loadThemePreference() {
   try {
     savedNamedTheme = localStorage.getItem('theme-named');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-named:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] Failed to read theme-named:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
   }
   if (savedNamedTheme && savedNamedTheme !== 'light') {
     applyThemePreset(savedNamedTheme);
@@ -42,7 +42,7 @@ function loadThemePreference() {
   try {
     savedTheme = localStorage.getItem('theme-preference');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-preference:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] Failed to read theme-preference:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
   }
   if (savedTheme) {
     document.body.classList.toggle('dark-mode', savedTheme === 'dark');
@@ -59,7 +59,7 @@ function updateThemeToggle() {
   try {
     localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to save theme preference:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] Failed to save theme preference:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
     showToast('Failed to save theme preference', 'error');
   }
 }
@@ -107,7 +107,7 @@ document.querySelectorAll('.provider-btn').forEach(btn => {
 function loadSettings() {
   const state = getState();
   chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to load settings:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to load settings:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     // Handle both new provider structure and legacy keys
     if (result.providers) {
       state.providerConfigs = result.providers;
@@ -135,7 +135,7 @@ const quickAssistToggle = document.getElementById('quickAssistToggle');
 const quickAssistLabel = document.getElementById('quickAssistLabel');
 if (quickAssistToggle) {
   chrome.storage.local.get(['quickAssist'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickAssist:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickAssist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.quickAssist !== false; // default ON
     quickAssistToggle.checked = enabled;
     if (quickAssistLabel) {
@@ -148,7 +148,7 @@ if (quickAssistToggle) {
     const enabled = quickAssistToggle.checked;
     chrome.storage.local.set({ quickAssist: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickAssist:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save quickAssist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -169,14 +169,14 @@ if (quickAssistToggle) {
 const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
 if (useTrustedInputToggle) {
   chrome.storage.local.get(['useTrustedInput'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     useTrustedInputToggle.checked = result.useTrustedInput === true;
   });
   useTrustedInputToggle.addEventListener('change', () => {
     const enabled = useTrustedInputToggle.checked;
     chrome.storage.local.set({ useTrustedInput: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save useTrustedInput:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -187,7 +187,7 @@ if (useTrustedInputToggle) {
             : 'Trusted input OFF — using synthetic events',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast unavailable:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast unavailable:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -202,14 +202,14 @@ if (useTrustedInputToggle) {
 const soundEnabledToggle = document.getElementById('soundEnabledToggle');
 if (soundEnabledToggle) {
   chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
   });
   soundEnabledToggle.addEventListener('change', () => {
     const enabled = soundEnabledToggle.checked;
     chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -220,7 +220,7 @@ if (soundEnabledToggle) {
             : 'Sound notifications OFF — silent mode',
           'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -234,7 +234,7 @@ const adaptiveExpansionModeSelect = document.getElementById('adaptiveExpansionMo
 
 if (adaptivePromptsModeSelect) {
   chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read adaptivePrompts:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read adaptivePrompts:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     adaptivePromptsModeSelect.value = result.adaptivePromptsMode || 'auto';
     if (adaptiveExpansionModeSelect) {
       adaptiveExpansionModeSelect.value = result.adaptiveExpansionMode || 'light';
@@ -244,21 +244,21 @@ if (adaptivePromptsModeSelect) {
     const v = adaptivePromptsModeSelect.value;
     chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
 
 if (adaptiveExpansionModeSelect) {
   adaptiveExpansionModeSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); });
   });
 }
 
@@ -269,17 +269,17 @@ if (adaptiveExpansionModeSelect) {
 const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
 if (telemetryLevelSelect) {
   chrome.storage.local.get(['telemetryLevel'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryLevel:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryLevel:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetryLevelSelect.value = result.telemetryLevel || 'normal';
   });
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryLevel:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save telemetryLevel:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
-      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -293,13 +293,13 @@ if (telemetryLevelSelect) {
 const telemetryPersistToggle = document.getElementById('telemetryPersistToggle');
 if (telemetryPersistToggle) {
   chrome.storage.local.get(['telemetryPersist'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryPersist:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryPersist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetryPersistToggle.checked = !!result.telemetryPersist;
   });
   telemetryPersistToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryPersist:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save telemetryPersist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -307,7 +307,7 @@ if (telemetryPersistToggle) {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
           : 'Telemetry persistence disabled', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -321,14 +321,14 @@ if (telemetryPersistToggle) {
 const telemetryRedactToggle = document.getElementById('telemetryRedactToggle');
 if (telemetryRedactToggle) {
   chrome.storage.local.get(['telemetryRedact'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     // Default ON: only set false if explicitly stored as false.
     telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
   });
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetryRedact:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -336,7 +336,7 @@ if (telemetryRedactToggle) {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
           : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -350,13 +350,13 @@ if (telemetryRedactToggle) {
 const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptToggle');
 if (telemetrySkillAdaptToggle) {
   chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -364,7 +364,7 @@ if (telemetrySkillAdaptToggle) {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
           : 'Adaptive skill priority OFF — static priorities only', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -374,11 +374,11 @@ if (skillStatsResetBtn) {
   skillStatsResetBtn.addEventListener('click', () => {
     if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
     chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to reset skill stats:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to reset skill stats:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -387,7 +387,7 @@ const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
 if (skillStatsViewBtn) {
   skillStatsViewBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to list skills:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to list skills:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       const skills = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.data) ? resp.data : []);
       _renderSkillStatsModal(skills);
     });
@@ -473,7 +473,7 @@ const quickModeToggle = document.getElementById('quickModeToggle');
 const quickModeLabel = document.getElementById('quickModeLabel');
 if (quickModeToggle) {
   chrome.storage.local.get(['quickMode'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickMode:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.quickMode === true;
     quickModeToggle.checked = enabled;
     if (quickModeLabel) {
@@ -495,7 +495,7 @@ if (quickModeToggle) {
           ? 'ON — Fast execution, no planning'
           : 'OFF - Standard pace';
       }
-      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -563,14 +563,14 @@ if (ticketModeToggle) {
             : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
 
 if (ticketFormatSelect) {
   ticketFormatSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); });
   });
 }
 
@@ -585,7 +585,7 @@ if (ticketFormatSelect) {
         const el = __TECH_INPUTS[key];
         if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
       }
-      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); });
     }, 400);
   };
   for (const key of Object.keys(__TECH_INPUTS)) {
@@ -611,7 +611,7 @@ if (expectedTenantInput) {
     if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
     __tenantSaveTimer = setTimeout(() => {
       const v = (expectedTenantInput.value || '').trim();
-      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); });
     }, 350);
   });
 }
@@ -647,7 +647,7 @@ function _renderLearnedPatterns(patterns) {
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         await chrome.storage.local.set({ learned_patterns: arr });
         _renderLearnedPatterns(arr);
-      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -658,7 +658,7 @@ if (clearAllPatternsBtn) {
     try {
       await chrome.storage.local.set({ learned_patterns: [] });
       _renderLearnedPatterns([]);
-    } catch (e) { console.warn('[Sentinel] clear patterns failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] clear patterns failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
   });
 }
 
@@ -688,7 +688,7 @@ if (downloadAuditLogBtn) {
       if (document.body) document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+      downloadAuditLogBtn.textContent = 'Error: ' + (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e));
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });
@@ -701,7 +701,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   try {
     stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/settings] storage read failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] storage read failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
     stored = {};
   }
 
@@ -931,7 +931,7 @@ function applyThemePreset(theme) {
     try {
       localStorage.setItem('theme-named', theme);
     } catch (e) {
-      console.warn('[Sentinel/settings] Failed to save theme-named:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      console.warn('[Sentinel/settings] Failed to save theme-named:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
       showToast('Failed to save theme', 'error');
     }
     // Remove all theme glow classes
@@ -969,7 +969,7 @@ if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
   try {
     localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to save custom theme:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] Failed to save custom theme:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
     showToast('Failed to save custom theme', 'error');
   }
   if (themeModal) themeModal.classList.remove('show');
@@ -1085,13 +1085,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
   });
 
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
-      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
       return;
     }
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
@@ -1112,14 +1112,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
         modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
         modelsSel.innerHTML = '<option value="">(no models returned)</option>';
-        try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
         return;
       }
       modelsSel.innerHTML = '';
@@ -1135,9 +1135,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       modelsSel.disabled = false;
       useBtn.disabled = false;
-      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     } catch (e) {
-      try { showToast('Error: ' + String(e), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Error: ' + String(e), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
@@ -1148,13 +1148,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   useBtn.addEventListener('click', () => {
     const value = modelsSel.value;
     if (!value) {
-      try { showToast('Pick a model from the list first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Pick a model from the list first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
       return;
     }
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
-      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
     }
   });
 })();
@@ -1173,7 +1173,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       el.textContent = css || '';
     } catch (e) {
-      console.warn('[Sentinel/settings] CSS application failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      console.warn('[Sentinel/settings] CSS application failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
     }
   }
 
@@ -1181,7 +1181,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) applyCustomCss(saved);
   } catch (e) {
-    console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
   }
 
   function wire() {
@@ -1195,7 +1195,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) ta.value = saved;
     } catch (e) {
-      console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
     }
 
     let saveTimer = null;
@@ -1215,7 +1215,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       debounce = setTimeout(() => {
         const css = ta.value || '';
         try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
       }
         applyCustomCss(css);
         setStatus('saved', '#6fcf80');
@@ -1225,7 +1225,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (applyBtn) applyBtn.addEventListener('click', () => {
       const css = ta.value || '';
       try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
       }
       applyCustomCss(css);
       setStatus('applied', '#6fcf80');
@@ -1233,7 +1233,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (clearBtn) clearBtn.addEventListener('click', () => {
       ta.value = '';
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage remove failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+        console.warn('[Sentinel/settings] localStorage remove failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
       }
       applyCustomCss('');
       setStatus('cleared', 'var(--text-tertiary)');
@@ -1260,10 +1260,10 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         if (theme === 'dark') document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
         try { localStorage.setItem('theme-named', theme); } catch (e) {
-          console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+          console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
         }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
       });
     });
   }
