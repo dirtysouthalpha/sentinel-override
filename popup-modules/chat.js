@@ -303,12 +303,15 @@ function ensureMiniShotPanel() {
     if (document.body) document.body.insertBefore(wrap, document.body.firstChild);
   }
   // Toggle collapse on header click
-  wrap.querySelector('.mini-shot-header').addEventListener('click', () => {
-    __miniShotCollapsed = !__miniShotCollapsed;
-    wrap.classList.toggle('collapsed', __miniShotCollapsed);
-    const tog = wrap.querySelector('.mini-shot-toggle');
-    if (tog) tog.textContent = __miniShotCollapsed ? '▸ SHOW' : '▾ HIDE';
-  });
+  const miniShotHeader = wrap.querySelector('.mini-shot-header');
+  if (miniShotHeader) {
+    miniShotHeader.addEventListener('click', () => {
+      __miniShotCollapsed = !__miniShotCollapsed;
+      wrap.classList.toggle('collapsed', __miniShotCollapsed);
+      const tog = wrap.querySelector('.mini-shot-toggle');
+      if (tog) tog.textContent = __miniShotCollapsed ? '▸ SHOW' : '▾ HIDE';
+    });
+  }
   __miniShotPanelEl = wrap;
   return wrap;
 }
@@ -3211,7 +3214,8 @@ chrome.runtime.onMessage.addListener((message) => {
           header.addEventListener('click', () => {
             const shown = list.style.display !== 'none';
             list.style.display = shown ? 'none' : 'block';
-            header.querySelector('.ck-chevron').textContent = shown ? '▶' : '▼';
+            const chevron = header.querySelector('.ck-chevron');
+            if (chevron) chevron.textContent = shown ? '▶' : '▼';
           });
           card.appendChild(header);
           card.appendChild(list);
@@ -3246,7 +3250,8 @@ chrome.runtime.onMessage.addListener((message) => {
           header.addEventListener('click', () => {
             const shown = list.style.display !== 'none';
             list.style.display = shown ? 'none' : 'block';
-            header.querySelector('.plan-chevron').textContent = shown ? '▶' : '▼';
+            const chevron = header.querySelector('.plan-chevron');
+            if (chevron) chevron.textContent = shown ? '▶' : '▼';
           });
           card.appendChild(header);
           card.appendChild(list);
