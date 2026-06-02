@@ -959,13 +959,13 @@ describe('_waitForAdaptedGoalDecision', () => {
     expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(sentMsg).toBeDefined();
-    expect(sentMsg.action).toBe('adapted_goal_available');
-    expect(sentMsg.mode).toBe('approval');
+    expect(sentMsg?.action).toBe('adapted_goal_available');
+    expect(sentMsg?.mode).toBe('approval');
 
     // Simulate user response
     simulateOnMessage({
       action: 'adapted_goal_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       approved: true,
     });
 
@@ -991,7 +991,7 @@ describe('_waitForAdaptedGoalDecision', () => {
     expect(sentMsg).toBeDefined();
     simulateOnMessage({
       action: 'adapted_goal_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       useOriginal: true,
     });
 
@@ -1017,7 +1017,7 @@ describe('_waitForAdaptedGoalDecision', () => {
     expect(sentMsg).toBeDefined();
     simulateOnMessage({
       action: 'adapted_goal_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       edited: true,
       editedGoal: 'This is my edited goal that is long enough to pass',
     });
@@ -1060,11 +1060,11 @@ describe('_waitForModeMismatchDecision', () => {
     expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(sentMsg).toBeDefined();
-    expect(sentMsg.action).toBe('mode_mismatch_pause');
+    expect(sentMsg?.action).toBe('mode_mismatch_pause');
 
     simulateOnMessage({
       action: 'mode_mismatch_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       flip: true,
     });
 
@@ -1084,7 +1084,7 @@ describe('_waitForModeMismatchDecision', () => {
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     simulateOnMessage({
       action: 'mode_mismatch_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       continue: true,
     });
 
@@ -1102,7 +1102,7 @@ describe('_waitForModeMismatchDecision', () => {
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     simulateOnMessage({
       action: 'mode_mismatch_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       cancel: true,
     });
 
@@ -1370,12 +1370,12 @@ describe('requestApproval', () => {
     expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(sentMsg).toBeDefined();
-    expect(sentMsg.action).toBe('request_approval');
-    expect(sentMsg.payload.description).toContain('Click');
+    expect(sentMsg?.action).toBe('request_approval');
+    expect(sentMsg?.payload?.description).toContain('Click');
 
     simulateOnMessage({
       action: 'approval_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       approved: true,
     });
 
@@ -1393,7 +1393,7 @@ describe('requestApproval', () => {
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     simulateOnMessage({
       action: 'approval_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       rejected: true,
     });
 
@@ -1412,7 +1412,7 @@ describe('requestApproval', () => {
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     simulateOnMessage({
       action: 'approval_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       skipped: true,
     });
 
@@ -1465,13 +1465,13 @@ describe('requestApproval', () => {
     expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(sentMsg).toBeDefined();
-    expect(sentMsg.payload.description).toBe('Navigate to https://example.com');
-    expect(sentMsg.payload.action).toBe('navigate');
+    expect(sentMsg?.payload?.description).toBe('Navigate to https://example.com');
+    expect(sentMsg?.payload?.action).toBe('navigate');
 
     // Resolve to avoid dangling promise
     simulateOnMessage({
       action: 'approval_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       approved: true,
     });
     await promise;
@@ -1491,13 +1491,13 @@ describe('requestApproval', () => {
     expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThan(0);
     const sentMsg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(sentMsg).toBeDefined();
-    expect(sentMsg.payload.ariaLabel).toBe('Submit Button');
-    expect(sentMsg.payload.elementText).toBe('Click Me');
-    expect(sentMsg.payload.selector).toBe('#btn');
+    expect(sentMsg?.payload?.ariaLabel).toBe('Submit Button');
+    expect(sentMsg?.payload?.elementText).toBe('Click Me');
+    expect(sentMsg?.payload?.selector).toBe('#btn');
 
     simulateOnMessage({
       action: 'approval_response',
-      requestId: sentMsg.requestId,
+      requestId: sentMsg?.requestId,
       approved: true,
     });
     await promise;
