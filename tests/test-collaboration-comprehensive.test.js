@@ -730,7 +730,8 @@ describe('importTemplates — skip mode', () => {
 
     expect(result.imported).toBe(0);
     expect(result.skipped).toBe(1);
-    expect(result.results[0].action).toBe('skipped');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('skipped');
   });
 
   test('imports new template when no conflict', async () => {
@@ -741,7 +742,8 @@ describe('importTemplates — skip mode', () => {
 
     expect(result.imported).toBe(1);
     expect(result.skipped).toBe(0);
-    expect(result.results[0].action).toBe('imported');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('imported');
   });
 });
 
@@ -756,9 +758,10 @@ describe('importTemplates — rename mode', () => {
 
     expect(result.imported).toBe(1);
     expect(result.renamed).toBe(1);
-    expect(result.results[0].action).toBe('renamed');
-    expect(result.results[0].originalName).toBe('Existing');
-    expect(result.results[0].name).toBe('Existing (1)');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('renamed');
+    expect(result.results[0]?.originalName).toBe('Existing');
+    expect(result.results[0]?.name).toBe('Existing (1)');
   });
 
   test('increments counter for multiple renames', async () => {
@@ -770,7 +773,8 @@ describe('importTemplates — rename mode', () => {
       'rename'
     );
 
-    expect(result.results[0].name).toBe('Test (2)');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.name).toBe('Test (2)');
   });
 });
 
@@ -785,7 +789,8 @@ describe('importTemplates — overwrite mode', () => {
 
     expect(result.imported).toBe(1);
     expect(result.overwritten).toBe(1);
-    expect(result.results[0].action).toBe('overwritten');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('overwritten');
   });
 
   test('preserves existing ID on overwrite', async () => {

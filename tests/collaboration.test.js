@@ -273,7 +273,8 @@ describe('importTemplates', () => {
     const templates = [{ name: 'New', goal: 'New goal', params: [], tags: [] }];
     const result = await importTemplates(templates, 'skip');
     expect(result.imported).toBe(1);
-    expect(result.results[0].action).toBe('imported');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('imported');
   });
 
   test('skips existing templates in skip mode', async () => {
@@ -288,7 +289,8 @@ describe('importTemplates', () => {
     const templates = [{ name: 'existing', goal: 'New goal', params: [], tags: [] }];
     const result = await importTemplates(templates, 'rename');
     expect(result.renamed).toBe(1);
-    expect(result.results[0].name).toContain('existing (1)');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.name).toContain('existing (1)');
   });
 
   test('overwrites conflicting templates in overwrite mode', async () => {
@@ -296,7 +298,8 @@ describe('importTemplates', () => {
     const templates = [{ name: 'existing', goal: 'Updated goal', params: [], tags: ['new'] }];
     const result = await importTemplates(templates, 'overwrite');
     expect(result.overwritten).toBe(1);
-    expect(result.results[0].action).toBe('overwritten');
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.action).toBe('overwritten');
   });
 
   test('returns empty result for null input', async () => {
