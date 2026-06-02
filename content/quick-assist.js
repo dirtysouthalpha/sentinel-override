@@ -670,7 +670,8 @@
     // Small delay to let selection settle
     setTimeout(function() {
       var text = (window.getSelection() || { toString: () => '' }).toString().trim();
-      if (text.length > 10) {
+      var MIN_SELECTION_LENGTH = 10;
+      if (text.length > MIN_SELECTION_LENGTH) {
         showTrigger();
       } else {
         hideTrigger();
