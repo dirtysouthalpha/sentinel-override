@@ -726,7 +726,7 @@
   // Check if Quick Assist is enabled
   try {
     chrome.storage.local.get(['quickAssist'], function(result) {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/quick-assist] init failed:', chrome.runtime.lastError.message || String(chrome.runtime.lastError)); return; }
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/quick-assist] init failed:', (typeof chrome.runtime.lastError.message === 'string') ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)); return; }
       enabled = result.quickAssist !== false; // default ON
     });
   } catch (_e) {
