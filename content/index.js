@@ -82,9 +82,10 @@ if (window.__sentinelInitialized) {
 
   try {
     const insertionObserver = new MutationObserver((muts) => {
+      if (!Array.isArray(muts)) return;
       const now = Date.now();
       for (const m of muts) {
-        if (!m.addedNodes) continue;
+        if (!m.addedNodes || typeof m.addedNodes.length !== 'number') continue;
         for (const n of m.addedNodes) {
           if (n && n.nodeType === 1) {
             __sentinelRecentInsertions.set(n, now);
@@ -271,7 +272,7 @@ if (window.__sentinelInitialized) {
         if (el.querySelector && el.querySelector('main')) continue;
 
         const style = window.getComputedStyle(el);
-        const zi = parseInt(style.zIndex, 10);
+        const zi = parseInt(style.zIndex || '0', 10);
         if (style.position !== 'fixed' || Number.isNaN(zi) || zi <= 1000) continue;
 
         const rect = el.getBoundingClientRect();

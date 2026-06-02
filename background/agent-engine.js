@@ -3489,7 +3489,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-        if (urlMatch) {
+        if (urlMatch && urlMatch.length >= 1) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : ('https://' + (urlMatch[1] || urlMatch[0]));
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
@@ -4153,7 +4153,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Activity stream surface — single item showing which skills fired
           try {
             const _label = _recovery.autoApply
-              ? 'Skill auto-applied: ' + _recovery.appliedSkillIds[0]
+              ? 'Skill auto-applied: ' + (_recovery.appliedSkillIds[0] || 'unknown')
               : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
             activityDone(stepCount, 'recovery-skills', _label, null);
           } catch (e) { console.warn('[Sentinel] recovery skills activity failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
