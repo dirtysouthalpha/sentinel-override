@@ -553,7 +553,7 @@ export async function executeScheduledTask(alarmName) {
     await storeResult(schedule, finalResult);
   } catch (e) {
     console.error('Failed to store scheduled task result:', (e && e.message) || String(e));
-    try { tel.error('scheduler', 'Failed to store result', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in scheduler.js:', (e && e.message) || String(e)); }
+    try { tel.error('scheduler', 'Failed to store result', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (nestedErr && nestedErr.message) || String(nestedErr)); }
   }
 
   schedule.lastRunAt = completedAt;
@@ -572,7 +572,7 @@ export async function executeScheduledTask(alarmName) {
     await saveSchedules(schedules);
   } catch (e) {
     console.error('Failed to save schedule state after execution:', (e && e.message) || String(e));
-    try { tel.error('scheduler', 'Failed to save schedule state', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in scheduler.js:', (e && e.message) || String(e)); }
+    try { tel.error('scheduler', 'Failed to save schedule state', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (nestedErr && nestedErr.message) || String(nestedErr)); }
   }
 
   sendNotification(schedule, finalResult);
@@ -803,7 +803,7 @@ export async function initScheduler() {
         tel.debug('scheduler', `Re-registered alarm for schedule: ${schedule.name}`);
       }
     } catch (err) {
-      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, err && err.message);
+      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, (err && err.message) || String(err));
     }
   }
 
