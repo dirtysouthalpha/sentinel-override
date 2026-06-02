@@ -644,7 +644,7 @@ export async function startAgent(goal, sender) {
     const tabs = await new Promise(resolve => {
       chrome.tabs.query({active: true, currentWindow: true}, (t) => {
         if (chrome.runtime.lastError) {
-          console.error('[startAgent] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+          console.error('[startAgent] tabs.query failed:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
           resolve([]);
         } else {
           resolve(t || []);
@@ -3383,7 +3383,7 @@ async function runAgentLoop(goal, workingTabId) {
         const allTabs = await new Promise(resolve => {
           chrome.tabs.query({}, (t) => {
             if (chrome.runtime.lastError) {
-              console.error('[Agent recovery] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+              console.error('[Agent recovery] tabs.query failed:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
               resolve([]);
             } else {
               resolve(t || []);
@@ -6096,14 +6096,14 @@ async function runAgentLoop(goal, workingTabId) {
                       text: ch,
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (chrome.runtime.lastError) rej((chrome.runtime.lastError && chrome.runtime.lastError.message) || String(chrome.runtime.lastError)); else res(r); });
+                    }, (r) => { if (chrome.runtime.lastError) rej((typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); else res(r); });
                   });
                   await new Promise((res, rej) => {
                     chrome.debugger.sendCommand({ tabId: typeof tab === 'object' && tab !== null ? tab.id : tab }, 'Input.dispatchKeyEvent', {
                       type: 'keyUp',
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (chrome.runtime.lastError) rej((chrome.runtime.lastError && chrome.runtime.lastError.message) || String(chrome.runtime.lastError)); else res(r); });
+                    }, (r) => { if (chrome.runtime.lastError) rej((typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); else res(r); });
                   });
                 } catch (_keyErr) {
                   // Fallback: set value directly via CDP JS
@@ -6208,7 +6208,7 @@ async function runAgentLoop(goal, workingTabId) {
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
               if (chrome.runtime.lastError) {
-                console.error('[New tab detection] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+                console.error('[New tab detection] tabs.query failed:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                 resolve([]);
               } else {
                 resolve(t || []);
@@ -6545,7 +6545,7 @@ async function runAgentLoop(goal, workingTabId) {
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
               if (chrome.runtime.lastError) {
-                console.error('[Tab recovery] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+                console.error('[Tab recovery] tabs.query failed:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                 resolve([]);
               } else {
                 resolve(t || []);
