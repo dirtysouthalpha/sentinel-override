@@ -609,6 +609,9 @@ describe('sendNotification — success path with report truncation', () => {
 
     // Notification should have been sent
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
+    if (sharedState.notifyIfEnabled.mock.calls.length === 0) {
+      throw new Error('notifyIfEnabled not called');
+    }
     const callArgs = sharedState.notifyIfEnabled.mock.calls[0];
     if (!callArgs || !callArgs[1]) {
       throw new Error('notifyIfEnabled not called with options');
@@ -921,6 +924,9 @@ describe('sendNotification — priority levels', () => {
     await execPromise;
 
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
+    if (sharedState.notifyIfEnabled.mock.calls.length === 0) {
+      throw new Error('notifyIfEnabled not called');
+    }
     const call = sharedState.notifyIfEnabled.mock.calls[0];
     if (!call || !call[1]) {
       throw new Error('notifyIfEnabled not called with 2 arguments');

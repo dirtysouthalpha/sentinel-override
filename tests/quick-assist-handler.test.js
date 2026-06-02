@@ -103,6 +103,9 @@ describe('quick-assist-handler', () => {
         })
       );
 
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
@@ -140,6 +143,9 @@ describe('quick-assist-handler', () => {
         })
       );
 
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
@@ -178,6 +184,9 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('System instructions\n---\nUser content');
 
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
@@ -207,6 +216,9 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('Full prompt without separator');
 
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
@@ -306,7 +318,9 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('test');
 
-      expect(global.fetch.mock.calls.length).toBeGreaterThan(0);
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch call missing options argument');
@@ -343,6 +357,9 @@ describe('quick-assist-handler', () => {
       const multiLinePrompt = 'Line 1\\nLine 2\\nLine 3';
       const result = await handleQuickAssist(multiLinePrompt);
 
+      if (global.fetch.mock.calls.length === 0) {
+        throw new Error('fetch not called');
+      }
       const fetchCall = global.fetch.mock.calls[0];
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');

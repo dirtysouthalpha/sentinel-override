@@ -1193,6 +1193,9 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
 
     activityDone(1, 'step', 'Step', { extra: 'data', count: 5 });
     expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
+    if (mockSendAgentActivity.mock.calls.length === 0) {
+      throw new Error('mock not called');
+    }
     const call = mockSendAgentActivity.mock.calls[0];
     if (!call || call.length < 5) {
       throw new Error('mock call expected 5 arguments, got ' + (call?.length || 0));
@@ -1209,6 +1212,9 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
 
     activityDone(2, 'test', 'Test');
     expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
+    if (mockSendAgentActivity.mock.calls.length === 0) {
+      throw new Error('mock not called');
+    }
     const call = mockSendAgentActivity.mock.calls[0];
     if (!call || call.length < 5) {
       throw new Error('mock call expected 5 arguments, got ' + (call?.length || 0));
@@ -1255,6 +1261,9 @@ describe('history helpers', () => {
     await persistHistory();
 
     expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
+    if (chrome.storage.local.set.mock.calls.length === 0) {
+      throw new Error('storage.set not called');
+    }
     const setCall = chrome.storage.local.set.mock.calls[0];
     if (!setCall || !setCall[0]) {
       throw new Error('storage.set not called');
@@ -1296,6 +1305,9 @@ describe('history helpers', () => {
     await persistHistory();
 
     expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
+    if (chrome.storage.local.set.mock.calls.length === 0) {
+      throw new Error('storage.set not called');
+    }
     const setCall = chrome.storage.local.set.mock.calls[0];
     if (!setCall || !setCall[0]) {
       throw new Error('storage.set not called');
