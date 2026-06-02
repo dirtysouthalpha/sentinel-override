@@ -449,14 +449,17 @@ if (window.__sentinelInitialized) {
               const skip = ['nav', 'header', 'footer', 'aside', '[role="navigation"]', '[role="banner"]',
                 '.cookie-notice', '.cookie-banner', '#cookie', '.ad', '.advertisement', '[aria-hidden="true"]',
                 'script', 'style', 'noscript', 'svg'];
-              skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel] skip selector remove:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); } });
+              skip.forEach(s => { try { const elements = clone.querySelectorAll(s); if (typeof elements.forEach === 'function') { elements.forEach(el => el.remove()); } } catch(e) { console.warn('[Sentinel] skip selector remove:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); } });
               content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
             }
 
             if (!content || content.length < 200) {
               const bodyClone = (document.body || document.documentElement).cloneNode(true);
               ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
-                bodyClone.querySelectorAll(tag).forEach(el => el.remove());
+                const elements = bodyClone.querySelectorAll(tag);
+                if (typeof elements.forEach === 'function') {
+                  elements.forEach(el => el.remove());
+                }
               });
               content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             }

@@ -98,9 +98,12 @@ function switchProviderCard(providerId) {
 }
 
 // Wire up provider selector buttons
-document.querySelectorAll('.provider-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchProviderCard(btn.dataset.provider));
-});
+const providerBtns = document.querySelectorAll('.provider-btn');
+if (providerBtns.length > 0) {
+  providerBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchProviderCard(btn.dataset.provider));
+  });
+}
 
 // ========== Settings Management ==========
 // eslint-disable-next-line no-unused-vars
@@ -1249,23 +1252,29 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
 (function wireThemeAutoSave() {
   function init() {
-    document.querySelectorAll('.theme-preset[data-theme]').forEach(el => {
-      el.addEventListener('click', () => {
-        const theme = el.dataset.theme;
-        if (!theme) return;
-        document.body.className = (document.body.className || '').split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
-        if (theme !== 'light' && theme !== 'dark') {
-          document.body.classList.add('theme-' + theme);
-        }
-        if (theme === 'dark') document.body.classList.add('dark-mode');
-        else document.body.classList.remove('dark-mode');
-        try { localStorage.setItem('theme-named', theme); } catch (e) {
-          console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
-        }
-        document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
+    const themePresets = document.querySelectorAll('.theme-preset[data-theme]');
+    if (themePresets.length > 0) {
+      themePresets.forEach(el => {
+        el.addEventListener('click', () => {
+          const theme = el.dataset.theme;
+          if (!theme) return;
+          document.body.className = (document.body.className || '').split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
+          if (theme !== 'light' && theme !== 'dark') {
+            document.body.classList.add('theme-' + theme);
+          }
+          if (theme === 'dark') document.body.classList.add('dark-mode');
+          else document.body.classList.remove('dark-mode');
+          try { localStorage.setItem('theme-named', theme); } catch (e) {
+            console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
+          }
+          const allThemePresets = document.querySelectorAll('.theme-preset');
+          if (allThemePresets.length > 0) {
+            allThemePresets.forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
+          }
+          try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
+        });
       });
-    });
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

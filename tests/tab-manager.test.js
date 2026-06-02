@@ -444,7 +444,9 @@ describe('cdpExecuteJs', () => {
     await cdpExecuteJs(100, 'return 1', { timeout: 100 });
     const evalCall = chrome.debugger.sendCommand.mock.calls.find(c => c[1] === 'Runtime.evaluate');
     expect(evalCall).toBeTruthy();
-    expect(evalCall[2].timeout).toBe(500);
+    if (evalCall) {
+      expect(evalCall[2].timeout).toBe(500);
+    }
   });
 });
 
@@ -1018,7 +1020,9 @@ describe('cdpDispatchType — per-char typing path', () => {
       c => c[1] === 'Input.insertText'
     );
     expect(insertCall).toBeTruthy();
-    expect(insertCall[2].text).toBe(longText);
+    if (insertCall) {
+      expect(insertCall[2].text).toBe(longText);
+    }
   });
 
   test('uses per-char path when perCharKeyEvents=true even for long strings', async () => {
@@ -1112,8 +1116,10 @@ describe('cdpDispatchClick — visual feedback', () => {
       c => c[1] && c[1].action === 'cdp_pre_click_visual'
     );
     expect(visualCall).toBeTruthy();
-    expect(visualCall[1].x).toBe(50);
-    expect(visualCall[1].y).toBe(75);
+    if (visualCall) {
+      expect(visualCall[1].x).toBe(50);
+      expect(visualCall[1].y).toBe(75);
+    }
   });
 
   test('sends click with right button and double click', async () => {
