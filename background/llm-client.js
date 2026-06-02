@@ -2180,7 +2180,7 @@ export function parseLLMResponse(content) {
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e) {
-      throw new Error('Failed to parse action JSON: ' + (e && e.message ? e.message : String(e)));
+      throw new Error('Failed to parse action JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     }
     if (!parsed.type && parsed.action && typeof parsed.action === 'object' && parsed.action !== null) parsed = parsed.action;
     if (!parsed.type && parsed.command && typeof parsed.command === 'object' && parsed.command !== null) parsed = parsed.command;

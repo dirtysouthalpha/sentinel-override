@@ -52,7 +52,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         navSignalsBlock = '\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n' + lines.join('\n');
       }
     }
-  } catch (e) { console.warn('[Sentinel/adaptive-prompts] waitStrings parse failed:', e && e.message || String(e)); }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] waitStrings parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
 
   // Build KNOWN SUB-PAGES block from profile.pageTypes
   let subPagesBlock = '';
@@ -63,7 +63,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         subPagesBlock = '\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n' + lines.join('\n');
       }
     }
-  } catch (e) { console.warn('[Sentinel/adaptive-prompts] pageTypes parse failed:', e && e.message || String(e)); }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] pageTypes parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
 
   // Build WORKFLOW SCAFFOLD block from profile.workflowHints if goal matches
   let workflowScaffold = '';
@@ -76,7 +76,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
         }
       }
     }
-  } catch (e) { console.warn('[Sentinel/adaptive-prompts] workflowHints parse failed:', e && e.message || String(e)); }
+  } catch (e) { console.warn('[Sentinel/adaptive-prompts] workflowHints parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
 
   const profileBlock = `
 DETECTED PLATFORM: ${profile.label} (id: ${profile.id})
@@ -282,7 +282,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     return result;
 
   } catch (e) {
-    result.error = (e && e.message || String(e)) ? e.message : String(e);
+    result.error = (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e);
     return result;
   } finally {
     result.durationMs = Date.now() - startedAt;
