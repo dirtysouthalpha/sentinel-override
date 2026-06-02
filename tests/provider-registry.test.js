@@ -1122,9 +1122,9 @@ describe('fetchModelsList', () => {
     });
     const provider = { modelsUrl: 'http://localhost:11434/api/tags', auth: 'none', tagsResponse: true };
     await fetchModelsList(provider, '');
-    const callArgs = fetchMock.mock.calls[0][1];
-    expect(callArgs.headers.Authorization).toBeUndefined();
-    expect(callArgs.headers['x-api-key']).toBeUndefined();
+    const callArgs = fetchMock.mock.calls[0]?.[1];
+    expect(callArgs?.headers.Authorization).toBeUndefined();
+    expect(callArgs?.headers['x-api-key']).toBeUndefined();
   });
 
   test('handles timeout via AbortController', async () => {
