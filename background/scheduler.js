@@ -600,7 +600,14 @@ async function _resolveGoalForSchedule(schedule) {
  */
 async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (t) => resolve(t || []));
+    chrome.tabs.query({ active: true, currentWindow: true }, (t) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] tabs.query lastError:', chrome.runtime.lastError.message);
+        resolve([]);
+        return;
+      }
+      resolve(t || []);
+    });
   });
   if (tabs && tabs.length > 0 && tabs[0] != null && typeof tabs[0].id === 'number') return tabs[0].id;
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
