@@ -196,7 +196,7 @@ if (window.__sentinelInitialized) {
           if (btn.offsetParent !== null && btn.getBoundingClientRect().width > 0) {
             btn.click();
             __sentinelDismissalCount++;
-            dismissed.push(btn.textContent.trim().substring(0, 40) || sel);
+            dismissed.push((btn.textContent ? btn.textContent.trim().substring(0, 40) : '') || sel);
           }
         }
       } catch (e) { console.warn('[Sentinel] Invalid selector:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
