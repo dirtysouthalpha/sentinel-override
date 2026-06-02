@@ -84,12 +84,11 @@ const {
 } = await import('../background/provider-registry.js');
 
 describe('getModelSupportsVision — deny list paths', () => {
-  test('Anthropic deny: claude-3-haiku-text exact model denied (but override takes precedence)', () => {
-    // claude-3-haiku is a substring of claude-3-haiku-text, and the override is true,
-    // so the per-model override wins over the deny list
+  test('Anthropic deny: claude-3-haiku-text exact model denied (explicit override wins)', () => {
+    // MODEL_VISION_OVERRIDES has 'claude-3-haiku-text': false which is more specific
+    // than 'claude-3-haiku': true, so the explicit deny wins due to longer key length
     const result = getModelSupportsVision('anthropic', 'claude-3-haiku-text');
-    // Per-model override for claude-3-haiku matches first (substring >= 5 chars)
-    expect(result).toBe(true);
+    expect(result).toBe(false); // Explicit 'claude-3-haiku-text': false override wins
   });
 
   test('Anthropic deny: exact regex match without override wins', () => {

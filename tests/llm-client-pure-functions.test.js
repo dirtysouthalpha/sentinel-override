@@ -93,10 +93,10 @@ describe('estimateCostUsd', () => {
     expect(cost).toBeCloseTo(2.50 + 10.00);
   });
 
-  test('gpt-4o-mini pricing (matched via gpt-4o substring first)', () => {
-    // Note: "gpt-4o-mini" matches "gpt-4o" first due to m.includes(key) iteration order
+  test('gpt-4o-mini pricing (specific model matched)', () => {
+    // Correctly matches gpt-4o-mini specific rate
     const cost = estimateCostUsd(1000000, 1000000, 'gpt-4o-mini');
-    expect(cost).toBeCloseTo(2.50 + 10.00); // gpt-4o rates, not gpt-4o-mini
+    expect(cost).toBeCloseTo(0.15 + 0.60); // gpt-4o-mini specific rate
   });
 
   test('gpt-4.1 pricing', () => {
@@ -105,16 +105,16 @@ describe('estimateCostUsd', () => {
     expect(cost).toBeCloseTo(2.00 + 8.00);
   });
 
-  test('gpt-4.1-mini pricing (matched via gpt-4.1 substring first)', () => {
-    // Note: "gpt-4.1-mini" matches "gpt-4.1" first due to iteration order
+  test('gpt-4.1-mini pricing (specific model matched)', () => {
+    // Correctly matches gpt-4.1-mini specific rate
     const cost = estimateCostUsd(1000000, 1000000, 'gpt-4.1-mini');
-    expect(cost).toBeCloseTo(2.00 + 8.00); // gpt-4.1 rates
+    expect(cost).toBeCloseTo(0.40 + 1.60); // gpt-4.1-mini specific rate
   });
 
-  test('gpt-4.1-nano pricing (matched via gpt-4.1 substring first)', () => {
-    // Note: "gpt-4.1-nano" matches "gpt-4.1" first due to iteration order
+  test('gpt-4.1-nano pricing (specific model matched)', () => {
+    // Correctly matches gpt-4.1-nano specific rate
     const cost = estimateCostUsd(1000000, 1000000, 'gpt-4.1-nano');
-    expect(cost).toBeCloseTo(2.00 + 8.00); // gpt-4.1 rates
+    expect(cost).toBeCloseTo(0.10 + 0.40); // gpt-4.1-nano specific rate
   });
 
   test('o4-mini pricing', () => {
