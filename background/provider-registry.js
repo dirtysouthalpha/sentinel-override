@@ -234,14 +234,14 @@ export const PROVIDERS = {
       // Z.AI returns {code:1000, msg:"Authentication Failed", success:false}
       if (data && (data.code === 1000 || data.code === 1001)) {
         const code = data.code || '?';
-        const msg = (typeof data.msg === 'string' ? data.msg : null) || (typeof data.message === 'string' ? data.message : null);
-        throw new Error(`🔑 Authentication failed: ${msg || 'Unknown error (code ' + code + ')'}. Check your API key in extension settings.`);
+        const msg = typeof data.msg === 'string' ? data.msg : (typeof data.message === 'string' ? data.message : 'Unknown error');
+        throw new Error(`🔑 Authentication failed: ${msg} (code ${code}). Check your API key in extension settings.`);
       }
       if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
-        if (errMsg) {
+        if (errMsg && typeof errMsg === 'string') {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
@@ -336,19 +336,16 @@ export const PROVIDERS = {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
-        if (errMsg) {
+        if (errMsg && typeof errMsg === 'string') {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      if (data.choices.length === 0) {
+      const choice = data.choices && Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
+      if (!choice || !choice.message) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices[0];
-      const msg = choice && choice.message;
-      if (!msg) {
-        throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
-      }
+      const msg = choice.message;
       // Extract tool_calls from the response
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         const tc = msg.tool_calls[0];
@@ -415,7 +412,8 @@ export const PROVIDERS = {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         if (data.code && data.success === false) {
-          throw new Error(`🔑 API Authentication Failed: ${data.msg || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
+          const msg = typeof data.msg === 'string' ? data.msg : 'Unknown error';
+          throw new Error(`🔑 API Authentication Failed: ${msg} (code ${data.code}). Check your API key in extension settings.`);
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
@@ -476,14 +474,11 @@ export const PROVIDERS = {
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      if (data.choices.length === 0) {
+      const choice = data.choices && Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
+      if (!choice || !choice.message) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices[0];
-      const msg = choice && choice.message;
-      if (!msg) {
-        throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
-      }
+      const msg = choice.message;
       if (msg.tool_calls && msg.tool_calls.length > 0) {
         const tc = msg.tool_calls[0];
         if (tc.function && tc.function.name) {
@@ -975,7 +970,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   }
   clearTimeout(timer);
   if (!resp.ok) {
-    const errText = await resp.text().catch(() => '(unreadable body)');
+    const errText = await resp.text().catch(() => '(unreadable body)').then(t => t || '(empty body)');
     throw new Error('Models endpoint returned ' + resp.status + ': ' + errText.slice(0, 240));
   }
   let data;
