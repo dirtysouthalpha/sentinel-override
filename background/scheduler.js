@@ -505,7 +505,7 @@ export async function executeScheduledTask(alarmName) {
     await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: 'Resolved goal was empty' });
     return;
   }
-  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: String(goal).substring(0, 80) });
+  tel.info('scheduler', `Executing scheduled task: ${schedule.name}`, { goal: typeof goal === 'string' ? goal.substring(0, 80) : String(goal).substring(0, 80) });
 
   let tabId;
   try {
