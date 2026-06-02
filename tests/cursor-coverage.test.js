@@ -187,6 +187,7 @@ describe('cursor.js — MutationObserver (lines 155-172)', () => {
   test('observer callback triggers ensureCursor when cursor is removed', () => {
     expect(observers.length).toBeGreaterThan(0);
     const obs = observers[0];
+    expect(obs && typeof obs._cb === 'function').toBe(true);
 
     // Simulate cursor being absent (getElementById returns null)
     const origGetById = globalThis.document.getElementById;

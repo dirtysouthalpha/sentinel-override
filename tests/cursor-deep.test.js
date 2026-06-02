@@ -284,7 +284,7 @@ describe('MutationObserver removal detection', () => {
     try {
       await loadCursor();
       createdElements.length = 0;
-      if (observers.length > 0 && observers[0]._cb) {
+      if (observers.length > 0 && observers[0] && typeof observers[0]._cb === 'function') {
         observers[0]._cb([]);
       }
       expect(createdElements.some(e => e.id === '__sentinel_cursor__')).toBe(true);
@@ -421,7 +421,7 @@ describe('line 161: MutationObserver callback early-return when cursor still con
     await loadCursor();
     const countBefore = createdElements.length;
     // Fire observer callback — cursor is still in DOM and isConnected = true
-    if (observers.length > 0 && observers[0]._cb) {
+    if (observers.length > 0 && observers[0] && typeof observers[0]._cb === 'function') {
       observers[0]._cb([]);
     }
     // No additional elements should have been created (early return taken)
