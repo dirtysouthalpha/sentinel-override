@@ -196,7 +196,7 @@ if (window.__sentinelInitialized) {
           if (btn.offsetParent !== null && btn.getBoundingClientRect().width > 0) {
             btn.click();
             __sentinelDismissalCount++;
-            dismissed.push((btn.textContent ? btn.textContent.trim().substring(0, 40) : '') || sel);
+            dismissed.push((typeof btn.textContent === 'string' ? btn.textContent.trim().substring(0, 40) : '') || sel);
           }
         }
       } catch (e) { console.warn('[Sentinel] Invalid selector:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
@@ -230,7 +230,7 @@ if (window.__sentinelInitialized) {
           const _btns = _cand.querySelectorAll('button, [role="button"], a[class*="btn"], a[class*="button"], span[class*="btn"], div[class*="btn"], input[type="button"], input[type="submit"]');
           for (const _btn of _btns) {
             if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
-            const _btnText = (_btn.textContent || _btn.value || '').trim();
+            const _btnText = String(_btn.textContent || _btn.value || '').trim();
             for (const _re of _continueTexts) {
               if (_re.test(_btnText)) {
                 _btn.click();
@@ -301,7 +301,7 @@ if (window.__sentinelInitialized) {
         if (closeBtn) {
           closeBtn.click();
           __sentinelDismissalCount++;
-          dismissed.push('overlay-close: ' + (closeBtn.textContent.trim().substring(0, 30) || 'unnamed'));
+          dismissed.push('overlay-close: ' + (typeof closeBtn.textContent === 'string' ? closeBtn.textContent.trim().substring(0, 30) : 'unnamed'));
         } else {
           el.style.display = 'none';
           __sentinelDismissalCount++;
@@ -1824,7 +1824,7 @@ if (window.__sentinelInitialized) {
           for (const val of cmd.value) {
             if (val == null) continue;
             const valStr = String(val);
-            const opt = options.find(o => o.value === val || (o.textContent && o.textContent.trim().toLowerCase() === valStr.toLowerCase()));
+            const opt = options.find(o => o.value === val || (typeof o.textContent === 'string' && o.textContent.trim().toLowerCase() === valStr.toLowerCase()));
             if (opt) opt.selected = true;
           }
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
@@ -1837,14 +1837,14 @@ if (window.__sentinelInitialized) {
         const options = Array.from(el.options);
         let targetOpt = options.find(o => o.value === cmd.value);
         if (!targetOpt) {
-          targetOpt = options.find(o => o.textContent && o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
+          targetOpt = options.find(o => typeof o.textContent === 'string' && o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
         }
         if (!targetOpt) {
           // Partial text match as fallback
-          targetOpt = options.find(o => o.textContent && o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
+          targetOpt = options.find(o => typeof o.textContent === 'string' && o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
         }
         if (!targetOpt) {
-          const availableOpts = options.map(o => `"${o.value}" (${o.textContent ? o.textContent.trim() : ''})`).join(', ');
+          const availableOpts = options.map(o => `"${o.value}" (${typeof o.textContent === 'string' ? o.textContent.trim() : ''})`).join(', ');
           hl.removeHighlight(el);
           return 'Error: No matching option "' + cmd.value + '". Available: ' + availableOpts;
         }

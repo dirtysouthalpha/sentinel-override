@@ -76,7 +76,7 @@ function deriveModelsUrl(endpoint) {
     const base = u.protocol + '//' + u.host + u.pathname.replace(CHAT_PATH_RE, '');
     return { url: base.replace(/\/$/, '') + '/models' };
   } catch (e) {
-    return { error: 'Could not parse custom endpoint: ' + (e && e.message ? e.message : 'invalid URL') };
+    return { error: 'Could not parse custom endpoint: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : 'invalid URL') };
   }
 }
 

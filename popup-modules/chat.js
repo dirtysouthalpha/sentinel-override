@@ -884,7 +884,7 @@ goalInput.addEventListener('input', () => {
 // (3.12.0) Example-prompt buttons in welcome state -- click to populate input
 document.querySelectorAll('.example-prompt-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const prompt = btn.dataset.prompt || btn.textContent.trim();
+    const prompt = btn.dataset.prompt || (typeof btn.textContent === 'string' ? btn.textContent.trim() : '');
     goalInput.value = prompt;
     goalInput.style.height = 'auto';
     goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
@@ -2289,7 +2289,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
     const card = state ? state.card : null;
     if (card) {
       const actionEl = card.querySelector('.activity-step-action');
-      if (actionEl && (actionEl.textContent === 'Preparing…' || actionEl.textContent.trim() === '')) {
+      if (actionEl && typeof actionEl.textContent === 'string' && (actionEl.textContent === 'Preparing…' || actionEl.textContent.trim() === '')) {
         // Convert "AI decided: note" → "Recording a note", "AI decided: finish" → "Finishing run"
         const m = label.match(/AI decided:\s*(\w+)/i);
         if (m) {

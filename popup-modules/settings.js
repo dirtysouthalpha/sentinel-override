@@ -989,7 +989,7 @@ if (presetButtons.length > 0) {
       switchProviderCard(provider);
       if (setProviderEndpoint) setProviderEndpoint.value = btn.dataset.endpoint || '';
       if (setProviderModel) setProviderModel.value = btn.dataset.model || '';
-      showToast(`Preset loaded: ${btn.textContent}`, 'success');
+      showToast(`Preset loaded: ${typeof btn.textContent === 'string' ? btn.textContent : ''}`, 'success');
     });
   });
 }
