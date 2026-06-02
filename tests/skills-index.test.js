@@ -332,9 +332,11 @@ describe('_scheduleSaveStats — debounced save', () => {
     // The debounced save should have fired
     expect(chrome.storage.local.set).toHaveBeenCalled();
     const setCalls = chrome.storage.local.set.mock.calls;
-    const lastCall = setCalls[setCalls.length - 1];
-    if (lastCall && lastCall[0]) {
-      expect(lastCall[0]).toHaveProperty('skill_stats');
+    if (setCalls.length > 0) {
+      const lastCall = setCalls[setCalls.length - 1];
+      if (lastCall && lastCall[0]) {
+        expect(lastCall[0]).toHaveProperty('skill_stats');
+      }
     }
   });
 });

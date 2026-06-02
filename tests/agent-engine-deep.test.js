@@ -628,6 +628,7 @@ describe('saveLearnedPattern', () => {
     await saveLearnedPattern('Overflow', [], true);
     expect(storageData.learned_patterns.length).toBeLessThanOrEqual(100);
     // The newest pattern should be at the end
+    expect(storageData.learned_patterns.length).toBeGreaterThan(0);
     expect(storageData.learned_patterns[storageData.learned_patterns.length - 1].goal).toBe('Overflow');
   });
 
