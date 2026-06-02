@@ -698,6 +698,7 @@ describe('post-loop cleanup paths', () => {
     // 500ms is far more than enough for all the mocked async calls to settle.
     await new Promise(r => setTimeout(r, 500));
 
+    expect(storageData.last_agent_report).toBeDefined();
     expect(storageData.last_agent_report).toMatchObject({ _isFallback: true });
   }, 5000);
 
