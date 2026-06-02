@@ -13,8 +13,8 @@ export const authWall = {
 
   matches(ctx) {
     if (!ctx) return false;
-    const url = String(ctx.currentUrl || '');
-    const pageText = String(ctx.pageText || '');
+    const url = typeof ctx.currentUrl === 'string' ? ctx.currentUrl : '';
+    const pageText = typeof ctx.pageText === 'string' ? ctx.pageText : '';
     // Url-based detection: known auth/SSO endpoints
     if (_LOGIN_URL_RE.test(url)) return true;
     // Text-based detection: login/MFA language on a short page (< 3000 chars suggests a gate)
@@ -30,7 +30,7 @@ export const authWall = {
 
   promptInjection(ctx) {
     try {
-      const url = String(ctx.currentUrl || '(unknown)').replace(/[`\\]/g, '_').substring(0, 200);
+      const url = (typeof ctx.currentUrl === 'string' ? ctx.currentUrl : '(unknown)').replace(/[`\\]/g, '_').substring(0, 200);
       const isMfa = /mfa|two.?factor|verif|authenticat|duo|approve/i.test(ctx.pageText || '');
       const isSso = /microsoftonline|okta|ping|auth0|saml|adfs/i.test(url);
 

@@ -23,7 +23,7 @@ export const unproductiveExtract = {
     if (!ctx || !ctx.lastResult || !ctx.lastCommand) return false;
     const t = ctx.lastCommand.type;
     if (t !== 'extract' && t !== 'extract_list' && t !== 'execute_js') return false;
-    const r = String(ctx.lastResult);
+    const r = typeof ctx.lastResult === 'string' ? ctx.lastResult : String(ctx.lastResult || '');
     return Array.isArray(UNPRODUCTIVE_PATTERNS) && UNPRODUCTIVE_PATTERNS.some(re => re.test(r));
   },
 
