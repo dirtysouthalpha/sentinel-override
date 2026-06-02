@@ -59,7 +59,11 @@ async function _visionObserve(tab, _currentUrl) {
       elementTree += '[' + el.index + ']<' + tag + attrs + text + closing + '\n';
     }
 
-    return { elements: indexedElements, elementTree, pageText };
+    return {
+      elements: Array.isArray(indexedElements) ? indexedElements : [],
+      elementTree: typeof elementTree === 'string' ? elementTree : '',
+      pageText: typeof pageText === 'string' ? pageText : ''
+    };
   } catch (e) {
     console.error('[Sentinel/v4] Vision observe error:', (e && e.message) || String(e));
     return { elements: [], elementTree: '', pageText: '' };
@@ -582,7 +586,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           confidence: modeDirective.confidence
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_handleModeMismatchCheck] run log set failed:', e);
+          console.error('[_handleModeMismatchCheck] run log set failed:', (e && e.message) || String(e));
         });
       }
     } catch (_) { /* non-fatal */ }
@@ -604,7 +608,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_handleModeMismatchCheck] decision log set failed:', e);
+          console.error('[_handleModeMismatchCheck] decision log set failed:', (e && e.message) || String(e));
         });
       }
     } catch (_e) { /* mode directive logging non-fatal */ }
@@ -667,7 +671,8 @@ export async function startAgent(goal, sender) {
   // Load speed mode from settings
   try {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
-    agentSpeed = speedSettings.agentSpeedMode || 'turbo';
+    const savedSpeed = speedSettings.agentSpeedMode;
+    agentSpeed = ['turbo', 'normal', 'stealth'].includes(savedSpeed) ? savedSpeed : 'turbo';
   } catch (speedErr) {
     /* Non-fatal: speed mode load failed, using turbo */
     agentSpeed = 'turbo';
@@ -810,7 +815,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
           adaptedLength: (result.adaptedGoal || '').length
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_applyAdaptivePrompts] Unhandled rejection:', e);
+          console.error('[_applyAdaptivePrompts] Unhandled rejection:', (e && e.message) || String(e));
         });
       }
     } catch (_) { /* non-fatal */ }
@@ -832,7 +837,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
         originalGoal: result.originalGoal,
         adaptedGoal: result.adaptedGoal
       }).catch((e) => {
-        console.error('[_applyAdaptivePrompts] Unhandled rejection:', e);
+        console.error('[_applyAdaptivePrompts] Unhandled rejection:', (e && e.message) || String(e));
       });
     } catch (_e) { /* non-fatal */ }
     return result.adaptedGoal;
@@ -3445,12 +3450,15 @@ async function runAgentLoop(goal, workingTabId) {
         // Only auto-navigate when the goal starts with an explicit navigation
         // imperative OR contains a full https:// URL. Avoid triggering on ticket
         // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
-        const _isExplicitNav = /^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
+        const _isExplicitNav = typeof _goalForUrlExtract === 'string' && (/^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
           || /\bbegin at:\s*\S/i.test(_goalForUrlExtract)
-          || /\bstart url:\s*\S/i.test(_goalForUrlExtract);
-        let urlMatch = _isExplicitNav
-          ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
-          : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
+          || /\bstart url:\s*\S/i.test(_goalForUrlExtract));
+        let urlMatch = null;
+        if (typeof _goalForUrlExtract === 'string') {
+          urlMatch = _isExplicitNav
+            ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
+            : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
+        }
         // v3.66: Bare site name fallback for Step 1 auto-navigate
         if (!urlMatch && _isExplicitNav) {
           const _step1BareMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
