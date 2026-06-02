@@ -369,7 +369,8 @@ function renderTemplateParams(params) {
   if (!container) return;
   container.innerHTML = '';
 
-  params.forEach(param => {
+  if (params && Array.isArray(params)) {
+    params.forEach(param => {
     const row = document.createElement('div');
     row.className = 'template-param-row';
     row.style.marginTop = '8px';
@@ -379,6 +380,7 @@ function renderTemplateParams(params) {
     `;
     container.appendChild(row);
   });
+  }
 }
 
 // ========== Save Schedule ==========
