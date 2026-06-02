@@ -908,11 +908,11 @@ function _detectGoalModeDirective(goal) {
   // Tier 1: Explicit "Mode: APPROVAL" / "Mode: AUTONOMOUS" / "Mode: YOLO"
   const tier1 = text.match(/\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i);
   if (tier1) {
-    const w = tier1[1].toUpperCase();
+    const w = tier1[1] ? tier1[1].toUpperCase() : '';
     return {
       detected: true,
       wants: (w === 'APPROVAL') ? 'approval' : 'autonomous',
-      evidence: tier1[0],
+      evidence: tier1[0] || '',
       confidence: 'high'
     };
   }
@@ -920,11 +920,11 @@ function _detectGoalModeDirective(goal) {
   // Tier 2: "<word> mode" phrasing
   const tier2 = text.match(/\b(approval|autonomous|yolo)\s+mode\b/i);
   if (tier2) {
-    const w = tier2[1].toUpperCase();
+    const w = tier2[1] ? tier2[1].toUpperCase() : '';
     return {
       detected: true,
       wants: (w === 'APPROVAL') ? 'approval' : 'autonomous',
-      evidence: tier2[0],
+      evidence: tier2[0] || '',
       confidence: 'high'
     };
   }
@@ -1156,17 +1156,20 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
 
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
+    const firstResult = recent[0] ? recent[0].result : undefined;
     const allSameType = recent[0] && recent[0].action && recent.every(h => h.action && h.action.type === recent[0].action.type);
-    const allSameResult = recent.every(h => h.result === recent[0]?.result);
+    const allSameResult = recent.every(h => h.result === firstResult);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';
       return r.includes('not found') || r.startsWith('Error') || r.includes('timed out') || r.startsWith('Timeout') || r.includes('Element not found') || r.includes('No element');
     });
 
     if (allSameType && allSameResult && allFailed) {
+      const actionType = recent[0] && recent[0].action && recent[0].action.type ? recent[0].action.type : 'unknown';
+      const resultStr = firstResult && typeof firstResult === 'string' ? firstResult : '';
       return {
         stalled: true,
-        reason: `Repeated "${recent[0]?.action?.type}" with same failure: "${recent[0]?.result || ''}"`,
+        reason: `Repeated "${actionType}" with same failure: "${resultStr}"`,
         recoveryAction: 'RESCAN_AND_REPLAN'
       };
     }
@@ -2652,7 +2655,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     if (host.includes(key) && goal) {
       // Try to extract search query from goal and go directly to search results
       const searchMatch = goal.match(/(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i);
-      if (searchMatch && info.searchPath) {
+      if (searchMatch && info.searchPath && searchMatch[1]) {
         const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
         console.log('[Sentinel/CAPTCHA] Navigating around CAPTCHA to:', searchUrl);
         sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
@@ -2916,7 +2919,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   // Patterns we care about: "extract X" / "give me X" / "find X" + commas
   // For each: the CVE ID, CVSS v3 base score, affected FortiOS versions, ...
   const fieldListMatch = goal.match(/(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i);
-  if (!fieldListMatch) return null;
+  if (!fieldListMatch || !fieldListMatch[1]) return null;
 
   const fieldList = fieldListMatch[1];
   // Split on commas / "and" / "&" -- get individual field names
@@ -3023,7 +3026,7 @@ function generateHeuristicPlan(goal, currentUrl) {
   let _urlMatch = urlMatch;
   if (!_urlMatch) {
     const _bareMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
-    if (_bareMatch) {
+    if (_bareMatch && _bareMatch[1]) {
       const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
       if (_bareSiteMap[_siteKey]) {
         _urlMatch = ['go to ' + _bareMatch[1], 'https://' + _bareSiteMap[_siteKey]];
@@ -3039,7 +3042,7 @@ function generateHeuristicPlan(goal, currentUrl) {
     }
   }
   const urlMatchFinal = _urlMatch;
-  const targetUrl = urlMatchFinal ? urlMatchFinal[1] : null;
+  const targetUrl = urlMatchFinal && urlMatchFinal[1] ? urlMatchFinal[1] : null;
   const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
   const _normHost = currentHost.replace(/^www\./, '');
   const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
@@ -4401,7 +4404,7 @@ async function runAgentLoop(goal, workingTabId) {
             try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
               // Try extracting from code block
               const _m = _vRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
-              if (_m) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
+              if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
             }
             
             if (_vParsed && _vParsed.action) {
@@ -5720,7 +5723,7 @@ async function runAgentLoop(goal, workingTabId) {
               : parsed.key;
             agentMemory[_finalKey] = parsed.value;
             const memKeys = Object.keys(agentMemory || {});
-            if (memKeys.length > CONFIG.maxMemoryEntries) {
+            if (memKeys.length > CONFIG.maxMemoryEntries && memKeys[0]) {
               delete agentMemory[memKeys[0]];
             }
             try {
@@ -6562,7 +6565,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             });
           });
-          if (allTabs.length > 0) {
+          if (allTabs.length > 0 && allTabs[0]) {
             const recoveryTab = allTabs[0];
             registerInitialTab(recoveryTab.id, recoveryTab.url || '');
           } else {
