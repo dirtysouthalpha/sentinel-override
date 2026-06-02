@@ -91,7 +91,16 @@ initScheduler();
             console.log('[Sentinel/self-heal] State restored, restarting agent loop');
             const { startAgent } = await import('./agent-engine.js');
             // Get any active tab to restart on
-            const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t || [])); });
+            const tabs = await new Promise(resolve => {
+              chrome.tabs.query({active: true, currentWindow: true}, (t) => {
+                if (chrome.runtime.lastError) {
+                  console.warn('[Sentinel/index] tabs.query lastError:', chrome.runtime.lastError.message);
+                  resolve([]);
+                  return;
+                }
+                resolve(t || []);
+              });
+            });
             if (tabs.length > 0 && tabs[0] && tabs[0].id) {
               await startAgent(result.goal, { tab: tabs[0] });
             }

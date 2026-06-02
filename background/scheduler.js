@@ -786,7 +786,14 @@ export async function initScheduler() {
 
     try {
       const alarm = await new Promise(resolve => {
-        chrome.alarms.get(`schedule-${id}`, (a) => resolve(a));
+        chrome.alarms.get(`schedule-${id}`, (a) => {
+          if (chrome.runtime.lastError) {
+            console.warn('[Sentinel/scheduler] alarms.get lastError:', chrome.runtime.lastError.message);
+            resolve(undefined);
+            return;
+          }
+          resolve(a);
+        });
       });
 
       if (!alarm) {
