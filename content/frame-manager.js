@@ -148,20 +148,21 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       return info;
     }
 
-    iframes.forEach(function(iframe, index) {
-      const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
-      let sameOrigin = false;
+    if (iframes && typeof iframes.forEach === 'function') {
+      iframes.forEach(function(iframe, index) {
+        const src = iframe.src || iframe.getAttribute('src') || 'about:blank';
+        let sameOrigin = false;
 
-      try {
-        if (iframe.contentWindow && iframe.contentWindow.document) {
-          sameOrigin = true;
+        try {
+          if (iframe.contentWindow && iframe.contentWindow.document) {
+            sameOrigin = true;
+          }
+        } catch (error) {
+          console.error(`Error checking origin for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
         }
-      } catch (error) {
-        console.error(`Error checking origin for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
-      }
 
-      let rect;
-      try {
+        let rect;
+        try {
         rect = iframe.getBoundingClientRect();
       } catch (error) {
         console.error(`Error getting dimensions for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
@@ -184,6 +185,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         visible,
       });
     });
+  }
 
     return info;
   };
