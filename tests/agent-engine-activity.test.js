@@ -630,6 +630,7 @@ describe('agent-engine checkpoint functionality', () => {
     test('writes checkpoint to chrome.storage.session', async () => {
       await writeCheckpoint(5);
       expect(chrome.storage.session.set).toHaveBeenCalled();
+      expect(chrome.storage.session.set.mock.calls.length).toBeGreaterThan(0);
       const setCall = chrome.storage.session.set.mock.calls[0]?.[0];
       expect(setCall).toHaveProperty('agent_checkpoint');
     });
@@ -640,7 +641,9 @@ describe('agent-engine checkpoint functionality', () => {
       ]);
 
       await writeCheckpoint(3);
+      expect(chrome.storage.session.set.mock.calls.length).toBeGreaterThan(0);
       const setCall = chrome.storage.session.set.mock.calls[0]?.[0];
+      expect(setCall).toBeDefined();
       const checkpoint = setCall.agent_checkpoint;
 
       expect(checkpoint).toHaveProperty('historySnapshot');
