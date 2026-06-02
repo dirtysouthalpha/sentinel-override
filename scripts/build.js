@@ -123,6 +123,6 @@ async function build() {
 }
 
 build().catch(err => {
-  console.error('   ❌ Build failed:', (err && err.message) || String(err));
+  console.error('   ❌ Build failed:', (typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err));
   process.exit(1);
 });
