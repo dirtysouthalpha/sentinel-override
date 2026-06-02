@@ -680,7 +680,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
   if (Array.isArray(pageTypes) && pageTypes.length && currentUrl) {
     let detected = null;
     for (const pt of pageTypes) {
-      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) { console.error('[Sentinel] Error in llm-client.js:', (e && e.message) || String(e)); }
+      try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) { console.error('[Sentinel] Error in llm-client.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
     if (detected) {
       parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));
@@ -762,7 +762,7 @@ export function getPlatformContext(currentUrl, goal) {
     const profile = getPlatformProfile(currentUrl, goal);
     selectorBlock = _formatProfileSelectorsBlock(profile, currentUrl);
   } catch (e) {
-    console.warn('[Sentinel/llm] Profile lookup failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/llm] Profile lookup failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     // Continue without selector block - non-fatal
   }
   const ctx = prose + selectorBlock;
@@ -976,7 +976,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const strs = parsed.steps.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
         if (strs.length > 0) return strs;
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
     // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
@@ -1011,7 +1011,7 @@ export async function generatePlan(goal, settings, context = {}) {
           s2from = s2end + 1;
         } else { break; }
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     // Strategy 3: find first { and last } and try that substring; also try bare array.
     // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
@@ -1031,7 +1031,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
         if (Array.isArray(parsed) && parsed.length > 0) { const r = _norm3(parsed); if (r.length > 0) return r; }
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     // Strategy 4: extract numbered or bulleted steps from prose.
     // Uses contentNoThink so think-block text isn't mistaken for real plan steps.
@@ -1063,7 +1063,7 @@ export async function generatePlan(goal, settings, context = {}) {
     return [(goal || 'Complete the task').substring(0, 300)];
   } catch (e) {
     clearTimeout(timeout);
-    console.warn('Plan generation failed (non-fatal):', (e && e.message) || String(e));
+    console.warn('Plan generation failed (non-fatal):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     // Even on hard exception, return a minimal fallback so the loop has a plan.
     return goal ? [goal.substring(0, 300)] : ['Complete the task'];
   }
@@ -1873,7 +1873,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   try {
     data = await response.json();
   } catch (e) {
-    throw new Error('API returned invalid JSON: ' + ((e && e.message) || String(e)));
+    throw new Error('API returned invalid JSON: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -1908,7 +1908,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         return provider.parseToolUseResponse(data);
       } catch (e) {
         // Malformed Anthropic tool_use response — fall through to text parsing
-        console.warn('[Sentinel] Anthropic parseToolUseResponse failed, falling back to text parsing:', (e && e.message) || String(e));
+        console.warn('[Sentinel] Anthropic parseToolUseResponse failed, falling back to text parsing:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       }
     }
     // OpenAI-compatible: check for tool_calls in the response message
@@ -1919,7 +1919,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         return provider.parseToolUseResponse(data);
       } catch (e) {
         // parseToolUseResponse failed — fall through to text parsing
-        console.warn('[Sentinel] tool_use parse failed, falling back to text parsing:', (e && e.message) || String(e));
+        console.warn('[Sentinel] tool_use parse failed, falling back to text parsing:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       }
     }
     // Fallback: model returned text instead of tool_calls (e.g. finish_reason !== 'tool_calls')
@@ -1928,7 +1928,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       const responseText = provider.parseResponse(data);
       if (responseText) return parseLLMResponse(responseText);
     } catch (e) {
-      console.warn('[Sentinel/llm] parseResponse fallback failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel/llm] parseResponse fallback failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
     // One last attempt: try the raw tool_calls directly
@@ -1938,7 +1938,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         try {
           const input = JSON.parse(tc.function.arguments || '{}');
           return { type: tc.function.name, ...input };
-        } catch (e) { console.warn('[Sentinel/llm] tool_calls JSON parse failed:', (e && e.message) || String(e)); }
+        } catch (e) { console.warn('[Sentinel/llm] tool_calls JSON parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       }
     }
     // v3.61: z.ai sometimes returns finish_reason="tool_calls" with malformed/empty tool_calls
@@ -2000,7 +2000,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   try {
     responseText = provider.parseResponse(data);
   } catch (e) {
-    console.warn('[Sentinel/llm] parseResponse failed (non-tool-use path):', (e && e.message) || String(e));
+    console.warn('[Sentinel/llm] parseResponse failed (non-tool-use path):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
   }
   if (!responseText) return { type: 'note', text: 'Empty LLM response — will retry on next step.' };
@@ -2049,7 +2049,7 @@ export function extractFirstJsonObject(str) {
       try {
         const parsed = JSON.parse(candidate);
         if (parsed.type && validTypes.has(parsed.type)) return candidate;
-      } catch (e) { console.warn('[Sentinel/llm] JSON parse failed:', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel/llm] JSON parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       searchFrom = end + 1;
     } else {
       break;
@@ -2218,14 +2218,14 @@ export function parseLLMResponse(content) {
           'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
           'smart_navigate', 'batch']);
         if (parsed && parsed.type && _validTypesSet.has(parsed.type)) return parsed;
-      } catch (e) { console.warn('[Sentinel/llm] Regex salvage failed:', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel/llm] Regex salvage failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         if (salvaged) {
           console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
           return salvaged;
         }
-      } catch (e) { console.warn('[Sentinel/llm] Parse failed:', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel/llm] Parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
     return { type: 'note', text: `Parse error (will retry): ${(err && err.message) || String(err)}` };
   }
@@ -2255,7 +2255,7 @@ export async function getRelevantPatterns(goal) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
     return scored.map(s => s.pattern);
-  } catch (e) { console.error('[Sentinel/llm] getRelevantPatterns failed:', (e && e.message) || String(e)); return []; }
+  } catch (e) { console.error('[Sentinel/llm] getRelevantPatterns failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return []; }
 }
 
 // ========== Simple LLM Call (Quick Assist) ==========

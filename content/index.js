@@ -413,7 +413,7 @@ if (window.__sentinelInitialized) {
             // If we found elements, stop retrying
             if (interactiveElements.length >= 5) break;
           } catch (e) {
-            if (e && e.message && e.message.includes('Extension context invalidated')) throw e;
+            if (typeof e === 'object' && e !== null && typeof e.message === 'string' && e.message.includes('Extension context invalidated')) throw e;
           }
           // Wait for SPA to render
           if (attempt < maxRetries - 1) {
@@ -463,7 +463,7 @@ if (window.__sentinelInitialized) {
             // If we got meaningful content, stop retrying
             if (content.length >= 200) break;
           } catch (e) {
-            if (e && e.message && e.message.includes('Extension context invalidated')) throw e;
+            if (typeof e === 'object' && e !== null && typeof e.message === 'string' && e.message.includes('Extension context invalidated')) throw e;
           }
           // Wait for SPA to render before retrying
           if (attempt < maxRetries - 1) {

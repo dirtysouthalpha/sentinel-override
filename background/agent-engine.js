@@ -24,13 +24,13 @@ async function _visionObserve(tab, _currentUrl) {
         const parsed = typeof discoverResult.value === 'string'
           ? JSON.parse(discoverResult.value) : discoverResult.value;
         indexedElements = Array.isArray(parsed) ? parsed : [];
-      } catch (e) { console.warn('[Sentinel/v4] Element parse error:', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel/v4] Element parse error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
     console.log('[Sentinel/v4] Discovered ' + indexedElements.length + ' interactive elements');
 
     // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
     try { await cdpExecuteJs(tab, VISION_SOM, { timeout: 5000 }); }
-    catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', (e && e.message) || String(e)); }
+    catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     // Step 3: Small delay for canvas to render
     await new Promise(r => setTimeout(r, 200));
@@ -42,7 +42,7 @@ async function _visionObserve(tab, _currentUrl) {
         'return document.body ? document.body.innerText.substring(0, 30000) : "";',
         { timeout: 5000 });
       pageText = (textResult && textResult.value) || '';
-    } catch (e) { console.warn('[Sentinel/v4] Page text failed:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel/v4] Page text failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     // Step 5: Build element tree text for LLM
     let elementTree = '';
@@ -65,7 +65,7 @@ async function _visionObserve(tab, _currentUrl) {
       pageText: typeof pageText === 'string' ? pageText : ''
     };
   } catch (e) {
-    console.error('[Sentinel/v4] Vision observe error:', (e && e.message) || String(e));
+    console.error('[Sentinel/v4] Vision observe error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     return { elements: [], elementTree: '', pageText: '' };
   }
 }
@@ -256,7 +256,7 @@ export async function restoreFromCheckpoint() {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10) || 0;
         if (tabId > 0 && typeof url === 'string') {
-          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         }
       }
     }
@@ -265,7 +265,7 @@ export async function restoreFromCheckpoint() {
 
     // Persist restored history to chrome.storage.local so it survives across
     // the boundary. The run loop reads it from there on the first step.
-    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     return {
       restored: true,
@@ -276,7 +276,7 @@ export async function restoreFromCheckpoint() {
       memoryKeys: Object.keys(agentMemory || {})
     };
   } catch (e) {
-    return { restored: false, error: (e && e.message) || String(e) };
+    return { restored: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
   }
 }
 
@@ -332,12 +332,12 @@ async function _updateRunLogIndex(runLogId, fields) {
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
       const evictKeys = evict.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId).filter(Boolean);
-      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
   } catch (e) {
     // Storage write failed non-fatally
-    console.warn('[Sentinel] Run log index save failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel] Run log index save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
 }
 
@@ -383,7 +383,7 @@ function activityFail(stepNumber, key, label, detail) {
 
 /** Update an in-progress item's label without changing state (e.g., elapsed counter). */
 function activityUpdate(stepNumber, key, label) {
-  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 }
 
 // ========== Configuration ==========
@@ -437,14 +437,14 @@ async function persistHistory() {
     await chrome.storage.local.set({ agent_history: slice });
     _historyDirty = false;
   } catch (e) {
-    console.warn('[Sentinel] persistHistory storage write failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel] persistHistory storage write failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
-  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
-  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return {
     goal,
     history: history.slice(),
@@ -586,7 +586,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           confidence: modeDirective.confidence
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_handleModeMismatchCheck] run log set failed:', (e && e.message) || String(e));
+          console.error('[_handleModeMismatchCheck] run log set failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
         });
       }
     } catch (_) { /* non-fatal */ }
@@ -608,7 +608,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_handleModeMismatchCheck] decision log set failed:', (e && e.message) || String(e));
+          console.error('[_handleModeMismatchCheck] decision log set failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
         });
       }
     } catch (_e) { /* mode directive logging non-fatal */ }
@@ -621,7 +621,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
     // step, so it will pick up the new value automatically.
     return { cancel: false };
   } catch (e) {
-    console.warn('[Sentinel] _handleModeMismatchCheck failed (non-fatal):', (e && e.message) || String(e));
+    console.warn('[Sentinel] _handleModeMismatchCheck failed (non-fatal):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     return { cancel: false };
   }
 }
@@ -733,16 +733,16 @@ export async function startAgent(goal, sender) {
     } catch (_) { /* non-fatal */ }
     // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
     // for matching telemetry events to forensic log entries during postmortems.
-    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     // (3.27.0) Tell the telemetry persistence layer this is a new run. If the
     // user has telemetryPersist enabled in settings, events start streaming
     // to chrome.storage.local from this point onward.
-    try { telStartRun(runLogId, goal); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    try { telStartRun(runLogId, goal); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   } catch (_) { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
   // Subsequent open_tab handlers add their tabs to the same group.
-  try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   // (v3.53) Disable side panel on all tabs except the working tab
   // (v3.57) sidePanel scoping removed — was closing panel on start
@@ -762,9 +762,9 @@ export async function startAgent(goal, sender) {
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
     try { await _enableSidePanelEverywhere(); } catch (sidePanelErr) {
       /* Non-fatal: side panel re-enable failed */
-    } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
-        console.error('[startAgent] mode mismatch cancel sendMessage failed:', (e && e.message) || String(e));
+        console.error('[startAgent] mode mismatch cancel sendMessage failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       });
       return 'Agent cancelled by user (mode mismatch)';
     }
@@ -815,7 +815,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
           adaptedLength: (result.adaptedGoal || '').length
         });
         chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_applyAdaptivePrompts] Unhandled rejection:', (e && e.message) || String(e));
+          console.error('[_applyAdaptivePrompts] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
         });
       }
     } catch (_) { /* non-fatal */ }
@@ -837,12 +837,12 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
         originalGoal: result.originalGoal,
         adaptedGoal: result.adaptedGoal
       }).catch((e) => {
-        console.error('[_applyAdaptivePrompts] Unhandled rejection:', (e && e.message) || String(e));
+        console.error('[_applyAdaptivePrompts] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       });
     } catch (_e) { /* non-fatal */ }
     return result.adaptedGoal;
   } catch (e) {
-    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', (e && e.message) || String(e));
+    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     return goal;
   }
 }
@@ -853,10 +853,10 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
 async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
   const requestId = crypto.randomUUID();
   const kaName = 'adaptive_prompt_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -961,10 +961,10 @@ function _detectGoalModeDirective(goal) {
 async function _waitForModeMismatchDecision(info) {
   const requestId = crypto.randomUUID();
   const kaName = 'mode_mismatch_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -1008,15 +1008,15 @@ export async function stopAgent() {
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
-  try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
-  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (e && e.message) || String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1147,7 +1147,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       'Recent action: ' + (history.length > 0 && history[history.length - 1].action ? history[history.length - 1].action.type : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
-  } catch (e) { console.warn('[Sentinel] HUD update failed:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('[Sentinel] HUD update failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 }
 
 // ========== Stall Detection ==========
@@ -1217,14 +1217,14 @@ async function attachTabToSentinelGroup(tabId) {
           color: SENTINEL_GROUP_COLOR,
           collapsed: false
         });
-      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     } else {
       // Add to the existing group. tabs.group with groupId moves them in.
       try {
         await chrome.tabs.group({ tabIds: [tabId], groupId: agentTabGroupId });
       } catch (e) {
         // Group may have been dissolved by the user — recreate.
-        console.warn('[Sentinel] Tab group failed, recreating:', (e && e.message) || String(e));
+        console.warn('[Sentinel] Tab group failed, recreating:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
         const groupId = await chrome.tabs.group({ tabIds: [tabId] });
         agentTabGroupId = groupId;
         try {
@@ -1240,11 +1240,11 @@ async function attachTabToSentinelGroup(tabId) {
     // Ensure side panel is enabled on this attached tab.
     try {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
-    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     // (v3.53) Re-scope: enable panel on this new tab, disable on others
     // (v3.57) sidePanel scoping removed from tab attach
   } catch (e) {
-    console.warn('[Sentinel] attachTabToSentinelGroup failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel] attachTabToSentinelGroup failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
 }
 
@@ -1337,7 +1337,7 @@ async function _cdpObservePage(tabId) {
       }
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Ready check failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/CDP] Ready check failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
 
   const code = 'var results = { elements: [], text: "", overlays: [] };'
@@ -1396,10 +1396,10 @@ async function _cdpObservePage(tabId) {
     + '            results.overlays.push({ selector: "overlay", text: (node.textContent || "").substring(0, 100), buttons: btnList });'
     + '          }'
     + '        }'
-    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", (e && e.message) || String(e)); }'
+    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", (typeof e === "object" && e !== null && typeof e.message === "string") ? e.message : String(e)); }'
     + '    }'
     + '  }'
-    + '} catch(e) { results.error = (e && e.message) || String(e); }'
+    + '} catch(e) { results.error = (typeof e === "object" && e !== null && typeof e.message === "string") ? e.message : String(e); }'
     + 'return results;';
 
   // SPEED: Check cache — if same URL observed recently, reuse
@@ -1535,7 +1535,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
       console.warn('[Sentinel/CDP] Phase2 FAILED. error:', nukeResult && nukeResult.error);
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Phase2 threw:', (e && e.message) || String(e));
+    console.warn('[Sentinel/CDP] Phase2 threw:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
 
   // Phase 3: Quick scroll test (only if overlays were found)
@@ -1543,7 +1543,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
     await new Promise(r => setTimeout(r, 200));
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
-  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', (e && e.message) || String(e)); }
+  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   console.log('[Sentinel/CDP] Overlay dismissal complete. Total removed:', totalRemoved);
   return totalRemoved;
@@ -2006,7 +2006,7 @@ function formatTicketOutput(format, summary, goal, tech, options) {
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 function _hostnameOf(url) {
-  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return ''; }
+  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return ''; }
 }
 
 function _tenantsMatch(detected, expected) {
@@ -2635,7 +2635,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       return 'solved';
     }
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', (e && e.message) || String(e));
+    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
   
   // Strategy 2: Navigate to an alternative URL for the same site
@@ -2671,7 +2671,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     await sleep(2000);
     return 'went_back';
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Go back failed:', (e && e.message) || String(e));
+    console.log('[Sentinel/CAPTCHA] Go back failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
   
   // Strategy 4: Pause for user
@@ -2684,7 +2684,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
   let host;
-  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return null; }
+  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return null; }
   if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
 
   // Signal 1: a password input is present in the observed elements
@@ -3107,7 +3107,7 @@ async function _initRunState(goal) {
       'quickMode',
     ]);
   } catch (e) {
-    console.warn('[Sentinel] runAgentLoop settings load failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel] runAgentLoop settings load failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     stored = {};
   }
   _runSettings = {
@@ -3125,7 +3125,7 @@ async function _initRunState(goal) {
   try {
     await chrome.storage.local.set({ agent_history: [] });
   } catch (e) {
-    console.warn('[Sentinel] agent_history clear failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel] agent_history clear failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
   if (stored.agent_context && stored.agent_context.trim()) {
     return `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
@@ -3247,7 +3247,7 @@ async function runAgentLoop(goal, workingTabId) {
   try {
     agentPlan = await _generateInitialPlan(goal, workingTabId);
   } catch (e) {
-    console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', (e && e.message) || String(e));
+    console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     agentPlan = null;
   }
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (e) {
@@ -3257,7 +3257,7 @@ async function runAgentLoop(goal, workingTabId) {
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
   const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
-  try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', (e && e.message) || String(e)); }
+  try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   let command;  // v3.66: Moved declaration here so batch skip can assign it
   // Loop-detector state — declared here so they survive across iterations without
@@ -3296,7 +3296,7 @@ async function runAgentLoop(goal, workingTabId) {
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
-      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -3496,7 +3496,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
               // Defensive: re-register the tab after navigation in case the tab
               // lifecycle events cleared the context during page load
-              try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', (e && e.message) || String(e)); }
+              try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
               continue;
             }
             // Already on the right page - skip navigation
@@ -3525,7 +3525,7 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_td] Unhandled rejection:', e);
               });
-            } catch (e) { console.warn('[Sentinel] _td handler failed:', e && e.message || String(e)); }
+            } catch (e) { console.warn('[Sentinel] _td handler failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           }
         }
       } catch (_) { /* non-fatal */ }
@@ -3821,7 +3821,7 @@ async function runAgentLoop(goal, workingTabId) {
             scrollY: shotResult.scrollY
           };
           // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
-          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // (9.3) Store screenshot for replay export (ring-cap at 20)
           _stepScreenshots.set(stepCount, base64Image);
           if (_stepScreenshots.size > 20) {
@@ -3893,7 +3893,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_wallHit] Unhandled rejection:', e);
             });
-          } catch (e) { console.warn('[Sentinel] _wallHit handler failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] _wallHit handler failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // Log to forensic run log so HR/compliance reviews see when the agent
           // paused for credentials.
           try {
@@ -3910,7 +3910,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_wallHit] Unhandled rejection:', e);
               });
             }
-          } catch (e) { console.warn('[Sentinel] _wallHit run log failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] _wallHit run log failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // Wait until user resumes (Resume button → resumeAgent message)
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -3944,7 +3944,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_mfaHit] Unhandled rejection:', e);
             });
-          } catch (e) { console.warn('[Sentinel] _mfaHit handler failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] _mfaHit handler failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -4137,14 +4137,14 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_recovery] Unhandled rejection:', e);
               });
             }
-          } catch (e) { console.warn('[Sentinel] _recovery run log failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] _recovery run log failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // Activity stream surface — single item showing which skills fired
           try {
             const _label = _recovery.autoApply
               ? 'Skill auto-applied: ' + _recovery.appliedSkillIds[0]
               : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
             activityDone(stepCount, 'recovery-skills', _label, null);
-          } catch (e) { console.warn('[Sentinel] recovery skills activity failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] recovery skills activity failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         }
         if (_recovery.autoApply) {
           // Deterministic recovery — skip the LLM consult for this step.
@@ -4157,7 +4157,7 @@ async function runAgentLoop(goal, workingTabId) {
           loopDirective += _recovery.promptInjection;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', (e && e.message) || String(e)); } catch (_e) {
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); } catch (_e) {
           // Console logging failed non-fatally
         }
       }
@@ -4435,7 +4435,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         } catch (e) {
-          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', (e && e.message) || String(e));
+          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
           try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         }
       }
@@ -4539,7 +4539,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (!refExists) {
           try {
             console.warn('[agent-engine] LLM returned unknown ref "' + command.ref + '" not in latest observation. Content script will fall back to selector if available.');
-          } catch (e) { console.warn('[Sentinel] unknown ref logging failed:', e && e.message || String(e)); }
+          } catch (e) { console.warn('[Sentinel] unknown ref logging failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         }
       }
 
@@ -4773,7 +4773,7 @@ async function runAgentLoop(goal, workingTabId) {
               stepCount, apiCallCount
             });
           }
-        } catch (e) { console.warn('[Sentinel] ticket formatter failed:', (e && e.message) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] ticket formatter failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
         // (3.9.0) Final run-log entry + broadcast runLogId so the popup can offer Export.
         try {
@@ -4791,12 +4791,12 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
             // full slice between them.
-            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             // (3.27.0) Tell the persistence layer this run is done. Flushes
             // the buffer one last time and stamps finishedAt on the index.
             // Awaited so the storage write completes before the SW potentially
             // suspends after agent_finished fires.
-            try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+            try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             // (3.14.0) Stamp the index entry as completed with final step count.
             // (3.30.0) Compute the trust score and attach it to the index entry
             // so the popup-side Run Log list can render it without recomputing.
@@ -4842,9 +4842,9 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_skillStats] Unhandled rejection:', e);
               });
-            } catch (e) { console.warn('[Sentinel] _skillStats telemetry failed:', e && e.message || String(e)); }
+            } catch (e) { console.warn('[Sentinel] _skillStats telemetry failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           }
-        } catch (e) { console.warn('[Sentinel] skill stats block failed:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] skill stats block failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
         // (3.31.0) Compute trust score for the agent_finished payload.
         // We recompute here rather than reaching into the run-log block's
@@ -4865,7 +4865,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (_) { return null; }
         })();
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return []; }
+          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -4935,7 +4935,7 @@ async function runAgentLoop(goal, workingTabId) {
             let _resolved;
             try { _resolved = JSON.parse(_resolvedStr); } catch (e) {
               console.error('[Sentinel] Error in agent-engine.js:', e);
-              historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${(e && e.message) || String(e)}` });
+              historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${(typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)}` });
               continue;
             }
             _pendingCommandQueue.push(_resolved);
@@ -4972,7 +4972,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _textVal = _parseExtract(_extractText);
           const _inputVal = _parseExtract(_extractValue);
           _verifyActual = _inputVal || _textVal;
-        } catch (e) { console.warn('[Sentinel] verify extract parse failed:', e && e.message || String(e)); _verifyActual = null; }
+        } catch (e) { console.warn('[Sentinel] verify extract parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); _verifyActual = null; }
         let _verifyOutcome;
         if (!_verifyActual) {
           _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
@@ -5010,7 +5010,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
           activityDone(stepCount, 'note-content', 'Noted: "' + _preview + '"', null);
-        } catch (e) { console.warn('[Sentinel] note-content activity failed:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] note-content activity failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
         await persistHistory();
@@ -5039,11 +5039,11 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
           // tab-manager already emits a debug-level read summary; this one is
           // at info level because the LLM explicitly chose to consume it.
-          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { tel.error('network', 'Error reading console', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           sendActionResult(stepCount, 'Error reading console: ' + ((e && e.message) ? e.message : 'unknown'), true);
         }
         await sleep(300);
@@ -5069,7 +5069,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { tel.error('network', 'Error reading network', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           sendActionResult(stepCount, 'Error reading network: ' + ((e && e.message) ? e.message : 'unknown'), true);
         }
         await sleep(300);
@@ -5509,7 +5509,7 @@ async function runAgentLoop(goal, workingTabId) {
           } else {
           // (3.7.2) Attach the new tab to the Sentinel group so the user
           // sees it linked in the tab bar.
-          try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           await switchToTab(ctx.tabId);
           await sleep(2000);
           await injectContentScript(ctx.tabId);
@@ -5598,13 +5598,13 @@ async function runAgentLoop(goal, workingTabId) {
         if (!isValidUrl(command.url)) {
           // (3.25.1) Telemetry: invalid navigate URL — usually means the LLM
           // hallucinated a URL or pasted a fragment without a scheme.
-          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           result = 'Invalid URL: ' + command.url;
           actionFailed = true;
         } else {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
           // below so operators can see latency + landing-URL mismatches.
-          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // (3.49.1) Push undo entry before navigating so we can go back.
           try {
             undoStack.push({ type: 'navigate', tabId: tab, previousUrl: currentUrl || '' });
@@ -5619,7 +5619,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
-            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             // In CDP mode, content script failure is expected — don't mark as action failure
             if (_cdpFallbackActive) {
               result = 'Navigated to ' + command.url;
@@ -5636,10 +5636,10 @@ async function runAgentLoop(goal, workingTabId) {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
-                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
                 result = 'Navigated to ' + arrivedUrl;
               } else {
-                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
                 result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
                 actionFailed = true;
               }
@@ -5716,7 +5716,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               await chrome.storage.local.set({ agent_memory: agentMemory });
             } catch (e) {
-              console.warn('[Sentinel] agent_memory storage write failed (extract):', (e && e.message) || String(e));
+              console.warn('[Sentinel] agent_memory storage write failed (extract):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
             }
             // (3.25.1) Telemetry: memory write from extract/extract_list. Lets
             // the operator watch memory grow in real time and catch keys that
@@ -5725,7 +5725,7 @@ async function runAgentLoop(goal, workingTabId) {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
               tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory || {}).length });
-            } catch (e) { console.warn('[Sentinel] extract telemetry failed:', e && e.message || String(e)); }
+            } catch (e) { console.warn('[Sentinel] extract telemetry failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
               : `"${String(parsed.value).substring(0, 100)}"`;
@@ -5735,7 +5735,7 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.20.0) Show extraction outcome in the activity stream
             try {
               activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
-            } catch (e) { console.warn('[Sentinel] extract-content activity failed:', e && e.message || String(e)); }
+            } catch (e) { console.warn('[Sentinel] extract-content activity failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             } // close else (error-string guard)
           }
         } catch (_) {
@@ -5822,7 +5822,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 await chrome.storage.local.set({ agent_memory: agentMemory });
               } catch (e) {
-                console.warn('[Sentinel] agent_memory storage write failed (execute_js):', (e && e.message) || String(e));
+                console.warn('[Sentinel] agent_memory storage write failed (execute_js):', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
               }
               // (3.25.1) Telemetry: memory write from execute_js. Tagged with
               // the recovery ladder strategy so operators can see when an
@@ -5831,7 +5831,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
                 tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory || {}).length });
-              } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', e && e.message || String(e)); }
+              } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
@@ -5842,7 +5842,7 @@ async function runAgentLoop(goal, workingTabId) {
                   ? _itemCount + ' items captured'
                   : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
                 activityDone(stepCount, 'js-extract-content', 'Saved "' + savedKey + '" → ' + _summary, null);
-              } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', e && e.message || String(e)); }
+              } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             }
           }
         }
@@ -5871,7 +5871,7 @@ async function runAgentLoop(goal, workingTabId) {
               const bbox = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
               if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
                 // Make sure the element is in view, then click via CDP at its center.
-                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
                 // Re-query bbox after scroll
                 let cx = bbox.x, cy = bbox.y;
                 try {
@@ -5885,7 +5885,7 @@ async function runAgentLoop(goal, workingTabId) {
                 if (r.ok) { result = 'Clicked ' + targetLabel + ' via CDP'; cdpDone = true; }
                 else { console.warn('[CDP] dispatchClick failed, falling back:', r.error); }
               }
-            } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', (e && e.message) || String(e)); }
+            } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           } else if (command.type === 'type') {
             // (3.49.1) Push undo entry before typing so we can restore the field.
             try {
@@ -5978,7 +5978,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.warn('[CDP] execute_js failed, falling back:', cdpResult.error);
               }
             } catch (e) {
-              console.warn('[CDP] execute_js threw, falling back:', (e && e.message) || String(e));
+              console.warn('[CDP] execute_js threw, falling back:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
             }
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
@@ -6226,9 +6226,9 @@ async function runAgentLoop(goal, workingTabId) {
               const newCtx = getTabContext(newTab.id);
               if (newCtx) newCtx.isAgentCreated = true;
               // (3.7.2) Attach the click-opened new tab to the Sentinel group.
-              try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+              try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); _host = newUrl || 'new page'; }
               result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
@@ -6239,7 +6239,7 @@ async function runAgentLoop(goal, workingTabId) {
               await waitForPageLoad(tab);
               await sleep(500);
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); _host = newUrl || 'new page'; }
               result = 'Clicked -> navigated to ' + _host;
             }
           } else {
@@ -6257,10 +6257,10 @@ async function runAgentLoop(goal, workingTabId) {
                 } else {
                   result = 'Clicked -> navigated to ' + _clickedHost;
                 }
-              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); result = 'Clicked -> page navigated'; }
+              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); result = 'Clicked -> page navigated'; }
             }
           }
-        } catch (e) { console.warn('[Sentinel] click handler failed:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] click handler failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       }
 
       // Track success/failure for self-healing
@@ -6503,10 +6503,10 @@ async function runAgentLoop(goal, workingTabId) {
       }
       // (3.8.2) Roll up old history into a single summary entry so the
       // LLM prompt stays bounded on long multi-portal runs.
-      try { maybeRollupHistory(history); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { maybeRollupHistory(history); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
       // (3.8.2) Periodic progress checkpoint chat message.
-      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
       // Cap in-memory history
       if (history.length > CONFIG.maxHistoryEntries) {
@@ -6640,19 +6640,19 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   // NOW safe to release keepalive — report is already generated
-  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', (e && e.message) || String(e)); }
+  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(_e) {}
 
   if (finished) {
     try {
       await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
     } catch (e) {
-      console.warn('[Sentinel] post-loop history/memory clear failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel] post-loop history/memory clear failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     }
   }
 
   // Release any CDP debugger attachments held during the run.
-  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
@@ -6660,7 +6660,7 @@ async function runAgentLoop(goal, workingTabId) {
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (e && e.message) || String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
@@ -6701,7 +6701,7 @@ async function saveLearnedPattern(goal, history, success) {
     });
     if (patterns.length > CONFIG.maxLearnedPatterns) patterns.splice(0, patterns.length - CONFIG.maxLearnedPatterns);
     await chrome.storage.local.set({ learned_patterns: patterns });
-  } catch (e) { console.warn('Failed to save pattern:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('Failed to save pattern:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 }
 
 // ========== Utilities ==========
@@ -6718,7 +6718,7 @@ function sleep(ms) {
   // (between CDP mouse events, between content-script roundtrips) and would
   // drown out the panel. >=1500ms sleeps are usually post-navigate / page-load
   // waits, which are exactly what operators want to see.
-  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -6782,10 +6782,10 @@ async function requestApproval(command, stepNumber) {
   // this, an AFK user past the ~30s MV3 idle timer kills the SW and the
   // listener gets GC'd — silent timeout, no recovery.
   const kaName = 'approval_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
+      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
