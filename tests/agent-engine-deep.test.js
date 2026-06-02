@@ -541,6 +541,7 @@ describe('saveLearnedPattern', () => {
   test('scrubs IP addresses from goal', async () => {
     await saveLearnedPattern('Check server 192.168.1.100 for issues', [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('192.168.1.100');
     expect(stored[0].goal).toContain('XXX.XXX.XXX.XXX');
   });
@@ -548,6 +549,7 @@ describe('saveLearnedPattern', () => {
   test('scrubs email addresses from goal', async () => {
     await saveLearnedPattern('Email user@example.com about policy', [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('user@example.com');
     expect(stored[0].goal).toContain('[email]');
   });
@@ -555,6 +557,7 @@ describe('saveLearnedPattern', () => {
   test('scrubs ticket numbers from goal', async () => {
     await saveLearnedPattern('Investigate ticket #12345', [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('#12345');
     expect(stored[0].goal).toContain('[ticket]');
   });
@@ -562,12 +565,14 @@ describe('saveLearnedPattern', () => {
   test('scrubs INC ticket numbers', async () => {
     await saveLearnedPattern('Review incident INC0001234', [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).toContain('[ticket]');
   });
 
   test('scrubs double-quoted strings from goal', async () => {
     await saveLearnedPattern('Check "Acme Corp" settings', [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('Acme Corp');
     expect(stored[0].goal).toContain('"[client]"');
   });
@@ -575,6 +580,7 @@ describe('saveLearnedPattern', () => {
   test('scrubs single-quoted strings from goal', async () => {
     await saveLearnedPattern("Check 'Acme Corp' settings", [], true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('Acme Corp');
     expect(stored[0].goal).toContain("'[client]'");
   });
@@ -586,6 +592,7 @@ describe('saveLearnedPattern', () => {
     ];
     await saveLearnedPattern('Do something', history, true);
     const stored = storageData.learned_patterns;
+    expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].steps).toHaveLength(2);
     expect(stored[0].steps[0].type).toBe('navigate');
     expect(stored[0].steps[1].selector).toBe('#btn');
