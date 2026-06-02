@@ -51,7 +51,7 @@ function openImportDialog() {
   input.type = 'file';
   input.accept = '.json';
   input.style.display = 'none';
-  document.body.appendChild(input);
+  if (document.body) document.body.appendChild(input);
 
   input.addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -233,10 +233,10 @@ function downloadJson(data, filename) {
   a.href = url;
   a.download = filename;
   try {
-    document.body.appendChild(a);
+    if (document.body) document.body.appendChild(a);
     a.click();
   } finally {
-    try { document.body.removeChild(a); } catch (_e) {}
+    try { if (document.body) document.body.removeChild(a); } catch (_e) {}
     URL.revokeObjectURL(url);
   }
 }
@@ -248,10 +248,10 @@ function downloadText(content, filename, mimeType) {
   a.href = url;
   a.download = filename;
   try {
-    document.body.appendChild(a);
+    if (document.body) document.body.appendChild(a);
     a.click();
   } finally {
-    try { document.body.removeChild(a); } catch (_e) {}
+    try { if (document.body) document.body.removeChild(a); } catch (_e) {}
     URL.revokeObjectURL(url);
   }
 }

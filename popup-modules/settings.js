@@ -440,7 +440,7 @@ function _renderSkillStatsModal(skills) {
 
   inner.appendChild(body);
   modal.appendChild(inner);
-  document.body.appendChild(modal);
+  if (document.body) document.body.appendChild(modal);
 
   const removeEscClose = () => document.removeEventListener('keydown', escClose);
   const close = () => { modal.remove(); removeEscClose(); };
@@ -666,9 +666,9 @@ if (downloadAuditLogBtn) {
       const a = document.createElement('a');
       a.href = url;
       a.download = 'sentinel-audit-log.csv';
-      document.body.appendChild(a);
+      if (document.body) document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      if (document.body) document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
       downloadAuditLogBtn.textContent = 'Error: ' + (String(e) || 'Unknown error');

@@ -244,7 +244,7 @@
         Click any row to expand payload. Verbosity set in Settings.
       </div>
     `;
-    document.body.appendChild(panel);
+    if (document.body) document.body.appendChild(panel);
 
     _buildFilterChips();
     _wirePanelControls();
@@ -353,10 +353,10 @@
           const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
           a.href = url;
           a.download = 'sentinel-telemetry-' + ts + '.json';
-          document.body.appendChild(a);
+          if (document.body) document.body.appendChild(a);
           a.click();
           setTimeout(() => {
-            try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch { /* DOM may be detached */ }
+            try { if (document.body) document.body.removeChild(a); URL.revokeObjectURL(url); } catch { /* DOM may be detached */ }
           }, 1500);
           exportBtn.textContent = 'Exported!';
           setTimeout(() => { exportBtn.textContent = 'Export'; }, 1200);
@@ -452,7 +452,7 @@
         menu.appendChild(item);
       }
     }
-    document.body.appendChild(menu);
+    if (document.body) document.body.appendChild(menu);
     const dismiss = (e) => {
       if (menu.contains(e.target) || (e.target && e.target.id === 'telemPastRunsBtn')) return;
       menu.remove();
