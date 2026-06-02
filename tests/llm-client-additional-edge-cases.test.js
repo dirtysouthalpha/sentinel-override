@@ -516,7 +516,7 @@ describe('LLM client additional edge cases', () => {
       },
     };
 
-    expect(nullMessageError.error.message).toBeNull();
+    expect(nullMessageError.error?.message ?? null).toBeNull();
   });
 
   test('handles error response with missing error fields', async () => {

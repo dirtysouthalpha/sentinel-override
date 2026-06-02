@@ -323,7 +323,7 @@ describe('agent-engine recovery and edge cases', () => {
         await startAgent(longGoal, { tab: { id: 1 } });
       } catch (e) {
         // Expected to fail without LLM setup
-        expect(e && e.message).not.toContain('4000');
+        expect(typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)).not.toContain('4000');
       }
     });
 
@@ -415,7 +415,7 @@ describe('agent-engine recovery and edge cases', () => {
           await startAgent(goal, { tab: { id: 1 } });
         } catch (e) {
           // Expected to fail without LLM
-          expect(e && e.message).not.toContain('special');
+          expect(typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)).not.toContain('special');
         }
       }
     });
@@ -428,7 +428,7 @@ describe('agent-engine recovery and edge cases', () => {
         await startAgent(longGoal, { tab: { id: 1 } });
       } catch (e) {
         // Expected to fail without LLM
-        expect(e && e.message).not.toContain('4000');
+        expect(typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)).not.toContain('4000');
       }
     });
   });
