@@ -969,7 +969,7 @@ function sendMessage() {
   chrome.storage.local.get(['last_agent_goal', 'agent_history'], (stored) => {
     if (chrome.runtime.lastError) {
       removeTypingIndicator();
-      addMessage('Error reading stored goal: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+      addMessage('Error reading stored goal: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
       resetUI();
       return;
     }
@@ -990,7 +990,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
-        addMessage('Error: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+        addMessage('Error: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
         resetUI();
         return;
       }
@@ -1018,7 +1018,7 @@ function resetUI() {
 stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
     if (chrome.runtime.lastError && !response) {
-      addMessage('Error stopping agent: ' + (chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error'), 'assistant');
+      addMessage('Error stopping agent: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
     } else if (response && response.ok === false) {
       addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
     } else {
@@ -1071,7 +1071,7 @@ if (undoBtn) {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
       if (chrome.runtime.lastError && !resp) {
-        addMessage('Undo failed: ' + ((chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error'), 'assistant');
+        addMessage('Undo failed: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
         return;
       }
       if (resp && resp.ok === false) {
@@ -1861,7 +1861,7 @@ function openReportModal(markdown) {
   try {
     chrome.storage.local.set({ _pendingViewReport: payload }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error');
+        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         openReportModalInline(markdown);
         return;
       }
