@@ -768,6 +768,8 @@ export async function cdpDispatchType(tabId, text, options = {}) {
       // Pace banner updates: every char for very short strings, every Nth
       // char for medium strings so the popup stream isn't spammy.
       const updateInterval = Math.max(1, Math.floor(text.length / 12));
+      let consecutiveErrors = 0;
+      const MAX_CONSECUTIVE_ERRORS = 3;
 
       for (let i = 0; i < text.length; i++) {
         const ch = text[i];
@@ -781,20 +783,36 @@ export async function cdpDispatchType(tabId, text, options = {}) {
               text,
               position: i + 1
             });
-          } catch (e) { console.warn('[Sentinel/tab-manager] typing progress update failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+            consecutiveErrors = 0;
+          } catch (e) {
+            consecutiveErrors++;
+            console.warn('[Sentinel/tab-manager] typing progress update failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+            if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+              return { ok: false, error: `Content script unreachable after ${MAX_CONSECUTIVE_ERRORS} consecutive failures` };
+            }
+          }
         }
 
-        if (ch === '\n' || ch === '\r') {
-          await cdpDispatchKey(tabId, 'Enter');
-        } else {
-          const params = cdpKeyParamsFor(ch) || {
-            key: ch,
-            code: 'Key' + ch.toUpperCase(),
-            windowsVirtualKeyCode: ch.charCodeAt(0),
-            text: ch
-          };
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyDown' });
-          await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
+        try {
+          if (ch === '\n' || ch === '\r') {
+            await cdpDispatchKey(tabId, 'Enter');
+          } else {
+            const params = cdpKeyParamsFor(ch) || {
+              key: ch,
+              code: 'Key' + ch.toUpperCase(),
+              windowsVirtualKeyCode: ch.charCodeAt(0),
+              text: ch
+            };
+            await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyDown' });
+            await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
+          }
+          consecutiveErrors = 0;
+        } catch (e) {
+          consecutiveErrors++;
+          console.warn('[Sentinel/tab-manager] character dispatch failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            return { ok: false, error: `Debugger command failed after ${MAX_CONSECUTIVE_ERRORS} consecutive failures` };
+          }
         }
 
         // Human-ish typing pace: fast for medium strings, slightly slower
@@ -954,8 +972,11 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
           if (chrome.runtime.lastError) {
             const err = typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError);
             reject(new Error(err || 'Screenshot capture failed'));
+          } else if (typeof dataUrl !== 'string' || dataUrl.length === 0) {
+            reject(new Error('Screenshot capture returned empty data'));
+          } else {
+            resolve(dataUrl);
           }
-          else resolve(dataUrl);
         });
       });
       const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
