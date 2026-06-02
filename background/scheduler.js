@@ -517,7 +517,7 @@ export async function executeScheduledTask(alarmName) {
   }
 
   let tabInfo;
-  try { tabInfo = await getTabInfo(tabId); } catch { tabInfo = null; }
+  try { tabInfo = await getTabInfo(tabId); } catch (e) { console.warn('[Sentinel/scheduler] getTabInfo failed:', (e && e.message) || String(e)); tabInfo = null; }
   registerInitialTab(tabId, tabInfo?.url || '');
 
   // Register listener BEFORE startAgent so agent_loop_complete can't fire and be missed

@@ -52,7 +52,7 @@ export async function waitForPageLoad(tabId) {
  */
 function getInFlightRequestCount(tabId) {
   const buf = networkBuffers.get(tabId);
-  if (!buf) return 0;
+  if (!buf || !(buf instanceof Map)) return 0;
   let count = 0;
   for (const entry of buf.values()) {
     // endTs === 0 means the request started but hasn't received a response or failure yet

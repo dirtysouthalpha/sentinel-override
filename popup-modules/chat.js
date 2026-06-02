@@ -907,6 +907,7 @@ goalInput.addEventListener('keydown', (e) => {
 sendBtn.addEventListener('click', sendMessage);
 
 function setAgentActive(isActive) {
+  if (!activeIndicator) return;
   if (isActive) {
     activeIndicator.classList.add('active');
     if (injectContextBar) injectContextBar.style.display = 'flex';

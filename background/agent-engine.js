@@ -637,8 +637,8 @@ export async function startAgent(goal, sender) {
   // Determine which tab to operate on
   let startTabId;
   if (!sender.tab || !sender.tab.id) {
-    const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t)); });
-    if (tabs && tabs.length > 0 && tabs[0] != null && tabs[0].id) {
+    const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t || [])); });
+    if (Array.isArray(tabs) && tabs.length > 0 && tabs[0] != null && tabs[0].id) {
       startTabId = tabs[0].id;
     } else {
       throw new Error('No active tab found');
@@ -1248,7 +1248,7 @@ async function detachAllSentinelTabs() {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) {
         // Tab was already closed during the run — not an error, expected behavior
         if (!_e2 || !_e2.message || !_e2.message.includes('No tab with id')) {
-          console.error('[Sentinel] Error in agent-engine.js:', _e2 && _e2.message);
+          console.error('[Sentinel] Error in agent-engine.js:', (_e2 && _e2.message) || String(_e2));
         }
       }
     }
@@ -1417,7 +1417,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
   // Phase 1: Click accept/agree buttons if we have overlay detection data
   if (overlays && overlays.length > 0) {
     for (const overlay of overlays) {
-      const buttons = overlay.buttons || [];
+      const buttons = Array.isArray(overlay.buttons) ? overlay.buttons : [];
       const acceptBtn = buttons.find(b =>
         b && /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i.test(b.text)
       );
@@ -3499,7 +3499,7 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_td] Unhandled rejection:', e);
               });
-            } catch (_e) {}
+            } catch (e) { console.warn('[Sentinel] _td handler failed:', e && e.message || String(e)); }
           }
         }
       } catch (_) { /* non-fatal */ }
@@ -3627,7 +3627,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const parsed = JSON.parse(val.replace('JS Result: ', ''));
                 val = (parsed && parsed.value !== undefined) ? parsed.value : val;
-              } catch (_e) {}
+              } catch (e) { /* JSON parse failed - use raw value */ }
             }
             const parsed = typeof val === 'number' ? val : parseInt(String(val), 10);
             _currentDomHash = (typeof parsed === 'number' && !Number.isNaN(parsed)) ? parsed : 0;
@@ -3867,7 +3867,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_wallHit] Unhandled rejection:', e);
             });
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] _wallHit handler failed:', e && e.message || String(e)); }
           // Log to forensic run log so HR/compliance reviews see when the agent
           // paused for credentials.
           try {
@@ -3884,7 +3884,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_wallHit] Unhandled rejection:', e);
               });
             }
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] _wallHit run log failed:', e && e.message || String(e)); }
           // Wait until user resumes (Resume button → resumeAgent message)
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -3918,7 +3918,7 @@ async function runAgentLoop(goal, workingTabId) {
             }).catch((e) => {
               console.error('[_mfaHit] Unhandled rejection:', e);
             });
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] _mfaHit handler failed:', e && e.message || String(e)); }
           // Wait until user resumes
           while (agentPaused && agentRunning) await sleep(500);
           if (!agentRunning) break;
@@ -4111,14 +4111,14 @@ async function runAgentLoop(goal, workingTabId) {
                 console.error('[_recovery] Unhandled rejection:', e);
               });
             }
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] _recovery run log failed:', e && e.message || String(e)); }
           // Activity stream surface — single item showing which skills fired
           try {
             const _label = _recovery.autoApply
               ? 'Skill auto-applied: ' + _recovery.appliedSkillIds[0]
               : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
             activityDone(stepCount, 'recovery-skills', _label, null);
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] recovery skills activity failed:', e && e.message || String(e)); }
         }
         if (_recovery.autoApply) {
           // Deterministic recovery — skip the LLM consult for this step.
@@ -4237,7 +4237,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (_pendingCommandQueue.length > 0) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {} }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ } }
         command = _pendingCommandQueue.shift();
         activityDone(stepCount, 'consult-ai', 'Queued sub-command: ' + command.type, null);
         _lastAiCallMs = 0;
@@ -4247,7 +4247,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else if (_skillAutoCommand) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {} }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ } }
         command = _skillAutoCommand;
         activityDone(stepCount, 'consult-ai', 'Skipped (skill auto-applied)', null);
         _lastAiCallMs = 0;
@@ -4410,7 +4410,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (e) {
           console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e && e.message);
-          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {}
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         }
       }
 
@@ -4421,7 +4421,7 @@ async function runAgentLoop(goal, workingTabId) {
         _lastAiCallMs = Date.now() - _aiStart;
         try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
         // Clear SoM overlay so it doesn't interfere with action execution
-        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) {}
+        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ }
         base64Image = null; // release screenshot memory
         agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
@@ -4513,7 +4513,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (!refExists) {
           try {
             console.warn('[agent-engine] LLM returned unknown ref "' + command.ref + '" not in latest observation. Content script will fall back to selector if available.');
-          } catch (_e) {}
+          } catch (e) { console.warn('[Sentinel] unknown ref logging failed:', e && e.message || String(e)); }
         }
       }
 
@@ -4816,9 +4816,9 @@ async function runAgentLoop(goal, workingTabId) {
               }).catch((e) => {
                 console.error('[_skillStats] Unhandled rejection:', e);
               });
-            } catch (_e) {}
+            } catch (e) { console.warn('[Sentinel] _skillStats telemetry failed:', e && e.message || String(e)); }
           }
-        } catch (_e) {}
+        } catch (e) { console.warn('[Sentinel] skill stats block failed:', e && e.message || String(e)); }
 
         // (3.31.0) Compute trust score for the agent_finished payload.
         // We recompute here rather than reaching into the run-log block's
@@ -4946,7 +4946,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _textVal = _parseExtract(_extractText);
           const _inputVal = _parseExtract(_extractValue);
           _verifyActual = _inputVal || _textVal;
-        } catch (_e) {}
+        } catch (e) { console.warn('[Sentinel] verify extract parse failed:', e && e.message || String(e)); _verifyActual = null; }
         let _verifyOutcome;
         if (!_verifyActual) {
           _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
@@ -4984,7 +4984,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
           activityDone(stepCount, 'note-content', 'Noted: "' + _preview + '"', null);
-        } catch (_e) {}
+        } catch (e) { console.warn('[Sentinel] note-content activity failed:', e && e.message || String(e)); }
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
         await persistHistory();
@@ -5699,7 +5699,7 @@ async function runAgentLoop(goal, workingTabId) {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
               tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory || {}).length });
-            } catch (_e) {}
+            } catch (e) { console.warn('[Sentinel] extract telemetry failed:', e && e.message || String(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
               : `"${String(parsed.value).substring(0, 100)}"`;
@@ -5709,7 +5709,7 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.20.0) Show extraction outcome in the activity stream
             try {
               activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
-            } catch (_e) {}
+            } catch (e) { console.warn('[Sentinel] extract-content activity failed:', e && e.message || String(e)); }
             } // close else (error-string guard)
           }
         } catch (_) {
@@ -5792,7 +5792,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (savedValue !== null) {
               agentMemory[savedKey] = savedValue;
               const memKeys = Object.keys(agentMemory || {});
-              if (memKeys.length > CONFIG.maxMemoryEntries) delete agentMemory[memKeys[0]];
+              if (memKeys.length > CONFIG.maxMemoryEntries && agentMemory) delete agentMemory[memKeys[0]];
               try {
                 await chrome.storage.local.set({ agent_memory: agentMemory });
               } catch (e) {
@@ -5805,7 +5805,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
                 tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory || {}).length });
-              } catch (_e) {}
+              } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', e && e.message || String(e)); }
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
@@ -5816,7 +5816,7 @@ async function runAgentLoop(goal, workingTabId) {
                   ? _itemCount + ' items captured'
                   : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
                 activityDone(stepCount, 'js-extract-content', 'Saved "' + savedKey + '" → ' + _summary, null);
-              } catch (_e) {}
+              } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', e && e.message || String(e)); }
             }
           }
         }
@@ -6223,7 +6223,7 @@ async function runAgentLoop(goal, workingTabId) {
               } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
             }
           }
-        } catch (_e) {}
+        } catch (e) { console.warn('[Sentinel] click handler failed:', e && e.message || String(e)); }
       }
 
       // Track success/failure for self-healing

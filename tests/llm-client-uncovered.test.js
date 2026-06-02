@@ -17,7 +17,8 @@ globalThis.chrome = {
     local: {
       get: (keys) => {
         const result = {};
-        for (const k of keys) {
+        const keyList = Array.isArray(keys) ? keys : [keys];
+        for (const k of keyList) {
           if (_storageData[k] !== undefined) result[k] = _storageData[k];
         }
         return Promise.resolve(result);
