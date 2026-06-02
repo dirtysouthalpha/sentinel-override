@@ -138,7 +138,7 @@ export async function resetSkillStats() {
   if (_saveStatsTimer) { clearTimeout(_saveStatsTimer); _saveStatsTimer = null; }
   _stats = {};
   _pendingOutcomeSkillIds = [];
-  try { await chrome.storage.local.remove(STATS_KEY); } catch (_e) { console.warn('[Sentinel/skills] stats clear error:', _e && _e.message); }
+  try { await chrome.storage.local.remove(STATS_KEY); } catch (_e) { console.warn('[Sentinel/skills] stats clear error:', (_e && _e.message) || String(_e)); }
   try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (_e) { /* telemetry unavailable */ }
 }
 

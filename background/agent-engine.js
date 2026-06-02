@@ -1992,7 +1992,7 @@ function formatTicketOutput(format, summary, goal, tech, options) {
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 function _hostnameOf(url) {
-  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return ''; }
+  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return ''; }
 }
 
 function _tenantsMatch(detected, expected) {
@@ -2670,7 +2670,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
   let host;
-  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return null; }
+  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return null; }
   if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
 
   // Signal 1: a password input is present in the observed elements
@@ -3243,7 +3243,7 @@ async function runAgentLoop(goal, workingTabId) {
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
   const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
-  try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', e); }
+  try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', (e && e.message) || String(e)); }
 
   let command;  // v3.66: Moved declaration here so batch skip can assign it
   // Loop-detector state — declared here so they survive across iterations without
@@ -3470,7 +3470,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
               // Defensive: re-register the tab after navigation in case the tab
               // lifecycle events cleared the context during page load
-              try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', e); }
+              try { registerInitialTab(tab, goalUrl); } catch(e) { console.warn('[Sentinel] tab re-register failed:', (e && e.message) || String(e)); }
               continue;
             }
             // Already on the right page - skip navigation
@@ -4839,7 +4839,7 @@ async function runAgentLoop(goal, workingTabId) {
           } catch (_) { return null; }
         })();
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); return []; }
+          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -6191,7 +6191,7 @@ async function runAgentLoop(goal, workingTabId) {
               // (3.7.2) Attach the click-opened new tab to the Sentinel group.
               try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); _host = newUrl || 'new page'; }
               result = 'Clicked -> new tab opened: ' + _host;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
@@ -6202,7 +6202,7 @@ async function runAgentLoop(goal, workingTabId) {
               await waitForPageLoad(tab);
               await sleep(500);
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); _host = newUrl || 'new page'; }
               result = 'Clicked -> navigated to ' + _host;
             }
           } else {
@@ -6220,7 +6220,7 @@ async function runAgentLoop(goal, workingTabId) {
                 } else {
                   result = 'Clicked -> navigated to ' + _clickedHost;
                 }
-              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); result = 'Clicked -> page navigated'; }
+              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); result = 'Clicked -> page navigated'; }
             }
           }
         } catch (e) { console.warn('[Sentinel] click handler failed:', e && e.message || String(e)); }
@@ -6594,7 +6594,7 @@ async function runAgentLoop(goal, workingTabId) {
   }
 
   // NOW safe to release keepalive — report is already generated
-  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', e); }
+  try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', (e && e.message) || String(e)); }
   try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(_e) {}
 
   if (finished) {
@@ -6655,7 +6655,7 @@ async function saveLearnedPattern(goal, history, success) {
     });
     if (patterns.length > CONFIG.maxLearnedPatterns) patterns.splice(0, patterns.length - CONFIG.maxLearnedPatterns);
     await chrome.storage.local.set({ learned_patterns: patterns });
-  } catch (e) { console.warn('Failed to save pattern:', e); }
+  } catch (e) { console.warn('Failed to save pattern:', (e && e.message) || String(e)); }
 }
 
 // ========== Utilities ==========
