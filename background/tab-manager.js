@@ -508,7 +508,7 @@ export function readNetworkRequests(tabId, options) {
   arr.sort((a, b) => b.startTs - a.startTs);
   return arr.slice(0, limit).map(e => ({
     method: e.method,
-    url: e.url.substring(0, 300),
+    url: (e.url || '').substring(0, 300),
     status: e.status,
     type: e.type,
     duration_ms: e.duration,

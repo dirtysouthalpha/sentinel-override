@@ -361,7 +361,7 @@ function loadApprovalMode() {
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
-      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
     } else {
       isApprovalMode = result.approvalMode === true;
     }
@@ -396,7 +396,7 @@ function setupApprovalModeToggle() {
       chrome.storage.local.set({
         approvalMode: false,
         approvalModeAcknowledged: true
-      }).catch(() => {});
+      }).catch((e) => { console.warn('[Sentinel/chat] Failed to persist approval mode:', (e && e.message) || String(e)); });
       updateApprovalModeUI(false);
       return;
     }
@@ -456,7 +456,7 @@ function maybeShowSafetyBanner() {
     const dismissSafetyBanner = document.getElementById('dismissSafetyBanner');
     if (dismissSafetyBanner) {
       dismissSafetyBanner.addEventListener('click', () => {
-        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
         banner.remove();
       });
     }
@@ -555,7 +555,7 @@ function respondApproval(decision, context) {
   // pending request (per the contract with Agent A).
   if (ctx.requestId) message.requestId = ctx.requestId;
 
-  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
 
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
@@ -736,7 +736,7 @@ function loadChatHistory() {
 function saveChatHistory() {
   try {
     const state = getState();
-    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
   } catch (_e) { /* storage unavailable */ }
 }
 
@@ -981,7 +981,7 @@ function sendMessage() {
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
@@ -1659,7 +1659,7 @@ window.executeCommand = (action) => {
       document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); try { showToast('Run log history unavailable: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); try { showToast('Run log history unavailable: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -1713,7 +1713,7 @@ function renderTabBar(tabs) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
       tab.addEventListener('click', () => {
-        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
       });
     }
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
@@ -2079,7 +2079,7 @@ function showMfaBanner(url, hint, _stepNumber) {
   const mfaResumeBtn = document.getElementById('mfaResumeBtn');
   if (mfaResumeBtn) {
     mfaResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
       banner.remove();
     });
   }
@@ -2137,7 +2137,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   const signInWallResumeBtn = document.getElementById('signInWallResumeBtn');
   if (signInWallResumeBtn) {
     signInWallResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
       banner.remove();
     });
   }
@@ -2146,7 +2146,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
     signInWallFocusBtn.addEventListener('click', () => {
     // Best-effort: ask the background to focus the URL's tab via the existing
     // active-tab focus hook (re-uses focus_tab message handled by index.js).
-    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
     });
   }
   const signInWallDismissBtn = document.getElementById('signInWallDismissBtn');
@@ -2635,9 +2635,12 @@ function showRunLogExportButton(runLogId, entryCount) {
   chatContainer.appendChild(banner);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  document.getElementById('exportRunLogJsonBtn').addEventListener('click', () => exportRunLog('json'));
-  document.getElementById('exportRunLogCsvBtn').addEventListener('click', () => exportRunLog('csv'));
-  document.getElementById('dismissRunLogBtn').addEventListener('click', () => banner.remove());
+  const exportJsonBtn = document.getElementById('exportRunLogJsonBtn');
+  const exportCsvBtn = document.getElementById('exportRunLogCsvBtn');
+  const dismissBtn = document.getElementById('dismissRunLogBtn');
+  if (exportJsonBtn) exportJsonBtn.addEventListener('click', () => exportRunLog('json'));
+  if (exportCsvBtn) exportCsvBtn.addEventListener('click', () => exportRunLog('csv'));
+  if (dismissBtn) dismissBtn.addEventListener('click', () => banner.remove());
   const histBtn = document.getElementById('viewRunLogHistoryBtn');
   if (histBtn) histBtn.addEventListener('click', () => openRunLogHistoryModal());
 }
@@ -2723,7 +2726,7 @@ async function renderRunLogHistoryList() {
       b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
     });
   } catch (e) {
-    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + (e && e.message ? e.message : 'unknown error') + '</div>';
+    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + ((e && e.message) || String(e)) + '</div>';
   }
 }
 
@@ -2746,7 +2749,7 @@ async function deleteRunLogById(runLogId) {
     try { showToast('Run log deleted', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Delete failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2763,7 +2766,7 @@ async function clearAllRunLogs() {
     try { showToast('All run logs cleared', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + (e && e.message ? e.message : 'unknown'), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Clear failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2870,11 +2873,13 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   `;
   chatContainer.insertBefore(banner, chatContainer.firstChild);
 
-  document.getElementById('resumeRunBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+  const resumeBtn = document.getElementById('resumeRunBtn');
+  const dismissResumeBtn = document.getElementById('dismissResumeBtn');
+  if (resumeBtn) resumeBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
     banner.remove();
   });
-  document.getElementById('dismissResumeBtn').addEventListener('click', () => banner.remove());
+  if (dismissResumeBtn) dismissResumeBtn.addEventListener('click', () => banner.remove());
 }
 
 // Run resume check on load (after DOM is ready).
