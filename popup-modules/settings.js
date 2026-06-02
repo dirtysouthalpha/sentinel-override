@@ -938,17 +938,23 @@ function applyThemePreset(theme) {
       showToast('Failed to save theme', 'error');
     }
     // Remove all theme glow classes
-    document.body.className = document.body.className
-      .replace(/theme-\S+/g, '')
-      .trim();
+    if (document.body) {
+      document.body.className = (document.body.className || '')
+        .replace(/theme-\S+/g, '')
+        .trim();
+    }
 
     // Toggle dark-mode class for dark themes
     const darkThemes = ['dark', 'matrix', 'tron', 'cyberpunk', 'neon', 'terminal', 'blood'];
-    document.body.classList.toggle('dark-mode', darkThemes.includes(theme));
+    if (document.body) {
+      document.body.classList.toggle('dark-mode', darkThemes.includes(theme));
+    }
 
     // Add theme glow class for themed presets
     if (!['light', 'dark'].includes(theme)) {
-      document.body.classList.add('theme-' + theme);
+      if (document.body) {
+        document.body.classList.add('theme-' + theme);
+      }
     }
 
     Object.entries(presets[theme]).forEach(([key, value]) => {
@@ -1172,7 +1178,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       if (!el) {
         el = document.createElement('style');
         el.id = STYLE_ID;
-        document.head.appendChild(el);
+        if (document.head) {
+          document.head.appendChild(el);
+        }
       }
       el.textContent = css || '';
     } catch (e) {
