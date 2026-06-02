@@ -47,7 +47,7 @@ function loadTemplates() {
   const tagFilter = tagEl ? tagEl.value.toLowerCase().trim() : '';
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error loading templates'), 'error');
       return;
     }
@@ -185,7 +185,7 @@ function saveNewTemplate() {
     action: 'template_save',
     template: { name, goal, tags, params }
   }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error saving template'), 'error');
       return;
     }
@@ -209,7 +209,7 @@ function parseTags(tagString) {
 // ========== Edit Template ==========
 function openEditTemplateModal(templateId) {
   chrome.runtime.sendMessage({ action: 'template_get', id: templateId }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error loading template'), 'error');
       return;
     }
@@ -261,7 +261,7 @@ function saveEditedTemplate() {
     id: editingTemplateId,
     updates: { name, goal, tags, params }
   }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error updating template'), 'error');
       return;
     }
@@ -324,7 +324,7 @@ function updateParamEditor(existingParams) {
 // ========== Run Template ==========
 function openRunModal(templateId) {
   chrome.runtime.sendMessage({ action: 'template_get', id: templateId }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error loading template'), 'error');
       return;
     }
@@ -378,7 +378,7 @@ function executeTemplate() {
     templateId: runningTemplateId,
     params
   }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error running template'), 'error');
       return;
     }
@@ -403,7 +403,7 @@ function deleteTemplate(templateId, templateName) {
     action: 'template_delete',
     id: templateId
   }, (response) => {
-    if (chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
       showToast((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Error deleting template'), 'error');
       return;
     }

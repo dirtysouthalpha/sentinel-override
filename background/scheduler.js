@@ -121,7 +121,7 @@ function registerAlarm(schedule) {
     });
   } else {
     chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
         console.warn('[Sentinel/scheduler] registerAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
       }
     });
@@ -141,7 +141,7 @@ function clearAlarm(scheduleId) {
     });
   } else {
     chrome.alarms.clear(`schedule-${scheduleId}`, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
         console.warn('[Sentinel/scheduler] clearAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
       }
     });
@@ -623,7 +623,7 @@ async function _resolveGoalForSchedule(schedule) {
 async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, (t) => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
         console.warn('[Sentinel/scheduler] tabs.query lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         resolve([]);
         return;
@@ -816,7 +816,7 @@ export async function initScheduler() {
     try {
       const alarm = await new Promise(resolve => {
         chrome.alarms.get(`schedule-${id}`, (a) => {
-          if (chrome.runtime.lastError) {
+          if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
             console.warn('[Sentinel/scheduler] alarms.get lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
             resolve(undefined);
             return;

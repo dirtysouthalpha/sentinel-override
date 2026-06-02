@@ -970,7 +970,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {
-          if (chrome.runtime.lastError) {
+          if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
             const err = typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError);
             reject(new Error(err || 'Screenshot capture failed'));
           } else if (typeof dataUrl !== 'string' || dataUrl.length === 0) {

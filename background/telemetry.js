@@ -167,7 +167,7 @@ function _redactEvent(event) {
 (function loadLevel() {
   try {
     chrome.storage.local.get(['telemetryLevel', 'telemetryPersist', 'telemetryRedact'], (r) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/telemetry] loadLevel failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.warn('[Sentinel/telemetry] loadLevel failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       if (r && typeof r.telemetryLevel === 'string') _currentLevel = r.telemetryLevel;
       if (r && typeof r.telemetryPersist === 'boolean') _persistEnabled = r.telemetryPersist;
       // (3.28.0) Default ON for safety; respects explicit false from storage.
