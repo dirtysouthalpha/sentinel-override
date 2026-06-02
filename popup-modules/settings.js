@@ -486,7 +486,7 @@ if (quickModeToggle) {
     const enabled = quickModeToggle.checked;
     chrome.storage.local.set({ quickMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save quickMode:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -533,7 +533,7 @@ function __setTicketFormatRowVisible(visible) {
 if (ticketModeToggle) {
   // Load saved state and prefill technician fields.
   chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read ticketMode:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.ticketMode === true;
     ticketModeToggle.checked = enabled;
     __setTicketFormatRowVisible(enabled);
@@ -552,7 +552,7 @@ if (ticketModeToggle) {
     __setTicketFormatRowVisible(enabled);
     chrome.storage.local.set({ ticketMode: enabled }, () => {
       if (chrome.runtime.lastError) {
-        console.error('[Sentinel/settings] Failed to save ticketMode:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        console.error('[Sentinel/settings] Failed to save ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
       }
@@ -600,7 +600,7 @@ if (ticketFormatSelect) {
 const expectedTenantInput = document.getElementById('expectedTenantInput');
 if (expectedTenantInput) {
   chrome.storage.local.get(['expectedTenant'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read expectedTenant:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read expectedTenant:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     if (typeof result.expectedTenant === 'string') {
       expectedTenantInput.value = result.expectedTenant;
     }
@@ -722,7 +722,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   if (settingsModal) settingsModal.classList.add('show');
   // Load and render learned patterns
   chrome.storage.local.get(['learned_patterns'], (s) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read learned patterns:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read learned patterns:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     _renderLearnedPatterns(s.learned_patterns || []);
   });
 });
@@ -767,7 +767,7 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
     agent_context: agentContext
   }, () => {
     if (chrome.runtime.lastError) {
-      console.error('[Sentinel/settings] Failed to save settings:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      console.error('[Sentinel/settings] Failed to save settings:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
       showToast('Failed to save settings', 'error');
       return;
     }
@@ -1054,7 +1054,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   function refreshCatalog() {
     chrome.runtime.sendMessage({ action: 'get_provider_catalog' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to get provider catalog:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to get provider catalog:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       const data = (resp && resp.data) ? resp.data : resp;
       if (!Array.isArray(data)) return;
       catalog = data;
