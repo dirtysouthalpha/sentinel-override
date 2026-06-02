@@ -196,7 +196,7 @@ export function runRecoverySkills(context) {
         } catch (_e) { /* telemetry failure is non-critical */ }
       }
     } catch (e) {
-      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e && e.message }); } catch (_e) { /* telemetry unavailable */ }
+      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: (e && e.message) || String(e) }); } catch (_e) { /* telemetry unavailable */ }
       try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message || String(e)); } catch (_e) { /* console unavailable */ }
     }
   }

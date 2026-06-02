@@ -637,7 +637,16 @@ export async function startAgent(goal, sender) {
   // Determine which tab to operate on
   let startTabId;
   if (!sender.tab || !sender.tab.id) {
-    const tabs = await new Promise(resolve => { chrome.tabs.query({active: true, currentWindow: true}, (t) => resolve(t || [])); });
+    const tabs = await new Promise(resolve => {
+      chrome.tabs.query({active: true, currentWindow: true}, (t) => {
+        if (chrome.runtime.lastError) {
+          console.error('[startAgent] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+          resolve([]);
+        } else {
+          resolve(t || []);
+        }
+      });
+    });
     if (Array.isArray(tabs) && tabs.length > 0 && tabs[0] != null && tabs[0].id) {
       startTabId = tabs[0].id;
     } else {
@@ -3366,7 +3375,16 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (!tabInfo) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
-        const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
+        const allTabs = await new Promise(resolve => {
+          chrome.tabs.query({}, (t) => {
+            if (chrome.runtime.lastError) {
+              console.error('[Agent recovery] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+              resolve([]);
+            } else {
+              resolve(t || []);
+            }
+          });
+        });
         const lostTab = allTabs.find(t => t.id === tab);
         if (lostTab) { tabInfo = lostTab; }
         else {
@@ -6179,7 +6197,16 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'click' || command.type === 'click_at' || command.type === 'double_click') {
         await sleep(1000);
         try {
-          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
+          const allTabs = await new Promise(resolve => {
+            chrome.tabs.query({}, (t) => {
+              if (chrome.runtime.lastError) {
+                console.error('[New tab detection] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+                resolve([]);
+              } else {
+                resolve(t || []);
+              }
+            });
+          });
           const newTabs = allTabs.filter(t => t.openerTabId === tab && t.id !== tab);
           if (newTabs.length > 0 && newTabs[0] != null) {
             const newTab = newTabs[0];
@@ -6507,7 +6534,16 @@ async function runAgentLoop(goal, workingTabId) {
         console.warn('[Sentinel] Tab was closed, attempting recovery...');
         // Try to find another tab or the same tab re-created
         try {
-          const allTabs = await new Promise(resolve => { chrome.tabs.query({}, (t) => resolve(t || [])); });
+          const allTabs = await new Promise(resolve => {
+            chrome.tabs.query({}, (t) => {
+              if (chrome.runtime.lastError) {
+                console.error('[Tab recovery] tabs.query failed:', chrome.runtime.lastError && chrome.runtime.lastError.message || 'Unknown error');
+                resolve([]);
+              } else {
+                resolve(t || []);
+              }
+            });
+          });
           if (allTabs.length > 0) {
             const recoveryTab = allTabs[0];
             registerInitialTab(recoveryTab.id, recoveryTab.url || '');

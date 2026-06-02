@@ -15,8 +15,10 @@
     container.innerHTML = results.map(r => `<div>${r}</div>`).join('');
   }
 
-  document.body.prepend(container);
-  log('Sentinel Diagnostic v4.0.1 starting...', null);
+  if (document.body) {
+    document.body.prepend(container);
+    log('Sentinel Diagnostic v4.0.1 starting...', null);
+  }
 
   // Test 1: Service Worker reachable?
   log('Testing chrome.runtime.sendMessage...', null);
