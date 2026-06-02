@@ -9,7 +9,7 @@ globalThis.chrome = {
   storage: {
     local: {
       get: jest.fn(async (keys) => {
-        const key = typeof keys === 'string' ? keys : Array.isArray(keys) ? keys[0] : Object.keys(keys || {})[0];
+        const key = typeof keys === 'string' ? keys : Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : Object.keys(keys || {})[0];
         return { [key]: storageData[key] || [] };
       }),
       set: jest.fn(async (obj) => Object.assign(storageData, obj)),
@@ -47,7 +47,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   // Restore storage mock implementations
   chrome.storage.local.get.mockImplementation(async (keys) => {
-    const key = typeof keys === 'string' ? keys : Array.isArray(keys) ? keys[0] : Object.keys(keys || {})[0];
+    const key = typeof keys === 'string' ? keys : Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : Object.keys(keys || {})[0];
     return { [key]: storageData[key] || [] };
   });
   chrome.storage.local.set.mockImplementation(async (obj) => Object.assign(storageData, obj));

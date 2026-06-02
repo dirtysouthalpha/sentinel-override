@@ -10,7 +10,7 @@ globalThis.chrome = {
   storage: {
     session: {
       get: async (keys) => {
-        const key = Array.isArray(keys) ? keys[0] : keys;
+        const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
         return { [key]: _sessionStore.get(key) || null };
       },
       set: async (obj) => {
