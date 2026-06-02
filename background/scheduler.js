@@ -36,7 +36,7 @@ export function onAgentComplete(callback) {
 function _fireAgentCompleteCallbacks() {
   const cbs = agentCompleteCallbacks.slice();
   agentCompleteCallbacks = [];
-  cbs.forEach(cb => { if (cb) { try { cb(); } catch (e) { console.error('Agent complete callback error:', (e && e.message) || String(e)); } } });
+  cbs.forEach(cb => { if (cb) { try { cb(); } catch (e) { console.error('Agent complete callback error:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); } } });
 }
 
 // ========== Storage Helpers ==========
@@ -50,7 +50,7 @@ async function loadSchedules() {
     const result = await chrome.storage.local.get([SCHEDULES_KEY]);
     return result[SCHEDULES_KEY] || {};
   } catch (e) {
-    console.warn('[Sentinel/scheduler] loadSchedules failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/scheduler] loadSchedules failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
     return {};
   }
 }
@@ -63,7 +63,7 @@ async function saveSchedules(schedules) {
   try {
     await chrome.storage.local.set({ [SCHEDULES_KEY]: schedules });
   } catch (e) {
-    console.warn('[Sentinel/scheduler] saveSchedules failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/scheduler] saveSchedules failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   }
 }
 
@@ -76,7 +76,7 @@ async function loadResults() {
     const result = await chrome.storage.local.get([RESULTS_KEY]);
     return result[RESULTS_KEY] || {};
   } catch (e) {
-    console.warn('[Sentinel/scheduler] loadResults failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/scheduler] loadResults failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
     return {};
   }
 }
@@ -89,7 +89,7 @@ async function saveResults(results) {
   try {
     await chrome.storage.local.set({ [RESULTS_KEY]: results });
   } catch (e) {
-    console.warn('[Sentinel/scheduler] saveResults failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/scheduler] saveResults failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   }
 }
 
@@ -114,7 +114,7 @@ function registerAlarm(schedule) {
 
   const _alarmPromise = chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
   if (_alarmPromise && typeof _alarmPromise.catch === 'function') _alarmPromise.catch((e) => {
-    console.error('[_alarmPromise] Unhandled rejection:', (e && e.message) || String(e));
+    console.error('[_alarmPromise] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   });
   tel.debug('scheduler', `Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
 }
@@ -126,7 +126,7 @@ function registerAlarm(schedule) {
 function clearAlarm(scheduleId) {
   const _p = chrome.alarms.clear(`schedule-${scheduleId}`);
   if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-    console.error('[_p] Unhandled rejection:', (e && e.message) || String(e));
+    console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   });
   tel.debug('scheduler', `Alarm cleared: schedule-${scheduleId}`);
 }
@@ -237,13 +237,13 @@ function sendNotification(schedule, result) {
 function setBadge(status) {
   const _t = chrome.action.setBadgeText({ text: '1' });
   if (_t && typeof _t.catch === 'function') _t.catch((e) => {
-    console.error('[_t] Unhandled rejection:', (e && e.message) || String(e));
+    console.error('[_t] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   });
   const _b = chrome.action.setBadgeBackgroundColor({
     color: status === 'success' ? '#22c55e' : '#ef4444',
   });
   if (_b && typeof _b.catch === 'function') _b.catch((e) => {
-    console.error('[_b] Unhandled rejection:', (e && e.message) || String(e));
+    console.error('[_b] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
   });
 }
 
@@ -495,8 +495,8 @@ export async function executeScheduledTask(alarmName) {
   try {
     goal = await _resolveGoalForSchedule(schedule);
   } catch (err) {
-    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, (err && err.message) || String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${(err && err.message) || String(err)}` });
+    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
     return;
   }
 
@@ -511,13 +511,13 @@ export async function executeScheduledTask(alarmName) {
   try {
     tabId = await _getOrCreateTab();
   } catch (err) {
-    console.error('Failed to get/create tab:', (err && err.message) || String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${(err && err.message) || String(err)}` });
+    console.error('Failed to get/create tab:', (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
     return;
   }
 
   let tabInfo;
-  try { tabInfo = await getTabInfo(tabId); } catch (e) { console.warn('[Sentinel/scheduler] getTabInfo failed:', (e && e.message) || String(e)); tabInfo = null; }
+  try { tabInfo = await getTabInfo(tabId); } catch (e) { console.warn('[Sentinel/scheduler] getTabInfo failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); tabInfo = null; }
   registerInitialTab(tabId, tabInfo?.url || '');
 
   // Register listener BEFORE startAgent so agent_loop_complete can't fire and be missed
@@ -528,8 +528,8 @@ export async function executeScheduledTask(alarmName) {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
     cancelCompletion(); // Clean up the timer + listener so they don't leak
-    console.error('Failed to start agent:', (err && err.message) || String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${(err && err.message) || String(err)}` });
+    console.error('Failed to start agent:', (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
     return;
   }
 
@@ -552,8 +552,8 @@ export async function executeScheduledTask(alarmName) {
   try {
     await storeResult(schedule, finalResult);
   } catch (e) {
-    console.error('Failed to store scheduled task result:', (e && e.message) || String(e));
-    try { tel.error('scheduler', 'Failed to store result', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (nestedErr && nestedErr.message) || String(nestedErr)); }
+    console.error('Failed to store scheduled task result:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+    try { tel.error('scheduler', 'Failed to store result', { error: (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (typeof nestedErr === 'object' && nestedErr !== null && 'message' in nestedErr) ? nestedErr.message : String(nestedErr)); }
   }
 
   schedule.lastRunAt = completedAt;
@@ -571,8 +571,8 @@ export async function executeScheduledTask(alarmName) {
   try {
     await saveSchedules(schedules);
   } catch (e) {
-    console.error('Failed to save schedule state after execution:', (e && e.message) || String(e));
-    try { tel.error('scheduler', 'Failed to save schedule state', { error: (typeof e === 'object' && e !== null && e.message) ? e.message : String(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (nestedErr && nestedErr.message) || String(nestedErr)); }
+    console.error('Failed to save schedule state after execution:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+    try { tel.error('scheduler', 'Failed to save schedule state', { error: (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (typeof nestedErr === 'object' && nestedErr !== null && 'message' in nestedErr) ? nestedErr.message : String(nestedErr)); }
   }
 
   sendNotification(schedule, finalResult);
@@ -668,7 +668,7 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
       error: resultPartial.error,
     });
   } catch (storeErr) {
-    console.error('Failed to store failure result:', (storeErr && storeErr.message) || String(storeErr));
+    console.error('Failed to store failure result:', (typeof storeErr === 'object' && storeErr !== null && 'message' in storeErr) ? storeErr.message : String(storeErr));
   }
   schedule.lastRunStatus = 'failure';
   schedule.lastRunAt = Date.now();
@@ -803,7 +803,7 @@ export async function initScheduler() {
         tel.debug('scheduler', `Re-registered alarm for schedule: ${schedule.name}`);
       }
     } catch (err) {
-      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, (err && err.message) || String(err));
+      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
     }
   }
 
