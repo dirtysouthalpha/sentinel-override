@@ -333,7 +333,7 @@ async function _updateRunLogIndex(runLogId, fields) {
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
   } catch (e) {
     // Storage write failed non-fatally
-    console.warn('[Sentinel] Run log index save failed:', e && e.message);
+    console.warn('[Sentinel] Run log index save failed:', (e && e.message) || String(e));
   }
 }
 
@@ -433,7 +433,7 @@ async function persistHistory() {
     await chrome.storage.local.set({ agent_history: slice });
     _historyDirty = false;
   } catch (e) {
-    console.warn('[Sentinel] persistHistory storage write failed:', e && e.message);
+    console.warn('[Sentinel] persistHistory storage write failed:', (e && e.message) || String(e));
   }
   try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 }
@@ -617,7 +617,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
     // step, so it will pick up the new value automatically.
     return { cancel: false };
   } catch (e) {
-    console.warn('[Sentinel] _handleModeMismatchCheck failed (non-fatal):', e && e.message);
+    console.warn('[Sentinel] _handleModeMismatchCheck failed (non-fatal):', (e && e.message) || String(e));
     return { cancel: false };
   }
 }
@@ -828,7 +828,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
     } catch (_e) { /* non-fatal */ }
     return result.adaptedGoal;
   } catch (e) {
-    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', e && e.message);
+    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', (e && e.message) || String(e));
     return goal;
   }
 }
@@ -1002,7 +1002,7 @@ export async function stopAgent() {
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', e && e.message); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (e && e.message) || String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1133,7 +1133,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       'Recent action: ' + (history.length > 0 && history[history.length - 1].action ? history[history.length - 1].action.type : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
-  } catch (e) { console.warn('[Sentinel] HUD update failed:', e && e.message); }
+  } catch (e) { console.warn('[Sentinel] HUD update failed:', (e && e.message) || String(e)); }
 }
 
 // ========== Stall Detection ==========
@@ -1203,14 +1203,14 @@ async function attachTabToSentinelGroup(tabId) {
           color: SENTINEL_GROUP_COLOR,
           collapsed: false
         });
-      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', (e && e.message) || String(e)); }
     } else {
       // Add to the existing group. tabs.group with groupId moves them in.
       try {
         await chrome.tabs.group({ tabIds: [tabId], groupId: agentTabGroupId });
       } catch (e) {
         // Group may have been dissolved by the user — recreate.
-        console.warn('[Sentinel] Tab group failed, recreating:', e && e.message);
+        console.warn('[Sentinel] Tab group failed, recreating:', (e && e.message) || String(e));
         const groupId = await chrome.tabs.group({ tabIds: [tabId] });
         agentTabGroupId = groupId;
         try {
@@ -1219,18 +1219,18 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', e2 && e2.message); }
+        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', (e2 && e2.message) || String(e2)); }
       }
     }
     agentAttachedTabs.add(tabId);
     // Ensure side panel is enabled on this attached tab.
     try {
       await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
-    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', e && e.message); }
+    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', (e && e.message) || String(e)); }
     // (v3.53) Re-scope: enable panel on this new tab, disable on others
     // (v3.57) sidePanel scoping removed from tab attach
   } catch (e) {
-    console.warn('[Sentinel] attachTabToSentinelGroup failed:', e && e.message);
+    console.warn('[Sentinel] attachTabToSentinelGroup failed:', (e && e.message) || String(e));
   }
 }
 
@@ -1323,7 +1323,7 @@ async function _cdpObservePage(tabId) {
       }
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Ready check failed:', e && e.message);
+    console.warn('[Sentinel/CDP] Ready check failed:', (e && e.message) || String(e));
   }
 
   const code = 'var results = { elements: [], text: "", overlays: [] };'
@@ -1382,10 +1382,10 @@ async function _cdpObservePage(tabId) {
     + '            results.overlays.push({ selector: "overlay", text: (node.textContent || "").substring(0, 100), buttons: btnList });'
     + '          }'
     + '        }'
-    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", e && e.message); }'
+    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", (e && e.message) || String(e)); }'
     + '    }'
     + '  }'
-    + '} catch(e) { results.error = e && e.message ? e.message : String(e); }'
+    + '} catch(e) { results.error = (e && e.message) || String(e); }'
     + 'return results;';
 
   // SPEED: Check cache — if same URL observed recently, reuse
@@ -1512,7 +1512,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
               await new Promise(r => setTimeout(r, 2000));
               console.log('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
-              console.warn('[Sentinel/CDP] Reload failed:', reloadErr && reloadErr.message);
+              console.warn('[Sentinel/CDP] Reload failed:', (reloadErr && reloadErr.message) || String(reloadErr));
             }
           }
         }
@@ -1521,7 +1521,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
       console.warn('[Sentinel/CDP] Phase2 FAILED. error:', nukeResult && nukeResult.error);
     }
   } catch(e) {
-    console.warn('[Sentinel/CDP] Phase2 threw:', e && e.message);
+    console.warn('[Sentinel/CDP] Phase2 threw:', (e && e.message) || String(e));
   }
 
   // Phase 3: Quick scroll test (only if overlays were found)
@@ -1529,7 +1529,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
     await new Promise(r => setTimeout(r, 200));
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
-  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', e && e.message); }
+  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', (e && e.message) || String(e)); }
 
   console.log('[Sentinel/CDP] Overlay dismissal complete. Total removed:', totalRemoved);
   return totalRemoved;
@@ -2621,7 +2621,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       return 'solved';
     }
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', e && e.message);
+    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', (e && e.message) || String(e));
   }
   
   // Strategy 2: Navigate to an alternative URL for the same site
@@ -2657,7 +2657,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     await sleep(2000);
     return 'went_back';
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Go back failed:', e && e.message);
+    console.log('[Sentinel/CAPTCHA] Go back failed:', (e && e.message) || String(e));
   }
   
   // Strategy 4: Pause for user
@@ -3093,7 +3093,7 @@ async function _initRunState(goal) {
       'quickMode',
     ]);
   } catch (e) {
-    console.warn('[Sentinel] runAgentLoop settings load failed:', e && e.message);
+    console.warn('[Sentinel] runAgentLoop settings load failed:', (e && e.message) || String(e));
     stored = {};
   }
   _runSettings = {
@@ -3111,7 +3111,7 @@ async function _initRunState(goal) {
   try {
     await chrome.storage.local.set({ agent_history: [] });
   } catch (e) {
-    console.warn('[Sentinel] agent_history clear failed:', e && e.message);
+    console.warn('[Sentinel] agent_history clear failed:', (e && e.message) || String(e));
   }
   if (stored.agent_context && stored.agent_context.trim()) {
     return `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
@@ -3233,7 +3233,7 @@ async function runAgentLoop(goal, workingTabId) {
   try {
     agentPlan = await _generateInitialPlan(goal, workingTabId);
   } catch (e) {
-    console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', e && e.message);
+    console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', (e && e.message) || String(e));
     agentPlan = null;
   }
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (e) {
@@ -3474,7 +3474,7 @@ async function runAgentLoop(goal, workingTabId) {
               continue;
             }
             // Already on the right page - skip navigation
-          } catch (navErr) { console.warn('[Sentinel] auto-navigate error:', navErr && navErr.message); /* URL parse error, skip auto-navigate */ }
+          } catch (navErr) { console.warn('[Sentinel] auto-navigate error:', (navErr && navErr.message) || String(navErr)); /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -3684,7 +3684,7 @@ async function runAgentLoop(goal, workingTabId) {
             ]);
           } catch (parallelErr) {
             // If parallel observation fails, fall back to sequential with better error recovery
-            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', parallelErr && parallelErr.message);
+            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', (parallelErr && parallelErr.message) || String(parallelErr));
             try {
               observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
             } catch (obsErr) {
@@ -3805,7 +3805,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (shotErr) {
         // Screenshot failure is non-fatal — continue to LLM call without image.
-        console.warn('[Sentinel] Screenshot failed, continuing without image:', shotErr && shotErr.message);
+        console.warn('[Sentinel] Screenshot failed, continuing without image:', (shotErr && shotErr.message) || String(shotErr));
         base64Image = null;
         screenshotMeta = null;
       }
@@ -3954,7 +3954,7 @@ async function runAgentLoop(goal, workingTabId) {
             continue;
           }
         }
-      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', _captchaErr && _captchaErr.message); }
+      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', (_captchaErr && _captchaErr.message) || String(_captchaErr)); }
 
       // Rate limiting
       await enforceRateLimit();
@@ -4131,7 +4131,7 @@ async function runAgentLoop(goal, workingTabId) {
           loopDirective += _recovery.promptInjection;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', e && e.message); } catch (_e) {
+        try { console.warn('[Sentinel/skills] consultation failed (non-fatal):', (e && e.message) || String(e)); } catch (_e) {
           // Console logging failed non-fatally
         }
       }
@@ -4409,7 +4409,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         } catch (e) {
-          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', e && e.message);
+          console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', (e && e.message) || String(e));
           try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         }
       }
@@ -4747,7 +4747,7 @@ async function runAgentLoop(goal, workingTabId) {
               stepCount, apiCallCount
             });
           }
-        } catch (e) { console.warn('[Sentinel] ticket formatter failed:', e && e.message); }
+        } catch (e) { console.warn('[Sentinel] ticket formatter failed:', (e && e.message) || String(e)); }
 
         // (3.9.0) Final run-log entry + broadcast runLogId so the popup can offer Export.
         try {
@@ -5690,7 +5690,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               await chrome.storage.local.set({ agent_memory: agentMemory });
             } catch (e) {
-              console.warn('[Sentinel] agent_memory storage write failed (extract):', e && e.message);
+              console.warn('[Sentinel] agent_memory storage write failed (extract):', (e && e.message) || String(e));
             }
             // (3.25.1) Telemetry: memory write from extract/extract_list. Lets
             // the operator watch memory grow in real time and catch keys that
@@ -5796,7 +5796,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 await chrome.storage.local.set({ agent_memory: agentMemory });
               } catch (e) {
-                console.warn('[Sentinel] agent_memory storage write failed (execute_js):', e && e.message);
+                console.warn('[Sentinel] agent_memory storage write failed (execute_js):', (e && e.message) || String(e));
               }
               // (3.25.1) Telemetry: memory write from execute_js. Tagged with
               // the recovery ladder strategy so operators can see when an
@@ -5857,7 +5857,7 @@ async function runAgentLoop(goal, workingTabId) {
                 if (r.ok) { result = 'Clicked ' + targetLabel + ' via CDP'; cdpDone = true; }
                 else { console.warn('[CDP] dispatchClick failed, falling back:', r.error); }
               }
-            } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', e && e.message); }
+            } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', (e && e.message) || String(e)); }
           } else if (command.type === 'type') {
             // (3.49.1) Push undo entry before typing so we can restore the field.
             try {
@@ -5910,11 +5910,11 @@ async function runAgentLoop(goal, workingTabId) {
                 console.warn('[CDP] Select failed:', selResult);
               }
             } catch (selErr) {
-              console.warn('[CDP] Select error:', selErr && selErr.message);
+              console.warn('[CDP] Select error:', (selErr && selErr.message) || String(selErr));
             }
           }
         } catch (err) {
-          console.warn('[CDP] dispatch threw, falling back:', err && err.message);
+          console.warn('[CDP] dispatch threw, falling back:', (err && err.message) || String(err));
         }
         if (!cdpDone) {
           // CDP path failed -- fall back to the synthetic content-script path.
@@ -5950,7 +5950,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.warn('[CDP] execute_js failed, falling back:', cdpResult.error);
               }
             } catch (e) {
-              console.warn('[CDP] execute_js threw, falling back:', e && e.message);
+              console.warn('[CDP] execute_js threw, falling back:', (e && e.message) || String(e));
             }
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
@@ -6039,7 +6039,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = false;
             sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
           }
-        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', _selErr && _selErr.message); }
+        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', (_selErr && _selErr.message) || String(_selErr)); }
       }
 
       // (v3.66) CDP fallback for type: when content script can't inject,
@@ -6089,7 +6089,7 @@ async function runAgentLoop(goal, workingTabId) {
               sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
             }
           }
-        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', _typeErr && _typeErr.message); }
+        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', (_typeErr && _typeErr.message) || String(_typeErr)); }
       }
 
       //       // ═══════════════════════════════════════════════════════════════
@@ -6112,7 +6112,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Don't mark success but LLM gets useful feedback about what happened
           }
         } catch (_ufbErr) {
-          console.log('[Sentinel/UFB] Universal fallback error:', _ufbErr && _ufbErr.message);
+          console.log('[Sentinel/UFB] Universal fallback error:', (_ufbErr && _ufbErr.message) || String(_ufbErr));
         }
       }
 
@@ -6614,7 +6614,7 @@ async function runAgentLoop(goal, workingTabId) {
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
   try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', e && e.message); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (e && e.message) || String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
 
   agentRunning = false;
   console.log(`Agent completed. Total API calls: ${apiCallCount}`);
