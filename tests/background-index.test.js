@@ -621,7 +621,7 @@ describe('Action string registry', () => {
 
   test('all actions are lowercase with underscores', () => {
     for (const action of KNOWN_ACTIONS) {
-      expect(action).toBe(action.toLowerCase());
+      expect(typeof action === 'string' ? action : String(action)).toBe(action.toLowerCase());
       expect(action).toMatch(/^[a-z][a-z0-9_]*$/);
     }
   });

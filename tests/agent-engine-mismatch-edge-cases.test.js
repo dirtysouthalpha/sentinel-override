@@ -204,7 +204,7 @@ describe('Agent engine mode mismatch and adaptive prompts edge cases', () => {
     ];
 
     for (const goal of goals) {
-      expect(typeof goal === 'string' && goal.toLowerCase()).toMatch(/(autonomous|approval)/);
+      expect(typeof goal === 'string' ? goal.toLowerCase() : String(goal).toLowerCase()).toMatch(/(autonomous|approval)/);
     }
   });
 
@@ -420,7 +420,7 @@ describe('Agent engine mode mismatch and adaptive prompts edge cases', () => {
     ];
 
     for (const variation of variations) {
-      expect(typeof variation === 'string' && variation.toLowerCase()).toMatch(/^(autonomous|approval)$/);
+      expect(typeof variation === 'string' ? variation.toLowerCase() : String(variation).toLowerCase()).toMatch(/^(autonomous|approval)$/);
     }
   });
 
