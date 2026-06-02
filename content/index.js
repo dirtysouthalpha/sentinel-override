@@ -24,7 +24,7 @@ if (!window.__sentinelContentTel) {
       }).catch((e) => {
         console.error('[_ctel] Unhandled rejection:', e && e.message || String(e));
       });
-    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', (e && e.message || String(e)) || String(e)); }
+    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', (e && e.message) || String(e)); }
   };
   // Per-level shorthands so call sites stay terse.
   window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
@@ -41,7 +41,7 @@ var ctel = window.__sentinelContentTel;
 if (window.__sentinelInitialized) {
   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
     console.warn('[Sentinel] re-inject ready send failed:', e && e.message || String(e));
-  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', e && e.message || String(e)); }
+  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', (e && e.message) || String(e)); }
 } else {
   window.__sentinelInitialized = true;
 
@@ -343,7 +343,7 @@ if (window.__sentinelInitialized) {
         try {
           const lbl = document.querySelector('label[for="' + CSS.escape(String(el.id)) + '"]');
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] label lookup by id:', (e && e.message || String(e)) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', (e && e.message) || String(e)); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -360,11 +360,11 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] ancestor label walk:', (e && e.message || String(e)) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', (e && e.message) || String(e)); }
         p = p.parentElement;
         depth++;
       }
-    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', (e && e.message) || String(e)); }
     return parts.join(' ').toLowerCase();
   }
 
