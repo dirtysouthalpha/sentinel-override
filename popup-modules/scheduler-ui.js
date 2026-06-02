@@ -95,12 +95,14 @@ async function loadAndRenderSchedules() {
     }
 
     container.innerHTML = '';
-    schedules.forEach(schedule => {
-      const card = document.createElement('div');
-      card.className = 'schedule-card' + (schedule.enabled ? '' : ' disabled');
-      card.innerHTML = renderScheduleCard(schedule);
-      container.appendChild(card);
-    });
+    if (schedules && typeof schedules.forEach === 'function') {
+      schedules.forEach(schedule => {
+        const card = document.createElement('div');
+        card.className = 'schedule-card' + (schedule.enabled ? '' : ' disabled');
+        card.innerHTML = renderScheduleCard(schedule);
+        container.appendChild(card);
+      });
+    }
   } catch (err) {
     container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}</div>`;
   }
@@ -139,7 +141,7 @@ function renderScheduleCard(schedule) {
   let statusBadge = '';
   if (schedule.lastRunStatus) {
     const statusClass = schedule.lastRunStatus;
-    const statusLabel = (typeof schedule.lastRunStatus === 'string' ? schedule.lastRunStatus.charAt(0).toUpperCase() : '?') + (typeof schedule.lastRunStatus === 'string' ? schedule.lastRunStatus.slice(1) : '');
+    const statusLabel = (typeof schedule.lastRunStatus === 'string' && schedule.lastRunStatus.length > 0 ? schedule.lastRunStatus.charAt(0).toUpperCase() : '?') + (typeof schedule.lastRunStatus === 'string' && schedule.lastRunStatus.length > 1 ? schedule.lastRunStatus.slice(1) : '');
     statusBadge = `<span class="schedule-status-badge ${statusClass}">${statusLabel}</span>`;
   }
 
@@ -287,14 +289,16 @@ function populateTemplateDropdown(preselectId) {
 
     templatesCache = templates;
 
-    templates.forEach(t => {
+    if (templates && typeof templates.forEach === 'function') {
+      templates.forEach(t => {
       const option = document.createElement('option');
       option.value = t.id;
       option.textContent = t.name;
       dropdown.appendChild(option);
-    });
+      });
+    }
 
-    if (templates.length === 0) {
+    if (templates && templates.length === 0) {
       dropdown.innerHTML = '<option value="">No templates available</option>';
     }
 
@@ -415,9 +419,12 @@ async function handleSaveSchedule() {
 
     // Collect params
     const params = {};
-    document.querySelectorAll('#sch-template-params input[data-sch-param]').forEach(input => {
-      params[input.dataset.schParam] = input.value;
-    });
+    const paramInputs = document.querySelectorAll('#sch-template-params input[data-sch-param]');
+    if (paramInputs && typeof paramInputs.forEach === 'function') {
+      paramInputs.forEach(input => {
+        params[input.dataset.schParam] = input.value;
+      });
+    }
     scheduleData.params = Object.keys(params).length > 0 ? params : null;
   } else {
     const goalEl = document.getElementById('sch-goal');
@@ -589,7 +596,8 @@ async function showRunHistory(scheduleId, scheduleName) {
       container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-tertiary);">No run history yet.</div>';
     } else {
       container.innerHTML = '';
-      results.forEach(result => {
+      if (results && typeof results.forEach === 'function') {
+        results.forEach(result => {
         const item = document.createElement('div');
         item.className = 'schedule-result-item';
 
@@ -621,17 +629,21 @@ async function showRunHistory(scheduleId, scheduleName) {
         `;
         container.appendChild(item);
       });
+      }
 
       // Wire view-report buttons inside history modal
-      container.querySelectorAll('[data-action="view-report"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const report = decodeURIComponent(btn.dataset.report || '');
-          if (report && window.openReportModal) {
-            window.openReportModal(report);
-          }
+      const viewReportBtns = container.querySelectorAll('[data-action="view-report"]');
+      if (viewReportBtns && typeof viewReportBtns.forEach === 'function') {
+        viewReportBtns.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const report = decodeURIComponent(btn.dataset.report || '');
+            if (report && window.openReportModal) {
+              window.openReportModal(report);
+            }
+          });
         });
-      });
+      }
     }
 
     // Show modal
