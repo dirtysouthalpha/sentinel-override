@@ -5828,8 +5828,10 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           if (command.type === 'click_at') {
             // click_at provides x/y in CSS pixels already (after #11 DPR fix).
-            const x = Number(command.x) || 0;
-            const y = Number(command.y) || 0;
+            const x = Number(command.x);
+            const y = Number(command.y);
+            if (typeof x !== 'number' || Number.isNaN(x)) throw new Error('Invalid x coordinate: must be a number');
+            if (typeof y !== 'number' || Number.isNaN(y)) throw new Error('Invalid y coordinate: must be a number');
             const r = await cdpDispatchClick(tab, x, y, {
               button: command.button,
               clickCount: command.clickCount,
