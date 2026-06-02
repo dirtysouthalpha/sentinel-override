@@ -949,7 +949,9 @@ chrome.windows.onCreated.addListener(async (win) => {
     const ssoTab = tabs.find(t => t.url && _SSO_HOSTS_RE.test(t.url));
     if (ssoTab) {
       await chrome.windows.update(win.id, { focused: true });
-      sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
+      let hostname = 'unknown host';
+      try { hostname = new URL(ssoTab.url).hostname; } catch (_e) { /* URL parse failed */ }
+      sendSilentUpdate('🔐 SSO popup detected (' + hostname + ') — sign in, then the agent will continue automatically');
     }
   } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 });
