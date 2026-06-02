@@ -108,7 +108,7 @@ window.__sentinelUtils.wait = window.__sentinelUtils.wait || {};
       if (shadow && shadow.queryDeep) {
         try {
           const found = shadow.queryDeep(document, condition.selector);
-          return !!(found && found.length > 0);
+          return !!(found && typeof found.length === 'number' && found.length > 0);
         } catch { /* invalid selector or shadow traversal error */ }
       }
 
