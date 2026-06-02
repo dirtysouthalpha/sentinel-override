@@ -20,7 +20,7 @@ export const cisco = {
       if (/meraki\.com/i.test(host)) return true;
       if (path.includes('/asdm') || path.includes('/fmc')) return true;
       if (/\.ise\./i.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
     const t = String(goal || '').toLowerCase();
     return /\b(cisco\s*asa|firepower|meraki|cisco\s*ise)\b/i.test(t);
   },

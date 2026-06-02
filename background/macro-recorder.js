@@ -37,7 +37,7 @@ export async function loadMacros() {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return result[STORAGE_KEY] || [];
   } catch (e) {
-    console.error('[Sentinel/macro-recorder] loadMacros failed:', e && e.message);
+    console.error('[Sentinel/macro-recorder] loadMacros failed:', e && e.message || String(e));
     return [];
   }
 }
@@ -50,7 +50,7 @@ async function saveMacros(macros) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: macros });
   } catch (e) {
-    console.error('[Sentinel/macro-recorder] saveMacros failed:', e && e.message);
+    console.error('[Sentinel/macro-recorder] saveMacros failed:', e && e.message || String(e));
     throw e;
   }
 }

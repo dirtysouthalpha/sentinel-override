@@ -32,7 +32,7 @@ export const m365Admin = {
         'portal.azure.com', 'login.microsoftonline.com'
       ];
       if (host && Array.isArray(m365Hosts) && m365Hosts.some(h => host === h || host.endsWith('.' + h))) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
     return /\b(m365|microsoft\s*365|entra|exchange\s+admin|purview|defender|intune)\b/i.test(String(goal || ''));
   },
 

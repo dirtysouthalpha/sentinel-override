@@ -57,7 +57,7 @@ export async function openTab(url, label) {
       .filter(([id]) => id !== activeTabId)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
     if (entries.length > 0 && entries[0] && entries[0][0]) {
-      try { await closeTab(entries[0][0]); } catch (e) { console.warn('[Sentinel/tab-context] LRU eviction failed:', e && e.message); }
+      try { await closeTab(entries[0][0]); } catch (e) { console.warn('[Sentinel/tab-context] LRU eviction failed:', e && e.message || String(e)); }
     }
   }
 
@@ -65,7 +65,7 @@ export async function openTab(url, label) {
   try {
     tab = await chrome.tabs.create({ url, active: false }); // Don't steal focus
   } catch (e) {
-    console.error('[Sentinel/tab-context] Failed to open tab for', url, ':', e && e.message);
+    console.error('[Sentinel/tab-context] Failed to open tab for', url, ':', e && e.message || String(e));
     return null;
   }
   const ctx = {

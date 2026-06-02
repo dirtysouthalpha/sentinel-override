@@ -58,7 +58,7 @@ let _saveStatsTimer = null;
         _stats = (v && typeof v === 'object') ? v : {};
       }
     });
-  } catch (e) { console.warn('[Sentinel/skills] init error:', e && e.message); }
+  } catch (e) { console.warn('[Sentinel/skills] init error:', e && e.message || String(e)); }
 })();
 
 /**
@@ -70,7 +70,7 @@ function _scheduleSaveStats() {
   if (_saveStatsTimer) return;
   _saveStatsTimer = setTimeout(() => {
     _saveStatsTimer = null;
-    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', e && e.message); }
+    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', e && e.message || String(e)); }
   }, 1500);
 }
 
@@ -197,7 +197,7 @@ export function runRecoverySkills(context) {
       }
     } catch (e) {
       try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: e && e.message }); } catch (_e) { /* telemetry unavailable */ }
-      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message); } catch (_e) { /* console unavailable */ }
+      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', e && e.message || String(e)); } catch (_e) { /* console unavailable */ }
     }
   }
   if (matches.length === 0) return result;
@@ -214,7 +214,7 @@ export function runRecoverySkills(context) {
           break;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', e && e.message); } catch (_e) { /* console unavailable */ }
+        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', e && e.message || String(e)); } catch (_e) { /* console unavailable */ }
       }
     }
   }
@@ -231,7 +231,7 @@ export function runRecoverySkills(context) {
         }
       }
     } catch (e) {
-      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', e && e.message); } catch (_e) { /* console unavailable */ }
+      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', e && e.message || String(e)); } catch (_e) { /* console unavailable */ }
     }
   }
   if (injections.length > 0) {

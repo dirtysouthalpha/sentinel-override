@@ -102,7 +102,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       // (3.8.1) Element might exist but be detached (React reconciliation).
       // If it's not currently in the document, drop it and rebuild.
       if (c && !c.isConnected) {
-        try { c.remove(); } catch (e) { console.warn('[Sentinel] cursor remove detached:', e && e.message); }
+        try { c.remove(); } catch (e) { console.warn('[Sentinel] cursor remove detached:', e && e.message || String(e)); }
         c = null;
       }
       if (c) return c;
@@ -163,7 +163,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         // Re-create on next animation frame so we don't fight an ongoing
         // reconciliation pass.
         requestAnimationFrame(() => {
-          try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor recreate on mutation:', e && e.message); }
+          try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor recreate on mutation:', e && e.message || String(e)); }
         });
       });
       const target = document.documentElement || document.body;
@@ -180,7 +180,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       try {
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
-      } catch (e) { console.warn('[Sentinel] cursor auto-hide dim:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] cursor auto-hide dim:', e && e.message || String(e)); }
     }, HIDE_AFTER_MS);
   }
 
@@ -273,9 +273,9 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         if (!c) return;
         c.classList.add('pressing');
         setTimeout(() => {
-          try { c.classList.remove('pressing'); } catch (e) { console.warn('[Sentinel] cursor press cleanup:', e && e.message); }
+          try { c.classList.remove('pressing'); } catch (e) { console.warn('[Sentinel] cursor press cleanup:', e && e.message || String(e)); }
         }, 240);
-      } catch (e) { console.warn('[Sentinel] cursor press:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] cursor press:', e && e.message || String(e)); }
     },
 
     /**
@@ -288,7 +288,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = ensureCursor();
         if (c) c.classList.remove('dimmed');
         scheduleAutoHide();
-      } catch (e) { console.warn('[Sentinel] cursor show:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] cursor show:', e && e.message || String(e)); }
     },
 
     /**
@@ -301,7 +301,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      } catch (e) { console.warn('[Sentinel] cursor hide:', e && e.message); }
+      } catch (e) { console.warn('[Sentinel] cursor hide:', e && e.message || String(e)); }
     },
 
     /**
@@ -313,7 +313,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
     setKeepVisible(on) {
       keepVisibleMode = !!on;
       if (on) {
-        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', e && e.message); }
+        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', e && e.message || String(e)); }
       }
     },
 
@@ -329,7 +329,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const _ = c.style;
         return { x: lastX, y: lastY };
       } catch (e) {
-        console.warn('[Sentinel] cursor.getPosition error:', e && e.message);
+        console.warn('[Sentinel] cursor.getPosition error:', e && e.message || String(e));
         return { x: -1, y: -1 };
       }
     }
@@ -340,5 +340,5 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   // (3.8.1) Make the cursor visible immediately on script load.
   try {
     ensureCursor();
-  } catch (e) { console.warn('[Sentinel/CURSOR] Init failed:', e && e.message); }
+  } catch (e) { console.warn('[Sentinel/CURSOR] Init failed:', e && e.message || String(e)); }
 })();

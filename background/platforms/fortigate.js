@@ -23,7 +23,7 @@ export const fortigate = {
       const path = u.pathname.toLowerCase();
       if (/fortinet|fortigate|fortimanager|fortiweb|forticloud/i.test(host)) return true;
       if (/\/ng\/|\/p\/login|\/p\/dashboard/.test(path) && /\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
     return /\b(fortigate|fortimanager|fortinet|fortiweb|fortianalyzer)\b/i.test(String(goal || ''));
   },
 

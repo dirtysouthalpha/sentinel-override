@@ -48,7 +48,7 @@ export async function loadTemplates() {
   try {
     const result = await chrome.storage.local.get([STORAGE_KEY]);
     return result[STORAGE_KEY] || {};
-  } catch (e) { console.error('[template-manager] loadTemplates failed:', (e && e.message) || String(e)); return {}; }
+  } catch (e) { console.error('[template-manager] loadTemplates failed:', (e && e.message || String(e)) || String(e)); return {}; }
 }
 
 /**
@@ -60,7 +60,7 @@ export async function saveTemplates(templates) {
     await chrome.storage.local.set({ [STORAGE_KEY]: templates });
   } catch (e) {
     // Storage quota or unavailable — callers should handle
-    throw new Error('Failed to save templates: ' + ((e && e.message) || String(e)));
+    throw new Error('Failed to save templates: ' + ((e && e.message || String(e)) || String(e)));
   }
 }
 
