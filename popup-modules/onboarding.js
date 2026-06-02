@@ -43,7 +43,7 @@
     try {
       await chrome.storage.local.set({ sentinelOnboardingDone: true });
     } catch (error) {
-      console.error('Failed to mark onboarding as done:', (error && error.message) || String(error));
+      console.error('Failed to mark onboarding as done:', (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error)));
     }
 
     const modal = _qs('onboarding-modal');
@@ -98,7 +98,7 @@
         modal.classList.add('show');
       }, 250);
     } catch (error) {
-      console.error('Error checking onboarding state:', (error && error.message) || String(error));
+      console.error('Error checking onboarding state:', (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error)));
     }
   })();
 
