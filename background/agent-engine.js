@@ -3741,7 +3741,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Page narration failed non-fatally
           }
         } catch (err) {
-          const errMsg = (typeof err === 'object' && err !== null && err.message) ? err.message : String(err);
+          const errMsg = (typeof err.message === 'string') ? err.message : String(err);
           activityFail(stepCount, 'observe', 'Page read failed: ' + errMsg, null);
           sendSilentUpdate(`Error reading page: ${errMsg}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection

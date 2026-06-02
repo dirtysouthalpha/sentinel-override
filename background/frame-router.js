@@ -99,7 +99,7 @@ export async function enumerateFrames(tabId) {
       };
     });
   } catch (e) {
-    const errMsg = (typeof e === 'object' && e !== null && e.message) ? e.message : String(e);
+    const errMsg = (typeof e.message === 'string') ? e.message : String(e);
     console.error('[Sentinel/frame-router] enumerateFrames failed:', errMsg);
     return [];
   }
