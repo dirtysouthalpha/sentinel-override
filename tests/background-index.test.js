@@ -475,7 +475,7 @@ function normalizeTelemetryEvent(request, sender) {
   const validLevels = ['error', 'warn', 'info', 'debug', 'trace'];
   const lvl = validLevels.includes(request.level) ? request.level : 'info';
   const msg = String(request.message || '');
-  const payload = (request.payload && typeof request.payload === 'object') ? { ...request.payload } : {};
+  const payload = (request.payload && typeof request.payload === 'object' && !Array.isArray(request.payload)) ? { ...request.payload } : {};
   if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
   if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);
   return { cat, lvl, msg, payload };

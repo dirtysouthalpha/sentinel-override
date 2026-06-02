@@ -17,7 +17,7 @@ globalThis.chrome = {
       get: jest.fn(async (keys) => {
         await new Promise(resolve => setTimeout(resolve, 1));
         const result = {};
-        const keyList = Array.isArray(keys) ? keys : [keys];
+        const keyList = Array.isArray(keys) ? keys : (keys ? [keys] : []);
         for (const k of keyList) {
           if (k === 'sentinel_schedules') result[k] = schedules;
           if (k === 'sentinel_schedule_results') result[k] = results;

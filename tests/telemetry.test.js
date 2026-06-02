@@ -15,7 +15,7 @@ globalThis.chrome = {
         } else if (Array.isArray(keys)) {
           result = {};
           for (const k of keys) result[k] = storageData[k];
-        } else if (keys && typeof keys === 'object') {
+        } else if (keys && typeof keys === 'object' && !Array.isArray(keys)) {
           // Object with defaults
           result = {};
           for (const k of Object.keys(keys)) {

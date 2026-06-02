@@ -19,6 +19,7 @@ globalThis.chrome = {
       get: jest.fn(async (keys) => {
         const result = {};
         const keyList = Array.isArray(keys) ? keys : Object.keys(keys || {});
+        if (!Array.isArray(keyList)) return result;
         for (const k of keyList) {
           result[k] = mockLocalStorage[k];
         }
@@ -26,7 +27,8 @@ globalThis.chrome = {
       }),
       set: jest.fn(async (obj) => { Object.assign(mockLocalStorage, obj); }),
       remove: jest.fn(async (keys) => {
-        const keyList = Array.isArray(keys) ? keys : [keys];
+        const keyList = Array.isArray(keys) ? keys : (keys ? [keys] : []);
+        if (!Array.isArray(keyList)) return;
         for (const k of keyList) {
           delete mockLocalStorage[k];
         }
