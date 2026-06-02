@@ -95,6 +95,7 @@ describe('audit-log edge cases', () => {
       await appendAuditEntry(runId, { type: 'test', target: longTarget, outcome: 'pass' });
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog.length).toBeGreaterThan(0);
       expect(storedLog[0]).toBeDefined();
       expect(storedLog[0].target).toBeDefined();
       expect(storedLog[0].target.length).toBe(120);
@@ -106,6 +107,7 @@ describe('audit-log edge cases', () => {
       await appendAuditEntry(runId, { type: 'test', target: 'foo', outcome: longOutcome });
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog.length).toBeGreaterThan(0);
       expect(storedLog[0]).toBeDefined();
       expect(storedLog[0].outcome).toBeDefined();
       expect(storedLog[0].outcome.length).toBe(200);
@@ -137,6 +139,7 @@ describe('audit-log edge cases', () => {
       await appendAuditEntry(runId, {});
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog.length).toBeGreaterThan(0);
       expect(storedLog[0].type).toBe('');
       expect(storedLog[0].target).toBe('');
       expect(storedLog[0].outcome).toBe('');
@@ -151,6 +154,7 @@ describe('audit-log edge cases', () => {
       });
       const storedLog = mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`];
       expect(storedLog).toBeDefined();
+      expect(storedLog.length).toBeGreaterThan(0);
       expect(storedLog[0].type).toBe('123');
       expect(storedLog[0].target).toBe('[object Object]');
       expect(storedLog[0].outcome).toBe('true');
@@ -178,28 +182,33 @@ describe('audit-log edge cases', () => {
       const runId1 = 'test-timestamp-custom';
       const customTs = 1234567890;
       await appendAuditEntry(runId1, { ts: customTs, type: 'test', target: 'foo', outcome: 'pass' });
+      expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId1}`]).toHaveLength(1);
       expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId1}`][0].ts).toBe(customTs);
 
       const runId2 = 'test-timestamp-default';
       await appendAuditEntry(runId2, { type: 'test2', target: 'bar', outcome: 'fail' });
+      expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId2}`]).toHaveLength(1);
       expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId2}`][0].ts).toBeGreaterThan(customTs);
     });
 
     it('handles null step correctly', async () => {
       const runId = 'test-null-step';
       await appendAuditEntry(runId, { step: null, type: 'test', target: 'foo', outcome: 'pass' });
+      expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`]).toHaveLength(1);
       expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`][0].step).toBeNull();
     });
 
     it('handles undefined step as null', async () => {
       const runId = 'test-undefined-step';
       await appendAuditEntry(runId, { type: 'test', target: 'foo', outcome: 'pass' });
+      expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`]).toHaveLength(1);
       expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`][0].step).toBeNull();
     });
 
     it('preserves numeric step value', async () => {
       const runId = 'test-numeric-step';
       await appendAuditEntry(runId, { step: 42, type: 'test', target: 'foo', outcome: 'pass' });
+      expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`]).toHaveLength(1);
       expect(mockLocalStorage[`${STORAGE_KEY_PREFIX}${runId}`][0].step).toBe(42);
     });
   });

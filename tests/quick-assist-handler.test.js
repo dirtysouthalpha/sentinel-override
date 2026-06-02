@@ -176,6 +176,7 @@ describe('quick-assist-handler', () => {
       const body = JSON.parse(fetchCall[1]?.body);
 
       // The handler splits on --- and sends only the part after as user content
+      expect(body.messages).toHaveLength(1);
       expect(body.messages[0].content).toBe('User content');
     });
 
@@ -200,6 +201,7 @@ describe('quick-assist-handler', () => {
       const fetchCall = global.fetch.mock.calls[0] || [];
       const body = JSON.parse(fetchCall[1]?.body);
 
+      expect(body.messages).toHaveLength(1);
       expect(body.messages[0].content).toBe('Full prompt without separator');
     });
 
@@ -329,6 +331,7 @@ describe('quick-assist-handler', () => {
       const fetchCall = global.fetch.mock.calls[0] || [];
       const body = JSON.parse(fetchCall[1]?.body);
 
+      expect(body.messages).toHaveLength(2);
       expect(body.messages[1].content).toBe(multiLinePrompt);
       expect(result).toBe('Response');
     });
