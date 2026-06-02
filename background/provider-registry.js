@@ -234,14 +234,16 @@ export const PROVIDERS = {
         const code = data.code || '?';
         throw new Error(`🔑 Authentication failed: ${data.msg || data.message || 'Unknown error (code ' + code + ')'}. Check your API key in extension settings.`);
       }
-      if (!data.choices || !data.choices.length) {
-        const errMsg = data.error?.message || data.msg || data.message || null;
+      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+        const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || (typeof data.msg === 'string' ? data.msg : null)
+          || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (!data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
       const content = data.choices[0].message.content || '';
       if (!content) {
         // Some APIs (OpenRouter, Z.ai) return null content for tool calls or empty responses
@@ -323,14 +325,16 @@ export const PROVIDERS = {
      */
     parseToolUseResponse(data) {
       // Detect auth/API errors from providers that return HTTP 200 with error payloads
-      if (!data.choices || !data.choices.length) {
-        const errMsg = data.error?.message || data.msg || data.message || null;
+      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+        const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || (typeof data.msg === 'string' ? data.msg : null)
+          || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices && data.choices[0];
+      const choice = data.choices[0];
       const msg = choice && choice.message;
       if (!msg) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
@@ -393,8 +397,10 @@ export const PROVIDERS = {
 
     parseResponse: (data) => {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
-      if (!data.choices || !data.choices.length) {
-        const errMsg = data.msg || data.error?.message || data.message || null;
+      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+        const errMsg = (typeof data.msg === 'string' ? data.msg : null)
+          || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
@@ -403,7 +409,7 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (!data.choices || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (!data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
       const content = data.choices[0].message.content || '';
       if (!content) {
         const reasoning = data.choices[0].message.reasoning_content || data.choices[0].message.reasoning;
@@ -447,8 +453,10 @@ export const PROVIDERS = {
 
     parseToolUseResponse(data) {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
-      if (!data.choices || !data.choices.length) {
-        const errMsg = data.msg || data.error?.message || data.message || null;
+      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+        const errMsg = (typeof data.msg === 'string' ? data.msg : null)
+          || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
@@ -457,7 +465,7 @@ export const PROVIDERS = {
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices && data.choices[0];
+      const choice = data.choices[0];
       const msg = choice && choice.message;
       if (!msg) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
