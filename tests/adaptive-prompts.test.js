@@ -484,7 +484,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
       { name: 'John Smith', company: 'Acme IT', phone: '555-000-0000', email: 'support@test.com' }
     );
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].content).toContain('John Smith');
     expect(body.messages[0].content).toContain('Acme IT');
@@ -509,7 +521,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('MENU MISMATCHES');
     expect(body.messages[1].content).toContain('Manage > Firewall');
@@ -535,7 +559,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('NAVIGATION SIGNALS');
     expect(body.messages[1].content).toContain('Dashboard');
@@ -560,7 +596,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('KNOWN SUB-PAGES');
     expect(body.messages[1].content).toContain('Main overview page');
@@ -587,7 +635,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('WORKFLOW SCAFFOLD');
     expect(body.messages[1].content).toContain('Phase 1: Navigate to Firewall');
@@ -614,7 +674,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).not.toContain('WORKFLOW SCAFFOLD');
   });
@@ -636,7 +708,19 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('PRE-FLIGHT');
     expect(body.messages[1].content).toContain('Phase 0: Select the target device');
@@ -659,7 +743,19 @@ describe.skip('rewriteGoalForPlatform — expansion modes', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com', {}, 'light');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].content).toContain('EXPANSION: LIGHT');
   });
@@ -677,7 +773,19 @@ describe.skip('rewriteGoalForPlatform — expansion modes', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com', {}, 'full');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].content).toContain('EXPANSION: FULL');
   });
@@ -791,7 +899,19 @@ describe.skip('rewriteGoalForPlatform — anthropic provider', () => {
     const longGoal = 'Investigate the firewall configuration on the network appliance and generate a comprehensive compliance report covering all security policies, NAT rules, VPN tunnels, and access control lists with detailed findings for each section';
     await rewriteGoalForPlatform(longGoal, 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     // Complex goals (>200 chars) with thinking-capable provider should use thinking
     expect(body.thinking).toBeDefined();
     expect(body.thinking.type).toBe('enabled');
@@ -840,7 +960,19 @@ describe.skip('rewriteGoalForPlatform — edge cases', () => {
     const result = await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
     expect(result.adapted).toBe(true);
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[1].content).toContain('Valid: valid hint');
   });
@@ -894,7 +1026,19 @@ describe.skip('rewriteGoalForPlatform — edge cases', () => {
 
     await rewriteGoalForPlatform('Investigate the firewall configuration on the network appliance for compliance checking', 'https://test.com');
 
-    const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
+    if (globalThis.fetch.mock.calls.length === 0) {
+      throw new Error('fetch not called');
+    }
+    const callArgs = globalThis.fetch.mock.calls[0]?.[1];
+    if (!callArgs || !callArgs.body) {
+      throw new Error('fetch not called with body');
+    }
+    let body;
+    try {
+      body = JSON.parse(callArgs.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs.body}`);
+    }
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].content).toContain('EXPANSION: LIGHT');
   });

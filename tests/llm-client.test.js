@@ -69,7 +69,12 @@ describe('extractFirstJsonObject', () => {
   test('extracts a valid action JSON string from clean input', () => {
     const result = extractFirstJsonObject('{"type":"click","selector":"#btn"}');
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('click');
   });
 
@@ -78,7 +83,12 @@ describe('extractFirstJsonObject', () => {
       'I will now click the button. {"type":"navigate","url":"https://example.com"}'
     );
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('navigate');
     expect(parsed.url).toBe('https://example.com');
   });
@@ -99,14 +109,24 @@ describe('extractFirstJsonObject', () => {
     const nested = '{"type":"execute_js","code":"var x=1;","key":"result"}';
     const result = extractFirstJsonObject(nested);
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('execute_js');
   });
 
   test('picks first valid object when multiple JSON objects present', () => {
     const input = '{"type":"note","text":"first"} and {"type":"finish","summary":"done"}';
     const result = extractFirstJsonObject(input);
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('note');
   });
 
@@ -115,7 +135,12 @@ describe('extractFirstJsonObject', () => {
     const input = '{"foo":"bar"} some text {"type":"click","selector":"#btn"}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('click');
   });
 
@@ -131,7 +156,12 @@ describe('extractFirstJsonObject', () => {
     for (const t of types) {
       const result = extractFirstJsonObject(`{"type":"${t}"}`);
       expect(result).not.toBeNull();
-      const parsed = JSON.parse(result);
+      let parsed;
+      try {
+        parsed = JSON.parse(result);
+      } catch (e) {
+        throw new Error(`Failed to parse JSON result for type "${t}": ${result}`);
+      }
       expect(parsed.type).toBe(t);
     }
   });
@@ -144,7 +174,12 @@ describe('extractFirstJsonObject', () => {
     const input = '{"type":"type","text":"he said \\"hello\\""}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.text).toBe('he said "hello"');
   });
 
@@ -152,7 +187,12 @@ describe('extractFirstJsonObject', () => {
     const input = '{"type":"execute_js","code":"if(true){return{a:1}}","key":"result"}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
-    const parsed = JSON.parse(result);
+    let parsed;
+    try {
+      parsed = JSON.parse(result);
+    } catch (e) {
+      throw new Error(`Failed to parse JSON result: ${result}`);
+    }
     expect(parsed.type).toBe('execute_js');
   });
 });
@@ -984,7 +1024,12 @@ describe('generatePlan', () => {
     expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     expect(body.model).toBe('glm-5');
   });
 
@@ -1020,7 +1065,12 @@ describe('generatePlan', () => {
     expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     expect(body.response_format).toBeUndefined();
   });
 
@@ -2245,7 +2295,12 @@ describe('Bug #2 regression: generatePlan prose fallback', () => {
     // Verify response_format is not sent (would cause 400 on Z.AI)
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     expect(body.response_format).toBeUndefined();
   });
 });
@@ -2386,7 +2441,12 @@ describe('callLLMSimple', () => {
     expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     expect(body.max_tokens).toBe(500);
   });
 
@@ -2401,7 +2461,12 @@ describe('callLLMSimple', () => {
     expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     expect(body.max_tokens).toBe(1200);
   });
 
@@ -2416,7 +2481,12 @@ describe('callLLMSimple', () => {
     expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs?.body);
+    let body;
+    try {
+      body = JSON.parse(callArgs?.body);
+    } catch (e) {
+      throw new Error(`Failed to parse request body: ${callArgs?.body}`);
+    }
     const msgs = body.messages;
     expect(msgs.some(m => m.role === 'system' && m.content === 'my system prompt')).toBe(true);
     expect(msgs.some(m => m.role === 'user' && m.content === 'my user prompt')).toBe(true);
