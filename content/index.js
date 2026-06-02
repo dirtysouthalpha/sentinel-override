@@ -1824,7 +1824,7 @@ if (window.__sentinelInitialized) {
           for (const val of cmd.value) {
             if (val == null) continue;
             const valStr = String(val);
-            const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === valStr.toLowerCase());
+            const opt = options.find(o => o.value === val || (o.textContent && o.textContent.trim().toLowerCase() === valStr.toLowerCase()));
             if (opt) opt.selected = true;
           }
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
@@ -1837,14 +1837,14 @@ if (window.__sentinelInitialized) {
         const options = Array.from(el.options);
         let targetOpt = options.find(o => o.value === cmd.value);
         if (!targetOpt) {
-          targetOpt = options.find(o => o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
+          targetOpt = options.find(o => o.textContent && o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
         }
         if (!targetOpt) {
           // Partial text match as fallback
-          targetOpt = options.find(o => o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
+          targetOpt = options.find(o => o.textContent && o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
         }
         if (!targetOpt) {
-          const availableOpts = options.map(o => `"${o.value}" (${o.textContent.trim()})`).join(', ');
+          const availableOpts = options.map(o => `"${o.value}" (${o.textContent ? o.textContent.trim() : ''})`).join(', ');
           hl.removeHighlight(el);
           return 'Error: No matching option "' + cmd.value + '". Available: ' + availableOpts;
         }
