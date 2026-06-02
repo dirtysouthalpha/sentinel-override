@@ -137,7 +137,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     try {
       const el = doc.querySelector(selector);
       if (el) return el;
-    } catch (e) { console.warn('[Sentinel] selector query fallback:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] selector query fallback:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 
     const testIdMatch = selector.match(/^\[data-testid="(.+)"\]$/);
     if (testIdMatch) {
@@ -356,7 +356,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
               dom._addElement(el, interactiveElements, selectorMap, prefix, shadow.isInShadowDOM(el));
             }
           }
-        } catch (e) { console.warn('[Sentinel] shadow element scan:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] shadow element scan:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
       });
     }
   };
@@ -391,7 +391,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
         w: Math.round(Number(r.width) || 0),
         h: Math.round(Number(r.height) || 0)
       };
-    } catch (e) { console.warn('[Sentinel] bbox getBoundingClientRect:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] bbox getBoundingClientRect:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 
     const elementData = {
       index: interactiveElements.length,

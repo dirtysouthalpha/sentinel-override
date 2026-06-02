@@ -31,7 +31,7 @@
       window.__sentinelCapturedRoots.set(this, shadowRoot);
       window.__sentinelShadowRoots.add(shadowRoot);
     } catch (error) {
-      console.error('[Sentinel] Failed to intercept shadow root:', error);
+      console.error('[Sentinel] Failed to intercept shadow root:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
     }
     return shadowRoot;
   };
