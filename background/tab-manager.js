@@ -660,7 +660,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchMouseEvent', { ...base, type: 'mouseReleased' });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (err && err.message) || String(err) };
+    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
   }
 }
 
@@ -731,7 +731,7 @@ export async function cdpDispatchKey(tabId, key, _options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (err && err.message) || String(err) };
+    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
   }
 }
 
@@ -817,7 +817,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (err && err.message) || String(err) };
+    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
   }
 }
 

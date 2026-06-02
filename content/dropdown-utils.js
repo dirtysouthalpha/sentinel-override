@@ -90,14 +90,14 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         try {
           const controlled = doc.getElementById(controlsId);
           if (controlled) addAllFromContainer(controlled);
-        } catch (e) { console.warn('[Sentinel] aria-controls lookup:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] aria-controls lookup:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
       }
       const ownsId = triggerEl.getAttribute('aria-owns');
       if (ownsId) {
         try {
           const owned = doc.getElementById(ownsId);
           if (owned) addAllFromContainer(owned);
-        } catch (e) { console.warn('[Sentinel] aria-owns lookup:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] aria-owns lookup:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
       }
 
       // 1b. If we got nothing yet, climb the DOM looking for a parent that contains
@@ -117,7 +117,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
             cursor = cursor.parentElement;
             depth++;
           }
-        } catch (e) { console.warn('[Sentinel] parent container climb:', e && e.message || String(e)); }
+        } catch (e) { console.warn('[Sentinel] parent container climb:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
       }
     }
 
@@ -371,7 +371,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     let className = '';
     try {
       className = (typeof el.className === 'string') ? el.className : (el.className && el.className.baseVal) || '';
-    } catch (e) { console.warn('[Sentinel] className access:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] className access:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     className = className.toLowerCase();
     if (className.includes('dropdown') || className.includes('combobox') ||
         className.includes('select') || className.includes('picker')) {

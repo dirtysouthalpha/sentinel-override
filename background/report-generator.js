@@ -369,7 +369,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       return cleaned;
     } catch (err) {
       lastError = err;
-      const errMsg = (err && err.message) || '';
+      const errMsg = (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : '');
       const isNonRetryable = errMsg === 'No active provider configured'
         || errMsg === 'API key not configured'
         || errMsg.startsWith('Failed to build report request')

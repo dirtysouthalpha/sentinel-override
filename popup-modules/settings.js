@@ -25,7 +25,7 @@ function loadThemePreference() {
   try {
     savedNamedTheme = localStorage.getItem('theme-named');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-named:', (e && e.message) || String(e));
+    console.warn('[Sentinel/settings] Failed to read theme-named:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
   }
   if (savedNamedTheme && savedNamedTheme !== 'light') {
     applyThemePreset(savedNamedTheme);
@@ -42,7 +42,7 @@ function loadThemePreference() {
   try {
     savedTheme = localStorage.getItem('theme-preference');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-preference:', (e && e.message) || String(e));
+    console.warn('[Sentinel/settings] Failed to read theme-preference:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
   }
   if (savedTheme) {
     document.body.classList.toggle('dark-mode', savedTheme === 'dark');
@@ -258,7 +258,7 @@ if (adaptivePromptsModeSelect) {
 
 if (adaptiveExpansionModeSelect) {
   adaptiveExpansionModeSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
+    chrome.storage.local.set({ adaptiveExpansionMode: adaptiveExpansionModeSelect.value }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
   });
 }
 
@@ -611,7 +611,7 @@ if (expectedTenantInput) {
     if (__tenantSaveTimer) clearTimeout(__tenantSaveTimer);
     __tenantSaveTimer = setTimeout(() => {
       const v = (expectedTenantInput.value || '').trim();
-      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
+      chrome.storage.local.set({ expectedTenant: v }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     }, 350);
   });
 }

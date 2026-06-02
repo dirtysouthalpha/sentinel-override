@@ -365,7 +365,7 @@ function loadApprovalMode() {
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
-      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     } else {
       isApprovalMode = result.approvalMode === true;
     }
@@ -400,13 +400,13 @@ function setupApprovalModeToggle() {
       chrome.storage.local.set({
         approvalMode: false,
         approvalModeAcknowledged: true
-      }).catch((e) => { console.warn('[Sentinel/chat] Failed to persist approval mode:', (e && e.message) || String(e)); });
+      }).catch((e) => { console.warn('[Sentinel/chat] Failed to persist approval mode:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
       updateApprovalModeUI(false);
       return;
     }
 
     // Re-enabling approvals is always safe; persist immediately.
-    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     updateApprovalModeUI(true);
   });
 }
@@ -460,7 +460,7 @@ function maybeShowSafetyBanner() {
     const dismissSafetyBanner = document.getElementById('dismissSafetyBanner');
     if (dismissSafetyBanner) {
       dismissSafetyBanner.addEventListener('click', () => {
-        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
         banner.remove();
       });
     }
@@ -986,7 +986,7 @@ function sendMessage() {
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (chrome.runtime.lastError) {
         removeTypingIndicator();
@@ -1666,7 +1666,7 @@ window.executeCommand = (action) => {
       document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); try { showToast('Run log history unavailable: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); try { showToast('Run log history unavailable: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -2733,7 +2733,7 @@ async function renderRunLogHistoryList() {
       b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
     });
   } catch (e) {
-    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + ((e && e.message) || String(e)) + '</div>';
+    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) + '</div>';
   }
 }
 
@@ -2756,7 +2756,7 @@ async function deleteRunLogById(runLogId) {
     try { showToast('Run log deleted', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Delete failed: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2773,7 +2773,7 @@ async function clearAllRunLogs() {
     try { showToast('All run logs cleared', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + ((e && e.message) || String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Clear failed: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
