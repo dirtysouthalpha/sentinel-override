@@ -30,7 +30,7 @@ globalThis.chrome = {
     local: {
       get: jest.fn(async (keys) => {
         const result = {};
-        if (keys && typeof keys === 'object') {
+        if (keys && typeof keys === 'object' && keys !== null) {
           for (const k of Object.keys(keys)) {
             result[k] = storageData[k] !== undefined ? storageData[k] : keys[k];
           }

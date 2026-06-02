@@ -14,7 +14,7 @@
  * @returns {Array<object>} Shallow copy of tools with cache_control added to the last entry.
  */
 function _cacheLastTool(tools) {
-  if (!tools || tools.length === 0) return tools;
+  if (!tools || !Array.isArray(tools) || tools.length === 0) return tools;
   const copy = tools.slice();
   copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
   return copy;

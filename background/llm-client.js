@@ -1365,7 +1365,7 @@ function _buildTabCtx() {
  */
 function _sanitizeHistory(history, isRunbook, CONFIG) {
   const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
-  const slicedHistory = history.slice(-historyWindowSize);
+  const slicedHistory = Array.isArray(history) ? history.slice(-historyWindowSize) : [];
   return slicedHistory.map((h, idx) => {
     const isMostRecent = idx === slicedHistory.length - 1;
     const action = h.action || {};
@@ -1681,8 +1681,8 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   agentState.model = model; // needed by _buildAgentPrompt → supportsVision
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
-  const last_action = history.length > 0 ? history[history.length - 1].action : null;
-  const last_result = history.length > 0 ? history[history.length - 1].result : null;
+  const last_action = Array.isArray(history) && history.length > 0 ? history[history.length - 1].action : null;
+  const last_result = Array.isArray(history) && history.length > 0 ? history[history.length - 1].result : null;
 
   // Runbook detection
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
@@ -1701,9 +1701,9 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 ` : '';
 
   // Navigation fatigue detection -- DISABLED in runbook mode.
-  const navigateCount = history.filter(h => h.action && h.action.type === 'navigate').length;
-  const extractCount = history.filter(h => h.action && ['extract', 'extract_list'].includes(h.action.type)).length;
-  const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
+  const navigateCount = Array.isArray(history) ? history.filter(h => h.action && h.action.type === 'navigate').length : 0;
+  const extractCount = Array.isArray(history) ? history.filter(h => h.action && ['extract', 'extract_list'].includes(h.action.type)).length : 0;
+  const noteCount = Array.isArray(history) ? history.filter(h => h.action && h.action.type === 'note').length : 0;
 
   const finishCtx = isRunbook ? '' :
     (navigateCount >= 5 && extractCount === 0 && noteCount === 0)
