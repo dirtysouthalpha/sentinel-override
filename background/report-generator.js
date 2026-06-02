@@ -277,7 +277,7 @@ export async function generateReport(executionData, CONFIG) {
     // (3.50.0) Build a better fallback that actually shows the collected data
     const fb = buildFallbackReport(executionData);
     // Prepend a note about the LLM failure
-    const fallbackReport = `> ⚠️ AI report formatting failed (${(err && err.message) || String(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
+    const fallbackReport = `> ⚠️ AI report formatting failed (${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
     return { summary: fb.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
@@ -317,7 +317,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
         requestHeaders = provider.buildHeaders(apiKey);
       } catch (err) {
         clearTimeout(timeout);
-        throw new Error('Failed to build report request: ' + ((err && err.message) || String(err)));
+        throw new Error('Failed to build report request: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)));
       }
 
       let response;
