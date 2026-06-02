@@ -600,7 +600,7 @@ describe('saveLearnedPattern', () => {
     const before = Date.now();
     await saveLearnedPattern('Goal', [], true);
     const after = Date.now();
-    const ts = storageData.learned_patterns[0].timestamp;
+    const ts = storageData.learned_patterns[0]?.timestamp;
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
   });

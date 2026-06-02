@@ -421,7 +421,7 @@ function installObservabilityEventHook() {
           });
         } else if (method === 'Runtime.consoleAPICalled' && params) {
           // console.log/error/warn/info — most app-level logs come through here
-          const args = (params.args || []).map(a => {
+          const args = (Array.isArray(params.args) ? params.args : []).map(a => {
             if (a && typeof a.value !== 'undefined') return String(a.value);
             if (a && typeof a.description !== 'undefined') return String(a.description);
             return '';

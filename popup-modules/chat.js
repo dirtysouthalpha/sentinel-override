@@ -892,7 +892,7 @@ document.querySelectorAll('.example-prompt-btn').forEach(btn => {
     // Position cursor at first [bracket] placeholder if present, so the
     // user can immediately fill in their value.
     const bracketMatch = prompt.match(/\[([^\]]+)\]/);
-    if (bracketMatch) {
+    if (bracketMatch && bracketMatch[0]) {
       const start = prompt.indexOf(bracketMatch[0]);
       goalInput.setSelectionRange(start, start + bracketMatch[0].length);
     }
@@ -1295,8 +1295,10 @@ function updateAttachmentPreview() {
       removeBtn.textContent = '×';
       removeBtn.addEventListener('click', () => {
         if (!state.selectedAttachments) return;
-        state.selectedAttachments.splice(index, 1);
-        updateAttachmentPreview();
+        if (index >= 0 && index < state.selectedAttachments.length) {
+          state.selectedAttachments.splice(index, 1);
+          updateAttachmentPreview();
+        }
       });
       item.appendChild(nameSpan);
       item.appendChild(removeBtn);

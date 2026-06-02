@@ -1962,19 +1962,19 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
           if (_fm && _fm[1]) _query = _fm[1].trim();
         }
         if (_query) {
-          console.log('[Sentinel/FALLBACK] Detected smart_navigate intent from content — site:', _site, 'query:', _query);
+          console.warn('[Sentinel/FALLBACK] Detected smart_navigate intent from content — site:', _site, 'query:', _query);
           return { type: 'smart_navigate', site: _site, query: _query };
         }
       }
       // Detect explicit navigate URL in content
       const _navUrl = _intentText.match(/navigate\s+(?:to\s+)?(?:the\s+)?(?:url\s+)?["']?(https?:\/\/[^\s"'\])\]]+)/i);
       if (_navUrl && _navUrl[1]) {
-        console.log('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
+        console.warn('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
         return { type: 'navigate', url: _navUrl[1] };
       }
       // v3.63: Detect navigate_back / go back intent
       if (/\b(?:go|navigate)\s*back\b|\bback\s+to\b|\breturn\s+to\b|\bprevious\s+page\b/i.test(_intentText)) {
-        console.log('[Sentinel/FALLBACK] Detected navigate_back intent from content');
+        console.warn('[Sentinel/FALLBACK] Detected navigate_back intent from content');
         return { type: 'navigate_back' };
       }
       // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
@@ -1983,13 +1983,13 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         const _siteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', google: 'google.com', twitter: 'twitter.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', 'weather.gov': 'weather.gov', stackoverflow: 'stackoverflow.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com' };
         const _mapped = _siteMap[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
         if (_mapped) {
-          console.log('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
+          console.warn('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
           return { type: 'navigate', url: 'https://' + _mapped };
         }
       }
       // v3.63: Detect finish intent from content
       if (/\b(?:finish|done|complete|here\s+(?:is|are)|summary|report)\b/i.test(_intentText) && /\b(?:task|report|findings|articles|results)\b/i.test(_intentText)) {
-        console.log('[Sentinel/FALLBACK] Detected finish intent from content');
+        console.warn('[Sentinel/FALLBACK] Detected finish intent from content');
         return { type: 'finish', summary: _intentText.substring(0, 500) };
       }
     }
