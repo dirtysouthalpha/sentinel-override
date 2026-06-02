@@ -414,7 +414,7 @@ function installObservabilityEventHook() {
           const e = params.entry;
           pushConsoleEntry(tabId, {
             level: e.level || 'info',
-            text: String(e.text || '').substring(0, 1000),
+            text: (e && typeof e.text === 'string' ? e.text : '').substring(0, 1000),
             url: e.url || '',
             line: e.lineNumber || 0,
             ts: Date.now()
@@ -422,8 +422,8 @@ function installObservabilityEventHook() {
         } else if (method === 'Runtime.consoleAPICalled' && params) {
           // console.log/error/warn/info — most app-level logs come through here
           const args = (params.args || []).map(a => {
-            if (a && a.value !== undefined) return String(a.value);
-            if (a && a.description) return String(a.description);
+            if (a && typeof a.value !== 'undefined') return String(a.value);
+            if (a && typeof a.description !== 'undefined') return String(a.description);
             return '';
           }).join(' ').substring(0, 1000);
           pushConsoleEntry(tabId, {
@@ -438,7 +438,7 @@ function installObservabilityEventHook() {
           const txt = (ex.exception && (ex.exception.description || ex.exception.value)) || ex.text || 'exception';
           pushConsoleEntry(tabId, {
             level: 'error',
-            text: String(txt).substring(0, 1000),
+            text: (typeof txt === 'string' ? txt : '').substring(0, 1000),
             url: ex.url || '',
             line: ex.lineNumber || 0,
             ts: Date.now()
@@ -877,7 +877,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
     if (result && result.exceptionDetails) {
       const ex = result.exceptionDetails;
       const msg = (ex.exception && (ex.exception.description || ex.exception.value)) || ex.text || 'Runtime exception';
-      return { ok: false, error: String(msg).slice(0, 500) };
+      return { ok: false, error: typeof msg === 'string' ? msg.slice(0, 500) : String(msg) };
     }
     const value = result && result.result ? result.result.value : undefined;
     return { ok: true, value };
@@ -980,7 +980,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         });
       });
       const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
-      if (_parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
+      if (!_parts || _parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
