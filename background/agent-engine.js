@@ -254,8 +254,12 @@ export async function restoreFromCheckpoint() {
     // to re-initialize when the agent re-opens tabs.
     if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object' && cp.tabContextUrls !== null) {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
-        const tabId = parseInt(tabIdStr, 10) || 0;
-        if (tabId > 0 && typeof url === 'string') {
+        const tabId = parseInt(tabIdStr, 10);
+        if (typeof tabId !== 'number' || isNaN(tabId) || tabId <= 0) {
+          console.warn('[Sentinel] Invalid tabId in checkpoint:', tabIdStr);
+          continue;
+        }
+        if (typeof url === 'string') {
           try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         }
       }
@@ -5581,7 +5585,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Support the `index` parameter from the tool definition
         if (!targetId && typeof command.index === 'number') {
           const allCtx = getAllTabContexts();
-          if (command.index >= 0 && command.index < allCtx.length) {
+          if (Array.isArray(allCtx) && command.index >= 0 && command.index < allCtx.length) {
             targetId = allCtx[command.index].tabId;
           }
         }
