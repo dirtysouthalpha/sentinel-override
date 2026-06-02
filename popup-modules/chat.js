@@ -263,7 +263,7 @@ function updateActiveTabAction(payload) {
     try {
       chrome.tabs.get(tabId, (info) => {
         if (chrome.runtime.lastError) {
-          console.warn('[Sentinel/chat] chrome.tabs.get failed:', String(chrome.runtime.lastError));
+          console.warn('[Sentinel/chat] chrome.tabs.get failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
           return;
         }
         if (info && typeof info.windowId === 'number') {
@@ -360,7 +360,7 @@ function showCrosshair(x, y, viewportW, viewportH) {
 // eslint-disable-next-line no-unused-vars
 function loadApprovalMode() {
   chrome.storage.local.get(['approvalMode'], (result) => {
-    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadApprovalMode failed:', String(chrome.runtime.lastError)); return; }
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadApprovalMode failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     let isApprovalMode;
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
@@ -424,7 +424,7 @@ function updateApprovalModeUI(isApprovalMode) {
 // ========== First-run Safety Banner ==========
 function maybeShowSafetyBanner() {
   chrome.storage.local.get(['seenSafetyBanner'], (result) => {
-    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] maybeShowSafetyBanner failed:', String(chrome.runtime.lastError)); return; }
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] maybeShowSafetyBanner failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     if (result.seenSafetyBanner) return;
 
     if (!chatContainer) return;
@@ -725,7 +725,7 @@ function updateActionCardResult(stepNumber, resultText, isError) {
 function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
-    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', String(chrome.runtime.lastError)); return; }
+    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     if (Array.isArray(result.chat_history) && result.chat_history.length > 0) {
       state.conversationHistory = result.chat_history;
       if (chatContainer) chatContainer.innerHTML = '';
@@ -1042,7 +1042,7 @@ document.querySelectorAll('[data-speed]').forEach(btn => {
   btn.addEventListener('click', () => {
     const mode = btn.getAttribute('data-speed');
     chrome.runtime.sendMessage({ action: 'set_agent_speed', mode }, (resp) => {
-      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setAgentSpeed failed:', String(chrome.runtime.lastError)); return; }
+      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setAgentSpeed failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       if (resp && resp.ok !== false) {
         // Update active state on buttons
         document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
@@ -1123,7 +1123,7 @@ newChatBtn.addEventListener('click', () => {
       }
     } catch { /* recentChats archive is non-critical */ }
     chrome.storage.local.set({ chat_history: [] }, () => {
-      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] clearChatHistory failed:', String(chrome.runtime.lastError)); return; }
+      if (chrome.runtime.lastError) { console.error('[Sentinel/chat] clearChatHistory failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       const state = getState();
       state.conversationHistory = [];
       if (chatContainer) {
@@ -2409,7 +2409,7 @@ function showModeMismatchCard(payload) {
       // Write the new setting from the popup side so updateApprovalModeUI and
       // the toggle reflect it without needing a separate broadcast.
       chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
-        if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', String(chrome.runtime.lastError)); return; }
+        if (chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
         try {
           if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
             approvalModeToggle.checked = wantsApproval;
@@ -3542,7 +3542,7 @@ chrome.runtime.onMessage.addListener((message) => {
           const originalGoal = typeof message.originalGoal === 'string' ? message.originalGoal : '';
           // Fetch dismissed map, prune expired, filter incoming suggestions.
           chrome.storage.local.get('dismissed_suggestions', (stored) => {
-            if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', String(chrome.runtime.lastError)); return; }
+            if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
             const now = Date.now();
             const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
               ? stored.dismissed_suggestions : {};
@@ -3638,7 +3638,7 @@ chrome.runtime.onMessage.addListener((message) => {
                 sCard.remove();
                 if (sug && sug.id) {
                   chrome.storage.local.get('dismissed_suggestions', (stored) => {
-                    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', String(chrome.runtime.lastError)); return; }
+                    if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
                     const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
