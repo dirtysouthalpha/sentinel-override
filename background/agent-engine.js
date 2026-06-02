@@ -5835,7 +5835,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (savedValue !== null) {
               agentMemory[savedKey] = savedValue;
               const memKeys = Object.keys(agentMemory || {});
-              if (memKeys.length > CONFIG.maxMemoryEntries && agentMemory) delete agentMemory[memKeys[0]];
+              if (memKeys.length > CONFIG.maxMemoryEntries && memKeys[0] && agentMemory) delete agentMemory[memKeys[0]];
               try {
                 await chrome.storage.local.set({ agent_memory: agentMemory });
               } catch (e) {
