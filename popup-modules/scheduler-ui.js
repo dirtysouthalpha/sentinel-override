@@ -139,7 +139,7 @@ function renderScheduleCard(schedule) {
   let statusBadge = '';
   if (schedule.lastRunStatus) {
     const statusClass = schedule.lastRunStatus;
-    const statusLabel = schedule.lastRunStatus.charAt(0).toUpperCase() + schedule.lastRunStatus.slice(1);
+    const statusLabel = (typeof schedule.lastRunStatus === 'string' ? schedule.lastRunStatus.charAt(0).toUpperCase() : '?') + (typeof schedule.lastRunStatus === 'string' ? schedule.lastRunStatus.slice(1) : '');
     statusBadge = `<span class="schedule-status-badge ${statusClass}">${statusLabel}</span>`;
   }
 
@@ -369,7 +369,7 @@ function renderTemplateParams(params) {
   if (!container) return;
   container.innerHTML = '';
 
-  if (params && Array.isArray(params)) {
+  if (params && Array.isArray(params) && typeof params.forEach === 'function') {
     params.forEach(param => {
     const row = document.createElement('div');
     row.className = 'template-param-row';
@@ -456,9 +456,12 @@ async function handleSaveSchedule() {
 
     if (interval === 'weekly') {
       const days = [];
-      document.querySelectorAll('.sch-day-check:checked').forEach(cb => {
-        days.push(parseInt(cb.value, 10));
-      });
+      const checkedBoxes = document.querySelectorAll('.sch-day-check:checked');
+      if (checkedBoxes && typeof checkedBoxes.forEach === 'function') {
+        checkedBoxes.forEach(cb => {
+          days.push(parseInt(cb.value, 10));
+        });
+      }
       if (days.length === 0) {
         showToast('Please select at least one day of the week', 'error');
         return;

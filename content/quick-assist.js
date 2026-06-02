@@ -419,18 +419,20 @@
     var container = document.createElement('div');
     container.className = 'qa-actions';
 
-    ACTIONS.forEach(function(action) {
-      var btn = document.createElement('button');
-      btn.className = 'qa-btn';
-      btn.textContent = action.label;
-      btn.dataset.actionId = action.id;
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        executeAction(action);
+    if (Array.isArray(ACTIONS) && typeof ACTIONS.forEach === 'function') {
+      ACTIONS.forEach(function(action) {
+        var btn = document.createElement('button');
+        btn.className = 'qa-btn';
+        btn.textContent = action.label;
+        btn.dataset.actionId = action.id;
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          executeAction(action);
+        });
+        container.appendChild(btn);
       });
-      container.appendChild(btn);
-    });
+    }
 
     return container;
   }

@@ -110,7 +110,7 @@ if (providerBtns.length > 0) {
 function loadSettings() {
   const state = getState();
   chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model', 'export_format', 'agent_context'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to load settings:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to load settings:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     // Handle both new provider structure and legacy keys
     if (result.providers) {
       state.providerConfigs = result.providers;
@@ -138,7 +138,7 @@ const quickAssistToggle = document.getElementById('quickAssistToggle');
 const quickAssistLabel = document.getElementById('quickAssistLabel');
 if (quickAssistToggle) {
   chrome.storage.local.get(['quickAssist'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickAssist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read quickAssist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.quickAssist !== false; // default ON
     quickAssistToggle.checked = enabled;
     if (quickAssistLabel) {
@@ -150,7 +150,7 @@ if (quickAssistToggle) {
   quickAssistToggle.addEventListener('change', () => {
     const enabled = quickAssistToggle.checked;
     chrome.storage.local.set({ quickAssist: enabled }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save quickAssist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -172,13 +172,13 @@ if (quickAssistToggle) {
 const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
 if (useTrustedInputToggle) {
   chrome.storage.local.get(['useTrustedInput'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     useTrustedInputToggle.checked = result.useTrustedInput === true;
   });
   useTrustedInputToggle.addEventListener('change', () => {
     const enabled = useTrustedInputToggle.checked;
     chrome.storage.local.set({ useTrustedInput: enabled }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -205,13 +205,13 @@ if (useTrustedInputToggle) {
 const soundEnabledToggle = document.getElementById('soundEnabledToggle');
 if (soundEnabledToggle) {
   chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
   });
   soundEnabledToggle.addEventListener('change', () => {
     const enabled = soundEnabledToggle.checked;
     chrome.storage.local.set({ sentinelSoundEnabled: enabled }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save sentinelSoundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -237,7 +237,7 @@ const adaptiveExpansionModeSelect = document.getElementById('adaptiveExpansionMo
 
 if (adaptivePromptsModeSelect) {
   chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read adaptivePrompts:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read adaptivePrompts:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     adaptivePromptsModeSelect.value = result.adaptivePromptsMode || 'auto';
     if (adaptiveExpansionModeSelect) {
       adaptiveExpansionModeSelect.value = result.adaptiveExpansionMode || 'light';
@@ -246,7 +246,7 @@ if (adaptivePromptsModeSelect) {
   adaptivePromptsModeSelect.addEventListener('change', () => {
     const v = adaptivePromptsModeSelect.value;
     chrome.storage.local.set({ adaptivePromptsMode: v }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save adaptivePromptsMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -272,12 +272,12 @@ if (adaptiveExpansionModeSelect) {
 const telemetryLevelSelect = document.getElementById('telemetryLevelSelect');
 if (telemetryLevelSelect) {
   chrome.storage.local.get(['telemetryLevel'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryLevel:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetryLevel:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetryLevelSelect.value = result.telemetryLevel || 'normal';
   });
   telemetryLevelSelect.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryLevel: telemetryLevelSelect.value }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save telemetryLevel:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -296,12 +296,12 @@ if (telemetryLevelSelect) {
 const telemetryPersistToggle = document.getElementById('telemetryPersistToggle');
 if (telemetryPersistToggle) {
   chrome.storage.local.get(['telemetryPersist'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryPersist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetryPersist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetryPersistToggle.checked = !!result.telemetryPersist;
   });
   telemetryPersistToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryPersist: telemetryPersistToggle.checked }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save telemetryPersist:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -324,13 +324,13 @@ if (telemetryPersistToggle) {
 const telemetryRedactToggle = document.getElementById('telemetryRedactToggle');
 if (telemetryRedactToggle) {
   chrome.storage.local.get(['telemetryRedact'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     // Default ON: only set false if explicitly stored as false.
     telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
   });
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -353,12 +353,12 @@ if (telemetryRedactToggle) {
 const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptToggle');
 if (telemetrySkillAdaptToggle) {
   chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -377,7 +377,7 @@ if (skillStatsResetBtn) {
   skillStatsResetBtn.addEventListener('click', () => {
     if (!confirm('Reset all skill outcome stats? This clears fire counts, success rates, and timing data for every recovery skill. The static priority numbers remain unchanged.')) return;
     chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to reset skill stats:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to reset skill stats:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
@@ -390,7 +390,7 @@ const skillStatsViewBtn = document.getElementById('skillStatsViewBtn');
 if (skillStatsViewBtn) {
   skillStatsViewBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'list_skills_with_stats' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to list skills:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to list skills:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       const skills = Array.isArray(resp) ? resp : (resp && Array.isArray(resp.data) ? resp.data : []);
       _renderSkillStatsModal(skills);
     });
@@ -476,7 +476,7 @@ const quickModeToggle = document.getElementById('quickModeToggle');
 const quickModeLabel = document.getElementById('quickModeLabel');
 if (quickModeToggle) {
   chrome.storage.local.get(['quickMode'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.quickMode === true;
     quickModeToggle.checked = enabled;
     if (quickModeLabel) {
@@ -488,7 +488,7 @@ if (quickModeToggle) {
   quickModeToggle.addEventListener('change', () => {
     const enabled = quickModeToggle.checked;
     chrome.storage.local.set({ quickMode: enabled }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -536,7 +536,7 @@ function __setTicketFormatRowVisible(visible) {
 if (ticketModeToggle) {
   // Load saved state and prefill technician fields.
   chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const enabled = result.ticketMode === true;
     ticketModeToggle.checked = enabled;
     __setTicketFormatRowVisible(enabled);
@@ -554,7 +554,7 @@ if (ticketModeToggle) {
     const enabled = ticketModeToggle.checked;
     __setTicketFormatRowVisible(enabled);
     chrome.storage.local.set({ ticketMode: enabled }, () => {
-      if (chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         console.error('[Sentinel/settings] Failed to save ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         showToast('Failed to save setting', 'error');
         return;
@@ -603,7 +603,7 @@ if (ticketFormatSelect) {
 const expectedTenantInput = document.getElementById('expectedTenantInput');
 if (expectedTenantInput) {
   chrome.storage.local.get(['expectedTenant'], (result) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read expectedTenant:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read expectedTenant:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     if (typeof result.expectedTenant === 'string') {
       expectedTenantInput.value = result.expectedTenant;
     }
@@ -725,7 +725,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   if (settingsModal) settingsModal.classList.add('show');
   // Load and render learned patterns
   chrome.storage.local.get(['learned_patterns'], (s) => {
-    if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to read learned patterns:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read learned patterns:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     _renderLearnedPatterns(s.learned_patterns || []);
   });
 });
@@ -1057,7 +1057,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   function refreshCatalog() {
     chrome.runtime.sendMessage({ action: 'get_provider_catalog' }, (resp) => {
-      if (chrome.runtime.lastError) { console.warn('[Sentinel/settings] Failed to get provider catalog:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to get provider catalog:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
       const data = (resp && resp.data) ? resp.data : resp;
       if (!Array.isArray(data)) return;
       catalog = data;
