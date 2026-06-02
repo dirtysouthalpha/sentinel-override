@@ -190,7 +190,7 @@ function saveNewTemplate() {
       return;
     }
     if (response && response.error) {
-      showToast(response.error, 'error');
+      showToast(typeof response.error === 'string' ? response.error : String(response.error), 'error');
       return;
     }
     document.getElementById('template-modal')?.classList.remove('show');
@@ -266,7 +266,7 @@ function saveEditedTemplate() {
       return;
     }
     if (response && response.error) {
-      showToast(response.error, 'error');
+      showToast(typeof response.error === 'string' ? response.error : String(response.error), 'error');
       return;
     }
     editingTemplateId = null;
@@ -383,7 +383,7 @@ function executeTemplate() {
       return;
     }
     if (response && response.error) {
-      showToast(response.error, 'error');
+      showToast(typeof response.error === 'string' ? response.error : String(response.error), 'error');
       return;
     }
     runningTemplateId = null;
@@ -408,7 +408,7 @@ function deleteTemplate(templateId, templateName) {
       return;
     }
     if (response && response.error) {
-      showToast(response.error, 'error');
+      showToast(typeof response.error === 'string' ? response.error : String(response.error), 'error');
       return;
     }
     loadTemplates();

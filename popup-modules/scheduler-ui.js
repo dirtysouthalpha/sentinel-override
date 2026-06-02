@@ -602,7 +602,7 @@ async function showRunHistory(scheduleId, scheduleName) {
 
         let errorMsg = '';
         if (result.error) {
-          errorMsg = `<div style="font-size:11px;color:var(--error-color);margin-top:2px;">${escapeHtml(result.error)}</div>`;
+          errorMsg = `<div style="font-size:11px;color:var(--error-color);margin-top:2px;">${escapeHtml(typeof result.error === 'string' ? result.error : String(result.error))}</div>`;
         }
 
         item.innerHTML = `
