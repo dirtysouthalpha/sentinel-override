@@ -1005,7 +1005,7 @@ export async function generatePlan(goal, settings, context = {}) {
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             if (s2end === -1) {
-              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', (typeof parseErr.message === 'string' ? parseErr.message : String(parseErr)));
+              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', (typeof parseErr === 'object' && parseErr !== null && typeof parseErr.message === 'string' ? parseErr.message : String(parseErr)));
             }
           }
           s2from = s2end + 1;
@@ -1171,7 +1171,7 @@ const _rateLimiter = {
     // Drop timestamps outside the sliding window
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
     if (this.timestamps.length >= this.maxCalls && this.timestamps.length > 0) {
-      const oldestInWindow = this.timestamps.length > 0 ? this.timestamps[0] : now;
+      const oldestInWindow = Array.isArray(this.timestamps) && this.timestamps.length > 0 ? this.timestamps[0] : now;
       const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
       throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
     }
@@ -1912,8 +1912,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       }
     }
     // OpenAI-compatible: check for tool_calls in the response message
-    const choice = data.choices && data.choices[0];
-    const hasToolCalls = choice && choice.message && choice.message.tool_calls && choice.message.tool_calls.length > 0;
+    const choice = Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
+    const hasToolCalls = choice && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0;
     if (hasToolCalls) {
       try {
         return provider.parseToolUseResponse(data);
@@ -1932,7 +1932,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
     // One last attempt: try the raw tool_calls directly
-    if (hasToolCalls && choice.message && choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+    if (hasToolCalls && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0) {
       const tc = choice.message.tool_calls[0];
       if (tc && tc.function && tc.function.name) {
         try {
@@ -1944,7 +1944,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // v3.61: z.ai sometimes returns finish_reason="tool_calls" with malformed/empty tool_calls
     // but the content or reasoning_content contains the tool intent. Detect and construct action.
     if (choice && choice.finish_reason === 'tool_calls') {
-      const _intentText = ((choice.message && choice.message.content) || '') + ' ' + ((choice.message && choice.message.reasoning_content) || '');
+      const _intentText = ((choice.message && typeof choice.message.content === 'string' ? choice.message.content : '') || '') + ' ' + ((choice.message && typeof choice.message.reasoning_content === 'string' ? choice.message.reasoning_content : '') || '');
       // Detect smart_navigate intent from content
       if (/smart[._-]?navigate/i.test(_intentText)) {
         let _site = 'google', _query = '';
@@ -2227,7 +2227,7 @@ export function parseLLMResponse(content) {
         }
       } catch (e) { console.warn('[Sentinel/llm] Parse failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
-    return { type: 'note', text: `Parse error (will retry): ${typeof err.message === 'string' ? err.message : String(err)}` };
+    return { type: 'note', text: `Parse error (will retry): ${typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)}` };
   }
 }
 
