@@ -610,6 +610,7 @@ describe('sendNotification — success path with report truncation', () => {
     // Notification should have been sent
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
     const callArgs = sharedState.notifyIfEnabled.mock.calls[0] || [];
+    expect(callArgs.length).toBeGreaterThan(1);
     // Second arg is the notification options
     const notifOpts = callArgs[1];
     expect(typeof notifOpts.message === 'string' && notifOpts.message.length).toBeLessThanOrEqual(500);

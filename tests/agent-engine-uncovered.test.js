@@ -283,6 +283,7 @@ describe('agent-engine uncovered paths', () => {
       expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
       const call = mockSendSilentUpdate.mock.calls[0] || [];
       expect(call && call[1]).toBe(25);
+      expect(call.length).toBeGreaterThan(0);
       expect(call[0]).toContain('PROGRESS UPDATE');
       expect(call[0]).toContain('step 25');
       expect(call[0]).toContain('Entra');

@@ -224,6 +224,7 @@ describe('onboarding flow', () => {
 
     const steps = sandbox._stepElements;
     expect(steps[0].style.display).toBe('none');
+      expect(steps.length).toBeGreaterThan(3);
     expect(steps[1].style.display).toBe('');
     expect(steps[2].style.display).toBe('none');
     expect(steps[3].style.display).toBe('none');

@@ -293,11 +293,11 @@ describe('quick-assist-handler', () => {
       await handleQuickAssist('test');
 
       expect(global.fetch.mock.calls.length).toBeGreaterThan(0);
-      const fetchCall = global.fetch.mock.calls[0];
-      expect(fetchCall[1].headers).toMatchObject({
+      const fetchCall = global.fetch.mock.calls[0] || [];
+      expect(fetchCall[1]?.headers).toMatchObject({
         'Content-Type': 'application/json',
       });
-      expect(fetchCall[1].headers['Authorization'] || fetchCall[1].headers['x-api-key']).toBeDefined();
+      expect(fetchCall[1]?.headers['Authorization'] || fetchCall[1]?.headers['x-api-key']).toBeDefined();
     });
 
     it('should handle empty prompt', async () => {

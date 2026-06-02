@@ -311,6 +311,7 @@ describe('executeInFrame', () => {
 
     // Second call should be the command function
     const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
+      expect(chrome.scripting.executeScript.mock.calls.length).toBeGreaterThan(1);
     expect(secondCall?.target).toEqual({ tabId: 1, frameIds: [5] });
     expect(secondCall.func).toBeDefined();
     expect(secondCall.args).toBeDefined();
@@ -346,6 +347,7 @@ describe('executeInFrame', () => {
 
     const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
     expect(secondCall).toBeDefined();
+      expect(chrome.scripting.executeScript.mock.calls.length).toBeGreaterThan(1);
     expect(secondCall.args?.[0]).toEqual(cmd);
   });
 
@@ -562,6 +564,7 @@ describe('runCommandInFrame', () => {
     await executeInFrame(9999, 99, { type: 'click', selector: 'x' });
     const secondCall = chrome.scripting.executeScript.mock.calls[1]?.[0];
     expect(secondCall).toBeDefined();
+      expect(chrome.scripting.executeScript.mock.calls.length).toBeGreaterThan(1);
     runCmd = secondCall.func;
     expect(typeof runCmd).toBe('function');
   });

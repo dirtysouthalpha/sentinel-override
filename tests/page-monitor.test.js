@@ -164,6 +164,7 @@ describe('page-monitor', () => {
 
     it('should remove monitor by id', async () => {
       const monitorsBefore = await loadMonitors();
+      expect(monitorsBefore.length).toBeGreaterThan(1);
       const idToRemove = monitorsBefore[1].id;
 
       await removeMonitor(idToRemove);

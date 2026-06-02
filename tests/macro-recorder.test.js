@@ -137,6 +137,7 @@ describe('macro-recorder', () => {
 
     it('should update existing macro', async () => {
       const macros = await loadMacros();
+      expect(macros.length).toBeGreaterThan(0);
       const id = macros[0].id;
 
       const updated = await updateMacro(id, {
@@ -157,6 +158,7 @@ describe('macro-recorder', () => {
 
     it('should preserve original fields when partially updating', async () => {
       const macros = await loadMacros();
+      expect(macros.length).toBeGreaterThan(0);
       const id = macros[0].id;
       const originalCreatedAt = macros[0].createdAt;
 

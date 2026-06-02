@@ -382,6 +382,7 @@ describe('onSuspend checkpoint listener', () => {
     // session.set should have been called
     expect(chrome.storage.session.set).toHaveBeenCalled();
     const call = chrome.storage.session.set.mock.calls[chrome.storage.session.set.mock.calls.length - 1];
+      expect(chrome.storage.session.set.mock.calls.length).toBeGreaterThan(0);
     expect(call[0]).toHaveProperty('agent_checkpoint');
   });
 });
