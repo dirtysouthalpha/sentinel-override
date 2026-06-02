@@ -105,28 +105,28 @@ describe('emit', () => {
   test('emits an event via chrome.runtime.sendMessage', () => {
     emit('test', 'info', 'Test message', { key: 'value' });
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.action).toBe('telemetry_event');
     expect(event.category).toBe('test');
     expect(event.level).toBe('info');
-    expect(event.message).toBe('Test message');
+    expect(typeof event.message === 'string' && event.message).toBe('Test message');
     expect(event.payload).toEqual({ key: 'value' });
   });
 
   test('increments sequence number', () => {
     emit('test', 'info', 'first');
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
-    const seq1 = globalThis.chrome.runtime.sendMessage.mock.calls[0][0].seq;
+    const seq1 = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0]?.seq;
     emit('test', 'info', 'second');
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(2);
-    const seq2 = globalThis.chrome.runtime.sendMessage.mock.calls[1][0].seq;
+    const seq2 = globalThis.chrome.runtime.sendMessage.mock.calls[1]?.[0]?.seq;
     expect(seq2).toBeGreaterThan(seq1);
   });
 
   test('caps message at 500 chars', () => {
     const longMsg = 'A'.repeat(600);
     emit('test', 'info', longMsg);
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(typeof event.message === 'string' && event.message.length).toBeLessThanOrEqual(500);
   });
 
@@ -153,19 +153,19 @@ describe('emit', () => {
 describe('tel convenience methods', () => {
   test('tel.error emits with error level', () => {
     tel.error('cat', 'msg');
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.level).toBe('error');
   });
 
   test('tel.warn emits with warn level', () => {
     tel.warn('cat', 'msg');
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.level).toBe('warn');
   });
 
   test('tel.info emits with info level', () => {
     tel.info('cat', 'msg');
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.level).toBe('info');
   });
 
@@ -177,7 +177,7 @@ describe('tel convenience methods', () => {
     expect(getLevel()).toBe('verbose');
     tel.debug('cat', 'msg');
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.level).toBe('debug');
   });
 
@@ -188,7 +188,7 @@ describe('tel convenience methods', () => {
     expect(getLevel()).toBe('debug');
     tel.trace('cat', 'msg');
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.level).toBe('trace');
   });
 });
@@ -196,54 +196,54 @@ describe('tel convenience methods', () => {
 describe('redaction', () => {
   test('redacts OpenAI API keys', () => {
     emit('test', 'info', 'Using key sk-proj-AbCdEf1234567890AbCdEf1234567890AbCd', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:openai-key]');
-    expect(event.message).not.toContain('sk-proj-AbCd');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:openai-key]');
+    expect(typeof event.message === 'string' && event.message).not.toContain('sk-proj-AbCd');
   });
 
   test('redacts Anthropic API keys', () => {
     emit('test', 'info', 'Key sk-ant-api03-AbCdEf1234567890AbCdEf1234567890', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:anthropic-key]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:anthropic-key]');
   });
 
   test('redacts Bearer tokens in messages', () => {
     emit('test', 'info', 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('Bearer [REDACTED:auth-header]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('Bearer [REDACTED:auth-header]');
   });
 
   test('redacts sensitive field names in payload', () => {
     emit('test', 'info', 'Login attempt', { password: 'secret123', username: 'admin' });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload.password).toBe('[REDACTED]');
     expect(event.payload.username).toBe('admin');
   });
 
   test('redacts nested sensitive fields', () => {
     emit('test', 'info', 'Config', { config: { api_key: 'sk-test-1234567890abcdef1234567890abcdef', name: 'prod' } });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload.config.api_key).toBe('[REDACTED]');
     expect(event.payload.config.name).toBe('prod');
   });
 
   test('redacts sensitive URL query parameters', () => {
     emit('test', 'info', 'URL https://api.example.com/data?token=abc123&other=ok', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('token=[REDACTED]');
-    expect(event.message).toContain('other=ok');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('token=[REDACTED]');
+    expect(typeof event.message === 'string' && event.message).toContain('other=ok');
   });
 
   test('redacts GitHub tokens', () => {
     emit('test', 'info', 'Using ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:github-token]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:github-token]');
   });
 
   test('redacts AWS access keys', () => {
     emit('test', 'info', 'Found AKIAIOSFODNN7EXAMPLE in config', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:aws-access-key]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:aws-access-key]');
   });
 });
 
@@ -457,7 +457,7 @@ describe('persistence flow', () => {
     storageData['telemetry_run_run-load'] = [{ seq: 1, message: 'test' }];
     const events = await loadPersistedRun('run-load');
     expect(events).toHaveLength(1);
-    expect(events[0].message).toBe('test');
+    expect(events[0] && typeof events[0].message === 'string' && events[0].message).toBe('test');
   });
 
   test('deletePersistedRun removes from index and storage', async () => {
@@ -482,9 +482,9 @@ describe('redaction toggle', () => {
     jest.clearAllMocks();
 
     emit('test', 'info', 'Key sk-proj-AbCdEf1234567890AbCdEf1234567890AbCd', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('sk-proj-AbCd');
-    expect(event.message).not.toContain('[REDACTED');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('sk-proj-AbCd');
+    expect(typeof event.message === 'string' && event.message).not.toContain('[REDACTED');
   });
 
   test('re-enabling redaction scrubs again', () => {
@@ -493,8 +493,8 @@ describe('redaction toggle', () => {
     jest.clearAllMocks();
 
     emit('test', 'info', 'Key sk-proj-AbCdEf1234567890AbCdEf1234567890AbCd', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:openai-key]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:openai-key]');
   });
 
   test('undefined newValue for redact defaults to true', () => {
@@ -503,8 +503,8 @@ describe('redaction toggle', () => {
     jest.clearAllMocks();
 
     emit('test', 'info', 'Key sk-proj-AbCdEf1234567890AbCdEf1234567890AbCd', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:openai-key]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:openai-key]');
   });
 });
 
@@ -515,16 +515,16 @@ describe('additional redaction patterns', () => {
     // AIza + 35 alphanumeric/underscore/hyphen chars
     const googleKey = 'AIzaSyBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1';
     emit('test', 'info', 'Google key ' + googleKey, {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:google-api-key]');
-    expect(event.message).not.toContain(googleKey);
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:google-api-key]');
+    expect(typeof event.message === 'string' && event.message).not.toContain(googleKey);
   });
 
   test('redacts Slack tokens', () => {
     const token = 'xoxb' + '-FAKETESTDATA001-FAKETESTDATA002-AbCdEfGhIjKlMnOpQrSt';
     emit('test', 'info', 'Token ' + token, {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:slack-token]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:slack-token]');
   });
 
   test('redacts Stripe live keys', () => {
@@ -532,32 +532,32 @@ describe('additional redaction patterns', () => {
     const prefix = 'sk' + '_live_';
     const key = prefix + 'FAKESTRIPEKEYTEST1234567890abcdef';
     emit('test', 'info', 'Stripe ' + key, {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:stripe-key]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:stripe-key]');
   });
 
   test('redacts JWT tokens', () => {
     emit('test', 'info', 'Token eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:jwt]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:jwt]');
   });
 
   test('redacts Basic auth headers', () => {
     emit('test', 'info', 'Authorization: Basic dXNlcjpwYXNzd29yZA==', {});
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
-    expect(event.message).toContain('[REDACTED:auth-header]');
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(typeof event.message === 'string' && event.message).toContain('[REDACTED:auth-header]');
   });
 
   test('redacts arrays with sensitive field names', () => {
     emit('test', 'info', 'Config', [{ password: 'secret1' }, { password: 'secret2' }]);
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload[0].password).toBe('[REDACTED]');
     expect(event.payload[1].password).toBe('[REDACTED]');
   });
 
   test('passes through null and number payload values', () => {
     emit('test', 'info', 'Data', { count: 42, ref: null, flag: true });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload.count).toBe(42);
     expect(event.payload.ref).toBeNull();
     expect(event.payload.flag).toBe(true);
@@ -570,7 +570,7 @@ describe('redaction of unknown payload types', () => {
   test('passes through function values in payload (line 146 fallback)', () => {
     const fn = () => 'test';
     emit('test', 'info', 'Function payload', { callback: fn });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     // Functions fall through to the final `return value` at line 146
     expect(event.payload.callback).toBe(fn);
   });
@@ -578,13 +578,13 @@ describe('redaction of unknown payload types', () => {
   test('passes through Symbol values in payload (line 146 fallback)', () => {
     const sym = Symbol('test');
     emit('test', 'info', 'Symbol payload', { key: sym });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload.key).toBe(sym);
   });
 
   test('passes through undefined values in payload (line 146 fallback)', () => {
     emit('test', 'info', 'Undefined payload', { missing: undefined });
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.payload.missing).toBeUndefined();
   });
 });
@@ -620,7 +620,7 @@ describe('redaction error fallback', () => {
     emit('test', 'info', 'Trigger redact crash', evilObj);
     // The event should still be emitted (fail-open on redaction error)
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
-    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0][0];
+    const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(event.action).toBe('telemetry_event');
   });
 });
