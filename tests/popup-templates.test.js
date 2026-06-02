@@ -104,7 +104,7 @@ describe('filterTemplates', () => {
   test('filters by search term (name)', () => {
     const result = sandbox.filterTemplates(templates, 'network', '');
     expect(result).toHaveLength(2);
-    expect(result.every(t => t.name.toLowerCase().includes('network'))).toBe(true);
+    expect(result.every(t => typeof t.name === 'string' && t.name.toLowerCase().includes('network'))).toBe(true);
   });
 
   test('filters by tag', () => {

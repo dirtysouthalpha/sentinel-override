@@ -795,7 +795,7 @@ function multiSelectOptions(optionValues, cmdValues) {
   for (const val of cmdValues) {
     if (val == null) continue;
     const valStr = String(val);
-    const opt = options.find(o => o.value === val || o.textContent.trim().toLowerCase() === valStr.toLowerCase());
+    const opt = options.find(o => o.value === val || (typeof o.textContent === 'string' && o.textContent.trim().toLowerCase() === valStr.toLowerCase()));
     if (opt) opt.selected = true;
   }
   return options;

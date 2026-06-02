@@ -567,7 +567,7 @@ describe('generateHeuristicPlan', () => {
     const plan = generateHeuristicPlan('Summarize all the top 5 articles about cybersecurity');
     expect(plan).toBeTruthy();
     expect(plan.length).toBeGreaterThan(4);
-    expect(plan.some(s => s.toLowerCase().includes('article') || s.toLowerCase().includes('open'))).toBe(true);
+    expect(plan.some(s => typeof s === 'string' && (s.toLowerCase().includes('article') || s.toLowerCase().includes('open')))).toBe(true);
   });
 
   test('generic goal produces fallback plan', () => {

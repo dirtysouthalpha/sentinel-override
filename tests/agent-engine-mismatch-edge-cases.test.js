@@ -386,7 +386,7 @@ describe('Agent engine mode mismatch and adaptive prompts edge cases', () => {
       'autonomous mode: task 3',
     ];
 
-    const autonomousCount = goals.filter(g => g.toLowerCase().includes('autonomous')).length;
+    const autonomousCount = goals.filter(g => typeof g === 'string' && g.toLowerCase().includes('autonomous')).length;
     expect(autonomousCount).toBe(2);
   });
 
@@ -405,7 +405,7 @@ describe('Agent engine mode mismatch and adaptive prompts edge cases', () => {
   test('handles mode directive in very long goal', () => {
     const longGoal = 'x'.repeat(10000) + ' autonomous: do something';
 
-    expect(longGoal.toLowerCase()).toContain('autonomous');
+    expect(typeof longGoal === 'string' && longGoal.toLowerCase()).toContain('autonomous');
   });
 
   test('handles mode directive with case variations', () => {
