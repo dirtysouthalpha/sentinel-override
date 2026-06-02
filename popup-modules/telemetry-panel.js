@@ -269,13 +269,16 @@
     filtersBar.innerHTML = chips.map(c =>
       `<button class="telem-chip" data-filter="${c.id}" style="padding:2px 8px; font-size:10px; background:${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--bg-input, rgba(255,255,255,0.04))'}; color:${c.id === activeFilter ? '#fff' : 'var(--text-secondary, #aaa)'}; border:1px solid ${c.id === activeFilter ? 'var(--accent-primary, #ff6b00)' : 'var(--border-color, rgba(255,255,255,0.10))'}; border-radius:10px; cursor:pointer;">${c.label}</button>`
     ).join('');
-    filtersBar.querySelectorAll('.telem-chip').forEach(btn => {
+    const filterChips = filtersBar.querySelectorAll('.telem-chip');
+    if (filterChips && typeof filterChips.forEach === 'function') {
+      filterChips.forEach(btn => {
       btn.addEventListener('click', () => {
         activeFilter = btn.dataset.filter;
         _buildFilterChips();
         _renderAll();
       });
-    });
+      });
+    }
   }
 
   function _wirePanelControls() {
