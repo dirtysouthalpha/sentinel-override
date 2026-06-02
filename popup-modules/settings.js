@@ -629,7 +629,7 @@ function _renderLearnedPatterns(patterns) {
     return;
   }
   list.innerHTML = patterns.map((p, i) => {
-    const date = p.timestamp ? new Date(p.timestamp).toLocaleDateString() : '';
+    const date = p.timestamp && !Number.isNaN(Date.parse(p.timestamp)) ? new Date(p.timestamp).toLocaleDateString() : '';
     const steps = Array.isArray(p.steps) ? p.steps.length : '?';
     const safeGoal = escapeHtml(p.goal || '(no goal)');
     return `<div style="display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border-color);">
@@ -688,7 +688,7 @@ if (downloadAuditLogBtn) {
       if (document.body) document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + (String(e) || 'Unknown error');
+      downloadAuditLogBtn.textContent = 'Error: ' + String(e);
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });
