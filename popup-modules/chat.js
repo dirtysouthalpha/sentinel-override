@@ -726,7 +726,7 @@ function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
     if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', String(chrome.runtime.lastError)); return; }
-    if (result.chat_history && result.chat_history.length > 0) {
+    if (Array.isArray(result.chat_history) && result.chat_history.length > 0) {
       state.conversationHistory = result.chat_history;
       if (chatContainer) chatContainer.innerHTML = '';
       state.conversationHistory.forEach(turn => {
@@ -752,6 +752,10 @@ function addMessage(text, role = 'assistant') {
 
   // Ensure text is always a string
   const textStr = typeof text === 'string' ? text : JSON.stringify(text);
+
+  if (!Array.isArray(state.conversationHistory)) {
+    state.conversationHistory = [];
+  }
 
   state.conversationHistory.push({ text: textStr, role });
   saveChatHistory();
@@ -1283,9 +1287,12 @@ fileInput.addEventListener('change', (e) => {
 
 function updateAttachmentPreview() {
   const state = getState();
-  if (state.selectedAttachments.length > 0) {
-    attachmentPreview.innerHTML = '<span>Attachments:</span>';
-    state.selectedAttachments.forEach((file, index) => {
+  if (!state.selectedAttachments || !Array.isArray(state.selectedAttachments) || state.selectedAttachments.length === 0) {
+    attachmentPreview.style.display = 'none';
+    return;
+  }
+  attachmentPreview.innerHTML = '<span>Attachments:</span>';
+  state.selectedAttachments.forEach((file, index) => {
       const item = document.createElement('div');
       item.className = 'attachment-item';
       const nameSpan = document.createElement('span');
@@ -1305,9 +1312,6 @@ function updateAttachmentPreview() {
       attachmentPreview.appendChild(item);
     });
     attachmentPreview.style.display = 'flex';
-  } else {
-    attachmentPreview.style.display = 'none';
-  }
 }
 
 // ========== Voice Input (tab-based) ==========
@@ -1500,7 +1504,7 @@ function setupVoiceInput() {
 // ========== Conversation Export ==========
 exportBtn.addEventListener('click', () => {
   const state = getState();
-  if (state.conversationHistory.length === 0) {
+  if (!state.conversationHistory || !Array.isArray(state.conversationHistory) || state.conversationHistory.length === 0) {
     showToast('No messages to export', 'error');
     return;
   }
@@ -1598,7 +1602,7 @@ function filterCommands() {
 
 function renderCommandList(commands) {
   if (!commandList) return;
-  if (commands.length === 0) {
+  if (!commands || !Array.isArray(commands) || commands.length === 0) {
     commands = COMMANDS;
   }
 
@@ -3654,7 +3658,7 @@ chrome.runtime.onMessage.addListener((message) => {
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
       } catch { /* trust-score render non-fatal */ }
     } catch (err) {
-      console.error('Error displaying completion message:', (typeof err.message === 'string' ? err.message : String(err)));
+      console.error('Error displaying completion message:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)));
     }
     resetUI();
   }

@@ -113,9 +113,17 @@ function registerAlarm(schedule) {
   }
 
   const _alarmPromise = chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
-  if (_alarmPromise && typeof _alarmPromise.catch === 'function') _alarmPromise.catch((e) => {
-    console.error('[_alarmPromise] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
-  });
+  if (_alarmPromise && typeof _alarmPromise.catch === 'function') {
+    _alarmPromise.catch((e) => {
+      console.error('[_alarmPromise] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    });
+  } else {
+    chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] registerAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      }
+    });
+  }
   tel.debug('scheduler', `Alarm registered: schedule-${schedule.id} at ${new Date(schedule.nextRunAt).toISOString()}`);
 }
 
@@ -125,9 +133,17 @@ function registerAlarm(schedule) {
  */
 function clearAlarm(scheduleId) {
   const _p = chrome.alarms.clear(`schedule-${scheduleId}`);
-  if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-    console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
-  });
+  if (_p && typeof _p.catch === 'function') {
+    _p.catch((e) => {
+      console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    });
+  } else {
+    chrome.alarms.clear(`schedule-${scheduleId}`, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] clearAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      }
+    });
+  }
   tel.debug('scheduler', `Alarm cleared: schedule-${scheduleId}`);
 }
 

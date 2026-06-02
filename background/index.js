@@ -349,6 +349,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'get_provider_catalog': {
       // (3.10.0) Return the catalog so the popup can populate the dropdown.
       try {
+        if (!Array.isArray(PROVIDER_CATALOG)) return [];
         return PROVIDER_CATALOG.map(p => ({
           id: p.id, label: p.label,
           endpoint: p.endpoint,
@@ -475,7 +476,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             },
             requestId
           }).catch((_e) => {
-            console.error('[finish] Unhandled rejection:', (typeof _e === 'object' && _e !== null && 'message' in _e) ? _e.message : String(_e));
+            console.error('[finish] Unhandled rejection:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string') ? _e.message : String(_e));
           });
 
           // Notify the user
@@ -582,7 +583,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const text = await callLLMSimple(qaSystem, qaPrompt, 1200);
         return { text };
       } catch (err) {
-        return { text: 'Error: ' + ((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)) };
+        return { text: 'Error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)) };
       }
     }
 
