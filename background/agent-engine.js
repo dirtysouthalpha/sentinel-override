@@ -1540,7 +1540,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
         }
       }
     } else {
-      console.warn('[Sentinel/CDP] Phase2 FAILED. error:', nukeResult && nukeResult.error);
+      console.warn('[Sentinel/CDP] Phase2 FAILED. error:', (typeof nukeResult === 'object' && nukeResult !== null && typeof nukeResult.error === 'string' ? nukeResult.error : String(nukeResult?.error || 'unknown')));
     }
   } catch(e) {
     console.warn('[Sentinel/CDP] Phase2 threw:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
@@ -5877,7 +5877,7 @@ async function runAgentLoop(goal, workingTabId) {
               description: 'Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')'
             });
             if (r.ok) { result = 'Clicked at (' + Math.round(x) + ',' + Math.round(y) + ') via CDP'; cdpDone = true; }
-            else { console.warn('[CDP] dispatchClick failed, falling back:', r.error); }
+            else { console.warn('[CDP] dispatchClick failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'click') {
             // Resolve ref/selector to a bbox center via the content script.
             try {
@@ -5896,7 +5896,7 @@ async function runAgentLoop(goal, workingTabId) {
                   description: 'Clicking ' + targetLabel
                 });
                 if (r.ok) { result = 'Clicked ' + targetLabel + ' via CDP'; cdpDone = true; }
-                else { console.warn('[CDP] dispatchClick failed, falling back:', r.error); }
+                else { console.warn('[CDP] dispatchClick failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
               }
             } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           } else if (command.type === 'type') {
@@ -5918,11 +5918,11 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (_) { /* non-fatal: insertText may still hit the active element */ }
             const r = await cdpDispatchType(tab, command.text || '');
             if (r.ok) { result = 'Typed ' + (command.text ? command.text.length : 0) + ' chars via CDP'; cdpDone = true; }
-            else { console.warn('[CDP] dispatchType failed, falling back:', r.error); }
+            else { console.warn('[CDP] dispatchType failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'press_key') {
             const r = await cdpDispatchKey(tab, command.key);
             if (r.ok) { result = 'Pressed ' + command.key + ' via CDP'; cdpDone = true; }
-            else { console.warn('[CDP] dispatchKey failed, falling back:', r.error); }
+            else { console.warn('[CDP] dispatchKey failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'select') {
             // v3.66: CDP select - find the <select> element and set its value
             try {
@@ -5988,7 +5988,7 @@ async function runAgentLoop(goal, workingTabId) {
                 result = 'JS Result: ' + valStr;
                 actionFailed = false;
               } else if (cdpResult && !cdpResult.attachDenied && cdpResult.error) {
-                console.warn('[CDP] execute_js failed, falling back:', cdpResult.error);
+                console.warn('[CDP] execute_js failed, falling back:', (typeof cdpResult === 'object' && cdpResult !== null && typeof cdpResult.error === 'string' ? cdpResult.error : String(cdpResult?.error || 'unknown')));
               }
             } catch (e) {
               console.warn('[CDP] execute_js threw, falling back:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
