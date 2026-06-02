@@ -34,7 +34,7 @@ export const consecutiveFailures = {
   promptInjection(ctx) {
     try {
       const failureCount = ctx.consecutiveFailures || 0;
-      const maxSteps = ctx.dynamicMaxSteps || DEFAULT_MAX_STEPS;
+      const maxSteps = (typeof ctx.dynamicMaxSteps === 'number' ? ctx.dynamicMaxSteps : DEFAULT_MAX_STEPS);
       const currentStep = ctx.stepCount || 0;
       const stepsRemaining = Math.max(0, maxSteps - currentStep);
 

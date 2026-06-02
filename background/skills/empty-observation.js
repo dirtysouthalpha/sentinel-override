@@ -39,7 +39,7 @@ export const emptyObservation = {
     try {
       // If the previous action was a navigate, the page is probably still
       // loading. Auto-apply wait_for_navigation with a moderate timeout.
-      if (ctx.lastCommand && ctx.lastCommand.type === 'navigate') {
+      if (typeof ctx.lastCommand === 'object' && ctx.lastCommand !== null && ctx.lastCommand.type === 'navigate') {
         return { 
           type: 'wait_for_navigation', 
           timeout: 8000, 

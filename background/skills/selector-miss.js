@@ -27,7 +27,7 @@ export const selectorMiss = {
   },
 
   promptInjection(ctx) {
-    const lastSel = (ctx.lastCommand && (ctx.lastCommand.selector || ctx.lastCommand.ref)) || '(unknown)';
+    const lastSel = (typeof ctx.lastCommand === 'object' && ctx.lastCommand !== null && (ctx.lastCommand.selector || ctx.lastCommand.ref)) || '(unknown)';
     return `The selector / ref you used (\`${lastSel}\`) didn't resolve to a visible element. The page may have changed under you (SPA re-renders, lazy-loaded panels, async loading). Strategies, in order:
 1. Re-read the page (auto-applied) and pick a NEW target from the fresh element list — do NOT re-emit the same selector.
 2. If you see the element you wanted but a different selector, use its \`ref:\` from the observation instead of the old CSS selector — refs survive DOM shuffles.
