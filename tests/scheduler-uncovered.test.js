@@ -609,9 +609,10 @@ describe('sendNotification — success path with report truncation', () => {
 
     // Notification should have been sent
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
-    const callArgs = sharedState.notifyIfEnabled.mock.calls[0] || [];
-    expect(callArgs.length).toBeGreaterThan(1);
-    // Second arg is the notification options
+    const callArgs = sharedState.notifyIfEnabled.mock.calls[0];
+    if (!callArgs || !callArgs[1]) {
+      throw new Error('notifyIfEnabled not called with options');
+    }
     const notifOpts = callArgs[1];
     expect(typeof notifOpts.message === 'string' && notifOpts.message.length).toBeLessThanOrEqual(500);
   });
@@ -920,7 +921,11 @@ describe('sendNotification — priority levels', () => {
     await execPromise;
 
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
-    const notifOpts = (sharedState.notifyIfEnabled.mock.calls[0] || [])?.[1];
+    const call = sharedState.notifyIfEnabled.mock.calls[0];
+    if (!call || !call[1]) {
+      throw new Error('notifyIfEnabled not called with 2 arguments');
+    }
+    const notifOpts = call[1];
     expect(notifOpts.priority).toBe(0);
   });
 });

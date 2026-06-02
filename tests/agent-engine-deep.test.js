@@ -1193,8 +1193,10 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
 
     activityDone(1, 'step', 'Step', { extra: 'data', count: 5 });
     expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
-    const call = mockSendAgentActivity.mock.calls[0] || [];
-    expect(call.length).toBeGreaterThan(4);
+    const call = mockSendAgentActivity.mock.calls[0];
+    if (!call || call.length < 5) {
+      throw new Error('mock call expected 5 arguments, got ' + (call?.length || 0));
+    }
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('extra', 'data');
     expect(detailArg).toHaveProperty('count', 5);
@@ -1207,8 +1209,10 @@ describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mo
 
     activityDone(2, 'test', 'Test');
     expect(mockSendAgentActivity.mock.calls.length).toBeGreaterThan(0);
-    const call = mockSendAgentActivity.mock.calls[0] || [];
-    expect(call.length).toBeGreaterThan(4);
+    const call = mockSendAgentActivity.mock.calls[0];
+    if (!call || call.length < 5) {
+      throw new Error('mock call expected 5 arguments, got ' + (call?.length || 0));
+    }
     const detailArg = call[4];
     expect(detailArg).toHaveProperty('durationMs');
   });
@@ -1251,8 +1255,10 @@ describe('history helpers', () => {
     await persistHistory();
 
     expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
-    const setCall = chrome.storage.local.set.mock.calls[0] || [];
-    expect(setCall.length).toBeGreaterThan(0);
+    const setCall = chrome.storage.local.set.mock.calls[0];
+    if (!setCall || !setCall[0]) {
+      throw new Error('storage.set not called');
+    }
     const stored = setCall[0].agent_history;
     expect(stored).toHaveLength(1);
     expect(stored[0].action.type).toBe('navigate');
@@ -1290,8 +1296,10 @@ describe('history helpers', () => {
     await persistHistory();
 
     expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
-    const setCall = chrome.storage.local.set.mock.calls[0] || [];
-    expect(setCall.length).toBeGreaterThan(0);
+    const setCall = chrome.storage.local.set.mock.calls[0];
+    if (!setCall || !setCall[0]) {
+      throw new Error('storage.set not called');
+    }
     const stored = setCall[0].agent_history;
     expect(stored.length).toBeLessThanOrEqual(40);
   });

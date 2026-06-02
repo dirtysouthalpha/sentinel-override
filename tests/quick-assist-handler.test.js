@@ -103,8 +103,11 @@ describe('quick-assist-handler', () => {
         })
       );
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1]?.body);
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch not called with correct args');
+      }
+      const body = JSON.parse(fetchCall[1].body);
 
       expect(body).toMatchObject({
         model: 'claude-3-opus-20240229',
@@ -137,8 +140,11 @@ describe('quick-assist-handler', () => {
         })
       );
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1]?.body);
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch not called with correct args');
+      }
+      const body = JSON.parse(fetchCall[1].body);
 
       expect(body).toMatchObject({
         model: 'gpt-4',
@@ -172,8 +178,11 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('System instructions\n---\nUser content');
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1]?.body);
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch not called with correct args');
+      }
+      const body = JSON.parse(fetchCall[1].body);
 
       // The handler splits on --- and sends only the part after as user content
       expect(body.messages).toHaveLength(1);
@@ -198,8 +207,11 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('Full prompt without separator');
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1]?.body);
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch not called with correct args');
+      }
+      const body = JSON.parse(fetchCall[1].body);
 
       expect(body.messages).toHaveLength(1);
       expect(body.messages[0].content).toBe('Full prompt without separator');
@@ -295,11 +307,14 @@ describe('quick-assist-handler', () => {
       await handleQuickAssist('test');
 
       expect(global.fetch.mock.calls.length).toBeGreaterThan(0);
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      expect(fetchCall[1]?.headers).toMatchObject({
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch call missing options argument');
+      }
+      expect(fetchCall[1].headers).toMatchObject({
         'Content-Type': 'application/json',
       });
-      expect(fetchCall[1]?.headers['Authorization'] || fetchCall[1]?.headers['x-api-key']).toBeDefined();
+      expect(fetchCall[1].headers['Authorization'] || fetchCall[1].headers['x-api-key']).toBeDefined();
     });
 
     it('should handle empty prompt', async () => {
@@ -328,8 +343,11 @@ describe('quick-assist-handler', () => {
       const multiLinePrompt = 'Line 1\\nLine 2\\nLine 3';
       const result = await handleQuickAssist(multiLinePrompt);
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1]?.body);
+      const fetchCall = global.fetch.mock.calls[0];
+      if (!fetchCall || !fetchCall[1]) {
+        throw new Error('fetch not called with correct args');
+      }
+      const body = JSON.parse(fetchCall[1].body);
 
       expect(body.messages).toHaveLength(2);
       expect(body.messages[1].content).toBe(multiLinePrompt);

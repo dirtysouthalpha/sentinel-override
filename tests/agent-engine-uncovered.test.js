@@ -281,9 +281,11 @@ describe('agent-engine uncovered paths', () => {
       ];
       maybePostProgressUpdate(25, hist, { key1: 'val1' });
       expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
-      const call = mockSendSilentUpdate.mock.calls[0] || [];
-      expect(call && call[1]).toBe(25);
-      expect(call.length).toBeGreaterThan(0);
+      const call = mockSendSilentUpdate.mock.calls[0];
+      if (!call || !call[0]) {
+        throw new Error('mock not called with arguments');
+      }
+      expect(call[1]).toBe(25);
       expect(call[0]).toContain('PROGRESS UPDATE');
       expect(call[0]).toContain('step 25');
       expect(call[0]).toContain('Entra');
