@@ -135,7 +135,7 @@ export function getMultiArticleDirective(goal) {
   // Try to extract N if present
   const m = goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i);
   const parsedN = m ? parseInt(m[1], 10) : 0;
-  const n = (isNaN(parsedN) || parsedN < 0) ? 0 : parsedN;
+  const n = (Number.isNaN(parsedN) || parsedN < 0) ? 0 : parsedN;
   const nLabel = (n > 0) ? n : 'N';
 
   return `
@@ -1342,8 +1342,10 @@ function _buildTabCtx() {
     const marker = isActive ? '[ACTIVE] ' : '';
     const snapSummary = ctx.snapshot
       ? `Last seen: "${(ctx.snapshot.pageContent || '').substring(0, 300)}..." (${(() => {
-          const d = new Date(ctx.snapshot.timestamp);
-          return isNaN(d.getTime()) ? 'Invalid timestamp' : d.toLocaleTimeString();
+          const ts = ctx.snapshot.timestamp;
+          if (!ts) return 'No timestamp';
+          const d = new Date(ts);
+          return Number.isNaN(d.getTime()) ? 'Invalid timestamp' : d.toLocaleTimeString();
         })()})`
       : 'No snapshot yet.';
     tabCtxSection += `- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`;

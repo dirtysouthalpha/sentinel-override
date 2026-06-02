@@ -2856,7 +2856,8 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   banner.id = 'resume-banner';
   banner.className = 'safety-banner';
   banner.style.borderColor = 'var(--accent-primary, #ff6b00)';
-  const ageText = ageSeconds < 60 ? ageSeconds + 's ago' : Math.floor(ageSeconds / 60) + 'm ago';
+  const ageText = (!ageSeconds || Number.isNaN(ageSeconds)) ? 'unknown ago'
+    : ageSeconds < 60 ? ageSeconds + 's ago' : Math.floor(ageSeconds / 60) + 'm ago';
   const preview = (goal || '').slice(0, 200) + ((goal || '').length > 200 ? '…' : '');
   banner.innerHTML = `
     <div class="safety-banner-header" style="color: var(--accent-primary, #ff6b00);">
@@ -2910,7 +2911,7 @@ async function _tryShowReport() {
     if (!report || typeof report !== 'object' || report === null) return;
     // Only show if report is less than 5 minutes old
     const age = Date.now() - new Date(report.timestamp).getTime();
-    if (age > 5 * 60 * 1000) return;
+    if (Number.isNaN(age) || age > 5 * 60 * 1000) return;
     // Don't show if there's already a report card in the chat
     if (chatContainer && chatContainer.querySelector('.report-card-title')) {
       _reportShown = true;
@@ -3397,7 +3398,7 @@ chrome.runtime.onMessage.addListener((message) => {
         const hostname = new URL(message.url).hostname;
         updateStatus(`On: ${hostname}${message.title ? ' — ' + message.title.substring(0, 50) : ''}`);
       } catch {
-        updateStatus('On: ' + message.url.substring(0, 60));
+        updateStatus('On: ' + (message.url || 'unknown').substring(0, 60));
       }
       updateActiveTabPage(message.url, message.title || '');
       if (message.stepNumber) updateActiveTabStep(message.stepNumber, message.totalSteps || 0);
