@@ -6601,7 +6601,7 @@ async function runAgentLoop(goal, workingTabId) {
     try {
       await chrome.storage.local.set({ agent_history: [], agent_memory: {} });
     } catch (e) {
-      console.warn('[Sentinel] post-loop history/memory clear failed:', e && e.message);
+      console.warn('[Sentinel] post-loop history/memory clear failed:', (e && e.message) || String(e));
     }
   }
 
