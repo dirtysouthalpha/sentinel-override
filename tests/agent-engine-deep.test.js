@@ -593,6 +593,7 @@ describe('saveLearnedPattern', () => {
 
   test('stores success flag', async () => {
     await saveLearnedPattern('Goal', [], false);
+    expect(storageData.learned_patterns.length).toBeGreaterThanOrEqual(1);
     expect(storageData.learned_patterns[0].success).toBe(false);
   });
 
@@ -608,6 +609,7 @@ describe('saveLearnedPattern', () => {
   test('truncates goal to 100 characters', async () => {
     const longGoal = 'A'.repeat(200);
     await saveLearnedPattern(longGoal, [], true);
+    expect(storageData.learned_patterns.length).toBeGreaterThanOrEqual(1);
     expect(storageData.learned_patterns[0].goal.length).toBeLessThanOrEqual(100);
   });
 
@@ -615,6 +617,7 @@ describe('saveLearnedPattern', () => {
     storageData.learned_patterns = [{ goal: 'Old', steps: [], success: true, timestamp: 1 }];
     await saveLearnedPattern('New', [], false);
     expect(storageData.learned_patterns).toHaveLength(2);
+    expect(storageData.learned_patterns.length).toBeGreaterThanOrEqual(2);
     expect(storageData.learned_patterns[0].goal).toBe('Old');
     expect(storageData.learned_patterns[1].goal).toBe('New');
   });
@@ -1270,6 +1273,7 @@ describe('history helpers', () => {
     }
     const stored = setCall[0].agent_history;
     expect(stored).toHaveLength(1);
+    expect(stored.length).toBeGreaterThanOrEqual(1);
     expect(stored[0].action.type).toBe('navigate');
   });
 
@@ -1334,8 +1338,8 @@ describe('history helpers', () => {
 
     await persistHistory();
     expect(chrome.storage.local.set.mock.calls.length).toBeGreaterThan(0);
-    const setCall = chrome.storage.local.set.mock.calls[0] || [];
-    expect(setCall.length).toBeGreaterThan(0);
+    const setCall = chrome.storage.local.set.mock.calls[0];
+    expect(setCall).toBeDefined();
     expect(setCall[0].agent_history).toHaveLength(3);
   });
 });
@@ -1375,8 +1379,8 @@ describe('checkpoint helpers', () => {
   test('writeCheckpoint stores the checkpoint object', async () => {
     await writeCheckpoint(25);
     expect(chrome.storage.session.set.mock.calls.length).toBeGreaterThan(0);
-    const setCall = chrome.storage.session.set.mock.calls[0] || [];
-    expect(setCall.length).toBeGreaterThan(0);
+    const setCall = chrome.storage.session.set.mock.calls[0];
+    expect(setCall).toBeDefined();
     const cp = setCall[0].agent_checkpoint;
     expect(cp.stepCount).toBe(25);
     expect(cp).toHaveProperty('lastUpdate');

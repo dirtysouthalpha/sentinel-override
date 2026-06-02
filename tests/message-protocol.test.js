@@ -248,7 +248,8 @@ describe('sendActionMessage', () => {
     const obs = { elements: [{ selector: '#btn', text: 'Save Settings' }] };
     sendActionMessage(cmd, 1, obs);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
-    
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
+
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.action).toBe('agent_action');
     expect(msg.payload.description).toBe('Click "Save Settings"');
@@ -262,7 +263,8 @@ describe('sendActionMessage', () => {
     const obs = { elements: [{ selector: '#btn', text: longText }] };
     sendActionMessage(cmd, 1, obs);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
-    
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
+
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.payload.description).toContain('...');
   });
@@ -297,12 +299,14 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'scroll', amount: 300 }, 3);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.payload.description).toBe('Scroll down');
     chrome.runtime.sendMessage.mockClear();
     sendActionMessage({ type: 'scroll', amount: -100 }, 4);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
-    
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
+
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload?.description).toBe('Scroll up');
   });
 
@@ -310,6 +314,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'execute_js', code: 'document.querySelectorAll(".row").length', key: 'row_count' }, 5);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.payload.description).toContain('save as "row_count"');
   });
@@ -318,6 +323,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'press_key', key: 'Enter' }, 6);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.payload.description).toBe('Press Enter');
   });
@@ -326,6 +332,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'wait_for_text', text: 'Loading complete' }, 7);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.payload.description).toContain('Loading complete');
   });
@@ -334,6 +341,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'wait_for_element' }, 8);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload?.description).toBe('Wait for element');
   });
 
@@ -341,6 +349,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'wait_for_navigation' }, 9);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload?.description).toBe('Wait for navigation');
   });
 
@@ -348,6 +357,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'click_at', x: 100, y: 200 }, 10);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload?.description).toBe('Click at (100, 200)');
   });
 
@@ -355,6 +365,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'open_tab', label: 'New Tab', url: 'https://x.com' }, 11);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload.description).toBe('Open tab: New Tab');
   });
 
@@ -362,6 +373,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'switch_tab', label: 'Dashboard' }, 12);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload.description).toBe('Switch to: Dashboard');
   });
 
@@ -369,6 +381,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'close_tab', tab_id: 5 }, 13);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload.description).toBe('Close tab: 5');
   });
 
@@ -376,6 +389,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'custom_action' }, 14);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload.description).toBe('custom_action');
   });
 
@@ -385,6 +399,7 @@ describe('sendActionMessage', () => {
     const longCode = 'y'.repeat(300);
     sendActionMessage({ type: 'type', text: longText, code: longCode }, 1);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const payload = chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload;
     expect(payload.text.length).toBeLessThanOrEqual(201);
     expect(payload.code.length).toBeLessThanOrEqual(201);
@@ -394,6 +409,7 @@ describe('sendActionMessage', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionMessage({ type: 'click', selector: '#x', ref: 'r1', url: 'u', key: 'k' }, 1);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const payload = chrome.runtime.sendMessage.mock.calls[0]?.[0]?.payload;
     expect(payload.selector).toBe('#x');
     expect(payload.ref).toBe('r1');
@@ -415,6 +431,7 @@ describe('sendActionResult', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionResult(5, { data: 42 }, true);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.isError).toBe(true);
     expect(msg.result).toBe('{"data":42}');
@@ -424,6 +441,7 @@ describe('sendActionResult', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendActionResult(5, 'x'.repeat(500), false);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(msg.result.length).toBeLessThanOrEqual(300);
   });
@@ -522,8 +540,10 @@ describe('sendAgentStepStart', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendAgentStepStart();
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.stepNumber).toBe(0);
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     expect(chrome.runtime.sendMessage.mock.calls[0]?.[0]?.totalPlannedSteps).toBe(0);
   });
 });
@@ -560,6 +580,7 @@ describe('sendAgentStatus', () => {
     chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
     sendAgentStatus('observing', 'Reading page...');
     expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage.mock.calls.length).toBeGreaterThanOrEqual(1);
     const call = chrome.runtime.sendMessage.mock.calls[0]?.[0];
     expect(call.timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
   });
