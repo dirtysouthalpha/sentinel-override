@@ -116,7 +116,7 @@ initScheduler();
       }
     }
   } catch (e) {
-    console.warn('[Sentinel/self-heal] Auto-resume check failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+    console.warn('[Sentinel/self-heal] Auto-resume check failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
 })();
 
@@ -197,7 +197,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       await executeScheduledTask(scheduleId);
     } catch (err) {
-      console.error('Scheduled task execution failed:', (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
+      console.error('Scheduled task execution failed:', (typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err));
     }
   }
 });
@@ -223,12 +223,12 @@ try {
             totalBytes: dl.totalBytes || 0
           }
         }).catch((e) => {
-          console.error('[download_captured] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+          console.error('[download_captured] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
         });
-      } catch (e) { console.warn('[Sentinel/index] download capture failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); }
+      } catch (e) { console.warn('[Sentinel/index] download capture failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     });
   }
-} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); }
+} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -243,7 +243,7 @@ try {
 // two APIs coexist fine.
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)));
+    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
 
 // ========== Side Panel Tab-Scoping (v3.53) ==========
@@ -330,7 +330,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     }
     case 'delete_persisted_telemetry_run': {
       if (!request.runId) return { ok: false, error: 'runId required' };
-      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) }; }
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) }; }
     }
 
     // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
@@ -343,7 +343,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
-      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) }; }
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) }; }
     }
 
     case 'get_provider_catalog': {
@@ -380,13 +380,13 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             const base = u.protocol + '//' + u.host + u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '');
             modelsUrl = base.replace(/\/$/, '') + '/models';
           } catch (e) {
-            return { ok: false, error: 'Could not parse custom endpoint: ' + ((typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)) };
+            return { ok: false, error: 'Could not parse custom endpoint: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
           }
         }
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
         return { ok: true, models };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
       }
     }
     case 'check_resume_available': {
@@ -427,7 +427,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         });
         return await startAgent(result.goal, sender);
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
       }
     }
     case 'execute_js_approval_request': {
@@ -528,7 +528,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           }, 60000);
         });
       } catch (e) {
-        return { approved: false, reason: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) };
+        return { approved: false, reason: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
       }
     }
 
@@ -622,7 +622,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         try { await chrome.windows.update(match.windowId, { focused: true }); } catch (_e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
       }
     }
 
@@ -796,7 +796,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'schedule_clear_badge':
       { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-        console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+        console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
       }); }
       return { cleared: true };
 
@@ -950,7 +950,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       await chrome.windows.update(win.id, { focused: true });
       sendSilentUpdate('🔐 SSO popup detected (' + new URL(ssoTab.url).hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -984,7 +984,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 });
 
 // ========== Keyboard Shortcut Commands ==========
@@ -1003,7 +1003,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab && typeof activeTab.id === 'number') {
               await chrome.sidePanel.open({ tabId: activeTab.id }).catch((e) => {
-                console.error('[attached] Unhandled rejection:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e));
+                console.error('[attached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
               });
             }
           } catch (_e) { /* no active tab — silently ignore */ }
@@ -1038,5 +1038,5 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
       }
     }
-  } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); }
+  } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 });
