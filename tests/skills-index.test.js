@@ -201,7 +201,7 @@ describe('getSkillStats', () => {
     });
 
     const stats = getSkillStats();
-    const skillId = result.appliedSkillIds[0];
+    const skillId = result.appliedSkillIds?.[0];
     expect(stats[skillId]).toBeDefined();
     expect(stats[skillId].fires).toBeGreaterThan(0);
     expect(typeof stats[skillId].successRate).toBe('number');

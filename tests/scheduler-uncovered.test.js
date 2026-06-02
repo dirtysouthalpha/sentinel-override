@@ -919,7 +919,7 @@ describe('sendNotification — priority levels', () => {
     await execPromise;
 
     expect(sharedState.notifyIfEnabled).toHaveBeenCalled();
-    const notifOpts = (sharedState.notifyIfEnabled.mock.calls[0] || [])[1];
+    const notifOpts = (sharedState.notifyIfEnabled.mock.calls[0] || [])?.[1];
     expect(notifOpts.priority).toBe(0);
   });
 });
