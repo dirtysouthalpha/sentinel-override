@@ -559,7 +559,7 @@ function respondApproval(decision, context) {
   // pending request (per the contract with Agent A).
   if (ctx.requestId) message.requestId = ctx.requestId;
 
-  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
 
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
@@ -740,7 +740,7 @@ function loadChatHistory() {
 function saveChatHistory() {
   try {
     const state = getState();
-    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
   } catch (_e) { /* storage unavailable */ }
 }
 
@@ -792,7 +792,7 @@ function addMessage(text, role = 'assistant') {
         copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
         copyBtn.classList.remove('copied');
       }, 2000);
-    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (e && e.message) || String(e)); });
+    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
   });
 
   wrapper.appendChild(msg);
@@ -828,7 +828,7 @@ function addCodeCopyButtons(messageElement) {
             copyBtn.textContent = 'Copy';
             copyBtn.classList.remove('copied');
           }, 2000);
-        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (e && e.message) || String(e)); });
+        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
       });
 
       header.appendChild(langSpan);
@@ -1201,7 +1201,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
+    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1242,7 +1242,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
+  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1255,7 +1255,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
+  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 }, true);
 
 function updateMarkdownPreview() {
@@ -1720,7 +1720,7 @@ function renderTabBar(tabs) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
       tab.addEventListener('click', () => {
-        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
       });
     }
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
@@ -1873,12 +1873,12 @@ function openReportModal(markdown) {
         });
       } catch (e) {
         // Tab creation failed — fall back to the in-panel modal.
-        console.warn('[Sentinel] report-view tab failed, falling back to modal:', (e && e.message) || String(e));
+        console.warn('[Sentinel] report-view tab failed, falling back to modal:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
         openReportModalInline(markdown);
       }
     });
   } catch (e) {
-    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', (e && e.message) || String(e));
+    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     openReportModalInline(markdown);
   }
 }
@@ -2086,7 +2086,7 @@ function showMfaBanner(url, hint, _stepNumber) {
   const mfaResumeBtn = document.getElementById('mfaResumeBtn');
   if (mfaResumeBtn) {
     mfaResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
       banner.remove();
     });
   }
@@ -2144,7 +2144,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   const signInWallResumeBtn = document.getElementById('signInWallResumeBtn');
   if (signInWallResumeBtn) {
     signInWallResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
       banner.remove();
     });
   }
@@ -2153,7 +2153,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
     signInWallFocusBtn.addEventListener('click', () => {
     // Best-effort: ask the background to focus the URL's tab via the existing
     // active-tab focus hook (re-uses focus_tab message handled by index.js).
-    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     });
   }
   const signInWallDismissBtn = document.getElementById('signInWallDismissBtn');
@@ -2408,7 +2408,7 @@ function showModeMismatchCard(payload) {
           if (typeof updateApprovalModeUI === 'function') {
             updateApprovalModeUI(wantsApproval);
           }
-        } catch (e) { console.warn('[Sentinel] DOM detach error:', (e && e.message) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
         sendResponse({ flip: true });
         card.remove();
       });
@@ -2884,7 +2884,7 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   const resumeBtn = document.getElementById('resumeRunBtn');
   const dismissResumeBtn = document.getElementById('dismissResumeBtn');
   if (resumeBtn) resumeBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (e && e.message) || String(e)); });
+    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     banner.remove();
   });
   if (dismissResumeBtn) dismissResumeBtn.addEventListener('click', () => banner.remove());
@@ -2925,7 +2925,7 @@ async function _tryShowReport() {
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
   } catch (e) {
-    console.warn('[Sentinel/report] _tryShowReport failed:', (e && e.message) || String(e));
+    console.warn('[Sentinel/report] _tryShowReport failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
   }
 }
 
@@ -3224,10 +3224,10 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   // (3.51) Report display — show report card in chat when report is ready
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (e && e.message) || String(e)); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'agent_loop_complete' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (e && e.message) || String(e)); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
@@ -3609,7 +3609,7 @@ chrome.runtime.onMessage.addListener((message) => {
                         inputBox.value = originalGoal;
                       }
                       if (typeof sendMessage === 'function') sendMessage();
-                    } catch (e) { console.warn('[Sentinel] DOM write error:', (e && e.message) || String(e)); }
+                    } catch (e) { console.warn('[Sentinel] DOM write error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
@@ -3635,7 +3635,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }
                   });
                 }
-              } catch (e) { console.warn('[Sentinel] DOM removal error:', (e && e.message) || String(e)); }
+              } catch (e) { console.warn('[Sentinel] DOM removal error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);
@@ -3655,24 +3655,24 @@ chrome.runtime.onMessage.addListener((message) => {
   // Approval / pause / interrupt cards — the background sends these but the
   // handler had no cases for them, leaving every approval-mode run deadlocked.
   if (message.action === 'request_approval') {
-    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', (e && e.message) || String(e)); }
+    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'mfa_pause') {
-    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', (e && e.message) || String(e)); }
+    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'sign_in_wall_pause') {
-    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', (e && e.message) || String(e)); }
+    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'adapted_goal_available') {
-    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', (e && e.message) || String(e)); }
+    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'mode_mismatch_pause') {
-    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', (e && e.message) || String(e)); }
+    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'download_captured') {
-    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', (e && e.message) || String(e)); }
+    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
   if (message.action === 'run_log_available') {
-    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', (e && e.message) || String(e)); }
+    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   }
 });

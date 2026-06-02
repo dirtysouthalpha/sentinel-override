@@ -16,7 +16,7 @@ export const virustotal = {
       const host = new URL(url).host.toLowerCase();
       if (host.includes('virustotal.com')) return true;
     } catch (e) {
-      console.warn('[Sentinel] URL parse failed:', e && e.message || String(e));
+      console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     }
     const t = String(goal || '').toLowerCase();
     return /\bvirustotal\b/i.test(t) || /\bvt\s+api\b/i.test(t);

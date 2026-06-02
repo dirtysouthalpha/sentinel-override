@@ -233,7 +233,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
       el.dispatchEvent(new Event('change', eventOpts));
       return { success: true, method: 'direct-innerHTML' };
     } catch (e) {
-      return { success: false, method: 'none', error: 'All rich text strategies failed: ' + ((e && e.message) || String(e)) };
+      return { success: false, method: 'none', error: 'All rich text strategies failed: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))) };
     }
   };
 })();

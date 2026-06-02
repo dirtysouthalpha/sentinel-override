@@ -17,7 +17,7 @@ export const ninjarmm = {
       const host = u.hostname;
       if (/ninjarmm\.com|ninjarmm\.io|app\.ninjarmm/i.test(host)) return true;
       if (/ninjarmm/i.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     return /\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i.test(String(goal || ''));
   },
 

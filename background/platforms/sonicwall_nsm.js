@@ -18,7 +18,7 @@ export const sonicwallNsm = {
       const host = new URL(url).host;
       if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$/i.test(host)) return true;
       if (/(^|\.)cloud\.sonicwall\.com$/i.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] NSM detect URL parse failed:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] NSM detect URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     return /\bsonicwall\s+nsm|network\s+security\s+manager\b/i.test(String(goal || ''));
   },
 

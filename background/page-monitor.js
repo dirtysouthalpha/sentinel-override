@@ -33,7 +33,7 @@ export async function loadMonitors() {
     const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
     return result[MONITOR_STORAGE_KEY] || [];
   } catch (e) {
-    console.error('[Sentinel/page-monitor] loadMonitors failed:', e && e.message || String(e));
+    console.error('[Sentinel/page-monitor] loadMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     return [];
   }
 }
@@ -42,7 +42,7 @@ async function saveMonitors(monitors) {
   try {
     await chrome.storage.local.set({ [MONITOR_STORAGE_KEY]: monitors });
   } catch (e) {
-    console.error('[Sentinel/page-monitor] saveMonitors failed:', e && e.message || String(e));
+    console.error('[Sentinel/page-monitor] saveMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     throw e;
   }
 }
@@ -139,7 +139,7 @@ export async function checkMonitor(monitor) {
 
     return { changed, content, changeCount: mon ? mon.changeCount : monitor.changeCount };
   } catch (e) {
-    console.error('[Sentinel/page-monitor] checkMonitor failed:', e && e.message || String(e));
+    console.error('[Sentinel/page-monitor] checkMonitor failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     return { changed: false, content: '', changeCount: monitor.changeCount };
   }
 }
@@ -192,7 +192,7 @@ export function startMonitorLoop() {
 
   _monitorAlarmHandler = alarm => {
     if (alarm.name === 'sentinel-monitor-check') {
-      runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', e && e.message || String(e)));
+      runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     }
   };
   chrome.alarms.onAlarm.addListener(_monitorAlarmHandler);

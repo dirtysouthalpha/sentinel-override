@@ -30,7 +30,7 @@ export const ambioViewlinc = {
         // Common internal viewLinc deployments — IP-based + DNS-based.
         if (/(^|\.)viewlinc\b/i.test(host)) return true;
         if (/^192\.168\.100\.\d+$/.test(host)) return true;  // user's specific server
-      } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
+      } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     }
     const g = String(goal || '').toLowerCase();
     if (/viewlinc|ambio\b/.test(g)) return true;

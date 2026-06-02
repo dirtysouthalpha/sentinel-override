@@ -19,7 +19,7 @@ export const nvd = {
       if (host.includes('nvd.nist.gov')) return true;
       if (host.includes('cve.mitre.org')) return true;
       if (host.includes('cve.org')) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     return /\b(nvd|cve\s*database|nist\s*nvd|cve\s*search)\b/i.test(String(goal || ''));
   },
 

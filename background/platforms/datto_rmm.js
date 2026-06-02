@@ -21,7 +21,7 @@ export const dattoRmm = {
       if (/centrastage\.net|dattormm\.com/i.test(host)) return true;
       if (/datto\.com/i.test(host) && /\/rmm/i.test(u.pathname)) return true;
       if (/autotask\.net|atask\.net/i.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     return /\b(?:datto\s+rmm|autotask|centrastage)\b/i.test(String(goal || ''));
   },
 

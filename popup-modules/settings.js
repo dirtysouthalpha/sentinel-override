@@ -570,7 +570,7 @@ if (ticketModeToggle) {
 
 if (ticketFormatSelect) {
   ticketFormatSelect.addEventListener('change', () => {
-    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', (e && e.message) || String(e)); });
+    chrome.storage.local.set({ ticketFormat: ticketFormatSelect.value }).catch((e) => { console.error('[Sentinel] Error saving ticket format:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
   });
 }
 
@@ -585,7 +585,7 @@ if (ticketFormatSelect) {
         const el = __TECH_INPUTS[key];
         if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
       }
-      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (e && e.message) || String(e)); });
+      chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     }, 400);
   };
   for (const key of Object.keys(__TECH_INPUTS)) {
@@ -647,7 +647,7 @@ function _renderLearnedPatterns(patterns) {
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         await chrome.storage.local.set({ learned_patterns: arr });
         _renderLearnedPatterns(arr);
-      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (e && e.message) || String(e)); }
+      } catch (e) { console.warn('[Sentinel] delete pattern failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }

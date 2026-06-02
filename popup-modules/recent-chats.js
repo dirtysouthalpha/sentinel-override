@@ -95,7 +95,7 @@
       await chrome.storage.local.set({ [STORAGE_KEY]: list });
       return entry;
     } catch (e) {
-      console.warn('[Sentinel] archiveCurrentChat failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel] archiveCurrentChat failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       return null;
     }
   }
@@ -145,7 +145,7 @@
 
       return true;
     } catch (e) {
-      console.warn('[Sentinel] restoreChat failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel] restoreChat failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       return false;
     }
   }
@@ -175,7 +175,7 @@
       await chrome.storage.local.set({ [STORAGE_KEY]: next });
       return true;
     } catch (e) {
-      console.warn('[Sentinel] deleteRecentChat failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel] deleteRecentChat failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       return false;
     }
   }
@@ -185,7 +185,7 @@
       await chrome.storage.local.set({ [STORAGE_KEY]: [] });
       return true;
     } catch (e) {
-      console.warn('[Sentinel] clearAllRecent failed:', (e && e.message) || String(e));
+      console.warn('[Sentinel] clearAllRecent failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       return false;
     }
   }
