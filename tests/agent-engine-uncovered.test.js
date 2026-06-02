@@ -312,7 +312,7 @@ describe('agent-engine uncovered paths', () => {
       ];
       maybePostProgressUpdate(25, hist, {});
       expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
-      const msg = mockSendSilentUpdate.mock.calls[0][0];
+      const msg = mockSendSilentUpdate.mock.calls[0]?.[0];
       expect(msg).toContain('Exchange');
       expect(msg).toContain('Purview');
       expect(msg).toContain('Defender');
@@ -321,7 +321,7 @@ describe('agent-engine uncovered paths', () => {
     test('handles empty history gracefully', () => {
       maybePostProgressUpdate(25, [], {});
       expect(mockSendSilentUpdate).toHaveBeenCalledTimes(1);
-      const msg = mockSendSilentUpdate.mock.calls[0][0];
+      const msg = mockSendSilentUpdate.mock.calls[0]?.[0];
       expect(msg).toContain('(none yet)');
       expect(msg).toContain('(none)');
     });
@@ -691,7 +691,7 @@ describe('agent-engine uncovered paths', () => {
     test('adds new entry to empty index', async () => {
       await _updateRunLogIndex('run-001', { goal: 'test goal', stepCount: 5 });
       expect(chrome.storage.local.set).toHaveBeenCalled();
-      const setCall = chrome.storage.local.set.mock.calls[0][0];
+      const setCall = chrome.storage.local.set.mock.calls[0]?.[0];
       const list = setCall.run_log_index;
       expect(list).toHaveLength(1);
       expect(list[0].runLogId).toBe('run-001');
@@ -704,7 +704,7 @@ describe('agent-engine uncovered paths', () => {
       storageData.run_log_index = [{ runLogId: 'run-001', goal: 'test goal', stepCount: 5 }];
       await _updateRunLogIndex('run-001', { stepCount: 10, completed: true });
       expect(chrome.storage.local.set).toHaveBeenCalled();
-      const setCall = chrome.storage.local.set.mock.calls[0][0];
+      const setCall = chrome.storage.local.set.mock.calls[0]?.[0];
       const list = setCall.run_log_index;
       expect(list).toHaveLength(1);
       expect(list[0].stepCount).toBe(10);
@@ -722,13 +722,13 @@ describe('agent-engine uncovered paths', () => {
       // Add a new one
       await _updateRunLogIndex('run-new', { goal: 'new run' });
       expect(chrome.storage.local.set).toHaveBeenCalled();
-      const setCall = chrome.storage.local.set.mock.calls[0][0];
+      const setCall = chrome.storage.local.set.mock.calls[0]?.[0];
       const list = setCall.run_log_index;
       expect(list).toHaveLength(20);
       expect(list[0].runLogId).toBe('run-new');
       // Should have evicted the oldest entry
       expect(chrome.storage.local.remove).toHaveBeenCalled();
-      const removeCall = chrome.storage.local.remove.mock.calls[0][0];
+      const removeCall = chrome.storage.local.remove.mock.calls[0]?.[0];
       expect(removeCall).toContain('run_log_run-020');
     });
 
@@ -736,7 +736,7 @@ describe('agent-engine uncovered paths', () => {
       storageData.run_log_index = [{ runLogId: 'run-old', goal: 'old' }];
       await _updateRunLogIndex('run-new', { goal: 'new' });
       expect(chrome.storage.local.set).toHaveBeenCalled();
-      const setCall = chrome.storage.local.set.mock.calls[0][0];
+      const setCall = chrome.storage.local.set.mock.calls[0]?.[0];
       const list = setCall.run_log_index;
       expect(list).toHaveLength(2);
       expect(list[0].runLogId).toBe('run-new');
@@ -746,7 +746,7 @@ describe('agent-engine uncovered paths', () => {
     test('handles corrupted storage gracefully', async () => {
       storageData.run_log_index = 'not an array';
       await _updateRunLogIndex('run-001', { goal: 'test' });
-      const setCall = chrome.storage.local.set.mock.calls[0][0];
+      const setCall = chrome.storage.local.set.mock.calls[0]?.[0];
       const list = setCall.run_log_index;
       expect(list).toHaveLength(1);
       expect(list[0].runLogId).toBe('run-001');
