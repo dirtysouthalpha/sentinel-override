@@ -945,6 +945,7 @@ if (injectContextInput) {
 
 function sendMessage() {
   const state = getState();
+  if (!goalInput) return;
   const goal = goalInput.value.trim();
   if (!goal) return;
 
@@ -1140,7 +1141,7 @@ newChatBtn.addEventListener('click', () => {
 // ========== Message Search ==========
 searchInput.addEventListener('input', (e) => {
   const state = getState();
-  state.currentSearchQuery = e.target.value.toLowerCase();
+  state.currentSearchQuery = (e.target && typeof e.target.value === 'string' ? e.target.value : '').toLowerCase();
   state.currentSearchIndex = 0;
 
   if (state.currentSearchQuery) {
@@ -1158,7 +1159,7 @@ function highlightSearchResults() {
   let matchCount = 0;
 
   messages.forEach(group => {
-    const text = group.textContent.toLowerCase();
+    const text = typeof group.textContent === 'string' ? group.textContent.toLowerCase() : '';
     if (text.includes(state.currentSearchQuery)) {
       group.classList.add('highlighted');
       matchCount++;
@@ -1584,6 +1585,7 @@ const COMMANDS = [
 ];
 
 function filterCommands() {
+  if (!commandInput) return;
   const query = commandInput.value.toLowerCase();
   const filtered = COMMANDS.filter(cmd =>
     cmd.name.toLowerCase().includes(query) ||
@@ -1998,7 +2000,7 @@ if (exportReplayBtn) {
       const costEl = document.getElementById('run-cost');
       const costText = costEl ? costEl.title : '';
       const costMatch = costText.match(/\$[\d.]+/);
-      const estimatedCostUsd = costMatch ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
+      const estimatedCostUsd = costMatch && costMatch[0] && typeof costMatch[0] === 'string' ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
       const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
       if (!resp || !resp.ok || !resp.data || !resp.data.html) {
         throw new Error((resp && resp.error) || 'No replay data available — run the agent first');
@@ -2289,7 +2291,8 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
     const card = state ? state.card : null;
     if (card) {
       const actionEl = card.querySelector('.activity-step-action');
-      if (actionEl && typeof actionEl.textContent === 'string' && (actionEl.textContent === 'Preparing…' || actionEl.textContent.trim() === '')) {
+      const actionText = typeof actionEl?.textContent === 'string' ? actionEl.textContent : '';
+      if (actionEl && (actionText === 'Preparing…' || actionText.trim() === '')) {
         // Convert "AI decided: note" → "Recording a note", "AI decided: finish" → "Finishing run"
         const m = label.match(/AI decided:\s*(\w+)/i);
         if (m) {
@@ -2966,8 +2969,9 @@ function renderSourceChipsIn(rootEl) {
     re.lastIndex = 0;
     const frag = document.createDocumentFragment();
     let last = 0; let m;
-    while ((m = re.exec(tn.textContent)) !== null) {
-      if (m.index > last) frag.appendChild(document.createTextNode(tn.textContent.slice(last, m.index)));
+    const tnContent = typeof tn.textContent === 'string' ? tn.textContent : '';
+    while ((m = re.exec(tnContent)) !== null) {
+      if (m.index > last) frag.appendChild(document.createTextNode(tnContent.slice(last, m.index)));
       const chip = document.createElement('span');
       chip.className = 'sentinel-src-chip';
       const isUnverified = m[0].toLowerCase() === '[unverified]';
@@ -2987,7 +2991,7 @@ function renderSourceChipsIn(rootEl) {
       frag.appendChild(chip);
       last = m.index + m[0].length;
     }
-    if (last < tn.textContent.length) frag.appendChild(document.createTextNode(tn.textContent.slice(last)));
+    if (last < tnContent.length) frag.appendChild(document.createTextNode(tnContent.slice(last)));
     tn.parentNode.replaceChild(frag, tn);
   }
 }
@@ -3437,7 +3441,7 @@ chrome.runtime.onMessage.addListener((message) => {
             const costEl = document.getElementById('run-cost');
             const costText = costEl ? costEl.title : '';
             const costMatch = costText.match(/\$[\d.]+/);
-            const estimatedCostUsd = costMatch ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
+            const estimatedCostUsd = costMatch && costMatch[0] && typeof costMatch[0] === 'string' ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
             const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
             if (!resp || !resp.ok || !resp.data || !resp.data.html) throw new Error((resp && resp.error) || 'No replay data');
             const blob = new Blob([resp.data.html], { type: 'text/html' });
