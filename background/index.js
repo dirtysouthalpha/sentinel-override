@@ -953,7 +953,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       try { hostname = new URL(ssoTab.url).hostname; } catch (_e) { /* URL parse failed */ }
       sendSilentUpdate('🔐 SSO popup detected (' + hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -987,7 +987,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 });
 
 // ========== Keyboard Shortcut Commands ==========
@@ -1041,5 +1041,5 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
       }
     }
-  } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+  } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 });
