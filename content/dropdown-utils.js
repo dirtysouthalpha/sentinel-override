@@ -77,7 +77,9 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         const items = container.querySelectorAll(
           '[role="option"], [role="menuitem"], li, .option, .dropdown-item, .menu-item, .select-option'
         );
-        items.forEach(addUnique);
+        if (typeof items.forEach === 'function') {
+          items.forEach(addUnique);
+        }
       } catch { /* invalid selector */ }
     }
 
@@ -110,7 +112,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
             const localContainers = cursor.querySelectorAll(
               '[role="listbox"], [role="menu"], [role="combobox"]'
             );
-            if (localContainers.length > 0) {
+            if (localContainers.length > 0 && typeof localContainers.forEach === 'function') {
               localContainers.forEach(addAllFromContainer);
               if (options.length > 0) break;
             }
@@ -129,11 +131,15 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     // ===== Fallback: doc-wide lookup =====
     // 2. ARIA pattern: role="option"
     let found = doc.querySelectorAll('[role="option"]');
-    found.forEach(addUnique);
+    if (typeof found.forEach === 'function') {
+      found.forEach(addUnique);
+    }
 
     // Also check role="listbox" > role="option" (more specific)
     found = doc.querySelectorAll('[role="listbox"] [role="option"]');
-    found.forEach(addUnique);
+    if (typeof found.forEach === 'function') {
+      found.forEach(addUnique);
+    }
 
     // 3. Common dropdown containers
     const containerSelectors = [
@@ -145,7 +151,9 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     for (const sel of containerSelectors) {
       try {
         found = doc.querySelectorAll(sel);
-        found.forEach(addAllFromContainer);
+        if (typeof found.forEach === 'function') {
+          found.forEach(addAllFromContainer);
+        }
       } catch { /* invalid selector */ }
     }
 
@@ -156,17 +164,23 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         const siblingItems = parent.querySelectorAll(
           'li, [role="option"], .option, .dropdown-item, .menu-item'
         );
-        siblingItems.forEach(addUnique);
+        if (typeof siblingItems.forEach === 'function') {
+          siblingItems.forEach(addUnique);
+        }
       }
     }
 
     // 5. Search inside shadow roots via queryDeep
     if (shadow && shadow.queryDeep) {
       const shadowOptions = shadow.queryDeep(doc, '[role="option"]');
-      shadowOptions.forEach(addUnique);
+      if (typeof shadowOptions.forEach === 'function') {
+        shadowOptions.forEach(addUnique);
+      }
 
       const shadowMenuItems = shadow.queryDeep(doc, '[role="menuitem"]');
-      shadowMenuItems.forEach(addUnique);
+      if (typeof shadowMenuItems.forEach === 'function') {
+        shadowMenuItems.forEach(addUnique);
+      }
     }
 
     // Filter by visibility
@@ -414,11 +428,13 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     } catch { return false; }
 
     let wasOpen = false;
-    openDropdowns.forEach(function(dropdown) {
-      if (dom.isVisible && dom.isVisible(dropdown)) {
-        wasOpen = true;
-      }
-    });
+    if (typeof openDropdowns.forEach === 'function') {
+      openDropdowns.forEach(function(dropdown) {
+        if (dom.isVisible && dom.isVisible(dropdown)) {
+          wasOpen = true;
+        }
+      });
+    }
 
     // Press Escape to dismiss — full keydown + keypress + keyup sequence (#23)
     try {

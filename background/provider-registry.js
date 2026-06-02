@@ -417,10 +417,10 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (!data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (data.choices.length === 0 || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
       const content = data.choices[0].message.content || '';
       if (!content) {
-        const reasoning = data.choices[0].message.reasoning_content || data.choices[0].message.reasoning;
+        const reasoning = (data.choices[0].message.reasoning_content || data.choices[0].message.reasoning);
         if (reasoning) return reasoning;
         throw new Error(`API returned null content: ${JSON.stringify(data).slice(0, 500)}`);
       }
