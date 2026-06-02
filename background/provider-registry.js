@@ -341,10 +341,17 @@ export const PROVIDERS = {
         if (tc.function && tc.function.name) {
           let input = {};
           try {
-            input = JSON.parse(tc.function.arguments || '{}');
+            const argsStr = tc.function.arguments;
+            if (typeof argsStr === 'string') {
+              input = JSON.parse(argsStr);
+            } else if (argsStr != null && typeof argsStr === 'object') {
+              input = argsStr;
+            } else {
+              input = { text: String(argsStr || '') };
+            }
           } catch {
             // If arguments aren't valid JSON, treat the whole string as a note
-            input = { text: tc.function.arguments };
+            input = { text: String(tc.function.arguments || '') };
           }
           return { type: tc.function.name, ...input };
         }
