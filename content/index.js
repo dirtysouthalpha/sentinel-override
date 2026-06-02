@@ -2157,7 +2157,7 @@ if (window.__sentinelInitialized) {
                     sourceFile: (e && e.sourceFile) ? String(e.sourceFile).substring(0, 200) : '',
                     url: location.href.substring(0, 200)
                   });
-                } catch (te) { console.warn('[Sentinel] CSP telemetry failed:', te && te.message); }
+                } catch (te) { console.warn('[Sentinel] CSP telemetry failed:', (te && te.message) || String(te)); }
               }
             } catch (err) { console.warn('[Sentinel] CSP violation handler failed:', err && err.message); }
           };
@@ -2495,7 +2495,7 @@ if (window.__sentinelInitialized) {
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } catch {
-          try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', ee && ee.message); }
+          try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', (ee && ee.message) || String(ee)); }
         }
         await waitForStableRect(el, 2, 800);
 

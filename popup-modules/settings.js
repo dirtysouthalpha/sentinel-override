@@ -21,16 +21,29 @@ const saveThemeBtn = document.getElementById('saveThemeBtn');
 // eslint-disable-next-line no-unused-vars
 function loadThemePreference() {
   // Restore named theme (tron, matrix, etc.)
-  const savedNamedTheme = localStorage.getItem('theme-named');
+  let savedNamedTheme = null;
+  try {
+    savedNamedTheme = localStorage.getItem('theme-named');
+  } catch (e) {
+    console.warn('[Sentinel/settings] Failed to read theme-named:', String(e));
+  }
   if (savedNamedTheme && savedNamedTheme !== 'light') {
     applyThemePreset(savedNamedTheme);
     // Update active preset button
-    document.querySelectorAll('[data-theme]').forEach(b => {
-      b.classList.toggle('active', b.dataset.theme === savedNamedTheme);
-    });
+    const themeButtons = document.querySelectorAll('[data-theme]');
+    if (themeButtons.length > 0) {
+      themeButtons.forEach(b => {
+        b.classList.toggle('active', b.dataset.theme === savedNamedTheme);
+      });
+    }
     return;
   }
-  const savedTheme = localStorage.getItem('theme-preference');
+  let savedTheme = null;
+  try {
+    savedTheme = localStorage.getItem('theme-preference');
+  } catch (e) {
+    console.warn('[Sentinel/settings] Failed to read theme-preference:', String(e));
+  }
   if (savedTheme) {
     document.body.classList.toggle('dark-mode', savedTheme === 'dark');
     updateThemeToggle();
@@ -47,6 +60,7 @@ function updateThemeToggle() {
     localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
   } catch (e) {
     console.warn('[Sentinel/settings] Failed to save theme preference:', String(e));
+    showToast('Failed to save theme preference', 'error');
   }
 }
 
@@ -61,9 +75,12 @@ function switchProviderCard(providerId) {
   state.activeProviderId = providerId;
 
   // Update active provider button styling
-  document.querySelectorAll('.provider-btn').forEach(btn => {
-    btn.classList.toggle('active-provider', btn.dataset.provider === providerId);
-  });
+  const providerButtons = document.querySelectorAll('.provider-btn');
+  if (providerButtons.length > 0) {
+    providerButtons.forEach(btn => {
+      btn.classList.toggle('active-provider', btn.dataset.provider === providerId);
+    });
+  }
 
   // Populate fields from provider config
   const config = state.providerConfigs[providerId] || {};
@@ -760,14 +777,20 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
 });
 
 // ========== Theme Customization ==========
-document.querySelectorAll('[data-theme]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const theme = btn.dataset.theme;
-    document.querySelectorAll('[data-theme]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    applyThemePreset(theme);
+const themeButtons = document.querySelectorAll('[data-theme]');
+if (themeButtons.length > 0) {
+  themeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.theme;
+      const allThemeButtons = document.querySelectorAll('[data-theme]');
+      if (allThemeButtons.length > 0) {
+        allThemeButtons.forEach(b => b.classList.remove('active'));
+      }
+      btn.classList.add('active');
+      applyThemePreset(theme);
+    });
   });
-});
+}
 
 function applyThemePreset(theme) {
   const presets = {
@@ -909,6 +932,7 @@ function applyThemePreset(theme) {
       localStorage.setItem('theme-named', theme);
     } catch (e) {
       console.warn('[Sentinel/settings] Failed to save theme-named:', String(e));
+      showToast('Failed to save theme', 'error');
     }
     // Remove all theme glow classes
     document.body.className = document.body.className
@@ -946,6 +970,7 @@ if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
     localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
   } catch (e) {
     console.warn('[Sentinel/settings] Failed to save custom theme:', String(e));
+    showToast('Failed to save custom theme', 'error');
   }
   if (themeModal) themeModal.classList.remove('show');
   showToast('Theme applied', 'success');
@@ -956,15 +981,18 @@ if (closeThemeBtn) closeThemeBtn.addEventListener('click', () => {
 });
 
 // ========== Preset Buttons ==========
-document.querySelectorAll('.preset-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
-    switchProviderCard(provider);
-    if (setProviderEndpoint) setProviderEndpoint.value = btn.dataset.endpoint || '';
-    if (setProviderModel) setProviderModel.value = btn.dataset.model || '';
-    showToast(`Preset loaded: ${btn.textContent}`, 'success');
+const presetButtons = document.querySelectorAll('.preset-btn');
+if (presetButtons.length > 0) {
+  presetButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
+      switchProviderCard(provider);
+      if (setProviderEndpoint) setProviderEndpoint.value = btn.dataset.endpoint || '';
+      if (setProviderModel) setProviderModel.value = btn.dataset.model || '';
+      showToast(`Preset loaded: ${btn.textContent}`, 'success');
+    });
   });
-});
+}
 
 // ========== Test Connection Button ==========
 const testConnectionBtn = document.getElementById('testConnectionBtn');

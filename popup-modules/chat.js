@@ -262,6 +262,10 @@ function updateActiveTabAction(payload) {
     try { await chrome.tabs.update(tabId, { active: true }); } catch { /* extension API may fail */ }
     try {
       chrome.tabs.get(tabId, (info) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[Sentinel/chat] chrome.tabs.get failed:', String(chrome.runtime.lastError));
+          return;
+        }
         if (info && typeof info.windowId === 'number') {
           try { chrome.windows.update(info.windowId, { focused: true }); } catch { /* extension API may fail */ }
         }
@@ -724,7 +728,7 @@ function loadChatHistory() {
     if (chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', String(chrome.runtime.lastError)); return; }
     if (result.chat_history && result.chat_history.length > 0) {
       state.conversationHistory = result.chat_history;
-      chatContainer.innerHTML = '';
+      if (chatContainer) chatContainer.innerHTML = '';
       state.conversationHistory.forEach(turn => {
         addMessage(turn.text, turn.role);
       });
@@ -1117,12 +1121,14 @@ newChatBtn.addEventListener('click', () => {
       if (chrome.runtime.lastError) { console.error('[Sentinel/chat] clearChatHistory failed:', String(chrome.runtime.lastError)); return; }
       const state = getState();
       state.conversationHistory = [];
-      chatContainer.innerHTML = `
-        <div class="welcome-message">
-          <h2>Sentinel Override</h2>
-          <p>Automate your browser tasks with AI. What would you like me to do?</p>
-        </div>
-      `;
+      if (chatContainer) {
+        chatContainer.innerHTML = `
+          <div class="welcome-message">
+            <h2>Sentinel Override</h2>
+            <p>Automate your browser tasks with AI. What would you like me to do?</p>
+          </div>
+        `;
+      }
       goalInput.value = '';
       goalInput.style.height = 'auto';
       resetUI();

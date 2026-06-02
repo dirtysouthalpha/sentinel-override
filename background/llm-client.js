@@ -848,7 +848,7 @@ function _buildPlanPrompt(goal, context) {
     ? `Current page: ${context.currentUrl}${context.pageTitle ? ` (${context.pageTitle})` : ''}\n`
     : '';
   const platformContext = context.platformContext || '';
-  const patternContext = context.relevantPatterns && context.relevantPatterns.length > 0
+  const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length > 0
     ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
@@ -1724,7 +1724,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 
   // Self-learning: inject relevant patterns
   const patterns = await getRelevantPatterns(goal);
-  const patternCtx = patterns.length > 0
+  const patternCtx = Array.isArray(patterns) && patterns.length > 0
     ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => p && p.goal ? `${i+1}. "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(' -> ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
