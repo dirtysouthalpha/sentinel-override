@@ -1233,7 +1233,7 @@ async function attachTabToSentinelGroup(tabId) {
             color: SENTINEL_GROUP_COLOR,
             collapsed: false
           });
-        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', (e2 && e2.message) || String(e2)); }
+        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', (typeof e2.message === 'string' ? e2.message : String(e2))); }
       }
     }
     agentAttachedTabs.add(tabId);
@@ -1262,7 +1262,7 @@ async function detachAllSentinelTabs() {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) {
         // Tab was already closed during the run — not an error, expected behavior
         if (!_e2 || !_e2.message || !_e2.message.includes('No tab with id')) {
-          console.error('[Sentinel] Error in agent-engine.js:', (_e2 && _e2.message) || String(_e2));
+          console.error('[Sentinel] Error in agent-engine.js:', (typeof _e2.message === 'string' ? _e2.message : String(_e2)));
         }
       }
     }
@@ -1526,7 +1526,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
               await new Promise(r => setTimeout(r, 2000));
               console.log('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
-              console.warn('[Sentinel/CDP] Reload failed:', (reloadErr && reloadErr.message) || String(reloadErr));
+              console.warn('[Sentinel/CDP] Reload failed:', (typeof reloadErr.message === 'string' ? reloadErr.message : String(reloadErr)));
             }
           }
         }
@@ -3500,7 +3500,7 @@ async function runAgentLoop(goal, workingTabId) {
               continue;
             }
             // Already on the right page - skip navigation
-          } catch (navErr) { console.warn('[Sentinel] auto-navigate error:', (navErr && navErr.message) || String(navErr)); /* URL parse error, skip auto-navigate */ }
+          } catch (navErr) { console.warn('[Sentinel] auto-navigate error:', (typeof navErr.message === 'string' ? navErr.message : String(navErr))); /* URL parse error, skip auto-navigate */ }
         }
       }
 
@@ -3710,18 +3710,18 @@ async function runAgentLoop(goal, workingTabId) {
             ]);
           } catch (parallelErr) {
             // If parallel observation fails, fall back to sequential with better error recovery
-            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', (parallelErr && parallelErr.message) || String(parallelErr));
+            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', (typeof parallelErr.message === 'string' ? parallelErr.message : String(parallelErr)));
             try {
               observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
             } catch (obsErr) {
               observation = { elements: [] };
-              console.warn('[Sentinel/agent] Sequential observe_page failed:', obsErr && obsErr.message);
+              console.warn('[Sentinel/agent] Sequential observe_page failed:', (typeof obsErr.message === 'string' ? obsErr.message : String(obsErr)));
             }
             try {
               pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
             } catch (readErr) {
               pageContent = { content: '' };
-              console.warn('[Sentinel/agent] Sequential read_page failed:', readErr && readErr.message);
+              console.warn('[Sentinel/agent] Sequential read_page failed:', (typeof readErr.message === 'string' ? readErr.message : String(readErr)));
             }
           }
           }
@@ -3831,7 +3831,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (shotErr) {
         // Screenshot failure is non-fatal — continue to LLM call without image.
-        console.warn('[Sentinel] Screenshot failed, continuing without image:', (shotErr && shotErr.message) || String(shotErr));
+        console.warn('[Sentinel] Screenshot failed, continuing without image:', (typeof shotErr.message === 'string' ? shotErr.message : String(shotErr)));
         base64Image = null;
         screenshotMeta = null;
       }
@@ -3980,7 +3980,7 @@ async function runAgentLoop(goal, workingTabId) {
             continue;
           }
         }
-      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', (_captchaErr && _captchaErr.message) || String(_captchaErr)); }
+      } catch (_captchaErr) { console.error('[Sentinel/CAPTCHA] Error:', (typeof _captchaErr.message === 'string' ? _captchaErr.message : String(_captchaErr))); }
 
       // Rate limiting
       await enforceRateLimit();
@@ -4488,8 +4488,8 @@ async function runAgentLoop(goal, workingTabId) {
           apiCallCount = agentState.apiCallCount;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
-            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + ((_aiCallError && _aiCallError.message) ? _aiCallError.message : 'unknown'), null);
-            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: (_aiCallError && _aiCallError.message) ? _aiCallError.message : String(_aiCallError) });
+            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (typeof _aiCallError.message === 'string' ? _aiCallError.message : 'unknown'), null);
+            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: typeof _aiCallError.message === 'string' ? _aiCallError.message : String(_aiCallError) });
           } else if (command && command.type) {
             activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
             tel.info('llm', 'LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
@@ -5065,7 +5065,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const _failed = entries.filter(e => e.failed || (e.status >= 400)).length;
             tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
-          } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', (_e && _e.message) || String(_e)); }
+          } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', (typeof _e.message === 'string' ? _e.message : String(_e))); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
@@ -5392,7 +5392,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             }
           } catch (_ve) {
-            result = 'Vision action error: ' + ((_ve && _ve.message) || String(_ve) || 'unknown');
+            result = 'Vision action error: ' + (typeof _ve.message === 'string' ? _ve.message : String(_ve));
             actionFailed = true;
           }
           // Skip the legacy execution path for this action
@@ -5938,7 +5938,7 @@ async function runAgentLoop(goal, workingTabId) {
                 console.warn('[CDP] Select failed:', selResult);
               }
             } catch (selErr) {
-              console.warn('[CDP] Select error:', (selErr && selErr.message) || String(selErr));
+              console.warn('[CDP] Select error:', (typeof selErr.message === 'string' ? selErr.message : String(selErr)));
             }
           }
         } catch (err) {
@@ -6067,7 +6067,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = false;
             sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
           }
-        } catch (_selErr) { console.warn('[Sentinel/CDP] Select fallback error:', (_selErr && _selErr.message) || String(_selErr)); }
+        } catch (_selErr) { console.warn('[Sentinel/CDP] Select fallback error:', (typeof _selErr.message === 'string' ? _selErr.message : String(_selErr))); }
       }
 
       // (v3.66) CDP fallback for type: when content script can't inject,
@@ -6117,7 +6117,7 @@ async function runAgentLoop(goal, workingTabId) {
               sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
             }
           }
-        } catch (_typeErr) { console.warn('[Sentinel/CDP] Type fallback error:', (_typeErr && _typeErr.message) || String(_typeErr)); }
+        } catch (_typeErr) { console.warn('[Sentinel/CDP] Type fallback error:', (typeof _typeErr.message === 'string' ? _typeErr.message : String(_typeErr))); }
       }
 
       //       // ═══════════════════════════════════════════════════════════════
@@ -6140,7 +6140,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Don't mark success but LLM gets useful feedback about what happened
           }
         } catch (_ufbErr) {
-          console.warn('[Sentinel/UFB] Universal fallback error:', (_ufbErr && _ufbErr.message) || String(_ufbErr));
+          console.warn('[Sentinel/UFB] Universal fallback error:', (typeof _ufbErr.message === 'string' ? _ufbErr.message : String(_ufbErr)));
         }
       }
 
