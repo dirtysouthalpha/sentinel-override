@@ -253,7 +253,7 @@ async function exportClientToFile(clientId) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const safeName = ((res.data.client && res.data.client.displayName) || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const safeName = (typeof (res.data.client && res.data.client.displayName) === 'string' ? (res.data.client && res.data.client.displayName) : 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     a.download = `sentinel-client-${safeName}.json`;
     if (document.body) document.body.appendChild(a);
     a.click();

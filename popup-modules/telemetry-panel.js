@@ -108,7 +108,7 @@
 
   function _eventMatchesSearch(ev) {
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
+    const q = typeof searchQuery === 'string' ? searchQuery.toLowerCase() : '';
     if ((ev.message || '').toLowerCase().includes(q)) return true;
     if ((ev.category || '').toLowerCase().includes(q)) return true;
     if (ev.payload) {
