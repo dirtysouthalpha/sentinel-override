@@ -98,7 +98,7 @@ initScheduler();
                   resolve([]);
                   return;
                 }
-                resolve(t || []);
+                resolve(Array.isArray(t) ? t : []);
               });
             });
             if (tabs.length > 0 && tabs[0] && tabs[0].id) {
@@ -491,7 +491,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           let hardRejectId = null;
 
           const listener = (message) => {
-            if (message && message.action === 'approval_response' && message.requestId === requestId) {
+            if (message && typeof message === 'object' && message.action === 'approval_response' && message.requestId === requestId) {
               chrome.runtime.onMessage.removeListener(listener);
               clearTimeout(timeoutId);
               if (hardRejectId) clearTimeout(hardRejectId);
@@ -508,7 +508,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             chrome.runtime.onMessage.removeListener(listener);
 
             const replacementListener = (message) => {
-              if (message && message.action === 'approval_response' && message.requestId === requestId) {
+              if (message && typeof message === 'object' && message.action === 'approval_response' && message.requestId === requestId) {
                 if (hardRejectId) clearTimeout(hardRejectId);
                 chrome.runtime.onMessage.removeListener(replacementListener);
                 finish({
@@ -944,6 +944,7 @@ chrome.windows.onCreated.addListener(async (win) => {
   if (!agentRunning) return;
   try {
     const tabs = await chrome.tabs.query({ windowId: win.id });
+    if (!Array.isArray(tabs) || tabs.length === 0) return;
     const ssoTab = tabs.find(t => t.url && _SSO_HOSTS_RE.test(t.url));
     if (ssoTab) {
       await chrome.windows.update(win.id, { focused: true });

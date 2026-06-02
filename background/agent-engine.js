@@ -1265,7 +1265,7 @@ async function detachAllSentinelTabs() {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) {
         // Tab was already closed during the run — not an error, expected behavior
         if (typeof _e2 !== 'object' || _e2 === null || typeof _e2.message !== 'string' || !_e2.message.includes('No tab with id')) {
-          console.error('[Sentinel] Error in agent-engine.js:', (typeof _e2.message === 'string' ? _e2.message : String(_e2)));
+          console.error('[Sentinel] Error in agent-engine.js:', (typeof _e2 === 'object' && _e2 !== null && typeof _e2.message === 'string' ? _e2.message : String(_e2)));
         }
       }
     }
@@ -1534,7 +1534,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
               await new Promise(r => setTimeout(r, 2000));
               console.log('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
-              console.warn('[Sentinel/CDP] Reload failed:', (typeof reloadErr.message === 'string' ? reloadErr.message : String(reloadErr)));
+              console.warn('[Sentinel/CDP] Reload failed:', (typeof reloadErr === 'object' && reloadErr !== null && typeof reloadErr.message === 'string' ? reloadErr.message : String(reloadErr)));
             }
           }
         }
@@ -3722,18 +3722,18 @@ async function runAgentLoop(goal, workingTabId) {
             ]);
           } catch (parallelErr) {
             // If parallel observation fails, fall back to sequential with better error recovery
-            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', (typeof parallelErr.message === 'string' ? parallelErr.message : String(parallelErr)));
+            console.warn('[Sentinel/agent] Parallel observation failed, falling back to sequential:', (typeof parallelErr === 'object' && parallelErr !== null && typeof parallelErr.message === 'string' ? parallelErr.message : String(parallelErr)));
             try {
               observation = await sendMessageWithRetry(tab, { action: 'observe_page' });
             } catch (obsErr) {
               observation = { elements: [] };
-              console.warn('[Sentinel/agent] Sequential observe_page failed:', (typeof obsErr.message === 'string' ? obsErr.message : String(obsErr)));
+              console.warn('[Sentinel/agent] Sequential observe_page failed:', (typeof obsErr === 'object' && obsErr !== null && typeof obsErr.message === 'string' ? obsErr.message : String(obsErr)));
             }
             try {
               pageContent = await sendMessageWithRetry(tab, { action: 'read_page' });
             } catch (readErr) {
               pageContent = { content: '' };
-              console.warn('[Sentinel/agent] Sequential read_page failed:', (typeof readErr.message === 'string' ? readErr.message : String(readErr)));
+              console.warn('[Sentinel/agent] Sequential read_page failed:', (typeof readErr === 'object' && readErr !== null && typeof readErr.message === 'string' ? readErr.message : String(readErr)));
             }
           }
           }
@@ -3843,7 +3843,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch (shotErr) {
         // Screenshot failure is non-fatal — continue to LLM call without image.
-        console.warn('[Sentinel] Screenshot failed, continuing without image:', (typeof shotErr.message === 'string' ? shotErr.message : String(shotErr)));
+        console.warn('[Sentinel] Screenshot failed, continuing without image:', (typeof shotErr === 'object' && shotErr !== null && typeof shotErr.message === 'string' ? shotErr.message : String(shotErr)));
         base64Image = null;
         screenshotMeta = null;
       }
@@ -4500,8 +4500,8 @@ async function runAgentLoop(goal, workingTabId) {
           apiCallCount = agentState.apiCallCount;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
-            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (typeof _aiCallError.message === 'string' ? _aiCallError.message : 'unknown'), null);
-            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: typeof _aiCallError.message === 'string' ? _aiCallError.message : String(_aiCallError) });
+            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + (typeof _aiCallError === 'object' && _aiCallError !== null && typeof _aiCallError.message === 'string' ? _aiCallError.message : 'unknown'), null);
+            tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: typeof _aiCallError === 'object' && _aiCallError !== null && typeof _aiCallError.message === 'string' ? _aiCallError.message : String(_aiCallError) });
           } else if (command && command.type) {
             activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
             tel.info('llm', 'LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
@@ -5081,7 +5081,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: (typeof e.message === 'string' ? e.message : String(e)) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+          try { tel.error('network', 'Error reading network', { stepCount, error: (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           sendActionResult(stepCount, 'Error reading network: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : 'unknown'), true);
         }
         await sleep(300);
@@ -5405,7 +5405,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             }
           } catch (_ve) {
-            result = 'Vision action error: ' + (typeof _ve.message === 'string' ? _ve.message : String(_ve));
+            result = 'Vision action error: ' + (typeof _ve === 'object' && _ve !== null && typeof _ve.message === 'string' ? _ve.message : String(_ve));
             actionFailed = true;
           }
           // Skip the legacy execution path for this action
@@ -5677,7 +5677,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           actionFailed = false;
         } catch (e) {
-          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + (e?.message || 'unknown');
+          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : 'unknown');
           actionFailed = true;
         }
       } else if (command.type === 'read_page') {
@@ -5951,11 +5951,11 @@ async function runAgentLoop(goal, workingTabId) {
                 console.warn('[CDP] Select failed:', selResult);
               }
             } catch (selErr) {
-              console.warn('[CDP] Select error:', (typeof selErr.message === 'string' ? selErr.message : String(selErr)));
+              console.warn('[CDP] Select error:', (typeof selErr === 'object' && selErr !== null && typeof selErr.message === 'string' ? selErr.message : String(selErr)));
             }
           }
         } catch (err) {
-          console.warn('[CDP] dispatch threw, falling back:', (typeof err.message === 'string' ? err.message : String(err)));
+          console.warn('[CDP] dispatch threw, falling back:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)));
         }
         if (!cdpDone) {
           // CDP path failed -- fall back to the synthetic content-script path.
@@ -5964,7 +5964,7 @@ async function runAgentLoop(goal, workingTabId) {
             result = res || 'Done';
             actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           } catch (err) {
-            result = 'Content script error: ' + (err?.message || 'command failed to reach page');
+            result = 'Content script error: ' + (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : 'command failed to reach page');
             actionFailed = true;
           }
         }
@@ -6017,7 +6017,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
           }
         } catch (err) {
-          result = 'Content script error: ' + (err?.message || 'command failed to reach page');
+          result = 'Content script error: ' + (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : 'command failed to reach page');
           actionFailed = true;
         }
       }
@@ -6153,7 +6153,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Don't mark success but LLM gets useful feedback about what happened
           }
         } catch (_ufbErr) {
-          console.warn('[Sentinel/UFB] Universal fallback error:', (typeof _ufbErr.message === 'string' ? _ufbErr.message : String(_ufbErr)));
+          console.warn('[Sentinel/UFB] Universal fallback error:', (typeof _ufbErr === 'object' && _ufbErr !== null && typeof _ufbErr.message === 'string' ? _ufbErr.message : String(_ufbErr)));
         }
       }
 
