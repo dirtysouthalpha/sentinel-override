@@ -279,7 +279,7 @@ if (telemetryLevelSelect) {
         showToast('Failed to save setting', 'error');
         return;
       }
-      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -495,7 +495,7 @@ if (quickModeToggle) {
           ? 'ON — Fast execution, no planning'
           : 'OFF - Standard pace';
       }
-      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast(enabled ? 'Quick Mode ON — agent will move fast' : 'Quick Mode OFF — standard pace', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -1085,13 +1085,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   });
 
   detectBtn.addEventListener('click', async () => {
     const id = sel.value;
     if (!id) {
-      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Pick a provider first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
       return;
     }
     const apiKey = (document.getElementById('set-provider-key') || {}).value || '';
@@ -1112,14 +1112,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
         modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
       const models = data.models || [];
       if (models.length === 0) {
         modelsSel.innerHTML = '<option value="">(no models returned)</option>';
-        try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+        try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
         return;
       }
       modelsSel.innerHTML = '';
@@ -1135,9 +1135,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       modelsSel.disabled = false;
       useBtn.disabled = false;
-      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     } catch (e) {
-      try { showToast('Error: ' + String(e), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Error: ' + String(e), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
@@ -1148,13 +1148,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   useBtn.addEventListener('click', () => {
     const value = modelsSel.value;
     if (!value) {
-      try { showToast('Pick a model from the list first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Pick a model from the list first', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
       return;
     }
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
-      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     }
   });
 })();
@@ -1263,7 +1263,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
           console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
         }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
-        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+        try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
       });
     });
   }
