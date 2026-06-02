@@ -574,6 +574,7 @@ describe('agent-engine — stall detection reference tests', () => {
   function detectStallRef(history, consecutiveFailures) {
     const recent = history.slice(-stallConfig.similarityWindow);
     if (recent.length >= stallConfig.similarityWindow) {
+      if (!recent[0]) return { stalled: false };
       const allSameType = recent[0].action != null && recent.every(h => h.action && h.action.type === recent[0].action.type);
       const allSameResult = recent.every(h => h.result === recent[0].result);
       const allFailed = recent.every(h => {

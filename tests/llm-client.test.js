@@ -962,6 +962,7 @@ describe('generatePlan', () => {
     }));
     _mockFetch = mockFn;
     await generatePlan('Check firewall', { api_key: 'test-key' });
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     expect(mockFn.mock.calls[0]?.[0]).toContain('z.ai');
   });
 
@@ -977,6 +978,7 @@ describe('generatePlan', () => {
       api_key: 'test-key',
       api_endpoint: 'https://api.openai.com/v1/chat/completions'
     });
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
     const body = JSON.parse(callArgs?.body);
@@ -1012,6 +1014,7 @@ describe('generatePlan', () => {
       model: 'glm-5'
     });
     expect(result).toEqual(['Navigate to site', 'Extract articles']);
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
     const body = JSON.parse(callArgs?.body);
@@ -2230,6 +2233,7 @@ describe('Bug #2 regression: generatePlan prose fallback', () => {
 
     // Verify the request was made without jsonMode causing 400
     expect(mockFn).toHaveBeenCalled();
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     expect(result).toEqual(['Step 1', 'Step 2']);
 
     // Verify response_format is not sent (would cause 400 on Z.AI)
@@ -2373,6 +2377,7 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('sys', 'user', 500);
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
     const body = JSON.parse(callArgs?.body);
@@ -2387,6 +2392,7 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('sys', 'user');
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
     const body = JSON.parse(callArgs?.body);
@@ -2401,6 +2407,7 @@ describe('callLLMSimple', () => {
     }));
     _mockFetch = mockFn;
     await callLLMSimple('my system prompt', 'my user prompt');
+    expect(mockFn.mock.calls.length).toBeGreaterThan(0);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
     const body = JSON.parse(callArgs?.body);
