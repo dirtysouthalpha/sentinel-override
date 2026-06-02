@@ -2539,7 +2539,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         // Also try finding by selector
         + 'var _el=document.querySelector(' + JSON.stringify(cmd.selector || '') + ');'
         + 'if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});'
-        + 'return JSON.stringify({ok:false,error:"not found: "+_s.slice(0,50)})'
+        + 'return JSON.stringify({ok:false,error:"not found: "+(typeof _s==="string"?_s:String(_s)).slice(0,50)})'
         + '})()';
       break;
     }
@@ -2548,7 +2548,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       jsCode = '(function(){'
         + 'var sel=' + JSON.stringify(cmd.selector || '') + ';'
         + 'if(sel){var els=document.querySelectorAll(sel);if(els.length){'
-        +   'var items=[];for(var i=0;i<els.length;i++)items.push(els[i].textContent.trim().slice(0,200));'
+        +   'var items=[];for(var i=0;i<els.length;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}'
         +   'return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})'
         + '}}'
         + 'return JSON.stringify({ok:false,error:"nothing to extract"})'
@@ -4287,7 +4287,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionHistory = promptHistory.slice(-6).map(h => {
           if (!h || !h.action) return '';
           const a = h.action;
-          return 'Step ' + (h.step||'?') + ': ' + a.type + (a.index ? '(' + a.index + ')' : '') + (a.text ? ' "' + a.text.substring(0,40) + '"' : '') + ' -> ' + (h.result||'').substring(0,80);
+          return 'Step ' + (h.step||'?') + ': ' + a.type + (a.index ? '(' + a.index + ')' : '') + (a.text ? ' "' + (typeof a.text === 'string' ? a.text.substring(0,40) : String(a.text || '').substring(0,40)) + '"' : '') + ' -> ' + (typeof h.result === 'string' ? h.result.substring(0,80) : String(h.result || '').substring(0,80));
         }).filter(Boolean).join('\n');
 
         const _visionSystemPrompt = [

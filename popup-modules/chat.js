@@ -170,13 +170,13 @@ function describeActionPlain(payload) {
   const t = payload.type;
   const desc = payload.description || '';
   switch (t) {
-    case 'click':       return 'Clicking ' + (payload.targetText ? '"' + (payload.targetText.length > 50 ? payload.targetText.slice(0, 50) + '…' : payload.targetText) + '"' : (desc || payload.selector || 'element'));
+    case 'click':       return 'Clicking ' + (payload.targetText ? '"' + (typeof payload.targetText === 'string' && payload.targetText.length > 50 ? payload.targetText.slice(0, 50) + '…' : payload.targetText) + '"' : (desc || payload.selector || 'element'));
     case 'click_at':    return 'Clicking at coordinates' + (payload.x !== undefined ? ' (' + Math.round(payload.x) + ',' + Math.round(payload.y) + ')' : '');
     case 'type': {
-      const text = payload.text || payload.value || '';
+      const text = String(payload.text || payload.value || '');
       const safe = (payload.sensitive ? '[sensitive — blocked]' : (text.length > 60 ? text.slice(0, 60) + '…' : text));
       const target = payload.targetText
-        ? '"' + (payload.targetText.length > 40 ? payload.targetText.slice(0, 40) + '…' : payload.targetText) + '"'
+        ? '"' + (typeof payload.targetText === 'string' && payload.targetText.length > 40 ? payload.targetText.slice(0, 40) + '…' : payload.targetText) + '"'
         : (desc || '');
       return 'Typing "' + safe + '"' + (target ? ' into ' + target : '');
     }
