@@ -537,13 +537,15 @@
   function setButtonsLoading(loading) {
     if (!shadow) return;
     var btns = shadow.querySelectorAll('.qa-btn');
-    btns.forEach(function(btn) {
+    if (btns && typeof btns.forEach === 'function') {
+      btns.forEach(function(btn) {
       if (loading) {
         btn.classList.add('qa-loading');
       } else {
         btn.classList.remove('qa-loading');
       }
     });
+    }
   }
 
   function setResponseLoading() {
