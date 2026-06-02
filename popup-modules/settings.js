@@ -430,8 +430,8 @@ function _renderSkillStatsModal(skills) {
       tr.style.cssText = 'border-bottom:1px solid var(--border-color);';
       const stats = s.stats || { fires: 0, successes: 0, failures: 0 };
       const rate = stats.fires > 0 ? (stats.successes / stats.fires) : null;
-      const rateStr = rate === null ? '—' : (Math.round(rate * 100) + '%');
-      const rateColor = rate === null ? 'var(--text-tertiary)' :
+      const rateStr = rate === null || Number.isNaN(rate) ? '—' : (Math.round(rate * 100) + '%');
+      const rateColor = rate === null || Number.isNaN(rate) ? 'var(--text-tertiary)' :
         rate >= 0.7 ? '#9ece6a' :
         rate >= 0.4 ? '#e0af68' :
         '#f44';

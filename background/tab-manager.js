@@ -375,16 +375,22 @@ function recordNetworkFailure(tabId, params) {
  */
 async function ensureObservabilityListeners(tabId) {
   if (observabilityListenersInstalled.has(tabId)) return;
+  let anySucceeded = false;
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Log.enable');
+    anySucceeded = true;
   } catch (_e) { /* may not be supported on this target */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Runtime.enable');
+    anySucceeded = true;
   } catch (_e) { /* Runtime domain may not be available */ }
   try {
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
+    anySucceeded = true;
   } catch (_e) { /* Network domain may not be available */ }
-  observabilityListenersInstalled.add(tabId);
+  if (anySucceeded) {
+    observabilityListenersInstalled.add(tabId);
+  }
 }
 
 // Single global event hook: chrome.debugger fires onEvent for every attached
