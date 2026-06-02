@@ -1079,12 +1079,12 @@ function summarizeHistoryBatch(batch) {
     if (!h || !h.action) continue;
     const t = h.action.type;
     counts[t] = (counts[t] || 0) + 1;
-    if (t === 'navigate' && h.action.url) navUrls.push(String(h.action.url).substring(0, 100));
+    if (t === 'navigate' && h.action.url) navUrls.push(typeof h.action.url === 'string' ? h.action.url.substring(0, 100) : String(h.action.url).substring(0, 100));
     if ((t === 'extract' || t === 'extract_list') && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
-    if (t === 'note' && h.action.text) notes.push(String(h.action.text).substring(0, 200));
+    if (t === 'note' && h.action.text) notes.push(typeof h.action.text === 'string' ? h.action.text.substring(0, 200) : String(h.action.text).substring(0, 200));
     const r = (h && typeof h.result === 'string') ? h.result : '';
-    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(t + ': ' + r.substring(0, 120));
+    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(t + ': ' + (typeof r === 'string' ? r.substring(0, 120) : String(r).substring(0, 120)));
   }
   const summaryParts = [];
   summaryParts.push('Action counts: ' + Object.entries(counts).map(([k, v]) => k + '×' + v).join(', '));
@@ -1354,8 +1354,9 @@ async function _cdpObservePage(tabId) {
     + '    var rect = el.getBoundingClientRect();'
     + '    if (rect.width < 2 || rect.height < 2) continue;'
     + '    if (rect.bottom < 0 || rect.top > window.innerHeight) continue;'
-    + '    var tag = el.tagName.toLowerCase();'
-    + '    var text = (el.textContent || "").trim().substring(0, 50);'
+    + '    var tag = typeof el.tagName === "string" ? el.tagName.toLowerCase() : "";'
+    + '    var tText = typeof el.textContent === "string" ? el.textContent : "";'
+    + '    var text = tText.trim().substring(0, 50);'
     + '    var href = el.href || "";'
     + '    var type = el.type || "";'
     + '    var id = el.id || "";'
@@ -1387,13 +1388,15 @@ async function _cdpObservePage(tabId) {
     + '            var buttons = node.querySelectorAll("button, a, [role=\\"button\\"]");'
     + '            var btnList = [];'
     + '            for (var b = 0; b < buttons.length; b++) {'
-    + '              var bText = (buttons[b].textContent || "").trim().substring(0, 40);'
+    + '              var bContent = typeof buttons[b].textContent === "string" ? buttons[b].textContent : "";'
+    + '              var bText = bContent.trim().substring(0, 40);'
     + '              var bRect = buttons[b].getBoundingClientRect();'
     + '              if (bRect.width > 0 && bRect.height > 0) {'
     + '                btnList.push({ text: bText, x: Math.round(bRect.left + bRect.width/2), y: Math.round(bRect.top + bRect.height/2) });'
     + '              }'
     + '            }'
-    + '            results.overlays.push({ selector: "overlay", text: (node.textContent || "").substring(0, 100), buttons: btnList });'
+    + '            var nodeText = typeof node.textContent === "string" ? node.textContent : "";'
+    + '            results.overlays.push({ selector: "overlay", text: nodeText.substring(0, 100), buttons: btnList });'
     + '          }'
     + '        }'
     + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", (typeof e === "object" && e !== null && typeof e.message === "string") ? e.message : String(e)); }'
@@ -1452,7 +1455,8 @@ async function _cdpDismissOverlays(tabId, overlays) {
         'var btns = document.querySelectorAll("button, a, [role=\\"button\\"], input[type=\\"submit\\"]");',
         'var consentClicked = false;',
         'for (var b = 0; b < btns.length; b++) {',
-        '  var t = (btns[b].textContent || "").trim().toLowerCase();',
+        '  var btnContent = typeof btns[b].textContent === "string" ? btns[b].textContent : "";',
+        '  var t = btnContent.trim().toLowerCase();',
         '  if (t === "accept" || t === "agree" || t === "i agree" || t === "ok" || t === "got it" || t === "accept all" || t === "agree all" || t === "consent" || t === "allow all" || t === "yes, i agree" || t.indexOf("accept") === 0 || t.indexOf("agree") === 0) {',
         '    btns[b].click(); consentClicked = true; n++; break;',
         '  }',
@@ -1489,7 +1493,8 @@ async function _cdpDismissOverlays(tabId, overlays) {
         '        var r = allDivs[k].getBoundingClientRect();',
         '        var area = r.width * r.height;',
         '        var screen = window.innerWidth * window.innerHeight;',
-        '        var textLen = (allDivs[k].textContent || "").trim().length;',
+        '        var divContent = typeof allDivs[k].textContent === "string" ? allDivs[k].textContent : "";',
+        '        var textLen = divContent.trim().length;',
         '        if (area > screen * 0.3 && textLen < 200) {',
         '          allDivs[k].remove(); n++;',
         '        }',
@@ -1603,10 +1608,10 @@ function hasRecentCommitClick(history) {
     const t = h.action.type;
     if (t !== 'click' && t !== 'click_at') continue;
     const probe = [
-      h.action.text || '',
-      h.action.selector || '',
-      h.action.ref || '',
-      h.action.description || '',
+      typeof h.action.text === 'string' ? h.action.text : '',
+      typeof h.action.selector === 'string' ? h.action.selector : '',
+      typeof h.action.ref === 'string' ? h.action.ref : '',
+      typeof h.action.description === 'string' ? h.action.description : '',
       typeof h.result === 'string' ? h.result : ''
     ].join(' ').toLowerCase();
     if (COMMIT_TARGET_RE.test(probe)) return true;
@@ -1625,9 +1630,9 @@ function hasPostCommitVerification(history) {
     if (!sawCommit) {
       if (t === 'click' || t === 'click_at') {
         const probe = [
-          h.action.text || '',
-          h.action.selector || '',
-          h.action.ref || '',
+          typeof h.action.text === 'string' ? h.action.text : '',
+          typeof h.action.selector === 'string' ? h.action.selector : '',
+          typeof h.action.ref === 'string' ? h.action.ref : '',
           typeof h.result === 'string' ? h.result : ''
         ].join(' ').toLowerCase();
         if (COMMIT_TARGET_RE.test(probe)) sawCommit = true;
@@ -1697,7 +1702,8 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
   const partial = /step limit|extraction.*fail|not yet|incomplete|manually search/i.test(summary || '');
 
   // Action Taken: take the first 2 sentences from the summary (or up to 240 chars).
-  let actionTaken = (summary || '').split(/(?<=[.!?])\s+/).slice(0, 2).join(' ').trim();
+  const summaryStr = typeof summary === 'string' ? summary : '';
+  let actionTaken = summaryStr.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ').trim();
   if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
   if (actionTaken.length > 240) actionTaken = actionTaken.slice(0, 237) + '...';
 
@@ -2010,10 +2016,10 @@ function _hostnameOf(url) {
 }
 
 function _tenantsMatch(detected, expected) {
-  if (!expected || !expected.trim()) return true;  // no expected = no lock
+  if (!expected || (typeof expected === 'string' && !expected.trim())) return true;  // no expected = no lock
   if (!detected) return false;  // we have an expectation but nothing detected yet → block
-  const exp = expected.trim().toLowerCase();
-  const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => String(s).toLowerCase());
+  const exp = typeof expected === 'string' ? expected.trim().toLowerCase() : '';
+  const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
   return signals.some(s => s && (s.includes(exp) || exp.includes(s)));
 }
 
@@ -2374,8 +2380,8 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
     var re = new RegExp(site, 'i');
     if (re.test(goal) && !re.test(url)) {
       var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
-      if (qm) {
-        strategies.push('Navigate directly to https://www.' + siteUrls[site] + encodeURIComponent(qm[1].trim()));
+      if (qm && qm[1]) {
+        strategies.push('Navigate directly to https://www.' + siteUrls[site] + encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : ''));
       }
     }
   }
@@ -2926,10 +2932,10 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   for (const field of rawFields) {
     // Pull "key" tokens from the field name (skip filler words)
     const filler = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
-    const tokens = field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t));
+    const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t)) : [];
     if (tokens.length === 0) continue;
     // Match if ANY meaningful token from this field shows up in evidence
-    const found = tokens.some(t => allEvidence.includes(t));
+    const found = typeof allEvidence === 'string' && tokens.some(t => allEvidence.includes(t));
     if (!found) missing.push(field);
   }
 
@@ -3041,7 +3047,7 @@ function generateHeuristicPlan(goal, currentUrl) {
   // Extract search query from goal
   const searchMatch = goal.match(/(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i)
     || goal.match(/(?:about|on|regarding)\s+([^,.\n]{10,60})/i);
-  const searchQuery = searchMatch && searchMatch[1] ? searchMatch[1].trim() : null;
+  const searchQuery = searchMatch && searchMatch[1] && typeof searchMatch[1] === 'string' ? searchMatch[1].trim() : null;
 
   // Extract count
   const countMatch = goal.match(/(?:top\s+)?(\d+)/);
@@ -3153,8 +3159,11 @@ function _buildPageNarration(url, title, observation, pageContent) {
     else if (host) parts.push(host);
 
     if (headings.length > 0 && headings[0]) {
-      const h = headings[0].length > 60 ? headings[0].substring(0, 57) + '...' : headings[0];
-      if (h.toLowerCase() !== pageTitle.toLowerCase()) parts.push('"' + h + '"');
+      const hText = typeof headings[0] === 'string' ? headings[0] : '';
+      const h = hText.length > 60 ? hText.substring(0, 57) + '...' : hText;
+      const hLower = typeof h === 'string' ? h.toLowerCase() : '';
+      const pTitleLower = typeof pageTitle === 'string' ? pageTitle.toLowerCase() : '';
+      if (hLower !== pTitleLower) parts.push('"' + h + '"');
     }
 
     const details = [];
@@ -3164,7 +3173,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
     if (links > 5) details.push(links + ' links');
 
     const errorEl = els.find(e => {
-      const t = (e.text || '').toLowerCase();
+      const t = typeof e.text === 'string' ? e.text.toLowerCase() : '';
       return t.includes('error') || t.includes('invalid') || t.includes('failed');
     });
     if (errorEl) details.push('⚠ error message visible');
@@ -3463,13 +3472,13 @@ async function runAgentLoop(goal, workingTabId) {
         if (!urlMatch && _isExplicitNav) {
           const _step1BareMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
           const _step1Bare = _goalForUrlExtract.match(/(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
-          if (_step1Bare) {
+          if (_step1Bare && typeof _step1Bare[1] === 'string') {
             const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
             if (_step1BareMap[_step1Key]) {
               urlMatch = ['go to ' + _step1Bare[1], _step1BareMap[_step1Key]];
             } else {
               for (const [k, v] of Object.entries(_step1BareMap)) {
-                if (_step1Key.includes(k) || k.includes(_step1Key)) {
+                if (_step1Key && typeof _step1Key === 'string' && typeof k === 'string' && (_step1Key.includes(k) || k.includes(_step1Key))) {
                   urlMatch = ['go to ' + _step1Bare[1], v];
                   break;
                 }
@@ -4671,7 +4680,7 @@ async function runAgentLoop(goal, workingTabId) {
         // (Microsoft Graph API via read_network_requests, alternate URLs,
         // Log Analytics KQL, etc.) before declaring done.
         try {
-          const _summary = String(command.summary || '').toLowerCase();
+          const _summary = typeof command.summary === 'string' ? command.summary.toLowerCase() : String(command.summary || '').toLowerCase();
           const _isMultiPortal = (function() {
             try {
               const RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|m365|admin\.microsoft|portal\.azure|sentinelone|virustotal)\b/gi;
@@ -4978,7 +4987,7 @@ async function runAgentLoop(goal, workingTabId) {
           _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
         } else if (!_verifyExpected) {
           _verifyOutcome = 'verified (read-back): ' + _verifyActual.slice(0, 200);
-        } else if (_verifyActual.toLowerCase().includes(_verifyExpected.toLowerCase())) {
+        } else if (typeof _verifyActual === 'string' && typeof _verifyExpected === 'string' && _verifyActual.toLowerCase().includes(_verifyExpected.toLowerCase())) {
           _verifyOutcome = 'verified: "' + _verifyActual.slice(0, 100) + '" contains expected "' + _verifyExpected + '"';
         } else {
           _verifyOutcome = 'MISMATCH: expected "' + _verifyExpected + '", got "' + _verifyActual.slice(0, 100) + '"';
@@ -5002,8 +5011,8 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       if (command.type === 'note') {
-        const noteText = command.text || command.summary || 'No note text';
-        sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
+        const noteText = typeof command.text === 'string' ? command.text : (typeof command.summary === 'string' ? command.summary : 'No note text');
+        sendSilentUpdate(`${typeof noteText === 'string' ? noteText.slice(0, 200) : String(noteText).slice(0, 200)}${typeof noteText === 'string' && noteText.length > 200 ? '...' : ''}`, stepCount);
         // (3.20.0) Surface the actual note content in the per-step activity
         // stream so the user can SEE what was captured, not just "Recording
         // a note". Truncated for display; full text remains in history.
@@ -5079,9 +5088,10 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.37.0) DNS-over-HTTPS lookup — no page interaction, pure background fetch
       // (3.39.0) preset: 'spf' | 'dmarc' | 'dkim' expand to the correct query target.
       if (command.type === 'lookup') {
-        let _domain = String(command.domain || command.host || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
-        let _type = String(command.record_type || command.type_field || 'A').toUpperCase();
-        const _preset = String(command.preset || '').toLowerCase();
+        let _domain = typeof command.domain === 'string' ? command.domain.trim() : (typeof command.host === 'string' ? command.host.trim() : '');
+        _domain = _domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+        let _type = typeof command.record_type === 'string' ? command.record_type.toUpperCase() : (typeof command.type_field === 'string' ? command.type_field.toUpperCase() : 'A');
+        const _preset = typeof command.preset === 'string' ? command.preset.toLowerCase() : '';
         // Expand preset shortcuts into canonical DNS query parameters
         if (_preset === 'spf') {
           _type = 'TXT';  // SPF lives in TXT at the root domain
@@ -5127,8 +5137,8 @@ async function runAgentLoop(goal, workingTabId) {
 
       // (3.37.0) run_remote_command — drives ScreenConnect / NinjaRMM command interface
       if (command.type === 'run_remote_command') {
-        const _cmd = String(command.command || '').trim();
-        const _cmdType = String(command.command_type || 'powershell').toLowerCase();
+        const _cmd = typeof command.command === 'string' ? command.command.trim() : '';
+        const _cmdType = typeof command.command_type === 'string' ? command.command_type.toLowerCase() : 'powershell';
         if (!_cmd) {
           const _r = 'run_remote_command: command is required';
           sendActionResult(stepCount, _r, true);
@@ -5604,7 +5614,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
           // below so operators can see latency + landing-URL mismatches.
-          try { tel.info('page', 'Navigating → ' + command.url.substring(0, 100), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+          try { tel.info('page', 'Navigating → ' + (typeof command.url === 'string' ? command.url.substring(0, 100) : String(command.url).substring(0, 100)), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           // (3.49.1) Push undo entry before navigating so we can go back.
           try {
             undoStack.push({ type: 'navigate', tabId: tab, previousUrl: currentUrl || '' });
@@ -5636,7 +5646,7 @@ async function runAgentLoop(goal, workingTabId) {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
-                try { tel.info('page', 'Navigate ok → ' + arrivedUrl.substring(0, 100), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+                try { tel.info('page', 'Navigate ok → ' + (typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100)), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
                 result = 'Navigated to ' + arrivedUrl;
               } else {
                 try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
@@ -5728,7 +5738,7 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (e) { console.warn('[Sentinel] extract telemetry failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
-              : `"${String(parsed.value).substring(0, 100)}"`;
+              : `"${typeof parsed.value === 'string' ? parsed.value.substring(0, 100) : String(parsed.value).substring(0, 100)}"`;
             result = `Extracted ${parsed.key} = ${preview}`;
             extractSucceeded = true;
             productiveSteps++;  // (3.8.0)
@@ -5779,7 +5789,7 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.9.0) Reject useless toString'd values — '[object Object]', null,
           // undefined, empty objects/arrays. Saving these is worse than failing.
           const _useless = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLElement|HTMLCollection|NodeList|Window|Document|Map|Set)\]\s*$/i;
-          const _trim = jsValue.trim();
+          const _trim = typeof jsValue === 'string' ? jsValue.trim() : String(jsValue).trim();
           if (_useless.test(_trim) || _trim === 'undefined' || _trim === 'null') {
             actionFailed = true;
             // (3.12.1) More actionable guidance — tell the LLM the SPECIFIC
@@ -5919,7 +5929,7 @@ async function runAgentLoop(goal, workingTabId) {
                 + 'if (!el) return { ok: false, error: "No select element found" };'
                 + 'var opts = el.options; var found = false;'
                 + 'for (var i = 0; i < opts.length; i++) {'
-                + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase()) {'
+                + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase())) {'
                 + '    el.selectedIndex = i; el.value = opts[i].value;'
                 + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
                 + '    el.dispatchEvent(new Event("input", { bubbles: true }));'
@@ -6053,7 +6063,7 @@ async function runAgentLoop(goal, workingTabId) {
             + 'if (!el) return null;'
             + 'var opts = el.options;'
             + 'for (var i = 0; i < opts.length; i++) {'
-            + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase()) {'
+            + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase())) {'
             + '    el.selectedIndex = i; el.value = opts[i].value;'
             + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
             + '    return el.value;'
