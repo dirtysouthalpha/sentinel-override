@@ -6067,7 +6067,7 @@ async function runAgentLoop(goal, workingTabId) {
             actionFailed = false;
             sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
           }
-        } catch (_selErr) { console.log('[Sentinel/CDP] Select fallback error:', (_selErr && _selErr.message) || String(_selErr)); }
+        } catch (_selErr) { console.warn('[Sentinel/CDP] Select fallback error:', (_selErr && _selErr.message) || String(_selErr)); }
       }
 
       // (v3.66) CDP fallback for type: when content script can't inject,
@@ -6117,7 +6117,7 @@ async function runAgentLoop(goal, workingTabId) {
               sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
             }
           }
-        } catch (_typeErr) { console.log('[Sentinel/CDP] Type fallback error:', (_typeErr && _typeErr.message) || String(_typeErr)); }
+        } catch (_typeErr) { console.warn('[Sentinel/CDP] Type fallback error:', (_typeErr && _typeErr.message) || String(_typeErr)); }
       }
 
       //       // ═══════════════════════════════════════════════════════════════
@@ -6140,7 +6140,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Don't mark success but LLM gets useful feedback about what happened
           }
         } catch (_ufbErr) {
-          console.log('[Sentinel/UFB] Universal fallback error:', (_ufbErr && _ufbErr.message) || String(_ufbErr));
+          console.warn('[Sentinel/UFB] Universal fallback error:', (_ufbErr && _ufbErr.message) || String(_ufbErr));
         }
       }
 
