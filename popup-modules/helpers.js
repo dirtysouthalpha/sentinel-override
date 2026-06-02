@@ -24,7 +24,7 @@ Helpers.formatCountdown = function formatCountdown(timestamp) {
 
   if (minutes < 60) return `${minutes}m away`;
   if (hours < 24) return `${hours}h ${minutes % 60}m away`;
-  if (days < 7) return `${days}d ${hours % 24}h away`;
+  if (days <= 6) return `${days}d ${hours % 24}h away`;
 
   return new Date(timestamp).toLocaleDateString(undefined, {
     month: 'short', day: 'numeric', year: 'numeric',
