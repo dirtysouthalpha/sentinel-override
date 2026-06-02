@@ -314,7 +314,7 @@
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
           }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', (typeof e === 'object' && e !== null && 'message' in e) ? e.message : String(e)); });
-        } catch { /* clipboard API may be restricted */ }
+        } catch (clipboardErr) { console.warn('[Sentinel] clipboard API may be restricted:', (clipboardErr && clipboardErr.message) || String(clipboardErr)); }
       });
     }
     const clearBtn = document.getElementById('telemClearBtn');

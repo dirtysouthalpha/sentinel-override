@@ -25,7 +25,7 @@ function loadThemePreference() {
   try {
     savedNamedTheme = localStorage.getItem('theme-named');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-named:', String(e));
+    console.warn('[Sentinel/settings] Failed to read theme-named:', (e && e.message) || String(e));
   }
   if (savedNamedTheme && savedNamedTheme !== 'light') {
     applyThemePreset(savedNamedTheme);
@@ -42,7 +42,7 @@ function loadThemePreference() {
   try {
     savedTheme = localStorage.getItem('theme-preference');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to read theme-preference:', String(e));
+    console.warn('[Sentinel/settings] Failed to read theme-preference:', (e && e.message) || String(e));
   }
   if (savedTheme) {
     document.body.classList.toggle('dark-mode', savedTheme === 'dark');
