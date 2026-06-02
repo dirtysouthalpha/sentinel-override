@@ -929,7 +929,7 @@ function sendInjectedContext() {
   if (!note) return;
   chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
     if (chrome.runtime.lastError || (resp && resp.ok === false)) {
-      if (typeof showToast === 'function') showToast('Failed to send note: ' + (chrome.runtime.lastError?.message || resp?.error || 'Unknown'), 'error');
+      if (typeof showToast === 'function') showToast('Failed to send note: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : (resp?.error || 'Unknown')), 'error');
       return;
     }
     injectContextInput.value = '';
