@@ -14,6 +14,9 @@ globalThis.chrome = {
     local: {
       get: (keys) => {
         const result = {};
+        if (!keys || typeof keys[Symbol.iterator] !== 'function') {
+          return Promise.resolve(result);
+        }
         for (const k of keys) {
           if (_storageData[k] !== undefined) result[k] = _storageData[k];
         }
@@ -1884,6 +1887,9 @@ describe('getRelevantPatterns', () => {
     // Restore
     globalThis.chrome.storage.local.get = (keys) => {
       const result = {};
+      if (!keys || typeof keys[Symbol.iterator] !== 'function') {
+        return Promise.resolve(result);
+      }
       for (const k of keys) {
         if (_storageData[k] !== undefined) result[k] = _storageData[k];
       }
