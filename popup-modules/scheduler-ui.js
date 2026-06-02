@@ -102,7 +102,7 @@ async function loadAndRenderSchedules() {
       container.appendChild(card);
     });
   } catch (err) {
-    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml((err && err.message) || String(err))}</div>`;
+    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err))}</div>`;
   }
 }
 
@@ -501,7 +501,7 @@ async function handleSaveSchedule() {
     loadAndRenderSchedules();
     showToast('Schedule created', 'success');
   } catch (err) {
-    showToast('Error creating schedule: ' + ((err && err.message) || String(err)), 'error');
+    showToast('Error creating schedule: ' + ((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)), 'error');
   }
 }
 
@@ -526,7 +526,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
     loadAndRenderSchedules();
     showToast(enabled ? 'Schedule enabled' : 'Schedule disabled', 'success');
   } catch (err) {
-    showToast('Error toggling schedule: ' + ((err && err.message) || String(err)), 'error');
+    showToast('Error toggling schedule: ' + ((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)), 'error');
   }
 }
 
@@ -555,7 +555,7 @@ async function handleDeleteSchedule(scheduleId, name) {
     loadAndRenderSchedules();
     showToast('Schedule deleted', 'success');
   } catch (err) {
-    showToast('Error deleting schedule: ' + ((err && err.message) || String(err)), 'error');
+    showToast('Error deleting schedule: ' + ((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)), 'error');
   }
 }
 
@@ -637,7 +637,7 @@ async function showRunHistory(scheduleId, scheduleName) {
       if (_h2) _h2.textContent = `Run History: ${scheduleName}`;
     }
   } catch (err) {
-    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--error-color);">Error: ${escapeHtml((err && err.message) || String(err))}</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--error-color);">Error: ${escapeHtml((typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err))}</div>`;
     const _histModal = document.getElementById('schedule-history-modal');
     if (_histModal) _histModal.classList.add('show');
   }
