@@ -84,7 +84,7 @@ export async function openTab(url, label) {
   tabContexts.set(tab.id, ctx);
 
   // Wait for the page to load before returning
-  try { await waitForPageLoad(tab.id); } catch (_e) { console.warn('[Sentinel/tab-context] waitForPageLoad error:', (_e && _e.message) || String(_e)); }
+  try { await waitForPageLoad(tab.id); } catch (_e) { console.warn('[Sentinel/tab-context] waitForPageLoad error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
 
   // Update URL/title from the actual loaded page
   try {
@@ -93,7 +93,7 @@ export async function openTab(url, label) {
       ctx.url = info.url || url;
       ctx.title = info.title || '';
     }
-  } catch (_e) { console.warn('[Sentinel/tab-context] getTabInfo error:', (_e && _e.message) || String(_e)); }
+  } catch (_e) { console.warn('[Sentinel/tab-context] getTabInfo error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
 
   setActiveTab(ctx.tabId);
   return ctx;
@@ -152,7 +152,7 @@ export async function closeAllAgentTabs() {
   const closable = Array.from(tabContexts.entries())
     .filter(([, ctx]) => ctx.isAgentCreated);
   for (const [tabId] of closable) {
-    try { await chrome.tabs.remove(tabId); } catch (_e) { console.warn('[Sentinel/tab-context] close tab error:', (_e && _e.message) || String(_e)); }
+    try { await chrome.tabs.remove(tabId); } catch (_e) { console.warn('[Sentinel/tab-context] close tab error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
   }
   tabContexts.clear();
   activeTabId = null;
