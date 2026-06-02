@@ -5043,7 +5043,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+          try { tel.error('network', 'Error reading console', { stepCount, error: (typeof e.message === 'string' ? e.message : String(e)) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           sendActionResult(stepCount, 'Error reading console: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : 'unknown'), true);
         }
         await sleep(300);
@@ -5069,7 +5069,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: (e && e.message) ? e.message : String(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+          try { tel.error('network', 'Error reading network', { stepCount, error: (typeof e.message === 'string' ? e.message : String(e)) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
           sendActionResult(stepCount, 'Error reading network: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : 'unknown'), true);
         }
         await sleep(300);
