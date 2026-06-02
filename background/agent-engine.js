@@ -435,12 +435,12 @@ async function persistHistory() {
   } catch (e) {
     console.warn('[Sentinel] persistHistory storage write failed:', (e && e.message) || String(e));
   }
-  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
-  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', e); }
+  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (e && e.message) || String(e)); }
   return {
     goal,
     history: history.slice(),
