@@ -169,7 +169,7 @@ describe('navigateLoop', () => {
 
   test('promptInjection tells agent not to navigate again', () => {
     const text = navigateLoop.promptInjection({});
-    expect(typeof text === 'string' && text.toLowerCase()).toContain('do not');
+    expect(typeof text === 'string' ? text.toLowerCase() : String(text)).toContain('do not');
   });
 });
 
