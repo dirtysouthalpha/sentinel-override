@@ -273,7 +273,7 @@ export async function generateReport(executionData, CONFIG) {
     const summary = firstParagraph.length > 300 ? firstParagraph.substring(0, 297) + '...' : firstParagraph;
     return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
-    console.error('Report generation failed:', err);
+    console.error('Report generation failed:', typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err));
     // (3.50.0) Build a better fallback that actually shows the collected data
     const fb = buildFallbackReport(executionData);
     // Prepend a note about the LLM failure

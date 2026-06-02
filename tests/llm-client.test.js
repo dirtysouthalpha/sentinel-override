@@ -979,7 +979,7 @@ describe('generatePlan', () => {
     });
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     expect(body.model).toBe('glm-5');
   });
 
@@ -1014,7 +1014,7 @@ describe('generatePlan', () => {
     expect(result).toEqual(['Navigate to site', 'Extract articles']);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     expect(body.response_format).toBeUndefined();
   });
 
@@ -2235,7 +2235,7 @@ describe('Bug #2 regression: generatePlan prose fallback', () => {
     // Verify response_format is not sent (would cause 400 on Z.AI)
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     expect(body.response_format).toBeUndefined();
   });
 });
@@ -2375,7 +2375,7 @@ describe('callLLMSimple', () => {
     await callLLMSimple('sys', 'user', 500);
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     expect(body.max_tokens).toBe(500);
   });
 
@@ -2389,7 +2389,7 @@ describe('callLLMSimple', () => {
     await callLLMSimple('sys', 'user');
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     expect(body.max_tokens).toBe(1200);
   });
 
@@ -2403,7 +2403,7 @@ describe('callLLMSimple', () => {
     await callLLMSimple('my system prompt', 'my user prompt');
     const callArgs = mockFn.mock.calls[0]?.[1];
     expect(callArgs).toBeDefined();
-    const body = JSON.parse(callArgs.body);
+    const body = JSON.parse(callArgs?.body);
     const msgs = body.messages;
     expect(msgs.some(m => m.role === 'system' && m.content === 'my system prompt')).toBe(true);
     expect(msgs.some(m => m.role === 'user' && m.content === 'my user prompt')).toBe(true);

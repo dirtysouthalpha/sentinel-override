@@ -104,7 +104,7 @@ describe('quick-assist-handler', () => {
       );
 
       const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1].body);
+      const body = JSON.parse(fetchCall[1]?.body);
 
       expect(body).toMatchObject({
         model: 'claude-3-opus-20240229',
@@ -138,7 +138,7 @@ describe('quick-assist-handler', () => {
       );
 
       const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1].body);
+      const body = JSON.parse(fetchCall[1]?.body);
 
       expect(body).toMatchObject({
         model: 'gpt-4',
@@ -173,7 +173,7 @@ describe('quick-assist-handler', () => {
       await handleQuickAssist('System instructions\n---\nUser content');
 
       const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1].body);
+      const body = JSON.parse(fetchCall[1]?.body);
 
       // The handler splits on --- and sends only the part after as user content
       expect(body.messages[0].content).toBe('User content');
@@ -198,7 +198,7 @@ describe('quick-assist-handler', () => {
       await handleQuickAssist('Full prompt without separator');
 
       const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1].body);
+      const body = JSON.parse(fetchCall[1]?.body);
 
       expect(body.messages[0].content).toBe('Full prompt without separator');
     });
@@ -326,7 +326,7 @@ describe('quick-assist-handler', () => {
       const result = await handleQuickAssist(multiLinePrompt);
 
       const fetchCall = global.fetch.mock.calls[0] || [];
-      const body = JSON.parse(fetchCall[1].body);
+      const body = JSON.parse(fetchCall[1]?.body);
 
       expect(body.messages[1].content).toBe(multiLinePrompt);
       expect(result).toBe('Response');

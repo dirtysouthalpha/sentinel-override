@@ -30,7 +30,7 @@ export const emptyObservation = {
       if (/^(about:|chrome:|data:|file:)/i.test(currentUrl)) return false;
       return elementCount < 5 && textLength < 200;
     } catch (error) {
-      console.error('Error in emptyObservation matches:', error);
+      console.error('Error in emptyObservation matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return false;
     }
   },
@@ -49,7 +49,7 @@ export const emptyObservation = {
       // Otherwise let the LLM choose between waiting and inspecting via JS.
       return null;
     } catch (error) {
-      console.error('Error in emptyObservation autoApply:', error);
+      console.error('Error in emptyObservation autoApply:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return null;
     }
   },

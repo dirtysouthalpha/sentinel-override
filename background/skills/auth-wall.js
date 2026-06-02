@@ -62,7 +62,7 @@ Actions:
 3. After successful login, use \`{type:'wait_for_navigation', timeout:15000}\` to wait for redirect to the target page.
 4. Use \`{type:'read_page'}\` to verify you are now on the intended page before continuing with the original goal.`;
     } catch (error) {
-      console.error('Error generating prompt injection for auth-wall:', error);
+      console.error('Error generating prompt injection for auth-wall:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return 'Error generating prompt injection for auth-wall. Please check logs for details.';
     }
   }

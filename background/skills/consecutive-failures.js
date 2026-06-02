@@ -19,7 +19,7 @@ export const consecutiveFailures = {
       const failureCount = ctx.consecutiveFailures || 0;
       return failureCount >= MIN_CONSECUTIVE_FAILURES;
     } catch (error) {
-      console.error('Error in consecutiveFailures.matches:', error);
+      console.error('Error in consecutiveFailures.matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return false;
     }
   },
@@ -50,7 +50,7 @@ export const consecutiveFailures = {
 
 Do NOT repeat the action that just failed. The user can see the failure pattern in the activity stream and will judge progress by your next move.`;
     } catch (error) {
-      console.error('Error in consecutiveFailures.promptInjection:', error);
+      console.error('Error in consecutiveFailures.promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return 'Error generating prompt for consecutive failures recovery.';
     }
   }

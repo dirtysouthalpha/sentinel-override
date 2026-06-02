@@ -16,7 +16,7 @@ export const clickNoTarget = {
       const resultString = typeof ctx.lastResult === 'string' ? ctx.lastResult : '';
       return /^BLOCKED:\s*\w+\s+command has no target/i.test(resultString);
     } catch (error) {
-      console.error('Error in clickNoTarget matches:', error);
+      console.error('Error in clickNoTarget matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return false;
     }
   },
@@ -37,7 +37,7 @@ export const clickNoTarget = {
 
 Do NOT re-emit a command with the same missing target.`;
     } catch (error) {
-      console.error('Error in clickNoTarget promptInjection:', error);
+      console.error('Error in clickNoTarget promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return 'Your previous command had no resolvable target. The element list in your next observation will be re-scanned. Choose a target from the observed elements list.';
     }
   }

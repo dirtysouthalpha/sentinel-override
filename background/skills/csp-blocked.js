@@ -19,7 +19,7 @@ export const cspBlocked = {
       if (!ctx || !ctx.lastResult) return false;
       return typeof ctx.lastResult === 'string' && /^CSP_BLOCKED:/i.test(ctx.lastResult);
     } catch (error) {
-      console.error('Error in cspBlocked matches:', error);
+      console.error('Error in cspBlocked matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return false;
     }
   },
@@ -54,7 +54,7 @@ export const cspBlocked = {
 
 DO NOT re-emit execute_js with similar code expecting different behavior — the CSP blocks the entire path, not just specific patterns.`;
     } catch (error) {
-      console.error('Error in cspBlocked promptInjection:', error);
+      console.error('Error in cspBlocked promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
       return `Your previous execute_js was blocked by the page's Content-Security-Policy. Available alternatives: read_page, extract, extract_list, read_network_requests, read_console_messages, or CDP path. DO NOT retry execute_js.`;
     }
   }

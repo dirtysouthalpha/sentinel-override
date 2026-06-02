@@ -106,11 +106,11 @@ describe('emit', () => {
     emit('test', 'info', 'Test message', { key: 'value' });
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(event.action).toBe('telemetry_event');
-    expect(event.category).toBe('test');
-    expect(event.level).toBe('info');
-    expect(typeof event.message === 'string' && event.message).toBe('Test message');
-    expect(event.payload).toEqual({ key: 'value' });
+    expect(event?.action).toBe('telemetry_event');
+    expect(event?.category).toBe('test');
+    expect(event?.level).toBe('info');
+    expect(typeof event?.message === 'string' && event?.message).toBe('Test message');
+    expect(event?.payload).toEqual({ key: 'value' });
   });
 
   test('increments sequence number', () => {
@@ -127,7 +127,7 @@ describe('emit', () => {
     const longMsg = 'A'.repeat(600);
     emit('test', 'info', longMsg);
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(typeof event.message === 'string' && event.message.length).toBeLessThanOrEqual(500);
+    expect(typeof event?.message === 'string' && event?.message.length).toBeLessThanOrEqual(500);
   });
 
   test('error level always emits even in quiet mode', () => {
@@ -154,19 +154,19 @@ describe('tel convenience methods', () => {
   test('tel.error emits with error level', () => {
     tel.error('cat', 'msg');
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(event.level).toBe('error');
+    expect(event?.level).toBe('error');
   });
 
   test('tel.warn emits with warn level', () => {
     tel.warn('cat', 'msg');
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(event.level).toBe('warn');
+    expect(event?.level).toBe('warn');
   });
 
   test('tel.info emits with info level', () => {
     tel.info('cat', 'msg');
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(event.level).toBe('info');
+    expect(event?.level).toBe('info');
   });
 
   test('tel.debug emits with debug level when verbose', () => {
@@ -621,7 +621,7 @@ describe('redaction error fallback', () => {
     // The event should still be emitted (fail-open on redaction error)
     expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
     const event = globalThis.chrome.runtime.sendMessage.mock.calls[0]?.[0];
-    expect(event.action).toBe('telemetry_event');
+    expect(event?.action).toBe('telemetry_event');
   });
 });
 

@@ -6547,7 +6547,7 @@ async function runAgentLoop(goal, workingTabId) {
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('[Sentinel] Agent loop error:', err, (typeof err.message === 'string' ? err.message : String(err)), (typeof err.stack === 'string' ? err.stack : '[no stack]'));
+      console.error('[Sentinel] Agent loop error:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)), (typeof err.stack === 'string' ? err.stack : '[no stack]'));
       sendSilentUpdate(`Loop error: ${typeof err.message === 'string' ? err.message : String(err)}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
