@@ -24,7 +24,7 @@ if (!window.__sentinelContentTel) {
       }).catch((e) => {
         console.error('[_ctel] Unhandled rejection:', ((e && typeof e.message === 'string') ? e.message : String(e)));
       });
-    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
   };
   // Per-level shorthands so call sites stay terse.
   window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
@@ -41,7 +41,7 @@ var ctel = window.__sentinelContentTel;
 if (window.__sentinelInitialized) {
   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
     console.warn('[Sentinel] re-inject ready send failed:', ((e && typeof e.message === 'string') ? e.message : String(e)));
-  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', (e && e.message) || String(e)); }
+  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
 } else {
   window.__sentinelInitialized = true;
 
@@ -343,7 +343,7 @@ if (window.__sentinelInitialized) {
         try {
           const lbl = document.querySelector('label[for="' + CSS.escape(String(el.id)) + '"]');
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] label lookup by id:', (e && e.message) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -360,11 +360,11 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] ancestor label walk:', (e && e.message) || String(e)); }
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
         p = p.parentElement;
         depth++;
       }
-    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', (e && e.message) || String(e)); }
+    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
     return parts.join(' ').toLowerCase();
   }
 
@@ -783,7 +783,7 @@ if (window.__sentinelInitialized) {
         if (__sensitiveMatch) {
           try { ctel && ctel.info && ctel.info('page', 'Focus: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
         }
-        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', (e2 && e2.message) || String(e2)); } }
+        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', ((e2 && typeof e2.message === 'string') ? e2.message : String(e2))); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
         // Dispatch explicit FocusEvent for frameworks (Formik, React Hook Form) that use listeners
         try { el.dispatchEvent(new FocusEvent('focus', { bubbles: true, composed: true })); } catch { /* non-fatal */ }
@@ -998,7 +998,7 @@ if (window.__sentinelInitialized) {
         if (data === null) return;
         sendResponse({ ok: true, data });
       })
-      .catch(err => sendResponse({ ok: false, error: (err && err.message) || String(err) }));
+      .catch(err => sendResponse({ ok: false, error: ((err && typeof err.message === 'string') ? err.message : String(err)) }));
     return true; // keep message channel open for async responses
   });
 
@@ -2158,9 +2158,9 @@ if (window.__sentinelInitialized) {
                     sourceFile: (e && e.sourceFile) ? String(e.sourceFile).substring(0, 200) : '',
                     url: location.href.substring(0, 200)
                   });
-                } catch (te) { console.warn('[Sentinel] CSP telemetry failed:', (te && te.message) || String(te)); }
+                } catch (te) { console.warn('[Sentinel] CSP telemetry failed:', ((te && typeof te.message === 'string') ? te.message : String(te))); }
               }
-            } catch (err) { console.warn('[Sentinel] CSP violation handler failed:', err && err.message); }
+            } catch (err) { console.warn('[Sentinel] CSP violation handler failed:', ((err && typeof err.message === 'string') ? err.message : String(err))); }
           };
           try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener add:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
 
@@ -2329,7 +2329,7 @@ if (window.__sentinelInitialized) {
           return 'JS Result: ' + (execResult.__value || '');
         } catch (err) {
           try { ctel.error('page', 'execute_js outer failure', { error: (err && err.message) || String(err), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', ((e && typeof e.message === 'string') ? e.message : String(e))); }
-          return 'JS Error: ' + (err && err.message || String(err));
+          return 'JS Error: ' + ((err && typeof err.message === 'string') ? err.message : String(err));
         }
       }
 
@@ -2496,7 +2496,7 @@ if (window.__sentinelInitialized) {
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         } catch {
-          try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', (ee && ee.message) || String(ee)); }
+          try { el.scrollIntoView(); } catch (ee) { console.warn('[Sentinel] scrollIntoView fallback failed:', ((ee && typeof ee.message === 'string') ? ee.message : String(ee))); }
         }
         await waitForStableRect(el, 2, 800);
 
