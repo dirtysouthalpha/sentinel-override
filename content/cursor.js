@@ -134,7 +134,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         try { root.appendChild(c); }
         catch {
           // Fallback: try body
-          try { (document.body || document).appendChild(c); } catch (e2) { console.warn('[Sentinel] cursor element append fallback failed:', e2 && e2.message); }
+          try { (document.body || document).appendChild(c); } catch (e2) { console.warn('[Sentinel] cursor element append fallback failed:', (e2 && e2.message) || String(e2)); }
         }
       };
 
