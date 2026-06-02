@@ -453,10 +453,13 @@ function maybeShowSafetyBanner() {
       chatContainer.insertBefore(banner, chatContainer.firstChild);
     }
 
-    document.getElementById('dismissSafetyBanner').addEventListener('click', () => {
-      chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
-      banner.remove();
-    });
+    const dismissSafetyBanner = document.getElementById('dismissSafetyBanner');
+    if (dismissSafetyBanner) {
+      dismissSafetyBanner.addEventListener('click', () => {
+        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+        banner.remove();
+      });
+    }
   });
 }
 
@@ -525,9 +528,12 @@ function showApprovalCard(payload) {
 
   // Wire up buttons. Capture description + requestId so the response handler
   // and the skip/reject system note can reference them.
-  document.getElementById('approvalApprove').addEventListener('click', () => respondApproval('approved', { requestId, description }));
-  document.getElementById('approvalReject').addEventListener('click', () => respondApproval('rejected', { requestId, description }));
-  document.getElementById('approvalSkip').addEventListener('click', () => respondApproval('skipped', { requestId, description }));
+  const approvalApprove = document.getElementById('approvalApprove');
+  const approvalReject = document.getElementById('approvalReject');
+  const approvalSkip = document.getElementById('approvalSkip');
+  if (approvalApprove) approvalApprove.addEventListener('click', () => respondApproval('approved', { requestId, description }));
+  if (approvalReject) approvalReject.addEventListener('click', () => respondApproval('rejected', { requestId, description }));
+  if (approvalSkip) approvalSkip.addEventListener('click', () => respondApproval('skipped', { requestId, description }));
 }
 
 function removeApprovalCard() {
@@ -2070,13 +2076,19 @@ function showMfaBanner(url, hint, _stepNumber) {
   chatContainer.appendChild(banner);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  document.getElementById('mfaResumeBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
-    banner.remove();
-  });
-  document.getElementById('mfaDismissBtn').addEventListener('click', () => {
-    banner.remove();
-  });
+  const mfaResumeBtn = document.getElementById('mfaResumeBtn');
+  if (mfaResumeBtn) {
+    mfaResumeBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+      banner.remove();
+    });
+  }
+  const mfaDismissBtn = document.getElementById('mfaDismissBtn');
+  if (mfaDismissBtn) {
+    mfaDismissBtn.addEventListener('click', () => {
+      banner.remove();
+    });
+  }
 }
 
 // ========== Sign-In Wall Banner (3.14.1) ==========
@@ -2122,18 +2134,27 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   chatContainer.appendChild(banner);
   chatContainer.scrollTop = chatContainer.scrollHeight;
 
-  document.getElementById('signInWallResumeBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
-    banner.remove();
-  });
-  document.getElementById('signInWallFocusBtn').addEventListener('click', () => {
+  const signInWallResumeBtn = document.getElementById('signInWallResumeBtn');
+  if (signInWallResumeBtn) {
+    signInWallResumeBtn.addEventListener('click', () => {
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
+      banner.remove();
+    });
+  }
+  const signInWallFocusBtn = document.getElementById('signInWallFocusBtn');
+  if (signInWallFocusBtn) {
+    signInWallFocusBtn.addEventListener('click', () => {
     // Best-effort: ask the background to focus the URL's tab via the existing
     // active-tab focus hook (re-uses focus_tab message handled by index.js).
     chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', String(e)); });
-  });
-  document.getElementById('signInWallDismissBtn').addEventListener('click', () => {
-    banner.remove();
-  });
+    });
+  }
+  const signInWallDismissBtn = document.getElementById('signInWallDismissBtn');
+  if (signInWallDismissBtn) {
+    signInWallDismissBtn.addEventListener('click', () => {
+      banner.remove();
+    });
+  }
 }
 
 // ========== Per-Step Activity Stream (3.16.0) ==========
