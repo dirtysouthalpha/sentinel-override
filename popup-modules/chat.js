@@ -3224,7 +3224,7 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   }
   if (message.action === 'cdp_reattach_warning') {
-    updateStatus('⚠️ ' + (message.message || 'Debugger re-attached after banner was dismissed.'));
+    updateStatus('⚠️ ' + (typeof message.message === 'string' ? message.message : 'Debugger re-attached after banner was dismissed.'));
   }
   // (3.51) Report display — show report card in chat when report is ready
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {

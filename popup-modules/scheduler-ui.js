@@ -276,7 +276,7 @@ function populateTemplateDropdown(preselectId) {
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
     if (chrome.runtime.lastError || !response) {
-      console.warn('[Sentinel/scheduler-ui] Template list fetch failed in populateTemplateDropdown:', chrome.runtime.lastError?.message || 'No response');
+      console.warn('[Sentinel/scheduler-ui] Template list fetch failed in populateTemplateDropdown:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response'));
       dropdown.innerHTML = '<option value="">Error loading templates</option>';
       return;
     }

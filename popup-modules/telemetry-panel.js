@@ -306,7 +306,7 @@
       copyBtn.addEventListener('click', () => {
         const filtered = events.filter(e => _eventMatchesFilter(e) && _eventMatchesSearch(e));
         const text = filtered.map(e =>
-          _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + e.message +
+          _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e.message === 'string' ? e.message : String(e.message)) +
           (e.payload ? '  ' + JSON.stringify(e.payload) : '')
         ).join('\n');
         try {
