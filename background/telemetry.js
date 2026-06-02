@@ -193,7 +193,7 @@ function _redactEvent(event) {
         _redactEnabled = (v === undefined || v === null) ? true : !!v;
       }
     });
-  } catch (e) { console.warn('[Sentinel/telemetry] init error:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('[Sentinel/telemetry] init error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 })();
 
 function _scheduleFlush() {
@@ -221,7 +221,7 @@ async function _flushRunBuffer() {
   } catch (e) {
     // Re-enable so the interval timer retries on the next tick
     _pendingPersistFlush = true;
-    console.warn('[Sentinel/telemetry] flush error (will retry):', e && e.message || String(e));
+    console.warn('[Sentinel/telemetry] flush error (will retry):', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
   }
 }
 
@@ -249,11 +249,11 @@ export async function startRun(runId, goal) {
     });
     const toEvict = index.splice(MAX_PERSISTED_RUNS);
     for (const old of toEvict) {
-      try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', (e && e.message) || String(e)); }
+      try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     }
     await chrome.storage.local.set({ telemetry_runs_index: index });
     _scheduleFlush();
-  } catch (e) { console.warn('[Sentinel/telemetry] startRun error:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('[Sentinel/telemetry] startRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 }
 
 /**
@@ -279,7 +279,7 @@ export async function endRun(runId) {
       entry.count = events.length;
       await chrome.storage.local.set({ telemetry_runs_index: index });
     }
-  } catch (e) { console.warn('[Sentinel/telemetry] endRun error:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('[Sentinel/telemetry] endRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   _currentRunId = null;
   _runBuffer = [];
 }
@@ -320,7 +320,7 @@ export async function deletePersistedRun(runId) {
     const filtered = index.filter(e => e.runId !== runId);
     await chrome.storage.local.set({ telemetry_runs_index: filtered });
     await chrome.storage.local.remove('telemetry_run_' + runId);
-  } catch (e) { console.warn('[Sentinel/telemetry] deletePersistedRun error:', (e && e.message) || String(e)); }
+  } catch (e) { console.warn('[Sentinel/telemetry] deletePersistedRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 }
 
 function _shouldEmit(level) {

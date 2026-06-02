@@ -60,7 +60,7 @@ export async function saveTemplates(templates) {
     await chrome.storage.local.set({ [STORAGE_KEY]: templates });
   } catch (e) {
     // Storage quota or unavailable — callers should handle
-    throw new Error('Failed to save templates: ' + ((e && e.message) || String(e)));
+    throw new Error('Failed to save templates: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
   }
 }
 
