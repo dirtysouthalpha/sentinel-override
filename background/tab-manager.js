@@ -611,7 +611,7 @@ async function ensureDebuggerAttached(tabId) {
       }).catch((e) => {
         console.error('[wasUserDetached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       });
-    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', (_e && _e.message) || String(_e)); }
+    } catch (_e) { console.warn('[tab-manager] CDP reattach warning broadcast failed:', (typeof _e.message === 'string' ? _e.message : String(_e))); }
   }
 }
 

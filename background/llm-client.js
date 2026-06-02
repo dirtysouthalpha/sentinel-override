@@ -1005,7 +1005,7 @@ export async function generatePlan(goal, settings, context = {}) {
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             if (s2end === -1) {
-              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', (parseErr && parseErr.message) || String(parseErr));
+              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', (typeof parseErr.message === 'string' ? parseErr.message : String(parseErr)));
             }
           }
           s2from = s2end + 1;
