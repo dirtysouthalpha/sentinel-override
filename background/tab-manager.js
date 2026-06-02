@@ -960,7 +960,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     }
     try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[Sentinel/tab-manager] ensureObservabilityListeners failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: CONFIG.screenshotQuality });
-    base64Image = screenshotResult ? screenshotResult.data : null;
+    base64Image = (screenshotResult && typeof screenshotResult.data === 'string') ? screenshotResult.data : null;
   } catch {
     // Attachment or capture failed — drop our tracking, attempt a clean detach,
     // then fall back to captureVisibleTab.
@@ -981,7 +981,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         });
       });
       const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
-      if (!_parts || _parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
+      if (!Array.isArray(_parts) || _parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);
