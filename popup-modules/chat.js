@@ -807,6 +807,7 @@ function addMessage(text, role = 'assistant') {
 }
 
 function addCodeCopyButtons(messageElement) {
+  if (!messageElement) return;
   const codeBlocks = messageElement.querySelectorAll('pre');
   codeBlocks.forEach(pre => {
     const code = pre.querySelector('code');
@@ -1159,7 +1160,8 @@ function highlightSearchResults() {
   const state = getState();
   clearSearchHighlights();
 
-  const messages = chatContainer.querySelectorAll('.message-group');
+  const messages = chatContainer ? chatContainer.querySelectorAll('.message-group') : [];
+  if (!messages.length) return;
   let matchCount = 0;
 
   messages.forEach(group => {
