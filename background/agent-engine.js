@@ -4146,7 +4146,7 @@ async function runAgentLoop(goal, workingTabId) {
                 auto_apply_type: _recovery.autoApply ? _recovery.autoApply.type : null
               });
               chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-                console.error('[_recovery] Unhandled rejection:', e);
+                console.error('[_recovery] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
               });
             }
           } catch (e) { console.warn('[Sentinel] _recovery run log failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
