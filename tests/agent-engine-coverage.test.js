@@ -817,13 +817,13 @@ describe('formatTicketKickoff', () => {
 describe('formatTicketFinalNotes', () => {
   test('produces final notes with action taken and ownership', () => {
     const result = formatTicketFinalNotes('Resolved the issue successfully.', 'Ticket #123', {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
+      company: 'Acme IT',
     }, { stepCount: 10, apiCallCount: 5 });
     expect(result).toContain('Action Taken');
-    expect(result).toContain('Brandon Goolsby');
-    expect(result).toContain('Premier Networx');
+    expect(result).toContain('John Smith');
+    expect(result).toContain('Acme IT');
   });
 
   test('detects partial results and adjusts framing', () => {
@@ -839,16 +839,16 @@ describe('formatTicketFinalNotes', () => {
 describe('formatWaitingOnClient', () => {
   test('produces waiting-on-client block', () => {
     const result = formatWaitingOnClient('Called client', 'Phone call at 2pm', {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     });
     expect(result).toContain('Action Taken');
     expect(result).toContain('Contact Attempt Details');
     expect(result).toContain('Next Step');
-    expect(result).toContain('Brandon Goolsby');
+    expect(result).toContain('John Smith');
   });
 });
 
@@ -856,14 +856,14 @@ describe('formatWaitingOnClient', () => {
 describe('formatWaitingOnVendor', () => {
   test('produces waiting-on-vendor block', () => {
     const result = formatWaitingOnVendor('Opened vendor ticket', 'Vendor support, 3pm, ETA 2 days', {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     });
     expect(result).toContain('Action Taken');
-    expect(result).toContain('Brandon Goolsby');
+    expect(result).toContain('John Smith');
   });
 });
 
@@ -883,16 +883,16 @@ describe('formatItGlueKb', () => {
 describe('formatClientEmail', () => {
   test('produces client email', () => {
     const result = formatClientEmail('VPN was reconnected successfully.', 'Investigate ticket #789 VPN disconnected', {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     });
     expect(result).toContain('Resolved');
-    expect(result).toContain('Brandon Goolsby');
-    expect(result).toContain('706-426-6313');
-    expect(result).toContain('support@augustaitguys.com');
+    expect(result).toContain('John Smith');
+    expect(result).toContain('555-000-0000');
+    expect(result).toContain('support@example.com');
   });
 });
 

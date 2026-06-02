@@ -174,10 +174,10 @@ const {
 } = await import('../background/agent-engine.js');
 
 const mockTech = {
-  name: 'Brandon Goolsby',
+  name: 'John Smith',
   title: 'IT Support Technician',
-  company: 'Premier Networx',
-  phone: '706-426-6313',
+  company: 'Acme IT',
+  phone: '555-000-0000',
   email: 'support@example.com',
 };
 
@@ -574,8 +574,8 @@ describe('getTechnicianInfo', () => {
   test('returns defaults when storage is empty', async () => {
     storageData.technicianInfo = undefined;
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('Brandon Goolsby');
-    expect(info.company).toBe('Premier Networx');
+    expect(info.name).toBe('John Smith');
+    expect(info.company).toBe('Acme IT');
   });
 
   test('merges stored info with defaults', async () => {
@@ -583,7 +583,7 @@ describe('getTechnicianInfo', () => {
     const info = await getTechnicianInfo();
     expect(info.name).toBe('Test Tech');
     expect(info.phone).toBe('555-1234');
-    expect(info.company).toBe('Premier Networx');
+    expect(info.company).toBe('Acme IT');
   });
 });
 

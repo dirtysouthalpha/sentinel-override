@@ -939,7 +939,7 @@ describe('getTechnicianInfo — new edge cases', () => {
   });
   test('returns defaults with correct name', async () => {
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('Brandon Goolsby');
+    expect(info.name).toBe('John Smith');
   });
 });
 

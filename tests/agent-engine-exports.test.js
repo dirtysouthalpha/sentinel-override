@@ -1054,18 +1054,18 @@ describe('maybeRollupHistory', () => {
 // ──────────────────────────────────────────────────────────────────────
 describe('ticket formatting functions', () => {
   const tech = {
-    name: 'Brandon Goolsby',
+    name: 'John Smith',
     title: 'IT Support Technician',
-    company: 'Premier Networx',
-    phone: '706-426-6313',
-    email: 'support@augustaitguys.com',
+    company: 'Acme IT',
+    phone: '555-000-0000',
+    email: 'support@example.com',
   };
 
   describe('formatTicketFinalNotes', () => {
     test('produces formatted output with tech info', () => {
       const result = formatTicketFinalNotes('Found the root cause. DNS was misconfigured.', 'Ticket #12345', tech);
-      expect(result).toContain('Brandon Goolsby');
-      expect(result).toContain('Premier Networx');
+      expect(result).toContain('John Smith');
+      expect(result).toContain('Acme IT');
       expect(result).toContain('Ticket #12345');
       expect(result).toContain('Action Taken');
       expect(result).toContain('Next Step');
@@ -1104,7 +1104,7 @@ describe('ticket formatting functions', () => {
       expect(result).toContain('Waiting on Client');
       expect(result).toContain('Action Taken');
       expect(result).toContain('Follow up by');
-      expect(result).toContain('Brandon Goolsby');
+      expect(result).toContain('John Smith');
     });
   });
 
@@ -1113,7 +1113,7 @@ describe('ticket formatting functions', () => {
       const result = formatWaitingOnVendor('Opened vendor case for RMA.', 'Ticket #22222', tech);
       expect(result).toContain('Waiting on Vendor');
       expect(result).toContain('Vendor case opened');
-      expect(result).toContain('Brandon Goolsby');
+      expect(result).toContain('John Smith');
     });
   });
 
@@ -1144,7 +1144,7 @@ describe('ticket formatting functions', () => {
       expect(result).toContain('Subject:');
       expect(result).toContain('Resolved:');
       expect(result).toContain('Hello [Client Name]');
-      expect(result).toContain('706-426-6313');
+      expect(result).toContain('555-000-0000');
     });
   });
 

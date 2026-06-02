@@ -487,11 +487,11 @@ describe('_describeTarget', () => {
 describe('getTechnicianInfo', () => {
   test('returns defaults when storage is empty', async () => {
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('Brandon Goolsby');
+    expect(info.name).toBe('John Smith');
     expect(info.title).toBe('IT Support Technician');
-    expect(info.company).toBe('Premier Networx');
-    expect(info.phone).toBe('706-426-6313');
-    expect(info.email).toBe('support@augustaitguys.com');
+    expect(info.company).toBe('Acme IT');
+    expect(info.phone).toBe('555-000-0000');
+    expect(info.email).toBe('support@example.com');
   });
 
   test('merges stored values with defaults', async () => {
@@ -501,8 +501,8 @@ describe('getTechnicianInfo', () => {
     expect(info.phone).toBe('555-1234');
     // Defaults preserved for missing fields
     expect(info.title).toBe('IT Support Technician');
-    expect(info.company).toBe('Premier Networx');
-    expect(info.email).toBe('support@augustaitguys.com');
+    expect(info.company).toBe('Acme IT');
+    expect(info.email).toBe('support@example.com');
   });
 
   test('overwrites all defaults when all fields stored', async () => {
@@ -522,14 +522,14 @@ describe('getTechnicianInfo', () => {
   test('returns defaults when stored value is not an object', async () => {
     storageData.technicianInfo = 'invalid';
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('Brandon Goolsby');
+    expect(info.name).toBe('John Smith');
   });
 
   test('returns defaults when storage.get throws', async () => {
     const origGet = chrome.storage.local.get;
     chrome.storage.local.get = jest.fn(async () => { throw new Error('fail'); });
     const info = await getTechnicianInfo();
-    expect(info.name).toBe('Brandon Goolsby');
+    expect(info.name).toBe('John Smith');
     chrome.storage.local.get = origGet;
   });
 });

@@ -1,6 +1,6 @@
 # Sentinel Override — MSP Task Playbooks
 **Date:** 2026-05-08
-**Audience:** Brandon (Premier Networx)
+**Audience:** Brandon (Acme IT)
 **Goal:** Match or beat Claude in Chrome for the four real workflows that get pushed to the agent: **SonicWall VPN tunnels**, **M365 permission edits**, **Exchange mail trace**, **AD/Entra sign-in auditing**.
 
 This document walks through each task family — what the current build does, where it breaks, and the specific code-level fixes that close the gap. The fixes at the end are *cross-cutting*: each one unlocks multiple task families.

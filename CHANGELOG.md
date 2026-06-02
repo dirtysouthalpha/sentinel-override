@@ -1753,7 +1753,7 @@ The "ship the three highest-leverage MSP workflow features from the REVAMP backl
 - New `_autoPickFormat(summary, goal)` heuristic routes the `auto` setting based on goal text ("waiting on vendor" → vendor block, "draft an email" → email, etc.). Defaults to `FINAL_NOTES`.
 - Finish handler now reads `chrome.storage.local.ticketMode` (boolean) and `ticketFormat` (string). When the toggle is on, every finish runs through the dispatcher. When off, the legacy 3.8.0 behavior (auto-detect ticket-shaped goals → `FINAL_NOTES`) remains.
 - **`popup.html`**: Settings modal gains a Ticket Mode toggle row + a conditionally-shown format dropdown + a technician details grid (name / title / company / phone / email).
-- **`popup-modules/settings.js`**: load/save/wire for the toggle + dropdown + debounced auto-save for technician fields. Defaults match the prior hardcoded values (Brandon Goolsby / Premier Networx / 706-426-6313 / support@augustaitguys.com), so users who don't edit see identical output.
+- **`popup-modules/settings.js`**: load/save/wire for the toggle + dropdown + debounced auto-save for technician fields. Defaults match the prior hardcoded values (John Smith / Acme IT / 555-000-0000 / support@example.com), so users who don't edit see identical output.
 
 ### Added — Run Log History modal
 
@@ -2261,7 +2261,7 @@ Five new platform blocks injected into the system prompt at plan time, with dete
   - Ownership Statement: technician name + role + company
   - Full investigation findings appended below
   - Footer: technician contact card (name, title, company, phone, email)
-- **`getTechnicianInfo`** (`background/agent-engine.js`). Reads `chrome.storage.local.technicianInfo` for the user's name, title, company, phone, email; falls back to defaults matching the user's preferences (Brandon Goolsby / IT Support Technician / Premier Networx / 706-426-6313 / support@augustaitguys.com).
+- **`getTechnicianInfo`** (`background/agent-engine.js`). Reads `chrome.storage.local.technicianInfo` for the user's name, title, company, phone, email; falls back to defaults matching the user's preferences (John Smith / IT Support Technician / Acme IT / 555-000-0000 / support@example.com).
 - **Smart partial-vs-resolved detection** — checks the summary text for "step limit", "extraction failed", "not yet", "incomplete", "manually search" patterns to choose between resolved-ticket framing and waiting/in-progress framing in the Next Step line.
 
 ### Implementation notes

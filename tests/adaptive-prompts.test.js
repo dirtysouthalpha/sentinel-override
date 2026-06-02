@@ -477,13 +477,13 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
     await rewriteGoalForPlatform(
       'Investigate the firewall configuration on the network appliance for compliance checking',
       'https://test.com',
-      { name: 'Brandon Goolsby', company: 'Premier Networx', phone: '706-426-6313', email: 'support@test.com' }
+      { name: 'John Smith', company: 'Acme IT', phone: '555-000-0000', email: 'support@test.com' }
     );
 
     const body = JSON.parse(globalThis.fetch.mock.calls[0]?.[1]?.body);
-    expect(body.messages[0].content).toContain('Brandon Goolsby');
-    expect(body.messages[0].content).toContain('Premier Networx');
-    expect(body.messages[0].content).toContain('706-426-6313');
+    expect(body.messages[0].content).toContain('John Smith');
+    expect(body.messages[0].content).toContain('Acme IT');
+    expect(body.messages[0].content).toContain('555-000-0000');
     expect(body.messages[0].content).toContain('support@test.com');
   });
 

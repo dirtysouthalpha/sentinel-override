@@ -516,11 +516,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatTicketOutput', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('TICKET_KICKOFF format produces kickoff template', () => {
@@ -535,7 +535,7 @@ describe('agent-engine uncovered paths', () => {
       const result = formatTicketOutput('FINAL_NOTES', 'The issue was resolved by restarting the service.', 'Ticket #12345: VPN down', tech);
       expect(result).toContain('Final Notes');
       expect(result).toContain('Action Taken');
-      expect(result).toContain('Brandon Goolsby');
+      expect(result).toContain('John Smith');
     });
 
     test('WAITING_ON_CLIENT format', () => {
@@ -758,11 +758,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatTicketKickoff', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders kickoff template with ticket number from goal', () => {
@@ -787,9 +787,9 @@ describe('agent-engine uncovered paths', () => {
 
     test('includes technician info in footer', () => {
       const result = formatTicketKickoff('summary', 'goal', tech);
-      expect(result).toContain('Brandon Goolsby');
-      expect(result).toContain('Premier Networx');
-      expect(result).toContain('706-426-6313');
+      expect(result).toContain('John Smith');
+      expect(result).toContain('Acme IT');
+      expect(result).toContain('555-000-0000');
     });
 
   });
@@ -799,11 +799,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatTicketFinalNotes', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders final notes template', () => {
@@ -833,11 +833,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatWaitingOnClient', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders waiting on client template', () => {
@@ -865,24 +865,24 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatWaitingOnVendor', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders waiting on vendor template', () => {
       const result = formatWaitingOnVendor('Opened SonicWall case #123456.', 'Ticket #789', tech, 'SonicWall Support', '2024-05-25');
       expect(result).toContain('Waiting on Vendor');
       expect(result).toContain('will follow up with vendor and update ticket');
-      expect(result).toContain('Brandon Goolsby');
+      expect(result).toContain('John Smith');
     });
 
     test('handles missing vendor name', () => {
       const result = formatWaitingOnVendor('Case opened with vendor.', 'Ticket #123', tech, '', '2024-05-25');
       expect(result).toContain('Waiting on Vendor');
-      expect(result).toContain('Brandon Goolsby');
+      expect(result).toContain('John Smith');
     });
 
     test('handles missing follow-up date', () => {
@@ -897,11 +897,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatItGlueKb', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders IT Glue KB template', () => {
@@ -924,11 +924,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatClientEmail', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('renders client email template', () => {
@@ -936,8 +936,8 @@ describe('agent-engine uncovered paths', () => {
       expect(result).toContain('**Subject:**');
       expect(result).toContain('Hello [Client Name]');
       expect(result).toContain('Ticket #12345');
-      expect(result).toContain('706-426-6313');
-      expect(result).toContain('support@augustaitguys.com');
+      expect(result).toContain('555-000-0000');
+      expect(result).toContain('support@example.com');
     });
 
     test('handles missing ticket number', () => {
@@ -1003,11 +1003,11 @@ describe('agent-engine uncovered paths', () => {
   // ═══════════════════════════════════════════════════════════════════
   describe('formatTicketOutput edge cases', () => {
     const tech = {
-      name: 'Brandon Goolsby',
+      name: 'John Smith',
       title: 'IT Support Technician',
-      company: 'Premier Networx',
-      phone: '706-426-6313',
-      email: 'support@augustaitguys.com',
+      company: 'Acme IT',
+      phone: '555-000-0000',
+      email: 'support@example.com',
     };
 
     test('handles null summary', () => {

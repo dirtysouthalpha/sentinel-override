@@ -1668,11 +1668,11 @@ function isTicketInvestigationGoal(goal) {
 
 async function getTechnicianInfo() {
   const defaults = {
-    name: 'Brandon Goolsby',
+    name: 'John Smith',
     title: 'IT Support Technician',
-    company: 'Premier Networx',
-    phone: '706-426-6313',
-    email: 'support@augustaitguys.com'
+    company: 'Acme IT',
+    phone: '555-000-0000',
+    email: 'support@example.com'
   };
   try {
     const stored = await chrome.storage.local.get(['technicianInfo']);
