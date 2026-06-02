@@ -864,7 +864,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
     const value = result && result.result ? result.result.value : undefined;
     return { ok: true, value };
   } catch (err) {
-    const msg = (typeof err.message === 'string' ? err.message : String(err));
+    const msg = (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err));
     // Detect chrome:// / extension page where debugger.attach is denied.
     return { ok: false, error: msg, cspBlocked: false, attachDenied: /Cannot access|chrome:\/\/|extension/i.test(msg) };
   }

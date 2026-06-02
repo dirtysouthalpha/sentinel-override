@@ -443,6 +443,7 @@ describe('cdpExecuteJs', () => {
       .mockResolvedValueOnce({ result: { value: null } }); // Runtime.evaluate
     await cdpExecuteJs(100, 'return 1', { timeout: 100 });
     const evalCall = chrome.debugger.sendCommand.mock.calls.find(c => c[1] === 'Runtime.evaluate');
+    expect(evalCall).toBeTruthy();
     expect(evalCall[2].timeout).toBe(500);
   });
 });

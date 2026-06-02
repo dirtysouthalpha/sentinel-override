@@ -1588,8 +1588,8 @@ function filterCommands() {
   if (!commandInput) return;
   const query = commandInput.value.toLowerCase();
   const filtered = COMMANDS.filter(cmd =>
-    cmd.name.toLowerCase().includes(query) ||
-    cmd.desc.toLowerCase().includes(query)
+    (typeof cmd.name === 'string' && cmd.name.toLowerCase().includes(query)) ||
+    (typeof cmd.desc === 'string' && cmd.desc.toLowerCase().includes(query))
   );
   renderCommandList(filtered);
 }
@@ -2296,7 +2296,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
         // Convert "AI decided: note" → "Recording a note", "AI decided: finish" → "Finishing run"
         const m = label.match(/AI decided:\s*(\w+)/i);
         if (m) {
-          const t = m[1].toLowerCase();
+          const t = typeof m[1] === 'string' ? m[1].toLowerCase() : String(m[1]).toLowerCase();
           const pretty = {
             note: 'Recording a note',
             extract: 'Extracting data',
@@ -2974,7 +2974,7 @@ function renderSourceChipsIn(rootEl) {
       if (m.index > last) frag.appendChild(document.createTextNode(tnContent.slice(last, m.index)));
       const chip = document.createElement('span');
       chip.className = 'sentinel-src-chip';
-      const isUnverified = m[0].toLowerCase() === '[unverified]';
+      const isUnverified = typeof m[0] === 'string' && m[0].toLowerCase() === '[unverified]';
       const key = isUnverified ? null : m[1];
       chip.textContent = isUnverified ? '⚠ unverified' : ('🔖 ' + key);
       chip.dataset.key = key || '';

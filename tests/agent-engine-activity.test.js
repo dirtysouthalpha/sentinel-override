@@ -277,6 +277,7 @@ describe('agent-engine activity tracking', () => {
       const call = mockSendAgentActivity.mock.calls.find(c =>
         c[0] === 3 && c[1] === 'navigate' && c[3] === 'done'
       );
+      expect(call).toBeTruthy();
       expect(call[4]).toEqual(expect.objectContaining({
         durationMs: 250,
         url: 'https://example.com',
@@ -291,6 +292,7 @@ describe('agent-engine activity tracking', () => {
       const call = mockSendAgentActivity.mock.calls.find(c =>
         c[0] === 1 && c[1] === 'test' && c[3] === 'done'
       );
+      expect(call).toBeTruthy();
       expect(call[4]).toEqual(expect.objectContaining({
         durationMs: expect.any(Number),
       }));
@@ -354,6 +356,7 @@ describe('agent-engine activity tracking', () => {
       const call = mockSendAgentActivity.mock.calls.find(c =>
         c[0] === 3 && c[1] === 'api_call' && c[3] === 'failed'
       );
+      expect(call).toBeTruthy();
       expect(call[4]).toEqual(expect.objectContaining({
         durationMs: 5000,
         statusCode: 500,
@@ -368,6 +371,7 @@ describe('agent-engine activity tracking', () => {
       const call = mockSendAgentActivity.mock.calls.find(c =>
         c[0] === 1 && c[1] === 'test' && c[3] === 'failed'
       );
+      expect(call).toBeTruthy();
       expect(call[4]).toEqual(expect.objectContaining({
         durationMs: expect.any(Number),
       }));

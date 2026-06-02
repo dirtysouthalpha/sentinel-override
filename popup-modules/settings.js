@@ -59,7 +59,7 @@ function updateThemeToggle() {
   try {
     localStorage.setItem('theme-preference', isDark ? 'dark' : 'light');
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to save theme preference:', String(e));
+    console.warn('[Sentinel/settings] Failed to save theme preference:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     showToast('Failed to save theme preference', 'error');
   }
 }
@@ -187,7 +187,7 @@ if (useTrustedInputToggle) {
             : 'Trusted input OFF — using synthetic events',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast unavailable:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast unavailable:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -220,7 +220,7 @@ if (soundEnabledToggle) {
             : 'Sound notifications OFF — silent mode',
           'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -251,7 +251,7 @@ if (adaptivePromptsModeSelect) {
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
         showToast('Adaptive Prompts: ' + label, 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -307,7 +307,7 @@ if (telemetryPersistToggle) {
         showToast(telemetryPersistToggle.checked
           ? 'Telemetry will now persist across sessions (last 5 runs)'
           : 'Telemetry persistence disabled', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -336,7 +336,7 @@ if (telemetryRedactToggle) {
         showToast(telemetryRedactToggle.checked
           ? 'Telemetry redaction ON — secrets scrubbed before persist'
           : 'Telemetry redaction OFF — raw payloads will be stored', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -364,7 +364,7 @@ if (telemetrySkillAdaptToggle) {
         showToast(telemetrySkillAdaptToggle.checked
           ? 'Adaptive skill priority ON — outcomes will re-rank skills'
           : 'Adaptive skill priority OFF — static priorities only', 'info');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -378,7 +378,7 @@ if (skillStatsResetBtn) {
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
         else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -563,7 +563,7 @@ if (ticketModeToggle) {
             : 'Ticket Mode OFF — auto-formatting on ticket-shaped goals only',
           enabled ? 'success' : 'info'
         );
-      } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }
+      } catch (e) { console.warn('[Sentinel] showToast failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     });
   });
 }
@@ -658,7 +658,7 @@ if (clearAllPatternsBtn) {
     try {
       await chrome.storage.local.set({ learned_patterns: [] });
       _renderLearnedPatterns([]);
-    } catch (e) { console.warn('[Sentinel] clear patterns failed:', String(e)); }
+    } catch (e) { console.warn('[Sentinel] clear patterns failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   });
 }
 
@@ -688,7 +688,7 @@ if (downloadAuditLogBtn) {
       if (document.body) document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + String(e);
+      downloadAuditLogBtn.textContent = 'Error: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });
@@ -701,7 +701,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   try {
     stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/settings] storage read failed:', String(e));
+    console.warn('[Sentinel/settings] storage read failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     stored = {};
   }
 
@@ -931,7 +931,7 @@ function applyThemePreset(theme) {
     try {
       localStorage.setItem('theme-named', theme);
     } catch (e) {
-      console.warn('[Sentinel/settings] Failed to save theme-named:', String(e));
+      console.warn('[Sentinel/settings] Failed to save theme-named:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       showToast('Failed to save theme', 'error');
     }
     // Remove all theme glow classes
@@ -969,7 +969,7 @@ if (saveThemeBtn) saveThemeBtn.addEventListener('click', () => {
   try {
     localStorage.setItem('custom-theme', JSON.stringify({ primary, bg, text }));
   } catch (e) {
-    console.warn('[Sentinel/settings] Failed to save custom theme:', String(e));
+    console.warn('[Sentinel/settings] Failed to save custom theme:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     showToast('Failed to save custom theme', 'error');
   }
   if (themeModal) themeModal.classList.remove('show');
@@ -1173,7 +1173,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       el.textContent = css || '';
     } catch (e) {
-      console.warn('[Sentinel/settings] CSS application failed:', String(e));
+      console.warn('[Sentinel/settings] CSS application failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     }
   }
 
@@ -1181,7 +1181,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) applyCustomCss(saved);
   } catch (e) {
-    console.warn('[Sentinel/settings] localStorage access failed:', String(e));
+    console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
   }
 
   function wire() {
@@ -1195,7 +1195,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) ta.value = saved;
     } catch (e) {
-      console.warn('[Sentinel/settings] localStorage access failed:', String(e));
+      console.warn('[Sentinel/settings] localStorage access failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
     }
 
     let saveTimer = null;
@@ -1215,7 +1215,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       debounce = setTimeout(() => {
         const css = ta.value || '';
         try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage save failed:', String(e));
+        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       }
         applyCustomCss(css);
         setStatus('saved', '#6fcf80');
@@ -1225,7 +1225,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (applyBtn) applyBtn.addEventListener('click', () => {
       const css = ta.value || '';
       try { localStorage.setItem(STORAGE_KEY, css); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage save failed:', String(e));
+        console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       }
       applyCustomCss(css);
       setStatus('applied', '#6fcf80');
@@ -1233,7 +1233,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (clearBtn) clearBtn.addEventListener('click', () => {
       ta.value = '';
       try { localStorage.removeItem(STORAGE_KEY); } catch (e) {
-        console.warn('[Sentinel/settings] localStorage remove failed:', String(e));
+        console.warn('[Sentinel/settings] localStorage remove failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
       }
       applyCustomCss('');
       setStatus('cleared', 'var(--text-tertiary)');
@@ -1260,7 +1260,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         if (theme === 'dark') document.body.classList.add('dark-mode');
         else document.body.classList.remove('dark-mode');
         try { localStorage.setItem('theme-named', theme); } catch (e) {
-          console.warn('[Sentinel/settings] localStorage save failed:', String(e));
+          console.warn('[Sentinel/settings] localStorage save failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
         }
         document.querySelectorAll('.theme-preset').forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
         try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', String(e)); }

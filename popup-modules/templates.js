@@ -63,14 +63,14 @@ function filterTemplates(templates, searchTerm, tagFilter) {
 
   if (searchTerm) {
     result = result.filter(t =>
-      t.name && t.name.toLowerCase().includes(searchTerm)
+      t.name && typeof t.name === 'string' && t.name.toLowerCase().includes(searchTerm)
     );
   }
 
   if (tagFilter) {
     result = result.filter(t =>
       t.tags && Array.isArray(t.tags) && t.tags.some(tag =>
-        tag.toLowerCase().includes(tagFilter)
+        typeof tag === 'string' && tag.toLowerCase().includes(tagFilter)
       )
     );
   }
