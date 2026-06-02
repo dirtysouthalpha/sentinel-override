@@ -188,7 +188,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       await executeScheduledTask(scheduleId);
     } catch (err) {
-      console.error('Scheduled task execution failed:', err && err.message);
+      console.error('Scheduled task execution failed:', (err && err.message) || String(err));
     }
   }
 });
