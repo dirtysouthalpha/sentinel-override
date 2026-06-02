@@ -18,7 +18,7 @@ globalThis.chrome = {
     local: {
       get: jest.fn(async (keys) => {
         const result = {};
-        const keyList = Array.isArray(keys) ? keys : Object.keys(keys || {});
+        const keyList = Array.isArray(keys) ? keys : Object.keys(keys && typeof keys === 'object' ? keys : {});
         if (!Array.isArray(keyList)) return result;
         for (const k of keyList) {
           result[k] = mockLocalStorage[k];

@@ -13,7 +13,7 @@ globalThis.chrome = {
     local: {
       get: jest.fn(async (keys) => {
         const result = {};
-        const keyList = Array.isArray(keys) ? keys : Object.keys(keys || {});
+        const keyList = Array.isArray(keys) ? keys : Object.keys(keys && typeof keys === 'object' ? keys : {});
         for (const k of keyList) {
           result[k] = storageData[k] !== undefined ? storageData[k] : (Array.isArray(keys) ? undefined : keys[k]);
         }
@@ -456,7 +456,7 @@ describe('agent-engine integration — startAgent storage operations', () => {
     // Agent should have loaded stealth mode
     const getCalls = chrome.storage.local.get.mock.calls;
     const hasSpeedCall = getCalls.some(call => {
-      const keys = Array.isArray(call[0]) ? call[0] : Object.keys(call[0] || {});
+      const keys = Array.isArray(call[0]) ? call[0] : Object.keys(call[0] && typeof call[0] === 'object' ? call[0] : {});
       return keys.includes('agentSpeedMode');
     });
     expect(hasSpeedCall).toBe(true);
