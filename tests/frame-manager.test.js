@@ -73,6 +73,7 @@ function setupFrameManagerEnv() {
         const parts = selector.split(':');
         if (parts.length < 2) return null;
         const idx = parseInt(parts[1], 10);
+        if (isNaN(idx)) return null;
         return doc.mockElements[idx] || null;
       }
       return null;
