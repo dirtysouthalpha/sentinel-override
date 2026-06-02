@@ -115,8 +115,10 @@ describe('emit', () => {
 
   test('increments sequence number', () => {
     emit('test', 'info', 'first');
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalled();
     const seq1 = globalThis.chrome.runtime.sendMessage.mock.calls[0][0].seq;
     emit('test', 'info', 'second');
+    expect(globalThis.chrome.runtime.sendMessage).toHaveBeenCalledTimes(2);
     const seq2 = globalThis.chrome.runtime.sendMessage.mock.calls[1][0].seq;
     expect(seq2).toBeGreaterThan(seq1);
   });
