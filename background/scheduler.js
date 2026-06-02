@@ -162,11 +162,15 @@ function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime)
 function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
-  const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':').map(Number);
-  const hours = (timeParts.length >= 1 && timeParts[0] != null && Number.isFinite(timeParts[0]) && timeParts[0] >= 0 && timeParts[0] < 24) ? timeParts[0] : 9;
-  const minutes = (timeParts.length >= 2 && timeParts[1] != null && Number.isFinite(timeParts[1]) && timeParts[1] >= 0 && timeParts[1] < 60) ? timeParts[1] : 0;
+  const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':');
+  const hours = (timeParts.length >= 1 && timeParts[0] != null) ? parseInt(timeParts[0], 10) : 9;
+  const validHours = Number.isFinite(hours) && hours >= 0 && hours < 24;
+  const finalHours = validHours ? hours : 9;
+  const minutes = (timeParts.length >= 2 && timeParts[1] != null) ? parseInt(timeParts[1], 10) : 0;
+  const validMinutes = Number.isFinite(minutes) && minutes >= 0 && minutes < 60;
+  const finalMinutes = validMinutes ? minutes : 0;
   const now = new Date();
-  const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+  const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), finalHours, finalMinutes, 0, 0);
 
   if (recurrence.interval === 'daily') {
     if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);

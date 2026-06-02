@@ -283,6 +283,7 @@ const NETWORK_BUFFER_MAX = 200;
 function pushConsoleEntry(tabId, entry) {
   let buf = consoleBuffers.get(tabId);
   if (!buf) { buf = []; consoleBuffers.set(tabId, buf); }
+  if (!Array.isArray(buf)) { buf = []; consoleBuffers.set(tabId, buf); }
   buf.push(entry);
   while (buf.length > CONSOLE_BUFFER_MAX) buf.shift();
 }
@@ -314,7 +315,7 @@ function recordNetworkStart(tabId, params) {
     errorText: ''
   });
   // Bound the map size by trimming oldest entries.
-  if (buf.size > NETWORK_BUFFER_MAX) {
+  if (buf && buf.size > NETWORK_BUFFER_MAX) {
     const it = buf.keys();
     let toRemove = buf.size - NETWORK_BUFFER_MAX;
     while (toRemove-- > 0) {
@@ -660,7 +661,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchMouseEvent', { ...base, type: 'mouseReleased' });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
+    return { ok: false, error: (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)) };
   }
 }
 

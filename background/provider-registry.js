@@ -606,8 +606,9 @@ export function getModelSupportsVision(providerId, model) {
   // 1) Per-model explicit override (highest precedence).
   // Sort by descending key length so more-specific keys (e.g. "glm-4.5v") win over
   // shorter substrings (e.g. "glm-4") when one model ID contains another.
-  for (const key of Object.keys(MODEL_VISION_OVERRIDES || {}).sort((a, b) => b.length - a.length)) {
-    const k = key.toLowerCase();
+  const keys = MODEL_VISION_OVERRIDES && typeof MODEL_VISION_OVERRIDES === 'object' ? Object.keys(MODEL_VISION_OVERRIDES) : [];
+  for (const key of keys.sort((a, b) => b.length - a.length)) {
+    const k = typeof key === 'string' ? key.toLowerCase() : String(key).toLowerCase();
     // Use substring matching only for keys long enough to avoid false positives (e.g. "o3", "o4").
     // Short keys (< 5 chars) require an exact match or a clear word boundary.
     const isExact = m === k;
@@ -985,7 +986,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   let ids = [];
   if (provider.tagsResponse && Array.isArray(data.models)) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
-    ids = (data.models || []).filter(m => m != null).map(m => m.name).filter(Boolean);
+    ids = (data.models || []).filter(m => m != null && typeof m === 'object' && m !== null).map(m => m.name).filter(Boolean);
   } else if (Array.isArray(data.data)) {
     // OpenAI-compatible: { data: [{ id: "gpt-4o" }] }
     ids = (data.data || []).filter(m => m != null).map(m => m.id || m.name).filter(Boolean);

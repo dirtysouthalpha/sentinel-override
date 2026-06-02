@@ -509,7 +509,8 @@
 
     // Build prompt
     var prompt = 'You are Sentinel Quick Assist, an AI assistant for MSP technicians.\n' +
-      'Current page: ' + pageInfo.title + ' (' + pageInfo.url + ')\n\n' +
+      'Current page: ' + (typeof pageInfo.title === 'string' ? pageInfo.title : 'Unknown') +
+      ' (' + (typeof pageInfo.url === 'string' ? pageInfo.url : 'unknown') + ')\n\n' +
       action.prompt + '\n\n---\n' + selectedText;
 
     // Send to background
