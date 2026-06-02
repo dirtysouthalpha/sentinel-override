@@ -783,7 +783,7 @@ if (window.__sentinelInitialized) {
         if (__sensitiveMatch) {
           try { ctel && ctel.info && ctel.info('page', 'Focus: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', e && e.message || String(e)); }
         }
-        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', e2 && e2.message); } }
+        try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', (e2 && e2.message) || String(e2)); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', e && e.message || String(e)); }
         // Dispatch explicit FocusEvent for frameworks (Formik, React Hook Form) that use listeners
         try { el.dispatchEvent(new FocusEvent('focus', { bubbles: true, composed: true })); } catch { /* non-fatal */ }
