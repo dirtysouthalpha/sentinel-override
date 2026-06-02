@@ -602,7 +602,7 @@ async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, (t) => {
       if (chrome.runtime.lastError) {
-        console.warn('[Sentinel/scheduler] tabs.query lastError:', chrome.runtime.lastError.message);
+        console.warn('[Sentinel/scheduler] tabs.query lastError:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
         resolve([]);
         return;
       }
@@ -795,7 +795,7 @@ export async function initScheduler() {
       const alarm = await new Promise(resolve => {
         chrome.alarms.get(`schedule-${id}`, (a) => {
           if (chrome.runtime.lastError) {
-            console.warn('[Sentinel/scheduler] alarms.get lastError:', chrome.runtime.lastError.message);
+            console.warn('[Sentinel/scheduler] alarms.get lastError:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
             resolve(undefined);
             return;
           }

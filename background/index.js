@@ -94,7 +94,7 @@ initScheduler();
             const tabs = await new Promise(resolve => {
               chrome.tabs.query({active: true, currentWindow: true}, (t) => {
                 if (chrome.runtime.lastError) {
-                  console.warn('[Sentinel/index] tabs.query lastError:', chrome.runtime.lastError.message);
+                  console.warn('[Sentinel/index] tabs.query lastError:', (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                   resolve([]);
                   return;
                 }
