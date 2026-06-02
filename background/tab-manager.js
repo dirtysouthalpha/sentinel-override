@@ -26,7 +26,7 @@ export function setPageLoadConfig(config) {
  * @returns {Promise<void>}
  */
 export async function waitForPageLoad(tabId) {
-  const tab = await new Promise(resolve => { chrome.tabs.get(tabId, (i) => { resolve(chrome.runtime.lastError ? null : i); }); });
+  const tab = await new Promise(resolve => { chrome.tabs.get(tabId, (i) => { resolve((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) ? null : i); }); });
   if (!tab || tab.status === 'complete') return;
   return new Promise((resolve) => {
     const timeout = setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); resolve(); }, pageLoadConfig.pageLoadTimeout);
@@ -1026,7 +1026,7 @@ export function isValidUrl(url) {
  */
 export async function getTabInfo(tabId) {
   return new Promise(resolve => {
-    chrome.tabs.get(tabId, (info) => { resolve(chrome.runtime.lastError ? null : info); });
+    chrome.tabs.get(tabId, (info) => { resolve((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) ? null : info); });
   });
 }
 

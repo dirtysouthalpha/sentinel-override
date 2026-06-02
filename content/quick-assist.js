@@ -613,7 +613,7 @@
     if (!text) return;
 
     chrome.runtime.sendMessage({ action: 'set_goal', goal: text }, function() {
-      if (chrome.runtime.lastError || !shadow) return;
+      if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) || !shadow) return;
       var btn = shadow.querySelector('.qa-send-btn');
       if (btn) {
         var orig = btn.textContent;

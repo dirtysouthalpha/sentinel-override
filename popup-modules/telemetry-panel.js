@@ -401,7 +401,7 @@
     try {
       runs = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: 'list_persisted_telemetry_runs' }, (response) => {
-          if (chrome.runtime.lastError) { resolve([]); return; }
+          if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { resolve([]); return; }
           resolve(Array.isArray(response) ? response : []);
         });
       });
@@ -476,7 +476,7 @@
     try {
       const pastEvents = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ action: 'load_persisted_telemetry_run', runId: runMeta.runId }, (response) => {
-          if (chrome.runtime.lastError) { resolve([]); return; }
+          if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { resolve([]); return; }
           resolve(Array.isArray(response) ? response : []);
         });
       });
