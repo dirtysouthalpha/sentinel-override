@@ -477,7 +477,7 @@ export const PROVIDERS = {
           try {
             input = JSON.parse(tc.function.arguments || '{}');
           } catch {
-            input = { text: tc.function.arguments };
+            input = { text: String(tc.function.arguments || '') };
           }
           return { type: tc.function.name, ...input };
         }
