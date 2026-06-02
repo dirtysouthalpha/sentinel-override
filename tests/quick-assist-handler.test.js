@@ -292,7 +292,8 @@ describe('quick-assist-handler', () => {
 
       await handleQuickAssist('test');
 
-      const fetchCall = global.fetch.mock.calls[0] || [];
+      expect(global.fetch.mock.calls.length).toBeGreaterThan(0);
+      const fetchCall = global.fetch.mock.calls[0];
       expect(fetchCall[1].headers).toMatchObject({
         'Content-Type': 'application/json',
       });

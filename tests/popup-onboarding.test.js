@@ -120,6 +120,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const nextBtn = sandbox._elements['onboardingNextBtn'];
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0]();
 
     const indicator = sandbox._elements['onboardingStepIndicator'];
@@ -133,6 +134,7 @@ describe('onboarding flow', () => {
     const nextBtn = sandbox._elements['onboardingNextBtn'];
 
     // Advance to step 4
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
     nextBtn._clickListeners[0](); // 2→3
     nextBtn._clickListeners[0](); // 3→4
@@ -154,6 +156,7 @@ describe('onboarding flow', () => {
     expect(indicator.textContent).toBe('Step 1 of 4');
 
     const prevBtn = sandbox._elements['onboardingPrevBtn'];
+    expect(prevBtn._clickListeners.length).toBeGreaterThan(0);
     prevBtn._clickListeners[0]();
 
     expect(indicator.textContent).toBe('Step 1 of 4');
@@ -166,7 +169,9 @@ describe('onboarding flow', () => {
     const nextBtn = sandbox._elements['onboardingNextBtn'];
     const prevBtn = sandbox._elements['onboardingPrevBtn'];
 
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
+    expect(prevBtn._clickListeners.length).toBeGreaterThan(0);
     prevBtn._clickListeners[0](); // 2→1
 
     const indicator = sandbox._elements['onboardingStepIndicator'];
@@ -178,6 +183,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const skipBtn = sandbox._elements['onboardingSkipBtn'];
+    expect(skipBtn._clickListeners.length).toBeGreaterThan(0);
     skipBtn._clickListeners[0]();
 
     // Flush async
@@ -213,6 +219,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const nextBtn = sandbox._elements['onboardingNextBtn'];
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // Go to step 2
 
     const steps = sandbox._stepElements;
@@ -247,6 +254,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const nextBtn = sandbox._elements['onboardingNextBtn'];
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
     nextBtn._clickListeners[0](); // 2→3
     nextBtn._clickListeners[0](); // 3→4
@@ -259,6 +267,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const nextBtn = sandbox._elements['onboardingNextBtn'];
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
     expect(nextBtn.textContent).toBe('Next →');
   });
@@ -296,12 +305,14 @@ describe('onboarding flow', () => {
     const prevBtn = sandbox._elements['onboardingPrevBtn'];
     const indicator = sandbox._elements['onboardingStepIndicator'];
 
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
     expect(indicator.textContent).toBe('Step 2 of 4');
 
     nextBtn._clickListeners[0](); // 2→3
     expect(indicator.textContent).toBe('Step 3 of 4');
 
+    expect(prevBtn._clickListeners.length).toBeGreaterThan(0);
     prevBtn._clickListeners[0](); // 3→2
     expect(indicator.textContent).toBe('Step 2 of 4');
 
@@ -316,6 +327,7 @@ describe('onboarding flow', () => {
     loadOnboarding(sandbox);
 
     const nextBtn = sandbox._elements['onboardingNextBtn'];
+    expect(nextBtn._clickListeners.length).toBeGreaterThan(0);
     nextBtn._clickListeners[0](); // 1→2
     nextBtn._clickListeners[0](); // 2→3
     nextBtn._clickListeners[0](); // 3→4
