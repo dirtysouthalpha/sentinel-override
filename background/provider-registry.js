@@ -597,7 +597,7 @@ export function getModelSupportsVision(providerId, model) {
   // 1) Per-model explicit override (highest precedence).
   // Sort by descending key length so more-specific keys (e.g. "glm-4.5v") win over
   // shorter substrings (e.g. "glm-4") when one model ID contains another.
-  for (const key of Object.keys(MODEL_VISION_OVERRIDES).sort((a, b) => b.length - a.length)) {
+  for (const key of Object.keys(MODEL_VISION_OVERRIDES || {}).sort((a, b) => b.length - a.length)) {
     const k = key.toLowerCase();
     // Use substring matching only for keys long enough to avoid false positives (e.g. "o3", "o4").
     // Short keys (< 5 chars) require an exact match or a clear word boundary.
