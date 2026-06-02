@@ -39,7 +39,7 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
       if (!el || !el.classList) return;
       ensureStyleInjected();
       el.classList.add(HIGHLIGHT_CLASS);
-    } catch (e) { console.warn('[Sentinel] highlight element:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] highlight element:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
   };
 
   /**
@@ -52,8 +52,8 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
       if (!el || !el.classList) return;
       // Keep highlight visible briefly so the user can see what was acted upon.
       setTimeout(() => {
-        try { el.classList.remove(HIGHLIGHT_CLASS); } catch (e) { console.warn('[Sentinel] remove highlight class:', e && e.message || String(e)); }
+        try { el.classList.remove(HIGHLIGHT_CLASS); } catch (e) { console.warn('[Sentinel] remove highlight class:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
       }, 500);
-    } catch (e) { console.warn('[Sentinel] removeHighlight:', e && e.message || String(e)); }
+    } catch (e) { console.warn('[Sentinel] removeHighlight:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))); }
   };
 })();

@@ -138,7 +138,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
       // Cannot programmatically click a specific date cell without knowing the calendar layout
       return { success: false, method: 'ui-fallback', error: 'Date picker opened but target date must be selected manually. Use YYYY-MM-DD format for native inputs.' };
     } catch (e) {
-      return { success: false, method: 'none', error: 'All date picker strategies failed: ' + ((e && e.message) || String(e)) };
+      return { success: false, method: 'none', error: 'All date picker strategies failed: ' + ((typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))) };
     }
   };
 
