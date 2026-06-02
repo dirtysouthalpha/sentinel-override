@@ -257,7 +257,7 @@ describe('showToast', () => {
   test('creates toast element with message', () => {
     const before = sandbox.document.body.childNodes.length;
     sandbox.showToast('Test message');
-    const added = Array.from(sandbox.document.body.childNodes).slice(before);
+    const added = Array.from(sandbox.document.body?.childNodes || []).slice(before);
     const toast = added.find(el => el.textContent === 'Test message');
     expect(toast).toBeTruthy();
   });
@@ -265,7 +265,7 @@ describe('showToast', () => {
   test('creates toast with success type by default', () => {
     const before = sandbox.document.body.childNodes.length;
     sandbox.showToast('Success');
-    const added = Array.from(sandbox.document.body.childNodes).slice(before);
+    const added = Array.from(sandbox.document.body?.childNodes || []).slice(before);
     const toast = added.find(el => el.className === 'toast success');
     expect(toast).toBeTruthy();
   });
@@ -273,7 +273,7 @@ describe('showToast', () => {
   test('creates toast with error type', () => {
     const before = sandbox.document.body.childNodes.length;
     sandbox.showToast('Error msg', 'error');
-    const added = Array.from(sandbox.document.body.childNodes).slice(before);
+    const added = Array.from(sandbox.document.body?.childNodes || []).slice(before);
     const toast = added.find(el => el.className === 'toast error');
     expect(toast).toBeTruthy();
   });
@@ -281,13 +281,13 @@ describe('showToast', () => {
   test('toast auto-removes via setTimeout', () => {
     const before = sandbox.document.body.childNodes.length;
     sandbox.showToast('Temp');
-    const added = Array.from(sandbox.document.body.childNodes).slice(before);
+    const added = Array.from(sandbox.document.body?.childNodes || []).slice(before);
     expect(added.length).toBeGreaterThanOrEqual(1);
     // Execute the setTimeout callbacks
     const fns = timeouts.splice(0);
     fns.forEach(t => t.fn());
     // Toast should have been removed
-    const stillPresent = Array.from(sandbox.document.body.childNodes).find(el => el.textContent === 'Temp');
+    const stillPresent = Array.from(sandbox.document.body?.childNodes || []).find(el => el.textContent === 'Temp');
     expect(stillPresent).toBeFalsy();
   });
 });

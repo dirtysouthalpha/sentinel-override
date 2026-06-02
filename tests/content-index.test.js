@@ -150,7 +150,7 @@ function checkSensitiveField(el) {
   if (el.title) parts.push(el.title);
   if (el.autocomplete) parts.push(el.autocomplete);
   if (el.labelText) parts.push(el.labelText);
-  const ctx = parts.join(' ').toLowerCase();
+  const ctx = (parts || []).join(' ').toLowerCase();
   const m = ctx.match(SENSITIVE_LABEL_RE);
   return m ? m[0] : null;
 }

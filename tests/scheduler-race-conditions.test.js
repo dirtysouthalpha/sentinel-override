@@ -17,7 +17,7 @@ globalThis.chrome = {
         const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
         return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
       }),
-      set: jest.fn(async (obj) => Object.assign(storageData, obj)),
+      set: jest.fn(async (obj) => Object.assign(storageData, obj || {})),
     },
     onChanged: { addListener: jest.fn(), removeListener: jest.fn() },
   },
