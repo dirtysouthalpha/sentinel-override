@@ -1264,7 +1264,7 @@ async function detachAllSentinelTabs() {
     for (const id of ids) {
       try { await chrome.tabs.ungroup([id]); } catch (_e2) {
         // Tab was already closed during the run — not an error, expected behavior
-        if (!_e2 || !_e2.message || !_e2.message.includes('No tab with id')) {
+        if (typeof _e2 !== 'object' || _e2 === null || typeof _e2.message !== 'string' || !_e2.message.includes('No tab with id')) {
           console.error('[Sentinel] Error in agent-engine.js:', (typeof _e2.message === 'string' ? _e2.message : String(_e2)));
         }
       }
