@@ -1867,7 +1867,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   try {
     data = await response.json();
   } catch (e) {
-    throw new Error('API returned invalid JSON: ' + (e && e.message ? e.message : String(e)));
+    throw new Error('API returned invalid JSON: ' + ((e && e.message) || String(e)));
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
