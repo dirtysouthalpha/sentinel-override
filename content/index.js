@@ -1282,7 +1282,7 @@ if (window.__sentinelInitialized) {
       } else {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');
-        const frameIndex = parseInt(parts[1], 10);
+        const frameIndex = parts.length >= 2 ? parseInt(parts[1], 10) : NaN;
         if (Number.isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
         const iframeSelector = parts.slice(2).join(':');
         const iframes = document.querySelectorAll('iframe');
@@ -2072,7 +2072,13 @@ if (window.__sentinelInitialized) {
                   code: code.substring(0, 2000),  // truncate for the approval card
                   key: cmd.key || null,
                   url: window.location.href
-                }, (response) => resolve(response || null));
+                }, (response) => {
+                  if (chrome.runtime.lastError) {
+                    resolve({ approved: false, reason: 'extension error: ' + (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) });
+                  } else {
+                    resolve(response || null);
+                  }
+                });
               }),
               new Promise((resolve) => setTimeout(() => resolve({ approved: false, reason: 'timeout' }), 60000))
             ]);

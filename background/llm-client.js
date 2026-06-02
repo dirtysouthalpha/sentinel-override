@@ -1821,7 +1821,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     });
   } catch (err) {
     clearTimeout(fetchTimeout);
-    throw (err && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
+    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
   }
   clearTimeout(fetchTimeout);
 
@@ -1853,7 +1853,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         _fbResp = await fetch(endpoint, { method: 'POST', headers: requestHeaders, body: _fbBody, signal: _fbCtrl.signal });
       } catch (err) {
         clearTimeout(_fbTimeout);
-        throw (err && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
+        throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
       }
       clearTimeout(_fbTimeout);
       if (!_fbResp.ok) {
@@ -2295,7 +2295,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
     return text;
   } catch (err) {
     clearTimeout(timeout);
-    throw (err && err.name === 'AbortError') ? new Error('Quick Assist request timed out after 30s') : err;
+    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error('Quick Assist request timed out after 30s') : err;
   }
 }
 
