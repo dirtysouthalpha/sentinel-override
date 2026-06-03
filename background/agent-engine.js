@@ -3038,8 +3038,8 @@ function _detectActionTypeLoop(history, _agentMemory) {
   const counts = {};
   for (const t of types) counts[t] = (counts[t] || 0) + 1;
   let dominantType = null, dominantCount = 0;
-  for (const t of Object.keys(counts)) {
-    if (counts[t] > dominantCount) { dominantType = t; dominantCount = counts[t]; }
+  for (const [t, count] of Object.entries(counts)) {
+    if (count > dominantCount) { dominantType = t; dominantCount = count; }
   }
   if (dominantCount < 3) return { isLoop: false };
 

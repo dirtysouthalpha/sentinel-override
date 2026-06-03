@@ -412,8 +412,7 @@ function buildStructuredData(executionData, timestamp) {
   const { actionCounts, failedActions, successfulActions } = _countActionHistory(history);
 
   const findings = {};
-  for (const key of Object.keys(agentMemory)) {
-    const val = agentMemory[key];
+  for (const [key, val] of Object.entries(agentMemory)) {
     if (Array.isArray(val)) {
       findings[key] = val.slice(0, 50);
     } else if (typeof val === 'object' && val !== null) {
