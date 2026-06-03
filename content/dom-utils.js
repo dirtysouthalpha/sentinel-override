@@ -8,6 +8,10 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
 (function() {
   const dom = window.__sentinelUtils.dom;
 
+  // Precompute sets for O(1) lookups in hot path functions
+  const genericIds = new Set(['button', 'input', 'form', 'container', 'main', 'wrapper', 'div', 'span', 'content', 'body', 'header', 'footer', 'nav']);
+  const formTags = new Set(['input', 'select', 'textarea', 'button']);
+
   // ========== Visibility Check ==========
   /**
    * Check whether an element is visible on the page.
@@ -87,12 +91,11 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     if (ariaLabel) return `[aria-label="${CSS.escape(ariaLabel)}"]`;
 
     if (el.id) {
-      const genericIds = ['button', 'input', 'form', 'container', 'main', 'wrapper', 'div', 'span', 'content', 'body', 'header', 'footer', 'nav'];
-      if (!genericIds.includes(el.id.toLowerCase())) return `#${CSS.escape(el.id)}`;
+      if (!genericIds.has(el.id.toLowerCase())) return `#${CSS.escape(el.id)}`;
     }
 
     const tagName = el.tagName.toLowerCase();
-    if (['input', 'select', 'textarea', 'button'].includes(tagName) && el.name) {
+    if (formTags.has(tagName) && el.name) {
       return `${tagName}[name="${CSS.escape(el.name)}"]`;
     }
 

@@ -41,12 +41,12 @@ const includeFiles = [
 ];
 
 // Patterns to exclude within included dirs
-const excludeDirs = ['tests', 'node_modules', 'coverage', 'docs', '.git', 'dist', '__pycache__'];
+const excludeDirs = new Set(['tests', 'node_modules', 'coverage', 'docs', '.git', 'dist', '__pycache__']);
 const excludeSuffixes = ['.test.js', '.spec.js', '.map'];
 
 function shouldExclude(relPath) {
   const parts = relPath.split(/[/\\]/);
-  if (parts.some(p => excludeDirs.includes(p))) return true;
+  if (parts.some(p => excludeDirs.has(p))) return true;
   return parts.some(p => excludeSuffixes.some(s => p.endsWith(s)));
 }
 

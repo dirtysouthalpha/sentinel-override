@@ -18,6 +18,10 @@ const closeThemeBtn = document.getElementById('closeThemeBtn');
 const saveThemeBtn = document.getElementById('saveThemeBtn');
 
 // ========== Theme Management ==========
+// Precompute theme sets for O(1) lookups
+const darkThemes = new Set(['dark', 'matrix', 'tron', 'cyberpunk', 'neon', 'terminal', 'blood']);
+const baseThemes = new Set(['light', 'dark']);
+
 // eslint-disable-next-line no-unused-vars
 function loadThemePreference() {
   // Restore named theme (tron, matrix, etc.)
@@ -945,13 +949,12 @@ function applyThemePreset(theme) {
     }
 
     // Toggle dark-mode class for dark themes
-    const darkThemes = ['dark', 'matrix', 'tron', 'cyberpunk', 'neon', 'terminal', 'blood'];
     if (document.body) {
-      document.body.classList.toggle('dark-mode', darkThemes.includes(theme));
+      document.body.classList.toggle('dark-mode', darkThemes.has(theme));
     }
 
     // Add theme glow class for themed presets
-    if (!['light', 'dark'].includes(theme)) {
+    if (!baseThemes.has(theme)) {
       if (document.body) {
         document.body.classList.add('theme-' + theme);
       }
