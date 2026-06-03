@@ -6011,20 +6011,23 @@ async function runAgentLoop(goal, workingTabId) {
           } else if (command.type === 'select') {
             // v3.66: CDP select - find the <select> element and set its value
             try {
+              // Cache JSON.stringify calls to avoid redundant serialization (perf)
+              const _selJson = JSON.stringify(command.selector || '');
+              const _valJson = JSON.stringify(command.value || '');
               const selCode = 'return (function(){'
-                + 'var el = document.querySelector(' + JSON.stringify(command.selector || '') + ');'
+                + 'var el = document.querySelector(' + _selJson + ');'
                 + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
                 + 'if (!el) return { ok: false, error: "No select element found" };'
                 + 'var opts = el.options; var found = false;'
                 + 'for (var i = 0; i < opts.length; i++) {'
-                + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase())) {'
+                + '  if (opts[i].value === ' + _valJson + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + _valJson + ').toLowerCase())) {'
                 + '    el.selectedIndex = i; el.value = opts[i].value;'
                 + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
                 + '    el.dispatchEvent(new Event("input", { bubbles: true }));'
                 + '    found = true; break;'
                 + '  }'
                 + '}'
-                + 'if (!found) return { ok: false, error: "Option not found: " + ' + JSON.stringify(command.value || '') + ' };'
+                + 'if (!found) return { ok: false, error: "Option not found: " + ' + _valJson + ' };'
                 + 'return { ok: true, value: el.value };'
                 + '})()';
               const selResult = await cdpExecuteJs(tab, selCode, { timeout: 3000 });
@@ -6145,13 +6148,16 @@ async function runAgentLoop(goal, workingTabId) {
       // (v3.66) CDP fallback for select: when content script is dead, set dropdown via CDP JS
       if (actionFailed && _cdpFallbackActive && command.type === 'select') {
         try {
+          // Cache JSON.stringify calls to avoid redundant serialization (perf)
+          const _selJson = JSON.stringify(command.selector || '');
+          const _valJson = JSON.stringify(command.value || '');
           const selJs = '(function(){'
-            + 'var el = document.querySelector(' + JSON.stringify(command.selector || '') + ');'
+            + 'var el = document.querySelector(' + _selJson + ');'
             + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
             + 'if (!el) return null;'
             + 'var opts = el.options;'
             + 'for (var i = 0; i < opts.length; i++) {'
-            + '  if (opts[i].value === ' + JSON.stringify(command.value || '') + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + JSON.stringify(command.value || '') + ').toLowerCase())) {'
+            + '  if (opts[i].value === ' + _valJson + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + _valJson + ').toLowerCase())) {'
             + '    el.selectedIndex = i; el.value = opts[i].value;'
             + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
             + '    return el.value;'
@@ -6270,23 +6276,28 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           let _universalJs = '';
           const _sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          // Cache JSON.stringify(_sel) to avoid redundant serialization (perf)
+          const _selJson = JSON.stringify(_sel);
           if (command.type === 'select' && _sel && command.value) {
-            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');'
+            // Cache value JSON.stringify calls too
+            const _valJson = JSON.stringify(command.value);
+            const _valLowerJson = JSON.stringify(String(command.value).toLowerCase());
+            _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');'
               + 'if(!el){var ss=document.querySelectorAll("select");for(var i=0;i<ss.length;i++){if(ss[i].offsetParent!==null){el=ss[i];break;}}}'
               + 'if(!el)return null;var opts=el.options;'
-              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + JSON.stringify(command.value) + '||opts[i].text.toLowerCase().includes(' + JSON.stringify(String(command.value).toLowerCase()) + ')){'
+              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + _valJson + '||opts[i].text.toLowerCase().includes(' + _valLowerJson + ')){'
               + 'el.selectedIndex=i;el.value=opts[i].value;el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;}}return null;})()';
           } else if (command.type === 'check' && _sel) {
-            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(!el)el=document.querySelector("[type=checkbox]");if(el){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));return"checked";}return null;})()';
+            _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');if(!el)el=document.querySelector("[type=checkbox]");if(el){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));return"checked";}return null;})()';
           } else if (command.type === 'scroll_to' && _sel) {
-            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.scrollIntoView({behavior:"smooth",block:"center"});return"scrolled";}return null;})()';
+            _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');if(el){el.scrollIntoView({behavior:"smooth",block:"center"});return"scrolled";}return null;})()';
           } else if (command.type === 'wait_for_element' && _sel) {
-            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');return el?"found":"not_found";})()';
+            _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');return el?"found":"not_found";})()';
           } else if (command.type === 'wait_for_text' && command.text) {
             _universalJs = '(function(){if(!document.body)return"not_found";var t=document.body.innerText;return t.indexOf(' + JSON.stringify(command.text) + ')>=0?"found":"not_found";})()';
           } else if (command.type === 'hover' && _sel) {
             // Hover via CDP: dispatch mouseover/mouseenter events
-            _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
+            _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
           }
           if (_universalJs) {
             const _uniRes = await cdpExecuteJs(tab, 'return ' + _universalJs, { timeout: 3000 });
