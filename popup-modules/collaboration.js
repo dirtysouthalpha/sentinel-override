@@ -20,7 +20,7 @@ async function exportTemplateFile(templateId) {
     downloadJson(data, filename);
     showToast('Template exported', 'success');
   } catch (err) {
-    showToast((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : 'Export failed'), 'error');
+    showToast(getErrorMessage(err) || 'Export failed', 'error');
   }
 }
 
@@ -37,7 +37,7 @@ async function exportAllTemplatesFile() {
     downloadJson(data, filename);
     showToast(`${data && data.count != null ? data.count : '?'} template(s) exported`, 'success');
   } catch (err) {
-    showToast((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : 'Export failed'), 'error');
+    showToast(getErrorMessage(err) || 'Export failed', 'error');
   }
 }
 
@@ -83,7 +83,7 @@ function openImportDialog() {
         showImportPreview(result, []);
       }
     } catch (err) {
-      const errorMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+      const errorMsg = getErrorMessage(err);
       // Distinguish between file read errors and JSON parse errors
       const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Failed to read file';
       showToast(prefix + ': ' + errorMsg, 'error');
@@ -119,7 +119,7 @@ async function exportReportFile(report) {
     downloadText(markdown, filename, 'text/markdown');
     showToast('Report exported', 'success');
   } catch (err) {
-    showToast((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : 'Export failed'), 'error');
+    showToast(getErrorMessage(err) || 'Export failed', 'error');
   }
 }
 
@@ -223,7 +223,7 @@ async function executeImport() {
     // Refresh template list if templates panel is visible
     if (typeof loadTemplates === 'function') loadTemplates();
   } catch (err) {
-    showToast((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : 'Import failed'), 'error');
+    showToast(getErrorMessage(err) || 'Import failed', 'error');
   }
 }
 
@@ -273,7 +273,7 @@ function sendMessage(action, data) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action, ...(data || {}) }, (response) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-        resolve({ ok: false, error: (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Unknown error' });
+        resolve({ ok: false, error: getErrorMessage(chrome.runtime.lastError) || 'Unknown error' });
         return;
       }
       resolve(response || { ok: false, error: 'No response' });

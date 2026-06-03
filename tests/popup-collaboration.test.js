@@ -75,6 +75,11 @@ function createSandbox() {
     showToast: () => {},
     sanitizeHtml: (s) => s,
     escapeHtml: (s) => s,
+    getErrorMessage(err) {
+      if (typeof err === 'string') return err;
+      if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+      return String(err || '');
+    },
   };
   sandbox.window = sandbox;
   return sandbox;
