@@ -677,7 +677,7 @@ export async function startAgent(goal, sender) {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
     const savedSpeed = speedSettings.agentSpeedMode;
     agentSpeed = ['turbo', 'normal', 'stealth'].includes(savedSpeed) ? savedSpeed : 'turbo';
-  } catch (speedErr) {
+  } catch (_speedErr) {
     /* Non-fatal: speed mode load failed, using turbo */
     agentSpeed = 'turbo';
   }
