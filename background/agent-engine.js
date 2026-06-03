@@ -339,9 +339,9 @@ async function _updateRunLogIndex(runLogId, fields) {
     const list = Array.isArray(stored[RUN_LOG_INDEX_KEY]) ? stored[RUN_LOG_INDEX_KEY].slice() : [];
     const idx = list.findIndex(e => e && e.runLogId === runLogId);
     if (idx >= 0) {
-      list[idx] = Object.assign({}, list[idx], fields, { runLogId });
+      list[idx] = { ...list[idx], ...fields, runLogId };
     } else {
-      list.unshift(Object.assign({ runLogId }, fields));
+      list.unshift({ runLogId, ...fields });
     }
     // Drop overflow and evict detail records for those runs.
     const evict = list.splice(RUN_LOG_INDEX_MAX);
@@ -386,7 +386,7 @@ function activityDone(stepNumber, key, label, detail) {
     const startedAt = _activityStartedAt.get(_activityKey(stepNumber, key));
     const durationMs = startedAt ? (Date.now() - startedAt) : null;
     _activityStartedAt.delete(_activityKey(stepNumber, key));
-    sendAgentActivity(stepNumber, key, label, 'done', Object.assign({ durationMs }, detail || {}));
+    sendAgentActivity(stepNumber, key, label, 'done', { durationMs, ...(detail || {}) });
   } catch (_e) { /* activity tracking non-fatal */ }
 }
 
@@ -396,7 +396,7 @@ function activityFail(stepNumber, key, label, detail) {
     const startedAt = _activityStartedAt.get(_activityKey(stepNumber, key));
     const durationMs = startedAt ? (Date.now() - startedAt) : null;
     _activityStartedAt.delete(_activityKey(stepNumber, key));
-    sendAgentActivity(stepNumber, key, label, 'failed', Object.assign({ durationMs }, detail || {}));
+    sendAgentActivity(stepNumber, key, label, 'failed', { durationMs, ...(detail || {}) });
   } catch (_e) { /* activity tracking non-fatal */ }
 }
 
