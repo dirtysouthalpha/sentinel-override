@@ -6140,7 +6140,7 @@ async function runAgentLoop(goal, workingTabId) {
               + 'if (!el) {'
               + '  var allEls = document.querySelectorAll("button, a, [role=\\"button\\"], input, [onclick]");'
               + '  for (var i = 0; i < allEls.length; i++) {'
-              + '    if (allEls[i].textContent && allEls[i].textContent.trim().length > 0) { el = allEls[i]; break; }'
+              + '    if (allEls[i].textContent && allEls[i].textContent.trim().length) { el = allEls[i]; break; }'
               + '  }'
               + '}'
               + 'if (!el) return null;'
