@@ -4410,16 +4410,16 @@ async function runAgentLoop(goal, workingTabId) {
               const _m = _vRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
               if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
             }
-            
+
             if (_vParsed && _vParsed.action) {
               const _va = _vParsed.action;
               // Map vision action types to legacy command format
               switch (_va.type) {
                 case 'click':
-                  command = { type: 'click_at', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index)) ? _va.index : 0, _visionAction: true };
+                  command = { type: 'click_at', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index) && _va.index > 0) ? _va.index : null, _visionAction: true };
                   break;
                 case 'input':
-                  command = { type: 'type', text: _va.text || '', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index)) ? _va.index : 0, _visionAction: true };
+                  command = { type: 'type', text: _va.text || '', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index) && _va.index > 0) ? _va.index : null, _visionAction: true };
                   break;
                 case 'scroll':
                   command = { type: 'scroll', direction: _va.direction || 'down', _visionAction: true };
@@ -5415,13 +5415,13 @@ async function runAgentLoop(goal, workingTabId) {
           // Skip the legacy execution path for this action
           command._visionExecuted = true;
         } else {
-          result = 'Element [' + command._visionIndex + '] not found in vision elements';
+          result = 'Element [' + (command._visionIndex || 'invalid') + '] not found in vision elements';
           actionFailed = true;
           command._visionExecuted = true;
         }
       }
       // Handle non-indexed vision actions (scroll, navigate, go_back, execute_js, done)
-      else if (command._visionAction && !command._visionIndex) {
+      else if (command._visionAction && command._visionIndex == null) {
         // These fall through to normal execution — just clear the flag
         // scroll, navigate, execute_js, done are all handled by the legacy switch
         command._visionExecuted = false;  // let legacy handle it
@@ -5695,7 +5695,11 @@ async function runAgentLoop(goal, workingTabId) {
         result = (typeof res === 'string' && res.length > 0) ? res : 'Error: no response from content script';
         let extractSucceeded = false;
         try {
-          const parsed = JSON.parse(result.replace('JS Result: ', ''));
+          if (!result || typeof result !== 'string') {
+            throw new Error('Invalid result for extract');
+          }
+          const _resultToParse = result.startsWith('JS Result: ') ? result.replace('JS Result: ', '') : result;
+          const parsed = JSON.parse(_resultToParse);
           if (parsed.key !== undefined && parsed.value !== undefined) {
             // Reject error-shaped values so failure strings ("Element not found",
             // "JS Error: ...", etc.) are never stored as real data in memory.
@@ -6202,7 +6206,7 @@ async function runAgentLoop(goal, workingTabId) {
           } else if (command.type === 'wait_for_element' && _sel) {
             _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');return el?"found":"not_found";})()';
           } else if (command.type === 'wait_for_text' && command.text) {
-            _universalJs = '(function(){var t=document.body.innerText;return t.indexOf(' + JSON.stringify(command.text) + ')>=0?"found":"not_found";})()';
+            _universalJs = '(function(){if(!document.body)return"not_found";var t=document.body.innerText;return t.indexOf(' + JSON.stringify(command.text) + ')>=0?"found":"not_found";})()';
           } else if (command.type === 'hover' && _sel) {
             // Hover via CDP: dispatch mouseover/mouseenter events
             _universalJs = '(function(){var el=document.querySelector(' + JSON.stringify(_sel) + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
