@@ -188,7 +188,7 @@ function describeActionPlain(payload) {
     case 'press_key':   return 'Pressing ' + (payload.key || 'key');
     case 'execute_js':  return 'Running JavaScript' + (payload.key ? ' → memory["' + payload.key + '"]' : '');
     case 'extract':     return 'Extracting ' + (payload.attribute || 'text') + ' from ' + (desc || payload.selector || 'element');
-    case 'extract_list':return 'Extracting list of items' + (payload.fields && typeof payload.fields === 'object' && payload.fields !== null ? ' (' + Object.keys(payload.fields).join(', ') + ')' : '');
+    case 'extract_list':return 'Extracting list of items' + (payload.fields && typeof payload.fields === 'object' ? ' (' + Object.keys(payload.fields).join(', ') + ')' : '');
     case 'read_page':   return 'Reading page content';
     case 'read_console_messages': return 'Reading console messages';
     case 'read_network_requests': return 'Reading network requests';
@@ -3570,7 +3570,7 @@ chrome.runtime.onMessage.addListener((message) => {
           chrome.storage.local.get('dismissed_suggestions', (stored) => {
             if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
             const now = Date.now();
-            const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
+            const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
               ? stored.dismissed_suggestions : {};
             // Prune entries older than TTL.
             const dismissedMap = {};
@@ -3666,7 +3666,7 @@ chrome.runtime.onMessage.addListener((message) => {
                 if (sug && sug.id) {
                   chrome.storage.local.get('dismissed_suggestions', (stored) => {
                     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-                    const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object' && stored.dismissed_suggestions !== null)
+                    const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
                     try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }

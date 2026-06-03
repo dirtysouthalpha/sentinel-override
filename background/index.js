@@ -274,7 +274,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const cat = String(request.category || 'content');
         const lvl = ['error', 'warn', 'info', 'debug', 'trace'].includes(request.level) ? request.level : 'info';
         const msg = String(request.message || '');
-        const payload = (request.payload && typeof request.payload === 'object' && request.payload !== null) ? { ...request.payload } : {};
+        const payload = (request.payload && typeof request.payload === 'object') ? { ...request.payload } : {};
         // Auto-stamp the sender info so panel rows show which tab fired.
         if (sender && sender.tab && typeof sender.tab.id === 'number') payload.tabId = sender.tab.id;
         if (sender && sender.url) payload.frameUrl = String(sender.url).substring(0, 200);

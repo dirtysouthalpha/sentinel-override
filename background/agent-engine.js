@@ -243,7 +243,7 @@ export async function restoreFromCheckpoint() {
     if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
       Object.assign(_runSettings, cp.runSettingsSnapshot);
     }
-    if (cp.trustCounters && typeof cp.trustCounters === 'object' && cp.trustCounters !== null) {
+    if (cp.trustCounters && typeof cp.trustCounters === 'object') {
       if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
       if (typeof cp.trustCounters.consecutiveFailureMax === 'number') consecutiveFailureMax = cp.trustCounters.consecutiveFailureMax;
     }
@@ -253,7 +253,7 @@ export async function restoreFromCheckpoint() {
     // Re-register tab contexts from URLs. After SW restart we don't have the
     // full context objects, just URLs, but that's enough for the tab manager
     // to re-initialize when the agent re-opens tabs.
-    if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object' && cp.tabContextUrls !== null) {
+    if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object') {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10);
         if (typeof tabId !== 'number' || isNaN(tabId) || tabId <= 0) {

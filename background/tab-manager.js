@@ -252,7 +252,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       let data = response && response.data !== undefined ? response.data : response;
       // Unwrap inner execute_command wrapper: { result: <string> }
       // Content script returns { result } for execute_command actions
-      if (data && typeof data === 'object' && data !== null && !Array.isArray(data) && Object.keys(data).length === 1 && 'result' in data) {
+      if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length === 1 && 'result' in data) {
         data = data.result;
       }
       return data;
