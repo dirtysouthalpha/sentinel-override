@@ -1291,7 +1291,7 @@ if (window.__sentinelInitialized) {
         if (!iframeResult.frameDoc) return 'Iframe document unavailable for selector: ' + selector;
         targetDoc = iframeResult.frameDoc;
         selector = iframeResult.remainingSelector || '';
-        cmd = Object.assign({}, cmd, { selector });
+        cmd = { ...cmd, selector };
       } else {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');

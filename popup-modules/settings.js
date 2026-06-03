@@ -547,7 +547,7 @@ if (ticketModeToggle) {
     if (ticketFormatSelect) {
       ticketFormatSelect.value = result.ticketFormat || 'auto';
     }
-    const tech = Object.assign({}, TECH_DEFAULTS, result.technicianInfo || {});
+    const tech = { ...TECH_DEFAULTS, ...(result.technicianInfo || {}) };
     for (const key of Object.keys(__TECH_INPUTS)) {
       const el = __TECH_INPUTS[key];
       if (el) el.value = tech[key] || '';

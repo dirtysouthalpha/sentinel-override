@@ -1813,7 +1813,7 @@ function _splitTriedSection(summary) {
   // Pull "what's been tried" candidates from the summary — anything that reads
   // like a remediation step. Falls back to a single line if nothing matches.
   if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
-  const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const lines = summary.split(/\n+/).filter(s => s.trim()).map(s => s.trim());
   const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
   return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
@@ -1826,7 +1826,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
   // as recommended next steps). If empty, leave numbered placeholders so the
   // tech can fill in.
-  const sentences = (summary || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+  const sentences = (summary || '').split(/(?<=[.!?])\s+/).filter(s => s.trim()).map(s => s.trim());
   const tail = sentences.slice(-3);
   const pathLines = tail.length
     ? tail.map((s, i) => `${i + 1}. ${s.replace(/\s+/g, ' ').slice(0, 240)}`)
@@ -1936,7 +1936,7 @@ function formatItGlueKb(summary, goal, tech, options) {
 
   // Derive resolution steps from the summary's numbered/bulleted lines or
   // sentence breakdown.
-  const lines = (summary || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const lines = (summary || '').split(/\n+/).filter(s => s.trim()).map(s => s.trim());
   const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
   const steps = stepCandidates.length
     ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[.)]|-|\*)\s+/, '')}`)
