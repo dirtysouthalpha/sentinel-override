@@ -241,11 +241,11 @@ if (window.__sentinelInitialized) {
               }
             }
           }
-        } catch (skipErr) {
+        } catch (_skipErr) {
           /* Element parsing failed - non-critical, skip this element */
         }
       }
-    } catch (nonFatalErr) {
+    } catch (_nonFatalErr) {
       /* Dismissal loop failed - non-fatal, continue with overlay removal */
     }
 
@@ -591,7 +591,7 @@ if (window.__sentinelInitialized) {
             banner.style.opacity = '0';
             banner.style.transform = 'translateX(-50%) translateY(-10px)';
           }, 2000);
-        } catch (visualErr) {
+        } catch (_visualErr) {
           /* Non-fatal visual feedback error - banner update failed but action proceeds */
         }
         return { ok: true };
@@ -1558,15 +1558,15 @@ if (window.__sentinelInitialized) {
           var mx = Math.round(srcX + (dstX - srcX) * (dragStep / steps));
           var my = Math.round(srcY + (dstY - srcY) * (dragStep / steps));
           dragEl.dispatchEvent(mkMouse('mousemove', mx, my));
-          try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch (dragOverErr) { /* Non-fatal: dragover failed */ }
+          try { dropEl.dispatchEvent(mkDrag('dragover', mx, my)); } catch (_dragOverErr) { /* Non-fatal: dragover failed */ }
           await humanDelay(20, 40);
         }
 
         // dragenter + drop + dragend on target
-        try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch (dragEnterErr) { /* Non-fatal: dragenter failed */ }
+        try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch (_dragEnterErr) { /* Non-fatal: dragenter failed */ }
         try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch (e) { console.warn('[Sentinel] Drop event error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
         dragEl.dispatchEvent(mkMouse('mouseup', dstX, dstY));
-        try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch (dragEndErr) { /* Non-fatal: dragend failed */ }
+        try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch (_dragEndErr) { /* Non-fatal: dragend failed */ }
 
         setTimeout(() => { hl.removeHighlight(dragEl); hl.removeHighlight(dropEl); }, 1500);
         hl.highlightElement(dropEl);
@@ -2484,7 +2484,7 @@ if (window.__sentinelInitialized) {
         // Try Escape globally first — handles enterprise dialogs that trap focus
         var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
         try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-        try { (document.body || document.documentElement).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (escDispatchErr) { /* Non-fatal: ESC dispatch to body failed */ }
+        try { (document.body || document.documentElement).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (_escDispatchErr) { /* Non-fatal: ESC dispatch to body failed */ }
         await new Promise(r => setTimeout(r, 200));
         var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;
         if (!detectedOverlay) return 'Overlay dismissed (Escape key sent)';
