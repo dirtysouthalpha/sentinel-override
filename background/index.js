@@ -47,7 +47,7 @@ chrome.runtime.onInstalled.addListener(() => {
     const updates = {};
     if (result.api_endpoint && typeof result.api_endpoint === 'string' && result.api_endpoint.includes('bigmodel.cn')) updates.api_endpoint = '';
     if (result.model && typeof result.model === 'string' && /glm-4(\.6v-flash|v-)/.test(result.model)) updates.model = '';
-    if (Object.keys(updates).length > 0) {
+    if (Object.keys(updates).length) {
       chrome.storage.local.set(updates, () => {
         if (chrome.runtime.lastError) console.error('[Sentinel] Migration set failed:', getErrorMessage(chrome.runtime.lastError));
       });
