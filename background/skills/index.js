@@ -58,7 +58,7 @@ let _saveStatsTimer = null;
       }
       if (changes[STATS_KEY]) {
         const v = changes[STATS_KEY].newValue;
-        _stats = (v && typeof v === 'object' && v !== null) ? v : {};
+        _stats = (v && typeof v === 'object') ? v : {};
       }
     });
   } catch (e) { console.warn('[Sentinel/skills] init error:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
