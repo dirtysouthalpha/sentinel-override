@@ -2395,9 +2395,10 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
     youtube: 'youtube.com/results?search_query=',
     google: 'google.com/search?q='
   };
+  var goalLower = typeof goal === 'string' ? goal.toLowerCase() : '';
+  var urlLower = typeof url === 'string' ? url.toLowerCase() : '';
   for (var site in siteUrls) {
-    var re = new RegExp(site, 'i');
-    if (re.test(goal) && !re.test(url)) {
+    if (goalLower.includes(site) && !urlLower.includes(site)) {
       var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
       if (qm && qm[1]) {
         strategies.push('Navigate directly to https://www.' + siteUrls[site] + encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : ''));
