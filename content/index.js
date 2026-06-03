@@ -1993,7 +1993,7 @@ if (window.__sentinelInitialized) {
         const baseOpts = { bubbles: true, cancelable: true, composed: true, view: view };
         const pointerOpts = Object.assign({ pointerType: 'mouse', isPrimary: true }, baseOpts);
 
-        const PE = view && view.PointerEvent ? view.PointerEvent : (typeof PointerEvent !== 'undefined' ? PointerEvent : null);
+        const PE = view?.PointerEvent ?? PointerEvent ?? null;
 
         if (PE) {
           el.dispatchEvent(new PE('pointerover', pointerOpts));

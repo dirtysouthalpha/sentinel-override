@@ -1432,7 +1432,7 @@ async function _cdpObservePage(tabId) {
   const tabInfo = await getTabInfo(tabId);
   const currentUrl = tabInfo ? tabInfo.url : '';
   // In batch mode (queue has items), always use cache if available (no TTL limit)
-  const _inBatchMode = typeof _pendingCommandQueue !== 'undefined' && _pendingCommandQueue.length;
+  const _inBatchMode = _pendingCommandQueue?.length;
   const _cacheTTL = _inBatchMode ? 60000 : 30000; // 60s in batch mode, 30s normal
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;

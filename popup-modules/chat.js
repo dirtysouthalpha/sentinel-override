@@ -2431,7 +2431,7 @@ function showModeMismatchCard(payload) {
       chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] setApprovalMode failed:', getErrorMessage(chrome.runtime.lastError)); return; }
         try {
-          if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
+          if (approvalModeToggle) {
             approvalModeToggle.checked = wantsApproval;
           }
           if (typeof updateApprovalModeUI === 'function') {
@@ -3641,7 +3641,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     // Use the same send-message path that the regular send button uses.
                     try {
                       const inputBox = document.getElementById('goalInput') || document.getElementById('chat-input');
-                      if (inputBox && typeof inputBox.value !== 'undefined') {
+                      if (inputBox) {
                         inputBox.value = originalGoal;
                       }
                       if (typeof sendMessage === 'function') sendMessage();
