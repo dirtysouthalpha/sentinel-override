@@ -1612,7 +1612,7 @@ let _observeCacheHits = 0;
  * @returns {number[]} Array of Chrome tab IDs.
  */
 export function getAttachedTabIds() {
-  return Array.from(agentAttachedTabs);
+  return [...agentAttachedTabs];
 }
 
 // (3.40.0) Audit log access — delegated from background/index.js message handler.

@@ -37,7 +37,7 @@ export function setActiveTab(tabId) {
 export function getTabContext(tabId) { return tabContexts.get(tabId); }
 
 /** Returns an array of all tracked TabContexts. */
-export function getAllTabContexts() { return Array.from(tabContexts.values()); }
+export function getAllTabContexts() { return [...tabContexts.values()]; }
 
 /** Returns the number of tracked tabs. */
 export function getTabCount() { return tabContexts.size; }
@@ -54,7 +54,7 @@ export function getTabCount() { return tabContexts.size; }
 export async function openTab(url, label) {
   // LRU eviction: if at limit, remove oldest non-active tab
   if (tabContexts.size >= TAB_LIMIT) {
-    const entries = Array.from(tabContexts.entries())
+    const entries = [...tabContexts.entries()]
       .filter(([id]) => id !== activeTabId)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
     if (entries[0]?.[0]) {
@@ -153,7 +153,7 @@ export async function closeTab(tabId) {
  * Used at agent loop end.
  */
 export async function closeAllAgentTabs() {
-  const closable = Array.from(tabContexts.entries())
+  const closable = [...tabContexts.entries()]
     .filter(([, ctx]) => ctx.isAgentCreated);
   for (const [tabId] of closable) {
     try { await chrome.tabs.remove(tabId); } catch (_e) { console.warn('[Sentinel/tab-context] close tab error:', getErrorMessage(_e)); }

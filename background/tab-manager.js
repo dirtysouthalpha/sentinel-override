@@ -574,7 +574,7 @@ function installDetachListenerOnce() {
  * Call from agent-engine cleanup paths (loop end, stop, error).
  */
 export async function detachAllDebuggees() {
-  const ids = Array.from(attachedDebuggees);
+  const ids = [...attachedDebuggees];
   attachedDebuggees.clear();
   for (const tabId of ids) {
     try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* may already be gone */ }
