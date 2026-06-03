@@ -62,7 +62,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
   let subPagesBlock = '';
   try {
     if (Array.isArray(profile.pageTypes) && profile.pageTypes.length) {
-      const lines = profile.pageTypes.map(pt => pt && pt.name && pt.hint ? `  ${pt.name}: ${pt.hint}` : null).filter(Boolean);
+      const lines = profile.pageTypes.filter(pt => pt && pt.name && pt.hint).map(pt => `  ${pt.name}: ${pt.hint}`);
       if (lines.length) {
         subPagesBlock = `\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n${lines.join('\n')}`;
       }
