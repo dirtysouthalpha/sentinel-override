@@ -211,7 +211,7 @@ export function sendActionMessage(command, stepNumber, observation) {
       text: enrichedText,
       code: enrichedCode,
       targetText: resolvedText,
-      reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length > 0)
+      reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length)
         ? command.__reasoning.substring(0, 600) : undefined
     }
   }).catch((e) => {

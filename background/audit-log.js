@@ -44,7 +44,7 @@ export async function appendAuditEntry(runId, entry) {
       const persisted = Array.isArray(stored[key]) ? stored[key] : [];
       // Splice persisted entries to front so they precede any concurrent entries
       // already pushed during the await (preserves chronological order).
-      if (persisted.length > 0) log.splice(0, 0, ...persisted);
+      if (persisted.length) log.splice(0, 0, ...persisted);
     }
     log.push({
       ts:      entry.ts      || Date.now(),

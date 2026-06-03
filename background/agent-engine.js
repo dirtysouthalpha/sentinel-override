@@ -1159,7 +1159,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (/virustotal/i.test(url)) portalsSeen.add('VirusTotal');
     }
     const memCount = Object.keys(agentMemory).length;
-    const lastAction = history.length > 0 ? history[history.length - 1] : null;
+    const lastAction = history.length ? history[history.length - 1] : null;
     const lines = [
       '📊 PROGRESS UPDATE — step ' + stepCount,
       'Portals visited: ' + (portalsSeen.size > 0 ? Array.from(portalsSeen).join(', ') : '(none yet)'),
@@ -1432,7 +1432,7 @@ async function _cdpObservePage(tabId) {
   const tabInfo = await getTabInfo(tabId);
   const currentUrl = tabInfo ? tabInfo.url : '';
   // In batch mode (queue has items), always use cache if available (no TTL limit)
-  const _inBatchMode = typeof _pendingCommandQueue !== 'undefined' && _pendingCommandQueue.length > 0;
+  const _inBatchMode = typeof _pendingCommandQueue !== 'undefined' && _pendingCommandQueue.length;
   const _cacheTTL = _inBatchMode ? 60000 : 30000; // 60s in batch mode, 30s normal
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
@@ -1455,7 +1455,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
   let totalRemoved = 0;
 
   // Phase 1: Click accept/agree buttons if we have overlay detection data
-  if (overlays && overlays.length > 0) {
+  if (overlays && overlays.length) {
     const acceptRegex = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
     for (const overlay of overlays) {
       const buttons = Array.isArray(overlay.buttons) ? overlay.buttons : [];
@@ -1466,12 +1466,12 @@ async function _cdpDismissOverlays(tabId, overlays) {
           dismissBtn = b;
           break; // Found accept button, use it immediately
         }
-        if (!dismissBtn && b && b.text && b.text.length > 0) {
+        if (!dismissBtn && b && b.text && b.text.length) {
           dismissBtn = b; // Track first fallback
         }
       }
       // Final fallback: first button if no other found
-      if (!dismissBtn && buttons.length > 0) {
+      if (!dismissBtn && buttons.length) {
         dismissBtn = buttons[0];
       }
       if (dismissBtn && dismissBtn.x && dismissBtn.y) {
@@ -1807,7 +1807,7 @@ function _splitTriedSection(summary) {
   const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
-  return matches.length ? matches : [(lines.length > 0 ? lines[0] : '').slice(0, 200)];
+  return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
 }
 
 function formatTicketKickoff(summary, goal, tech, options) {
@@ -3363,7 +3363,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Drain any mid-run context notes from the user and push them into history
       // so the LLM sees them on the very next call.
-      if (_pendingContextInjections.length > 0) {
+      if (_pendingContextInjections.length) {
         const notes = _pendingContextInjections.splice(0);
         for (const n of notes) {
           historyPush({ role: 'user', content: '📌 Technician note (mid-run): ' + n });
@@ -3611,7 +3611,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Send tab state to popup so user can see all managed tabs
       const allTabContexts = getAllTabContexts();
-      if (allTabContexts.length > 0) {
+      if (allTabContexts.length) {
         sendTabStateUpdate(allTabContexts);
       }
 
@@ -3704,7 +3704,7 @@ async function runAgentLoop(goal, workingTabId) {
       // AND the URL hasn't changed AND the DOM content hash matches (catches SPA
       // content changes without URL changes). On slow portals this halves step latency.
       let observation, pageContent;
-      const _prevAction = history.length > 0 ? history[history.length - 1] : null;
+      const _prevAction = history.length ? history[history.length - 1] : null;
       const _prevType = _prevAction && _prevAction.action ? _prevAction.action.type : '';
       const _nonMutating = /^(note|extract|extract_list|scroll|wait_for_text|wait_for_element|wait_for_navigation|read_page)$/.test(_prevType);
       const _obsUrl = (tabInfo && tabInfo.url) || '';
@@ -3762,7 +3762,7 @@ async function runAgentLoop(goal, workingTabId) {
               observation = { elements: cdpObs.elements || [] };
               pageContent = { content: cdpObs.text || '' };
               // Also check for overlays and auto-dismiss
-              if (cdpObs.overlays && cdpObs.overlays.length > 0) {
+              if (cdpObs.overlays && cdpObs.overlays.length) {
                 const dismissed = await _cdpDismissOverlays(tab, cdpObs.overlays);
                 if (dismissed > 0) {
                   sendSilentUpdate(`[CDP] Auto-dismissed ${dismissed} overlay(s) during observation`, stepCount);
@@ -4180,7 +4180,7 @@ async function runAgentLoop(goal, workingTabId) {
       // accumulated in history + consecutiveFailures + _lastAiCallMs.
       let _skillAutoCommand = null;
       try {
-        const _lastHistEntry = history.length > 0 ? history[history.length - 1] : null;
+        const _lastHistEntry = history.length ? history[history.length - 1] : null;
         const _lastResult = _lastHistEntry && typeof _lastHistEntry.result === 'string' ? _lastHistEntry.result : '';
         const _lastFailed = _lastResult.startsWith('BLOCKED:') ||
                             _lastResult.startsWith('Element not found') ||
@@ -4205,7 +4205,7 @@ async function runAgentLoop(goal, workingTabId) {
           productiveSteps
         };
         const _recovery = runRecoverySkills(_skillCtx);
-        if (_recovery.appliedSkillIds.length > 0) {
+        if (_recovery.appliedSkillIds.length) {
           sendSilentUpdate('Recovery skills consulted: ' + _recovery.appliedSkillIds.join(', '), stepCount);
           tel.info('skill', 'Recovery skills fired: ' + _recovery.appliedSkillIds.join(', '), { autoApplied: !!_recovery.autoApply, autoApplyType: _recovery.autoApply ? _recovery.autoApply.type : null, lastResult: _skillCtx.lastResult });
           // Forensic log
@@ -4289,7 +4289,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           console.log('[Sentinel/v4] Vision observation starting...');
           const visionResult = await _visionObserve(tab, currentUrl);
-          if (visionResult.elements.length > 0) {
+          if (visionResult.elements.length) {
             _visionElements = visionResult.elements;
             _visionElementMap = new Map(visionResult.elements.map(e => [e.index, e]));
             _visionElementTree = visionResult.elementTree;
@@ -4348,7 +4348,7 @@ async function runAgentLoop(goal, workingTabId) {
       });
       let _aiCallError = null;
       // Drain one sub-command from the repeat_for_each queue before consulting LLM
-      if (_pendingCommandQueue.length > 0) {
+      if (_pendingCommandQueue.length) {
         clearInterval(progressTimer);
         base64Image = null;
         if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
@@ -4822,7 +4822,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Don't append raw memory to the summary — let the report generator handle it
         // Only include a clean reference if there's valuable data
         const cleanKeys = Object.keys(cleanMemory);
-        if (cleanKeys.length > 0) {
+        if (cleanKeys.length) {
           // Let the LLM's summary stand on its own — the report will incorporate the data
           finalSummary += '\n\n📊 **' + cleanKeys.length + ' data points collected** — full analysis in the report below.';
         }
@@ -4976,7 +4976,7 @@ async function runAgentLoop(goal, workingTabId) {
         // actually use these?" questions later. One info event with the
         // count + ids, individual suggestions visible by expanding payload.
         try {
-          if (_retrySuggestions.length > 0) {
+          if (_retrySuggestions.length) {
             tel.info('lifecycle', 'Retry suggestions: ' + _retrySuggestions.length + ' (' + _retrySuggestions.map(s => s.id).join(', ') + ')', {
               count: _retrySuggestions.length,
               suggestions: _retrySuggestions.map(s => ({ id: s.id, severity: s.severity, applyKeys: s.applyKeys })),
@@ -5146,7 +5146,7 @@ async function runAgentLoop(goal, workingTabId) {
           });
           const result = JSON.stringify(entries);
           sendActionMessage(command, stepCount, observation);
-          if (entries.length > 0) productiveSteps++;  // (3.8.0)
+          if (entries.length) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Console: ' + entries.length + ' entries', false);
           // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
           // tab-manager already emits a debug-level read summary; this one is
@@ -5170,7 +5170,7 @@ async function runAgentLoop(goal, workingTabId) {
           });
           const result = JSON.stringify(entries);
           sendActionMessage(command, stepCount, observation);
-          if (entries.length > 0) productiveSteps++;  // (3.8.0)
+          if (entries.length) productiveSteps++;  // (3.8.0)
           sendActionResult(stepCount, 'Network: ' + entries.length + ' requests', false);
           // (3.25.1) Telemetry: LLM-requested network read. Tag the failed
           // count so 4xx/5xx spikes during a run are easy to spot.
@@ -5224,7 +5224,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
           const _status = (_dohJson.Status === 0 || _dohJson.Status === 'NOERROR') ? 'NOERROR' : `RCODE ${_dohJson.Status ?? 'UNKNOWN'}`;
           const _result = JSON.stringify({ domain: _domain, recordType: _type, preset: _preset || null, status: _status, answers: _answers, authoritative: !!_dohJson.AA });
-          if (_answers.length > 0) productiveSteps++;
+          if (_answers.length) productiveSteps++;
           sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
@@ -5531,8 +5531,8 @@ async function runAgentLoop(goal, workingTabId) {
       // different strategy next step.
       const _targetableActions = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
       if (_targetableActions.has(command.type) && !command._visionAction) {
-        const _hasSelector = typeof command.selector === 'string' && command.selector.length > 0;
-        const _hasRef      = typeof command.ref === 'string' && command.ref.length > 0;
+        const _hasSelector = typeof command.selector === 'string' && command.selector.length;
+        const _hasRef      = typeof command.ref === 'string' && command.ref.length;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
         if (!_hasSelector && !_hasRef && !_hasCoords) {
           const _msg = 'BLOCKED: ' + command.type + ' command has no target — supply at least one of selector, ref, or x/y coords. The observation panel above lists usable selectors/refs.';
@@ -5550,7 +5550,7 @@ async function runAgentLoop(goal, workingTabId) {
       // SPEED (v3.60): Handle batch actions — execute multiple actions without re-observing
       if (command.type === 'batch' && Array.isArray(command.actions)) {
         const batchActions = command.actions.filter(a => a && a.type);
-        if (batchActions.length > 0) {
+        if (batchActions.length) {
           console.log('[Sentinel/SPEED] Batch: queuing ' + batchActions.length + ' actions');
           // Push in reverse so shift() gets them in order
           for (let i = batchActions.length - 1; i >= 0; i--) {
@@ -5788,7 +5788,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (/^extract(_list)?$/.test(command.type)) {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        result = (typeof res === 'string' && res.length > 0) ? res : 'Error: no response from content script';
+        result = (typeof res === 'string' && res.length) ? res : 'Error: no response from content script';
         let extractSucceeded = false;
         try {
           if (!result || typeof result !== 'string') {
@@ -6484,7 +6484,7 @@ async function runAgentLoop(goal, workingTabId) {
         _recoveryMsg += '- Read the page text content and extract what you need without interacting\n\n';
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
-        if (_smartStrats.length > 0) {
+        if (_smartStrats.length) {
           _recoveryMsg += 'SMART STRATEGIES for this page:\n' + _smartStrats.map(s => '→ ' + s).join('\n') + '\n';
         }
         historyPush({
@@ -6597,7 +6597,7 @@ async function runAgentLoop(goal, workingTabId) {
             },
             result: typeof result === 'string' ? result.substring(0, 500) : JSON.stringify(result || '').substring(0, 500),
             failed: !!actionFailed,
-            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length > 0) ? command.__reasoning.substring(0, 400) : undefined,
+            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length) ? command.__reasoning.substring(0, 400) : undefined,
             screenshot: _stepScreenshots.get(stepCount) || undefined,
           });
           // Keep last 200 entries; older ones get rolled into a summary.

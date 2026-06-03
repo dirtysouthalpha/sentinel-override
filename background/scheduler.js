@@ -195,7 +195,7 @@ function computeNextRun(recurrence) {
     return candidate.getTime();
   }
 
-  if (recurrence.interval === 'weekly' && recurrence.daysOfWeek && Array.isArray(recurrence.daysOfWeek) && recurrence.daysOfWeek.length > 0) {
+  if (recurrence.interval === 'weekly' && recurrence.daysOfWeek && Array.isArray(recurrence.daysOfWeek) && recurrence.daysOfWeek.length) {
     const daysAhead = _computeWeeklyDaysAhead(recurrence.daysOfWeek, now.getDay(), candidate.getTime(), now.getTime());
     candidate.setDate(candidate.getDate() + daysAhead);
     return candidate.getTime();
@@ -398,7 +398,7 @@ export async function deleteSchedule(id) {
   for (const rid of resultIds) {
     delete results[rid];
   }
-  if (resultIds.length > 0) {
+  if (resultIds.length) {
     await saveResults(results);
   }
 }

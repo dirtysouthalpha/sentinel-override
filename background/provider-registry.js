@@ -18,7 +18,7 @@ import { getErrorMessage } from './error-utils.js';
 function _cacheLastTool(tools) {
   if (!tools || !Array.isArray(tools) || tools.length === 0) return tools;
   const copy = tools.slice();
-  if (copy.length > 0) {
+  if (copy.length) {
     copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };
   }
   return copy;
@@ -344,13 +344,13 @@ export const PROVIDERS = {
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices && Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
+      const choice = data.choices && Array.isArray(data.choices) && data.choices.length ? data.choices[0] : null;
       if (!choice || !choice.message) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
       const msg = choice.message;
       // Extract tool_calls from the response
-      if (msg.tool_calls && msg.tool_calls.length > 0) {
+      if (msg.tool_calls && msg.tool_calls.length) {
         const tc = msg.tool_calls[0];
         if (tc.function && tc.function.name) {
           let input = {};
@@ -478,12 +478,12 @@ export const PROVIDERS = {
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
-      const choice = data.choices && Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
+      const choice = data.choices && Array.isArray(data.choices) && data.choices.length ? data.choices[0] : null;
       if (!choice || !choice.message) {
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }
       const msg = choice.message;
-      if (msg.tool_calls && msg.tool_calls.length > 0) {
+      if (msg.tool_calls && msg.tool_calls.length) {
         const tc = msg.tool_calls[0];
         if (tc.function && tc.function.name) {
           let input = {};

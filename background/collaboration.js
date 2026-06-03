@@ -139,7 +139,7 @@ export function validateImport(importedData) {
 
     // Safety scan
     const scanResult = scanForDangerousPatterns(t.goal);
-    if (scanResult.length > 0) {
+    if (scanResult.length) {
       result.errors.push(`Template "${t.name}": ${scanResult.map(s => s.reason).join('; ')}`);
       return;
     }
@@ -149,7 +149,7 @@ export function validateImport(importedData) {
     if (Array.isArray(t.tags)) {
       t.tags.forEach(tag => {
         const tagScan = scanForDangerousPatterns(typeof tag === 'string' ? tag : String(tag));
-        if (tagScan.length > 0) {
+        if (tagScan.length) {
           result.errors.push(`Template "${t.name}" tag "${tag}": ${tagScan.map(s => s.reason).join('; ')}`);
           hasDangerousTag = true;
         }
@@ -168,7 +168,7 @@ export function validateImport(importedData) {
   });
 
   result.templates = validated;
-  result.safe = result.errors.length === 0 && validated.length > 0;
+  result.safe = !result.errors.length && !!validated.length;
   return result;
 }
 

@@ -1687,8 +1687,8 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   agentState.model = model; // needed by _buildAgentPrompt → supportsVision
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
-  const last_action = Array.isArray(history) && history.length > 0 ? history[history.length - 1].action : null;
-  const last_result = Array.isArray(history) && history.length > 0 ? history[history.length - 1].result : null;
+  const last_action = Array.isArray(history) && history.length ? history[history.length - 1].action : null;
+  const last_result = Array.isArray(history) && history.length ? history[history.length - 1].result : null;
 
   // Runbook detection
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
@@ -1738,13 +1738,13 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 
   // Self-learning: inject relevant patterns
   const patterns = await getRelevantPatterns(goal);
-  const patternCtx = Array.isArray(patterns) && patterns.length > 0
+  const patternCtx = Array.isArray(patterns) && patterns.length
     ? `\nPAST SUCCESSFUL PATTERNS (similar tasks):\n${patterns.map((p, i) => p && p.goal ? `${i+1}. "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s.type).join(' -> ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
   // Memory context
   const memoryKeys = Object.keys(agentState?.agentMemory || {});
-  const memoryCtx = memoryKeys.length > 0
+  const memoryCtx = memoryKeys.length
     ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState?.agentMemory || {}, null, 2)}\n`
     : '';
 
@@ -1920,8 +1920,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       }
     }
     // OpenAI-compatible: check for tool_calls in the response message
-    const choice = Array.isArray(data.choices) && data.choices.length > 0 ? data.choices[0] : null;
-    const hasToolCalls = choice && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0;
+    const choice = Array.isArray(data.choices) && data.choices.length ? data.choices[0] : null;
+    const hasToolCalls = choice && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length;
     if (hasToolCalls) {
       try {
         return provider.parseToolUseResponse(data);
@@ -1940,7 +1940,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     }
     // If we get here, the model returned tool_calls but parsing failed AND text fallback failed
     // One last attempt: try the raw tool_calls directly
-    if (hasToolCalls && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length > 0) {
+    if (hasToolCalls && choice.message && Array.isArray(choice.message.tool_calls) && choice.message.tool_calls.length) {
       const tc = choice.message.tool_calls[0];
       if (tc && tc.function && tc.function.name) {
         try {

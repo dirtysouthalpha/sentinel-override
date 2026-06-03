@@ -136,7 +136,7 @@ export async function closeTab(tabId) {
 
   if (wasActive) {
     const remaining = Array.from(tabContexts.keys());
-    if (remaining.length > 0) {
+    if (remaining.length) {
       setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
       return;
     }
@@ -250,7 +250,7 @@ export function handleTabRemoved(tabId) {
 
   if (wasActive) {
     const remaining = Array.from(tabContexts.keys());
-    if (remaining.length > 0) {
+    if (remaining.length) {
       setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
       return;
     }
