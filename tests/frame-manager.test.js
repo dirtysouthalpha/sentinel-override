@@ -60,7 +60,7 @@ function setupFrameManagerEnv() {
   globalThis.window.__sentinelUtils.dom = {
     scanDocument: (doc, elements, selectorMap, prefix) => {
       // Mock scan to add a few elements
-      if (doc && doc.mockElements) {
+      if (doc && doc.mockElements && Array.isArray(doc.mockElements)) {
         doc.mockElements.forEach((el, i) => {
           const wrapped = { ...el, selector: prefix + 'el:' + i };
           elements.push(wrapped);
