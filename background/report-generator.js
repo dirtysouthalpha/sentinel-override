@@ -465,8 +465,7 @@ export function buildFallbackReport(executionData) {
   if (!executionData) return 'Report generation failed: no execution data available.';
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 
-  const memoryLines = Object.keys(agentMemory || {}).map(k => {
-    const val = agentMemory[k];
+  const memoryLines = Object.entries(agentMemory || {}).map(([k, val]) => {
     const valStr = Array.isArray(val)
       ? `${val.length} items: ${val.slice(0, 5).map(v => String(v).substring(0, 100)).join(', ')}`
       : (val !== null && typeof val === 'object')
