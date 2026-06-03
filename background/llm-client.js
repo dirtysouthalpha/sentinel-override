@@ -932,7 +932,7 @@ export async function generatePlan(goal, settings, context = {}) {
       return [(goal || 'Complete the task').substring(0, 300)];
     }
     const data = await response.json();
-    if (!data || typeof data !== 'object' || data === null) throw new Error('Plan API returned invalid response body');
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Plan API returned invalid response body');
     // Early detection of auth errors from providers that return HTTP 200 with error payloads
     if ((!data.choices || !data.choices.length) && (data.error || data.msg || (data.code && data.success === false))) {
       const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);

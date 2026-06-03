@@ -103,7 +103,7 @@ function _collectUrlsVisited(history) {
  * @returns {{ memorySummary: string, citableKeysList: string }}
  */
 function _buildMemorySummary(agentMemory) {
-  if (!agentMemory || typeof agentMemory !== 'object' || agentMemory === null) {
+  if (!agentMemory || typeof agentMemory !== 'object' || Array.isArray(agentMemory)) {
     return { memorySummary: 'No usable data was extracted.', citableKeysList: '(none)' };
   }
   const memoryKeys = Object.keys(agentMemory);

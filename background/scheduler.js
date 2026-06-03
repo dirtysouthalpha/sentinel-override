@@ -281,7 +281,7 @@ function setBadge(status) {
  * @param {object} data
  */
 function _validateScheduleData(data) {
-  if (!data || typeof data !== 'object' || data === null) throw new Error('Schedule data must be an object');
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Schedule data must be an object');
   if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') throw new Error('Schedule name is required');
   if (!data.templateId && (!data.goal || typeof data.goal !== 'string' || data.goal.trim() === '')) {
     throw new Error('Either templateId or goal is required');
@@ -663,7 +663,7 @@ function _waitForAgentCompletion(timeoutMs) {
   }, timeoutMs);
 
   const listener = (msg) => {
-    if (!msg || typeof msg !== 'object' || msg === null) return;
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
     if (msg.action === 'agent_loop_complete') {
       clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(listener);

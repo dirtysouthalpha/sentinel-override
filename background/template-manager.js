@@ -129,7 +129,7 @@ export async function getTemplate(id) {
  * @returns {Promise<object>} The complete template object
  */
 export async function saveTemplate(templateData) {
-  if (!templateData || typeof templateData !== 'object' || templateData === null) {
+  if (!templateData || typeof templateData !== 'object' || Array.isArray(templateData)) {
     throw new Error('Template data must be an object');
   }
   if (!templateData.name || typeof templateData.name !== 'string' || templateData.name.trim() === '') {
@@ -175,7 +175,7 @@ export async function updateTemplate(id, updates) {
   if (!id || typeof id !== 'string') {
     throw new Error('Template ID is required');
   }
-  if (!updates || typeof updates !== 'object' || updates === null) {
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
     throw new Error('Update data must be an object');
   }
 

@@ -177,7 +177,7 @@ export function getSkillStats() {
  */
 export function runRecoverySkills(context) {
   const result = { autoApply: null, promptInjection: '', appliedSkillIds: [] };
-  if (!context || typeof context !== 'object' || context === null) return result;
+  if (!context || typeof context !== 'object' || Array.isArray(context)) return result;
 
   _recordPendingOutcomes(context);
 
