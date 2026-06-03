@@ -4118,11 +4118,11 @@ async function runAgentLoop(goal, workingTabId) {
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
       const recentTabActions = history.slice(-5).filter(h => h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
-      const isMakingProgress = recentTabActions > 0 || Object.keys(agentMemory || {}).length > 0;
+      const memCount = Object.keys(agentMemory || {}).length;
+      const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
       } else if (stepCount >= 20 && !loopDirective) {
-        const memCount = Object.keys(agentMemory || {}).length;
         loopDirective = memCount > 0
           ? '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. You have ' + memCount + ' extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n'
           : '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n';
@@ -4133,7 +4133,6 @@ async function runAgentLoop(goal, workingTabId) {
       //    from collected memory instead of just being broken out of.
       const _softCap = Math.max(40, dynamicMaxSteps - 5);
       if (stepCount >= _softCap) {
-        const memCount = Object.keys(agentMemory || {}).length;
         const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
           const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
           return '- ' + k + ': ' + vStr;
