@@ -137,6 +137,7 @@ export default [
         exportFormatSelect: 'readonly',
         isValidUrl: 'readonly',
         executeCommand: 'readonly',
+        getErrorMessage: 'readonly',
       },
     },
   },
