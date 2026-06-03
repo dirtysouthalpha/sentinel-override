@@ -69,7 +69,7 @@ function clearFrameMap(tabId) {
 export async function enumerateFrames(tabId) {
   try {
     const frames = await chrome.webNavigation.getAllFrames({ tabId });
-    if (!frames || frames.length === 0) return [];
+    if (!frames || !frames.length) return [];
 
     // Get the main frame URL for cross-origin detection
     const mainFrame = frames.find(f => f.frameId === 0);

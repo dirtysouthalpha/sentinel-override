@@ -77,7 +77,7 @@ function renderTenantChip(tenant, expected) {
   chip.style.display = 'inline-flex';
 
   // Match logic — case-insensitive substring match against any signal.
-  if (expected && typeof expected === 'string' && expected.trim()) {
+  if (typeof expected === 'string' && expected.trim()) {
     const expLow = expected.trim().toLowerCase();
     const signals = [
       tenant.chipText || '',

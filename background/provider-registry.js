@@ -1029,7 +1029,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
       }
     }
   }
-  if (ids.length === 0) {
+  if (!ids.length) {
     throw new Error('Could not parse models from response: ' + JSON.stringify(data).slice(0, 240));
   }
   return ids.sort();

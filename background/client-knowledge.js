@@ -320,7 +320,7 @@ export async function formatPromptSection(clientId, currentUrl) {
   const c = state.clients[clientId];
   if (!c) return '';
   const relevant = await getRelevantEntries(clientId, currentUrl);
-  if (relevant.length === 0) return '';
+  if (!relevant.length) return '';
   const lines = relevant.map((e, i) => `${i + 1}. ${e.wisdom}`).join('\n');
   return `\n## CLIENT-SPECIFIC KNOWLEDGE for ${c.displayName}\nThese are facts learned from previous runs for this specific client. Treat as authoritative for THIS run unless the page actively contradicts them:\n\n${lines}\n`;
 }

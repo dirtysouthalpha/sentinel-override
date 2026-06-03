@@ -220,7 +220,7 @@ function _scheduleFlush() {
 }
 
 async function _flushRunBuffer() {
-  if (!_persistEnabled || !_currentRunId || _runBuffer.length === 0) return;
+  if (!_persistEnabled || !_currentRunId || !_runBuffer.length) return;
   const key = 'telemetry_run_' + _currentRunId;
   try {
     const stored = await chrome.storage.local.get(key);

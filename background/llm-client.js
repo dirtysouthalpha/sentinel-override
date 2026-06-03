@@ -1335,7 +1335,7 @@ function _buildPlanCtx(agentPlan, currentPlanStep) {
 function _buildTabCtx() {
   const allContexts = getAllTabContexts();
   const activeId = getActiveTabId();
-  if (allContexts.length === 0) return '';
+  if (!allContexts.length) return '';
   let tabCtxSection = `\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`;
   for (const ctx of allContexts) {
     const isActive = ctx.tabId === activeId;

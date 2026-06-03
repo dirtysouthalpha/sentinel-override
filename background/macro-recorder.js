@@ -211,7 +211,7 @@ export async function stopRecording(name = 'Recorded Macro', description = '') {
   _recording = false;
   const steps = [..._recordedSteps];
   _recordedSteps = [];
-  if (steps.length === 0) return null;
+  if (!steps.length) return null;
   return createMacro(name, description, steps);
 }
 

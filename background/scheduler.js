@@ -165,7 +165,7 @@ function clearAlarm(scheduleId) {
  * @returns {number} Days ahead until next matching day
  */
 function _computeWeeklyDaysAhead(daysOfWeek, currentDay, candidateTime, nowTime) {
-  if (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0) return 7;
+  if (!Array.isArray(daysOfWeek) || !daysOfWeek.length) return 7;
   const sortedDays = daysOfWeek.slice().sort((a, b) => a - b);
   let daysAhead = 0;
   for (const day of sortedDays) {

@@ -512,7 +512,7 @@ export function resetAgentState() {
  * @returns {Promise<{ success: boolean, description: string }|{ success: boolean, reason: string }>}
  */
 export async function undoLastAction() {
-  if (undoStack.length === 0) {
+  if (!undoStack.length) {
     return { success: false, reason: 'Nothing to undo' };
   }
   const entry = undoStack.pop();
@@ -1079,7 +1079,7 @@ const HISTORY_SUMMARIZE_THRESHOLD = 30;
 const HISTORY_SUMMARIZE_BATCH = 15;
 
 function summarizeHistoryBatch(batch) {
-  if (!batch || batch.length === 0) return null;
+  if (!batch || !batch.length) return null;
   const firstValid = batch.find(h => h && h.step !== undefined);
   let lastValid = null;
   for (let i = batch.length - 1; i >= 0; i--) {
@@ -1276,7 +1276,7 @@ async function detachAllSentinelTabs() {
   const ids = Array.from(agentAttachedTabs);
   agentAttachedTabs.clear();
   agentTabGroupId = null;
-  if (ids.length === 0) return;
+  if (!ids.length) return;
   try {
     await chrome.tabs.ungroup(ids);
   } catch (_e) {
