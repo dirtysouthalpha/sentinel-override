@@ -5,6 +5,7 @@
 
 import { sendTabStateUpdate } from './message-protocol.js';
 import { waitForPageLoad, getTabInfo } from './tab-manager.js';
+import { getErrorMessage } from './error-utils.js';
 
 // ========== Constants ==========
 export const TAB_LIMIT = 10;
@@ -57,7 +58,7 @@ export async function openTab(url, label) {
       .filter(([id]) => id !== activeTabId)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
     if (entries[0]?.[0]) {
-      try { await closeTab(entries[0][0]); } catch (e) { console.warn('[Sentinel/tab-context] LRU eviction failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+      try { await closeTab(entries[0][0]); } catch (e) { console.warn('[Sentinel/tab-context] LRU eviction failed:', getErrorMessage(e)); }
     }
   }
 
@@ -65,7 +66,7 @@ export async function openTab(url, label) {
   try {
     tab = await chrome.tabs.create({ url, active: false }); // Don't steal focus
   } catch (e) {
-    console.error('[Sentinel/tab-context] Failed to open tab for', url, ':', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    console.error('[Sentinel/tab-context] Failed to open tab for', url, ':', getErrorMessage(e));
     return null;
   }
   const ctx = {
@@ -84,7 +85,7 @@ export async function openTab(url, label) {
   tabContexts.set(tab.id, ctx);
 
   // Wait for the page to load before returning
-  try { await waitForPageLoad(tab.id); } catch (_e) { console.warn('[Sentinel/tab-context] waitForPageLoad error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
+  try { await waitForPageLoad(tab.id); } catch (_e) { console.warn('[Sentinel/tab-context] waitForPageLoad error:', getErrorMessage(_e)); }
 
   // Update URL/title from the actual loaded page
   try {
@@ -93,7 +94,7 @@ export async function openTab(url, label) {
       ctx.url = info.url || url;
       ctx.title = info.title || '';
     }
-  } catch (_e) { console.warn('[Sentinel/tab-context] getTabInfo error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
+  } catch (_e) { console.warn('[Sentinel/tab-context] getTabInfo error:', getErrorMessage(_e)); }
 
   setActiveTab(ctx.tabId);
   return ctx;
@@ -152,7 +153,7 @@ export async function closeAllAgentTabs() {
   const closable = Array.from(tabContexts.entries())
     .filter(([, ctx]) => ctx.isAgentCreated);
   for (const [tabId] of closable) {
-    try { await chrome.tabs.remove(tabId); } catch (_e) { console.warn('[Sentinel/tab-context] close tab error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
+    try { await chrome.tabs.remove(tabId); } catch (_e) { console.warn('[Sentinel/tab-context] close tab error:', getErrorMessage(_e)); }
   }
   tabContexts.clear();
   activeTabId = null;
