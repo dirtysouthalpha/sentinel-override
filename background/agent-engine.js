@@ -656,7 +656,7 @@ export async function startAgent(goal, sender) {
   if (!sender.tab || !sender.tab.id) {
     const tabs = await new Promise(resolve => {
       chrome.tabs.query({active: true, currentWindow: true}, (t) => {
-        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
           console.error('[startAgent] tabs.query failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
           resolve([]);
         } else {
@@ -3461,7 +3461,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('Agent tab lost. Attempting recovery...', stepCount);
         const allTabs = await new Promise(resolve => {
           chrome.tabs.query({}, (t) => {
-            if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+            if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
               console.error('[Agent recovery] tabs.query failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
               resolve([]);
             } else {
@@ -6343,7 +6343,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
-              if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+              if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
                 console.error('[New tab detection] tabs.query failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                 resolve([]);
               } else {
@@ -6679,7 +6679,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
-              if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+              if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
                 console.error('[Tab recovery] tabs.query failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
                 resolve([]);
               } else {
