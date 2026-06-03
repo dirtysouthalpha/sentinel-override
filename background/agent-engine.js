@@ -2440,7 +2440,7 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
   };
   var goalLower = typeof goal === 'string' ? goal.toLowerCase() : '';
   var urlLower = typeof url === 'string' ? url.toLowerCase() : '';
-  for (var site in siteUrls) {
+  for (const site of Object.keys(siteUrls)) {
     if (goalLower.includes(site) && !urlLower.includes(site)) {
       var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
       if (qm && qm[1]) {
