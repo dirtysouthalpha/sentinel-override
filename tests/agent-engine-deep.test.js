@@ -543,7 +543,7 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('192.168.1.100');
-    expect(stored[0].goal).toContain('[ip]');
+    expect(stored[0].goal).toContain('[REDACTED:ip]');
   });
 
   test('scrubs email addresses from goal', async () => {
@@ -551,7 +551,7 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('user@example.com');
-    expect(stored[0].goal).toContain('[email]');
+    expect(stored[0].goal).toContain('[REDACTED:email]');
   });
 
   test('scrubs ticket numbers from goal', async () => {
@@ -559,14 +559,14 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('#12345');
-    expect(stored[0].goal).toContain('[ticket]');
+    expect(stored[0].goal).toContain('[REDACTED:ticket]');
   });
 
   test('scrubs INC ticket numbers', async () => {
     await saveLearnedPattern('Review incident INC0001234', [], true);
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
-    expect(stored[0].goal).toContain('[ticket]');
+    expect(stored[0].goal).toContain('[REDACTED:ticket]');
   });
 
   test('scrubs double-quoted strings from goal', async () => {
@@ -574,7 +574,7 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('Acme Corp');
-    expect(stored[0].goal).toContain('"[client]"');
+    expect(stored[0].goal).toContain('"[REDACTED:client]"');
   });
 
   test('scrubs single-quoted strings from goal', async () => {
@@ -582,7 +582,7 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('Acme Corp');
-    expect(stored[0].goal).toContain("'[client]'");
+    expect(stored[0].goal).toContain("'[REDACTED:client]'");
   });
 
   test('stores pattern with steps from history', async () => {

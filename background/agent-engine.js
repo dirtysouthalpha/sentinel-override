@@ -6727,11 +6727,11 @@ async function saveLearnedPattern(goal, history, success) {
     // strings (often client names) are replaced with safe placeholders so
     // chrome.storage.local doesn't accumulate identifiable client data.
     const _scrubPii = (str) => String(str)
-      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[ip]')
-      .replace(/[\w.+-]+@[\w.-]+/g, '[email]')
-      .replace(/(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi, '[ticket]')
-      .replace(/"[^"]{2,60}"/g, '"[client]"')
-      .replace(/'[^']{2,60}'/g, "'[client]'");
+      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[REDACTED:ip]')
+      .replace(/[\w.+-]+@[\w.-]+/g, '[REDACTED:email]')
+      .replace(/(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi, '[REDACTED:ticket]')
+      .replace(/"[^"]{2,60}"/g, '"[REDACTED:client]"')
+      .replace(/'[^']{2,60}'/g, "'[REDACTED:client]'");
     patterns.push({
       goal: _scrubPii(goal.substring(0, 100)),
       steps: history.filter(h => h.action).map(h => ({ type: h.action.type, selector: h.action.selector })),

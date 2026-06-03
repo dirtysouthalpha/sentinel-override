@@ -1139,31 +1139,31 @@ describe('agent-engine — tenant lockdown reference tests', () => {
 describe('agent-engine — PII scrubbing reference tests', () => {
   function scrubPii(str) {
     return String(str)
-      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[ip]')
-      .replace(/[\w.+\-]+@[\w.\-]+/g, '[email]')
-      .replace(/\b(?:TKT|TICKET|INC|INCIDENT|SR|#)\s*\d+/gi, '[ticket]')
-      .replace(/"[^"]{2,60}"/g, '"[client]"')
-      .replace(/'[^']{2,60}'/g, "'[client]'");
+      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[REDACTED:ip]')
+      .replace(/[\w.+\-]+@[\w.\-]+/g, '[REDACTED:email]')
+      .replace(/\b(?:TKT|TICKET|INC|INCIDENT|SR|#)\s*\d+/gi, '[REDACTED:ticket]')
+      .replace(/"[^"]{2,60}"/g, '"[REDACTED:client]"')
+      .replace(/'[^']{2,60}'/g, "'[REDACTED:client]'");
   }
 
   test('scrubs IP addresses', () => {
-    expect(scrubPii('Server at 192.168.1.100 is down')).toBe('Server at [ip] is down');
+    expect(scrubPii('Server at 192.168.1.100 is down')).toBe('Server at [REDACTED:ip] is down');
   });
 
   test('scrubs email addresses', () => {
-    expect(scrubPii('Contact admin@example.com')).toBe('Contact [email]');
+    expect(scrubPii('Contact admin@example.com')).toBe('Contact [REDACTED:email]');
   });
 
   test('scrubs ticket numbers', () => {
-    expect(scrubPii('See ticket 12345')).toBe('See [ticket]');
+    expect(scrubPii('See ticket 12345')).toBe('See [REDACTED:ticket]');
   });
 
   test('scrubs INC numbers', () => {
-    expect(scrubPii('Refer to INC12345')).toBe('Refer to [ticket]');
+    expect(scrubPii('Refer to INC12345')).toBe('Refer to [REDACTED:ticket]');
   });
 
   test('scrubs quoted client names', () => {
-    expect(scrubPii('Client "Acme Corp" reported')).toBe('Client "[client]" reported');
+    expect(scrubPii('Client "Acme Corp" reported')).toBe('Client "[REDACTED:client]" reported');
   });
 
   test('scrubs all PII types at once', () => {
@@ -1171,10 +1171,10 @@ describe('agent-engine — PII scrubbing reference tests', () => {
     expect(result).not.toContain('admin@corp.com');
     expect(result).not.toContain('10.0.0.1');
     expect(result).not.toContain('ticket 999');
-    expect(result).toContain('[email]');
-    expect(result).toContain('[ip]');
-    expect(result).toContain('[ticket]');
-    expect(result).toContain('[client]');
+    expect(result).toContain('[REDACTED:email]');
+    expect(result).toContain('[REDACTED:ip]');
+    expect(result).toContain('[REDACTED:ticket]');
+    expect(result).toContain('[REDACTED:client]');
   });
 });
 
