@@ -50,7 +50,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     if (el.isContentEditable) {
       // Check for rich content indicators (has formatting child elements)
       const richChildren = el.querySelectorAll('b, i, a, br, strong, em, u, span, div, p, h1, h2, h3, ul, ol, li, img');
-      if (richChildren.length > 0) return true;
+      if (richChildren.length) return true;
 
       // Check for known editor container classes on self or parents
       const classStr = (el.className || '').toLowerCase();

@@ -284,7 +284,7 @@ function importClientFromFile() {
   input.type = 'file';
   input.accept = '.json,application/json';
   input.onchange = async (e) => {
-    const file = e.target.files && e.target.files.length > 0 && e.target.files[0];
+    const file = e.target.files && e.target.files.length && e.target.files[0];
     if (!file) return;
     try {
       const text = await file.text();

@@ -54,7 +54,7 @@ function openImportDialog() {
   if (document.body) document.body.appendChild(input);
 
   input.addEventListener('change', async (e) => {
-    const file = e.target.files && e.target.files.length > 0 && e.target.files[0];
+    const file = e.target.files && e.target.files.length && e.target.files[0];
     if (!file) return;
 
     try {

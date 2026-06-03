@@ -42,7 +42,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     while (Date.now() - startTime < TIMEOUT) {
       if (wait.sleep) await wait.sleep(POLL_INTERVAL);
       const options = dd.findDropdownOptions(doc, triggerEl);
-      if (options && options.length > 0) {
+      if (options && options.length) {
         return options;
       }
     }
@@ -112,9 +112,9 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
             const localContainers = cursor.querySelectorAll(
               '[role="listbox"], [role="menu"], [role="combobox"]'
             );
-            if (localContainers.length > 0 && typeof localContainers.forEach === 'function') {
+            if (localContainers.length && typeof localContainers.forEach === 'function') {
               localContainers.forEach(addAllFromContainer);
-              if (options.length > 0) break;
+              if (options.length) break;
             }
             cursor = cursor.parentElement;
             depth++;
@@ -124,7 +124,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     }
 
     // If scoped lookup found options, return them now (skip doc-wide).
-    if (options.length > 0) {
+    if (options.length) {
       return options.filter(function(el) { return dom.isVisible && dom.isVisible(el); });
     }
 
@@ -399,13 +399,13 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         const siblingContainers = parent.querySelectorAll(
           '[role="listbox"], [role="option"], .dropdown-menu, .select-options, .menu'
         );
-        if (siblingContainers.length > 0) return true;
+        if (siblingContainers.length) return true;
 
         // Check children
         const childContainers = el.querySelectorAll(
           '.dropdown-menu, .select-options'
         );
-        if (childContainers.length > 0) return true;
+        if (childContainers.length) return true;
       }
     } catch { /* querySelectorAll may fail on detached elements */ }
 
@@ -454,7 +454,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
   // Looks for a search/filter input within the dropdown container.
   dd._findSearchInput = function(doc, optionEls) {
     // Look for an input near the first option
-    if (optionEls && optionEls.length > 0) {
+    if (optionEls && optionEls.length) {
       const firstOption = optionEls[0];
       try {
         const container = firstOption.closest('[role="listbox"], .dropdown-menu, .select-options, .menu, .autocomplete-list');

@@ -2012,7 +2012,7 @@ if (window.__sentinelInitialized) {
         if (dd) {
           await wait.sleep(500);
           const subItems = dd.findDropdownOptions(targetDoc, el);
-          if (subItems && subItems.length > 0) {
+          if (subItems && subItems.length) {
             const submenuTexts = subItems
               .map(item => (item.innerText || item.textContent || '').trim())
               .filter(t => t.length > 0)
