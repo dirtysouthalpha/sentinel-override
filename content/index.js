@@ -1380,7 +1380,7 @@ if (window.__sentinelInitialized) {
         // Get element center for click indicator
         try {
           const rect = el.getBoundingClientRect();
-          if (!rect || rect.width === 0 || rect.height === 0) throw new Error('Unable to get element bounding rect');
+          if (!rect || !rect.width || !rect.height) throw new Error('Unable to get element bounding rect');
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
         } catch (e) { console.warn('[Sentinel] click indicator rect:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 
@@ -1422,7 +1422,7 @@ if (window.__sentinelInitialized) {
           }
         } catch (e) { console.warn('[Sentinel] cursor right_click:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
         var rcRect = rcEl.getBoundingClientRect();
-        if (!rcRect || rcRect.width === 0 || rcRect.height === 0) return 'Error: unable to get bounding rect for right_click';
+        if (!rcRect || !rcRect.width || !rcRect.height) return 'Error: unable to get bounding rect for right_click';
         var rcX = Math.round(rcRect.left + rcRect.width / 2);
         var rcY = Math.round(rcRect.top + rcRect.height / 2);
         if (!targetDoc.defaultView) return 'Error: no window context for right_click dispatch';
@@ -1548,7 +1548,7 @@ if (window.__sentinelInitialized) {
 
         var srcRect = dragEl.getBoundingClientRect();
         var dstRect = dropEl.getBoundingClientRect();
-        if (!srcRect || !dstRect || srcRect.width === 0 || srcRect.height === 0 || dstRect.width === 0 || dstRect.height === 0) return 'Error: unable to get bounding rects for drag_and_drop';
+        if (!srcRect || !dstRect || !srcRect.width || !srcRect.height || !dstRect.width || !dstRect.height) return 'Error: unable to get bounding rects for drag_and_drop';
         var srcX = Math.round(srcRect.left + srcRect.width / 2);
         var srcY = Math.round(srcRect.top + srcRect.height / 2);
         var dstX = Math.round(dstRect.left + dstRect.width / 2);
@@ -2536,7 +2536,7 @@ if (window.__sentinelInitialized) {
 
         try {
           const r = el.getBoundingClientRect();
-          if (!r || r.width === 0 || r.height === 0) { console.warn('[Sentinel] scroll_to indicator: null or zero rect'); }
+          if (!r || !r.width || !r.height) { console.warn('[Sentinel] scroll_to indicator: null or zero rect'); }
           else if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
         } catch (e) { console.warn('[Sentinel] scroll_to indicator:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
         setTimeout(() => hl.removeHighlight(el), 1500);
