@@ -6,6 +6,28 @@
 const MONITOR_STORAGE_KEY = 'sentinel_monitors';
 const _CHECK_INTERVAL_MS = 30_000; // 30 seconds (reserved for future use)
 
+// ========== In-Memory Cache ==========
+let _cachedMonitors = null;
+let _loadMonitorsPromise = null;
+
+// Invalidate cache when storage changes externally
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes[MONITOR_STORAGE_KEY]) {
+      _cachedMonitors = null;
+      _loadMonitorsPromise = null;
+    }
+  });
+}
+
+/**
+ * Clear the in-memory cache. Exposed for testing.
+ */
+export function clearMonitorCache() {
+  _cachedMonitors = null;
+  _loadMonitorsPromise = null;
+}
+
 /**
  * @typedef {Object} PageMonitor
  * @property {string} id - UUID
@@ -26,21 +48,41 @@ function generateId() {
 
 /**
  * Load all monitors from storage.
+ * Uses in-memory cache to reduce I/O overhead.
  * @returns {Promise<PageMonitor[]>}
  */
 export async function loadMonitors() {
-  try {
-    const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
-    return result[MONITOR_STORAGE_KEY] || [];
-  } catch (e) {
-    console.error('[Sentinel/page-monitor] loadMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
-    return [];
+  // Return cached data if available
+  if (_cachedMonitors !== null) {
+    return _cachedMonitors;
   }
+
+  // Coalesce concurrent calls to avoid duplicate storage reads
+  if (_loadMonitorsPromise !== null) {
+    return _loadMonitorsPromise;
+  }
+
+  _loadMonitorsPromise = (async () => {
+    try {
+      const result = await chrome.storage.local.get(MONITOR_STORAGE_KEY);
+      _cachedMonitors = result[MONITOR_STORAGE_KEY] || [];
+      return _cachedMonitors;
+    } catch (e) {
+      console.error('[Sentinel/page-monitor] loadMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+      return [];
+    } finally {
+      _loadMonitorsPromise = null;
+    }
+  })();
+
+  return _loadMonitorsPromise;
 }
 
 async function saveMonitors(monitors) {
   try {
     await chrome.storage.local.set({ [MONITOR_STORAGE_KEY]: monitors });
+    // Update cache immediately after save
+    _cachedMonitors = monitors;
   } catch (e) {
     console.error('[Sentinel/page-monitor] saveMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     throw e;

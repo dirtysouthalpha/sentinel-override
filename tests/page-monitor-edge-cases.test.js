@@ -40,11 +40,13 @@ const {
   toggleMonitor,
   checkMonitor,
   runMonitorCycle,
+  clearMonitorCache,
 } = await import('../background/page-monitor.js');
 
 beforeEach(() => {
   storageData = {};
   jest.clearAllMocks();
+  clearMonitorCache();
   // Restore storage mock implementations
   chrome.storage.local.get.mockImplementation(async (keys) => {
     const key = typeof keys === 'string' ? keys : Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : Object.keys(keys || {})[0];
