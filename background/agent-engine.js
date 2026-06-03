@@ -3536,7 +3536,7 @@ async function runAgentLoop(goal, workingTabId) {
               urlMatch = ['go to ' + _step1Bare[1], _step1BareMap[_step1Key]];
             } else {
               for (const [k, v] of Object.entries(_step1BareMap)) {
-                if (_step1Key && typeof _step1Key === 'string' && typeof k === 'string' && (_step1Key.includes(k) || k.includes(_step1Key))) {
+                if (_step1Key.includes(k) || k.includes(_step1Key)) {
                   urlMatch = ['go to ' + _step1Bare[1], v];
                   break;
                 }
