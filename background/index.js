@@ -246,35 +246,6 @@ try {
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
 
-// ========== Side Panel Tab-Scoping (v3.53) ==========
-// During an agent run, the side panel should ONLY appear on tabs the agent
-// is actively using (attached tabs). All other tabs have it disabled.
-// Mirrors Claude's computer-use behavior — panel follows the agent window.
-
-async function _scopeSidePanelToAttachedTabs() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    const attached = getAttachedTabIds();
-    const attachedSet = new Set(attached);
-    for (const tab of allTabs) {
-      if (tab.id && !attachedSet.has(tab.id)) {
-        try { await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' }); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-}
-
-async function _enableSidePanelEverywhere() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    for (const tab of allTabs) {
-      if (tab.id) {
-        try { await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' }); } catch (_) {}
-      }
-    }
-  } catch (_) {}
-}
-
 // (v3.53) When user opens a new tab during agent run, immediately disable
 // the side panel on it — only agent-attached tabs should show the panel.
 chrome.tabs.onCreated.addListener((tab) => {
@@ -387,7 +358,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
         return { ok: true, models };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
       }
     }
     case 'check_resume_available': {
@@ -428,7 +399,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         });
         return await startAgent(result.goal, sender);
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
       }
     }
     case 'execute_js_approval_request': {
@@ -529,7 +500,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           }, 60000);
         });
       } catch (e) {
-        return { approved: false, reason: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
+        return { approved: false, reason: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
       }
     }
 
@@ -623,7 +594,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         try { await chrome.windows.update(match.windowId, { focused: true }); } catch (_e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
+        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
       }
     }
 
@@ -797,7 +768,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'schedule_clear_badge':
       { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-        console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
+        console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
       }); }
       return { cleared: true };
 
@@ -1006,7 +977,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab && typeof activeTab.id === 'number') {
               await chrome.sidePanel.open({ tabId: activeTab.id }).catch((e) => {
-                console.error('[attached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
+                console.error('[attached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
               });
             }
           } catch (_e) { /* no active tab — silently ignore */ }

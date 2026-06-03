@@ -543,7 +543,7 @@ describe('saveLearnedPattern', () => {
     const stored = storageData.learned_patterns;
     expect(stored.length).toBeGreaterThan(0);
     expect(stored[0].goal).not.toContain('192.168.1.100');
-    expect(stored[0].goal).toContain('XXX.XXX.XXX.XXX');
+    expect(stored[0].goal).toContain('[ip]');
   });
 
   test('scrubs email addresses from goal', async () => {
