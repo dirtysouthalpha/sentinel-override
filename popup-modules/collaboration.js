@@ -83,7 +83,10 @@ function openImportDialog() {
         showImportPreview(result, []);
       }
     } catch (err) {
-      showToast('Failed to read file: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))), 'error');
+      const errorMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+      // Distinguish between file read errors and JSON parse errors
+      const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Failed to read file';
+      showToast(prefix + ': ' + errorMsg, 'error');
     } finally {
       if (document.body && document.body.contains(input)) document.body.removeChild(input);
     }

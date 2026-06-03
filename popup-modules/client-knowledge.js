@@ -284,7 +284,10 @@ function importClientFromFile() {
         alert(res.error || 'Import failed');
       }
     } catch (err) {
-      alert('Import failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+      const errorMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+      // Distinguish between file read errors and JSON parse errors
+      const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Import failed';
+      alert(prefix + ': ' + errorMsg);
     }
   };
   input.click();
