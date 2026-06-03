@@ -121,8 +121,8 @@ function registerAlarm(schedule) {
     });
   } else {
     chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        console.warn('[Sentinel/scheduler] registerAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] registerAlarm lastError:', getErrorMessage(chrome.runtime.lastError));
       }
     });
   }
@@ -141,8 +141,8 @@ function clearAlarm(scheduleId) {
     });
   } else {
     chrome.alarms.clear(`schedule-${scheduleId}`, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        console.warn('[Sentinel/scheduler] clearAlarm lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] clearAlarm lastError:', getErrorMessage(chrome.runtime.lastError));
       }
     });
   }
@@ -226,15 +226,15 @@ function sendNotification(schedule, result) {
   const title = `Schedule ${schedule.name}`;
   let message;
 
+  const completedDate = result.completedAt && !Number.isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
+
   if (result.status === 'success') {
-    const completedDate = result.completedAt && !Number.isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
     message = `Completed successfully at ${completedDate.toLocaleTimeString()}.`;
     if (result.report && typeof result.report === 'string') {
       const snippet = result.report.substring(0, 150).replace(/\n/g, ' ');
       message += ` ${snippet}${result.report.length > 150 ? '...' : ''}`;
     }
   } else {
-    const completedDate = result.completedAt && !Number.isNaN(new Date(result.completedAt).getTime()) ? new Date(result.completedAt) : new Date();
     message = `Failed at ${completedDate.toLocaleTimeString()}.`;
     if (result.error && typeof result.error === 'string') {
       message += ` Error: ${result.error.substring(0, 100)}`;
@@ -517,8 +517,8 @@ export async function executeScheduledTask(alarmName) {
   try {
     goal = await _resolveGoalForSchedule(schedule);
   } catch (err) {
-    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
+    console.error(`Failed to resolve goal for schedule ${schedule.name}:`, getErrorMessage(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Goal resolution failed: ${getErrorMessage(err)}` });
     return;
   }
 
@@ -533,8 +533,8 @@ export async function executeScheduledTask(alarmName) {
   try {
     tabId = await _getOrCreateTab();
   } catch (err) {
-    console.error('Failed to get/create tab:', (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
+    console.error('Failed to get/create tab:', getErrorMessage(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Tab creation failed: ${getErrorMessage(err)}` });
     return;
   }
 
@@ -550,8 +550,8 @@ export async function executeScheduledTask(alarmName) {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
   } catch (err) {
     cancelCompletion(); // Clean up the timer + listener so they don't leak
-    console.error('Failed to start agent:', (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
-    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${(typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err)}` });
+    console.error('Failed to start agent:', getErrorMessage(err));
+    await _handleTaskFailure(schedule, scheduleId, schedules, { id: resultId, startedAt, error: `Agent start failed: ${getErrorMessage(err)}` });
     return;
   }
 
@@ -575,7 +575,7 @@ export async function executeScheduledTask(alarmName) {
     await storeResult(schedule, finalResult);
   } catch (e) {
     console.error('Failed to store scheduled task result:', getErrorMessage(e));
-    try { tel.error('scheduler', 'Failed to store result', { error: (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (typeof nestedErr === 'object' && nestedErr !== null && typeof nestedErr.message === 'string') ? nestedErr.message : String(nestedErr)); }
+    try { tel.error('scheduler', 'Failed to store result', { error: getErrorMessage(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', getErrorMessage(nestedErr)); }
   }
 
   schedule.lastRunAt = completedAt;
@@ -594,7 +594,7 @@ export async function executeScheduledTask(alarmName) {
     await saveSchedules(schedules);
   } catch (e) {
     console.error('Failed to save schedule state after execution:', getErrorMessage(e));
-    try { tel.error('scheduler', 'Failed to save schedule state', { error: (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', (typeof nestedErr === 'object' && nestedErr !== null && typeof nestedErr.message === 'string') ? nestedErr.message : String(nestedErr)); }
+    try { tel.error('scheduler', 'Failed to save schedule state', { error: getErrorMessage(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', getErrorMessage(nestedErr)); }
   }
 
   sendNotification(schedule, finalResult);
@@ -623,8 +623,8 @@ async function _resolveGoalForSchedule(schedule) {
 async function _getOrCreateTab() {
   const tabs = await new Promise(resolve => {
     chrome.tabs.query({ active: true, currentWindow: true }, (t) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        console.warn('[Sentinel/scheduler] tabs.query lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      if (chrome.runtime.lastError) {
+        console.warn('[Sentinel/scheduler] tabs.query lastError:', getErrorMessage(chrome.runtime.lastError));
         resolve([]);
         return;
       }
@@ -697,7 +697,7 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
       error: resultPartial.error,
     });
   } catch (storeErr) {
-    console.error('Failed to store failure result:', (typeof storeErr === 'object' && storeErr !== null && 'message' in storeErr) ? storeErr.message : String(storeErr));
+    console.error('Failed to store failure result:', getErrorMessage(storeErr));
   }
   schedule.lastRunStatus = 'failure';
   schedule.lastRunAt = Date.now();
@@ -816,8 +816,8 @@ export async function initScheduler() {
     try {
       const alarm = await new Promise(resolve => {
         chrome.alarms.get(`schedule-${id}`, (a) => {
-          if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-            console.warn('[Sentinel/scheduler] alarms.get lastError:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+          if (chrome.runtime.lastError) {
+            console.warn('[Sentinel/scheduler] alarms.get lastError:', getErrorMessage(chrome.runtime.lastError));
             resolve(undefined);
             return;
           }
@@ -839,7 +839,7 @@ export async function initScheduler() {
         tel.debug('scheduler', `Re-registered alarm for schedule: ${schedule.name}`);
       }
     } catch (err) {
-      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, (typeof err === 'object' && err !== null && 'message' in err) ? err.message : String(err));
+      console.error(`Failed to check/register alarm for schedule ${schedule.name}:`, getErrorMessage(err));
     }
   }
 
