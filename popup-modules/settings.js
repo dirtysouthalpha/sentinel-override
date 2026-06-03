@@ -253,7 +253,7 @@ if (adaptivePromptsModeSelect) {
       }
       try {
         const label = v === 'auto' ? 'Auto (silent rewrite)' : v === 'approval' ? 'Approval (review diff)' : 'Off';
-        showToast('Adaptive Prompts: ' + label, 'info');
+        showToast(`Adaptive Prompts: ${label}`, 'info');
       } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     });
   });
@@ -282,7 +282,7 @@ if (telemetryLevelSelect) {
         showToast('Failed to save setting', 'error');
         return;
       }
-      try { showToast('Telemetry verbosity: ' + telemetryLevelSelect.value, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+      try { showToast(`Telemetry verbosity: ${telemetryLevelSelect.value}`, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     });
   });
 }
@@ -380,7 +380,7 @@ if (skillStatsResetBtn) {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to reset skill stats:', getErrorMessage(chrome.runtime.lastError)); return; }
       try {
         if (resp && resp.ok) showToast('Skill stats reset', 'success');
-        else showToast('Reset failed: ' + ((resp && resp.error) || 'unknown'), 'error');
+        else showToast(`Reset failed: ${(resp && resp.error) || 'unknown'}`, 'error');
       } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     });
   });
@@ -433,13 +433,13 @@ function _renderSkillStatsModal(skills) {
       tr.style.cssText = 'border-bottom:1px solid var(--border-color);';
       const stats = s.stats || { fires: 0, successes: 0, failures: 0 };
       const rate = stats.fires > 0 ? (stats.successes / stats.fires) : null;
-      const rateStr = rate === null || Number.isNaN(rate) ? '—' : (Math.round(rate * 100) + '%');
+      const rateStr = rate === null || Number.isNaN(rate) ? '—' : `${Math.round(rate * 100)}%`;
       const rateColor = rate === null || Number.isNaN(rate) ? 'var(--text-tertiary)' :
         rate >= 0.7 ? '#9ece6a' :
         rate >= 0.4 ? '#e0af68' :
         '#f44';
       const delta = (s.effectivePriority || 0) - (s.priority || 0);
-      const deltaStr = delta === 0 ? '' : (delta > 0 ? ' (+' + delta + ')' : ' (' + delta + ')');
+      const deltaStr = delta === 0 ? '' : (delta > 0 ? ` (+${delta})` : ` (${delta})`);
       const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
       tr.innerHTML =
         '<td style="padding:6px 4px;"><strong>' + escapeHtml(s.id) + '</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">' + escapeHtml(s.description || '') + '</div></td>' +

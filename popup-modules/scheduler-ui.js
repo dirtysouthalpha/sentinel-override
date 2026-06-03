@@ -98,7 +98,7 @@ async function loadAndRenderSchedules() {
     if (schedules && typeof schedules.forEach === 'function') {
       schedules.forEach(schedule => {
         const card = document.createElement('div');
-        card.className = 'schedule-card' + (schedule.enabled ? '' : ' disabled');
+        card.className = `schedule-card${schedule.enabled ? '' : ' disabled'}`;
         card.innerHTML = renderScheduleCard(schedule);
         container.appendChild(card);
       });
@@ -515,7 +515,7 @@ async function handleSaveSchedule() {
     loadAndRenderSchedules();
     showToast('Schedule created', 'success');
   } catch (err) {
-    showToast('Error creating schedule: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), 'error');
+    showToast(`Error creating schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
   }
 }
 
@@ -540,7 +540,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
     loadAndRenderSchedules();
     showToast(enabled ? 'Schedule enabled' : 'Schedule disabled', 'success');
   } catch (err) {
-    showToast('Error toggling schedule: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), 'error');
+    showToast(`Error toggling schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
   }
 }
 
@@ -569,7 +569,7 @@ async function handleDeleteSchedule(scheduleId, name) {
     loadAndRenderSchedules();
     showToast('Schedule deleted', 'success');
   } catch (err) {
-    showToast('Error deleting schedule: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), 'error');
+    showToast(`Error deleting schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
   }
 }
 

@@ -293,7 +293,7 @@ function importClientFromFile() {
       if (res.ok) {
         await refreshClientPicker();
         await refreshClientList();
-        try { window.showToast && showToast('Client imported: ' + ((res.data && (res.data.displayName || (res.data.client && res.data.client.displayName))) || 'client'), 'success'); } catch { /* showToast may fail in detached popup */ }
+        try { window.showToast && showToast(`Client imported: ${(res.data && (res.data.displayName || (res.data.client && res.data.client.displayName))) || 'client'}`, 'success'); } catch { /* showToast may fail in detached popup */ }
       } else {
         alert(res.error || 'Import failed');
       }

@@ -125,7 +125,7 @@
     div.className = 'telem-event';
     div.dataset.category = ev.category;
     div.dataset.level = ev.level;
-    div.style.cssText = 'display:flex; gap:6px; padding:3px 8px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; line-height:1.45; cursor:' + (ev.payload ? 'pointer' : 'default') + ';';
+    div.style.cssText = `display:flex; gap:6px; padding:3px 8px; border-bottom:1px solid rgba(255,255,255,0.04); font-size:11px; line-height:1.45; cursor:${ev.payload ? 'pointer' : 'default'};`;
 
     const ts = document.createElement('span');
     ts.style.cssText = 'color:var(--text-tertiary, #777); font-family:monospace; font-size:10px; flex-shrink:0; min-width:84px;';
@@ -420,10 +420,10 @@
     const rect = btn.getBoundingClientRect();
     const menu = document.createElement('div');
     menu.id = 'telemPastRunsMenu';
-    menu.style.cssText = 'position:fixed; top:' + (rect.bottom + 4) + 'px; right:' + (window.innerWidth - rect.right) + 'px; min-width:280px; max-width:420px; max-height:320px; overflow-y:auto; background:var(--bg-tertiary, #1f1f1f); border:1px solid var(--border-color, rgba(255,255,255,0.10)); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:300; padding:4px 0;';
+    menu.style.cssText = `position:fixed; top:${rect.bottom + 4}px; right:${window.innerWidth - rect.right}px; min-width:280px; max-width:420px; max-height:320px; overflow-y:auto; background:var(--bg-tertiary, #1f1f1f); border:1px solid var(--border-color, rgba(255,255,255,0.10)); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.5); z-index:300; padding:4px 0;`;
     const liveItem = document.createElement('div');
-    liveItem.style.cssText = 'padding:6px 12px; font-size:11px; color:var(--text-primary, #fff); cursor:pointer; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.06)); background:' + (_viewingPastRun ? 'transparent' : 'rgba(255,107,0,0.15)') + ';';
-    liveItem.innerHTML = '<strong>● Live stream</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">' + (events.length) + ' events in current buffer</div>';
+    liveItem.style.cssText = `padding:6px 12px; font-size:11px; color:var(--text-primary, #fff); cursor:pointer; border-bottom:1px solid var(--border-color, rgba(255,255,255,0.06)); background:${_viewingPastRun ? 'transparent' : 'rgba(255,107,0,0.15)'};`;
+    liveItem.innerHTML = `<strong>● Live stream</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">${events.length} events in current buffer</div>`;
     liveItem.addEventListener('click', () => { _loadLiveStream(); menu.remove(); });
     menu.appendChild(liveItem);
     if (runs.length === 0) {
