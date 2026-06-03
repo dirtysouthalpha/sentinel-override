@@ -957,7 +957,7 @@ export function getCatalogProvider(id) {
 export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   if (!provider) throw new Error('No provider given');
   const url = customModelsUrl || (provider && provider.modelsUrl);
-  if (!url) throw new Error('Provider "' + (provider && provider.label) + '" does not expose a /models endpoint. Enter the model name manually.');
+  if (!url) throw new Error('Provider "' + provider.label + '" does not expose a /models endpoint. Enter the model name manually.');
 
   const headers = { 'Content-Type': 'application/json' };
   if (provider.auth === 'bearer' && apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
