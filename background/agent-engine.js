@@ -2440,11 +2440,11 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
   };
   var goalLower = typeof goal === 'string' ? goal.toLowerCase() : '';
   var urlLower = typeof url === 'string' ? url.toLowerCase() : '';
-  for (const site of Object.keys(siteUrls)) {
+  for (const [site, siteUrl] of Object.entries(siteUrls)) {
     if (goalLower.includes(site) && !urlLower.includes(site)) {
       var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
       if (qm && qm[1]) {
-        strategies.push('Navigate directly to https://www.' + siteUrls[site] + encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : ''));
+        strategies.push('Navigate directly to https://www.' + siteUrl + encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : ''));
       }
     }
   }
@@ -2948,9 +2948,8 @@ function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
 
   // Reject duplicates -- if an existing memory key has the EXACT same value,
   // overwriting it is meaningless and clutters the prompt.
-  for (const existingKey of Object.keys(agentMemory || {})) {
+  for (const [existingKey, ev] of Object.entries(agentMemory || {})) {
     if (existingKey === key) continue;
-    const ev = agentMemory[existingKey];
     const evStr = typeof ev === 'string' ? ev : JSON.stringify(ev);
     if (evStr === valStr) {
       return { ok: false, reason: 'duplicates existing key ' + existingKey };
