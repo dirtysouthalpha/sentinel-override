@@ -102,6 +102,24 @@ describe('macro-recorder', () => {
       // Restore the mock
       chrome.storage.local.get.mockImplementation((keys) => Promise.resolve({ ...mockStorage }));
     });
+
+    it('should handle primitive string errors gracefully', async () => {
+      // Simulate an error that is a primitive string, not an Error object
+      chrome.storage.local.get.mockImplementation(() => Promise.reject('String error'));
+
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const macros = await loadMacros();
+
+      expect(macros).toEqual([]);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Sentinel/macro-recorder] loadMacros failed:',
+        'String error'
+      );
+      consoleSpy.mockRestore();
+
+      // Restore the mock
+      chrome.storage.local.get.mockImplementation((keys) => Promise.resolve({ ...mockStorage }));
+    });
   });
 
   describe('createMacro', () => {
