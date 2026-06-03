@@ -2840,7 +2840,7 @@ async function exportRunLog(format) {
     if (format === 'csv') {
       const headers = ['step', 'timestamp', 'kind', 'url', 'tenant', 'action_type', 'selector_or_ref', 'text_preview', 'result', 'failed'];
       const escape = (v) => {
-        if (v === undefined || v === null) return '';
+        if (v == null) return '';
         const s = String(v).replace(/"/g, '""');
         return /[",\n\r]/.test(s) ? '"' + s + '"' : s;
       };

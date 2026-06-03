@@ -54,7 +54,7 @@ let _saveStatsTimer = null;
       if (area !== 'local') return;
       if (changes[ADAPT_ENABLED_KEY]) {
         const v = changes[ADAPT_ENABLED_KEY].newValue;
-        _adaptEnabled = (v === undefined || v === null) ? true : !!v;
+        _adaptEnabled = (v == null) ? true : !!v;
       }
       if (changes[STATS_KEY]) {
         const v = changes[STATS_KEY].newValue;

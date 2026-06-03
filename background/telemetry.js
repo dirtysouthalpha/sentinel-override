@@ -198,7 +198,7 @@ function _redactEvent(event) {
       if (changes.telemetryRedact) {
         // Default-true semantics: any explicit value sets the flag; missing/unset = true.
         const v = changes.telemetryRedact.newValue;
-        _redactEnabled = (v === undefined || v === null) ? true : !!v;
+        _redactEnabled = (v == null) ? true : !!v;
       }
       if (changes.telemetry_runs_index) {
         _runsIndexCache = Array.isArray(changes.telemetry_runs_index.newValue) ? changes.telemetry_runs_index.newValue : [];
