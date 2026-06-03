@@ -1335,12 +1335,12 @@ async function _cdpObservePage(tabId) {
       // If page has no body and no children, wait a moment and try again
       if (!r.hasBody && r.childCount === 0) {
         console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await sleep(2000);
       }
       // If title is empty and URL is still about:blank or loading, wait
       if (!r.title && (r.url === 'about:blank' || r.url === '')) {
         console.log('[Sentinel/CDP] Page still loading — waiting 2s...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await sleep(2000);
       }
     }
   } catch(e) {
