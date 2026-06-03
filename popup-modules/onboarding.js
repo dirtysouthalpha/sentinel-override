@@ -43,7 +43,7 @@
     try {
       await chrome.storage.local.set({ sentinelOnboardingDone: true });
     } catch (error) {
-      console.error('Failed to mark onboarding as done:', (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error)));
+      console.error('Failed to mark onboarding as done:', (typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error)));
     }
 
     const modal = _qs('onboarding-modal');
