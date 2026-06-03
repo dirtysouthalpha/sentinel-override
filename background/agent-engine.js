@@ -2046,6 +2046,14 @@ function formatTicketOutput(format, summary, goal, tech, options) {
 
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
+// Pre-computed Sets for loop detection - avoid recreating on every action
+const NON_PRODUCTIVE_ACTIONS = new Set(['navigate', 'switch_tab', 'click', 'scroll', 'wait_for_text', 'wait_for_element', 'read_page']);
+const NON_PRODUCTIVE_READ_ACTIONS = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
+const REF_DRIVEN_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'extract', 'extract_list', 'wait_for_element', 'scroll_to']);
+const TARGETABLE_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
+const LOOP_EXCLUDE_TYPES = new Set(['finish', 'navigate', 'extract', 'extract_list']);
+const FILLER_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
+
 function _hostnameOf(url) {
   try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return ''; }
 }
@@ -2974,12 +2982,10 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
 
   // For each requested field, check whether ANY token from it appears in
   // memory or notes. This is a deliberately loose heuristic.
-  // Pre-create filler Set once for all fields (not in loop)
-  const filler = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
   const missing = [];
   for (const field of rawFields) {
     // Pull "key" tokens from the field name (skip filler words)
-    const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t)) : [];
+    const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !FILLER_WORDS.has(t)) : [];
     if (!tokens.length) continue;
     // Match if ANY meaningful token from this field shows up in evidence
     const found = typeof allEvidence === 'string' && tokens.some(t => allEvidence.includes(t));
@@ -3029,8 +3035,7 @@ function _detectActionTypeLoop(history, _agentMemory) {
   // Implementation: store a memory-key-count snapshot in agent state at each
   // step and compare. For now we use a simpler heuristic: the dominant type
   // is non-modifying AND no new note/extract/execute_js-with-key happened.
-  const NON_PRODUCTIVE = new Set(['navigate', 'switch_tab', 'click', 'scroll', 'wait_for_text', 'wait_for_element', 'read_page']);
-  if (!NON_PRODUCTIVE.has(dominantType)) return { isLoop: false };
+  if (!NON_PRODUCTIVE_ACTIONS.has(dominantType)) return { isLoop: false };
 
   // Count productive actions in the window
   const recentProductive = recent.filter(h => {
@@ -4098,10 +4103,9 @@ async function runAgentLoop(goal, workingTabId) {
 
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (history.length >= 3 && !loopDirective) {
-        const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
         let consecutiveNonProductive = 0;
         for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].action && nonProductive.has(history[i].action.type)) {
+          if (history[i].action && NON_PRODUCTIVE_READ_ACTIONS.has(history[i].action.type)) {
             consecutiveNonProductive++;
           } else {
             break;
@@ -4657,8 +4661,7 @@ async function runAgentLoop(goal, workingTabId) {
       // when the LLM supplied a ref — refs are the preferred handle and the
       // content script resolves them directly. Also accept commands that have
       // ONLY a ref (no selector at all) for the ref-driven actions.
-      const refDrivenActions = new Set(['click', 'type', 'hover', 'select', 'check', 'extract', 'extract_list', 'wait_for_element', 'scroll_to']);
-      if (refDrivenActions.has(command.type) && command.selector && !command.ref) {
+      if (REF_DRIVEN_ACTIONS.has(command.type) && command.selector && !command.ref) {
         const selectorExists = trimmedElements.some(e => e.selector === command.selector);
         if (!selectorExists) {
           sendSilentUpdate('Invalid selector -- re-asking AI', stepCount);
@@ -5533,8 +5536,7 @@ async function runAgentLoop(goal, workingTabId) {
       // no-op, and the result is "Click: undefined" with no useful feedback.
       // Catch it here and return a clear error to the LLM so it picks a
       // different strategy next step.
-      const _targetableActions = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
-      if (_targetableActions.has(command.type) && !command._visionAction) {
+      if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         const _hasSelector = typeof command.selector === 'string' && command.selector.length;
         const _hasRef      = typeof command.ref === 'string' && command.ref.length;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
@@ -6471,8 +6473,7 @@ async function runAgentLoop(goal, workingTabId) {
         _lastCmdType = command.type;
       }
       // v3.68: Trigger on 2 repeats (not 3), cover ALL action types, and be more specific
-      const _loopExcludeTypes = new Set(['finish', 'navigate', 'extract', 'extract_list']);
-      if (_sameCmdCount >= 2 && !_loopExcludeTypes.has(command.type)) {
+      if (_sameCmdCount >= 2 && !LOOP_EXCLUDE_TYPES.has(command.type)) {
         const _pageUnchanged = currentUrl === (_lastLoopUrl || '');
         console.warn('[Sentinel/RECOVERY] Same-command loop:', command.type, 'used', _sameCmdCount + 1, 'times. Page unchanged:', _pageUnchanged);
         let _recoveryMsg = 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row';

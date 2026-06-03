@@ -40,6 +40,9 @@ const SITE_DOMAIN_MAP = {
   linkedin: 'linkedin.com'
 };
 
+// Valid JSON escape characters - avoid recreating on every call
+const VALID_JSON_ESCAPE_CHARS = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
+
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
 // Detects when a goal mentions 2+ M365/security admin centers (Entra,
 // Exchange, Purview, OneDrive, SharePoint, Teams, Intune, Defender, Compliance,
@@ -2102,7 +2105,6 @@ export function extractFirstJsonObject(str) {
  */
 function sanitizeLlmJson(jsonStr) {
   if (typeof jsonStr !== 'string') return jsonStr;
-  const valid = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
   let out = '';
   let inStr = false;
   for (let i = 0; i < jsonStr.length; i++) {
@@ -2117,7 +2119,7 @@ function sanitizeLlmJson(jsonStr) {
     if (ch === '\\') {
       const next = jsonStr[i + 1];
       if (next === undefined) { out += ch; continue; }
-      if (valid.has(next)) {
+      if (VALID_JSON_ESCAPE_CHARS.has(next)) {
         // Valid JSON escape — emit both chars and skip ahead.
         out += ch + next;
         i++;
@@ -2240,16 +2242,7 @@ export function parseLLMResponse(content) {
       try {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);
-        const _validTypesSet = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
-          'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
-          'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-          'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
-          'navigate_back', 'navigate_forward',
-          'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
-          'read_console_messages', 'read_network_requests',
-          'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
-          'smart_navigate', 'batch']);
-        if (parsed && parsed.type && _validTypesSet.has(parsed.type)) return parsed;
+        if (parsed && parsed.type && VALID_ACTION_TYPES.has(parsed.type)) return parsed;
       } catch (e) { console.warn('[Sentinel/llm] Regex salvage failed:', getErrorMessage(e)); }
       try {
         const salvaged = regexSalvageFinishOrNote(content);
