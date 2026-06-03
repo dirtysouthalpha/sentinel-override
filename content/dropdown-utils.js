@@ -378,7 +378,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     if (el.getAttribute('role') === 'combobox') return true;
     // ARIA button with haspopup
     if (el.getAttribute('role') === 'button' && el.getAttribute('aria-haspopup')) return true;
-    if (el.getAttribute('aria-haspopup') === 'listbox' || el.getAttribute('aria-haspopup') === 'menu') return true;
+    if (/^(listbox|menu)$/.test(el.getAttribute('aria-haspopup'))) return true;
 
     // Check class names for common dropdown patterns
     // SVG elements have SVGAnimatedString for className, not a plain string

@@ -216,7 +216,7 @@ describe('telemetry-panel._eventMatchesFilter', () => {
       return ev.level !== 'trace';
     }
     if (activeFilter === 'errors') {
-      return ev.level === 'error' || ev.level === 'warn';
+      return /^(error|warn)$/.test(ev.level);
     }
     return ev.category === activeFilter;
   }

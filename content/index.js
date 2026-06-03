@@ -108,7 +108,7 @@ if (window.__sentinelInitialized) {
   function __sentinelHasPositiveModalSignal(el) {
     try {
       const role = el && el.getAttribute ? el.getAttribute('role') : null;
-      if (role === 'dialog' || role === 'alertdialog') return true;
+      if (/^(dialog|alertdialog)$/.test(role)) return true;
       if (el && el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
       const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 500);
       // Core modal signals
@@ -1705,7 +1705,7 @@ if (window.__sentinelInitialized) {
 
         // Standard INPUT / TEXTAREA — full key sequence per character with native
         // setter so React/Vue/MUI controlled inputs sync (#8).
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
           if (!targetDoc.defaultView) return 'Error: no window context for input typing';
           const _dv = targetDoc.defaultView;
           const _ProtoClass = el.tagName === 'TEXTAREA' ? _dv.HTMLTextAreaElement : _dv.HTMLInputElement;
@@ -1927,7 +1927,7 @@ if (window.__sentinelInitialized) {
           return describeTarget(cmd) + ' was already ' + (desiredState ? 'checked' : 'unchecked');
         }
         // Handle ARIA checkbox roles (common in SPA frameworks)
-        if (checkEl.getAttribute('role') === 'checkbox' || checkEl.getAttribute('role') === 'switch') {
+        if (/^(checkbox|switch)$/.test(checkEl.getAttribute('role'))) {
           const currentAria = checkEl.getAttribute('aria-checked') === 'true';
           if (currentAria !== desiredState) {
             checkEl.click();
@@ -2169,7 +2169,7 @@ if (window.__sentinelInitialized) {
             try {
               const dir = (e && e.violatedDirective) || '';
               const blocked = (e && e.blockedURI) || '';
-              if (dir.startsWith('script-src') && (blocked === 'inline' || blocked === '')) {
+              if (dir.startsWith('script-src') && (/^(inline|)$/.test(blocked))) {
                 __cspBlocked = true;
                 // (3.26.0) Content-side telemetry: capture the FIRST CSP
                 // violation so operators see the exact directive that's
@@ -2387,7 +2387,7 @@ if (window.__sentinelInitialized) {
           value = el.value !== undefined ? String(el.value) : (el.getAttribute('value') || '');
         } else if (attr === 'src') {
           value = el.src || el.getAttribute('src') || '';
-        } else if (attr === 'html' || attr === 'innerHTML') {
+        } else if (/^(html|innerHTML)$/.test(attr)) {
           value = el.innerHTML || '';
         } else if (attr === 'checked') {
           value = String(el.checked !== undefined ? el.checked : el.getAttribute('aria-checked') === 'true');

@@ -1711,7 +1711,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     if (!h || !h.action) return acc;
     const type = h.action.type;
     if (type === 'navigate') acc.navigate++;
-    if (type === 'extract' || type === 'extract_list') acc.extract++;
+    if (/^extract(_list)?$/.test(type)) acc.extract++;
     if (type === 'note') acc.note++;
     return acc;
   }, { navigate: 0, extract: 0, note: 0 }) : { navigate: 0, extract: 0, note: 0 };

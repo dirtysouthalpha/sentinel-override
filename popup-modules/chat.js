@@ -485,7 +485,7 @@ function showApprovalCard(payload) {
   // names are tolerated so this card stays compatible regardless of which one
   // the background sends.
   const code = payload && (payload.code || payload.script || payload.js);
-  const isCode = (actionType === 'execute_js' || actionType === 'run_js' || !!code);
+  const isCode = (/^(execute_js|run_js)$/.test(actionType) || !!code);
   const isRisky = RISKY_ACTION_PATTERN.test(description);
 
   const card = document.createElement('div');
@@ -564,7 +564,7 @@ function respondApproval(decision, context) {
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
   // is handled server-side.
-  if (decision === 'rejected' || decision === 'skipped') {
+  if (/^(rejected|skipped)$/.test(decision)) {
     appendSkipRejectionNote(decision, ctx.description);
   }
 }
@@ -1105,7 +1105,7 @@ if (undoBtn) {
 // Space key while agent is running: toggle pause/resume
 document.addEventListener('keydown', (e) => {
   const active = document.activeElement;
-  const inText = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  const inText = active && (/^(INPUT|TEXTAREA)$/.test(active.tagName) || active.isContentEditable);
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
     if (inText) return;
     if (!undoBtn || undoBtn.disabled || undoBtn.style.display === 'none') return;

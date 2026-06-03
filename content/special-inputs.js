@@ -13,7 +13,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     if (!el) return false;
 
     // Native date input types
-    if (el.type === 'date' || el.type === 'datetime-local' || el.type === 'month') {
+    if (/^(date|datetime-local|month)$/.test(el.type)) {
       return true;
     }
 
@@ -100,7 +100,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     const eventOpts = { bubbles: true, composed: true };
 
     // Strategy 1: Native date input
-    if (el.type === 'date' || el.type === 'datetime-local' || el.type === 'month') {
+    if (/^(date|datetime-local|month)$/.test(el.type)) {
       try {
         const _desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
         const nativeSetter = _desc && _desc.set;

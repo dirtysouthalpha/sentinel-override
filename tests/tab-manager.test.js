@@ -1171,7 +1171,7 @@ describe('ensureObservabilityListeners — already installed', () => {
     // The only new sendCommand calls should be mouse events, not Log/Network enable
     const newCalls = chrome.debugger.sendCommand.mock.calls.slice(sendCommandCount);
     const domainEnableCalls = newCalls.filter(
-      c => c[1] === 'Log.enable' || c[1] === 'Runtime.enable' || c[1] === 'Network.enable'
+      c => /^(Log\.enable|Runtime\.enable|Network\.enable)$/.test(c[1])
     );
     expect(domainEnableCalls.length).toBe(0);
   });

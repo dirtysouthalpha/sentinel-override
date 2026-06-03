@@ -1099,7 +1099,7 @@ function summarizeHistoryBatch(batch) {
     const t = h.action.type;
     counts[t] = (counts[t] || 0) + 1;
     if (t === 'navigate' && h.action.url) navUrls.push(typeof h.action.url === 'string' ? h.action.url.substring(0, 100) : String(h.action.url).substring(0, 100));
-    if ((t === 'extract' || t === 'extract_list') && h.action.key) extractedKeys.push(h.action.key);
+    if ((/^extract(_list)?$/.test(t)) && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'note' && h.action.text) notes.push(typeof h.action.text === 'string' ? h.action.text.substring(0, 200) : String(h.action.text).substring(0, 200));
     const r = (h && typeof h.result === 'string') ? h.result : '';
@@ -3037,7 +3037,7 @@ function _detectActionTypeLoop(history, _agentMemory) {
     if (!h || !h.action) return false;
     const t = h.action.type;
     if (t === 'note') return true;
-    if (t === 'extract' || t === 'extract_list') return !!h.action.key;
+    if (/^extract(_list)?$/.test(t)) return !!h.action.key;
     if (t === 'execute_js') return !!h.action.key;
     return false;
   });
@@ -3204,13 +3204,13 @@ function _buildPageNarration(url, title, observation, pageContent) {
       const tag = e.tag || '';
 
       // Count element types
-      if (tag === 'form' || tag === 'FORM') {
+      if (/^form$/i.test(tag)) {
         forms++;
-      } else if (tag === 'button' || tag === 'BUTTON' || e.role === 'button') {
+      } else if (/^button$/i.test(tag) || e.role === 'button') {
         buttons++;
-      } else if (['input','textarea','select','INPUT','TEXTAREA','SELECT'].includes(tag)) {
+      } else if (/^(input|textarea|select)$/i.test(tag)) {
         inputs++;
-      } else if (tag === 'a' || tag === 'A') {
+      } else if (/^a$/i.test(tag)) {
         links++;
       }
 
@@ -4039,7 +4039,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _captchaHit = detectCaptcha(currentUrl, pageText, allElements.length);
         if (_captchaHit && _captchaHit.confidence >= 0.5) {
           const _captchaResult = await recoverFromCaptcha({id: tab}, _captchaHit, currentUrl, goal);
-          if (_captchaResult === 'solved' || _captchaResult === 'bypassed' || _captchaResult === 'went_back') {
+          if (/^(solved|bypassed|went_back)$/.test(_captchaResult)) {
             // Page should be in a different state now, re-observe
             continue;
           }
@@ -5131,7 +5131,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Handle extract / extract_list (save to agent memory)
-      if (command.type === 'extract' || command.type === 'extract_list') {
+      if (/^extract(_list)?$/.test(command.type)) {
         sendSilentUpdate(`Extracting: ${command.key}`, stepCount);
       }
 
@@ -5320,7 +5320,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Handle wait_for actions
-      if (command.type === 'wait_for_text' || command.type === 'wait_for_element' || command.type === 'wait_for_navigation') {
+      if (/^wait_for_(text|element|navigation)$/.test(command.type)) {
         sendAgentStatus('waiting', 'Waiting for: ' + (command.text || command.selector || 'navigation'));
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
         sendActionMessage(command, stepCount, observation);
@@ -5576,7 +5576,7 @@ async function runAgentLoop(goal, workingTabId) {
         else if (site === 'youtube') smartUrl = 'https://www.youtube.com/results?search_query=' + q;
         else if (site === 'amazon') smartUrl = 'https://www.amazon.com/s?k=' + q;
         else if (site === 'reddit') smartUrl = 'https://www.reddit.com/search/?q=' + q;
-        else if (site === 'twitter' || site === 'x') smartUrl = 'https://x.com/search?q=' + q;
+        else if (/^(twitter|x)$/.test(site)) smartUrl = 'https://x.com/search?q=' + q;
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
           console.log('[Sentinel/SPEED] smart_navigate → ' + smartUrl);
@@ -5761,7 +5761,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-      } else if (command.type === 'navigate_back' || command.type === 'navigate_forward') {
+      } else if (/^navigate_(back|forward)$/.test(command.type)) {
         try {
           const _prevUrl = (await getTabInfo(tab))?.url || '';
           const _navDelta = command.type === 'navigate_back' ? -1 : 1;
@@ -5786,7 +5786,7 @@ async function runAgentLoop(goal, workingTabId) {
           result = freshContent ? 'Page content re-read' : 'Failed to re-read page';
           actionFailed = !freshContent;
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
-      } else if (command.type === 'extract' || command.type === 'extract_list') {
+      } else if (/^extract(_list)?$/.test(command.type)) {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
         result = (typeof res === 'string' && res.length > 0) ? res : 'Error: no response from content script';
         let extractSucceeded = false;
@@ -5963,7 +5963,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-      } else if (useTrustedInput && (command.type === 'click' || command.type === 'click_at' || command.type === 'type' || command.type === 'press_key' || command.type === 'select')) {
+      } else if (useTrustedInput && (/^(click|click_at|type|press_key|select)$/.test(command.type))) {
         // (#9) CDP trusted-input dispatch path. Opt-in via settings.
         // On any CDP failure we fall back to the synthetic content-script
         // path so existing flows aren't broken.
@@ -6131,7 +6131,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // (v3.54) CDP fallback for click: when content script can't inject and click fails,
       // resolve the element via CDP and click its center coordinates.
-      if (actionFailed && _cdpFallbackActive && (command.type === 'click' || command.type === 'right_click' || command.type === 'double_click')) {
+      if (actionFailed && _cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
           if (sel) {
@@ -6334,7 +6334,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
             // Post-click: handle navigation and new tab capture
-      if (command.type === 'click' || command.type === 'click_at' || command.type === 'double_click') {
+      if (/^(click|click_at|double_click)$/.test(command.type)) {
         await sleep(1000);
         try {
           const allTabs = await new Promise(resolve => {

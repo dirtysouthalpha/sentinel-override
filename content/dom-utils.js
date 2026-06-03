@@ -415,7 +415,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       elementData.multiple = el.multiple;
     }
 
-    if (el.type === 'checkbox' || el.type === 'radio') {
+    if (/^(checkbox|radio)$/.test(el.type)) {
       elementData.checked = el.checked;
     }
 

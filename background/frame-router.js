@@ -299,7 +299,7 @@ async function runCommandInFrame(command) {
         }
 
         // Standard INPUT/TEXTAREA
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
           const proto = el.tagName === 'TEXTAREA'
             ? (view.HTMLTextAreaElement && view.HTMLTextAreaElement.prototype)
             : (view.HTMLInputElement && view.HTMLInputElement.prototype);

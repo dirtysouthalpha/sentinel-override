@@ -28,7 +28,7 @@
 
     titleBar.addEventListener('pointerdown', (e) => {
       // Ignore clicks on inputs / buttons that might happen to be inside the title.
-      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT')) return;
+      if (e.target && (/^(INPUT|BUTTON|SELECT)$/.test(e.target.tagName))) return;
       // Only start drag on primary button.
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       e.preventDefault();

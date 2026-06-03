@@ -203,7 +203,7 @@ function round(n, digits = 0) {
  */
 export function suggestRetryActions(scoreResult) {
   if (!scoreResult || typeof scoreResult.score !== 'number') return [];
-  if (scoreResult.band === 'high' || scoreResult.band === 'good') return [];
+  if (/^(high|good)$/.test(scoreResult.band)) return [];
 
   const bd = scoreResult.breakdown || {};
   const suggestions = [];

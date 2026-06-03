@@ -484,9 +484,9 @@ export function readConsoleMessages(tabId, options) {
   if (!isFinite(limit) || limit < 0) return [];
   const filter = options && typeof options === 'object' ? options.filter : undefined;
   let out = buf.slice();
-  if (filter === 'error' || filter === 'errors') {
+  if (/^error?s?$/.test(filter)) {
     out = out.filter(e => /error|severe|critical/i.test(e.level));
-  } else if (filter === 'warning' || filter === 'warn') {
+  } else if (/^warn(ing)?$/.test(filter)) {
     out = out.filter(e => /warn/i.test(e.level));
   }
   return out.slice(-limit);
@@ -807,7 +807,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
         }
 
         try {
-          if (ch === '\n' || ch === '\r') {
+          if (/^[\n\r]$/.test(ch)) {
             await cdpDispatchKey(tabId, 'Enter');
           } else {
             const params = cdpKeyParamsFor(ch) || {

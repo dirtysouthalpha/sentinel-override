@@ -245,7 +245,7 @@ export async function updateEntry(clientId, entryId, updates) {
   const e = c.entries.find(x => x.id === entryId);
   if (!e) return { ok: false, error: 'Entry not found' };
   if (typeof updates.wisdom === 'string') e.wisdom = updates.wisdom.trim().substring(0, 1000);
-  if (updates.scope === 'global' || updates.scope === 'url') e.scope = updates.scope;
+  if (/^(global|url)$/.test(updates.scope)) e.scope = updates.scope;
   if (typeof updates.urlPattern === 'string') e.urlPattern = updates.urlPattern.trim();
   if (Array.isArray(updates.tags)) e.tags = updates.tags.slice(0, 8).map(t => String(t).trim()).filter(Boolean);
   const written = await _write(state);

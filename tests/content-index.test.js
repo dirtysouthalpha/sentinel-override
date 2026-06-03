@@ -668,7 +668,7 @@ describe('execute_js static guard', () => {
 function hasPositiveModalSignal(el) {
   try {
     const role = el.getAttribute && el.getAttribute('role');
-    if (role === 'dialog' || role === 'alertdialog') return true;
+    if (/^(dialog|alertdialog)$/.test(role)) return true;
     if (el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
     const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 200);
     if (/\b(modal|dialog|sign in|subscribe)\b/.test(text)) return true;
