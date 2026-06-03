@@ -128,6 +128,23 @@ describe('macro-recorder', () => {
 
       expect(macro.steps).toEqual([]);
     });
+
+    it('should handle storage set errors gracefully', async () => {
+      chrome.storage.local.set.mockImplementation(() => Promise.reject(new Error('Storage quota exceeded')));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(createMacro('Test', 'Desc', [])).rejects.toThrow('Storage quota exceeded');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Sentinel/macro-recorder] saveMacros failed:',
+        'Storage quota exceeded'
+      );
+
+      consoleSpy.mockRestore();
+      chrome.storage.local.set.mockImplementation((data) => {
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+    });
   });
 
   describe('updateMacro', () => {
@@ -168,6 +185,26 @@ describe('macro-recorder', () => {
       expect(updated.description).toBe('Original Desc');
       expect(updated.steps).toEqual([{ action: 'click' }]);
     });
+
+    it('should handle storage set errors gracefully', async () => {
+      const macros = await loadMacros();
+      const id = macros[0].id;
+
+      chrome.storage.local.set.mockImplementation(() => Promise.reject(new Error('Storage quota exceeded')));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(updateMacro(id, { name: 'Test' })).rejects.toThrow('Storage quota exceeded');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Sentinel/macro-recorder] saveMacros failed:',
+        'Storage quota exceeded'
+      );
+
+      consoleSpy.mockRestore();
+      chrome.storage.local.set.mockImplementation((data) => {
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
+    });
   });
 
   describe('deleteMacro', () => {
@@ -194,6 +231,26 @@ describe('macro-recorder', () => {
 
       const macrosAfter = await loadMacros();
       expect(macrosAfter).toHaveLength(macrosBefore.length);
+    });
+
+    it('should handle storage set errors gracefully', async () => {
+      const macrosBefore = await loadMacros();
+      const idToDelete = macrosBefore[0].id;
+
+      chrome.storage.local.set.mockImplementation(() => Promise.reject(new Error('Storage quota exceeded')));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(deleteMacro(idToDelete)).rejects.toThrow('Storage quota exceeded');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Sentinel/macro-recorder] saveMacros failed:',
+        'Storage quota exceeded'
+      );
+
+      consoleSpy.mockRestore();
+      chrome.storage.local.set.mockImplementation((data) => {
+        Object.assign(mockStorage, data);
+        return Promise.resolve();
+      });
     });
   });
 
