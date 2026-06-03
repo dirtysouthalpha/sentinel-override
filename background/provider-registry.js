@@ -2,6 +2,8 @@
 // Multi-provider LLM support: Anthropic and OpenAI-compatible APIs.
 // Centralizes provider definitions, API format handling, and settings migration.
 
+import { getErrorMessage } from './error-utils.js';
+
 // ========== Provider Definitions ==========
 // Each provider defines how to build headers, request bodies, parse responses,
 // and handle vision (base64 image) content for its specific API format.
@@ -683,7 +685,7 @@ export async function getActiveProvider() {
   try {
     stored = await chrome.storage.local.get(['active_provider', 'providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage read failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/provider-registry] Storage read failed:', getErrorMessage(e));
     const provider = PROVIDERS.openai;
     return { id: 'openai', ...provider, endpoint: provider.defaultEndpoint, apiKey: '', model: provider.defaultModel, maxTokens: 8000, temperature: 0.3 };
   }
@@ -733,7 +735,7 @@ export async function migrateLegacySettings() {
   try {
     stored = await chrome.storage.local.get(['providers', 'api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage read failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/provider-registry] Storage read failed:', getErrorMessage(e));
     return;
   }
   if (stored.providers) return; // already migrated
@@ -772,7 +774,7 @@ export async function migrateLegacySettings() {
       }
     });
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage set failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/provider-registry] Storage set failed:', getErrorMessage(e));
     return;
   }
 
@@ -781,7 +783,7 @@ export async function migrateLegacySettings() {
   try {
     await chrome.storage.local.remove(['api_endpoint', 'api_key', 'model']);
   } catch (e) {
-    console.warn('[Sentinel/provider-registry] Storage cleanup failed:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/provider-registry] Storage cleanup failed:', getErrorMessage(e));
   }
 }
 
@@ -969,7 +971,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
   } catch (e) {
     clearTimeout(timer);
-    throw new Error('Network error fetching models from ' + url + ': ' + ((typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))));
+    throw new Error('Network error fetching models from ' + url + ': ' + getErrorMessage(e));
   }
   clearTimeout(timer);
   if (!resp.ok) {
@@ -983,8 +985,8 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   let data;
   try { data = await resp.json(); }
   catch (e) {
-    console.error('[Sentinel/provider-registry] Models JSON parse error:', (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)));
-    throw new Error('Models endpoint did not return JSON: ' + ((typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e))));
+    console.error('[Sentinel/provider-registry] Models JSON parse error:', getErrorMessage(e));
+    throw new Error('Models endpoint did not return JSON: ' + getErrorMessage(e));
   }
   if (!data) throw new Error('Models endpoint returned null response body');
 
