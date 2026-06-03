@@ -46,7 +46,7 @@ chrome.runtime.onInstalled.addListener(() => {
     if (chrome.runtime.lastError) { console.warn('[Sentinel] Migration get failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     const updates = {};
     if (result.api_endpoint && typeof result.api_endpoint === 'string' && result.api_endpoint.includes('bigmodel.cn')) updates.api_endpoint = '';
-    if (result.model && typeof result.model === 'string' && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';
+    if (result.model && typeof result.model === 'string' && /glm-4(\.6v-flash|v-)/.test(result.model)) updates.model = '';
     if (Object.keys(updates).length > 0) {
       chrome.storage.local.set(updates, () => {
         if (chrome.runtime.lastError) console.error('[Sentinel] Migration set failed:', getErrorMessage(chrome.runtime.lastError));
