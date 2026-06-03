@@ -501,7 +501,7 @@ if (window.__sentinelInitialized) {
         const cmd = request.command;
         const result = await executeCommand(cmd);
         // If executeCommand returns an error string, throw so the wrapper sends { ok: false, error }
-        if (typeof result === 'string' && (result.startsWith('Error') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element'))) {
+        if (typeof result === 'string' && (/^(Error)| not found|Element not found|No element/.test(result))) {
           throw new Error(result);
         }
         return { result };
