@@ -2,6 +2,8 @@
 // Tab locking, page load waiting, content script injection, screenshot capture.
 // Imports from message-protocol.js only (no circular dependency risk).
 
+import { getErrorMessage } from './error-utils.js';
+
 // ========== Page Load Waiting ==========
 let pageLoadConfig = {
   pageLoadTimeout: 25000
@@ -620,7 +622,7 @@ async function ensureDebuggerAttached(tabId) {
         tabId,
         message: 'Debugger re-attached after banner was dismissed. Trusted input is active. Dismiss this banner again to fall back to synthetic events.'
       }).catch((e) => {
-        console.error('[Sentinel/tab-manager] Unhandled rejection in wasUserDetached:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+        console.error('[Sentinel/tab-manager] Unhandled rejection in wasUserDetached:', getErrorMessage(e));
       });
     } catch (_e) { console.warn('[Sentinel/tab-manager] CDP reattach warning broadcast failed:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
   }
@@ -797,7 +799,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
             consecutiveErrors = 0;
           } catch (e) {
             consecutiveErrors++;
-            console.warn('[Sentinel/tab-manager] typing progress update failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+            console.warn('[Sentinel/tab-manager] typing progress update failed:', getErrorMessage(e));
             if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
               return { ok: false, error: `Content script unreachable after ${MAX_CONSECUTIVE_ERRORS} consecutive failures` };
             }
@@ -820,7 +822,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
           consecutiveErrors = 0;
         } catch (e) {
           consecutiveErrors++;
-          console.warn('[Sentinel/tab-manager] character dispatch failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+          console.warn('[Sentinel/tab-manager] character dispatch failed:', getErrorMessage(e));
           if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
             return { ok: false, error: `Debugger command failed after ${MAX_CONSECUTIVE_ERRORS} consecutive failures` };
           }
@@ -960,7 +962,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         scrollY: Number(vp.scrollY) || 0
       };
     }
-  } catch (e) { console.warn('[Sentinel/tab-manager] viewport parse failed, keeping defaults:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/tab-manager] viewport parse failed, keeping defaults:', getErrorMessage(e)); }
 
   let base64Image = null;
   try {
@@ -968,7 +970,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
       await chrome.debugger.attach({ tabId }, '1.3');
       attachedDebuggees.add(tabId);
     }
-    try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[Sentinel/tab-manager] ensureObservabilityListeners failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+    try { await ensureObservabilityListeners(tabId); } catch (e) { console.warn('[Sentinel/tab-manager] ensureObservabilityListeners failed:', getErrorMessage(e)); }
     const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: CONFIG.screenshotQuality });
     base64Image = (screenshotResult && typeof screenshotResult.data === 'string') ? screenshotResult.data : null;
   } catch {
@@ -976,7 +978,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     // then fall back to captureVisibleTab.
     attachedDebuggees.delete(tabId);
     observabilityListenersInstalled.delete(tabId);
-    try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[Sentinel/tab-manager] Debugger detach failed in error path:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+    try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[Sentinel/tab-manager] Debugger detach failed in error path:', getErrorMessage(e)); }
     try {
       const screenshot_data_url = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {

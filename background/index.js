@@ -18,6 +18,7 @@ import { exportTemplate, exportAllTemplates, validateImport, importTemplates, ex
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
 import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
+import { getErrorMessage } from './error-utils.js';
 // (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
 import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
 import {
@@ -109,7 +110,7 @@ initScheduler();
       }
     }
   } catch (e) {
-    console.warn('[Sentinel/self-heal] Auto-resume check failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    console.warn('[Sentinel/self-heal] Auto-resume check failed:', getErrorMessage(e));
   }
 })();
 
@@ -216,12 +217,12 @@ try {
             totalBytes: dl.totalBytes || 0
           }
         }).catch((e) => {
-          console.error('[download_captured] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+          console.error('[download_captured] Unhandled rejection:', getErrorMessage(e));
         });
-      } catch (e) { console.warn('[Sentinel/index] download capture failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+      } catch (e) { console.warn('[Sentinel/index] download capture failed:', getErrorMessage(e)); }
     });
   }
-} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+} catch (e) { console.warn('[Sentinel/index] downloads API unavailable:', getErrorMessage(e)); }
 
 // ========== Toolbar Icon: Toggle Side Panel (3.12.2) ==========
 // Tell Chrome to handle the action-icon click natively as a toggle. With
@@ -236,7 +237,7 @@ try {
 // two APIs coexist fine.
 try {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
-    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
+    .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', getErrorMessage(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
 
 // (v3.53) When user opens a new tab during agent run, immediately disable
@@ -294,7 +295,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     }
     case 'delete_persisted_telemetry_run': {
       if (!request.runId) return { ok: false, error: 'runId required' };
-      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) }; }
+      try { await deletePersistedRun(request.runId); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', getErrorMessage(e)); return { ok: false, error: getErrorMessage(e) }; }
     }
 
     // (3.29.0) Skill outcome bridge. Settings UI reads via list_skills_with_stats
@@ -307,7 +308,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       try { return getSkillStats(); } catch { return {}; }
     }
     case 'reset_skill_stats': {
-      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) }; }
+      try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', getErrorMessage(e)); return { ok: false, error: getErrorMessage(e) }; }
     }
 
     case 'get_provider_catalog': {
@@ -345,13 +346,13 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             const base = u.protocol + '//' + u.host + u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '');
             modelsUrl = base.replace(/\/$/, '') + '/models';
           } catch (e) {
-            return { ok: false, error: 'Could not parse custom endpoint: ' + ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)) };
+            return { ok: false, error: 'Could not parse custom endpoint: ' + (getErrorMessage(e)) };
           }
         }
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
         return { ok: true, models };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+        return { ok: false, error: getErrorMessage(e) };
       }
     }
     case 'check_resume_available': {
@@ -392,7 +393,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         });
         return await startAgent(result.goal, sender);
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+        return { ok: false, error: getErrorMessage(e) };
       }
     }
     case 'execute_js_approval_request': {
@@ -493,7 +494,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           }, 60000);
         });
       } catch (e) {
-        return { approved: false, reason: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+        return { approved: false, reason: getErrorMessage(e) };
       }
     }
 
@@ -587,7 +588,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         try { await chrome.windows.update(match.windowId, { focused: true }); } catch (_e) { /* window may have closed */ }
         return { ok: true, tabId: match.id };
       } catch (e) {
-        return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+        return { ok: false, error: getErrorMessage(e) };
       }
     }
 
@@ -761,7 +762,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'schedule_clear_badge':
       { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
-        console.error('[_p] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+        console.error('[_p] Unhandled rejection:', getErrorMessage(e));
       }); }
       return { cleared: true };
 
@@ -925,7 +926,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       try { hostname = new URL(ssoTab.url).hostname; } catch (_e) { /* URL parse failed */ }
       sendSilentUpdate('🔐 SSO popup detected (' + hostname + ') — sign in, then the agent will continue automatically');
     }
-  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', getErrorMessage(e)); }
 });
 
 // Detect externally-closed tabs and clean up context
@@ -959,7 +960,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     }
-  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', getErrorMessage(e)); }
 });
 
 // ========== Keyboard Shortcut Commands ==========
@@ -978,7 +979,7 @@ chrome.commands.onCommand.addListener(async (command) => {
             const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (activeTab && typeof activeTab.id === 'number') {
               await chrome.sidePanel.open({ tabId: activeTab.id }).catch((e) => {
-                console.error('[attached] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+                console.error('[attached] Unhandled rejection:', getErrorMessage(e));
               });
             }
           } catch (_e) { /* no active tab — silently ignore */ }
@@ -1013,7 +1014,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         break;
       }
     }
-  } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+  } catch (e) { console.warn('Command handler error:', getErrorMessage(e)); }
 });
 
 // ========== Service Worker Suspend Cleanup ==========
@@ -1024,10 +1025,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onSuspend)
     // Detach all debugger connections to prevent port conflicts
     try {
       detachAllDebuggees().catch((e) => {
-        console.warn('[Sentinel] Failed to detach debuggees on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+        console.warn('[Sentinel] Failed to detach debuggees on suspend:', getErrorMessage(e));
       });
     } catch (e) {
-      console.warn('[Sentinel] Error detaching debuggees on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+      console.warn('[Sentinel] Error detaching debuggees on suspend:', getErrorMessage(e));
     }
 
     // Stop all keepalive intervals
@@ -1035,7 +1036,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onSuspend)
       stopSwKeepalive('default');
       stopSwKeepalive('agent-loop');
     } catch (e) {
-      console.warn('[Sentinel] Error stopping keepalive on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+      console.warn('[Sentinel] Error stopping keepalive on suspend:', getErrorMessage(e));
     }
   });
 }
