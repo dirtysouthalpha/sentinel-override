@@ -238,11 +238,11 @@ export function runRecoverySkills(context) {
       try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', getErrorMessage(e)); } catch (_e) { /* console unavailable */ }
     }
   }
-  if (injections.length > 0) {
+  if (injections.length) {
     result.promptInjection = `\n\n## RECOVERY DIRECTIVES (Sentinel skill library)\nThe engine detected a pattern that suggests a different strategy. Read these before deciding your next action:\n\n${injections.join('\n\n')}\n`;
   }
 
-  if (result.appliedSkillIds.length > 0) {
+  if (result.appliedSkillIds.length) {
     const now = Date.now();
     _pendingOutcomeSkillIds = result.appliedSkillIds.slice();
     for (const id of result.appliedSkillIds) {
