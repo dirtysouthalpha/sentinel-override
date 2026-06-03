@@ -6,6 +6,29 @@
 const STORAGE_KEY = 'sentinel_templates';
 const PARAM_REGEX = /:{2}(\w+):{2}/g;
 
+// ========== In-Memory Cache ==========
+let templatesCache = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 60000; // 1 minute TTL
+
+// Invalidate cache when storage changes externally (e.g., from popup)
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName === 'local' && changes[STORAGE_KEY]) {
+      templatesCache = null;
+      cacheTimestamp = 0;
+    }
+  });
+}
+
+/**
+ * Clear the in-memory cache. Exposed for testing.
+ */
+export function clearTemplateCache() {
+  templatesCache = null;
+  cacheTimestamp = 0;
+}
+
 // ========== Parameter Extraction ==========
 
 /**
@@ -42,22 +65,34 @@ export function extractParameters(goalText) {
 
 /**
  * Read the full templates object from chrome.storage.local.
+ * Uses in-memory cache to reduce I/O overhead.
  * @returns {Promise<Object<string, object>>}
  */
 export async function loadTemplates() {
+  const now = Date.now();
+  if (templatesCache && (now - cacheTimestamp) < CACHE_TTL) {
+    return templatesCache;
+  }
+
   try {
     const result = await chrome.storage.local.get([STORAGE_KEY]);
-    return result[STORAGE_KEY] || {};
+    templatesCache = result[STORAGE_KEY] || {};
+    cacheTimestamp = now;
+    return templatesCache;
   } catch (e) { console.error('[template-manager] loadTemplates failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); return {}; }
 }
 
 /**
  * Persist the full templates object to chrome.storage.local.
+ * Invalidates the in-memory cache after save.
  * @param {Object<string, object>} templates
  */
 export async function saveTemplates(templates) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: templates });
+    // Update cache immediately after save
+    templatesCache = templates;
+    cacheTimestamp = Date.now();
   } catch (e) {
     // Storage quota or unavailable — callers should handle
     throw new Error('Failed to save templates: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));

@@ -53,11 +53,13 @@ const {
   deleteTemplate,
   resolveTemplateGoal,
   updateTemplateUsage,
+  clearTemplateCache,
 } = await import('../background/template-manager.js');
 
 beforeEach(() => {
   storageData = {};
   jest.clearAllMocks();
+  clearTemplateCache();
 });
 
 // ========== extractParameters ==========
