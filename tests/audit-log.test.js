@@ -292,4 +292,20 @@ describe('clearAuditLog', () => {
     // Should not throw
     await clearAuditLog('run1');
   });
+
+  test('handles outer try block errors gracefully', async () => {
+    // Test the outer catch block (line 113 in audit-log.js) that catches errors
+    // from _storageKey(runId) computation before the inner remove call
+    const badRunId = {
+      toString: () => { throw new Error('toString failed'); },
+    };
+    const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // Should not throw - outer catch should handle the error
+    await clearAuditLog(badRunId);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[Sentinel/audit-log] clearAuditLog failed:',
+      'toString failed'
+    );
+    consoleSpy.mockRestore();
+  });
 });
