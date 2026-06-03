@@ -1673,7 +1673,7 @@ function hasPostCommitVerification(history) {
         if (COMMIT_TARGET_RE.test(probe)) sawCommit = true;
       }
     } else {
-      if (['read_page', 'extract', 'extract_list', 'note'].includes(t)) return true;
+      if (MEMORY_WRITING_ACTIONS.has(t)) return true;
     }
   }
   return false;
@@ -2053,6 +2053,14 @@ const REF_DRIVEN_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check',
 const TARGETABLE_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
 const LOOP_EXCLUDE_TYPES = new Set(['finish', 'navigate', 'extract', 'extract_list']);
 const FILLER_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
+const DATA_ACTIONS = new Set(['extract', 'extract_list', 'note', 'finish']);
+const TAB_ACTIONS = new Set(['open_tab', 'switch_tab', 'close_tab']);
+const INTERACTIVE_ACTIONS = new Set(['navigate', 'click', 'click_at', 'type', 'press_key', 'select', 'scroll_to', 'scroll']);
+const CDP_FALLBACK_BLOCKED = new Set(['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list', 'note', 'batch', 'smart_navigate']);
+const EXTRACT_ACTIONS = new Set(['extract', 'extract_list', 'read_page']);
+const MEMORY_WRITING_ACTIONS = new Set(['read_page', 'extract', 'extract_list', 'note']);
+const MODIFYING_INTERACTIVE_ACTIONS = new Set(['click', 'type', 'select', 'navigate', 'check', 'check_all']);
+const OTHER_ACTIONS = new Set(['execute_js', 'scroll', 'dismiss_overlay']);
 
 function _hostnameOf(url) {
   try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return ''; }
@@ -4117,7 +4125,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (!h || !h.action) return acc;
           const type = h.action.type;
           if (type === 'execute_js') acc.js++;
-          if (['extract', 'extract_list', 'note', 'finish'].includes(type)) acc.extract++;
+          if (DATA_ACTIONS.has(type)) acc.extract++;
           return acc;
         }, { js: 0, extract: 0 });
         const recentJsCount = _recentCounts.js;
@@ -4147,7 +4155,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
-      const recentTabActions = history.slice(-5).reduce((count, h) => count + (h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type) ? 1 : 0), 0);
+      const recentTabActions = history.slice(-5).reduce((count, h) => count + (h.action && TAB_ACTIONS.has(h.action.type) ? 1 : 0), 0);
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
@@ -5400,7 +5408,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Invalidate screenshot cache for actions that can change the page.
       // (#10) scroll_to changes viewport position which affects bbox/elementFromPoint
       // for the next observation — must invalidate.
-      if (['navigate', 'click', 'click_at', 'type', 'press_key', 'select', 'scroll_to', 'scroll'].includes(command.type)) {
+      if (INTERACTIVE_ACTIONS.has(command.type)) {
         const invalidationCtx = getTabContext(tab);
         if (invalidationCtx) {
           // (#11) Invalidate the entire snapshot object, not just the legacy field.
@@ -6301,7 +6309,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (v3.67) UNIVERSAL CDP fallback — when content script is dead and a specific
       // CDP handler didn't fire, convert the failed action to execute_js via CDP.
       // Covers: select, check, check_all, scroll_to, wait_for_element, hover, wait_for_text
-      if (actionFailed && _cdpFallbackActive && !['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list', 'note', 'batch', 'smart_navigate'].includes(command.type)) {
+      if (actionFailed && _cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
         try {
           let _universalJs = '';
           const _sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
@@ -6621,7 +6629,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Consecutive navigate tracking
       if (command.type === 'navigate') {
         consecutiveNavigates++;
-      } else if (['extract', 'extract_list', 'read_page'].includes(command.type)) {
+      } else if (EXTRACT_ACTIONS.has(command.type)) {
         consecutiveNavigates = 0;
       }
 
@@ -6658,11 +6666,11 @@ async function runAgentLoop(goal, workingTabId) {
       const speedMultiplier = agentSpeed === 'turbo' ? 0.02 : agentSpeed === 'stealth' ? 2.0 : agentSpeed === 'fast' ? 0.15 : 1.0;
       const actionType = command.type;
       let baseDelay;
-      if (['read_page', 'extract', 'extract_list', 'note'].includes(actionType)) {
+      if (MEMORY_WRITING_ACTIONS.has(actionType)) {
         baseDelay = 100 + Math.random() * 50;     // 100-150ms: data gathering (turbo ~7ms)
-      } else if (['click', 'type', 'select', 'navigate', 'check', 'check_all'].includes(actionType)) {
+      } else if (MODIFYING_INTERACTIVE_ACTIONS.has(actionType)) {
         baseDelay = 200 + Math.random() * 100;    // 200-300ms: deliberate actions (turbo ~15ms)
-      } else if (['execute_js', 'scroll', 'dismiss_overlay'].includes(actionType)) {
+      } else if (OTHER_ACTIONS.has(actionType)) {
         baseDelay = 75 + Math.random() * 50;      // 75-125ms: utility actions (turbo ~5ms)
       } else {
         baseDelay = 150 + Math.random() * 100;    // 150-250ms: default (turbo ~12ms)
