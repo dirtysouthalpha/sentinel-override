@@ -29,9 +29,19 @@ export async function waitForPageLoad(tabId) {
   const tab = await new Promise(resolve => { chrome.tabs.get(tabId, (i) => { resolve((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) ? null : i); }); });
   if (!tab || tab.status === 'complete') return;
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => { chrome.tabs.onUpdated.removeListener(listener); resolve(); }, pageLoadConfig.pageLoadTimeout);
+    const timeout = setTimeout(() => {
+      try {
+        chrome.tabs.onUpdated.removeListener(listener);
+      } catch (_e) { /* ignore - listener may not be registered */ }
+      resolve();
+    }, pageLoadConfig.pageLoadTimeout);
     const listener = (id, info) => { if (id === tabId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(listener); clearTimeout(timeout); resolve(); } };
-    chrome.tabs.onUpdated.addListener(listener);
+    try {
+      chrome.tabs.onUpdated.addListener(listener);
+    } catch (e) {
+      clearTimeout(timeout);
+      resolve();
+    }
   });
 }
 

@@ -660,6 +660,15 @@ async function showRunHistory(scheduleId, scheduleName) {
   }
 }
 
+// ========== Popup Unload Cleanup ==========
+// Clear intervals when popup closes to prevent memory leaks
+window.addEventListener('unload', () => {
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId);
+    refreshIntervalId = null;
+  }
+});
+
 // ========== Global Exports ==========
 window.showSchedulesPanel = showSchedulesPanel;
 window.hideSchedulesPanel = hideSchedulesPanel;

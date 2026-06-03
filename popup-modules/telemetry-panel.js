@@ -26,6 +26,7 @@
   let searchQuery = '';
   let autoScroll = true;
   let panelOpen = false;
+  let _searchDebounce = null;  // Search input debounce timer
   // (3.27.0) When non-null, the panel is displaying a persisted past run
   // instead of the live stream. Incoming telemetry_event messages are still
   // buffered (so toggling back to "Live" doesn't lose anything), but the
@@ -284,7 +285,6 @@
   function _wirePanelControls() {
     const searchInput = document.getElementById('telemSearch');
     if (searchInput) {
-      let _searchDebounce = null;
       searchInput.addEventListener('input', () => {
         clearTimeout(_searchDebounce);
         _searchDebounce = setTimeout(() => {
@@ -561,6 +561,14 @@
   } else {
     init();
   }
+
+  // Cleanup on popup unload
+  window.addEventListener('unload', () => {
+    if (_searchDebounce) {
+      clearTimeout(_searchDebounce);
+      _searchDebounce = null;
+    }
+  });
 
   try {
     window.__sentinelTelemetry = { toggle: togglePanel, eventCount: () => events.length };
