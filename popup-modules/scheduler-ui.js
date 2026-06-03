@@ -142,7 +142,8 @@ function renderScheduleCard(schedule) {
   let statusBadge = '';
   if (schedule.lastRunStatus) {
     const statusClass = schedule.lastRunStatus;
-    const statusLabel = (typeof schedule.lastRunStatus === 'string' && schedule.lastRunStatus.length > 0 ? schedule.lastRunStatus.charAt(0).toUpperCase() : '?') + (typeof schedule.lastRunStatus === 'string' && schedule.lastRunStatus.length > 1 ? schedule.lastRunStatus.slice(1) : '');
+    const status = schedule.lastRunStatus || '';
+    const statusLabel = status ? status.charAt(0).toUpperCase() + status.slice(1) : '?';
     statusBadge = `<span class="schedule-status-badge ${statusClass}">${statusLabel}</span>`;
   }
 

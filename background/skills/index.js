@@ -227,7 +227,7 @@ export function runRecoverySkills(context) {
     if (typeof skill.promptInjection !== 'function') continue;
     try {
       const text = skill.promptInjection(context);
-      if (text && typeof text === 'string' && text.trim().length > 0) {
+      if (typeof text === 'string' && text.trim()) {
         injections.push('### Recovery skill: ' + skill.id + '\n' + text.trim());
         if (!result.appliedSkillIds.includes(skill.id)) {
           result.appliedSkillIds.push(skill.id);
