@@ -43,13 +43,13 @@ import { generateHtmlReport, generateReplayReport } from './export-report.js';
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['api_endpoint', 'model'], (result) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.warn('[Sentinel] Migration get failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (chrome.runtime.lastError) { console.warn('[Sentinel] Migration get failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     const updates = {};
     if (result.api_endpoint && typeof result.api_endpoint === 'string' && result.api_endpoint.includes('bigmodel.cn')) updates.api_endpoint = '';
     if (result.model && typeof result.model === 'string' && (result.model.includes('glm-4.6v-flash') || result.model.includes('glm-4v-'))) updates.model = '';
     if (Object.keys(updates).length > 0) {
       chrome.storage.local.set(updates, () => {
-        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) console.error('[Sentinel] Migration set failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        if (chrome.runtime.lastError) console.error('[Sentinel] Migration set failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
       });
     }
   });
