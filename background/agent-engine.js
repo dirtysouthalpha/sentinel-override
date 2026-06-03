@@ -4223,6 +4223,7 @@ async function runAgentLoop(goal, workingTabId) {
       
       // v4.0 Vision-First Observation Override
       let _visionElements = null;
+      let _visionElementMap = null;
       let _visionElementTree = '';
       let _visionMode = false;
       // v4.0: Vision-first ALWAYS active
@@ -4232,6 +4233,7 @@ async function runAgentLoop(goal, workingTabId) {
           const visionResult = await _visionObserve(tab, currentUrl);
           if (visionResult.elements.length > 0) {
             _visionElements = visionResult.elements;
+            _visionElementMap = new Map(visionResult.elements.map(e => [e.index, e]));
             _visionElementTree = visionResult.elementTree;
             _visionMode = true;
             if (visionResult.pageText && visionResult.pageText.length > pageText.length) {
@@ -4254,7 +4256,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -5334,7 +5336,7 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION INDEX-BASED ACTION EXECUTION
       // ═══════════════════════════════════════════════════════════
       if (command._visionAction && Number.isInteger(command._visionIndex) && command._visionIndex > 0) {
-        const _viEl = _visionElements ? _visionElements.find(e => e.index === command._visionIndex) : null;
+        const _viEl = _visionElementMap ? _visionElementMap.get(command._visionIndex) : null;
         if (_viEl) {
           try {
             if (command.type === 'click_at') {
