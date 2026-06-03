@@ -1222,6 +1222,9 @@ const _PRICING = {
   'o3': [10.00, 40.00],
 };
 
+// Cache sorted pricing entries by key length (longest first) for efficient matching
+const _PRICING_SORTED = Object.entries(_PRICING).sort((a, b) => b[0].length - a[0].length);
+
 /**
  * Estimate run cost in USD from token counts and model name.
  * @param {number} inputTokens
@@ -1233,7 +1236,7 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   const m = (modelName || '').toLowerCase();
   if (!m) return ((inputTokens || 0) * 3.00 + (outputTokens || 0) * 15.00) / 1_000_000;
   let rates = [3.00, 15.00]; // default: Sonnet-class
-  for (const [key, r] of Object.entries(_PRICING).sort((a,b) => b[0].length - a[0].length)) {
+  for (const [key, r] of _PRICING_SORTED) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
   }
   if (!rates || !Array.isArray(rates) || typeof rates.length !== 'number' || rates.length < 2) {

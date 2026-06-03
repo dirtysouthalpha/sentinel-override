@@ -595,6 +595,9 @@ export const MODEL_VISION_OVERRIDES = {
   'claude-instant': false
 };
 
+// Cache sorted model vision override keys by length (longest first) for efficient matching
+const _MODEL_VISION_OVERRIDE_KEYS = Object.keys(MODEL_VISION_OVERRIDES).sort((a, b) => b.length - a.length);
+
 /**
  * Returns the registry's verdict on vision support for a (provider, model) pair,
  * or null if the registry has no opinion (caller should fall back to regex).
@@ -608,10 +611,9 @@ export function getModelSupportsVision(providerId, model) {
   const m = String(model).toLowerCase();
 
   // 1) Per-model explicit override (highest precedence).
-  // Sort by descending key length so more-specific keys (e.g. "glm-4.5v") win over
+  // Keys are pre-sorted by descending length so more-specific keys (e.g. "glm-4.5v") win over
   // shorter substrings (e.g. "glm-4") when one model ID contains another.
-  const keys = MODEL_VISION_OVERRIDES && typeof MODEL_VISION_OVERRIDES === 'object' ? Object.keys(MODEL_VISION_OVERRIDES) : [];
-  for (const key of keys.sort((a, b) => b.length - a.length)) {
+  for (const key of _MODEL_VISION_OVERRIDE_KEYS) {
     const k = String(key).toLowerCase();
     // Use substring matching only for keys long enough to avoid false positives (e.g. "o3", "o4").
     // Short keys (< 5 chars) require an exact match or a clear word boundary.
