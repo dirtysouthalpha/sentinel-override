@@ -2285,7 +2285,8 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
     const response = await fetch(endpoint, { method: 'POST', headers, body, signal: controller.signal });
     clearTimeout(timeout);
     if (!response.ok) {
-      const errText = await response.text().catch(() => '');
+      let errText;
+      try { errText = await response.text(); } catch (_) { errText = ''; }
       throw new Error(`API Error ${response?.status || 'unknown'}: ${errText.substring(0, 200)}`);
     }
     const data = await response.json();
