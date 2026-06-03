@@ -3189,7 +3189,6 @@ function _buildPageNarration(url, title, observation, pageContent) {
 
     for (const e of els) {
       const tag = e.tag || '';
-      const tagLower = tag.toLowerCase();
 
       // Count element types
       if (tag === 'form' || tag === 'FORM') {

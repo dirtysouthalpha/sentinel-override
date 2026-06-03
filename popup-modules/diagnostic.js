@@ -33,7 +33,7 @@
       let respStr;
       try {
         respStr = JSON.stringify(response).slice(0, 200);
-      } catch (e) {
+      } catch (_e) {
         respStr = '(unserializable response)';
       }
       log('SW responded: ' + respStr, true);

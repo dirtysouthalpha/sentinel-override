@@ -40,7 +40,7 @@ export async function waitForPageLoad(tabId) {
     const listener = (id, info) => { if (id === tabId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(listener); clearTimeout(timeout); resolve(); } };
     try {
       chrome.tabs.onUpdated.addListener(listener);
-    } catch (e) {
+    } catch (_e) {
       clearTimeout(timeout);
       resolve();
     }
