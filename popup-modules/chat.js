@@ -367,7 +367,7 @@ function loadApprovalMode() {
       isApprovalMode = true;
       chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
     } else {
-      isApprovalMode = result.approvalMode === true;
+      isApprovalMode = result.approvalMode;
     }
     if (approvalModeToggle) approvalModeToggle.checked = isApprovalMode;
     updateApprovalModeUI(isApprovalMode);

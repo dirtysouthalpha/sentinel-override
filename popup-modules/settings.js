@@ -173,7 +173,7 @@ const useTrustedInputToggle = document.getElementById('useTrustedInputToggle');
 if (useTrustedInputToggle) {
   chrome.storage.local.get(['useTrustedInput'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read useTrustedInput:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    useTrustedInputToggle.checked = result.useTrustedInput === true;
+    useTrustedInputToggle.checked = result.useTrustedInput;
   });
   useTrustedInputToggle.addEventListener('change', () => {
     const enabled = useTrustedInputToggle.checked;
@@ -206,7 +206,7 @@ const soundEnabledToggle = document.getElementById('soundEnabledToggle');
 if (soundEnabledToggle) {
   chrome.storage.local.get({ sentinelSoundEnabled: false }, (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read soundEnabled:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    soundEnabledToggle.checked = result.sentinelSoundEnabled === true;
+    soundEnabledToggle.checked = result.sentinelSoundEnabled;
   });
   soundEnabledToggle.addEventListener('change', () => {
     const enabled = soundEnabledToggle.checked;
@@ -477,7 +477,7 @@ const quickModeLabel = document.getElementById('quickModeLabel');
 if (quickModeToggle) {
   chrome.storage.local.get(['quickMode'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read quickMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    const enabled = result.quickMode === true;
+    const enabled = result.quickMode;
     quickModeToggle.checked = enabled;
     if (quickModeLabel) {
       quickModeLabel.textContent = enabled
@@ -537,7 +537,7 @@ if (ticketModeToggle) {
   // Load saved state and prefill technician fields.
   chrome.storage.local.get(['ticketMode', 'ticketFormat', 'technicianInfo'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read ticketMode:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    const enabled = result.ticketMode === true;
+    const enabled = result.ticketMode;
     ticketModeToggle.checked = enabled;
     __setTicketFormatRowVisible(enabled);
     if (ticketFormatSelect) {
