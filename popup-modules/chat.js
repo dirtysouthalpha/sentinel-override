@@ -3301,7 +3301,8 @@ chrome.runtime.onMessage.addListener((message) => {
           card.style.cssText = 'margin:6px 0; padding:8px 12px; background:var(--bg-secondary,#1a1a1a); border:1px solid var(--border,#333); border-left:3px solid #4a9eff; border-radius:6px; font-size:11px;';
           const header = document.createElement('div');
           header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
-          header.innerHTML = '<span style="font-weight:600; color:#4a9eff;">🧠 ' + facts.length + ' fact' + (facts.length !== 1 ? 's' : '') + ' for ' + (message.clientName || 'client') + '</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
+          const _factsLen = facts.length; // Cache to avoid repeated property access
+          header.innerHTML = '<span style="font-weight:600; color:#4a9eff;">🧠 ' + _factsLen + ' fact' + (_factsLen !== 1 ? 's' : '') + ' for ' + (message.clientName || 'client') + '</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
           const list = document.createElement('div');
           list.style.cssText = 'margin-top:6px;';
           facts.forEach(f => {
