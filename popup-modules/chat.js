@@ -751,7 +751,16 @@ function addMessage(text, role = 'assistant') {
   if (welcome) welcome.remove();
 
   // Ensure text is always a string
-  const textStr = typeof text === 'string' ? text : JSON.stringify(text);
+  let textStr;
+  if (typeof text === 'string') {
+    textStr = text;
+  } else {
+    try {
+      textStr = JSON.stringify(text);
+    } catch (e) {
+      textStr = (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e));
+    }
+  }
 
   if (!Array.isArray(state.conversationHistory)) {
     state.conversationHistory = [];
@@ -1522,7 +1531,11 @@ exportBtn.addEventListener('click', () => {
     filename = `conversation-${Date.now()}.md`;
     mimeType = 'text/markdown';
   } else if (format === 'json') {
-    content = JSON.stringify(state.conversationHistory, null, 2);
+    try {
+      content = JSON.stringify(state.conversationHistory, null, 2);
+    } catch (e) {
+      content = JSON.stringify({ error: 'Failed to serialize conversation', message: (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)) }, null, 2);
+    }
     filename = `conversation-${Date.now()}.json`;
     mimeType = 'application/json';
   } else {
