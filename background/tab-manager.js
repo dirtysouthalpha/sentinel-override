@@ -624,7 +624,7 @@ async function ensureDebuggerAttached(tabId) {
       }).catch((e) => {
         console.error('[Sentinel/tab-manager] Unhandled rejection in wasUserDetached:', getErrorMessage(e));
       });
-    } catch (_e) { console.warn('[Sentinel/tab-manager] CDP reattach warning broadcast failed:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
+    } catch (_e) { console.warn('[Sentinel/tab-manager] CDP reattach warning broadcast failed:', getErrorMessage(_e)); }
   }
 }
 
@@ -673,7 +673,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchMouseEvent', { ...base, type: 'mouseReleased' });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)) };
+    return { ok: false, error: getErrorMessage(err) };
   }
 }
 
@@ -744,7 +744,7 @@ export async function cdpDispatchKey(tabId, key, _options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
+    return { ok: false, error: getErrorMessage(err) };
   }
 }
 
@@ -848,7 +848,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
     await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
     return { ok: true };
   } catch (err) {
-    return { ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)) };
+    return { ok: false, error: getErrorMessage(err) };
   }
 }
 
@@ -895,7 +895,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
     const value = result && result.result ? result.result.value : undefined;
     return { ok: true, value };
   } catch (err) {
-    const msg = (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err));
+    const msg = getErrorMessage(err);
     // Detect chrome:// / extension page where debugger.attach is denied.
     return { ok: false, error: msg, cspBlocked: false, attachDenied: /Cannot access|chrome:\/\/|extension/i.test(msg) };
   }

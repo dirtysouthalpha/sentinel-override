@@ -191,7 +191,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     try {
       await executeScheduledTask(scheduleId);
     } catch (err) {
-      console.error('Scheduled task execution failed:', (typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err));
+      console.error('Scheduled task execution failed:', getErrorMessage(err));
     }
   }
 });
@@ -441,7 +441,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             },
             requestId
           }).catch((_e) => {
-            console.error('[finish] Unhandled rejection:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string') ? _e.message : String(_e));
+            console.error('[finish] Unhandled rejection:', getErrorMessage(_e));
           });
 
           // Notify the user
@@ -548,7 +548,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const text = await callLLMSimple(qaSystem, qaPrompt, 1200);
         return { text };
       } catch (err) {
-        return { text: 'Error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)) };
+        return { text: 'Error: ' + getErrorMessage(err) };
       }
     }
 

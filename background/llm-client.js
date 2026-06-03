@@ -1008,7 +1008,7 @@ export async function generatePlan(goal, settings, context = {}) {
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             if (s2end === -1) {
-              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', (typeof parseErr === 'object' && parseErr !== null && typeof parseErr.message === 'string' ? parseErr.message : String(parseErr)));
+              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', getErrorMessage(parseErr));
             }
           }
           s2from = s2end + 1;
@@ -2182,7 +2182,7 @@ export function parseLLMResponse(content) {
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e) {
-      throw new Error('Failed to parse action JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      throw new Error('Failed to parse action JSON: ' + getErrorMessage(e));
     }
     if (!parsed.type && parsed.action && typeof parsed.action === 'object' && parsed.action !== null) parsed = parsed.action;
     if (!parsed.type && parsed.command && typeof parsed.command === 'object' && parsed.command !== null) parsed = parsed.command;
@@ -2229,7 +2229,7 @@ export function parseLLMResponse(content) {
         }
       } catch (e) { console.warn('[Sentinel/llm] Parse failed:', getErrorMessage(e)); }
     }
-    return { type: 'note', text: `Parse error (will retry): ${typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)}` };
+    return { type: 'note', text: `Parse error (will retry): ${getErrorMessage(err)}` };
   }
 }
 
