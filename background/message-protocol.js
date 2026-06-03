@@ -31,7 +31,7 @@ export function sendMessage(tabId, message, timeoutMs = 10000) {
         reject(new Error('No response from content script'));
         return;
       }
-      if (response.ok === false) {
+      if (!response.ok) {
         reject(new Error(response.error || 'Unknown content script error'));
         return;
       }

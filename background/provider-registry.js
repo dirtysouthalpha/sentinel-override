@@ -414,7 +414,7 @@ export const PROVIDERS = {
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
-        if (data.code && data.success === false) {
+        if (data.code && !data.success) {
           const msg = typeof data.msg === 'string' ? data.msg : 'Unknown error';
           throw new Error(`🔑 API Authentication Failed: ${msg} (code ${data.code}). Check your API key in extension settings.`);
         }
@@ -472,7 +472,7 @@ export const PROVIDERS = {
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
-        if (data.code && data.success === false) {
+        if (data.code && !data.success) {
           const msg = (typeof data.msg === 'string' ? data.msg : null) || (typeof data.message === 'string' ? data.message : null);
           throw new Error(`🔑 API Authentication Failed: ${msg || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
         }

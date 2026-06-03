@@ -245,7 +245,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
     try {
       const response = await chrome.tabs.sendMessage(tabId, message);
       // Unwrap the content-script envelope: { ok: true, data: <actual> }
-      if (response && response.ok === false) {
+      if (response && !response.ok) {
         throw new Error(response.error || 'Content script error');
       }
       // Unwrap outer envelope
