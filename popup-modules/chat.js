@@ -3283,7 +3283,7 @@ chrome.runtime.onMessage.addListener((message) => {
           facts.forEach(f => {
             const item = document.createElement('div');
             item.style.cssText = 'padding:3px 0; border-top:1px solid var(--border,#333); color:var(--text-secondary,#aaa); line-height:1.5;';
-            const wisdom = (f.wisdom || '').length > 120 ? f.wisdom.substring(0, 117) + '...' : f.wisdom;
+            const wisdom = (f.wisdom || '').length > 120 ? (f.wisdom || '').substring(0, 117) + '...' : (f.wisdom || '');
             item.textContent = wisdom;
             list.appendChild(item);
           });
@@ -3427,7 +3427,7 @@ chrome.runtime.onMessage.addListener((message) => {
     hideMiniShot();
     try { clearActivityState(); } catch { /* activity state may not be initialized */ }
     try {
-      const summary = message.summary || 'Done';
+      const summary = String(message.summary || 'Done');
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
       addMessage(prefix + summary, 'assistant');
       try {
