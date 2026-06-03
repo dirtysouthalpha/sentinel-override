@@ -102,7 +102,7 @@ async function _checkDomReadyState(tabId) {
     if (typeof data === 'string') {
       try { data = JSON.parse(data.replace('JS Result: ', '')); } catch (_e) { /* parse failed */ }
     }
-    if (data && typeof data === 'object' && data !== null) {
+    if (data && typeof data === 'object') {
       let parsed;
       try { parsed = typeof data.value === 'string' ? JSON.parse(data.value) : data; } catch (_e) { parsed = null; }
       if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
@@ -953,7 +953,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
   let viewport = { width: 0, height: 0, dpr: 1, scrollX: 0, scrollY: 0 };
   try {
     const vp = await sendMessageWithRetry(tabId, { action: 'get_viewport_info' }, 1);
-    if (vp && typeof vp === 'object' && vp !== null) {
+    if (vp && typeof vp === 'object') {
       viewport = {
         width: Number(vp.width) || 0,
         height: Number(vp.height) || 0,

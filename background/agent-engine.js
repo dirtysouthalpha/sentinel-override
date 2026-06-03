@@ -226,7 +226,7 @@ export async function restoreFromCheckpoint() {
     if (!cp.lastGoal) return { restored: false, error: 'no goal in checkpoint' };
 
     // Restore in-memory state
-    if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object' && cp.agentMemorySnapshot !== null) {
+    if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object') {
       Object.assign(agentMemory, cp.agentMemorySnapshot);
     }
     if (Array.isArray(cp.historySnapshot)) {
@@ -240,7 +240,7 @@ export async function restoreFromCheckpoint() {
     if (cp.agentSpeed && ['turbo', 'normal', 'stealth'].includes(cp.agentSpeed)) agentSpeed = cp.agentSpeed;
     if (cp.expectedTenant) expectedTenant = cp.expectedTenant;
     if (cp.activeClientId) activeClientId = cp.activeClientId;
-    if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object' && cp.runSettingsSnapshot !== null) {
+    if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
       Object.assign(_runSettings, cp.runSettingsSnapshot);
     }
     if (cp.trustCounters && typeof cp.trustCounters === 'object' && cp.trustCounters !== null) {
