@@ -2476,7 +2476,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       break;
     }
     case 'type': {
-      var safeText = (cmd.text || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+      var safeText = escapeJsString(cmd.text || '', '"');
       jsCode = '(function(){'
         + 'var el=' + finderCode + ';'
         + 'if(!el)return JSON.stringify({ok:false,error:"input not found"});'
@@ -2491,7 +2491,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       break;
     }
     case 'select': {
-      var safeVal = (cmd.value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+      var safeVal = escapeJsString(cmd.value || '', '"');
       jsCode = '(function(){'
         + 'var el=' + finderCode + ';'
         + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
@@ -5411,7 +5411,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             } else if (command.type === 'type') {
               // Type into indexed element
-              const _safeText = (command.text || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+              const _safeText = escapeJsString(command.text || '', "'");
               try {
                 const _typeRes = await cdpExecuteJs(tab,
                   'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
@@ -6762,6 +6762,20 @@ function sleep(ms) {
   // waits, which are exactly what operators want to see.
   try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Escape a string for safe inclusion in JavaScript code (CDP injection).
+ * Handles backslashes, quotes, newlines, carriage returns, and tabs.
+ * @param {string} str - The string to escape.
+ * @param {string} [quote='"'] - The quote character to escape ('"' or "'").
+ * @returns {string} The escaped string.
+ */
+function escapeJsString(str, quote = '"') {
+  if (typeof str !== 'string') return '';
+  const backslashEscaped = str.replace(/\\/g, '\\\\');
+  const quoteEscaped = quote === '"' ? backslashEscaped.replace(/"/g, '\\"') : backslashEscaped.replace(/'/g, "\\'");
+  return quoteEscaped.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
 }
 
 // ========== Approval Mode ==========

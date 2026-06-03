@@ -80,28 +80,48 @@ describe('vision index guard uses Number.isInteger and > 0', () => {
 
 // ═══════════════════════════════════════════════════════════════════
 // Vision type CDP string escaping — \r and \t (Bug #2 fix)
+// Now uses escapeJsString helper function
 // ═══════════════════════════════════════════════════════════════════
-describe('vision type action _safeText escaping includes \\r and \\t', () => {
+describe('vision type action _safeText escaping uses escapeJsString', () => {
   // Find the _safeText assignment line in the vision type handler
-  const safeTextLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.includes('const _safeText') && l.includes('replace'));
+  const safeTextLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.includes('const _safeText') && l.includes('escapeJsString'));
 
   it('_safeText line exists', () => {
     expect(safeTextLine).toBeTruthy();
   });
 
-  it('escapes carriage return (\\r)', () => {
-    expect(safeTextLine).toContain('\\r');
+  it('uses escapeJsString helper', () => {
+    expect(safeTextLine).toContain('escapeJsString');
   });
 
-  it('escapes tab (\\t)', () => {
-    expect(safeTextLine).toContain('\\t');
+  it('passes single quote for escaping', () => {
+    expect(safeTextLine).toContain("'");
   });
+});
 
-  it('escapes newline (\\n)', () => {
-    expect(safeTextLine).toContain('\\n');
+describe('escapeJsString helper function', () => {
+  it('is defined', () => {
+    expect(src).toContain('function escapeJsString');
   });
 
   it('escapes backslash', () => {
-    expect(safeTextLine).toContain('\\/g');
+    expect(src).toContain('replace(/\\\\/g');
+  });
+
+  it('escapes newlines', () => {
+    expect(src).toContain("replace(/\\n/g, '\\\\n')");
+  });
+
+  it('escapes carriage returns', () => {
+    expect(src).toContain("replace(/\\r/g, '\\\\r')");
+  });
+
+  it('escapes tabs', () => {
+    expect(src).toContain("replace(/\\t/g, '\\\\t')");
+  });
+
+  it('supports quote parameter for escaping', () => {
+    expect(src).toContain('quote =');
+    expect(src).toContain('quote ===');
   });
 });
