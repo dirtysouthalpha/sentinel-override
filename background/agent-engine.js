@@ -4626,13 +4626,13 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Template substitution: replace ::key:: with memory values
-      if (command.text && typeof command.text === 'string') {
+      if (typeof command.text === 'string') {
         command.text = command.text.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
-      if (command.url && typeof command.url === 'string') {
+      if (typeof command.url === 'string') {
         command.url = command.url.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
-      if (command.value && typeof command.value === 'string') {
+      if (typeof command.value === 'string') {
         command.value = command.value.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
       }
 
@@ -4640,7 +4640,7 @@ async function runAgentLoop(goal, workingTabId) {
       // in the most recent observation almost always means the model invented
       // it (or carried it over from a stale step). We log a warning but DON'T
       // block — the content script handles stale-ref fallback to selector.
-      if (command.ref && typeof command.ref === 'string') {
+      if (typeof command.ref === 'string') {
         const refExists = trimmedElements.some(e => e.ref === command.ref);
         if (!refExists) {
           try {

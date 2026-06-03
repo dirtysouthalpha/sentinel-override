@@ -2079,7 +2079,7 @@ function showMfaBanner(url, hint, _stepNumber) {
   if (existing) existing.remove();
 
   let host = '';
-  if (url && typeof url === 'string') {
+  if (typeof url === 'string') {
     try { host = new URL(url).hostname; } catch { host = url; }
   } else {
     host = 'the page';
@@ -2136,7 +2136,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   if (existing) existing.remove();
 
   let hostname = host || '';
-  if (!hostname && url && typeof url === 'string') {
+  if (!hostname && typeof url === 'string') {
     try { hostname = new URL(url).hostname; } catch { hostname = url; }
   }
   if (!hostname) hostname = 'the page';

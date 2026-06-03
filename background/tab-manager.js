@@ -519,8 +519,8 @@ export function readNetworkRequests(tabId, options) {
   } else if (filter === '5xx') {
     arr = arr.filter(e => e.status >= 500);
   }
-  if (urlIncludes && typeof urlIncludes === 'string') {
-    const needle = typeof urlIncludes === 'string' ? urlIncludes.toLowerCase() : '';
+  if (typeof urlIncludes === 'string') {
+    const needle = urlIncludes.toLowerCase();
     arr = arr.filter(e => (e.url || '').toLowerCase().includes(needle));
   }
   // Most-recent first

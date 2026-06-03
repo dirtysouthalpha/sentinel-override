@@ -230,13 +230,13 @@ function sendNotification(schedule, result) {
 
   if (result.status === 'success') {
     message = `Completed successfully at ${completedDate.toLocaleTimeString()}.`;
-    if (result.report && typeof result.report === 'string') {
+    if (typeof result.report === 'string') {
       const snippet = result.report.substring(0, 150).replace(/\n/g, ' ');
       message += ` ${snippet}${result.report.length > 150 ? '...' : ''}`;
     }
   } else {
     message = `Failed at ${completedDate.toLocaleTimeString()}.`;
-    if (result.error && typeof result.error === 'string') {
+    if (typeof result.error === 'string') {
       message += ` Error: ${result.error.substring(0, 100)}`;
     }
   }

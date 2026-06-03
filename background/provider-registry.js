@@ -243,7 +243,7 @@ export const PROVIDERS = {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
-        if (errMsg && typeof errMsg === 'string') {
+        if (typeof errMsg === 'string') {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
@@ -339,7 +339,7 @@ export const PROVIDERS = {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
-        if (errMsg && typeof errMsg === 'string') {
+        if (typeof errMsg === 'string') {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
