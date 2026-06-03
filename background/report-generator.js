@@ -117,10 +117,10 @@ function _buildMemorySummary(agentMemory) {
   });
   // (3.50.0) Hard-cap each memory entry at 400 chars — keeps report prompt
   // small enough to avoid timeouts on slower models.
-  const memorySummary = usableKeys.length > 0
+  const memorySummary = usableKeys.length
     ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 400)}`).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
-  const citableKeysList = usableKeys.length > 0
+  const citableKeysList = usableKeys.length
     ? usableKeys.map(k => `\`${k}\``).join(', ')
     : '(none — investigation produced no extractable data)';
   return { memorySummary, citableKeysList };
@@ -256,7 +256,7 @@ export async function generateReport(executionData, CONFIG) {
     ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 14} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]
     : _allHistory;
   const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
-  const planContext = agentPlan && agentPlan.length > 0
+  const planContext = agentPlan && agentPlan.length
     ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => {
         const stepStr = typeof s === 'string' ? s : (s && s.description) || '';
         try {
@@ -266,7 +266,7 @@ export async function generateReport(executionData, CONFIG) {
         }
       }).join('\n')}`
     : '\nNo formal plan was generated (direct execution mode).';
-  const tabReferences = tabContexts.length > 0
+  const tabReferences = tabContexts.length
     ? `\nTabs/screenshots captured:\n${tabContexts.map(tc => `- "${tc.label}" (${tc.url})${tc.hasScreenshot ? ' [screenshot available]' : ''}`).join('\n')}`
     : '';
 
@@ -488,7 +488,7 @@ ${stepsTaken || 'No significant steps recorded.'}
 Report generation encountered an error. The raw extracted data is shown below.
 
 ### Evidence
-${memoryLines.length > 0 ? memoryLines.join('\n') : 'No data was extracted during this investigation.'}
+${memoryLines.length ? memoryLines.join('\n') : 'No data was extracted during this investigation.'}
 
 ### Conclusions
 Investigation completed in ${stepCount} steps (${apiCallCount} API calls). For a detailed report, retry the task or check the agent's step-by-step log above.`;

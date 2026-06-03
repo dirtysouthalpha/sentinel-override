@@ -160,9 +160,9 @@ export function describeTrustScore(scoreResult) {
     { name: 'efficiency',   delta: safeDelta(breakdown.efficiency) },
   ];
   components.sort((a, b) => b.delta - a.delta);
-  if (components.length > 0 && components[0].delta > 5) parts.push('weak ' + components[0].name);
+  if (components[0]?.delta > 5) parts.push('weak ' + components[0].name);
   if (breakdown.safety) { const blocks = breakdown.safety.blocks; if (blocks > 0) parts.push(blocks + ' safety block' + (blocks > 1 ? 's' : '')); }
-  const suffix = parts.length > 0 ? ' (' + parts.join(', ') + ')' : '';
+  const suffix = parts.length ? ' (' + parts.join(', ') + ')' : '';
   return 'Trust ' + score + '/100 · ' + band + suffix;
 }
 

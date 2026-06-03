@@ -842,7 +842,7 @@ function _buildPlanPrompt(goal, context) {
     ? `Current page: ${context.currentUrl}${context.pageTitle ? ` (${context.pageTitle})` : ''}\n`
     : '';
   const platformContext = context.platformContext || '';
-  const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length > 0
+  const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length
     ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal && typeof p === 'object' ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && typeof s === 'object' && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
@@ -959,18 +959,18 @@ export async function generatePlan(goal, settings, context = {}) {
     try {
       const parsed = JSON.parse(jsonStr);
       // Some models (Z.AI/GLM) return a bare array ["step1","step2"] with no wrapper object
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed) && parsed.length) {
         const strs = _normalizeSteps(parsed);
-        if (strs.length > 0) return strs;
+        if (strs.length) return strs;
       }
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.plan) && parsed.plan.length > 0) {
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.plan) && parsed.plan.length) {
         const strs = _normalizeSteps(parsed.plan);
-        if (strs.length > 0) return strs;
+        if (strs.length) return strs;
       }
       // Some models return { "steps": [...] } instead of { "plan": [...] }
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length) {
         const strs = _normalizeSteps(parsed.steps);
-        if (strs.length > 0) return strs;
+        if (strs.length) return strs;
       }
     } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', getErrorMessage(e)); }
 
@@ -995,8 +995,8 @@ export async function generatePlan(goal, settings, context = {}) {
         if (s2end !== -1) {
           try {
             const parsed = JSON.parse(contentNoThink.substring(s2start, s2end + 1));
-            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _normalizeSteps(parsed.plan); if (r.length > 0) return r; }
-            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _normalizeSteps(parsed.steps); if (r.length > 0) return r; }
+            if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
+            if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             if (s2end === -1) {
@@ -1015,15 +1015,15 @@ export async function generatePlan(goal, settings, context = {}) {
       const objEnd = contentNoThink.lastIndexOf('}');
       if (objStart !== -1 && objEnd > objStart) {
         const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
-        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _normalizeSteps(parsed.plan); if (r.length > 0) return r; }
-        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _normalizeSteps(parsed.steps); if (r.length > 0) return r; }
+        if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
+        if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
       }
       // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
       const arrStart = contentNoThink.indexOf('[');
       const arrEnd = contentNoThink.lastIndexOf(']');
       if (arrStart !== -1 && arrEnd > arrStart && (objStart === -1 || arrStart < objStart)) {
         const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
-        if (Array.isArray(parsed) && parsed.length > 0) { const r = _normalizeSteps(parsed); if (r.length > 0) return r; }
+        if (Array.isArray(parsed) && parsed.length) { const r = _normalizeSteps(parsed); if (r.length) return r; }
       }
     } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', getErrorMessage(e)); }
 
@@ -1167,8 +1167,8 @@ const _rateLimiter = {
     const now = Date.now();
     // Drop timestamps outside the sliding window
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    if (this.timestamps.length >= this.maxCalls && this.timestamps.length > 0) {
-      const oldestInWindow = Array.isArray(this.timestamps) && this.timestamps.length > 0 ? this.timestamps[0] : now;
+    if (this.timestamps.length >= this.maxCalls && this.timestamps.length) {
+      const oldestInWindow = Array.isArray(this.timestamps) && this.timestamps.length ? this.timestamps[0] : now;
       const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
       throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
     }
