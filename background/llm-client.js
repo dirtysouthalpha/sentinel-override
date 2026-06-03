@@ -8,6 +8,38 @@ import { resolveProvider, getActiveProvider, getModelSupportsVision } from './pr
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage } from './error-utils.js';
 
+// Constants for response parsing - avoid recreating on every call
+const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
+  'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
+  'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
+  'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
+  'navigate_back', 'navigate_forward',
+  'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
+  'read_console_messages', 'read_network_requests',
+  'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
+  'smart_navigate', 'batch']);
+
+// Site name to domain mapping - avoid recreating on every call
+const SITE_DOMAIN_MAP = {
+  amazon: 'amazon.com',
+  reddit: 'reddit.com',
+  youtube: 'youtube.com',
+  google: 'google.com',
+  twitter: 'twitter.com',
+  github: 'github.com',
+  wikipedia: 'wikipedia.org',
+  hackernews: 'news.ycombinator.com',
+  'hacker news': 'news.ycombinator.com',
+  cnn: 'cnn.com',
+  bbc: 'bbc.com',
+  nytimes: 'nytimes.com',
+  'weather.gov': 'weather.gov',
+  stackoverflow: 'stackoverflow.com',
+  facebook: 'facebook.com',
+  instagram: 'instagram.com',
+  linkedin: 'linkedin.com'
+};
+
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
 // Detects when a goal mentions 2+ M365/security admin centers (Entra,
 // Exchange, Purview, OneDrive, SharePoint, Teams, Intune, Defender, Compliance,
@@ -1956,18 +1988,19 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       const _intentText = ((typeof _msg.content === 'string' ? _msg.content : '') || '') + ' ' + ((typeof _msg.reasoning_content === 'string' ? _msg.reasoning_content : '') || '');
       // Detect smart_navigate intent from content
       if (/smart[._-]?navigate/i.test(_intentText)) {
+        const _goal = goal || ''; // Cache to avoid repeated fallback
         let _site = 'google', _query = '';
-        if (/weather\.gov/i.test(goal || '')) _site = 'weather.gov';
-        else if (/wikipedia/i.test(goal || '')) _site = 'wikipedia';
-        else if (/youtube/i.test(goal || '')) _site = 'youtube';
-        else if (/amazon/i.test(goal || '')) _site = 'amazon';
-        else if (/reddit/i.test(goal || '')) _site = 'reddit';
-        else if (/twitter\.com|x\.com/i.test(goal || '')) _site = 'twitter';
+        if (/weather\.gov/i.test(_goal)) _site = 'weather.gov';
+        else if (/wikipedia/i.test(_goal)) _site = 'wikipedia';
+        else if (/youtube/i.test(_goal)) _site = 'youtube';
+        else if (/amazon/i.test(_goal)) _site = 'amazon';
+        else if (/reddit/i.test(_goal)) _site = 'reddit';
+        else if (/twitter\.com|x\.com/i.test(_goal)) _site = 'twitter';
         // Extract query from goal text
-        const _qm = (goal || '').match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
+        const _qm = _goal.match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
         if (_qm && _qm[1]) _query = _qm[1].trim();
         else {
-          const _fm = (goal || '').match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
+          const _fm = _goal.match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
           if (_fm && _fm[1]) _query = _fm[1].trim();
         }
         if (_query) {
@@ -1989,8 +2022,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
       const _siteUrl = _intentText.match(/(?:go|navigate)\s+(?:to\s+)?(?:the\s+)?(amazon|reddit|youtube|google|twitter|github|wikipedia|hackernews|hacker\s+news|cnn|bbc|nytimes|weather\.gov|stackoverflow|facebook|instagram|linkedin)[\s.,)]/i);
       if (_siteUrl && _siteUrl[1]) {
-        const _siteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', google: 'google.com', twitter: 'twitter.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', 'weather.gov': 'weather.gov', stackoverflow: 'stackoverflow.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com' };
-        const _mapped = _siteMap[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
+        const _mapped = SITE_DOMAIN_MAP[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
         if (_mapped) {
           console.warn('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
           return { type: 'navigate', url: 'https://' + _mapped };
@@ -2026,15 +2058,6 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 export function extractFirstJsonObject(str) {
   // Try every '{' position to find a valid JSON object with a "type" field.
   // This handles models that prepend reasoning text before the actual JSON.
-  const validTypes = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
-    'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
-    'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-    'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
-    'navigate_back', 'navigate_forward',
-    'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
-    'read_console_messages', 'read_network_requests',
-    'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
-    'smart_navigate', 'batch']);
 
   let searchFrom = 0;
   while (searchFrom < str.length) {
@@ -2057,7 +2080,7 @@ export function extractFirstJsonObject(str) {
       const candidate = str.substring(start, end + 1);
       try {
         const parsed = JSON.parse(candidate);
-        if (parsed.type && validTypes.has(parsed.type)) return candidate;
+        if (parsed.type && VALID_ACTION_TYPES.has(parsed.type)) return candidate;
       } catch (e) { console.warn('[Sentinel/llm] JSON parse failed:', getErrorMessage(e)); }
       searchFrom = end + 1;
     } else {
