@@ -23,7 +23,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
 
     // Container class heuristics
     const classStr = (el.className || '').toLowerCase();
-    if (classStr.includes('datepicker') || classStr.includes('date-picker') || classStr.includes('calendar')) {
+    if (/datepicker|date-picker|calendar/.test(classStr)) {
       return true;
     }
 
@@ -32,7 +32,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
     let depth = 0;
     while (parent && depth < 3) {
       const parentClass = (parent.className || '').toLowerCase();
-      if (parentClass.includes('datepicker') || parentClass.includes('date-picker') || parentClass.includes('calendar')) {
+      if (/datepicker|date-picker|calendar/.test(parentClass)) {
         return true;
       }
       parent = parent.parentElement;

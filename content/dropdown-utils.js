@@ -387,8 +387,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
       className = (typeof el.className === 'string') ? el.className : (el.className && el.className.baseVal) || '';
     } catch (e) { console.warn('[Sentinel] className access:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     className = className.toLowerCase();
-    if (className.includes('dropdown') || className.includes('combobox') ||
-        className.includes('select') || className.includes('picker')) {
+    if (/dropdown|combobox|select|picker/.test(className)) {
       return true;
     }
 

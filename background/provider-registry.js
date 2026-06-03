@@ -655,8 +655,8 @@ export function getModelSupportsVision(providerId, model) {
  */
 export function resolveProvider(endpoint) {
   if (!endpoint) return PROVIDERS.openai;
-  if (endpoint.includes('api.anthropic.com')) return PROVIDERS.anthropic;
-  if (endpoint.includes('api.z.ai') || endpoint.includes('z.ai')) return PROVIDERS.zai;
+  if (/api\.anthropic\.com/.test(endpoint)) return PROVIDERS.anthropic;
+  if (/api\.z\.ai|z\.ai/.test(endpoint)) return PROVIDERS.zai;
   return PROVIDERS.openai;
 }
 
@@ -669,8 +669,8 @@ export function resolveProvider(endpoint) {
  */
 export function detectProviderFromEndpoint(endpoint) {
   if (!endpoint) return 'openai';
-  if (endpoint.includes('api.anthropic.com')) return 'anthropic';
-  if (endpoint.includes('z.ai')) return 'zai';
+  if (/api\.anthropic\.com/.test(endpoint)) return 'anthropic';
+  if (/z\.ai/.test(endpoint)) return 'zai';
   return 'openai';
 }
 
