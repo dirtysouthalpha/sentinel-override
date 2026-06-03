@@ -188,6 +188,11 @@ if (window.__sentinelInitialized) {
       'button[class*="close" i]', '[class*="dismiss-btn" i]',
     ];
 
+    // Early exit if already at max dismissals
+    if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) {
+      return { dismissed, count: __sentinelDismissalCount, capped: true };
+    }
+
     for (const sel of closeBtnSelectors) {
       if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
       try {

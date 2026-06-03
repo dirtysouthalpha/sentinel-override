@@ -1606,14 +1606,19 @@ const COMMANDS = [
   { name: 'About', desc: 'About Sentinel Override', action: 'about', icon: 'info' },
 ];
 
+// Cache normalized commands for faster filtering (avoid repeated toLowerCase calls)
+const COMMANDS_NORMALIZED = COMMANDS.map(cmd => ({
+  ...cmd,
+  nameLower: cmd.name.toLowerCase(),
+  descLower: cmd.desc.toLowerCase()
+}));
+
 function filterCommands() {
   if (!commandInput) return;
   const query = commandInput.value.toLowerCase();
-  const filtered = COMMANDS.filter(cmd => {
-    const nameLower = typeof cmd.name === 'string' ? cmd.name.toLowerCase() : '';
-    const descLower = typeof cmd.desc === 'string' ? cmd.desc.toLowerCase() : '';
-    return nameLower.includes(query) || descLower.includes(query);
-  });
+  const filtered = COMMANDS_NORMALIZED.filter(cmd =>
+    cmd.nameLower.includes(query) || cmd.descLower.includes(query)
+  );
   renderCommandList(filtered);
 }
 
