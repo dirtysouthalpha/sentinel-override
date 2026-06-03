@@ -51,6 +51,8 @@ let _pendingPersistFlush = false;
 
 // In-memory cache for runs index to eliminate repetitive I/O
 let _runsIndexCache = null;
+// Pending read promise to prevent duplicate storage reads when multiple callers invoke _getRunsIndex simultaneously
+let _runsIndexReadPromise = null;
 
 // (3.28.0) Redaction layer. With v3.27.0 persistence + Export JSON shipped,
 // telemetry payloads can leak across sessions and into bug-report files. We
@@ -198,6 +200,7 @@ function _redactEvent(event) {
       }
       if (changes.telemetry_runs_index) {
         _runsIndexCache = Array.isArray(changes.telemetry_runs_index.newValue) ? changes.telemetry_runs_index.newValue : [];
+        _runsIndexReadPromise = null;
       }
     });
   } catch (e) { console.warn('[Sentinel/telemetry] init error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
@@ -237,18 +240,26 @@ async function _flushRunBuffer() {
 /**
  * Get the runs index from cache or storage.
  * Uses in-memory cache to eliminate repetitive I/O.
+ * Coalesces simultaneous reads to prevent duplicate storage access.
  * @returns {Promise<Array>} The runs index array.
  */
 async function _getRunsIndex() {
   if (_runsIndexCache !== null) return _runsIndexCache;
+  // If a read is already in progress, wait for it to complete instead of duplicating the I/O
+  if (_runsIndexReadPromise) return _runsIndexReadPromise;
   try {
-    const stored = await chrome.storage.local.get('telemetry_runs_index');
-    _runsIndexCache = Array.isArray(stored.telemetry_runs_index) ? stored.telemetry_runs_index : [];
+    _runsIndexReadPromise = (async () => {
+      const stored = await chrome.storage.local.get('telemetry_runs_index');
+      _runsIndexCache = Array.isArray(stored.telemetry_runs_index) ? stored.telemetry_runs_index : [];
+      _runsIndexReadPromise = null;
+      return _runsIndexCache;
+    })();
+    return await _runsIndexReadPromise;
   } catch (e) {
     _runsIndexCache = [];
+    _runsIndexReadPromise = null;
     throw e;
   }
-  return _runsIndexCache;
 }
 
 /**
