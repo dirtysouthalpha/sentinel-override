@@ -883,12 +883,20 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'export_replay_report': {
       const { runLogId: reqRunId, estimatedCostUsd } = request.params || {};
-      const runId = reqRunId || (await chrome.storage.local.get('run_log_index').then(r => {
-        const idx = (r.run_log_index || []);
-        return idx.length > 0 && idx[0] ? idx[0].runLogId : null;
-      }).catch(() => null));
+      let runId = reqRunId;
+      if (!runId) {
+        try {
+          const r = await chrome.storage.local.get('run_log_index');
+          const idx = (r.run_log_index || []);
+          runId = (idx.length > 0 && idx[0]) ? idx[0].runLogId : null;
+        } catch (_) { runId = null; }
+      }
       if (!runId) throw new Error('No run log available to export');
-      const logData = await chrome.storage.local.get('run_log_' + runId).then(r => r['run_log_' + runId]).catch(() => null);
+      let logData;
+      try {
+        const r = await chrome.storage.local.get('run_log_' + runId);
+        logData = r['run_log_' + runId];
+      } catch (_) { logData = null; }
       if (!logData || !logData.entries) throw new Error('Run log data not found');
       const html = generateReplayReport(logData.entries, { goal: logData.goal, runLogId: runId, estimatedCostUsd: estimatedCostUsd || 0 });
       return { html };
