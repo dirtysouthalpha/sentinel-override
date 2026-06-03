@@ -10,6 +10,8 @@
 //   index.js  --> shared-state.js  <-- agent-engine.js
 // No circular imports.
 
+import { getErrorMessage } from './error-utils.js';
+
 let _spaTransitionPending = false;
 
 /** Mark that an SPA page transition occurred while the agent is running. */
@@ -52,7 +54,7 @@ export function startSwKeepalive(name) {
     try {
       if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.set) {
         chrome.storage.session.set({ ['_sw_keepalive_' + name]: Date.now() }).catch((e) => {
-          console.error('[tick] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+          console.error('[tick] Unhandled rejection:', getErrorMessage(e));
         });
       } else if (chrome && chrome.runtime && chrome.runtime.getPlatformInfo) {
         chrome.runtime.getPlatformInfo(() => {});
@@ -87,7 +89,7 @@ export function stopSwKeepalive(name) {
   try {
     if (chrome && chrome.storage && chrome.storage.session && chrome.storage.session.remove) {
       chrome.storage.session.remove('_sw_keepalive_' + name).catch((e) => {
-        console.error('[handle] Unhandled rejection:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+        console.error('[handle] Unhandled rejection:', getErrorMessage(e));
       });
     }
   } catch (_e) { /* session storage may not be available */ }

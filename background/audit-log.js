@@ -57,7 +57,7 @@ export async function appendAuditEntry(runId, entry) {
     await chrome.storage.local.set({ [key]: log }).catch((e) => {
       console.error('[audit-log] Error:', getErrorMessage(e) || String(e));
     });
-  } catch (e) { console.warn('[Sentinel/audit-log] appendAuditEntry failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/audit-log] appendAuditEntry failed:', getErrorMessage(e)); }
 }
 
 /**
@@ -76,7 +76,7 @@ export async function getAuditLog(runId) {
     return Array.isArray(stored[key]) ? stored[key] : [];
   } catch (e) {
     /* storage read failed — return empty log rather than crashing */
-    console.warn('[Sentinel/audit-log] storage read failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.warn('[Sentinel/audit-log] storage read failed:', getErrorMessage(e));
     return [];
   }
 }
@@ -112,7 +112,7 @@ export async function clearAuditLog(runId) {
     await chrome.storage.local.remove(key).catch((e) => {
       console.error('[audit-log] remove failed:', getErrorMessage(e) || String(e));
     });
-  } catch (e) { console.warn('[Sentinel/audit-log] clearAuditLog failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/audit-log] clearAuditLog failed:', getErrorMessage(e)); }
 }
 
 /**
