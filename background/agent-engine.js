@@ -14,8 +14,11 @@ const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use st
 // Precompute valid agent speed modes for O(1) lookup
 const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
 
-// Precompiled regex for extracting JSON from markdown code blocks
+// Precompile regex for extracting JSON from markdown code blocks
 const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
+
+// Priority element types for O(1) lookup in element sorting
+const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
@@ -3953,10 +3956,15 @@ async function runAgentLoop(goal, workingTabId) {
       if (pageIsEmpty) {
         pageText = '[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n' + pageText;
       }
-      const priorityTypes = ['button', 'input', 'select', 'textarea'];
       const { priorityEls, otherEls } = allElements.reduce((acc, e) => {
         const selectorLower = e.selector?.toLowerCase() || '';
-        const isPriority = priorityTypes.some(t => selectorLower.includes(t));
+        let isPriority = false;
+        for (const t of PRIORITY_ELEMENT_TYPES) {
+          if (selectorLower.includes(t)) {
+            isPriority = true;
+            break;
+          }
+        }
         (isPriority ? acc.priorityEls : acc.otherEls).push(e);
         return acc;
       }, { priorityEls: [], otherEls: [] });
