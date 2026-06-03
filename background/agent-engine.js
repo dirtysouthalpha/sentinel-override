@@ -1159,11 +1159,12 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (/virustotal/i.test(url)) portalsSeen.add('VirusTotal');
     }
     const memCount = Object.keys(agentMemory).length;
+    const lastAction = history.length > 0 ? history[history.length - 1] : null;
     const lines = [
       '📊 PROGRESS UPDATE — step ' + stepCount,
       'Portals visited: ' + (portalsSeen.size > 0 ? Array.from(portalsSeen).join(', ') : '(none yet)'),
       'Data points in memory: ' + memCount,
-      'Recent action: ' + (history.length > 0 && history[history.length - 1].action ? history[history.length - 1].action.type : '(none)')
+      'Recent action: ' + (lastAction?.action ? lastAction.action.type : '(none)')
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
   } catch (e) { console.warn('[Sentinel] HUD update failed:', getErrorMessage(e)); }
