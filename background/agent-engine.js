@@ -5658,16 +5658,16 @@ async function runAgentLoop(goal, workingTabId) {
         if (!targetId && command.label) {
           targetId = findTabByLabel(command.label);
         }
+        // Cache tab contexts to avoid redundant getAllTabContexts() calls
+        const allCtx = getAllTabContexts();
         // Support the `index` parameter from the tool definition
         if (!targetId && typeof command.index === 'number') {
-          const allCtx = getAllTabContexts();
           if (Array.isArray(allCtx) && command.index >= 0 && command.index < allCtx.length) {
             targetId = allCtx[command.index].tabId;
           }
         }
         // Default: close the current active tab (if it's not the last one)
         if (!targetId) {
-          const allCtx = getAllTabContexts();
           const activeId = getActiveTabId();
           if (allCtx.length > 1 && activeId) {
             targetId = activeId;
