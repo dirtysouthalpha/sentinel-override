@@ -612,7 +612,7 @@ export function getModelSupportsVision(providerId, model) {
   // shorter substrings (e.g. "glm-4") when one model ID contains another.
   const keys = MODEL_VISION_OVERRIDES && typeof MODEL_VISION_OVERRIDES === 'object' ? Object.keys(MODEL_VISION_OVERRIDES) : [];
   for (const key of keys.sort((a, b) => b.length - a.length)) {
-    const k = typeof key === 'string' ? key.toLowerCase() : String(key).toLowerCase();
+    const k = String(key).toLowerCase();
     // Use substring matching only for keys long enough to avoid false positives (e.g. "o3", "o4").
     // Short keys (< 5 chars) require an exact match or a clear word boundary.
     const isExact = m === k;

@@ -2324,7 +2324,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
         // Convert "AI decided: note" → "Recording a note", "AI decided: finish" → "Finishing run"
         const m = label.match(/AI decided:\s*(\w+)/i);
         if (m) {
-          const t = typeof m[1] === 'string' ? m[1].toLowerCase() : String(m[1]).toLowerCase();
+          const t = String(m[1]).toLowerCase();
           const pretty = {
             note: 'Recording a note',
             extract: 'Extracting data',

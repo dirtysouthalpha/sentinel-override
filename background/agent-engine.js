@@ -2052,7 +2052,7 @@ function _tenantsMatch(detected, expected) {
   if (!expected || (typeof expected === 'string' && !expected.trim())) return true;  // no expected = no lock
   if (!detected) return false;  // we have an expectation but nothing detected yet → block
   const exp = typeof expected === 'string' ? expected.trim().toLowerCase() : '';
-  const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
+  const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => String(s).toLowerCase());
   return signals.some(s => s && (s.includes(exp) || exp.includes(s)));
 }
 
@@ -4766,7 +4766,7 @@ async function runAgentLoop(goal, workingTabId) {
         // (Microsoft Graph API via read_network_requests, alternate URLs,
         // Log Analytics KQL, etc.) before declaring done.
         try {
-          const _summary = typeof command.summary === 'string' ? command.summary.toLowerCase() : String(command.summary || '').toLowerCase();
+          const _summary = String(command.summary || '').toLowerCase();
           const _isMultiPortal = (function() {
             try {
               const RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|m365|admin\.microsoft|portal\.azure|sentinelone|virustotal)\b/gi;
