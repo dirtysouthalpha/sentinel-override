@@ -2574,10 +2574,12 @@ if (window.__sentinelInitialized) {
     }); } catch (e) { console.warn('[Sentinel] safe send msg:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
   }
 
-  function setupSPAObservers() {
-    let spaDebounce = null;
+  // SPA observer at module scope for cleanup access
+  let domObserver = null;
+  let spaDebounce = null;
 
-    const domObserver = new MutationObserver((mutations) => {
+  function setupSPAObservers() {
+    domObserver = new MutationObserver((mutations) => {
       const significantChange = mutations.some(m =>
         m.addedNodes.length > 0 || m.removedNodes.length > 0
       );
@@ -2636,6 +2638,18 @@ if (window.__sentinelInitialized) {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         dispatchSPATransition(lastUrl);
+      }
+    });
+
+    // Cleanup on page unload to prevent memory leaks
+    window.addEventListener('beforeunload', () => {
+      if (domObserver) {
+        domObserver.disconnect();
+        domObserver = null;
+      }
+      if (spaDebounce) {
+        clearTimeout(spaDebounce);
+        spaDebounce = null;
       }
     });
   }

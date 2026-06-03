@@ -3,8 +3,8 @@
 
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
-import { injectContentScript, sendMessageWithRetry, isValidUrl } from './tab-manager.js';
-import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
+import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
+import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
 import { getActiveTabId, handleTabRemoved } from './tab-context.js';
 import { callLLMSimple } from './llm-client.js';
@@ -1015,3 +1015,28 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
   } catch (e) { console.warn('Command handler error:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 });
+
+// ========== Service Worker Suspend Cleanup ==========
+// Chrome suspends the service worker when idle to save resources.
+// Clean up resources to prevent memory leaks and dangling connections.
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onSuspend) {
+  chrome.runtime.onSuspend.addListener(() => {
+    // Detach all debugger connections to prevent port conflicts
+    try {
+      detachAllDebuggees().catch((e) => {
+        console.warn('[Sentinel] Failed to detach debuggees on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+      });
+    } catch (e) {
+      console.warn('[Sentinel] Error detaching debuggees on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    }
+
+    // Stop all keepalive intervals
+    try {
+      stopSwKeepalive('default');
+      stopSwKeepalive('agent-loop');
+    } catch (e) {
+      console.warn('[Sentinel] Error stopping keepalive on suspend:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    }
+  });
+}
+
