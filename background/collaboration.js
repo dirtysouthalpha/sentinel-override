@@ -117,7 +117,7 @@ export function validateImport(importedData) {
 
   // Extract templates array
   const templates = importedData.format === 'sentinel-template-batch'
-    ? (importedData.templates || [])
+    ? (Array.isArray(importedData.templates) ? importedData.templates : [])
     : (importedData.template ? [importedData.template] : []);
 
   if (templates.length === 0) {
