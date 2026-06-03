@@ -1077,7 +1077,13 @@ const HISTORY_SUMMARIZE_BATCH = 15;
 function summarizeHistoryBatch(batch) {
   if (!batch || batch.length === 0) return null;
   const firstValid = batch.find(h => h && h.step !== undefined);
-  const lastValid = [...batch].reverse().find(h => h && h.step !== undefined);
+  let lastValid = null;
+  for (let i = batch.length - 1; i >= 0; i--) {
+    if (batch[i] && batch[i].step !== undefined) {
+      lastValid = batch[i];
+      break;
+    }
+  }
   if (!firstValid || !lastValid) return null;
   const counts = {};
   const navUrls = [];
@@ -4670,7 +4676,8 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_) { /* completeness check failure is non-fatal */ }
 
-        const memCount = Object.keys(agentMemory || {}).length;
+        const memKeys = Object.keys(agentMemory || {});
+        const memCount = memKeys.length;
         const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
         const hasData = memCount > 0 || noteCount > 0;
 
@@ -4705,7 +4712,7 @@ async function runAgentLoop(goal, workingTabId) {
             const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
             const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
             const _notes = history.filter(h => h.action && h.action.type === 'note').length;
-            const _summaryKeys = Object.keys(agentMemory || {}).filter(k =>
+            const _summaryKeys = memKeys.filter(k =>
               k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
             );
             // Block: haven't opened ANY article tabs AND no summaries written
@@ -4785,7 +4792,6 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('Task complete', stepCount);
 
         let finalSummary = command.summary || '';
-        const memKeys = Object.keys(agentMemory || {});
 
         // Clean up memory — filter out failed/timed-out/empty entries
         const cleanMemory = {};
