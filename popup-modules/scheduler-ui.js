@@ -122,7 +122,7 @@ function renderScheduleCard(schedule) {
     const r = schedule.recurrence;
     if (r.interval === 'daily') {
       recurrenceText = `Daily at ${r.time || '09:00'}`;
-    } else if (r.interval === 'weekly' && r.daysOfWeek && r.daysOfWeek.length > 0) {
+    } else if (r.interval === 'weekly' && r.daysOfWeek && r.daysOfWeek.length) {
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const days = [...r.daysOfWeek].sort((a, b) => a - b).map(d => dayNames[d]).join(', ');
       recurrenceText = `Weekly on ${days} at ${r.time || '09:00'}`;
@@ -363,7 +363,7 @@ document.getElementById('sch-template-id')?.addEventListener('change', (e) => {
 
   // Find template from cache or fetch
   const cached = templatesCache.find(t => t.id === templateId);
-  if (cached && cached.params && cached.params.length > 0) {
+  if (cached && cached.params && cached.params.length) {
     renderTemplateParams(cached.params);
   } else {
     container.innerHTML = '';

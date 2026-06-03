@@ -236,7 +236,7 @@ function updateActiveTabAction(payload) {
     if (!tabId && __atsStripState.url) {
       try {
         const tabs = await chrome.tabs.query({ url: __atsStripState.url });
-        if (tabs && tabs.length > 0) tabId = tabs[0].id;
+        if (tabs && tabs.length) tabId = tabs[0].id;
       } catch (_apiErr) { /* extension API may fail */ }
     }
     // Fallback 2: query by hostname pattern
@@ -244,7 +244,7 @@ function updateActiveTabAction(payload) {
       try {
         const pattern = '*://*.' + __atsStripState.hostname.replace(/^www\./, '') + '/*';
         const tabs = await chrome.tabs.query({ url: pattern });
-        if (tabs && tabs.length > 0) tabId = tabs[0].id;
+        if (tabs && tabs.length) tabId = tabs[0].id;
       } catch (_apiErr) { /* extension API may fail */ }
     }
     // Fallback 3: bare hostname in URL string match across all tabs
@@ -655,7 +655,7 @@ function addActionCard(payload) {
 
   // Drain any log lines that arrived before this card was created
   const logs = state.pendingStepLogs[payload.stepNumber];
-  if (logs && Array.isArray(logs) && logs.length > 0) {
+  if (logs && Array.isArray(logs) && logs.length) {
     logs.forEach(text => appendLogLine(payload.stepNumber, text));
     delete state.pendingStepLogs[payload.stepNumber];
   }
@@ -726,7 +726,7 @@ function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    if (Array.isArray(result.chat_history) && result.chat_history.length > 0) {
+    if (Array.isArray(result.chat_history) && result.chat_history.length) {
       state.conversationHistory = result.chat_history;
       if (chatContainer) chatContainer.innerHTML = '';
       state.conversationHistory.forEach(turn => {
@@ -991,7 +991,7 @@ function sendMessage() {
     const lastGoal = stored.last_agent_goal || '';
     const history = stored.agent_history || [];
     // If the message is short and looks like a follow-up (not a URL or specific instruction), prepend context
-    const isFollowUp = goal.length < 50 && history.length > 0 &&
+    const isFollowUp = goal.length < 50 && history.length &&
       !goal.startsWith('http') &&
       !/go to|navigate|search/.test(goal);
     if (isFollowUp && lastGoal) {
@@ -1648,7 +1648,7 @@ function moveCommandSelection(direction) {
   const items = commandList.querySelectorAll('.command-item');
   const selected = commandList.querySelector('.command-item.selected');
 
-  if (!selected && items.length > 0) {
+  if (!selected && items.length) {
     items[0].classList.add('selected');
   } else if (selected) {
     const nextIndex = Array.from(items).indexOf(selected) + direction;
@@ -3207,7 +3207,7 @@ function _ensureHeartbeatDot() {
 function _updateHeartbeat(durationMs) {
   __heartbeat.samples.push(durationMs);
   if (__heartbeat.samples.length > 5) __heartbeat.samples.shift();
-  const avg = __heartbeat.samples.length > 0
+  const avg = __heartbeat.samples.length
     ? Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / __heartbeat.samples.length)
     : 0;
   const dot = _ensureHeartbeatDot();
@@ -3593,7 +3593,7 @@ chrome.runtime.onMessage.addListener((message) => {
             const sevColor = sug.severity === 'high' ? '#f44'
               : sug.severity === 'medium' ? '#e0af68'
               : '#7aa2f7';
-            const isAutoApply = Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0;
+            const isAutoApply = Array.isArray(sug.applyKeys) && sug.applyKeys.length;
             const isResetSkills = sug.id === 'reset-skills-and-retry';
             const sCard = document.createElement('div');
             sCard.className = 'retry-suggestion-card';
@@ -3678,7 +3678,7 @@ chrome.runtime.onMessage.addListener((message) => {
             sCard.appendChild(header);
             chatContainer.appendChild(sCard);
           }
-          if (suggestions.length > 0) {
+          if (suggestions.length) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
           }
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */

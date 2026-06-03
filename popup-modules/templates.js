@@ -92,7 +92,7 @@ function renderTemplateList(templates) {
     const card = document.createElement('div');
     card.className = 'template-card';
 
-    const tagsHtml = (template.tags && template.tags.length > 0)
+    const tagsHtml = (template.tags && template.tags.length)
       ? `<div class="template-card-tags">${template.tags.map(t => `<span class="template-tag">${escapeHtml(t)}</span>`).join('')}</div>`
       : '';
 

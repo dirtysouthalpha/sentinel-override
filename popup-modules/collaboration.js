@@ -77,7 +77,7 @@ function openImportDialog() {
       }
 
       // Check for version warnings
-      if (result.warnings && result.warnings.length > 0) {
+      if (result.warnings && result.warnings.length) {
         showImportPreview(result, result.warnings);
       } else {
         showImportPreview(result, []);
@@ -137,11 +137,11 @@ function showImportPreview(validationResult, warnings) {
     const row = document.createElement('div');
     row.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-color);';
 
-    const paramsText = (t.params && t.params.length > 0)
+    const paramsText = (t.params && t.params.length)
       ? `${t.params.length} param(s)`
       : 'No params';
 
-    const tagsText = (t.tags && t.tags.length > 0)
+    const tagsText = (t.tags && t.tags.length)
       ? t.tags.map(tag => `<span class="template-tag">${escapeHtml(tag)}</span>`).join(' ')
       : '';
 
@@ -159,7 +159,7 @@ function showImportPreview(validationResult, warnings) {
   // Show version warning if any
   const warningEl = document.getElementById('import-version-warning');
   if (warningEl) {
-    if (warnings.length > 0) {
+    if (warnings.length) {
       warningEl.style.display = 'block';
       warningEl.innerHTML = warnings.map(w =>
         `<div style="font-size:12px;color:var(--warning-color);padding:4px 0;">⚠ ${escapeHtml(w)}</div>`

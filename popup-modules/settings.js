@@ -31,7 +31,7 @@ function loadThemePreference() {
     applyThemePreset(savedNamedTheme);
     // Update active preset button
     const themeButtons = document.querySelectorAll('[data-theme]');
-    if (themeButtons.length > 0) {
+    if (themeButtons.length) {
       themeButtons.forEach(b => {
         b.classList.toggle('active', b.dataset.theme === savedNamedTheme);
       });
@@ -76,7 +76,7 @@ function switchProviderCard(providerId) {
 
   // Update active provider button styling
   const providerButtons = document.querySelectorAll('.provider-btn');
-  if (providerButtons.length > 0) {
+  if (providerButtons.length) {
     providerButtons.forEach(btn => {
       btn.classList.toggle('active-provider', btn.dataset.provider === providerId);
     });
@@ -99,7 +99,7 @@ function switchProviderCard(providerId) {
 
 // Wire up provider selector buttons
 const providerBtns = document.querySelectorAll('.provider-btn');
-if (providerBtns.length > 0) {
+if (providerBtns.length) {
   providerBtns.forEach(btn => {
     btn.addEventListener('click', () => switchProviderCard(btn.dataset.provider));
   });
@@ -781,12 +781,12 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
 
 // ========== Theme Customization ==========
 const themeButtons = document.querySelectorAll('[data-theme]');
-if (themeButtons.length > 0) {
+if (themeButtons.length) {
   themeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const theme = btn.dataset.theme;
       const allThemeButtons = document.querySelectorAll('[data-theme]');
-      if (allThemeButtons.length > 0) {
+      if (allThemeButtons.length) {
         allThemeButtons.forEach(b => b.classList.remove('active'));
       }
       btn.classList.add('active');
@@ -991,7 +991,7 @@ if (closeThemeBtn) closeThemeBtn.addEventListener('click', () => {
 
 // ========== Preset Buttons ==========
 const presetButtons = document.querySelectorAll('.preset-btn');
-if (presetButtons.length > 0) {
+if (presetButtons.length) {
   presetButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const provider = btn.dataset.provider || ((btn.dataset.endpoint || '').includes('api.anthropic.com') ? 'anthropic' : 'openai');
@@ -1261,7 +1261,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 (function wireThemeAutoSave() {
   function init() {
     const themePresets = document.querySelectorAll('.theme-preset[data-theme]');
-    if (themePresets.length > 0) {
+    if (themePresets.length) {
       themePresets.forEach(el => {
         el.addEventListener('click', () => {
           const theme = el.dataset.theme;
@@ -1276,7 +1276,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
             console.warn('[Sentinel/settings] localStorage save failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e));
           }
           const allThemePresets = document.querySelectorAll('.theme-preset');
-          if (allThemePresets.length > 0) {
+          if (allThemePresets.length) {
             allThemePresets.forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
           }
           try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
