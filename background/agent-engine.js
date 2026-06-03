@@ -2956,10 +2956,11 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
 
   // For each requested field, check whether ANY token from it appears in
   // memory or notes. This is a deliberately loose heuristic.
+  // Pre-create filler Set once for all fields (not in loop)
+  const filler = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
   const missing = [];
   for (const field of rawFields) {
     // Pull "key" tokens from the field name (skip filler words)
-    const filler = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
     const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t)) : [];
     if (tokens.length === 0) continue;
     // Match if ANY meaningful token from this field shows up in evidence
@@ -4967,6 +4968,8 @@ async function runAgentLoop(goal, workingTabId) {
         }
         sendSilentUpdate(`repeat_for_each: ${items.length} items × ${doActions.length} actions`, stepCount);
         const iterVar = command.item_var || 'item';
+        // Pre-compile regex for template substitution - created once, reused for all iterations
+        const _templateRegex = new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g');
         for (const _item of items) {
           for (const _act of doActions) {
             if (!_act || !_act.type) continue;
@@ -4974,7 +4977,7 @@ async function runAgentLoop(goal, workingTabId) {
             // correctness (handles undefined fields, circular-ref-safe) and
             // speed (avoids double-parse on deeply nested action objects).
             const _resolvedStr = JSON.stringify(structuredClone(_act)).replace(
-              new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g'),
+              _templateRegex,
               (_, field) => field ? (typeof _item === 'object' && _item !== null ? String(_item[field] ?? '') : '') : String(_item)
             );
             let _resolved;
