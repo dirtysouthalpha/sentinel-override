@@ -45,7 +45,7 @@ async function _visionObserve(tab, _currentUrl) {
     } catch (e) { console.warn('[Sentinel/v4] Page text failed:', getErrorMessage(e)); }
 
     // Step 5: Build element tree text for LLM
-    let elementTree = '';
+    const elementParts = [];
     for (const el of indexedElements) {
       const tag = el.tag || 'div';
       let attrs = '';
@@ -56,8 +56,9 @@ async function _visionObserve(tab, _currentUrl) {
       if (el.href && el.href.length > 5 && el.href.length < 100) attrs += ' href=' + JSON.stringify(el.href.substring(0, 80));
       const text = el.text ? '>' + (el.text || '').substring(0, 60) : '/>';
       const closing = el.text ? '</' + tag + '>' : '';
-      elementTree += '[' + el.index + ']<' + tag + attrs + text + closing + '\n';
+      elementParts.push('[' + el.index + ']<' + tag + attrs + text + closing + '\n');
     }
+    const elementTree = elementParts.join('');
 
     return {
       elements: Array.isArray(indexedElements) ? indexedElements : [],
@@ -1157,7 +1158,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (/sentinelone/i.test(url)) portalsSeen.add('SentinelOne');
       else if (/virustotal/i.test(url)) portalsSeen.add('VirusTotal');
     }
-    const memCount = Object.keys(agentMemory || {}).length;
+    const memCount = Object.keys(agentMemory).length;
     const lines = [
       '📊 PROGRESS UPDATE — step ' + stepCount,
       'Portals visited: ' + (portalsSeen.size > 0 ? Array.from(portalsSeen).join(', ') : '(none yet)'),
@@ -4086,7 +4087,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Cache memory count for reuse in this section (perf: multiple uses below)
-      const memCount = Object.keys(agentMemory || {}).length;
+      const memCount = Object.keys(agentMemory).length;
 
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (history.length >= 3 && !loopDirective) {
