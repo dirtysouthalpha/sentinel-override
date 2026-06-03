@@ -2661,7 +2661,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       return 'solved';
     }
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Auto-solve attempt failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    console.warn('[Sentinel/CAPTCHA] Auto-solve attempt failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
   
   // Strategy 2: Navigate to an alternative URL for the same site
@@ -2697,7 +2697,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     await sleep(2000);
     return 'went_back';
   } catch (e) {
-    console.log('[Sentinel/CAPTCHA] Go back failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    console.warn('[Sentinel/CAPTCHA] Go back failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
   }
   
   // Strategy 4: Pause for user
