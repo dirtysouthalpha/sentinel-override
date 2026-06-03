@@ -1529,7 +1529,8 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         setTimeout(() => hl.removeHighlight(el), 2000);
         const classes = String(el.className || '').split(' ').filter(Boolean);
-        const classSuffix = classes.length > 0 ? '.' + classes[0] : '';
+        const _classesLen = classes.length; // Cache to avoid repeated property access
+        const classSuffix = _classesLen > 0 ? '.' + classes[0] : '';
         return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + classSuffix;
       }
 

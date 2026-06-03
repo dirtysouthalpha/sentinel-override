@@ -223,7 +223,8 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     //    e.g. "div.container > ul > li > a.btn" → try "a.btn" alone.
     try {
       var _parts = selector.split(/[\s>+~]+/);
-      var _leaf = _parts.length > 0 ? (_parts[_parts.length - 1] || '').trim() : '';
+      var _partsLen = _parts.length; // Cache to avoid repeated property access
+      var _leaf = _partsLen > 0 ? (_parts[_partsLen - 1] || '').trim() : '';
       if (_leaf && _leaf !== selector && _leaf.length > 1) {
         try {
           var _leafEl = doc.querySelector(_leaf);
