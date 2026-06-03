@@ -361,7 +361,7 @@ export const PROVIDERS = {
             } else {
               input = { text: String(argsStr || '') };
             }
-          } catch {
+          } catch (_parseErr) {
             // If arguments aren't valid JSON, treat the whole string as a note
             input = { text: String(tc.function.arguments || '') };
           }

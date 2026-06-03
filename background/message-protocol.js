@@ -139,7 +139,7 @@ function _describeCommand(command, observation) {
     return `${command.type} element`;
   }
   if (command.type === 'navigate' && command.url) {
-    try { return `Navigate to ${new URL(command.url).hostname}`; } catch { return `Navigate to ${command.url}`; }
+    try { return `Navigate to ${new URL(command.url).hostname}`; } catch (_urlErr) { return `Navigate to ${command.url}`; }
   }
   if (command.type === 'scroll')              return `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
   if (command.type === 'execute_js') {

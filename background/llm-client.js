@@ -1829,7 +1829,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 
   if (!response.ok) {
     let errorData;
-    try { errorData = await response.text(); } catch { errorData = 'unable to read error body'; }
+    try { errorData = await response.text(); } catch (_readErr) { errorData = 'unable to read error body'; }
     if (response.status === 429) throw new Error(`429 Rate limited. ${errorData}`);
     if (response.status === 400 && errorData && typeof errorData === 'string' && errorData.includes('Unknown Model')) throw new Error(`Unknown model "${model}".`);
     // (3.51.1) Vision fallback: if we sent image content and got a 400, retry
@@ -1860,7 +1860,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       clearTimeout(_fbTimeout);
       if (!_fbResp.ok) {
         let _fbErr;
-        try { _fbErr = await _fbResp.text(); } catch { _fbErr = 'unable to read error body'; }
+        try { _fbErr = await _fbResp.text(); } catch (_readErr) { _fbErr = 'unable to read error body'; }
         if (_fbResp.status === 429) throw new Error(`429 Rate limited. ${_fbErr}`);
         throw new Error(`API Error: ${_fbResp.status} - ${_fbErr}`);
       }

@@ -162,7 +162,7 @@ function extractJsonObject(text) {
       depth--;
       if (depth === 0) {
         const candidate = s.substring(start, i + 1);
-        try { return JSON.parse(candidate); } catch { return null; }
+        try { return JSON.parse(candidate); } catch (_parseErr) { return null; }
       }
     }
   }

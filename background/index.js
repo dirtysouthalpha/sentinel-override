@@ -287,11 +287,11 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // panel context and can't import telemetry.js directly — these handlers
     // expose the persistence read/delete API.
     case 'list_persisted_telemetry_runs': {
-      try { return await listPersistedRuns(); } catch { return []; }
+      try { return await listPersistedRuns(); } catch (_loadErr) { return []; }
     }
     case 'load_persisted_telemetry_run': {
       if (!request.runId) return [];
-      try { return await loadPersistedRun(request.runId); } catch { return []; }
+      try { return await loadPersistedRun(request.runId); } catch (_loadErr) { return []; }
     }
     case 'delete_persisted_telemetry_run': {
       if (!request.runId) return { ok: false, error: 'runId required' };
@@ -302,10 +302,10 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     // to render the per-skill success-rate table, then optionally resets via
     // reset_skill_stats. Both are popup-initiated, no side effects on the agent loop.
     case 'list_skills_with_stats': {
-      try { return listSkills(); } catch { return []; }
+      try { return listSkills(); } catch (_listErr) { return []; }
     }
     case 'get_skill_stats': {
-      try { return getSkillStats(); } catch { return {}; }
+      try { return getSkillStats(); } catch (_statsErr) { return {}; }
     }
     case 'reset_skill_stats': {
       try { await resetSkillStats(); return { ok: true }; } catch (e) { console.error('[Sentinel] Error in index.js:', getErrorMessage(e)); return { ok: false, error: getErrorMessage(e) }; }
@@ -323,7 +323,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           auth: p.auth,
           docsUrl: p.docsUrl
         }));
-      } catch { return []; }
+      } catch (_mapErr) { return []; }
     }
     case 'fetch_provider_models': {
       // (3.10.0) Auto-detect models for the selected provider. Caller passes
@@ -370,7 +370,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           stepCount: cp.stepCount || 0,
           ageSeconds: Math.floor(age / 1000)
         };
-      } catch {
+      } catch (_checkpointErr) {
         return { available: false };
       }
     }
@@ -572,7 +572,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const target = String(request.url || '');
         if (!target) return { ok: false, error: 'focus_tab_by_url: missing url' };
         let targetHost;
-        try { targetHost = new URL(target).host; } catch { targetHost = ''; }
+        try { targetHost = new URL(target).host; } catch (_urlErr) { targetHost = ''; }
         const tabs = await chrome.tabs.query({});
         if (!tabs || tabs.length === 0) return { ok: false, error: 'no tabs available' };
         // Prefer exact URL match, fall back to host match (Microsoft sign-in

@@ -2671,7 +2671,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
   
   // Strategy 2: Navigate to an alternative URL for the same site
   let host;
-  try { host = new URL(currentUrl).hostname.replace(/^www\./, ''); } catch { host = ''; }
+  try { host = new URL(currentUrl).hostname.replace(/^www\./, ''); } catch (_urlErr) { host = ''; }
   
   for (const [key, info] of Object.entries(CAPTCHA_HOST_MAP)) {
     if (host.includes(key) && goal) {
@@ -3042,7 +3042,7 @@ function _detectActionTypeLoop(history, _agentMemory) {
 function generateHeuristicPlan(goal, currentUrl) {
   if (!goal) return null;
   const g = goal.toLowerCase();
-  const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch { return ''; } })();
+  const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch (_urlErr) { return ''; } })();
 
   // Detect multi-page research patterns
   const isMultiPage = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i.test(g)
@@ -3074,7 +3074,7 @@ function generateHeuristicPlan(goal, currentUrl) {
   }
   const urlMatchFinal = _urlMatch;
   const targetUrl = urlMatchFinal && urlMatchFinal[1] ? urlMatchFinal[1] : null;
-  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch { return ''; } })() : '';
+  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch (_urlErr) { return ''; } })() : '';
   const _normHost = currentHost.replace(/^www\./, '');
   const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
 
@@ -3179,7 +3179,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
   try {
     const els = (observation && observation.elements) || [];
     const _text = (pageContent && pageContent.content) || '';
-    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } })();
+    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (_urlErr) { return url; } })();
     const pageTitle = (title || '').trim();
 
     // Single-pass optimization: count all element types and collect headings in one loop
@@ -5056,7 +5056,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Parse JSON result from extract action: { key, value }
           const _parseExtract = (r) => {
             if (!r || typeof r !== 'string') return '';
-            try { const p = JSON.parse(r); return (p && typeof p.value === 'string') ? p.value.trim() : ''; } catch { return ''; }
+            try { const p = JSON.parse(r); return (p && typeof p.value === 'string') ? p.value.trim() : ''; } catch (_parseErr) { return ''; }
           };
           const _textVal = _parseExtract(_extractText);
           const _inputVal = _parseExtract(_extractValue);
@@ -6738,9 +6738,9 @@ async function runAgentLoop(goal, workingTabId) {
   try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {
     console.warn('[Sentinel] Failed to clear agent state from session storage:', getErrorMessage(e));
     // Try to force-clear individual keys
-    try { await chrome.storage.session.remove(['agentRunning']); } catch {}
-    try { await chrome.storage.session.remove(['agentGoal']); } catch {}
-    try { await chrome.storage.session.remove(['agentStartTime']); } catch {}
+    try { await chrome.storage.session.remove(['agentRunning']); } catch (_clearErr) {}
+    try { await chrome.storage.session.remove(['agentGoal']); } catch (_clearErr) {}
+    try { await chrome.storage.session.remove(['agentStartTime']); } catch (_clearErr) {}
   }
 
   if (finished) {
