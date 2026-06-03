@@ -973,7 +973,11 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   }
   clearTimeout(timer);
   if (!resp.ok) {
-    const errText = await resp.text().catch(() => '(unreadable body)').then(t => t || '(empty body)');
+    let errText;
+    try {
+      const t = await resp.text();
+      errText = t || '(empty body)';
+    } catch (_) { errText = '(unreadable body)'; }
     throw new Error('Models endpoint returned ' + resp.status + ': ' + errText.slice(0, 240));
   }
   let data;
