@@ -30,7 +30,13 @@
       log('2. Close ALL Chrome windows', null);
       log('3. Reopen Chrome and reload unpacked', null);
     } else {
-      log('SW responded: ' + JSON.stringify(response).slice(0, 200), true);
+      let respStr;
+      try {
+        respStr = JSON.stringify(response).slice(0, 200);
+      } catch (e) {
+        respStr = '(unserializable response)';
+      }
+      log('SW responded: ' + respStr, true);
     }
   });
 
