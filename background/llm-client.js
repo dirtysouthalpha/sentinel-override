@@ -2248,10 +2248,13 @@ export async function getRelevantPatterns(goal) {
     const goalWords = goal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     const scored = patterns
       .filter(p => p.success)
-      .map(p => ({
-        pattern: p,
-        score: goalWords.reduce((acc, w) => acc + ((p.goal && typeof p.goal === 'string' && p.goal.toLowerCase().includes(w)) ? 1 : 0), 0)
-      }))
+      .map(p => {
+        const pGoalLower = p.goal && typeof p.goal === 'string' ? p.goal.toLowerCase() : '';
+        return {
+          pattern: p,
+          score: goalWords.reduce((acc, w) => acc + (pGoalLower.includes(w) ? 1 : 0), 0)
+        };
+      })
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
