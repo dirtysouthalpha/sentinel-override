@@ -276,7 +276,7 @@ export async function generateReport(executionData, CONFIG) {
 
   try {
     const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
-    const fullReport = typeof reportResult === 'string' ? reportResult.trim() : String(reportResult).trim();
+    const fullReport = String(reportResult).trim();
     const firstParagraph = fullReport.split('\n\n')[0] || '';
     const summary = firstParagraph.length > 300 ? firstParagraph.substring(0, 297) + '...' : firstParagraph;
     return { summary, fullReport, structuredData, goal, timestamp };
