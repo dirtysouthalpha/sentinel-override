@@ -1960,7 +1960,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // v3.61: z.ai sometimes returns finish_reason="tool_calls" with malformed/empty tool_calls
     // but the content or reasoning_content contains the tool intent. Detect and construct action.
     if (choice && choice.finish_reason === 'tool_calls') {
-      const _intentText = ((choice.message && typeof choice.message.content === 'string' ? choice.message.content : '') || '') + ' ' + ((choice.message && typeof choice.message.reasoning_content === 'string' ? choice.message.reasoning_content : '') || '');
+      const _msg = choice.message || {}; // Cache to avoid repeated property access
+      const _intentText = ((typeof _msg.content === 'string' ? _msg.content : '') || '') + ' ' + ((typeof _msg.reasoning_content === 'string' ? _msg.reasoning_content : '') || '');
       // Detect smart_navigate intent from content
       if (/smart[._-]?navigate/i.test(_intentText)) {
         let _site = 'google', _query = '';
