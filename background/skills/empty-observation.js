@@ -1,5 +1,9 @@
 // background/skills/empty-observation.js
 import { getErrorMessage } from '../error-utils.js';
+
+// Precompute post-observe action types for O(1) lookup
+const POST_OBSERVE_ACTIONS = new Set(['read_page', 'navigate']);
+
 // Fires when observe_page returns < 5 elements — either the page hasn't
 // loaded yet or it's a render-blocked SPA. The LLM can't pick a target if
 // there are no targets in the element list.
@@ -21,7 +25,7 @@ export const emptyObservation = {
       // successful click/extract is expected, not a recovery scenario.
       const lastCommand = ctx.lastCommand;
       const lastFailed = !!ctx.lastActionFailed;
-      const isPostObserve = lastCommand && ['read_page', 'navigate'].includes(lastCommand.type);
+      const isPostObserve = lastCommand && POST_OBSERVE_ACTIONS.has(lastCommand.type);
       if (!isPostObserve && !lastFailed) return false;
       // Only fire when we have an observation but it's nearly empty
       const elementCount = Array.isArray(ctx.allElements) ? ctx.allElements.length : 0;

@@ -2220,16 +2220,7 @@ export function parseLLMResponse(content) {
     if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
     if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
     if (!parsed.type) throw new Error('Missing type field');
-    const validTypes = ['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
-      'extract', 'extract_list', 'wait', 'wait_for_text', 'wait_for_element', 'wait_for_navigation',
-      'execute_js', 'read_page', 'note', 'finish', 'open_tab', 'switch_tab', 'close_tab',
-      'dismiss_overlay', 'switch_to_frame', 'switch_to_parent_frame', 'drag_and_drop', 'right_click', 'double_click',
-      'navigate_back', 'navigate_forward',
-      'click_at', 'scroll_to', 'check', 'check_all', 'open_dropdown', 'upload_file',
-      'read_console_messages', 'read_network_requests',
-      'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
-      'smart_navigate', 'batch'];
-    if (!validTypes.includes(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
+    if (!VALID_ACTION_TYPES.has(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
     if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;
   } catch (err) {
