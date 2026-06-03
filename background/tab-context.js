@@ -110,7 +110,10 @@ export async function switchToTab(tabId) {
   try { await chrome.tabs.update(tabId, { active: true }); } catch { return false; }
   // (3.50.1) Dismiss overlays (cursor, HUD, highlights) on ALL other tabs
   // so visual feedback only shows on the active agent tab.
-  const otherTabIds = Array.from(tabContexts.keys()).filter(id => id !== tabId);
+  const otherTabIds = [];
+  for (const id of tabContexts.keys()) {
+    if (id !== tabId) otherTabIds.push(id);
+  }
   for (const otherId of otherTabIds) {
     try {
       await chrome.tabs.sendMessage(otherId, { action: 'dismiss_overlays' });
@@ -135,7 +138,7 @@ export async function closeTab(tabId) {
   tabContexts.delete(tabId);
 
   if (wasActive) {
-    const remaining = Array.from(tabContexts.keys());
+    const remaining = [...tabContexts.keys()];
     if (remaining.length) {
       setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
       return;
@@ -249,7 +252,7 @@ export function handleTabRemoved(tabId) {
   tabContexts.delete(tabId);
 
   if (wasActive) {
-    const remaining = Array.from(tabContexts.keys());
+    const remaining = [...tabContexts.keys()];
     if (remaining.length) {
       setActiveTab(remaining[0]); // deactivates all others, calls notifyStateChange
       return;

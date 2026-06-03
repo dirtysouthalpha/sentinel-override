@@ -225,7 +225,7 @@ async function _flushRunBuffer() {
   try {
     const stored = await chrome.storage.local.get(key);
     const existing = Array.isArray(stored[key]) ? stored[key] : [];
-    const merged = existing.concat(_runBuffer);
+    const merged = [...existing, ..._runBuffer];
     const capped = merged.length > PERSIST_MAX_EVENTS_PER_RUN
       ? merged.slice(-PERSIST_MAX_EVENTS_PER_RUN)
       : merged;
