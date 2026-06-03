@@ -66,7 +66,7 @@ function _countActionHistory(history) {
     const t = h.action.type || 'unknown';
     if (actionCounts[t] !== undefined) actionCounts[t]++;
     const result = String(h.result || '');
-    if (result.includes('not found') || result.includes('Error') || result.includes('failed') || result.includes('timed out')) {
+    if (/(not found|Error|failed|timed out)/i.test(result)) {
       failedActions++;
     } else {
       successfulActions++;
