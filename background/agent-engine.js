@@ -2746,7 +2746,7 @@ function detectSignInWall(allElements, currentUrl, pageText) {
       if (!e) return false;
       if (e.type === 'password') return true;
       const sel = String(e.selector || '').toLowerCase();
-      if (sel.includes('password') || sel.includes('passwd') || sel.includes('passwordinput')) return true;
+      if (/passw(or)?d|passwordinput/i.test(sel)) return true;
       return false;
     });
   }
@@ -3223,7 +3223,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
       // Find error element (if not already found)
       if (!errorEl) {
         const t = typeof e.text === 'string' ? e.text.toLowerCase() : '';
-        if (t.includes('error') || t.includes('invalid') || t.includes('failed')) {
+        if (/error|invalid|failed/i.test(t)) {
           errorEl = e;
         }
       }
