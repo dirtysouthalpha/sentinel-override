@@ -6,6 +6,9 @@ import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
 
+// Precompute action types to filter from step history for O(1) lookup
+const FILTERED_ACTION_TYPES = new Set(['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation']);
+
 // ========== Pure Helpers ==========
 
 /**
@@ -474,7 +477,7 @@ export function buildFallbackReport(executionData) {
   });
 
   const stepsTaken = (history || [])
-    .filter(h => h && h.action && h.action.type && !['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation'].includes(h.action.type))
+    .filter(h => h && h.action && h.action.type && !FILTERED_ACTION_TYPES.has(h.action.type))
     .map(h => `${h.step || '?'}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
     .join('\n');
 

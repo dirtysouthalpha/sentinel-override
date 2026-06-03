@@ -21,6 +21,8 @@ import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './
 
 // Precompute valid log levels for O(1) lookup
 const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
+// Precompute agent-starting actions for O(1) lookup
+const AGENT_STARTING_ACTIONS = new Set(['analyze', 'extract', 'fill_form', 'screenshot', 'summarize']);
 import { getErrorMessage } from './error-utils.js';
 // (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
 import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
@@ -127,7 +129,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const message = { action: `context_menu_${action}`, params };
 
   // Direct invocation for agent-starting actions
-  if (['analyze', 'extract', 'fill_form', 'screenshot', 'summarize'].includes(action)) {
+  if (AGENT_STARTING_ACTIONS.has(action)) {
     chrome.runtime.sendMessage(message).catch(() => {});
   } else if (action === 'monitor_changes') {
     // Use selected text as selector hint, prompt via side panel
