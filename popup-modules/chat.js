@@ -3574,11 +3574,12 @@ chrome.runtime.onMessage.addListener((message) => {
               ? stored.dismissed_suggestions : {};
             // Prune entries older than TTL.
             const dismissedMap = {};
+            const rawCount = Object.keys(raw).length;
             for (const [id, ts] of Object.entries(raw)) {
               if (typeof ts === 'number' && (now - ts) < DISMISS_TTL_MS) dismissedMap[id] = ts;
             }
             // Persist the pruned map back if anything changed (lazy cleanup).
-            if (Object.keys(dismissedMap).length !== Object.keys(raw).length) {
+            if (Object.keys(dismissedMap).length !== rawCount) {
               try { chrome.storage.local.set({ dismissed_suggestions: dismissedMap }); } catch { /* storage write may fail */ }
             }
             const suggestions = rawSuggestions.filter(s => s && s.id && !dismissedMap[s.id]);
