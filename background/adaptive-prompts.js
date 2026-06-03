@@ -283,7 +283,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     return result;
 
   } catch (e) {
-    result.error = (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e);
+    result.error = getErrorMessage(e);
     return result;
   } finally {
     result.durationMs = Date.now() - startedAt;
