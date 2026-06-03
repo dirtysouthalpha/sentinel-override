@@ -23,8 +23,8 @@ export function sendMessage(tabId, message, timeoutMs = 10000) {
 
     chrome.tabs.sendMessage(tabId, message, (response) => {
       clearTimeout(timeout);
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Content script message failed'));
+      if (chrome.runtime.lastError) {
+        reject(new Error((chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Content script message failed'));
         return;
       }
       if (!response) {
@@ -56,8 +56,8 @@ export function sendRuntimeMessage(message, timeoutMs = 10000) {
 
     chrome.runtime.sendMessage(message, (response) => {
       clearTimeout(timeout);
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Runtime message failed'));
+      if (chrome.runtime.lastError) {
+        reject(new Error((chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Runtime message failed'));
         return;
       }
       resolve(response);
@@ -78,7 +78,7 @@ export function wrapMessageHandler(asyncHandler) {
   return (request, sender, sendResponse) => {
     asyncHandler(request, sender)
       .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: (typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err) }));
+      .catch(err => sendResponse({ ok: false, error: (err && typeof err.message === 'string') ? err.message : String(err) }));
     return true; // keep message channel open
   };
 }
