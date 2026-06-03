@@ -28,6 +28,7 @@ globalThis.chrome = {
           return result;
         }
         const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
+        if (key === undefined) return {};
         return { [key]: storageData[key] !== undefined ? storageData[key] : undefined };
       }),
       set: jest.fn(async (obj) => Object.assign(storageData, obj)),

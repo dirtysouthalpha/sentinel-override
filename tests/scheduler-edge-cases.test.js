@@ -12,6 +12,7 @@ globalThis.chrome = {
     local: {
       get: jest.fn(async (keys) => {
         const key = Array.isArray(keys) ? (keys.length > 0 ? keys[0] : undefined) : keys;
+        if (key === undefined) return {};
         const defaultVal = keys && typeof keys === 'object' && !Array.isArray(keys) ? keys[key] : undefined;
         return { [key]: storageData[key] !== undefined ? storageData[key] : defaultVal };
       }),

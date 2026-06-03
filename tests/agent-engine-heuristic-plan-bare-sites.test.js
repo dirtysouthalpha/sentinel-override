@@ -83,6 +83,7 @@ describe('generateHeuristicPlan — bare site URL matching', () => {
     const plan = generateHeuristicPlan('go to Amazon and find a laptop');
     expect(plan).toBeTruthy();
     expect(Array.isArray(plan)).toBe(true);
+    expect(plan.length).toBeGreaterThan(0);
     expect(plan[0]).toContain('amazon.com');
   });
 
