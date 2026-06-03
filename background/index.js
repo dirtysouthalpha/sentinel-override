@@ -18,6 +18,9 @@ import { exportTemplate, exportAllTemplates, validateImport, importTemplates, ex
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
 import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
+
+// Precompute valid log levels for O(1) lookup
+const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
 import { getErrorMessage } from './error-utils.js';
 // (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
 import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
@@ -272,7 +275,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'content_telemetry_event': {
       try {
         const cat = String(request.category || 'content');
-        const lvl = ['error', 'warn', 'info', 'debug', 'trace'].includes(request.level) ? request.level : 'info';
+        const lvl = VALID_LOG_LEVELS.has(request.level) ? request.level : 'info';
         const msg = String(request.message || '');
         const payload = (request.payload && typeof request.payload === 'object') ? { ...request.payload } : {};
         // Auto-stamp the sender info so panel rows show which tab fired.

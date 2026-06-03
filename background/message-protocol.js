@@ -126,9 +126,12 @@ export function sendPageContext(url, pageTitle, stepNumber, tabId, totalSteps) {
   });
 }
 
+// Precompute interactive command types for O(1) lookup
+const INTERACTIVE_COMMANDS = new Set(['click', 'type', 'hover', 'select', 'extract']);
+
 // Build a human-readable one-liner describing a command for the popup action card.
 function _describeCommand(command, observation) {
-  if (['click', 'type', 'hover', 'select', 'extract'].includes(command.type) && observation && observation.elements) {
+  if (INTERACTIVE_COMMANDS.has(command.type) && observation && observation.elements) {
     const el = observation.elements.find(e => e.selector === command.selector);
     if (el && el.text && el.text !== 'No label') {
       const label = el.text.length > 50 ? el.text.substring(0, 47) + '...' : el.text;

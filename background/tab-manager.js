@@ -1019,6 +1019,9 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
 }
 
 // ========== Validation ==========
+// Precompute valid protocols for O(1) lookup
+const VALID_PROTOCOLS = new Set(['http:', 'https:']);
+
 /**
  * Check whether a URL string is a valid http or https URL.
  *
@@ -1026,7 +1029,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
  * @returns {boolean} True if the URL parses and uses http: or https: protocol.
  */
 export function isValidUrl(url) {
-  try { const p = new URL(url); return ['http:', 'https:'].includes(p.protocol); } catch { return false; }
+  try { const p = new URL(url); return VALID_PROTOCOLS.has(p.protocol); } catch { return false; }
 }
 
 // ========== Tab Info ==========
