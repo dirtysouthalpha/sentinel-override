@@ -130,7 +130,7 @@ function hideActiveTabStrip() {
 function updateActiveTabPage(url, title) {
   if (!url) return;
   let host = url;
-  try { host = new URL(url).hostname; } catch { /* URL parse failure is non-critical */ }
+  try { host = new URL(url).hostname; } catch (_urlErr) { /* URL parse failure is non-critical */ }
   __atsStripState.url = url;
   __atsStripState.title = title || '';
   __atsStripState.hostname = host;
@@ -145,7 +145,7 @@ function updateActiveTabPage(url, title) {
     // tiny blank if we can't compute a clean URL.
     try {
       elFav.src = 'https://www.google.com/s2/favicons?sz=32&domain_url=' + encodeURIComponent(host);
-    } catch { elFav.src = ''; }
+    } catch (_favErr) { elFav.src = ''; }
   }
   showActiveTabStrip();
 }
@@ -237,7 +237,7 @@ function updateActiveTabAction(payload) {
       try {
         const tabs = await chrome.tabs.query({ url: __atsStripState.url });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch { /* extension API may fail */ }
+      } catch (_apiErr) { /* extension API may fail */ }
     }
     // Fallback 2: query by hostname pattern
     if (!tabId && __atsStripState.hostname) {
@@ -245,7 +245,7 @@ function updateActiveTabAction(payload) {
         const pattern = '*://*.' + __atsStripState.hostname.replace(/^www\./, '') + '/*';
         const tabs = await chrome.tabs.query({ url: pattern });
         if (tabs && tabs.length > 0) tabId = tabs[0].id;
-      } catch { /* extension API may fail */ }
+      } catch (_apiErr) { /* extension API may fail */ }
     }
     // Fallback 3: bare hostname in URL string match across all tabs
     if (!tabId && __atsStripState.hostname) {
@@ -253,13 +253,13 @@ function updateActiveTabAction(payload) {
         const all = await chrome.tabs.query({});
         const match = (all || []).find(t => t.url && t.url.includes(__atsStripState.hostname));
         if (match) tabId = match.id;
-      } catch { /* extension API may fail */ }
+      } catch (_apiErr) { /* extension API may fail */ }
     }
     if (!tabId) {
-      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch { /* showToast may fail in detached popup */ }
+      try { showToast('Could not find the agent\'s tab to focus', 'error'); } catch (_toastErr) { /* showToast may fail in detached popup */ }
       return;
     }
-    try { await chrome.tabs.update(tabId, { active: true }); } catch { /* extension API may fail */ }
+    try { await chrome.tabs.update(tabId, { active: true }); } catch (_updateErr) { /* extension API may fail */ }
     try {
       chrome.tabs.get(tabId, (info) => {
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
@@ -267,10 +267,10 @@ function updateActiveTabAction(payload) {
           return;
         }
         if (info && typeof info.windowId === 'number') {
-          try { chrome.windows.update(info.windowId, { focused: true }); } catch { /* extension API may fail */ }
+          try { chrome.windows.update(info.windowId, { focused: true }); } catch (_winErr) { /* extension API may fail */ }
         }
       });
-    } catch { /* chrome.tabs.get callback may fail */ }
+    } catch (_tabsErr) { /* chrome.tabs.get callback may fail */ }
   });
 })();
 
