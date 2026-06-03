@@ -116,7 +116,7 @@ const _REDACT_QUERY_PARAMS = new Set([
 ]);
 
 function _redactString(s) {
-  if (typeof s !== 'string' || s.length === 0) return s;
+  if (typeof s !== 'string' || !s.length) return s;
   let out = s;
   // Pattern-based replacements
   for (const { re, label } of REDACT_PATTERNS) {

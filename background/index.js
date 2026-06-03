@@ -574,7 +574,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         let targetHost;
         try { targetHost = new URL(target).host; } catch (_urlErr) { targetHost = ''; }
         const tabs = await chrome.tabs.query({});
-        if (!tabs || tabs.length === 0) return { ok: false, error: 'no tabs available' };
+        if (!tabs || !tabs.length) return { ok: false, error: 'no tabs available' };
         // Prefer exact URL match, fall back to host match (Microsoft sign-in
         // walks the user through multiple URLs on the same host).
         let match = tabs.find(t => t && t.url === target);
@@ -877,7 +877,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
     case 'export_html_report': {
       const log = await fetchAuditLog(request.params?.runId || null);
-      if (!log || log.length === 0) throw new Error('No audit log data to export');
+      if (!log || !log.length) throw new Error('No audit log data to export');
       const html = generateHtmlReport(log, request.params?.metadata || {});
       return { html };
     }
@@ -918,7 +918,7 @@ chrome.windows.onCreated.addListener(async (win) => {
   if (!agentRunning) return;
   try {
     const tabs = await chrome.tabs.query({ windowId: win.id });
-    if (!Array.isArray(tabs) || tabs.length === 0) return;
+    if (!Array.isArray(tabs) || !tabs.length) return;
     const ssoTab = tabs.find(t => t.url && _SSO_HOSTS_RE.test(t.url));
     if (ssoTab) {
       await chrome.windows.update(win.id, { focused: true });

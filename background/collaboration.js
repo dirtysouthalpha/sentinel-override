@@ -120,7 +120,7 @@ export function validateImport(importedData) {
     ? (Array.isArray(importedData.templates) ? importedData.templates : [])
     : (importedData.template ? [importedData.template] : []);
 
-  if (templates.length === 0) {
+  if (!templates.length) {
     result.errors.push('No templates found in file');
     return result;
   }

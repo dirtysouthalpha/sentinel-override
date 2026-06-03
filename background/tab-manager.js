@@ -764,7 +764,7 @@ export async function cdpDispatchKey(tabId, key, _options = {}) {
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
 export async function cdpDispatchType(tabId, text, options = {}) {
-  if (typeof text !== 'string' || text.length === 0) {
+  if (typeof text !== 'string' || !text.length) {
     return { ok: true };
   }
   try {
@@ -874,7 +874,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
  * @returns {Promise<{ok: boolean, value?: any, error?: string, cspBlocked?: boolean}>}
  */
 export async function cdpExecuteJs(tabId, code, options = {}) {
-  if (typeof code !== 'string' || code.length === 0) {
+  if (typeof code !== 'string' || !code.length) {
     return { ok: false, error: 'No code provided' };
   }
   const timeout = Math.max(500, Math.min(60000, Number(options.timeout) || 8000)) || 8000;
@@ -985,7 +985,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
           if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
             const err = typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError);
             reject(new Error(err || 'Screenshot capture failed'));
-          } else if (typeof dataUrl !== 'string' || dataUrl.length === 0) {
+          } else if (typeof dataUrl !== 'string' || !dataUrl.length) {
             reject(new Error('Screenshot capture returned empty data'));
           } else {
             resolve(dataUrl);
@@ -993,7 +993,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
         });
       });
       const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
-      if (!Array.isArray(_parts) || _parts.length < 2 || !_parts[1] || _parts[1].length === 0) throw new Error('captureVisibleTab returned invalid data URL');
+      if (!Array.isArray(_parts) || _parts.length < 2 || !_parts[1] || !_parts[1].length) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {
       if (sendSilentUpdateFn) sendSilentUpdateFn('Screenshot skipped (text-only mode)', stepNumber);

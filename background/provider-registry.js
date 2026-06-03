@@ -16,7 +16,7 @@ import { getErrorMessage } from './error-utils.js';
  * @returns {Array<object>} Shallow copy of tools with cache_control added to the last entry.
  */
 function _cacheLastTool(tools) {
-  if (!tools || !Array.isArray(tools) || tools.length === 0) return tools;
+  if (!tools || !Array.isArray(tools) || !tools.length) return tools;
   const copy = tools.slice();
   if (copy.length) {
     copy[copy.length - 1] = { ...copy[copy.length - 1], cache_control: { type: 'ephemeral' } };

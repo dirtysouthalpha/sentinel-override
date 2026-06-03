@@ -151,7 +151,7 @@ export async function checkMonitor(monitor) {
   // Hash the current content of the selector
   try {
     const tabs = await chrome.tabs.query({ url: monitor.url });
-    if (!tabs || tabs.length === 0) return { changed: false, content: '' };
+    if (!tabs || !tabs.length) return { changed: false, content: '' };
 
     const tab = tabs[0];
     if (!tab || !tab.id) return { changed: false, content: '' };

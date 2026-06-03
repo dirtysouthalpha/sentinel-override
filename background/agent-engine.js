@@ -1543,7 +1543,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
       ].join('\n');
 
   // SPEED: Skip nuke entirely when no overlays detected AND last nuke was clean
-  if (overlays.length === 0 && _lastNukeClean) {
+  if (!overlays.length && _lastNukeClean) {
     console.log('[Sentinel/CDP] Skipping nuke — no overlays and last nuke was clean');
   } else try {
     console.log('[Sentinel/CDP] Phase2: sending surgical nuke (' + nukeCode.length + ' chars) to tab', tabId);
@@ -1938,7 +1938,7 @@ function formatItGlueKb(summary, goal, tech, options) {
   if (/sonicwall|fortigate|firewall/i.test(goal || '')) envBits.push('Firewall (vendor-specific)');
   if (/sentinelone|crowdstrike|defender for endpoint/i.test(goal || '')) envBits.push('EDR platform');
   if (/connectwise|ninjaone|kaseya|datto/i.test(goal || '')) envBits.push('RMM/PSA platform');
-  if (envBits.length === 0) envBits.push('General — see investigation findings for specifics');
+  if (!envBits.length) envBits.push('General — see investigation findings for specifics');
 
   const out = [
     '## IT Glue Knowledge Base Entry',
@@ -2428,7 +2428,7 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
   if (text.length > 1000) {
     strategies.push('Read the page text — you may already have enough data');
   }
-  if (strategies.length === 0) {
+  if (!strategies.length) {
     strategies.push('Use execute_js to inspect DOM and find alternative approach');
     strategies.push('Try read_page to get full content and extract what you need');
     strategies.push('Use navigate_back and try a different path');
@@ -2808,8 +2808,8 @@ function _isUnproductiveJsResult(raw) {
   try {
     const p = JSON.parse(trim);
     if (p === null) return true;
-    if (Array.isArray(p) && p.length === 0) return true;
-    if (typeof p === 'object' && p !== null && Object.keys(p).length === 0) return true;
+    if (Array.isArray(p) && !p.length) return true;
+    if (typeof p === 'object' && p !== null && !Object.keys(p).length) return true;
   } catch (_) { /* not JSON, that's fine */ }
 
   return false;
@@ -2980,18 +2980,18 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   for (const field of rawFields) {
     // Pull "key" tokens from the field name (skip filler words)
     const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !filler.has(t)) : [];
-    if (tokens.length === 0) continue;
+    if (!tokens.length) continue;
     // Match if ANY meaningful token from this field shows up in evidence
     const found = typeof allEvidence === 'string' && tokens.some(t => allEvidence.includes(t));
     if (!found) missing.push(field);
   }
 
-  if (missing.length === 0) return null;
+  if (!missing.length) return null;
 
   // Don't fire on every gap -- only if MORE THAN HALF of asked fields are
   // missing. Otherwise the existing hallucination gate handles it via
   // [unverified] tagging.
-  if (rawFields.length === 0 || missing.length / rawFields.length < 0.5) return null;
+  if (!rawFields.length || missing.length / rawFields.length < 0.5) return null;
 
   return 'Goal asked for: ' + rawFields.join(', ') + '. Memory is missing token-evidence for: ' + missing.join(', ') + '. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.';
 }
@@ -3041,7 +3041,7 @@ function _detectActionTypeLoop(history, _agentMemory) {
     if (t === 'execute_js') return !!h.action.key;
     return false;
   });
-  if (recentProductive.length === 0) {
+  if (!recentProductive.length) {
     return { isLoop: true, type: dominantType, count: dominantCount };
   }
 
@@ -4730,7 +4730,7 @@ async function runAgentLoop(goal, workingTabId) {
               k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
             );
             // Block: haven't opened ANY article tabs AND no summaries written
-            if (_openTabs === 0 && _summaryKeys.length === 0 && noteCount === 0) {
+            if (_openTabs === 0 && !_summaryKeys.length && noteCount === 0) {
               console.warn('[Sentinel/multi-article] Blocking premature finish —', _targetN, 'articles requested, 0 opened/read');
               historyPush({ step: stepCount, action: command, result: `BLOCKED: premature finish — goal asks for ${_targetN} articles. Must open_tab article URLs and read each page before finishing.` });
               await persistHistory();
@@ -5910,8 +5910,8 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const parsed = JSON.parse(jsValue);
               // Reject parsed-but-empty objects/arrays
-              const isEmptyObj = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0;
-              const isEmptyArr = Array.isArray(parsed) && parsed.length === 0;
+              const isEmptyObj = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && !Object.keys(parsed).length;
+              const isEmptyArr = Array.isArray(parsed) && !parsed.length;
               if (parsed === null || isEmptyObj || isEmptyArr) {
                 actionFailed = true;
                 result = 'JS returned ' + (isEmptyArr ? 'an empty array []' : (isEmptyObj ? 'an empty object {}' : 'null')) + '. Re-run the query or extract specific fields directly.';

@@ -214,7 +214,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     // Short-circuit: only skip when adaptation is explicitly disabled AND there
     // are no structural mismatches to fix. When a platform profile matched, even
     // short goals benefit from workflow scaffolding and wait-string injection.
-    if (expMode === 'off' && mismatchHints.length === 0 && !profile.needsTargetSelection) {
+    if (expMode === 'off' && !mismatchHints.length && !profile.needsTargetSelection) {
       result.error = 'adaptation disabled (expansionMode=off, no mismatches, no Phase 0)';
       return result;
     }
