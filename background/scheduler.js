@@ -360,8 +360,15 @@ export async function listSchedules() {
   const schedules = await loadSchedules();
   const all = Object.values(schedules);
 
-  const enabled = all.filter(s => s.enabled).sort((a, b) => (a.nextRunAt || Infinity) - (b.nextRunAt || Infinity));
-  const disabled = all.filter(s => !s.enabled).sort((a, b) => (a.nextRunAt || Infinity) - (b.nextRunAt || Infinity));
+  const enabled = [];
+  const disabled = [];
+  for (const s of all) {
+    if (s.enabled) enabled.push(s);
+    else disabled.push(s);
+  }
+  const sortFn = (a, b) => (a.nextRunAt || Infinity) - (b.nextRunAt || Infinity);
+  enabled.sort(sortFn);
+  disabled.sort(sortFn);
 
   return [...enabled, ...disabled];
 }
