@@ -1,4 +1,5 @@
 // background/skills/csp-blocked.js
+import { getErrorMessage } from '../error-utils.js';
 // Fires when an execute_js attempt was blocked by the page's Content-
 // Security-Policy. The content-script path uses inline <script> injection,
 // which strict-CSP sites (SentinelOne, GitHub, banks, etc.) deny. The
@@ -19,7 +20,7 @@ export const cspBlocked = {
       if (!ctx || !ctx.lastResult) return false;
       return typeof ctx.lastResult === 'string' && /^CSP_BLOCKED:/i.test(ctx.lastResult);
     } catch (error) {
-      console.error('Error in cspBlocked matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in cspBlocked matches:', getErrorMessage(error));
       return false;
     }
   },
@@ -54,7 +55,7 @@ export const cspBlocked = {
 
 DO NOT re-emit execute_js with similar code expecting different behavior — the CSP blocks the entire path, not just specific patterns.`;
     } catch (error) {
-      console.error('Error in cspBlocked promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in cspBlocked promptInjection:', getErrorMessage(error));
       return `Your previous execute_js was blocked by the page's Content-Security-Policy. Available alternatives: read_page, extract, extract_list, read_network_requests, read_console_messages, or CDP path. DO NOT retry execute_js.`;
     }
   }

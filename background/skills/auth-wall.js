@@ -3,6 +3,8 @@
 // Common in MSP work: navigating between M365 tenants, Azure subscriptions, or
 // enterprise portals where sessions expire or SSO kicks in unexpectedly.
 
+import { getErrorMessage } from '../error-utils.js';
+
 const _LOGIN_URL_RE = /\/login|\/signin|\/sign-in|\/auth|\/sso|\/oauth|\/saml|\/adfs|\/mfa|\/verify|microsoftonline\.com|accounts\.google\.com|login\.live\.com|okta\.com|auth0\.com|duosecurity\.com|\.ping(?:identity|federate)|duo\.com/i;
 const _LOGIN_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s*your\s*(email|password|username)|forgot\s*password|two.?factor|authenticat(?:or|ion)\s*code|verification\s*code|send\s*code|approve\s*sign.?in|mfa\s*required|session\s*(expired|timed?\s*out)|please\s*(sign|log)\s*in|identity\s*verification)\b/i;
 
@@ -62,7 +64,7 @@ Actions:
 3. After successful login, use \`{type:'wait_for_navigation', timeout:15000}\` to wait for redirect to the target page.
 4. Use \`{type:'read_page'}\` to verify you are now on the intended page before continuing with the original goal.`;
     } catch (error) {
-      console.error('Error generating prompt injection for auth-wall:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error generating prompt injection for auth-wall:', getErrorMessage(error));
       return 'Error generating prompt injection for auth-wall. Please check logs for details.';
     }
   }

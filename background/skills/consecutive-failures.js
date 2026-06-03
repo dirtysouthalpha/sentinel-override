@@ -5,6 +5,8 @@
 // Recovery: tell the LLM to STEP BACK, reconsider the goal, and either
 // pick a fundamentally different approach OR finish honestly with what's known.
 
+import { getErrorMessage } from '../error-utils.js';
+
 const MIN_CONSECUTIVE_FAILURES = 3;
 const DEFAULT_MAX_STEPS = 100;
 
@@ -19,7 +21,7 @@ export const consecutiveFailures = {
       const failureCount = ctx.consecutiveFailures || 0;
       return failureCount >= MIN_CONSECUTIVE_FAILURES;
     } catch (error) {
-      console.error('Error in consecutiveFailures.matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in consecutiveFailures.matches:', getErrorMessage(error));
       return false;
     }
   },
@@ -50,7 +52,7 @@ export const consecutiveFailures = {
 
 Do NOT repeat the action that just failed. The user can see the failure pattern in the activity stream and will judge progress by your next move.`;
     } catch (error) {
-      console.error('Error in consecutiveFailures.promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in consecutiveFailures.promptInjection:', getErrorMessage(error));
       return 'Error generating prompt for consecutive failures recovery.';
     }
   }

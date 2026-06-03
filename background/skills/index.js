@@ -17,6 +17,7 @@ import { slowLlmCall } from './slow-llm-call.js';
 import { cspBlocked } from './csp-blocked.js';
 import { authWall } from './auth-wall.js';
 import { tel } from '../telemetry.js';
+import { getErrorMessage } from '../error-utils.js';
 
 const SKILLS = [
   cspBlocked,
@@ -46,7 +47,7 @@ let _saveStatsTimer = null;
 (function loadAdaptiveState() {
   try {
     chrome.storage.local.get([STATS_KEY, ADAPT_ENABLED_KEY], (r) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.warn('[Sentinel/skills] storage load error:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/skills] storage load error:', getErrorMessage(chrome.runtime.lastError)); return; }
       if (r && r[STATS_KEY] && typeof r[STATS_KEY] === 'object' && r[STATS_KEY] !== null) _stats = r[STATS_KEY];
       if (r && r[ADAPT_ENABLED_KEY] === false) _adaptEnabled = false;
     });
@@ -61,7 +62,7 @@ let _saveStatsTimer = null;
         _stats = (v && typeof v === 'object') ? v : {};
       }
     });
-  } catch (e) { console.warn('[Sentinel/skills] init error:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+  } catch (e) { console.warn('[Sentinel/skills] init error:', getErrorMessage(e)); }
 })();
 
 /**
@@ -73,7 +74,7 @@ function _scheduleSaveStats() {
   if (_saveStatsTimer) return;
   _saveStatsTimer = setTimeout(() => {
     _saveStatsTimer = null;
-    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    try { chrome.storage.local.set({ [STATS_KEY]: _stats }); } catch (e) { console.warn('[Sentinel/skills] stats save error:', getErrorMessage(e)); }
   }, 1500);
 }
 
@@ -103,7 +104,7 @@ function _effectivePriority(skill) {
  * @private
  */
 function _recordPendingOutcomes(context) {
-  if (!Array.isArray(_pendingOutcomeSkillIds) || _pendingOutcomeSkillIds.length === 0) return;
+  if (!Array.isArray(_pendingOutcomeSkillIds) || !_pendingOutcomeSkillIds.length) return;
   if (typeof context.lastActionFailed !== 'boolean') {
     _pendingOutcomeSkillIds = [];
     return;
@@ -141,7 +142,7 @@ export async function resetSkillStats() {
   if (_saveStatsTimer) { clearTimeout(_saveStatsTimer); _saveStatsTimer = null; }
   _stats = {};
   _pendingOutcomeSkillIds = [];
-  try { await chrome.storage.local.remove(STATS_KEY); } catch (_e) { console.warn('[Sentinel/skills] stats clear error:', (typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e))); }
+  try { await chrome.storage.local.remove(STATS_KEY); } catch (_e) { console.warn('[Sentinel/skills] stats clear error:', getErrorMessage(_e)); }
   try { tel.info('skill', 'Skill outcome stats reset', {}); } catch (_e) { /* telemetry unavailable */ }
 }
 
@@ -199,11 +200,11 @@ export function runRecoverySkills(context) {
         } catch (_e) { /* telemetry failure is non-critical */ }
       }
     } catch (e) {
-      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) }); } catch (_e) { /* telemetry unavailable */ }
-      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); } catch (_e) { /* console unavailable */ }
+      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: getErrorMessage(e) }); } catch (_e) { /* telemetry unavailable */ }
+      try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', getErrorMessage(e)); } catch (_e) { /* console unavailable */ }
     }
   }
-  if (matches.length === 0) return result;
+  if (!matches.length) return result;
 
   matches.sort((a, b) => _effectivePriority(b) - _effectivePriority(a));
 
@@ -217,7 +218,7 @@ export function runRecoverySkills(context) {
           break;
         }
       } catch (e) {
-        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); } catch (_e) { /* console unavailable */ }
+        try { console.warn('[Sentinel/skills] autoApply error in', skill.id, ':', getErrorMessage(e)); } catch (_e) { /* console unavailable */ }
       }
     }
   }
@@ -234,7 +235,7 @@ export function runRecoverySkills(context) {
         }
       }
     } catch (e) {
-      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); } catch (_e) { /* console unavailable */ }
+      try { console.warn('[Sentinel/skills] promptInjection error in', skill.id, ':', getErrorMessage(e)); } catch (_e) { /* console unavailable */ }
     }
   }
   if (injections.length > 0) {

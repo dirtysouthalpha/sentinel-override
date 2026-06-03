@@ -262,8 +262,8 @@ function updateActiveTabAction(payload) {
     try { await chrome.tabs.update(tabId, { active: true }); } catch (_updateErr) { /* extension API may fail */ }
     try {
       chrome.tabs.get(tabId, (info) => {
-        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-          console.warn('[Sentinel/chat] chrome.tabs.get failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+          console.warn('[Sentinel/chat] chrome.tabs.get failed:', getErrorMessage(chrome.runtime.lastError));
           return;
         }
         if (info && typeof info.windowId === 'number') {
@@ -360,12 +360,12 @@ function showCrosshair(x, y, viewportW, viewportH) {
 // eslint-disable-next-line no-unused-vars
 function loadApprovalMode() {
   chrome.storage.local.get(['approvalMode'], (result) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadApprovalMode failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadApprovalMode failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     let isApprovalMode;
     if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
-      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
     } else {
       isApprovalMode = result.approvalMode;
     }
@@ -400,13 +400,13 @@ function setupApprovalModeToggle() {
       chrome.storage.local.set({
         approvalMode: false,
         approvalModeAcknowledged: true
-      }).catch((e) => { console.warn('[Sentinel/chat] Failed to persist approval mode:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      }).catch((e) => { console.warn('[Sentinel/chat] Failed to persist approval mode:', getErrorMessage(e)); });
       updateApprovalModeUI(false);
       return;
     }
 
     // Re-enabling approvals is always safe; persist immediately.
-    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
     updateApprovalModeUI(true);
   });
 }
@@ -424,7 +424,7 @@ function updateApprovalModeUI(isApprovalMode) {
 // ========== First-run Safety Banner ==========
 function maybeShowSafetyBanner() {
   chrome.storage.local.get(['seenSafetyBanner'], (result) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] maybeShowSafetyBanner failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] maybeShowSafetyBanner failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     if (result.seenSafetyBanner) return;
 
     if (!chatContainer) return;
@@ -460,7 +460,7 @@ function maybeShowSafetyBanner() {
     const dismissSafetyBanner = document.getElementById('dismissSafetyBanner');
     if (dismissSafetyBanner) {
       dismissSafetyBanner.addEventListener('click', () => {
-        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+        chrome.storage.local.set({ seenSafetyBanner: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
         banner.remove();
       });
     }
@@ -559,7 +559,7 @@ function respondApproval(decision, context) {
   // pending request (per the contract with Agent A).
   if (ctx.requestId) message.requestId = ctx.requestId;
 
-  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+  chrome.runtime.sendMessage(message).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
 
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
@@ -725,7 +725,7 @@ function updateActionCardResult(stepNumber, resultText, isError) {
 function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadChatHistory failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadChatHistory failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     if (Array.isArray(result.chat_history) && result.chat_history.length) {
       state.conversationHistory = result.chat_history;
       if (chatContainer) chatContainer.innerHTML = '';
@@ -740,7 +740,7 @@ function loadChatHistory() {
 function saveChatHistory() {
   try {
     const state = getState();
-    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.storage.local.set({ chat_history: state.conversationHistory }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
   } catch (_e) { /* storage unavailable */ }
 }
 
@@ -758,7 +758,7 @@ function addMessage(text, role = 'assistant') {
     try {
       textStr = JSON.stringify(text);
     } catch (e) {
-      textStr = (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e));
+      textStr = getErrorMessage(e);
     }
   }
 
@@ -805,7 +805,7 @@ function addMessage(text, role = 'assistant') {
         copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
         copyBtn.classList.remove('copied');
       }, 2000);
-    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', getErrorMessage(e)); });
   });
 
   wrapper.appendChild(msg);
@@ -842,7 +842,7 @@ function addCodeCopyButtons(messageElement) {
             copyBtn.textContent = 'Copy';
             copyBtn.classList.remove('copied');
           }, 2000);
-        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+        }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', getErrorMessage(e)); });
       });
 
       header.appendChild(langSpan);
@@ -943,7 +943,7 @@ function sendInjectedContext() {
   if (!note) return;
   chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
     if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || (resp && !resp.ok)) {
-      if (typeof showToast === 'function') showToast('Failed to send note: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : (resp?.error || 'Unknown')), 'error');
+      if (typeof showToast === 'function') showToast('Failed to send note: ' + getErrorMessage(chrome.runtime.lastError || resp?.error || 'Unknown'), 'error');
       return;
     }
     injectContextInput.value = '';
@@ -982,9 +982,9 @@ function sendMessage() {
   // Carry over the last goal if the new message seems like a follow-up
   let fullGoal = goal;
   chrome.storage.local.get(['last_agent_goal', 'agent_history'], (stored) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
       removeTypingIndicator();
-      addMessage('Error reading stored goal: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
+      addMessage('Error reading stored goal: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
       resetUI();
       return;
     }
@@ -999,11 +999,11 @@ function sendMessage() {
 Follow-up instruction: ${goal}
 The user wants you to continue or adjust the previous task. Look at the current page and respond accordingly.`;
     }
-    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.storage.local.set({ last_agent_goal: isFollowUp ? lastGoal : goal }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         removeTypingIndicator();
-        addMessage('Error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
+        addMessage('Error: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
         resetUI();
         return;
       }
@@ -1031,7 +1031,7 @@ function resetUI() {
 stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !response) {
-      addMessage('Error stopping agent: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
+      addMessage('Error stopping agent: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
     } else if (response && !response.ok) {
       addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
     } else {
@@ -1050,7 +1050,7 @@ document.querySelectorAll('[data-speed]').forEach(btn => {
   btn.addEventListener('click', () => {
     const mode = btn.getAttribute('data-speed');
     chrome.runtime.sendMessage({ action: 'set_agent_speed', mode }, (resp) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] setAgentSpeed failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] setAgentSpeed failed:', getErrorMessage(chrome.runtime.lastError)); return; }
       if (resp && resp.ok !== false) {
         // Update active state on buttons
         document.querySelectorAll('[data-speed]').forEach(b => b.classList.remove('active'));
@@ -1084,7 +1084,7 @@ if (undoBtn) {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !resp) {
-        addMessage('Undo failed: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
+        addMessage('Undo failed: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
         return;
       }
       if (resp && !resp.ok) {
@@ -1131,7 +1131,7 @@ newChatBtn.addEventListener('click', () => {
       }
     } catch { /* recentChats archive is non-critical */ }
     chrome.storage.local.set({ chat_history: [] }, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] clearChatHistory failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] clearChatHistory failed:', getErrorMessage(chrome.runtime.lastError)); return; }
       const state = getState();
       state.conversationHistory = [];
       if (chatContainer) {
@@ -1215,7 +1215,7 @@ function _closeMarkdownPreview() {
   if (!markdownPreview) return;
   if (markdownPreview.classList.contains('show')) {
     markdownPreview.classList.remove('show');
-    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { previewBtn.classList.remove('active'); } catch (e) { console.warn('[Sentinel] DOM detach error:', getErrorMessage(e)); }
   }
 }
 const _mdPreviewCloseBtn = document.getElementById('markdownPreviewCloseBtn');
@@ -1256,7 +1256,7 @@ document.addEventListener('keydown', (e) => {
   const openModals = document.querySelectorAll('.modal.show');
   if (openModals.length === 0) return;
   const top = openModals[openModals.length - 1];
-  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+  try { top.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', getErrorMessage(e)); }
 });
 
 // (3.34.0) Click-the-backdrop safety net. If the operator clicks the dark
@@ -1269,7 +1269,7 @@ document.addEventListener('mousedown', (e) => {
   if (!target.classList.contains('show')) return;
   // The class is on the overlay element AND the click landed on the overlay
   // itself (not on a descendant inside modal-content), so dismiss.
-  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+  try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', getErrorMessage(e)); }
 }, true);
 
 function updateMarkdownPreview() {
@@ -1434,7 +1434,7 @@ function setupVoiceInput() {
       });
       showToast('Listening... speak now', 'success');
     } catch (err) {
-      console.error('Voice input error:', ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)));
+      console.error('Voice input error:', getErrorMessage(err));
       showToast('Voice error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : 'Unknown error'), 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
@@ -1532,7 +1532,7 @@ exportBtn.addEventListener('click', () => {
     try {
       content = JSON.stringify(state.conversationHistory, null, 2);
     } catch (e) {
-      content = JSON.stringify({ error: 'Failed to serialize conversation', message: (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e)) }, null, 2);
+      content = JSON.stringify({ error: 'Failed to serialize conversation', message: getErrorMessage(e) }, null, 2);
     }
     filename = `conversation-${Date.now()}.json`;
     mimeType = 'application/json';
@@ -1694,7 +1694,7 @@ window.executeCommand = (action) => {
       document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); try { showToast('Run log history unavailable: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); try { showToast('Run log history unavailable: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -1748,7 +1748,7 @@ function renderTabBar(tabs) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
       tab.addEventListener('click', () => {
-        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+        if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
       });
     }
     tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
@@ -1888,8 +1888,8 @@ function openReportModal(markdown) {
   };
   try {
     chrome.storage.local.set({ _pendingViewReport: payload }, () => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.warn('[Sentinel] storage.set for _pendingViewReport failed:', getErrorMessage(chrome.runtime.lastError));
         openReportModalInline(markdown);
         return;
       }
@@ -1901,12 +1901,12 @@ function openReportModal(markdown) {
         });
       } catch (e) {
         // Tab creation failed — fall back to the in-panel modal.
-        console.warn('[Sentinel] report-view tab failed, falling back to modal:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+        console.warn('[Sentinel] report-view tab failed, falling back to modal:', getErrorMessage(e));
         openReportModalInline(markdown);
       }
     });
   } catch (e) {
-    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel] storage.set for _pendingViewReport failed, using modal fallback:', getErrorMessage(e));
     openReportModalInline(markdown);
   }
 }
@@ -2114,7 +2114,7 @@ function showMfaBanner(url, hint, _stepNumber) {
   const mfaResumeBtn = document.getElementById('mfaResumeBtn');
   if (mfaResumeBtn) {
     mfaResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
       banner.remove();
     });
   }
@@ -2172,7 +2172,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
   const signInWallResumeBtn = document.getElementById('signInWallResumeBtn');
   if (signInWallResumeBtn) {
     signInWallResumeBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+      chrome.runtime.sendMessage({ action: 'resume_agent_loop' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
       banner.remove();
     });
   }
@@ -2181,7 +2181,7 @@ function showSignInWallBanner(url, host, evidence, _stepNumber) {
     signInWallFocusBtn.addEventListener('click', () => {
     // Best-effort: ask the background to focus the URL's tab via the existing
     // active-tab focus hook (re-uses focus_tab message handled by index.js).
-    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.runtime.sendMessage({ action: 'focus_tab_by_url', url: url || '' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
     });
   }
   const signInWallDismissBtn = document.getElementById('signInWallDismissBtn');
@@ -2429,7 +2429,7 @@ function showModeMismatchCard(payload) {
       // Write the new setting from the popup side so updateApprovalModeUI and
       // the toggle reflect it without needing a separate broadcast.
       chrome.storage.local.set({ approvalMode: wantsApproval }, () => {
-        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] setApprovalMode failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] setApprovalMode failed:', getErrorMessage(chrome.runtime.lastError)); return; }
         try {
           if (typeof approvalModeToggle !== 'undefined' && approvalModeToggle) {
             approvalModeToggle.checked = wantsApproval;
@@ -2437,7 +2437,7 @@ function showModeMismatchCard(payload) {
           if (typeof updateApprovalModeUI === 'function') {
             updateApprovalModeUI(wantsApproval);
           }
-        } catch (e) { console.warn('[Sentinel] DOM detach error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] DOM detach error:', getErrorMessage(e)); }
         sendResponse({ flip: true });
         card.remove();
       });
@@ -2762,7 +2762,7 @@ async function renderRunLogHistoryList() {
       b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
     });
   } catch (e) {
-    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) + '</div>';
+    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + getErrorMessage(e) + '</div>';
   }
 }
 
@@ -2785,7 +2785,7 @@ async function deleteRunLogById(runLogId) {
     try { showToast('Run log deleted', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Delete failed: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2806,7 +2806,7 @@ async function clearAllRunLogs() {
     try { showToast('All run logs cleared', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast('Clear failed: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2917,7 +2917,7 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   const resumeBtn = document.getElementById('resumeRunBtn');
   const dismissResumeBtn = document.getElementById('dismissResumeBtn');
   if (resumeBtn) resumeBtn.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); });
+    chrome.runtime.sendMessage({ action: 'resume_from_checkpoint' }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
     banner.remove();
   });
   if (dismissResumeBtn) dismissResumeBtn.addEventListener('click', () => banner.remove());
@@ -2958,7 +2958,7 @@ async function _tryShowReport() {
       if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
   } catch (e) {
-    console.warn('[Sentinel/report] _tryShowReport failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    console.warn('[Sentinel/report] _tryShowReport failed:', getErrorMessage(e));
   }
 }
 
@@ -3258,10 +3258,10 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   // (3.51) Report display — show report card in chat when report is ready
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', getErrorMessage(e)); }
   }
   if (message.action === 'agent_loop_complete' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', getErrorMessage(e)); }
   }
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
@@ -3567,7 +3567,7 @@ chrome.runtime.onMessage.addListener((message) => {
           const originalGoal = typeof message.originalGoal === 'string' ? message.originalGoal : '';
           // Fetch dismissed map, prune expired, filter incoming suggestions.
           chrome.storage.local.get('dismissed_suggestions', (stored) => {
-            if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+            if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadDismissedSuggestions failed:', getErrorMessage(chrome.runtime.lastError)); return; }
             const now = Date.now();
             const raw = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
               ? stored.dismissed_suggestions : {};
@@ -3645,7 +3645,7 @@ chrome.runtime.onMessage.addListener((message) => {
                         inputBox.value = originalGoal;
                       }
                       if (typeof sendMessage === 'function') sendMessage();
-                    } catch (e) { console.warn('[Sentinel] DOM write error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+                    } catch (e) { console.warn('[Sentinel] DOM write error:', getErrorMessage(e)); }
                   }
                   sCard.style.opacity = '0.5';
                   applyBtn.textContent = 'Applied';
@@ -3664,14 +3664,14 @@ chrome.runtime.onMessage.addListener((message) => {
                 sCard.remove();
                 if (sug && sug.id) {
                   chrome.storage.local.get('dismissed_suggestions', (stored) => {
-                    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
+                    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadDismissedSuggestion failed:', getErrorMessage(chrome.runtime.lastError)); return; }
                     const map = (stored && stored.dismissed_suggestions && typeof stored.dismissed_suggestions === 'object')
                       ? stored.dismissed_suggestions : {};
                     map[sug.id] = Date.now();
                     try { chrome.storage.local.set({ dismissed_suggestions: map }); } catch { /* storage write may fail */ }
                   });
                 }
-              } catch (e) { console.warn('[Sentinel] DOM removal error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+              } catch (e) { console.warn('[Sentinel] DOM removal error:', getErrorMessage(e)); }
             });
             btnWrap.appendChild(dismissBtn);
             header.appendChild(btnWrap);
@@ -3684,31 +3684,31 @@ chrome.runtime.onMessage.addListener((message) => {
         }  /* end of _renderSuggestionsList (v3.33.0 callback-scoped) */
       } catch { /* trust-score render non-fatal */ }
     } catch (err) {
-      console.error('Error displaying completion message:', (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err)));
+      console.error('Error displaying completion message:', getErrorMessage(err));
     }
     resetUI();
   }
   // Approval / pause / interrupt cards — the background sends these but the
   // handler had no cases for them, leaving every approval-mode run deadlocked.
   if (message.action === 'request_approval') {
-    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showApprovalCard(message.payload); } catch (e) { console.error('[Sentinel] showApprovalCard error:', getErrorMessage(e)); }
   }
   if (message.action === 'mfa_pause') {
-    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showMfaBanner(message.url, message.hint, message.stepNumber); } catch (e) { console.error('[Sentinel] showMfaBanner error:', getErrorMessage(e)); }
   }
   if (message.action === 'sign_in_wall_pause') {
-    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showSignInWallBanner(message.url, message.host, message.evidence, message.stepNumber); } catch (e) { console.error('[Sentinel] showSignInWallBanner error:', getErrorMessage(e)); }
   }
   if (message.action === 'adapted_goal_available') {
-    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showAdaptedGoalCard(message); } catch (e) { console.error('[Sentinel] showAdaptedGoalCard error:', getErrorMessage(e)); }
   }
   if (message.action === 'mode_mismatch_pause') {
-    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showModeMismatchCard(message); } catch (e) { console.error('[Sentinel] showModeMismatchCard error:', getErrorMessage(e)); }
   }
   if (message.action === 'download_captured') {
-    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showDownloadCaptured(message); } catch (e) { console.error('[Sentinel] showDownloadCaptured error:', getErrorMessage(e)); }
   }
   if (message.action === 'run_log_available') {
-    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+    try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', getErrorMessage(e)); }
   }
 });

@@ -74,6 +74,11 @@ function createSandbox() {
 
   const sandbox = {
     window: {},
+    getErrorMessage(err) {
+      if (typeof err === 'string') return err;
+      if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+      return String(err || '');
+    },
     console,
     JSON,
     Error,

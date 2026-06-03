@@ -1,4 +1,5 @@
 // background/skills/navigate-loop.js
+import { getErrorMessage } from '../error-utils.js';
 // Fires after the v3.20.1 navigate-loop guard catches 2+ navigates to the
 // same URL. The agent is re-navigating instead of interacting with the page.
 // Recovery: read the current page (deterministic) so the LLM sees what's
@@ -17,7 +18,7 @@ export const navigateLoop = {
       const blockedPattern = /^BLOCKED:\s*already navigated to/i;
       return blockedPattern.test(resultString);
     } catch (error) {
-      console.error('Error in navigateLoop matches:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in navigateLoop matches:', getErrorMessage(error));
       return false;
     }
   },
@@ -27,7 +28,7 @@ export const navigateLoop = {
       if (!ctx) return null;
       return { type: 'read_page', _autoAppliedBy: 'navigate-loop' };
     } catch (error) {
-      console.error('Error in navigateLoop autoApply:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in navigateLoop autoApply:', getErrorMessage(error));
       return null;
     }
   },
@@ -41,7 +42,7 @@ export const navigateLoop = {
 3. If the page lacks what you need, try \`execute_js\` with a key to inspect the DOM structure: \`{type:'execute_js', key:'page_struct', code:'return document.querySelectorAll("nav, aside, [role=navigation]").length'}\`.
 4. If the goal expects content that isn't here, the URL might be wrong — fall through to \`note\` recording what IS here, then \`finish\` honestly with "[MISSING DATA — page does not contain expected X]".`;
     } catch (error) {
-      console.error('Error in navigateLoop promptInjection:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error in navigateLoop promptInjection:', getErrorMessage(error));
       return '';
     }
   }

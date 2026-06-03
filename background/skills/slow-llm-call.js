@@ -1,4 +1,5 @@
 // background/skills/slow-llm-call.js
+import { getErrorMessage } from '../error-utils.js';
 // Fires when the most recent LLM call took > 25 seconds. Almost always
 // means token bloat or provider slowness. Recovery is observability-focused:
 // the engine has already capped per-step history result fields at 800 chars
@@ -36,7 +37,7 @@ export const slowLlmCall = {
 - Don't re-emit the same page-read commands repeatedly — past observations are already in your context.
 - If the provider is genuinely slow (rate-limited / overloaded), wait it out — there's nothing the code can do about that.`;
     } catch (error) {
-      console.error('Error generating prompt injection for slowLlmCall:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error generating prompt injection for slowLlmCall:', getErrorMessage(error));
       return 'Error generating prompt injection for slow LLM call.';
     }
   }
