@@ -2085,7 +2085,9 @@ function _countEvidenceSources(agentMemory, history) {
   try {
     count += Object.keys(agentMemory || {}).length;
     if (Array.isArray(history)) {
-      count += history.filter(h => h && h.action && h.action.type === 'note').length;
+      // Cache filter result to avoid repeated array traversal
+      const noteCount = history.filter(h => h && h.action && h.action.type === 'note').length;
+      count += noteCount;
     }
   } catch (_e) {
     // Context data read failed non-fatally
