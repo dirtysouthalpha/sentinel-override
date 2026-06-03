@@ -1,7 +1,9 @@
 // Sentinel Override v3 -- Template Manager
 // Template CRUD, parameter extraction, goal resolution, usage tracking.
-// Layer 2 module -- imports NOTHING from other background modules.
+// Layer 2 module -- imports from error-utils.js only.
 // Storage: chrome.storage.local key 'sentinel_templates'
+
+import { getErrorMessage } from './error-utils.js';
 
 const STORAGE_KEY = 'sentinel_templates';
 const PARAM_REGEX = /:{2}(\w+):{2}/g;
@@ -79,7 +81,7 @@ export async function loadTemplates() {
     templatesCache = result[STORAGE_KEY] || {};
     cacheTimestamp = now;
     return templatesCache;
-  } catch (e) { console.error('[template-manager] loadTemplates failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); return {}; }
+  } catch (e) { console.error('[template-manager] loadTemplates failed:', getErrorMessage(e)); return {}; }
 }
 
 /**
@@ -95,7 +97,7 @@ export async function saveTemplates(templates) {
     cacheTimestamp = Date.now();
   } catch (e) {
     // Storage quota or unavailable — callers should handle
-    throw new Error('Failed to save templates: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    throw new Error('Failed to save templates: ' + getErrorMessage(e));
   }
 }
 
