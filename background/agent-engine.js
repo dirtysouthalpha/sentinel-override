@@ -5015,7 +5015,7 @@ async function runAgentLoop(goal, workingTabId) {
         const itemsKey = command.items_key;
         const items = itemsKey && Array.isArray(agentMemory[itemsKey]) ? agentMemory[itemsKey] : (Array.isArray(command.items) ? command.items : []);
         const doActions = Array.isArray(command.do) ? command.do : [];
-        if (items.length === 0 || doActions.length === 0) {
+        if (!items.length || !doActions.length) {
           historyPush({ step: stepCount, action: command, result: 'repeat_for_each: nothing to iterate (items=' + items.length + ', actions=' + doActions.length + ')' });
           await persistHistory();
           continue;
