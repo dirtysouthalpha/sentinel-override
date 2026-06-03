@@ -1116,8 +1116,8 @@ function summarizeHistoryBatch(batch) {
   }
   const summaryParts = [];
   summaryParts.push('Action counts: ' + Object.entries(counts).map(([k, v]) => k + '×' + v).join(', '));
-  if (navUrls.length) summaryParts.push('Navigated to: ' + Array.from(new Set(navUrls)).slice(0, 5).join(' | '));
-  if (extractedKeys.length) summaryParts.push('Memory keys saved: ' + Array.from(new Set(extractedKeys)).slice(0, 8).join(', '));
+  if (navUrls.length) summaryParts.push('Navigated to: ' + [...new Set(navUrls)].slice(0, 5).join(' | '));
+  if (extractedKeys.length) summaryParts.push('Memory keys saved: ' + [...new Set(extractedKeys)].slice(0, 8).join(', '));
   if (notes.length) summaryParts.push('Notes recorded: ' + notes.slice(0, 3).join(' || '));
   if (failures.length) summaryParts.push('Failures: ' + failures.slice(0, 3).join(' || '));
   return {
@@ -1171,7 +1171,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
     const lastAction = history.length ? history[history.length - 1] : null;
     const lines = [
       '📊 PROGRESS UPDATE — step ' + stepCount,
-      'Portals visited: ' + (portalsSeen.size > 0 ? Array.from(portalsSeen).join(', ') : '(none yet)'),
+      'Portals visited: ' + (portalsSeen.size > 0 ? [...portalsSeen].join(', ') : '(none yet)'),
       'Data points in memory: ' + memCount,
       'Recent action: ' + (lastAction?.action ? lastAction.action.type : '(none)')
     ];
@@ -1282,7 +1282,7 @@ async function attachTabToSentinelGroup(tabId) {
 
 async function detachAllSentinelTabs() {
   // Ungroup every attached tab. Safe even if some are already gone.
-  const ids = Array.from(agentAttachedTabs);
+  const ids = [...agentAttachedTabs];
   agentAttachedTabs.clear();
   agentTabGroupId = null;
   if (!ids.length) return;
