@@ -852,5 +852,6 @@ export async function initScheduler() {
 
   // Save any updated schedules
   await saveSchedules(schedules);
-  tel.info('scheduler', `Scheduler initialized. ${Object.values(schedules).filter(s => s.enabled).length} enabled schedules.`);
+  const _enabledCount = Object.values(schedules).reduce((acc, s) => acc + (s.enabled ? 1 : 0), 0);
+  tel.info('scheduler', `Scheduler initialized. ${_enabledCount} enabled schedules.`);
 }

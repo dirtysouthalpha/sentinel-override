@@ -1712,9 +1712,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
 ` : '';
 
   // Navigation fatigue detection -- DISABLED in runbook mode.
-  const navigateCount = Array.isArray(history) ? history.filter(h => h.action && h.action.type === 'navigate').length : 0;
-  const extractCount = Array.isArray(history) ? history.filter(h => h.action && ['extract', 'extract_list'].includes(h.action.type)).length : 0;
-  const noteCount = Array.isArray(history) ? history.filter(h => h.action && h.action.type === 'note').length : 0;
+  const _actionCounts = Array.isArray(history) ? history.reduce((acc, h) => {
+    if (!h || !h.action) return acc;
+    const type = h.action.type;
+    if (type === 'navigate') acc.navigate++;
+    if (type === 'extract' || type === 'extract_list') acc.extract++;
+    if (type === 'note') acc.note++;
+    return acc;
+  }, { navigate: 0, extract: 0, note: 0 }) : { navigate: 0, extract: 0, note: 0 };
+  const navigateCount = _actionCounts.navigate;
+  const extractCount = _actionCounts.extract;
+  const noteCount = _actionCounts.note;
 
   const finishCtx = isRunbook ? '' :
     (navigateCount >= 5 && extractCount === 0 && noteCount === 0)

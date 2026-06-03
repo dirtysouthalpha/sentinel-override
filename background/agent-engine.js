@@ -2085,8 +2085,8 @@ function _countEvidenceSources(agentMemory, history) {
   try {
     count += Object.keys(agentMemory || {}).length;
     if (Array.isArray(history)) {
-      // Cache filter result to avoid repeated array traversal
-      const noteCount = history.filter(h => h && h.action && h.action.type === 'note').length;
+      // Count notes in a single pass
+      const noteCount = history.reduce((acc, h) => acc + (h && h.action && h.action.type === 'note' ? 1 : 0), 0);
       count += noteCount;
     }
   } catch (_e) {
@@ -4105,8 +4105,15 @@ async function runAgentLoop(goal, workingTabId) {
         }
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
         const recentWindow = history.slice(-8);
-        const recentJsCount = recentWindow.filter(h => h && h.action && h.action.type === 'execute_js').length;
-        const recentExtractCount = recentWindow.filter(h => h && h.action && ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
+        const _recentCounts = recentWindow.reduce((acc, h) => {
+          if (!h || !h.action) return acc;
+          const type = h.action.type;
+          if (type === 'execute_js') acc.js++;
+          if (['extract', 'extract_list', 'note', 'finish'].includes(type)) acc.extract++;
+          return acc;
+        }, { js: 0, extract: 0 });
+        const recentJsCount = _recentCounts.js;
+        const recentExtractCount = _recentCounts.extract;
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
 
         if (consecutiveNonProductive >= 3 || jsLoop) {
@@ -4121,10 +4128,10 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 1b. Empty page detection — page didn't render (SPA, anti-bot, loading failure)
       if ((pageIsEmpty || elementsEmpty) && !loopDirective) {
-        const emptyCount = history.slice(-4).filter(h => {
+        const emptyCount = history.slice(-4).reduce((acc, h) => {
           const r = h.result || '';
-          return r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300);
-        }).length;
+          return acc + ((r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) ? 1 : 0);
+        }, 0);
         if (emptyCount >= 2) {
           loopDirective = '\n⚠ EMPTY PAGE -- The page content has been empty for multiple attempts. This site may block automation or use heavy JavaScript rendering. You MUST try a different approach:\n1. Use "execute_js" with key to extract data directly: return document.body.innerText\n2. Navigate to a simpler URL (e.g., the homepage instead of search results)\n3. Try a different site for the same information\nDo NOT read_page again on this empty page.\n';
         }
@@ -4686,7 +4693,7 @@ async function runAgentLoop(goal, workingTabId) {
 
         const memKeys = Object.keys(agentMemory || {});
         const memCount = memKeys.length;
-        const noteCount = history.filter(h => h.action && h.action.type === 'note').length;
+        const noteCount = history.reduce((acc, h) => acc + (h.action && h.action.type === 'note' ? 1 : 0), 0);
         const hasData = memCount > 0 || noteCount > 0;
 
         // Block finish if no real data was extracted and we haven't tried enough
@@ -4718,7 +4725,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _articleGoal = (typeof goal === 'string') ? goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i) : null;
           if (_articleGoal && !command.force) {
             const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
-            const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
+            const _openTabs = history.reduce((acc, h) => acc + (h.action && h.action.type === 'open_tab' ? 1 : 0), 0);
             const _summaryKeys = memKeys.filter(k =>
               k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
             );
@@ -5168,7 +5175,7 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.25.1) Telemetry: LLM-requested network read. Tag the failed
           // count so 4xx/5xx spikes during a run are easy to spot.
           try {
-            const _failed = entries.filter(e => e.failed || (e.status >= 400)).length;
+            const _failed = entries.reduce((acc, e) => acc + ((e.failed || (e.status >= 400)) ? 1 : 0), 0);
             tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
           } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', getErrorMessage(_e)); }
           historyPush({ step: stepCount, action: command, result });
