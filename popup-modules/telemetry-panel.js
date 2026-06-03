@@ -308,10 +308,19 @@
     if (copyBtn) {
       copyBtn.addEventListener('click', () => {
         const filtered = events.filter(e => _eventMatchesFilter(e) && _eventMatchesSearch(e));
-        const text = filtered.map(e =>
-          _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) +
-          (e.payload ? '  ' + JSON.stringify(e.payload) : '')
-        ).join('\n');
+        let text;
+        try {
+          text = filtered.map(e =>
+            _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) +
+            (e.payload ? '  ' + JSON.stringify(e.payload) : '')
+          ).join('\n');
+        } catch (stringifyErr) {
+          console.warn('[Sentinel] Failed to stringify event payload:', typeof stringifyErr === 'object' && stringifyErr !== null && typeof stringifyErr.message === 'string' ? stringifyErr.message : String(stringifyErr));
+          text = filtered.map(e =>
+            _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) +
+            '  [payload omitted - circular or non-serializable]'
+          ).join('\n');
+        }
         try {
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = 'Copied!';

@@ -199,9 +199,11 @@ function _redactEvent(event) {
 function _scheduleFlush() {
   if (_persistFlushTimer) return;
   _persistFlushTimer = setInterval(() => {
-    if (_pendingPersistFlush) _flushRunBuffer().catch((e) => {
-      console.error('[_scheduleFlush] Unhandled rejection:', e);
-    });
+    if (_pendingPersistFlush) {
+      _flushRunBuffer().catch((e) => {
+        console.error('[_scheduleFlush] Unhandled rejection:', e);
+      });
+    }
   }, PERSIST_FLUSH_INTERVAL_MS);
 }
 

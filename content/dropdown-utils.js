@@ -125,7 +125,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
     // If scoped lookup found options, return them now (skip doc-wide).
     if (options.length > 0) {
-      return options.filter(function(el) { return dom.isVisible(el); });
+      return options.filter(function(el) { return dom.isVisible && dom.isVisible(el); });
     }
 
     // ===== Fallback: doc-wide lookup =====
@@ -185,7 +185,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
     // Filter by visibility
     return options.filter(function(el) {
-      return dom.isVisible(el);
+      return dom.isVisible && dom.isVisible(el);
     });
   };
 
@@ -471,7 +471,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
       'input[type="text"], input[type="search"], input[placeholder*="search" i], input[placeholder*="filter" i]'
     );
     for (const input of searchInputs) {
-      if (dom.isVisible(input)) return input;
+      if (dom.isVisible && dom.isVisible(input)) return input;
     }
 
     return null;
