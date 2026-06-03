@@ -698,7 +698,7 @@ export async function startAgent(goal, sender) {
       clientKnowledgeUsedIds = relevantEntries.map(e => e.id);
       clientKnowledgeText = await formatPromptSection(activeClient.id, startUrl);
       // (9.1) Broadcast which facts are being injected so popup can show them
-      try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (previewErr) {
+      try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (_previewErr) {
         /* Non-fatal: client knowledge preview send failed */
       }
     } else {
@@ -764,7 +764,7 @@ export async function startAgent(goal, sender) {
       agentRunning = false;
       try { await detachAllSentinelTabs();
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (sidePanelErr) {
+    try { await _enableSidePanelEverywhere(); } catch (_sidePanelErr) {
       /* Non-fatal: side panel re-enable failed */
     } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
       chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
@@ -1299,12 +1299,12 @@ async function _enableSidePanelEverywhere() {
       if (tab.id) {
         try {
           await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
-        } catch (e) {
+        } catch (_e) {
           // Side panel may not be available in all contexts
         }
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Side panel API call failed non-critically
   }
 }
@@ -2071,7 +2071,7 @@ function _countEvidenceSources(agentMemory, history) {
     if (Array.isArray(history)) {
       count += history.filter(h => h && h.action && h.action.type === 'note').length;
     }
-  } catch (e) {
+  } catch (_e) {
     // Context data read failed non-fatally
   }
   return count;
@@ -3278,7 +3278,7 @@ async function runAgentLoop(goal, workingTabId) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
     agentPlan = null;
   }
-  try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (e) {
+  try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_e) {
     // Plan preview send failed non-fatally
   }
 
@@ -3338,7 +3338,7 @@ async function runAgentLoop(goal, workingTabId) {
             dynamicBaseline = CONFIG.maxSteps + 50;
           }
         }
-      } catch (e) {
+      } catch (_e) {
         // Dynamic baseline calculation failed non-fatally
       }
       const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
@@ -3620,7 +3620,7 @@ async function runAgentLoop(goal, workingTabId) {
               role: 'user',
               content: `[SYSTEM RECOVERY] The action "${stuckAction}" has failed ${lastActionTypes.length} times in a row. You are stuck in a loop. Try a COMPLETELY DIFFERENT approach. If close_tab isn't working, try navigate to the main page instead. If you can't close a tab, just navigate away from it. Do NOT repeat "${stuckAction}" again.`
             });
-            try { await persistHistory(); } catch (e) {
+            try { await persistHistory(); } catch (_e) {
               // History persist failed non-fatally during recovery
             }
           }
@@ -3681,7 +3681,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const parsed = JSON.parse(val.replace('JS Result: ', ''));
                 val = (parsed && parsed.value !== undefined) ? parsed.value : val;
-              } catch (e) { /* JSON parse failed - use raw value */ }
+              } catch (_e) { /* JSON parse failed - use raw value */ }
             }
             const parsed = typeof val === 'number' ? val : parseInt(String(val), 10);
             _currentDomHash = (typeof parsed === 'number' && !Number.isNaN(parsed)) ? parsed : 0;
@@ -3765,7 +3765,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const narration = _buildPageNarration(tabInfo && tabInfo.url, tabInfo && tabInfo.title, observation, pageContent);
             if (narration) sendAgentStatus('observing', narration);
-          } catch (e) {
+          } catch (_e) {
             // Page narration failed non-fatally
           }
         } catch (err) {
@@ -3809,7 +3809,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Context should have been registered in startAgent/registerInitialTab.
         // If it's missing (e.g., tab was replaced mid-run), re-register so the
         // loop can continue rather than spin forever on the continue below.
-        try { registerInitialTab(tab, currentUrl); } catch (e) {
+        try { registerInitialTab(tab, currentUrl); } catch (_e) {
           // Tab registration failed non-fatally during recovery
         }
         tabCtx = getTabContext(tab);
@@ -3817,7 +3817,7 @@ async function runAgentLoop(goal, workingTabId) {
         // proceed — never spin-loop here as it would keep apiCallCount at 0.
         if (!tabCtx) {
           console.warn('[Sentinel] tabCtx still null after re-register — creating minimal context for tab', tab);
-          try { registerInitialTab(tab, currentUrl); } catch (e) {
+          try { registerInitialTab(tab, currentUrl); } catch (_e) {
           // Tab registration failed non-fatally during recovery
         }
           tabCtx = getTabContext(tab);
@@ -4293,7 +4293,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (_pendingCommandQueue.length > 0) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ } }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
         command = _pendingCommandQueue.shift();
         activityDone(stepCount, 'consult-ai', 'Queued sub-command: ' + command.type, null);
         _lastAiCallMs = 0;
@@ -4303,7 +4303,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else if (_skillAutoCommand) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ } }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
         command = _skillAutoCommand;
         activityDone(stepCount, 'consult-ai', 'Skipped (skill auto-applied)', null);
         _lastAiCallMs = 0;
@@ -4483,7 +4483,7 @@ async function runAgentLoop(goal, workingTabId) {
         _lastAiCallMs = Date.now() - _aiStart;
         try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
         // Clear SoM overlay so it doesn't interfere with action execution
-        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (e) { /* vision cleanup failed - non-fatal */ }
+        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         base64Image = null; // release screenshot memory
         agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
@@ -6449,7 +6449,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           activityDone(stepCount, 'dispatch', describeAction(command), { result: _resPreview });
         }
-      } catch (e) {
+      } catch (_e) {
         // Activity emit failed non-fatally
       }
       historyPush({ step: stepCount, action: command, result });
@@ -6463,7 +6463,7 @@ async function runAgentLoop(goal, workingTabId) {
           target:  _describeTarget(command),
           outcome: typeof result === 'string' ? result.slice(0, 200) : (actionFailed ? 'failed' : 'ok'),
         });
-      } catch (e) {
+      } catch (_e) {
         // Audit log append failed non-fatally
       }
 
@@ -6865,7 +6865,7 @@ async function requestApproval(command, stepNumber) {
           title: 'Sentinel Override — Approval needed',
           message: 'Step ' + stepNumber + ': ' + description.substring(0, 100) + '. Open Sentinel to approve or reject.'
         });
-      } catch (e) {
+      } catch (_e) {
         // Notification create failed non-fatally
       }
       // Hard-reject after 5 minutes total (4 more minutes from here).
