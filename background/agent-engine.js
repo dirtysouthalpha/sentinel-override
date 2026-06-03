@@ -5815,8 +5815,8 @@ async function runAgentLoop(goal, workingTabId) {
               if (u.includes('onedrive')) return 'onedrive';
               if (u.includes('sharepoint')) return 'sharepoint';
               if (u.includes('teams')) return 'teams';
-              if (u.includes('intune') || u.includes('endpoint.microsoft')) return 'intune';
-              if (u.includes('defender') || u.includes('security.microsoft')) return 'defender';
+              if (/intune|endpoint\.microsoft/.test(u)) return 'intune';
+              if (/defender|security\.microsoft/.test(u)) return 'defender';
               if (u.includes('admin.microsoft')) return 'm365';
               if (u.includes('sentinelone')) return 'sentinelone';
               if (u.includes('virustotal')) return 'virustotal';

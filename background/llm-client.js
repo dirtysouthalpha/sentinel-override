@@ -316,7 +316,7 @@ UI-SPECIFIC RULES:
 `
   },
   {
-    test: (url) => url.includes('nvd.nist.gov') || url.includes('cve.mitre.org') || url.includes('cve.org'),
+    test: (url) => /(nvd\.nist\.gov|cve\.mitre\.org|cve\.org)/.test(url),
     prose: `[NIST NVD / CVE Database -- Platform Context (3.12.6)]
 
 ## CRITICAL RULE: When you have the listing data, you are DONE.
@@ -557,8 +557,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      url.includes('datto') || url.includes('centrestage') || url.includes('autotask') ||
-      url.includes('adra') || text.includes('datto rmm') || text.includes('autotask'),
+      /datto|centrestage|autotask|adra/.test(url) ||
+      /datto rmm|autotask/.test(text),
     prose: `
 [Datto/Autotask Platform Context]
 - Autotask PSA: navigation via top menu (Dispatch, Service Desk, Projects, etc.)
@@ -573,7 +573,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url, text) => url.includes('itglue') || url.includes('it-glue') || text.includes('it glue'),
+    test: (url, text) => /itglue|it-glue/.test(url) || /it glue/.test(text),
     prose: `
 [IT Glue Platform Context]
 - Navigation: left sidebar with Organizations, Passwords, Documents, Configurations, etc.

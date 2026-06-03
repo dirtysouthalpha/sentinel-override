@@ -745,8 +745,8 @@ export async function migrateLegacySettings() {
   const endpoint = stored.api_endpoint || '';
   const apiKey = stored.api_key || '';
   const model = stored.model || '';
-  const providerId = endpoint.includes('api.anthropic.com') ? 'anthropic'
-    : (endpoint.includes('z.ai') || endpoint.includes('api.z.ai')) ? 'zai'
+  const providerId = /api\.anthropic\.com/.test(endpoint) ? 'anthropic'
+    : /z\.ai|api\.z\.ai/.test(endpoint) ? 'zai'
     : 'openai';
   try {
     await chrome.storage.local.set({
