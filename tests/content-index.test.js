@@ -45,7 +45,7 @@ function detectMFA(text) {
   if (!text || typeof text !== 'string') return null;
   const sample = text.substring(0, 4000);
   for (const re of MFA_PATTERNS) {
-    const m = sample.match(re);
+    const m = typeof sample === 'string' ? sample.match(re) : null;
     if (m) return m[0];
   }
   return null;
@@ -150,8 +150,9 @@ function checkSensitiveField(el) {
   if (el.title) parts.push(el.title);
   if (el.autocomplete) parts.push(el.autocomplete);
   if (el.labelText) parts.push(el.labelText);
-  const ctx = (parts || []).join(' ').toLowerCase();
-  const m = ctx.match(SENSITIVE_LABEL_RE);
+  const ctx = (parts || []).join(' ');
+  const ctxLower = typeof ctx === 'string' ? ctx.toLowerCase() : String(ctx).toLowerCase();
+  const m = typeof ctxLower === 'string' ? ctxLower.match(SENSITIVE_LABEL_RE) : null;
   return m ? m[0] : null;
 }
 

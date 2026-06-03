@@ -100,7 +100,7 @@ function _effectivePriority(skill) {
  * @private
  */
 function _recordPendingOutcomes(context) {
-  if (_pendingOutcomeSkillIds.length === 0) return;
+  if (!Array.isArray(_pendingOutcomeSkillIds) || _pendingOutcomeSkillIds.length === 0) return;
   if (typeof context.lastActionFailed !== 'boolean') {
     _pendingOutcomeSkillIds = [];
     return;

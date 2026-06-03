@@ -21,8 +21,8 @@ jest.unstable_mockModule('../background/template-manager.js', () => ({
   loadTemplates: jest.fn(async () => ({ ...mockStorage })),
   saveTemplates: jest.fn(async (t) => Object.assign(mockStorage, t)),
   extractParameters: jest.fn((goal) => {
-    const matches = goal.match(/\{\{(\w+)\}\}/g);
-    return matches ? matches.map(m => m.replace(/[{}]/g, '')) : [];
+    const matches = typeof goal === 'string' ? goal.match(/\{\{(\w+)\}\}/g) : null;
+    return matches ? matches.map(m => typeof m === 'string' ? m.replace(/[{}]/g, '') : String(m)) : [];
   }),
 }));
 

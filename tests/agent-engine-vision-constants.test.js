@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(resolve(__dirname, '../background/agent-engine.js'), 'utf8');
 
 describe('VISION_DISCOVER', () => {
-  const constLine = src.split('\n').find(l => l.startsWith('const VISION_DISCOVER'));
+  const constLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.startsWith('const VISION_DISCOVER'));
 
   it('is defined', () => {
     expect(constLine).toBeTruthy();
@@ -31,7 +31,7 @@ describe('VISION_DISCOVER', () => {
 });
 
 describe('VISION_CLEAR', () => {
-  const constLine = src.split('\n').find(l => l.startsWith('const VISION_CLEAR'));
+  const constLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.startsWith('const VISION_CLEAR'));
 
   it('is defined', () => {
     expect(constLine).toBeTruthy();
@@ -83,7 +83,7 @@ describe('vision index guard uses Number.isInteger and > 0', () => {
 // ═══════════════════════════════════════════════════════════════════
 describe('vision type action _safeText escaping includes \\r and \\t', () => {
   // Find the _safeText assignment line in the vision type handler
-  const safeTextLine = src.split('\n').find(l => l.includes('const _safeText') && l.includes('replace'));
+  const safeTextLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.includes('const _safeText') && l.includes('replace'));
 
   it('_safeText line exists', () => {
     expect(safeTextLine).toBeTruthy();

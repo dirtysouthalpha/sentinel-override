@@ -883,7 +883,7 @@ describe('_runExecuteJsOnce', () => {
     mockCdpExecuteJs.mockResolvedValueOnce({ ok: true, value: longObj });
     const result = await _runExecuteJsOnce(1, 'return big', 5000);
     // The JS Result prefix + JSON stringified should be truncated
-    const valPart = result.replace('JS Result: ', '');
+    const valPart = typeof result === 'string' ? result.replace('JS Result: ', '') : String(result);
     expect(valPart.length).toBeLessThanOrEqual(3000);
   });
 });
