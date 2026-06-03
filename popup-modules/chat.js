@@ -677,7 +677,7 @@ function appendLogLine(stepNumber, text) {
   const line = document.createElement('div');
   line.className = 'step-log-line';
   // Detect error/warning state for styling
-  if (text.startsWith('❌') || text.includes('Error') || text.includes('failed')) {
+  if (/^❌|Error|failed/.test(text)) {
     line.classList.add('log-error');
   } else if (text.startsWith('⚠️') || text.includes('Retrying')) {
     line.classList.add('log-warn');
