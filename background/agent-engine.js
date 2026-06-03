@@ -5885,7 +5885,7 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.9.0) Reject useless toString'd values — '[object Object]', null,
           // undefined, empty objects/arrays. Saving these is worse than failing.
           const _useless = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLElement|HTMLCollection|NodeList|Window|Document|Map|Set)\]\s*$/i;
-          const _trim = typeof jsValue === 'string' ? jsValue.trim() : String(jsValue).trim();
+          const _trim = String(jsValue).trim();
           if (_useless.test(_trim) || _trim === 'undefined' || _trim === 'null') {
             actionFailed = true;
             // (3.12.1) More actionable guidance — tell the LLM the SPECIFIC
