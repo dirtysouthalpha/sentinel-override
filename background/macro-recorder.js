@@ -145,7 +145,7 @@ export async function importMacro(jsonStr) {
   try {
     data = JSON.parse(jsonStr);
   } catch (e) {
-    throw new Error('Invalid macro JSON: ' + getErrorMessage(e));
+    throw new Error(`Invalid macro JSON: ${getErrorMessage(e)}`);
   }
   if (!data.sentinelMacro || !data.steps) {
     throw new Error('Invalid macro format');

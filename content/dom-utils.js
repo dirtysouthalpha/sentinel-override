@@ -88,7 +88,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
 
     if (el.id) {
       const genericIds = ['button', 'input', 'form', 'container', 'main', 'wrapper', 'div', 'span', 'content', 'body', 'header', 'footer', 'nav'];
-      if (!genericIds.includes(el.id.toLowerCase())) return '#' + CSS.escape(el.id);
+      if (!genericIds.includes(el.id.toLowerCase())) return `#${CSS.escape(el.id)}`;
     }
 
     const tagName = el.tagName.toLowerCase();
@@ -181,7 +181,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     if (testIdHealMatch) {
       try {
         const base = testIdHealMatch[1];
-        const el = doc.querySelector('[data-testid*="' + base.replace(/"/g, '') + '"]');
+        const el = doc.querySelector(`[data-testid*="${base.replace(/"/g, '')}"]`);
         if (el) return el;
       } catch (_) { /* non-fatal */ }
     }
@@ -278,7 +278,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
    */
   dom._assignRef = function(el) {
     __sentinelRefCounter++;
-    const refId = 'ref_' + __sentinelRefCounter;
+    const refId = `ref_${__sentinelRefCounter}`;
     try {
       const wr = (typeof WeakRef === 'function') ? new WeakRef(el) : { deref: () => el };
       __sentinelRefLookup.set(refId, wr);

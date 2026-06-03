@@ -97,7 +97,7 @@ export async function saveTemplates(templates) {
     cacheTimestamp = Date.now();
   } catch (e) {
     // Storage quota or unavailable — callers should handle
-    throw new Error('Failed to save templates: ' + getErrorMessage(e));
+    throw new Error(`Failed to save templates: ${getErrorMessage(e)}`);
   }
 }
 
@@ -182,7 +182,7 @@ export async function updateTemplate(id, updates) {
   const templates = await loadTemplates();
   const existing = templates[id];
   if (!existing) {
-    throw new Error('Template not found: ' + id);
+    throw new Error(`Template not found: ${id}`);
   }
 
   if (updates.name !== undefined) {
@@ -234,7 +234,7 @@ export async function deleteTemplate(id) {
 
   const templates = await loadTemplates();
   if (!templates[id]) {
-    throw new Error('Template not found: ' + id);
+    throw new Error(`Template not found: ${id}`);
   }
 
   delete templates[id];
@@ -259,7 +259,7 @@ export async function resolveTemplateGoal(templateId, paramValues) {
   const templates = await loadTemplates();
   const template = templates[templateId];
   if (!template) {
-    throw new Error('Template not found: ' + templateId);
+    throw new Error(`Template not found: ${templateId}`);
   }
 
   const values = paramValues || {};

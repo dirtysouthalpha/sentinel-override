@@ -118,7 +118,7 @@ function _recordPendingOutcomes(context) {
     else _stats[skillId].failures++;
     _stats[skillId].lastOutcomeAt = now;
     try {
-      tel.debug('skill', 'Skill outcome: ' + skillId + ' -> ' + (success ? 'success' : 'failure'), {
+      tel.debug('skill', `Skill outcome: ${skillId} -> ${success ? 'success' : 'failure'}`, {
         skillId,
         success,
         fires: _stats[skillId].fires,
@@ -189,7 +189,7 @@ export function runRecoverySkills(context) {
       if (skill.matches(context)) {
         matches.push(skill);
         try {
-          tel.debug('skill', 'Skill matched: ' + skill.id, {
+          tel.debug('skill', `Skill matched: ${skill.id}`, {
             skillId: skill.id,
             priority: skill.priority || 0,
             stepCount: context.stepCount,
@@ -200,7 +200,7 @@ export function runRecoverySkills(context) {
         } catch (_e) { /* telemetry failure is non-critical */ }
       }
     } catch (e) {
-      try { tel.error('skill', 'Skill predicate threw: ' + skill.id, { skillId: skill.id, error: getErrorMessage(e) }); } catch (_e) { /* telemetry unavailable */ }
+      try { tel.error('skill', `Skill predicate threw: ${skill.id}`, { skillId: skill.id, error: getErrorMessage(e) }); } catch (_e) { /* telemetry unavailable */ }
       try { console.warn('[Sentinel/skills] predicate error in', skill.id, ':', getErrorMessage(e)); } catch (_e) { /* console unavailable */ }
     }
   }
@@ -229,7 +229,7 @@ export function runRecoverySkills(context) {
     try {
       const text = skill.promptInjection(context);
       if (typeof text === 'string' && text.trim()) {
-        injections.push('### Recovery skill: ' + skill.id + '\n' + text.trim());
+        injections.push(`### Recovery skill: ${skill.id}\n${text.trim()}`);
         if (!result.appliedSkillIds.includes(skill.id)) {
           result.appliedSkillIds.push(skill.id);
         }
@@ -239,7 +239,7 @@ export function runRecoverySkills(context) {
     }
   }
   if (injections.length > 0) {
-    result.promptInjection = '\n\n## RECOVERY DIRECTIVES (Sentinel skill library)\nThe engine detected a pattern that suggests a different strategy. Read these before deciding your next action:\n\n' + injections.join('\n\n') + '\n';
+    result.promptInjection = `\n\n## RECOVERY DIRECTIVES (Sentinel skill library)\nThe engine detected a pattern that suggests a different strategy. Read these before deciding your next action:\n\n${injections.join('\n\n')}\n`;
   }
 
   if (result.appliedSkillIds.length > 0) {

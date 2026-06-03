@@ -151,7 +151,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.runtime.sendMessage({ action: 'export_html_report', params: {} })
       .then((resp) => {
         if (resp?.ok && resp.data?.html) {
-          const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(resp.data.html);
+          const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(resp.data.html)}`;
           chrome.downloads.download({
             url: dataUrl,
             filename: `sentinel-report-${Date.now()}.html`,
@@ -333,7 +333,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const id = request.providerId;
         const apiKey = request.apiKey || '';
         let provider = getCatalogProvider(id);
-        if (!provider) return { ok: false, error: 'Unknown provider id: ' + id };
+        if (!provider) return { ok: false, error: `Unknown provider id: ${id}` };
         let modelsUrl = provider.modelsUrl;
         if (id === 'custom') {
           // For 'custom', derive modelsUrl from the user's endpoint URL.
@@ -343,10 +343,10 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           try {
             const u = new URL(ep);
             // Strip any /chat/completions or trailing path
-            const base = u.protocol + '//' + u.host + u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '');
+            const base = `${u.protocol}//${u.host}${u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '')}`;
             modelsUrl = base.replace(/\/$/, '') + '/models';
           } catch (e) {
-            return { ok: false, error: 'Could not parse custom endpoint: ' + (getErrorMessage(e)) };
+            return { ok: false, error: `Could not parse custom endpoint: ${getErrorMessage(e)}` };
           }
         }
         const models = await fetchModelsList({ ...provider, modelsUrl }, apiKey);
@@ -430,7 +430,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             action: 'request_approval',
             payload: {
               action: 'execute_js',
-              description: 'Run JS: ' + codePreview + (request.key ? ' → "' + request.key + '"' : ''),
+              description: `Run JS: ${codePreview}${request.key ? ` → "${request.key}"` : ''}`,
               stepNumber: 0,
               requestId,
               ariaLabel: null,
@@ -446,11 +446,11 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
 
           // Notify the user
           try {
-            notifyIfEnabled('exec_js_approval_' + requestId, {
+            notifyIfEnabled(`exec_js_approval_${requestId}`, {
               type: 'basic',
               iconUrl: chrome.runtime.getURL('icon-48.png'),
               title: 'Sentinel Override — JS execution approval needed',
-              message: 'Code: ' + codePreview.substring(0, 100) + '...'
+              message: `Code: ${codePreview.substring(0, 100)}...`
             });
           } catch (_e) { /* notification API may not be available */ }
 
@@ -509,7 +509,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (cmd.type === 'navigate') {
         if (!isValidUrl(cmd.url)) throw new Error('Invalid URL provided');
         await chrome.tabs.update(tab, { url: cmd.url });
-        return 'Navigated to ' + cmd.url;
+        return `Navigated to ${cmd.url}`;
       }
 
       // All other commands: inject content script, send message
@@ -548,7 +548,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const text = await callLLMSimple(qaSystem, qaPrompt, 1200);
         return { text };
       } catch (err) {
-        return { text: 'Error: ' + getErrorMessage(err) };
+        return { text: `Error: ${getErrorMessage(err)}` };
       }
     }
 
@@ -614,12 +614,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         return { ok: false, error: 'execute_in_frame: no active agent tab' };
       }
       if (frameIndex == null || frameIndex < 0) {
-        return { ok: false, error: 'execute_in_frame: invalid frameIndex ' + frameIndex };
+        return { ok: false, error: `execute_in_frame: invalid frameIndex ${frameIndex}` };
       }
       const frameId = await resolveFrameForSelector(tabId, frameIndex);
       // frameId === 0 (main frame) is a legitimate value — only reject null/undefined.
       if (frameId == null) {
-        return { ok: false, error: 'execute_in_frame: frame ' + frameIndex + ' not found in tab ' + tabId };
+        return { ok: false, error: `execute_in_frame: frame ${frameIndex} not found in tab ${tabId}` };
       }
       if (!command || typeof command !== 'object' || command === null) {
         return { ok: false, error: 'execute_in_frame: missing or invalid command' };
@@ -895,8 +895,8 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (!runId) throw new Error('No run log available to export');
       let logData;
       try {
-        const r = await chrome.storage.local.get('run_log_' + runId);
-        logData = r['run_log_' + runId];
+        const r = await chrome.storage.local.get(`run_log_${runId}`);
+        logData = r[`run_log_${runId}`];
       } catch (_) { logData = null; }
       if (!logData || !logData.entries) throw new Error('Run log data not found');
       const html = generateReplayReport(logData.entries, { goal: logData.goal, runLogId: runId, estimatedCostUsd: estimatedCostUsd || 0 });
@@ -924,7 +924,7 @@ chrome.windows.onCreated.addListener(async (win) => {
       await chrome.windows.update(win.id, { focused: true });
       let hostname = 'unknown host';
       try { hostname = new URL(ssoTab.url).hostname; } catch (_e) { /* URL parse failed */ }
-      sendSilentUpdate('🔐 SSO popup detected (' + hostname + ') — sign in, then the agent will continue automatically');
+      sendSilentUpdate(`🔐 SSO popup detected (${hostname}) — sign in, then the agent will continue automatically`);
     }
   } catch (e) { console.warn('[Sentinel/index] SSO popup detection failed:', getErrorMessage(e)); }
 });

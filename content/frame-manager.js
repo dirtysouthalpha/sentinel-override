@@ -44,7 +44,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
           // Same-origin: scan the iframe's document
           const iframeElements = [];
           const selectorMap = new Map();
-          dom.scanDocument(iframeDoc, iframeElements, selectorMap, 'frame:' + index + ':');
+          dom.scanDocument(iframeDoc, iframeElements, selectorMap, `frame:${index}:`);
           // Add each scanned element to the main elements array
           iframeElements.forEach(function(el) {
             // Add frame metadata

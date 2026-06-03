@@ -32,7 +32,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
 
   const tech = technicianInfo || {};
   const techLine = (tech.name || tech.phone || tech.email)
-    ? `Technician: ${tech.name || ''}${tech.company ? ' · ' + tech.company : ''}${tech.phone ? ' · ' + tech.phone : ''}${tech.email ? ' · ' + tech.email : ''}.`
+    ? `Technician: ${tech.name || ''}${tech.company ? ` · ${tech.company}` : ''}${tech.phone ? ` · ${tech.phone}` : ''}${tech.email ? ` · ${tech.email}` : ''}.`
     : '';
 
   const mismatchLines = (mismatchHints && mismatchHints.length)
@@ -47,10 +47,10 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
     const ws = profile.waitStrings;
     if (ws && typeof ws === 'object') {
       const lines = Object.entries(ws).map(([k, v]) =>
-        Array.isArray(v) && v.length ? `  ${k}: any of [${v.map(s => '"' + s + '"').join(', ')}]` : null
+        Array.isArray(v) && v.length ? `  ${k}: any of [${v.map(s => `"${s}"`).join(', ')}]` : null
       ).filter(Boolean);
       if (lines.length) {
-        navSignalsBlock = '\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n' + lines.join('\n');
+        navSignalsBlock = `\nNAVIGATION SIGNALS (add wait_for_text with these after each navigation step to confirm page load):\n${lines.join('\n')}`;
       }
     }
   } catch (e) { console.warn('[Sentinel/adaptive-prompts] waitStrings parse failed:', getErrorMessage(e)); }
@@ -61,7 +61,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
     if (Array.isArray(profile.pageTypes) && profile.pageTypes.length) {
       const lines = profile.pageTypes.map(pt => pt && pt.name && pt.hint ? `  ${pt.name}: ${pt.hint}` : null).filter(Boolean);
       if (lines.length) {
-        subPagesBlock = '\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n' + lines.join('\n');
+        subPagesBlock = `\nKNOWN SUB-PAGES (use these hints when navigating to each section):\n${lines.join('\n')}`;
       }
     }
   } catch (e) { console.warn('[Sentinel/adaptive-prompts] pageTypes parse failed:', getErrorMessage(e)); }
@@ -72,7 +72,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
     if (Array.isArray(profile.workflowHints)) {
       for (const wh of profile.workflowHints) {
         if (wh && wh.match instanceof RegExp && wh.hint && wh.match.test(rawGoal)) {
-          workflowScaffold = '\nWORKFLOW SCAFFOLD (goal matches a known task pattern — use as the phase structure unless the user already provided one):\n' + wh.hint;
+          workflowScaffold = `\nWORKFLOW SCAFFOLD (goal matches a known task pattern — use as the phase structure unless the user already provided one):\n${wh.hint}`;
           break;
         }
       }
@@ -90,7 +90,7 @@ ${profile.liveDataCaveats || '(none)'}
 KNOWN GOTCHAS:
 ${profile.knownGotchas || '(none)'}
 
-${profile.needsTargetSelection ? 'PRE-FLIGHT (Phase 0) — REQUIRED:\n' + profile.preflightInstructions + '\n' : ''}
+${profile.needsTargetSelection ? `PRE-FLIGHT (Phase 0) — REQUIRED:\n${profile.preflightInstructions}\n` : ''}
 PLATFORM-SPECIFIC INSTRUCTIONS:
 ${profile.rewriteInstructions || '(none)'}
 ${navSignalsBlock}
@@ -248,7 +248,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
     }
 
     if (!response.ok) {
-      result.error = 'rewriter API ' + response.status;
+      result.error = `rewriter API ${response.status}`;
       response.body && response.body.cancel().catch(() => {});
       return result;
     }

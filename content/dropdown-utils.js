@@ -222,14 +222,14 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     if (!matchedEl) {
       for (const opt of optionEls) {
         const optText = (opt.innerText || opt.textContent || '').trim().toLowerCase();
-        if (optText.startsWith(valueLower + ' ') || optText.startsWith(valueLower) && (optText.length === valueLower.length || optText[valueLower.length] === ' ')) {
+        if (optText.startsWith(`${valueLower} `) || optText.startsWith(valueLower) && (optText.length === valueLower.length || optText[valueLower.length] === ' ')) {
           matchedEl = opt; break;
         }
       }
     }
     // 4. Contains as whole word
     if (!matchedEl) {
-      const wordRegex = new RegExp('\\b' + valueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      const wordRegex = new RegExp(`\\b${valueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
       for (const opt of optionEls) {
         const optText = (opt.innerText || opt.textContent || '').trim();
         if (wordRegex.test(optText)) { matchedEl = opt; break; }

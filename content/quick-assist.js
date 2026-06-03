@@ -321,8 +321,8 @@
     // Clamp to viewport
     var x = Math.min(pos.x, window.innerWidth - 40);
     var y = Math.max(4, pos.y);
-    triggerBtn.style.left = x + 'px';
-    triggerBtn.style.top = y + 'px';
+    triggerBtn.style.left = `${x}px`;
+    triggerBtn.style.top = `${y}px`;
 
     triggerBtn.addEventListener('click', function(e) {
       e.preventDefault();
@@ -363,8 +363,8 @@
     panel.style.position = 'fixed';
     panel.style.zIndex = '2147483647';
     var pos = getPanelPosition();
-    panel.style.left = pos.x + 'px';
-    panel.style.top = pos.y + 'px';
+    panel.style.left = `${pos.x}px`;
+    panel.style.top = `${pos.y}px`;
 
     // Attach shadow DOM
     shadow = panel.attachShadow({ mode: 'closed' });
@@ -510,10 +510,13 @@
     setResponseLoading();
 
     // Build prompt
-    var prompt = 'You are Sentinel Quick Assist, an AI assistant for MSP technicians.\n' +
-      'Current page: ' + (typeof pageInfo.title === 'string' ? pageInfo.title : 'Unknown') +
-      ' (' + (typeof pageInfo.url === 'string' ? pageInfo.url : 'unknown') + ')\n\n' +
-      action.prompt + '\n\n---\n' + selectedText;
+    var prompt = `You are Sentinel Quick Assist, an AI assistant for MSP technicians.
+Current page: ${typeof pageInfo.title === 'string' ? pageInfo.title : 'Unknown'} (${typeof pageInfo.url === 'string' ? pageInfo.url : 'unknown'})
+
+${action.prompt}
+
+---
+${selectedText}`;
 
     // Send to background
     chrome.runtime.sendMessage(
@@ -521,7 +524,7 @@
       function(response) {
         setButtonsLoading(false);
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-          setResponseHTML('<span class="qa-error">Error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error') + '</span>');
+          setResponseHTML(`<span class="qa-error">Error: ${typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'}</span>`);
           return;
         }
         var text = response && response.data && response.data.text;
@@ -563,14 +566,14 @@
     if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
-    area.innerHTML = '<div class="qa-response">' + renderMarkdown(text) + '</div>';
+    area.innerHTML = `<div class="qa-response">${renderMarkdown(text)}</div>`;
   }
 
   function setResponseHTML(html) {
     if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
-    area.innerHTML = '<div class="qa-response">' + html + '</div>';
+    area.innerHTML = `<div class="qa-response">${html}</div>`;
   }
 
   function copyResponse() {

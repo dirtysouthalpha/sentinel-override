@@ -658,7 +658,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           action: 'cdp_pre_click_visual',
           x: Number(x) || 0,
           y: Number(y) || 0,
-          description: (typeof options.description === 'string' ? options.description : ('Clicking at (' + Math.round(Number(x) || 0) + ', ' + Math.round(Number(y) || 0) + ')'))
+          description: (typeof options.description === 'string' ? options.description : `Clicking at (${Math.round(Number(x) || 0)}, ${Math.round(Number(y) || 0)})`)
         });
       } catch (_e) { /* content script may not be ready on first frame */ }
       // Brief pause so the user sees the cursor arrive + element light up
@@ -718,7 +718,7 @@ function cdpKeyParamsFor(key) {
   // Single printable char fallback
   if (k.length === 1) {
     const code = k.charCodeAt(0);
-    return { key: k, code: 'Key' + k.toUpperCase(), windowsVirtualKeyCode: code, text: k };
+    return { key: k, code: `Key${k.toUpperCase()}`, windowsVirtualKeyCode: code, text: k };
   }
   return null;
 }
@@ -733,7 +733,7 @@ function cdpKeyParamsFor(key) {
  */
 export async function cdpDispatchKey(tabId, key, _options = {}) {
   const params = cdpKeyParamsFor(key);
-  if (!params) return { ok: false, error: 'Unknown key: ' + key };
+  if (!params) return { ok: false, error: `Unknown key: ${key}` };
   try {
     await ensureDebuggerAttached(tabId);
     // For keys with `text` (Enter, Space, printable chars) use 'keyDown' so the
@@ -812,7 +812,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
           } else {
             const params = cdpKeyParamsFor(ch) || {
               key: ch,
-              code: 'Key' + ch.toUpperCase(),
+              code: `Key${ch.toUpperCase()}`,
               windowsVirtualKeyCode: ch.charCodeAt(0),
               text: ch
             };
@@ -880,7 +880,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
   const timeout = Math.max(500, Math.min(60000, Number(options.timeout) || 8000)) || 8000;
   try {
     await ensureDebuggerAttached(tabId);
-    const expression = '(async () => { ' + code + ' \n })()';
+    const expression = `(async () => { ${code} \n })()`;
     const result = await chrome.debugger.sendCommand({ tabId }, 'Runtime.evaluate', {
       expression,
       awaitPromise: true,

@@ -385,7 +385,7 @@ export async function deleteSchedule(id) {
 
   const schedules = await loadSchedules();
   if (!schedules[id]) {
-    throw new Error('Schedule not found: ' + id);
+    throw new Error(`Schedule not found: ${id}`);
   }
 
   delete schedules[id];
@@ -420,7 +420,7 @@ export async function toggleSchedule(id, enabled) {
   const schedules = await loadSchedules();
   const schedule = schedules[id];
   if (!schedule) {
-    throw new Error('Schedule not found: ' + id);
+    throw new Error(`Schedule not found: ${id}`);
   }
 
   schedule.enabled = enabled;

@@ -163,7 +163,7 @@ export function generateReplayReport(entries, meta) {
   const { goal = 'Unknown', runLogId = '', estimatedCostUsd = 0 } = meta || {};
   const actionEntries = (entries || []).filter(e => e.kind === 'action');
   const startTs = entries?.[0]?.timestamp ? new Date(entries[0].timestamp).toLocaleString() : '';
-  const costStr = estimatedCostUsd > 0 ? ('~$' + estimatedCostUsd.toFixed(estimatedCostUsd < 0.01 ? 4 : 3)) : '';
+  const costStr = estimatedCostUsd > 0 ? `~$${estimatedCostUsd.toFixed(estimatedCostUsd < 0.01 ? 4 : 3)}` : '';
 
   const steps = actionEntries.map((e, i) => {
     const num = e.step || i + 1;
@@ -174,8 +174,8 @@ export function generateReplayReport(entries, meta) {
     const a = e.action || {};
     let detail = '';
     if (a.url) detail = truncate(a.url, 70);
-    else if (a.text) detail = '"' + truncate(a.text, 60) + '"';
-    else if (a.key) detail = 'key: ' + a.key;
+    else if (a.text) detail = `"${truncate(a.text, 60)}"`;
+    else if (a.key) detail = `key: ${a.key}`;
     else if (a.selector) detail = truncate(a.selector, 60);
 
     const screenshotHtml = e.screenshot
@@ -217,7 +217,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 <div class="container">
   <div style="border-bottom:1px solid #334155;padding-bottom:1rem;margin-bottom:1.5rem;">
     <h1 style="font-size:1.4rem;font-weight:700;">🛡️ Sentinel <span style="color:#818cf8;">Override</span> — Run Replay</h1>
-    <div style="margin-top:8px;font-size:13px;color:#94a3b8;">${startTs}${costStr ? ' &nbsp;·&nbsp; Cost: ' + escapeHtml(costStr) : ''}${runLogId ? ' &nbsp;·&nbsp; Run ID: ' + escapeHtml(runLogId.substring(0, 8)) + '…' : ''}</div>
+    <div style="margin-top:8px;font-size:13px;color:#94a3b8;">${startTs}${costStr ? ` &nbsp;·&nbsp; Cost: ${escapeHtml(costStr)}` : ''}${runLogId ? ` &nbsp;·&nbsp; Run ID: ${escapeHtml(runLogId.substring(0, 8))}…` : ''}</div>
   </div>
   <div style="background:#1e293b;padding:10px 14px;border-radius:6px;border-left:3px solid #818cf8;margin-bottom:1.5rem;font-size:13px;">
     <strong style="color:#818cf8;">Goal:</strong> ${escapeHtml(goal)}

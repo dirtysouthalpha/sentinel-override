@@ -91,9 +91,9 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
         const year = parsed.getFullYear();
         const month = String(parsed.getMonth() + 1).padStart(2, '0');
         const day = String(parsed.getDate()).padStart(2, '0');
-        nativeDate = year + '-' + month + '-' + day;
+        nativeDate = `${year}-${month}-${day}`;
       } else {
-        return { success: false, method: 'none', error: 'Cannot parse date: ' + dateStr };
+        return { success: false, method: 'none', error: `Cannot parse date: ${dateStr}` };
       }
     }
 

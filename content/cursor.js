@@ -117,8 +117,8 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       c = document.createElement('div');
       c.id = CURSOR_ID;
       c.setAttribute('data-sentinel', 'cursor');
-      c.style.left = lastX + 'px';
-      c.style.top = lastY + 'px';
+      c.style.left = `${lastX}px`;
+      c.style.top = `${lastY}px`;
       c.innerHTML =
         '<div class="sentinel-cursor-halo"></div>' +
         '<svg width="22" height="24" viewBox="0 0 22 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
@@ -228,8 +228,8 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = ensureCursor();
         if (!c) return Promise.resolve();
         c.classList.remove('dimmed');
-        c.style.left = clamped.x + 'px';
-        c.style.top = clamped.y + 'px';
+        c.style.left = `${clamped.x}px`;
+        c.style.top = `${clamped.y}px`;
         lastX = clamped.x;
         lastY = clamped.y;
         scheduleAutoHide();

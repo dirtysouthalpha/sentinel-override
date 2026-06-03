@@ -242,7 +242,7 @@ if (window.__sentinelInitialized) {
               if (_re.test(_btnText)) {
                 _btn.click();
                 __sentinelDismissalCount++;
-                dismissed.push('text-match: ' + _btnText.substring(0, 30));
+                dismissed.push(`text-match: ${_btnText.substring(0, 30)}`);
                 break;
               }
             }
@@ -351,7 +351,7 @@ if (window.__sentinelInitialized) {
       // Associated <label for="id">
       if (el.id) {
         try {
-          const lbl = document.querySelector('label[for="' + CSS.escape(String(el.id)) + '"]');
+          const lbl = document.querySelector(`label[for="${CSS.escape(String(el.id))}"]`);
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
         } catch (e) { console.warn('[Sentinel] label lookup by id:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
       }

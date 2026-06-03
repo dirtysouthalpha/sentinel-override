@@ -312,7 +312,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       if (!apiKey) throw new Error('API key not configured');
 
       const provider = resolveProvider(endpoint);
-      if (!provider) throw new Error('Unsupported API endpoint for report generation: ' + endpoint);
+      if (!provider) throw new Error(`Unsupported API endpoint for report generation: ${endpoint}`);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), REPORT_TIMEOUT);
 
@@ -325,7 +325,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
         requestHeaders = provider.buildHeaders(apiKey);
       } catch (err) {
         clearTimeout(timeout);
-        throw new Error('Failed to build report request: ' + getErrorMessage(err));
+        throw new Error(`Failed to build report request: ${getErrorMessage(err)}`);
       }
 
       let response;
@@ -339,7 +339,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       } catch (err) {
         clearTimeout(timeout);
         if (err.name === 'AbortError') {
-          lastError = new Error('Report LLM timed out after ' + (REPORT_TIMEOUT/1000) + 's (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')');
+          lastError = new Error(`Report LLM timed out after ${REPORT_TIMEOUT / 1000}s (attempt ${attempt}/${MAX_ATTEMPTS})`);
           if (attempt < MAX_ATTEMPTS) {
             console.warn('[Sentinel/report] Attempt', attempt, 'timed out, retrying with shorter output...');
             continue;

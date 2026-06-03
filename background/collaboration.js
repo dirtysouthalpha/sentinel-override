@@ -36,7 +36,7 @@ export async function exportTemplate(templateId) {
 
   const template = await getTemplate(templateId);
   if (!template) {
-    throw new Error('Template not found: ' + templateId);
+    throw new Error(`Template not found: ${templateId}`);
   }
 
   return {
@@ -338,5 +338,5 @@ function parseVersion(version) {
  */
 function escapeYaml(str) {
   if (!str) return '""';
-  return '"' + String(str).replace(/"/g, '\\"') + '"';
+  return `"${String(str).replace(/"/g, '\\"')}"`;
 }
