@@ -34,6 +34,8 @@
 //   - background/index.js (popup message handlers)
 //   - popup-modules/* (client picker + management modal)
 
+import { getErrorMessage } from './error-utils.js';
+
 const STORAGE_KEY = 'sentinelClientKnowledge';
 
 const DEFAULT_STATE = {
@@ -52,7 +54,7 @@ async function _read() {
     if (typeof state.activeClientId !== 'string' && state.activeClientId !== null) state.activeClientId = null;
     return state;
   } catch (e) {
-    console.error('[Sentinel/client-knowledge] _read failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/client-knowledge] _read failed:', getErrorMessage(e));
     return { ...DEFAULT_STATE };
   }
 }
@@ -62,7 +64,7 @@ async function _write(state) {
     await chrome.storage.local.set({ [STORAGE_KEY]: state });
     return true;
   } catch (e) {
-    console.error('[Sentinel/client-knowledge] _write failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/client-knowledge] _write failed:', getErrorMessage(e));
     return false;
   }
 }
@@ -284,7 +286,7 @@ function _urlMatches(pattern, url) {
     );
     return re.test(url.toLowerCase());
   } catch (e) {
-    console.error('[Sentinel/client-knowledge] _matchesPattern failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/client-knowledge] _matchesPattern failed:', getErrorMessage(e));
     return false;
   }
 }
