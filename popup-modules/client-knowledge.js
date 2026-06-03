@@ -38,7 +38,7 @@ function _send(action, body) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action, ...(body || {}) }, (res) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-        resolve({ ok: false, error: (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Unknown error' });
+        resolve({ ok: false, error: getErrorMessage(chrome.runtime.lastError) || 'Unknown error' });
         return;
       }
       resolve(res || { ok: false, error: 'No response' });
@@ -67,7 +67,7 @@ async function refreshHeaderChip() {
       chip.title = 'No active client. Click to set one.';
     }
   } catch (err) {
-    console.error('[client-knowledge] refreshHeaderChip error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
+    console.error('[client-knowledge] refreshHeaderChip error:', getErrorMessage(err));
   }
 }
 
@@ -79,7 +79,7 @@ async function openClientModal() {
     const modal = _get('client-modal');
     if (modal) modal.classList.add('show');
   } catch (err) {
-    console.error('[client-knowledge] openClientModal error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
+    console.error('[client-knowledge] openClientModal error:', getErrorMessage(err));
   }
 }
 function closeClientModal() {
@@ -100,7 +100,7 @@ async function refreshClientPicker() {
         return `<option value="${_safeEsc(c.id)}" ${active && active.id === c.id ? 'selected' : ''}>${_safeEsc(c.displayName)} (${entryCount} entries)</option>`;
       }).join('');
   } catch (err) {
-    console.error('[client-knowledge] refreshClientPicker error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
+    console.error('[client-knowledge] refreshClientPicker error:', getErrorMessage(err));
   }
 }
 
@@ -158,13 +158,13 @@ async function refreshClientList() {
             }
           }
         } catch (err) {
-          console.error('[client-knowledge] action error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
-          alert('Action failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+          console.error('[client-knowledge] action error:', getErrorMessage(err));
+          alert('Action failed: ' + getErrorMessage(err));
         }
       });
     });
   } catch (err) {
-    console.error('[client-knowledge] refreshClientList error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
+    console.error('[client-knowledge] refreshClientList error:', getErrorMessage(err));
   }
 }
 
@@ -273,7 +273,7 @@ async function exportClientToFile(clientId) {
     if (document.body) document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (err) {
-    const errMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+    const errMsg = getErrorMessage(err);
     console.error('[client-knowledge] exportClientToFile error:', errMsg);
     alert('Export failed: ' + errMsg);
   }
@@ -298,7 +298,7 @@ function importClientFromFile() {
         alert(res.error || 'Import failed');
       }
     } catch (err) {
-      const errorMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+      const errorMsg = getErrorMessage(err);
       // Distinguish between file read errors and JSON parse errors
       const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Import failed';
       alert(prefix + ': ' + errorMsg);
@@ -341,7 +341,7 @@ _on('clientAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add client error:', err);
-    alert('Create failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+    alert('Create failed: ' + getErrorMessage(err));
   }
 });
 
@@ -361,7 +361,7 @@ _on('clientDetailSaveBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] save client error:', err);
-    alert('Save failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+    alert('Save failed: ' + getErrorMessage(err));
   }
 });
 
@@ -380,7 +380,7 @@ _on('clientDetailDeleteBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] delete client error:', err);
-    alert('Delete failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+    alert('Delete failed: ' + getErrorMessage(err));
   }
 });
 
@@ -409,7 +409,7 @@ _on('clientEntryAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add entry error:', err);
-    alert('Add failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+    alert('Add failed: ' + getErrorMessage(err));
   }
 });
 

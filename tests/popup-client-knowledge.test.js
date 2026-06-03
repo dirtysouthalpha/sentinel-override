@@ -50,6 +50,11 @@ function createSandbox() {
     escapeHtml: (s) => s,
     confirm: () => false,
     alert: () => {},
+    getErrorMessage(err) {
+      if (typeof err === 'string') return err;
+      if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+      return String(err || '');
+    },
     _elements: elements,
   };
   sandbox.window = sandbox;
