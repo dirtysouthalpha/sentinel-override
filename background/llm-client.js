@@ -1038,7 +1038,10 @@ export async function generatePlan(goal, settings, context = {}) {
     // Strategy 4: extract numbered or bulleted steps from prose.
     // Uses contentNoThink so think-block text isn't mistaken for real plan steps.
     {
-      const lines = contentNoThink.split(/\n/).map(l => l.trim().replace(/^\*{1,2}|\*{1,2}$/g, '').trim()).filter(Boolean);
+      const lines = contentNoThink.split(/\n/).map(l => {
+        const _trimmed = l.trim(); // Cache to avoid repeated trim calls
+        return _trimmed.replace(/^\*{1,2}|\*{1,2}$/g, '').trim();
+      }).filter(Boolean);
       // Numbered: "1. Step", "1) Step", "Step 1: Step"
       const numberedLines = lines.filter(l => /^\d+[.)]\s+.{8,}/.test(l) || /^[Ss]tep\s+\d+[:.)\s]+.{8,}/.test(l));
       if (numberedLines.length >= 2) {
