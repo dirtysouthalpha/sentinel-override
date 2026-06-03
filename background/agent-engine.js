@@ -4399,6 +4399,19 @@ async function runAgentLoop(goal, workingTabId) {
           const _vCtrl = new AbortController();
           const _vTimeoutId = setTimeout(() => _vCtrl.abort(), 45000);
           let _vResponse;
+          // Prepare request body safely
+          let _visionBody;
+          try {
+            _visionBody = JSON.stringify({
+              model: _vModel,
+              messages: _visionMessages,
+              max_tokens: 600,
+              temperature: 0.1
+            });
+          } catch (_stringifyErr) {
+            console.warn('[Sentinel/v4] Vision payload serialization failed:', (typeof _stringifyErr === 'object' && _stringifyErr !== null && typeof _stringifyErr.message === 'string') ? _stringifyErr.message : String(_stringifyErr));
+            break; // Exit vision mode on serialization failure
+          }
           try {
             _vResponse = await fetch(
               _vEndpoint,
@@ -4408,12 +4421,7 @@ async function runAgentLoop(goal, workingTabId) {
                   'Content-Type': 'application/json',
                   'Authorization': 'Bearer ' + _vApiKey
                 },
-                body: JSON.stringify({
-                  model: _vModel,
-                  messages: _visionMessages,
-                  max_tokens: 600,
-                  temperature: 0.1
-                }),
+                body: _visionBody,
                 signal: _vCtrl.signal
               }
             );
@@ -4428,7 +4436,8 @@ async function runAgentLoop(goal, workingTabId) {
               _vData = await _vResponse.json();
             } catch (_jsonErr) {
               console.warn('[Sentinel/v4] Vision LLM response not JSON:', _vResponse.status);
-              break;
+              _vData = null; // Explicitly mark as failed
+              // Don't break - let the null check on line 4433 handle it
             }
             const _vRaw = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0] && _vData.choices[0].message
               ? (_vData.choices[0].message.content || '') : '';
