@@ -907,6 +907,9 @@ export async function generatePlan(goal, settings, context = {}) {
   const model = settings.model || 'glm-5';
   if (!apiKey) return null;
 
+  // Helper to normalize plan step objects/strings into consistent string array
+  const _normalizeSteps = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+
   const planPrompt = _buildPlanPrompt(goal, context);
 
   const controller = new AbortController();
@@ -964,16 +967,16 @@ export async function generatePlan(goal, settings, context = {}) {
       const parsed = JSON.parse(jsonStr);
       // Some models (Z.AI/GLM) return a bare array ["step1","step2"] with no wrapper object
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const strs = parsed.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        const strs = _normalizeSteps(parsed);
         if (strs.length > 0) return strs;
       }
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.plan) && parsed.plan.length > 0) {
-        const strs = parsed.plan.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        const strs = _normalizeSteps(parsed.plan);
         if (strs.length > 0) return strs;
       }
       // Some models return { "steps": [...] } instead of { "plan": [...] }
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
-        const strs = parsed.steps.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
+        const strs = _normalizeSteps(parsed.steps);
         if (strs.length > 0) return strs;
       }
     } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
@@ -999,9 +1002,8 @@ export async function generatePlan(goal, settings, context = {}) {
         if (s2end !== -1) {
           try {
             const parsed = JSON.parse(contentNoThink.substring(s2start, s2end + 1));
-            const _norm = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
-            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm(parsed.plan); if (r.length > 0) return r; }
-            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm(parsed.steps); if (r.length > 0) return r; }
+            if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _normalizeSteps(parsed.plan); if (r.length > 0) return r; }
+            if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _normalizeSteps(parsed.steps); if (r.length > 0) return r; }
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             if (s2end === -1) {
@@ -1016,20 +1018,19 @@ export async function generatePlan(goal, settings, context = {}) {
     // Strategy 3: find first { and last } and try that substring; also try bare array.
     // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
     try {
-      const _norm3 = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
       const objStart = contentNoThink.indexOf('{');
       const objEnd = contentNoThink.lastIndexOf('}');
       if (objStart !== -1 && objEnd > objStart) {
         const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
-        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _norm3(parsed.plan); if (r.length > 0) return r; }
-        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _norm3(parsed.steps); if (r.length > 0) return r; }
+        if (Array.isArray(parsed.plan) && parsed.plan.length > 0) { const r = _normalizeSteps(parsed.plan); if (r.length > 0) return r; }
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) { const r = _normalizeSteps(parsed.steps); if (r.length > 0) return r; }
       }
       // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
       const arrStart = contentNoThink.indexOf('[');
       const arrEnd = contentNoThink.lastIndexOf(']');
       if (arrStart !== -1 && arrEnd > arrStart && (objStart === -1 || arrStart < objStart)) {
         const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
-        if (Array.isArray(parsed) && parsed.length > 0) { const r = _norm3(parsed); if (r.length > 0) return r; }
+        if (Array.isArray(parsed) && parsed.length > 0) { const r = _normalizeSteps(parsed); if (r.length > 0) return r; }
       }
     } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
