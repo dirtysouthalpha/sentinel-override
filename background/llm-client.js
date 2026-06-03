@@ -205,8 +205,7 @@ will overflow your budget. Use this BATCH pattern instead:
 const _PLATFORM_SPECS = [
   {
     test: (url, text) =>
-      url.includes('sonicwall') || text.includes('sonicwall') ||
-      text.includes('sonicos') ||
+      url.includes('sonicwall') || /sonicwall|sonicos/.test(text) ||
       /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/.test(url),
     prose: `
 PLATFORM: SonicWall Management UI (SonicOS)
@@ -245,8 +244,8 @@ IFRAMES: Some SonicWall panels (especially older 6.5 UI) embed content in iframe
   },
   {
     test: (url, text) =>
-      url.includes('fortinet') || url.includes('fortigate') || url.includes('fortimanager') ||
-      text.includes('fortinet') || text.includes('fortigate'),
+      /fortinet|fortigate|fortimanager/.test(url) ||
+      /fortinet|fortigate/.test(text),
     prose: `
 PLATFORM: Fortinet / FortiGate Management UI
 UI-SPECIFIC RULES:
@@ -259,10 +258,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      url.includes('cisco') || url.includes('/asdm') || url.includes('/fmc') ||
-      url.includes('meraki') || url.includes('.ise.') ||
-      text.includes('cisco asa') || text.includes('firepower') || text.includes('meraki') ||
-      text.includes('cisco ise'),
+      /cisco|\/asdm|\/fmc|meraki|\.ise\./.test(url) ||
+      /cisco asa|firepower|meraki|cisco ise/.test(text),
     prose: `
 PLATFORM: Cisco Management UI (ASA/FMC/Meraki/ISE)
 UI-SPECIFIC RULES:
@@ -275,8 +272,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      url.includes('paloalto') || url.includes('panorama') || url.includes('/php/rest/pan') ||
-      text.includes('palo alto') || text.includes('pan-os') || text.includes('panorama'),
+      /paloalto|panorama|\/php\/rest\/pan/.test(url) ||
+      /palo alto|pan-os|panorama/.test(text),
     prose: `
 PLATFORM: Palo Alto Networks (PAN-OS / Panorama)
 UI-SPECIFIC RULES:
@@ -289,8 +286,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      url.includes('sentinelone.net') || url.includes('.sentinelone.com') || url.includes('s1.com') ||
-      text.includes('sentinelone') || text.includes('singularity'),
+      /sentinelone\.net|\.sentinelone\.com|s1\.com/.test(url) ||
+      /sentinelone|singularity/.test(text),
     prose: `
 [SentinelOne Singularity Console — Platform Context]
 - Top-bar global search accepts SHA1, SHA256, MD5 hashes, filenames, IPs, URLs.
@@ -405,8 +402,8 @@ recommend the user check NVD directly. The hallucination gate enforces.`
   },
   {
     test: (url, text) =>
-      url.includes('virustotal.com') || url.includes('vt-api') ||
-      text.includes('virustotal') || text.includes(' vt '),
+      /virustotal\.com|vt-api/.test(url) ||
+      /virustotal| vt /.test(text),
     prose: `
 [VirusTotal — Platform Context]
 - The GUI is built with Lit shadow-DOM web components (vt-ui-main-generic-report,
@@ -438,9 +435,7 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url) =>
-      url.includes('admin.microsoft.com') || url.includes('admin.exchange.microsoft.com') ||
-      url.includes('admin.exchange.outlook.com') || url.includes('compliance.microsoft.com') ||
-      url.includes('security.microsoft.com') || url.includes('purview.microsoft.com'),
+      /admin\.microsoft\.com|admin\.exchange\.microsoft\.com|admin\.exchange\.outlook\.com|compliance\.microsoft\.com|security\.microsoft\.com|purview\.microsoft\.com/.test(url),
     prose: `
 [Microsoft 365 Admin Center — Platform Context]
 - Built on Microsoft Fluent UI / FluentUI React. Prefer selectors using:
@@ -477,9 +472,9 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      url.includes('entra.microsoft.com') || url.includes('aad.portal.azure.com') ||
-      url.includes('myapps.microsoft.com') || text.includes('entra') ||
-      (text.includes('azure ad') && url.includes('microsoft')),
+      /entra\.microsoft\.com|aad\.portal\.azure\.com|myapps\.microsoft\.com/.test(url) ||
+      /entra/.test(text) ||
+      (/azure ad/.test(text) && /microsoft/.test(url)),
     prose: `
 [Microsoft Entra ID — Platform Context]
 - Identity admin UI built on FluentUI React + Monaco editor for JSON details.
@@ -508,7 +503,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url) => url.includes('portal.azure.com') || url.includes('preview.portal.azure.com'),
+    test: (url) => /portal\.azure\.com|preview\.portal\.azure\.com/.test(url),
     prose: `
 [Azure Portal — Platform Context]
 - Heavy use of iframes and Monaco editor. iframe-aware element scanning is
@@ -526,9 +521,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      url.includes('connectwise') || url.includes('cw.manage') ||
-      url.includes('my.connectwise') || url.includes('cwautomate') ||
-      text.includes('connectwise'),
+      /connectwise|cw\.manage|my\.connectwise|cwautomate/.test(url) ||
+      /connectwise/.test(text),
     prose: `
 [ConnectWise Platform Context]
 - Navigation uses a left sidebar with expandable menu sections (Service, Sales, Procurement, etc.)
@@ -593,7 +587,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url, text) => url.includes('huntress') || text.includes('huntress'),
+    test: (url, text) => /huntress/.test(url) || /huntress/.test(text),
     prose: `
 [Huntress Platform Context]
 - Dashboard shows threat summary with alert counts
@@ -607,8 +601,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      url.includes('screenconnect') || url.includes('connectwisecontrol') ||
-      text.includes('screenconnect'),
+      /screenconnect|connectwisecontrol/.test(url) ||
+      /screenconnect/.test(text),
     prose: `
 [ScreenConnect Platform Context]
 - Access page lists all managed machines with status (online/offline)
@@ -622,9 +616,7 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (_, text) =>
-      text.includes('firewall') || text.includes('router') || text.includes('switch') ||
-      text.includes('access point') || text.includes('management ui') ||
-      text.includes('admin panel') || text.includes('web ui'),
+      /firewall|router|switch|access point|management ui|admin panel|web ui/.test(text),
     prose: `
 PLATFORM: Network/Security Device Management UI (generic)
 UI-SPECIFIC RULES:

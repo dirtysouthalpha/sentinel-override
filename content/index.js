@@ -2169,7 +2169,7 @@ if (window.__sentinelInitialized) {
             try {
               const dir = (e && e.violatedDirective) || '';
               const blocked = (e && e.blockedURI) || '';
-              if (dir.indexOf('script-src') === 0 && (blocked === 'inline' || blocked === '')) {
+              if (dir.startsWith('script-src') && (blocked === 'inline' || blocked === '')) {
                 __cspBlocked = true;
                 // (3.26.0) Content-side telemetry: capture the FIRST CSP
                 // violation so operators see the exact directive that's

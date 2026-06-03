@@ -679,7 +679,7 @@ function appendLogLine(stepNumber, text) {
   // Detect error/warning state for styling
   if (/^❌|Error|failed/.test(text)) {
     line.classList.add('log-error');
-  } else if (text.startsWith('⚠️') || text.includes('Retrying')) {
+  } else if (/^⚠️|Retrying/.test(text)) {
     line.classList.add('log-warn');
   } else if (text.startsWith('✅')) {
     line.classList.add('log-success');
@@ -993,9 +993,7 @@ function sendMessage() {
     // If the message is short and looks like a follow-up (not a URL or specific instruction), prepend context
     const isFollowUp = goal.length < 50 && history.length > 0 &&
       !goal.startsWith('http') &&
-      !goal.includes('go to') &&
-      !goal.includes('navigate') &&
-      !goal.includes('search');
+      !/go to|navigate|search/.test(goal);
     if (isFollowUp && lastGoal) {
       fullGoal = `Previous task: "${lastGoal}"
 Follow-up instruction: ${goal}
