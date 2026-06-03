@@ -109,6 +109,7 @@ async function loadAndRenderSchedules() {
 }
 
 function renderScheduleCard(schedule) {
+  const isEnabled = schedule.enabled;
   const goalPreview = schedule.goal
     ? escapeHtml(schedule.goal.length > 80 ? schedule.goal.substring(0, 80) + '...' : schedule.goal)
     : (schedule.templateId ? '<em>Template task</em>' : '<em>No goal</em>');
@@ -133,7 +134,7 @@ function renderScheduleCard(schedule) {
   }
 
   // Next run countdown
-  const nextRunText = schedule.enabled
+  const nextRunText = isEnabled
     ? formatCountdown(schedule.nextRunAt)
     : (schedule.nextRunAt ? 'Disabled' : 'Not scheduled');
 
@@ -146,7 +147,7 @@ function renderScheduleCard(schedule) {
   }
 
   // Toggle checkbox
-  const toggleChecked = schedule.enabled ? 'checked' : '';
+  const toggleChecked = isEnabled ? 'checked' : '';
 
   return `
     <div class="schedule-card-header">
