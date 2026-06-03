@@ -350,7 +350,8 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       clearTimeout(timeout);
 
       if (!response.ok) {
-        const errorData = await response.text().catch(() => 'unknown error');
+        let errorData;
+        try { errorData = await response.text(); } catch (_) { errorData = 'unknown error'; }
         lastError = new Error('Report LLM call failed: ' + response.status + ' - ' + errorData);
         if (attempt < MAX_ATTEMPTS) {
           console.warn('[Sentinel/report] Attempt', attempt, 'failed:', response.status, 'retrying...');
