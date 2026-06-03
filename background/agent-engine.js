@@ -3249,7 +3249,7 @@ async function _generateInitialPlan(goal, workingTabId) {
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
-  console.log('Agent starting loop for goal:', goal);
+  console.log('[Sentinel] Agent starting loop for goal:', goal);
   _lastGoal = goal || '';
   let finished = false;
   // (3.15.1) `history` is module-level — clear in-place so the array reference
@@ -6704,7 +6704,7 @@ async function runAgentLoop(goal, workingTabId) {
     try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
   agentRunning = false;
-  console.log(`Agent completed. Total API calls: ${apiCallCount}`);
+  console.log(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
 
   // (3.12.0) Tally client-knowledge entries used and bump the client's runCount.
   // Quiet, non-fatal — never let knowledge bookkeeping break the run finish path.
