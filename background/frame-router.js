@@ -213,12 +213,6 @@ async function runCommandInFrame(command) {
 
   const dom = utils.dom;
   const hl = utils.highlight;
-   
-  const _shadow = utils.shadow;
-   
-  const _wait = utils.wait;
-   
-  const _dd = utils.dropdown;
   const ov = utils.overlay;
   const si = utils.specialInputs;
   const doc = document;
