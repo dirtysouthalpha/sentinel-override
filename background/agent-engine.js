@@ -6857,9 +6857,15 @@ async function saveLearnedPattern(goal, history, success) {
       .replace(/(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi, '[REDACTED:ticket]')
       .replace(/"[^"]{2,60}"/g, '"[REDACTED:client]"')
       .replace(/'[^']{2,60}'/g, "'[REDACTED:client]'");
+    const steps = [];
+    for (const h of history) {
+      if (h.action) {
+        steps.push({ type: h.action.type, selector: h.action.selector });
+      }
+    }
     patterns.push({
       goal: _scrubPii(goal.substring(0, 100)),
-      steps: history.filter(h => h.action).map(h => ({ type: h.action.type, selector: h.action.selector })),
+      steps,
       success,
       timestamp: Date.now()
     });

@@ -182,9 +182,12 @@ export function validateImport(importedData) {
 export async function importTemplates(templates, conflictMode = 'skip') {
   if (!Array.isArray(templates)) return { imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] };
   const existing = await loadTemplates();
-  const existingNames = new Map(
-    Object.values(existing).filter(t => t && t.name).map(t => [t.name.toLowerCase(), t.id])
-  );
+  const existingNames = new Map();
+  for (const t of Object.values(existing)) {
+    if (t && t.name) {
+      existingNames.set(t.name.toLowerCase(), t.id);
+    }
+  }
 
   const results = [];
   let imported = 0, skipped = 0, renamed = 0, overwritten = 0;
