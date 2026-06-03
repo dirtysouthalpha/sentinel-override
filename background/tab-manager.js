@@ -510,7 +510,7 @@ export function readNetworkRequests(tabId, options) {
   if (!isFinite(limit) || limit < 0) return [];
   const filter = options && typeof options === 'object' ? options.filter : undefined;
   const urlIncludes = options && typeof options === 'object' ? options.url_includes : undefined;
-  let arr = Array.from(buf.values());
+  let arr = [...buf.values()];
   if (filter === 'failed') {
     arr = arr.filter(e => e.failed || (e.status >= 400));
   } else if (filter === '4xx') {

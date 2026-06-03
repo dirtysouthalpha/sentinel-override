@@ -413,7 +413,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
     };
 
     if (el.tagName === 'SELECT') {
-      const opts = Array.from(el.options).slice(0, 30);
+      const opts = [...el.options].slice(0, 30);
       elementData.options = opts.map(o => ({ value: o.value, text: typeof o.textContent === 'string' ? o.textContent.trim().substring(0, 60) : '' }));
       elementData.multiple = el.multiple;
     }

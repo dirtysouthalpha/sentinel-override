@@ -1176,7 +1176,7 @@ if (window.__sentinelInitialized) {
         try {
           const tag = String(cmd.tag).toLowerCase();
           const needle = String(cmd.elementText).trim();
-          const byText = Array.from(targetDoc.querySelectorAll(tag))
+          const byText = [...targetDoc.querySelectorAll(tag)]
             .find(el => (el.innerText || el.textContent || '').trim() === needle);
           if (byText) return { el: byText, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] text+tag fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
@@ -1834,7 +1834,7 @@ if (window.__sentinelInitialized) {
 
         if (el.multiple && Array.isArray(cmd.value)) {
           // Multi-select: select multiple options by value or text
-          const options = Array.from(el.options);
+          const options = [...el.options];
           for (const val of cmd.value) {
             if (val == null) continue;
             const valStr = String(val);
@@ -1848,7 +1848,7 @@ if (window.__sentinelInitialized) {
         }
 
         // Single select: try exact value match, then visible text match
-        const options = Array.from(el.options);
+        const options = [...el.options];
         const cmdValueLower = String(cmd.value).toLowerCase();
         let targetOpt = options.find(o => o.value === cmd.value);
         if (!targetOpt) {
@@ -2414,7 +2414,7 @@ if (window.__sentinelInitialized) {
               console.warn('[Sentinel Override] ' + cmd.ref + ' stale, falling back to selector');
             } catch (e) { console.warn('[Sentinel] extract_list stale log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
             try {
-              containers = Array.from(targetDoc.querySelectorAll(cmd.selector));
+              containers = [...targetDoc.querySelectorAll(cmd.selector)];
               // (3.8.0) Auto-fall-through to shadow.queryDeep on empty results.
               if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
                 try {

@@ -1289,7 +1289,7 @@ attachBtn.addEventListener('click', () => {
 fileInput.addEventListener('change', (e) => {
   const state = getState();
   if (e.target && e.target.files) {
-    state.selectedAttachments = Array.from(e.target.files);
+    state.selectedAttachments = [...e.target.files];
     updateAttachmentPreview();
   }
 });
@@ -1651,7 +1651,7 @@ function moveCommandSelection(direction) {
   if (!selected && items.length) {
     items[0].classList.add('selected');
   } else if (selected) {
-    const nextIndex = Array.from(items).indexOf(selected) + direction;
+    const nextIndex = [...items].indexOf(selected) + direction;
     if (nextIndex >= 0 && nextIndex < items.length) {
       selected.classList.remove('selected');
       items[nextIndex].classList.add('selected');

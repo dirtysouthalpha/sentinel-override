@@ -33,7 +33,7 @@ function sanitizeHtml(dirtyHtml) {
   dangerous.forEach(el => el.remove());
   // Remove event handler attributes and dangerous URLs from all remaining elements
   doc.querySelectorAll('*').forEach(el => {
-    for (const attr of Array.from(el.attributes)) {
+    for (const attr of el.attributes) {
       const name = attr.name.toLowerCase();
       const val = attr.value.toLowerCase().trim();
       // Remove on* event handlers
