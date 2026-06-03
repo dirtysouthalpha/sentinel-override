@@ -276,6 +276,13 @@ if (window.__sentinelInitialized) {
         // Don't kill page shells that contain <main>
         if (el.querySelector && el.querySelector('main')) continue;
 
+        // Cheap checks before expensive getComputedStyle
+        const cls = typeof el.className === 'string' ? el.className : '';
+        if (cls.includes('sentinel')) continue;
+        // Also skip elements with known composer/drawer class markers early
+        if (/compose|drawer|figma|sheet|panel/i.test(cls + (el.id || ''))) continue;
+
+        // Now do expensive computed style check
         const style = window.getComputedStyle(el);
         const zi = parseInt(style.zIndex || '0', 10);
         if (style.position !== 'fixed' || Number.isNaN(zi) || zi <= 1000) continue;
@@ -284,8 +291,6 @@ if (window.__sentinelInitialized) {
         const viewportArea = window.innerWidth * window.innerHeight;
         const elArea = rect.width * rect.height;
         if (elArea <= viewportArea * 0.5) continue;
-        const cls = typeof el.className === 'string' ? el.className : '';
-        if (cls.includes('sentinel')) continue;
 
         // Require positive modal/dialog signal.
         // Relax "recently inserted" check for overlays covering >80% of viewport —
@@ -299,8 +304,6 @@ if (window.__sentinelInitialized) {
         // These are content the user or agent is actively filling out — dismissing
         // them would destroy in-progress work.
         if (el.querySelector('input:not([type="hidden"]), textarea, [contenteditable="true"], [contenteditable=""]')) continue;
-        // Also skip elements with known composer/drawer class markers.
-        if (/compose|drawer|figma|sheet|panel/i.test(el.className + (el.id || ''))) continue;
 
         // Prefer clicking a close button if available; otherwise hide.
         const closeBtn = el.querySelector('button, [role="button"], [class*="close" i], [aria-label="Close"]');

@@ -563,12 +563,14 @@
   }
 
   // Cleanup on popup unload
-  window.addEventListener('unload', () => {
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('unload', () => {
     if (_searchDebounce) {
       clearTimeout(_searchDebounce);
       _searchDebounce = null;
     }
-  });
+    });
+  }
 
   try {
     window.__sentinelTelemetry = { toggle: togglePanel, eventCount: () => events.length };
