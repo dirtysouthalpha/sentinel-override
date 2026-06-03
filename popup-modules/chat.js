@@ -88,11 +88,11 @@ function renderTenantChip(tenant, expected) {
     chip.classList.toggle('match', matches);
     chip.classList.toggle('mismatch', !matches);
     chip.title = matches
-      ? 'Tenant matches expected (' + expected + ')'
-      : 'Tenant MISMATCH — expected "' + expected + '", saw "' + display + '"';
+      ? `Tenant matches expected (${expected})`
+      : `Tenant MISMATCH — expected "${expected}", saw "${display}"`;
   } else {
     chip.classList.remove('match', 'mismatch');
-    chip.title = 'Detected tenant: ' + display + ' (set expected tenant in Settings to enable match check)';
+    chip.title = `Detected tenant: ${display} (set expected tenant in Settings to enable match check)`;
   }
 }
 
@@ -156,9 +156,9 @@ function updateActiveTabStep(stepNumber, totalSteps) {
   const elStep = document.getElementById('ats-step');
   if (!elStep) return;
   if (__atsStripState.totalSteps) {
-    elStep.textContent = 'STEP ' + __atsStripState.stepNumber + '/' + __atsStripState.totalSteps;
+    elStep.textContent = `STEP ${__atsStripState.stepNumber}/${__atsStripState.totalSteps}`;
   } else if (__atsStripState.stepNumber > 0) {
-    elStep.textContent = 'STEP ' + __atsStripState.stepNumber;
+    elStep.textContent = `STEP ${__atsStripState.stepNumber}`;
   } else {
     elStep.textContent = '';
   }
@@ -170,41 +170,41 @@ function describeActionPlain(payload) {
   const t = payload.type;
   const desc = payload.description || '';
   switch (t) {
-    case 'click':       return 'Clicking ' + (payload.targetText ? '"' + (payload.targetText.length > 50 ? payload.targetText.slice(0, 50) + '…' : payload.targetText) + '"' : (desc || payload.selector || 'element'));
-    case 'click_at':    return 'Clicking at coordinates' + (payload.x !== undefined ? ' (' + Math.round(payload.x) + ',' + Math.round(payload.y) + ')' : '');
+    case 'click':       return `Clicking ${payload.targetText ? `"${payload.targetText.length > 50 ? payload.targetText.slice(0, 50) + '…' : payload.targetText}"` : (desc || payload.selector || 'element')}`;
+    case 'click_at':    return `Clicking at coordinates${payload.x !== undefined ? ` (${Math.round(payload.x)},${Math.round(payload.y)})` : ''}`;
     case 'type': {
       const text = String(payload.text || payload.value || '');
       const safe = (payload.sensitive ? '[sensitive — blocked]' : (text.length > 60 ? text.slice(0, 60) + '…' : text));
       const target = payload.targetText
-        ? '"' + (payload.targetText.length > 40 ? payload.targetText.slice(0, 40) + '…' : payload.targetText) + '"'
+        ? `"${payload.targetText.length > 40 ? payload.targetText.slice(0, 40) + '…' : payload.targetText}"`
         : (desc || '');
-      return 'Typing "' + safe + '"' + (target ? ' into ' + target : '');
+      return `Typing "${safe}"${target ? ` into ${target}` : ''}`;
     }
-    case 'navigate':    return 'Navigating to ' + (payload.url || desc || '');
-    case 'scroll':      return 'Scrolling ' + (payload.amount > 0 ? 'down' : 'up');
-    case 'select':      return 'Selecting "' + (payload.value || '') + '"' + (payload.targetText ? ' in "' + payload.targetText + '"' : (desc ? ' in ' + desc : ''));
-    case 'check':       return (payload.checked ? 'Checking ' : 'Unchecking ') + (payload.targetText ? '"' + payload.targetText + '"' : (desc || payload.selector || 'element'));
-    case 'hover':       return 'Hovering over ' + (payload.targetText ? '"' + payload.targetText + '"' : (desc || payload.selector || 'element'));
+    case 'navigate':    return `Navigating to ${payload.url || desc || ''}`;
+    case 'scroll':      return `Scrolling ${payload.amount > 0 ? 'down' : 'up'}`;
+    case 'select':      return `Selecting "${payload.value || ''}"${payload.targetText ? ` in "${payload.targetText}"` : (desc ? ` in ${desc}` : '')}`;
+    case 'check':       return `${payload.checked ? 'Checking ' : 'Unchecking '}${payload.targetText ? `"${payload.targetText}"` : (desc || payload.selector || 'element')}`;
+    case 'hover':       return `Hovering over ${payload.targetText ? `"${payload.targetText}"` : (desc || payload.selector || 'element')}`;
     case 'press_key':   return 'Pressing ' + (payload.key || 'key');
-    case 'execute_js':  return 'Running JavaScript' + (payload.key ? ' → memory["' + payload.key + '"]' : '');
-    case 'extract':     return 'Extracting ' + (payload.attribute || 'text') + ' from ' + (desc || payload.selector || 'element');
-    case 'extract_list':return 'Extracting list of items' + (payload.fields && typeof payload.fields === 'object' ? ' (' + Object.keys(payload.fields).join(', ') + ')' : '');
+    case 'execute_js':  return `Running JavaScript${payload.key ? ` → memory["${payload.key}"]` : ''}`;
+    case 'extract':     return `Extracting ${payload.attribute || 'text'} from ${desc || payload.selector || 'element'}`;
+    case 'extract_list':return `Extracting list of items${payload.fields && typeof payload.fields === 'object' ? ` (${Object.keys(payload.fields).join(', ')})` : ''}`;
     case 'read_page':   return 'Reading page content';
     case 'read_console_messages': return 'Reading console messages';
     case 'read_network_requests': return 'Reading network requests';
-    case 'wait_for_text':    return 'Waiting for text "' + (payload.text || '') + '"';
-    case 'wait_for_element': return 'Waiting for element ' + (payload.selector || payload.ref || '');
+    case 'wait_for_text':    return `Waiting for text "${payload.text || ''}"`;
+    case 'wait_for_element': return `Waiting for element ${payload.selector || payload.ref || ''}`;
     case 'wait_for_navigation': return 'Waiting for navigation';
-    case 'open_tab':    return 'Opening new tab' + (payload.label ? ' "' + payload.label + '"' : '');
-    case 'switch_tab':  return 'Switching to tab ' + (payload.label || '');
-    case 'close_tab':   return 'Closing tab ' + (payload.label || '');
+    case 'open_tab':    return `Opening new tab${payload.label ? ` "${payload.label}"` : ''}`;
+    case 'switch_tab':  return `Switching to tab ${payload.label || ''}`;
+    case 'close_tab':   return `Closing tab ${payload.label || ''}`;
     case 'note':        return 'Recording note';
     case 'finish':      return 'Finishing task';
-    case 'scroll_to':   return 'Scrolling to ' + (desc || payload.ref || payload.selector || '');
+    case 'scroll_to':   return `Scrolling to ${desc || payload.ref || payload.selector || ''}`;
     case 'dismiss_overlay': return 'Dismissing overlay';
     case 'open_dropdown': return 'Opening dropdown';
-    case 'switch_to_frame': return 'Switching to iframe ' + (payload.frame_index || 0);
-    default: return t + (desc ? ': ' + desc : '');
+    case 'switch_to_frame': return `Switching to iframe ${payload.frame_index || 0}`;
+    default: return `${t}${desc ? ': ' : ''}${desc}`;
   }
 }
 
@@ -1722,7 +1722,7 @@ function renderTabBar(tabs) {
   // Remove stale rows
   for (const [id] of _tabBarCache) {
     if (!incomingIds.has(id)) {
-      const stale = tabBar.querySelector('[data-tab-id="' + id + '"]');
+      const stale = tabBar.querySelector(`[data-tab-id="${id}"]`);
       if (stale) stale.remove();
       _tabBarCache.delete(id);
     }
@@ -1732,18 +1732,18 @@ function renderTabBar(tabs) {
   tabs.forEach((ctx, i) => {
     let hostname = '';
     try { hostname = new URL(ctx.url).hostname.replace(/^www\./, ''); } catch { /* URL parse failure is non-critical */ }
-    const displayText = ctx.label ? ctx.label + ' (' + hostname + ')' : hostname || ctx.url;
+    const displayText = ctx.label ? `${ctx.label} (${hostname})` : hostname || ctx.url;
     const cached = _tabBarCache.get(ctx.tabId);
 
     if (cached && cached.text === displayText && cached.title === ctx.url && cached.isActive === !!ctx.isActive) {
       // Row unchanged — only reorder if needed
-      const existing = tabBar.querySelector('[data-tab-id="' + ctx.tabId + '"]');
+      const existing = tabBar.querySelector(`[data-tab-id="${ctx.tabId}"]`);
       const nthChild = tabBar.children[i];
       if (existing && nthChild !== existing) tabBar.insertBefore(existing, nthChild || null);
       return;
     }
 
-    let tab = tabBar.querySelector('[data-tab-id="' + ctx.tabId + '"]');
+    let tab = tabBar.querySelector(`[data-tab-id="${ctx.tabId}"]`);
     if (!tab) {
       tab = document.createElement('div');
       tab.dataset.tabId = String(ctx.tabId);
