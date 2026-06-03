@@ -2281,7 +2281,7 @@ if (window.__sentinelInitialized) {
                       ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
                   '} catch(e) {' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))) ? e.message : String(e) }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, "*");' +
                   '}' +
                 '})();';
             } else {
@@ -2296,7 +2296,7 @@ if (window.__sentinelInitialized) {
                       ' : (__r === null || __r === undefined ? "" : String(__r)).substring(0, 3000);' +
                     'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __value: __s }, "*");' +
                   '} catch(e) {' +
-                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))) ? e.message : String(e) }, "*");' +
+                    'window.postMessage({ __sentinelEventId: ' + __eventIdJson + ', __error: (typeof e === \'object\' && e !== null && typeof e.message === \'string\' ? e.message : String(e)) }, "*");' +
                   '}' +
                 '})();';
             }
