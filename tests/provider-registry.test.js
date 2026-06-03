@@ -913,6 +913,7 @@ describe('migrateLegacySettings', () => {
       model: 'claude-sonnet-4-6'
     };
     await migrateLegacySettings();
+    expect(setCalls.length).toBeGreaterThan(0);
     const setObj = setCalls[0];
     expect(setObj.active_provider).toBe('anthropic');
     expect(setObj.providers.anthropic.api_key).toBe('ant-key');
@@ -922,6 +923,7 @@ describe('migrateLegacySettings', () => {
   test('migrates with empty storage (defaults)', async () => {
     storageData = {};
     await migrateLegacySettings();
+    expect(setCalls.length).toBeGreaterThan(0);
     const setObj = setCalls[0];
     expect(setObj.active_provider).toBe('openai');
     expect(setObj.providers.openai.endpoint).toBe('https://api.openai.com/v1/chat/completions');
@@ -935,6 +937,7 @@ describe('migrateLegacySettings', () => {
       model: 'gpt-3.5-turbo'
     };
     await migrateLegacySettings();
+    expect(setCalls.length).toBeGreaterThan(0);
     const setObj = setCalls[0];
     expect(setObj.providers.openai.model).toBe('gpt-3.5-turbo');
     expect(setObj.providers.anthropic.model).toBe('claude-sonnet-4-6');
