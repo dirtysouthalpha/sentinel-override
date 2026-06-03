@@ -2796,7 +2796,11 @@ async function clearAllRunLogs() {
   try {
     const stored = await chrome.storage.local.get('run_log_index');
     const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
-    const keys = list.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId);
+    // Single-pass optimization: filter and map in one loop
+    const keys = [];
+    for (const e of list) {
+      if (e && e.runLogId) keys.push('run_log_' + e.runLogId);
+    }
     if (keys.length) {
       try { await chrome.storage.local.remove(keys); } catch { /* storage write may fail */ }
     }
