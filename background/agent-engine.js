@@ -1185,8 +1185,8 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     });
 
     if (allSameType && allSameResult && allFailed) {
-      const actionType = recent[0] && recent[0].action && recent[0].action.type ? recent[0].action.type : 'unknown';
-      const resultStr = firstResult && typeof firstResult === 'string' ? firstResult : '';
+      const actionType = recent[0].action.type || 'unknown';
+      const resultStr = typeof firstResult === 'string' ? firstResult : '';
       return {
         stalled: true,
         reason: `Repeated "${actionType}" with same failure: "${resultStr}"`,
@@ -3935,8 +3935,12 @@ async function runAgentLoop(goal, workingTabId) {
         pageText = '[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n' + pageText;
       }
       const priorityTypes = ['button', 'input', 'select', 'textarea'];
-      const priorityEls = allElements.filter(e => priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
-      const otherEls    = allElements.filter(e => !priorityTypes.some(t => e.selector && e.selector.toLowerCase().includes(t)));
+      const { priorityEls, otherEls } = allElements.reduce((acc, e) => {
+        const selectorLower = e.selector?.toLowerCase() || '';
+        const isPriority = priorityTypes.some(t => selectorLower.includes(t));
+        (isPriority ? acc.priorityEls : acc.otherEls).push(e);
+        return acc;
+      }, { priorityEls: [], otherEls: [] });
       let trimmedElements = [...priorityEls, ...otherEls]
         .slice(0, CONFIG.maxElements)
         .map(e => ({
