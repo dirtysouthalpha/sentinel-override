@@ -4,6 +4,7 @@
 
 import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
+import { getErrorMessage } from './error-utils.js';
 
 // ========== Pure Helpers ==========
 
@@ -280,11 +281,11 @@ export async function generateReport(executionData, CONFIG) {
     const summary = firstParagraph.length > 300 ? firstParagraph.substring(0, 297) + '...' : firstParagraph;
     return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
-    console.error('Report generation failed:', typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err));
+    console.error('Report generation failed:', getErrorMessage(err));
     // (3.50.0) Build a better fallback that actually shows the collected data
     const fb = buildFallbackReport(executionData);
     // Prepend a note about the LLM failure
-    const fallbackReport = `> ⚠️ AI report formatting failed (${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
+    const fallbackReport = `> ⚠️ AI report formatting failed (${getErrorMessage(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
     return { summary: fb.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
@@ -324,7 +325,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
         requestHeaders = provider.buildHeaders(apiKey);
       } catch (err) {
         clearTimeout(timeout);
-        throw new Error('Failed to build report request: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)));
+        throw new Error('Failed to build report request: ' + getErrorMessage(err));
       }
 
       let response;
@@ -377,7 +378,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       return cleaned;
     } catch (err) {
       lastError = err;
-      const errMsg = (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : '');
+      const errMsg = getErrorMessage(err);
       const isNonRetryable = errMsg === 'No active provider configured'
         || errMsg === 'API key not configured'
         || errMsg.startsWith('Failed to build report request')

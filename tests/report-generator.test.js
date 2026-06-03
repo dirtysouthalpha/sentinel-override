@@ -27,6 +27,11 @@ jest.unstable_mockModule('../background/provider-registry.js', () => ({
   resolveProvider: mockResolveProvider,
 }));
 
+// Mock error-utils
+jest.unstable_mockModule('../background/error-utils.js', () => ({
+  getErrorMessage: (err) => typeof err === 'string' ? err : (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err || '')),
+}));
+
 // Mock message-protocol
 jest.unstable_mockModule('../background/message-protocol.js', () => ({
   sendSilentUpdate: jest.fn(),
