@@ -67,7 +67,7 @@
         if (ty > maxTy) ty = maxTy;
       } catch { /* bounds calc failed — let the transform through */ }
 
-      modalContent.style.transform = 'translate(' + tx + 'px, ' + ty + 'px)';
+      modalContent.style.transform = `translate(${tx}px, ${ty}px)`;
       POSITIONS.set(modalContent, { tx, ty });
     });
 

@@ -23,7 +23,7 @@
   const STORAGE_KEY = 'recent_chats';
 
   function _genId() {
-    return 'rc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    return `rc_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   }
 
   /** Extract the user's first message as the "goal" label for the session. */
@@ -158,9 +158,9 @@
       banner.className = 'restored-banner';
       banner.style.cssText = 'margin: 8px 14px 4px; padding: 8px 12px; background: rgba(120,180,255,0.08); border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; font-size: 11px; color: var(--text-secondary, #aaa); display: flex; align-items: center; justify-content: space-between; gap: 12px;';
       const ageMin = Math.round((Date.now() - entry.createdAt) / 60000);
-      const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? ageMin + ' min ago' : ageMin < 1440 ? Math.round(ageMin / 60) + 'h ago' : Math.round(ageMin / 1440) + 'd ago';
+      const ageStr = ageMin < 1 ? 'just now' : ageMin < 60 ? `${ageMin} min ago` : ageMin < 1440 ? `${Math.round(ageMin / 60)}h ago` : `${Math.round(ageMin / 1440)}d ago`;
       banner.innerHTML =
-        '<span><strong>Restored chat</strong> · archived ' + ageStr + ' · ' + (entry.messagesCount || 0) + ' messages' + (entry.hadReport ? ' · had report' : '') + '</span>' +
+        `<span><strong>Restored chat</strong> · archived ${ageStr} · ${entry.messagesCount || 0} messages${entry.hadReport ? ' · had report' : ''}</span>` +
         '<button id="dismissRestoredBanner" style="background: transparent; border: 1px solid var(--border-color, rgba(255,255,255,0.15)); color: var(--text-secondary, #aaa); padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Dismiss</button>';
       chatContainer.insertBefore(banner, chatContainer.firstChild);
       const dismissBtn = banner.querySelector('#dismissRestoredBanner');
@@ -197,9 +197,9 @@
     const ageMs = Date.now() - ts;
     const min = Math.round(ageMs / 60000);
     if (min < 1) return 'just now';
-    if (min < 60) return min + ' min ago';
-    if (min < 1440) return Math.round(min / 60) + 'h ago';
-    return Math.round(min / 1440) + 'd ago';
+    if (min < 60) return `${min} min ago`;
+    if (min < 1440) return `${Math.round(min / 60)}h ago`;
+    return `${Math.round(min / 1440)}d ago`;
   }
 
   function _escapeHtml(s) {

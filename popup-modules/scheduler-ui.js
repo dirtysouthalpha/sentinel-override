@@ -265,7 +265,7 @@ function openCreateScheduleModalForTemplate(templateId, templateName) {
   // Pre-fill name immediately (synchronous)
   if (templateName) {
     const nameEl = document.getElementById('sch-name');
-    if (nameEl) nameEl.value = templateName + ' Schedule';
+    if (nameEl) nameEl.value = `${templateName} Schedule`;
   }
 
   // populateTemplateDropdown is async — pre-select after it finishes by

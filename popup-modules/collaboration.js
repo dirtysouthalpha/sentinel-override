@@ -33,7 +33,7 @@ async function exportAllTemplatesFile() {
     if (!response.ok) throw new Error(response.error || 'Export failed');
 
     const data = response.data;
-    const filename = 'sentinel-templates-' + new Date().toISOString().slice(0, 10) + '.json';
+    const filename = `sentinel-templates-${new Date().toISOString().slice(0, 10)}.json`;
     downloadJson(data, filename);
     showToast(`${data && data.count != null ? data.count : '?'} template(s) exported`, 'success');
   } catch (err) {
@@ -86,7 +86,7 @@ function openImportDialog() {
       const errorMsg = getErrorMessage(err);
       // Distinguish between file read errors and JSON parse errors
       const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Failed to read file';
-      showToast(prefix + ': ' + errorMsg, 'error');
+      showToast(`${prefix}: ${errorMsg}`, 'error');
     } finally {
       if (document.body && document.body.contains(input)) document.body.removeChild(input);
     }
@@ -115,7 +115,7 @@ async function exportReportFile(report) {
     if (!response.ok) throw new Error(response.error || 'Export failed');
 
     const markdown = response.data;
-    const filename = 'report-' + new Date().toISOString().slice(0, 10) + '.md';
+    const filename = `report-${new Date().toISOString().slice(0, 10)}.md`;
     downloadText(markdown, filename, 'text/markdown');
     showToast('Report exported', 'success');
   } catch (err) {

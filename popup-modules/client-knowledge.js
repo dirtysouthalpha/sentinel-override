@@ -159,7 +159,7 @@ async function refreshClientList() {
           }
         } catch (err) {
           console.error('[client-knowledge] action error:', getErrorMessage(err));
-          alert('Action failed: ' + getErrorMessage(err));
+          alert(`Action failed: ${getErrorMessage(err)}`);
         }
       });
     });
@@ -275,7 +275,7 @@ async function exportClientToFile(clientId) {
   } catch (err) {
     const errMsg = getErrorMessage(err);
     console.error('[client-knowledge] exportClientToFile error:', errMsg);
-    alert('Export failed: ' + errMsg);
+    alert(`Export failed: ${errMsg}`);
   }
 }
 
@@ -301,7 +301,7 @@ function importClientFromFile() {
       const errorMsg = getErrorMessage(err);
       // Distinguish between file read errors and JSON parse errors
       const prefix = errorMsg && errorMsg.includes('JSON') ? 'Invalid JSON file' : 'Import failed';
-      alert(prefix + ': ' + errorMsg);
+      alert(`${prefix}: ${errorMsg}`);
     }
   };
   input.click();
@@ -341,7 +341,7 @@ _on('clientAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add client error:', err);
-    alert('Create failed: ' + getErrorMessage(err));
+    alert(`Create failed: ${getErrorMessage(err)}`);
   }
 });
 
@@ -361,7 +361,7 @@ _on('clientDetailSaveBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] save client error:', err);
-    alert('Save failed: ' + getErrorMessage(err));
+    alert(`Save failed: ${getErrorMessage(err)}`);
   }
 });
 
@@ -380,7 +380,7 @@ _on('clientDetailDeleteBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] delete client error:', err);
-    alert('Delete failed: ' + getErrorMessage(err));
+    alert(`Delete failed: ${getErrorMessage(err)}`);
   }
 });
 
@@ -409,7 +409,7 @@ _on('clientEntryAddBtn', 'click', async () => {
     }
   } catch (err) {
     console.error('[client-knowledge] add entry error:', err);
-    alert('Add failed: ' + getErrorMessage(err));
+    alert(`Add failed: ${getErrorMessage(err)}`);
   }
 });
 

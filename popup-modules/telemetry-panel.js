@@ -49,7 +49,7 @@
     const mm = String(d.getMinutes()).padStart(2, '0');
     const ss = String(d.getSeconds()).padStart(2, '0');
     const ms = String(d.getMilliseconds()).padStart(3, '0');
-    return hh + ':' + mm + ':' + ss + '.' + ms;
+    return `${hh}:${mm}:${ss}.${ms}`;
   }
 
   function _categoryBadgeColor(cat) {
@@ -133,11 +133,11 @@
     div.appendChild(ts);
 
     const dot = document.createElement('span');
-    dot.style.cssText = 'flex-shrink:0; width:6px; height:6px; border-radius:50%; background:' + _levelDotColor(ev.level) + '; margin-top:6px;';
+    dot.style.cssText = `flex-shrink:0; width:6px; height:6px; border-radius:50%; background:${_levelDotColor(ev.level)}; margin-top:6px;`;
     div.appendChild(dot);
 
     const badge = document.createElement('span');
-    badge.style.cssText = 'flex-shrink:0; padding:1px 5px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; border-radius:3px; background:rgba(255,255,255,0.06); color:' + _categoryBadgeColor(ev.category) + ';';
+    badge.style.cssText = `flex-shrink:0; padding:1px 5px; font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; border-radius:3px; background:rgba(255,255,255,0.06); color:${_categoryBadgeColor(ev.category)};`;
     badge.textContent = ev.category;
     div.appendChild(badge);
 
@@ -193,7 +193,7 @@
     const badge = document.getElementById('telemCountBadge');
     if (!badge) return;
     const filtered = events.filter(e => _eventMatchesFilter(e) && _eventMatchesSearch(e));
-    badge.textContent = filtered.length + ' / ' + events.length;
+    badge.textContent = `${filtered.length} / ${events.length}`;
   }
 
   // --------- Panel UI ---------
@@ -311,13 +311,13 @@
         let text;
         try {
           text = filtered.map(e =>
-            _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) +
-            (e.payload ? '  ' + JSON.stringify(e.payload) : '')
+            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)}` +
+            (e.payload ? `  ${JSON.stringify(e.payload)}` : '')
           ).join('\n');
         } catch (stringifyErr) {
           console.warn('[Sentinel] Failed to stringify event payload:', typeof stringifyErr === 'object' && stringifyErr !== null && typeof stringifyErr.message === 'string' ? stringifyErr.message : String(stringifyErr));
           text = filtered.map(e =>
-            _formatTs(e.ts) + ' [' + e.level + '/' + e.category + '] ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) +
+            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)}` +
             '  [payload omitted - circular or non-serializable]'
           ).join('\n');
         }
@@ -364,7 +364,7 @@
           const a = document.createElement('a');
           const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
           a.href = url;
-          a.download = 'sentinel-telemetry-' + ts + '.json';
+          a.download = `sentinel-telemetry-${ts}.json`;
           if (document.body) document.body.appendChild(a);
           a.click();
           setTimeout(() => {
@@ -442,7 +442,7 @@
         const goalSnip = (run.goal || '(no goal)').substring(0, 60);
         const main = document.createElement('div');
         main.style.cssText = 'flex:1; min-width:0;';
-        main.innerHTML = '<strong>' + completed + ' ' + _esc(goalSnip) + (run.goal && run.goal.length > 60 ? '…' : '') + '</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">' + startStr + ' · ' + (run.count || 0) + ' events</div>';
+        main.innerHTML = `<strong>${completed} ${_esc(goalSnip)}${run.goal && run.goal.length > 60 ? '…' : ''}</strong><div style="font-size:10px; color:var(--text-tertiary, #777); margin-top:2px;">${startStr} · ${run.count || 0} events</div>`;
         item.appendChild(main);
         const delBtn = document.createElement('button');
         delBtn.textContent = '✕';
@@ -520,7 +520,7 @@
     banner.id = 'telemViewingBanner';
     banner.style.cssText = 'position:sticky; top:0; padding:6px 10px; background:rgba(255,107,0,0.18); border-bottom:1px solid var(--accent-primary, #ff6b00); font-size:11px; color:var(--text-primary, #fff); display:flex; justify-content:space-between; align-items:center; z-index:5;';
     const startStr = _viewingPastRun.startedAt ? new Date(_viewingPastRun.startedAt).toLocaleString() : '(unknown)';
-    banner.innerHTML = '<span>Viewing past run · ' + _esc((_viewingPastRun.goal || '(no goal)').substring(0, 60)) + ' · ' + startStr + '</span><button id="telemBackToLive" style="padding:2px 8px; font-size:10px; background:var(--accent-primary, #ff6b00); color:#fff; border:none; border-radius:3px; cursor:pointer;">Back to Live</button>';
+    banner.innerHTML = `<span>Viewing past run · ${_esc((_viewingPastRun.goal || '(no goal)').substring(0, 60))} · ${startStr}</span><button id="telemBackToLive" style="padding:2px 8px; font-size:10px; background:var(--accent-primary, #ff6b00); color:#fff; border:none; border-radius:3px; cursor:pointer;">Back to Live</button>`;
     if (list.parentNode) list.parentNode.insertBefore(banner, list);
     const back = document.getElementById('telemBackToLive');
     if (back) back.addEventListener('click', _loadLiveStream);

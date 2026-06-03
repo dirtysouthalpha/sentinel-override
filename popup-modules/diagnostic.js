@@ -45,7 +45,7 @@
       } catch (_e) {
         respStr = '(unserializable response)';
       }
-      log('SW responded: ' + respStr, true);
+      log(`SW responded: ${respStr}`, true);
     }
   });
 
