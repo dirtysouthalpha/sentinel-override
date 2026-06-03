@@ -14,6 +14,21 @@ const MS_PER_SECOND = 1000;
 window.Helpers = {};
 
 /**
+ * Safely extract an error message from any value.
+ * Matches the implementation in background/error-utils.js for consistency.
+ * @param {*} err - The error value to extract a message from
+ * @returns {string} A string representation of the error
+ */
+Helpers.getErrorMessage = function getErrorMessage(err) {
+  if (typeof err === 'string') return err;
+  if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+  return String(err || '');
+};
+
+// Also expose as global function for backward compatibility
+window.getErrorMessage = Helpers.getErrorMessage;
+
+/**
  * Format a future timestamp as a countdown string.
  * @param {number} timestamp - The target timestamp (ms).
  * @returns {string} Human-readable countdown.
