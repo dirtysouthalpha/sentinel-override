@@ -19,6 +19,9 @@ import { getPlatformProfile, findMismatchHints } from './platforms/index.js';
 const REWRITER_TIMEOUT_MS = 30000;
 const REWRITER_MAX_TOKENS = 4000;
 
+// Precompiled regex for extracting JSON from markdown code blocks
+const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
+
 /**
  * Build the rewriter system + user prompts for the LLM.
  * @returns {{system: string, user: string}}
@@ -145,7 +148,7 @@ function extractJsonObject(text) {
   let s = String(text).trim();
   // Strip code fences if present
   if (s.startsWith('```')) {
-    const m = s.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    const m = s.match(CODE_BLOCK_REGEX);
     if (m && m[1]) s = m[1].trim();
   }
   // eslint-disable-next-line no-control-regex

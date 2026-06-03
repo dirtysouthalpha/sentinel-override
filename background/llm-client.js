@@ -19,6 +19,9 @@ const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'sele
   'lookup', 'run_remote_command', 'verify', 'repeat_for_each',
   'smart_navigate', 'batch']);
 
+// Precompiled regex for extracting JSON from markdown code blocks
+const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
+
 // Site name to domain mapping - avoid recreating on every call
 const SITE_DOMAIN_MAP = {
   amazon: 'amazon.com',
@@ -987,7 +990,7 @@ export async function generatePlan(goal, settings, context = {}) {
     // Strategy 1: strip markdown fences, strip control chars, then JSON.parse
     let jsonStr = contentNoThink;
     if (jsonStr.includes('```')) {
-      const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      const match = jsonStr.match(CODE_BLOCK_REGEX);
       if (match && match[1]) jsonStr = match[1].trim();
     }
     jsonStr = jsonStr.replace(/[\x00-\x1f]/gu, '');  // eslint-disable-line no-control-regex
@@ -2195,7 +2198,7 @@ export function parseLLMResponse(content) {
     // isn't mistaken for the real action. Same fix as in generatePlan.
     jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (jsonStr.includes('```')) {
-      const match = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+      const match = jsonStr.match(CODE_BLOCK_REGEX);
       if (match && match[1]) jsonStr = match[1].trim();
     }
     const firstObj = extractFirstJsonObject(jsonStr);

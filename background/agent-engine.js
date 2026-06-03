@@ -14,6 +14,9 @@ const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use st
 // Precompute valid agent speed modes for O(1) lookup
 const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
 
+// Precompiled regex for extracting JSON from markdown code blocks
+const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -4513,7 +4516,7 @@ async function runAgentLoop(goal, workingTabId) {
             let _vParsed = null;
             try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
               // Try extracting from code block
-              const _m = _vRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
+              const _m = _vRaw.match(CODE_BLOCK_REGEX);
               if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
             }
 
