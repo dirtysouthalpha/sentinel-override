@@ -1435,7 +1435,7 @@ function setupVoiceInput() {
       showToast('Listening... speak now', 'success');
     } catch (err) {
       console.error('Voice input error:', getErrorMessage(err));
-      showToast('Voice error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : 'Unknown error'), 'error');
+      showToast(`Voice error: ${getErrorMessage(err)}`, 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
       voiceBtn.classList.remove('listening');

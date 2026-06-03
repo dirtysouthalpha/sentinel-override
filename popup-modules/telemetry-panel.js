@@ -311,13 +311,13 @@
         let text;
         try {
           text = filtered.map(e =>
-            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)}` +
+            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${getErrorMessage(e)}` +
             (e.payload ? `  ${JSON.stringify(e.payload)}` : '')
           ).join('\n');
         } catch (stringifyErr) {
-          console.warn('[Sentinel] Failed to stringify event payload:', typeof stringifyErr === 'object' && stringifyErr !== null && typeof stringifyErr.message === 'string' ? stringifyErr.message : String(stringifyErr));
+          console.warn('[Sentinel] Failed to stringify event payload:', getErrorMessage(stringifyErr));
           text = filtered.map(e =>
-            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)}` +
+            `${_formatTs(e.ts)} [${e.level}/${e.category}] ${getErrorMessage(e)}` +
             '  [payload omitted - circular or non-serializable]'
           ).join('\n');
         }
@@ -325,8 +325,8 @@
           navigator.clipboard.writeText(text).then(() => {
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200);
-          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); });
-        } catch (clipboardErr) { console.warn('[Sentinel] clipboard API may be restricted:', (typeof clipboardErr === 'object' && clipboardErr !== null && typeof clipboardErr.message === 'string' ? clipboardErr.message : String(clipboardErr))); }
+          }).catch((e) => { console.error('[Sentinel] Error in telemetry-panel.js:', getErrorMessage(e)); });
+        } catch (clipboardErr) { console.warn('[Sentinel] clipboard API may be restricted:', getErrorMessage(clipboardErr)); }
       });
     }
     const clearBtn = document.getElementById('telemClearBtn');

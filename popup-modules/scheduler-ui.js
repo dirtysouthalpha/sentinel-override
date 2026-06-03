@@ -78,7 +78,7 @@ async function loadAndRenderSchedules() {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_list' }, (resp) => {
         if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
-          reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response')));
+          reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
         resolve(resp);
@@ -104,7 +104,7 @@ async function loadAndRenderSchedules() {
       });
     }
   } catch (err) {
-    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}</div>`;
+    container.innerHTML = `<div class="schedule-empty" style="color:var(--error-color);">Error loading schedules: ${escapeHtml(getErrorMessage(err))}</div>`;
   }
 }
 
@@ -497,7 +497,7 @@ async function handleSaveSchedule() {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_create', schedule: scheduleData }, (resp) => {
         if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
-          reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response')));
+          reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
         resolve(resp);
@@ -525,7 +525,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_toggle', id: scheduleId, enabled }, (resp) => {
         if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
-          reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response')));
+          reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
         resolve(resp);
@@ -554,7 +554,7 @@ async function handleDeleteSchedule(scheduleId, name) {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_delete', id: scheduleId }, (resp) => {
         if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
-          reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response')));
+          reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
         resolve(resp);
@@ -583,7 +583,7 @@ async function showRunHistory(scheduleId, scheduleName) {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_results', id: scheduleId }, (resp) => {
         if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
-          reject(new Error((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response')));
+          reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
         resolve(resp);
@@ -656,7 +656,7 @@ async function showRunHistory(scheduleId, scheduleName) {
       if (_h2) _h2.textContent = `Run History: ${scheduleName}`;
     }
   } catch (err) {
-    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--error-color);">Error: ${escapeHtml((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--error-color);">Error: ${escapeHtml(getErrorMessage(err))}</div>`;
     const _histModal = document.getElementById('schedule-history-modal');
     if (_histModal) _histModal.classList.add('show');
   }

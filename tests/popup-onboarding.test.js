@@ -71,6 +71,7 @@ function createSandbox(overrides = {}) {
     },
     setTimeout: (cb, ms) => cb(),
     console,
+    getErrorMessage: (err) => typeof err === 'string' ? err : (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err || '')),
     parseInt: (s, radix) => {
       if (radix === undefined) {
         throw new Error('parseInt called without radix - unsafe (line 74 in popup-onboarding.test.js)');

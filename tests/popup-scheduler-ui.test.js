@@ -112,6 +112,7 @@ function createSandbox() {
 
 function runSchedulerUI(sandbox) {
   const globals = {
+    getErrorMessage: (err) => typeof err === 'string' ? err : (typeof err === 'object' && err !== null && typeof err.message === 'string' ? err.message : String(err || '')),
     escapeHtml: (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
     formatCountdown: (ts) => ts ? '5m away' : 'Not scheduled',
     relativeTime: (ts) => ts ? '2 min ago' : 'Never',
