@@ -183,7 +183,7 @@ export async function executeInFrame(tabId, frameId, command) {
       args: [command]
     });
 
-    if (results && results.length > 0 && results[0].result !== undefined) {
+    if (results?.[0]?.result !== undefined) {
       return results[0].result;
     }
 

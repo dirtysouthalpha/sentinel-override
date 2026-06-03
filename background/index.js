@@ -94,7 +94,7 @@ initScheduler();
                 resolve(Array.isArray(t) ? t : []);
               });
             });
-            if (tabs.length > 0 && tabs[0] && tabs[0].id) {
+            if (tabs[0]?.id) {
               await startAgent(result.goal, { tab: tabs[0] });
             }
           }
@@ -888,7 +888,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         try {
           const r = await chrome.storage.local.get('run_log_index');
           const idx = (r.run_log_index || []);
-          runId = (idx.length > 0 && idx[0]) ? idx[0].runLogId : null;
+          runId = idx[0]?.runLogId ?? null;
         } catch (_) { runId = null; }
       }
       if (!runId) throw new Error('No run log available to export');

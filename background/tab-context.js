@@ -56,7 +56,7 @@ export async function openTab(url, label) {
     const entries = Array.from(tabContexts.entries())
       .filter(([id]) => id !== activeTabId)
       .sort((a, b) => a[1].createdAt - b[1].createdAt);
-    if (entries.length > 0 && entries[0] && entries[0][0]) {
+    if (entries[0]?.[0]) {
       try { await closeTab(entries[0][0]); } catch (e) { console.warn('[Sentinel/tab-context] LRU eviction failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
   }

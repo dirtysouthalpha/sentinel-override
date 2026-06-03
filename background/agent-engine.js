@@ -655,7 +655,7 @@ export async function startAgent(goal, sender) {
         }
       });
     });
-    if (Array.isArray(tabs) && tabs.length > 0 && tabs[0] != null && tabs[0].id) {
+    if (Array.isArray(tabs) && tabs[0] != null && tabs[0].id) {
       startTabId = tabs[0].id;
     } else {
       throw new Error('No active tab found');
@@ -3187,7 +3187,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
     if (pageTitle) parts.push(pageTitle);
     else if (host) parts.push(host);
 
-    if (headings.length > 0 && headings[0]) {
+    if (headings[0]) {
       const hText = typeof headings[0] === 'string' ? headings[0] : '';
       const h = hText.length > 60 ? hText.substring(0, 57) + '...' : hText;
       const hLower = typeof h === 'string' ? h.toLowerCase() : '';
@@ -3397,7 +3397,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (!tab) {
         // Try to recover from tab contexts before giving up
         const allCtx = getAllTabContexts();
-        if (allCtx && allCtx.length > 0 && allCtx[0]) {
+        if (allCtx && allCtx[0]) {
           tab = allCtx[0].tabId;
           /* Recovered tab from context */
         }
@@ -6281,7 +6281,7 @@ async function runAgentLoop(goal, workingTabId) {
             });
           });
           const newTabs = allTabs.filter(t => t.openerTabId === tab && t.id !== tab);
-          if (newTabs.length > 0 && newTabs[0] != null) {
+          if (newTabs[0] != null) {
             const newTab = newTabs[0];
             const newUrl = newTab.url;
             if (getTabCount() > 1 && newTab.id) {
@@ -6617,7 +6617,7 @@ async function runAgentLoop(goal, workingTabId) {
               }
             });
           });
-          if (allTabs.length > 0 && allTabs[0]) {
+          if (allTabs[0]) {
             const recoveryTab = allTabs[0];
             registerInitialTab(recoveryTab.id, recoveryTab.url || '');
           } else {

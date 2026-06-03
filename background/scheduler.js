@@ -631,7 +631,7 @@ async function _getOrCreateTab() {
       resolve(t || []);
     });
   });
-  if (tabs && tabs.length > 0 && tabs[0] != null && typeof tabs[0].id === 'number') return tabs[0].id;
+  if (tabs?.[0]?.id && typeof tabs[0].id === 'number') return tabs[0].id;
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
   await new Promise(resolve => setTimeout(resolve, 500));
   if (newTab && newTab.id) return newTab.id;

@@ -246,7 +246,7 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (data.choices.length > 0 && data.choices[0] && data.choices[0].message) {
+      if (data.choices[0]?.message) {
         // Valid choice exists
       } else {
         throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
