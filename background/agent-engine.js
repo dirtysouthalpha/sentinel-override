@@ -2967,7 +2967,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   const fieldList = fieldListMatch[1];
   // Split on commas / "and" / "&" -- get individual field names
   const rawFields = fieldList.split(/[,]|\s+and\s+|\s+&\s+/i)
-    .map(f => f.trim().replace(/^the\s+/i, '').replace(/\.$/, ''))
+    .map(f => f.trim().replace(/^the\s+|\.$/gi, ''))
     .filter(f => f.length > 3 && f.length < 60);
 
   if (rawFields.length < 2) return null;  // not a structured field list
@@ -5192,7 +5192,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.39.0) preset: 'spf' | 'dmarc' | 'dkim' expand to the correct query target.
       if (command.type === 'lookup') {
         let _domain = typeof command.domain === 'string' ? command.domain.trim() : (typeof command.host === 'string' ? command.host.trim() : '');
-        _domain = _domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+        _domain = _domain.replace(/^https?:\/\/|\/.*$/gi, '');
         let _type = typeof command.record_type === 'string' ? command.record_type.toUpperCase() : (typeof command.type_field === 'string' ? command.type_field.toUpperCase() : 'A');
         const _preset = typeof command.preset === 'string' ? command.preset.toLowerCase() : '';
         // Expand preset shortcuts into canonical DNS query parameters
