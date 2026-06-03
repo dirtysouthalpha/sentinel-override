@@ -203,7 +203,7 @@ function parseTags(tagString) {
   if (!tagString) return [];
   return tagString.split(',')
     .map(t => t.trim())
-    .filter(t => t.length > 0);
+    .filter(t => t.length);
 }
 
 // ========== Edit Template ==========
