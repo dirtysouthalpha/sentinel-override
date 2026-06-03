@@ -260,7 +260,7 @@ export async function restoreFromCheckpoint() {
           continue;
         }
         if (typeof url === 'string') {
-          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+          try { registerInitialTab(tabId, url); } catch (e) { console.error('[Sentinel] Initial tab registration failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
         }
       }
     }
@@ -269,7 +269,7 @@ export async function restoreFromCheckpoint() {
 
     // Persist restored history to chrome.storage.local so it survives across
     // the boundary. The run loop reads it from there on the first step.
-    try { await persistHistory(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+    try { await persistHistory(); } catch (e) { console.error('[Sentinel] History persistence failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 
     return {
       restored: true,
@@ -336,7 +336,7 @@ async function _updateRunLogIndex(runLogId, fields) {
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
       const evictKeys = evict.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId).filter(Boolean);
-      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+      try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] History eviction failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });
   } catch (e) {
@@ -387,7 +387,7 @@ function activityFail(stepNumber, key, label, detail) {
 
 /** Update an in-progress item's label without changing state (e.g., elapsed counter). */
 function activityUpdate(stepNumber, key, label) {
-  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+  try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Agent activity send failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
 }
 
 // ========== Configuration ==========
