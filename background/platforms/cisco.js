@@ -18,7 +18,7 @@ export const cisco = {
       const path = u.pathname.toLowerCase();
       if (/cisco/i.test(host)) return true;
       if (/meraki\.com/i.test(host)) return true;
-      if (path.includes('/asdm') || path.includes('/fmc')) return true;
+      if (/\/asdm|\/fmc/.test(path)) return true;
       if (/\.ise\./i.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     const t = String(goal || '').toLowerCase();
