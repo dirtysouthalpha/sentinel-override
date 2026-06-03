@@ -570,7 +570,7 @@ function respondApproval(decision, context) {
 }
 
 function appendSkipRejectionNote(decision, description) {
-  const desc = (description && description.trim()) ? description.trim() : '(no description)';
+  const desc = (description && description.trim()) ? description : '(no description)';
   const verb = decision === 'rejected' ? 'rejected' : 'skipped';
 
   const wrapper = document.createElement('div');

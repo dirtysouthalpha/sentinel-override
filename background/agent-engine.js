@@ -4140,7 +4140,7 @@ async function runAgentLoop(goal, workingTabId) {
           return '- ' + k + ': ' + vStr;
         }).join('\n');
         const summary = memCount > 0
-          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (Object.keys(agentMemory || {}).length > 10 ? '\n...and ' + (Object.keys(agentMemory || {}).length - 10) + ' more items.' : '')
+          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (memCount > 10 ? '\n...and ' + (memCount - 10) + ' more items.' : '')
           : 'Task timed out after ' + stepCount + ' steps without extracting useful data.';
         finished = true;
         sendSilentUpdate('Step limit reached -- finishing', stepCount);
@@ -5092,7 +5092,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (command.type === 'note') {
         const noteText = typeof command.text === 'string' ? command.text : (typeof command.summary === 'string' ? command.summary : 'No note text');
-        sendSilentUpdate(`${typeof noteText === 'string' ? noteText.slice(0, 200) : String(noteText).slice(0, 200)}${typeof noteText === 'string' && noteText.length > 200 ? '...' : ''}`, stepCount);
+        sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
         // (3.20.0) Surface the actual note content in the per-step activity
         // stream so the user can SEE what was captured, not just "Recording
         // a note". Truncated for display; full text remains in history.
@@ -5818,7 +5818,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
-              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: Object.keys(agentMemory || {}).length });
+              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: memKeys.length });
             } catch (e) { console.warn('[Sentinel] extract telemetry failed:', getErrorMessage(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
@@ -5924,7 +5924,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
-                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: Object.keys(agentMemory || {}).length });
+                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
               } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', getErrorMessage(e)); }
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
