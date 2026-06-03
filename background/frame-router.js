@@ -352,15 +352,22 @@ async function runCommandInFrame(command) {
         }
         if (mainEl) {
           const clone = mainEl.cloneNode(true);
-          const skip = ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript', 'svg'];
-          skip.forEach(s => { try { clone.querySelectorAll(s).forEach(el => el.remove()); } catch(e) { console.warn('[Sentinel/frame-router] DOM cleanup failed for', s, ':', getErrorMessage(e)); } });
+          const skipSelectors = ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript', 'svg'];
+          try {
+            clone.querySelectorAll(skipSelectors.join(',')).forEach(el => el.remove());
+          } catch(e) {
+            console.warn('[Sentinel/frame-router] DOM cleanup failed:', getErrorMessage(e));
+          }
           content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
         }
         if ((!content || content.length < 200) && doc.body) {
           const bodyClone = doc.body.cloneNode(true);
-          ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'].forEach(tag => {
-            bodyClone.querySelectorAll(tag).forEach(el => el.remove());
-          });
+          const skipSelectors = ['nav', 'header', 'footer', 'aside', 'script', 'style', 'noscript'];
+          try {
+            bodyClone.querySelectorAll(skipSelectors.join(',')).forEach(el => el.remove());
+          } catch(e) {
+            console.warn('[Sentinel/frame-router] Body cleanup failed:', getErrorMessage(e));
+          }
           content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
         }
         return { ok: true, data: 'Page Title: ' + title + '\nURL: ' + url + '\n\n' + content };
