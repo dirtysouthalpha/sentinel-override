@@ -177,6 +177,7 @@ describe('validateImport', () => {
       template: { name: 'Param Template', goal: 'Check {{device}} for {{issue}}' },
     });
     expect(result.safe).toBe(true);
+    expect(result.templates.length).toBeGreaterThan(0);
     expect(result.templates[0].params).toEqual(['device', 'issue']);
   });
 

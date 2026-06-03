@@ -155,8 +155,8 @@ describe('waitForPageLoad', () => {
     });
     const promise = waitForPageLoad(1);
     await new Promise(r => setTimeout(r, 10));
-    const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
-    if (listener) {
+    if (listeners.tabsOnUpdated.length > 0) {
+      const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
       listener(1, { status: 'complete' });
     }
     await expect(promise).resolves.toBeUndefined();
@@ -169,8 +169,8 @@ describe('waitForPageLoad', () => {
     setPageLoadConfig({ pageLoadTimeout: 100 });
     const promise = waitForPageLoad(1);
     await new Promise(r => setTimeout(r, 10));
-    const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
-    if (listener) {
+    if (listeners.tabsOnUpdated.length > 0) {
+      const listener = listeners.tabsOnUpdated[listeners.tabsOnUpdated.length - 1];
       listener(2, { status: 'complete' });
     }
     await expect(promise).resolves.toBeUndefined();
@@ -183,8 +183,8 @@ describe('createContentScriptListener', () => {
   test('resolves true when content_script_ready received', async () => {
     const { promise } = createContentScriptListener(1, 5000);
     await new Promise(r => setTimeout(r, 10));
-    const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
-    if (listener) {
+    if (listeners.runtimeOnMessage.length > 0) {
+      const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
       listener({ action: 'content_script_ready' }, { tab: { id: 1 } });
     }
     await expect(promise).resolves.toBe(true);
@@ -201,8 +201,8 @@ describe('createContentScriptListener', () => {
   test('ignores messages from other tabs', async () => {
     jest.useFakeTimers();
     const { promise } = createContentScriptListener(1, 100);
-    const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
-    if (listener) {
+    if (listeners.runtimeOnMessage.length > 0) {
+      const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
       listener({ action: 'content_script_ready' }, { tab: { id: 2 } });
     }
     jest.advanceTimersByTime(200);
@@ -227,8 +227,8 @@ describe('injectContentScript', () => {
   test('returns true when script signals ready', async () => {
     chrome.scripting.executeScript.mockImplementation(async () => {
       await new Promise(r => setTimeout(r, 10));
-      const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
-      if (listener) {
+      if (listeners.runtimeOnMessage.length > 0) {
+        const listener = listeners.runtimeOnMessage[listeners.runtimeOnMessage.length - 1];
         listener({ action: 'content_script_ready' }, { tab: { id: 1 } });
       }
     });
@@ -870,15 +870,15 @@ describe('Debugger detach listener', () => {
     await cdpDispatchClick(600, 10, 10, { skipVisual: true });
 
     // Populate some observability data
-    const eventListener = listeners.debuggerOnEvent[listeners.debuggerOnEvent.length - 1];
-    if (eventListener) {
+    if (listeners.debuggerOnEvent.length > 0) {
+      const eventListener = listeners.debuggerOnEvent[listeners.debuggerOnEvent.length - 1];
       eventListener({ tabId: 600 }, 'Log.entryAdded', { entry: { level: 'info', text: 'test' } });
     }
     expect(readConsoleMessages(600).length).toBe(1);
 
     // Simulate user detaching the debugger (clicking the "Cancel" banner)
+    expect(listeners.debuggerOnDetach.length).toBeGreaterThan(0);
     const detachListener = listeners.debuggerOnDetach[listeners.debuggerOnDetach.length - 1];
-    expect(detachListener).toBeTruthy();
     detachListener({ tabId: 600 });
 
     // Observability buffers should be cleared
@@ -895,6 +895,7 @@ describe('CDP re-attach warning after user detach', () => {
     await cdpDispatchClick(610, 10, 10, { skipVisual: true });
 
     // Simulate user detach
+    expect(listeners.debuggerOnDetach.length).toBeGreaterThan(0);
     const detachListener = listeners.debuggerOnDetach[listeners.debuggerOnDetach.length - 1];
     detachListener({ tabId: 610 });
 

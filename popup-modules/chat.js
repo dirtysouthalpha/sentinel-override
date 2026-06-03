@@ -2983,7 +2983,7 @@ function renderSourceChipsIn(rootEl) {
       const chip = document.createElement('span');
       chip.className = 'sentinel-src-chip';
       const isUnverified = typeof m[0] === 'string' && m[0].toLowerCase() === '[unverified]';
-      const key = isUnverified ? null : m[1];
+      const key = isUnverified ? null : (typeof m[1] === 'string' ? m[1] : null);
       chip.textContent = isUnverified ? '⚠ unverified' : ('🔖 ' + key);
       chip.dataset.key = key || '';
       chip.dataset.unverified = isUnverified ? '1' : '0';
