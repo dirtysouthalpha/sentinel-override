@@ -5074,10 +5074,15 @@ async function runAgentLoop(goal, workingTabId) {
           _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
         } else if (!_verifyExpected) {
           _verifyOutcome = 'verified (read-back): ' + _verifyActual.slice(0, 200);
-        } else if (typeof _verifyActual === 'string' && typeof _verifyExpected === 'string' && _verifyActual.toLowerCase().includes(_verifyExpected.toLowerCase())) {
-          _verifyOutcome = 'verified: "' + _verifyActual.slice(0, 100) + '" contains expected "' + _verifyExpected + '"';
-        } else {
-          _verifyOutcome = 'MISMATCH: expected "' + _verifyExpected + '", got "' + _verifyActual.slice(0, 100) + '"';
+        } else if (typeof _verifyActual === 'string' && typeof _verifyExpected === 'string') {
+          // Cache toLowerCase() to avoid redundant string operations (perf)
+          const _actualLower = _verifyActual.toLowerCase();
+          const _expectedLower = _verifyExpected.toLowerCase();
+          if (_actualLower.includes(_expectedLower)) {
+            _verifyOutcome = 'verified: "' + _verifyActual.slice(0, 100) + '" contains expected "' + _verifyExpected + '"';
+          } else {
+            _verifyOutcome = 'MISMATCH: expected "' + _verifyExpected + '", got "' + _verifyActual.slice(0, 100) + '"';
+          }
         }
         sendSilentUpdate(_verifyOutcome.slice(0, 120), stepCount);
         activityDone(stepCount, 'verify', _verifyOutcome.slice(0, 100), null);
