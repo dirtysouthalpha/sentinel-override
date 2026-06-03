@@ -89,7 +89,7 @@ async function loadAndRenderSchedules() {
       ? response.data
       : [];
 
-    if (schedules.length === 0) {
+    if (!schedules.length) {
       container.innerHTML = '<div class="schedule-empty">No schedules yet. Click + New Schedule to create one.</div>';
       return;
     }
@@ -300,7 +300,7 @@ function populateTemplateDropdown(preselectId) {
       });
     }
 
-    if (templates && templates.length === 0) {
+    if (templates && !templates.length) {
       dropdown.innerHTML = '<option value="">No templates available</option>';
     }
 
@@ -471,7 +471,7 @@ async function handleSaveSchedule() {
           days.push(parseInt(cb.value, 10));
         });
       }
-      if (days.length === 0) {
+      if (!days.length) {
         showToast('Please select at least one day of the week', 'error');
         return;
       }
@@ -594,7 +594,7 @@ async function showRunHistory(scheduleId, scheduleName) {
       ? response.data
       : [];
 
-    if (results.length === 0) {
+    if (!results.length) {
       container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-tertiary);">No run history yet.</div>';
     } else {
       container.innerHTML = '';

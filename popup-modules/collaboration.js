@@ -179,7 +179,7 @@ function showImportPreview(validationResult, warnings) {
 
 function showImportErrors(result) {
   const errors = result.errors || [];
-  if (errors.length === 0) return;
+  if (!errors.length) return;
 
   const message = errors.length === 1
     ? errors[0]
@@ -192,7 +192,7 @@ function showImportErrors(result) {
 
 async function executeImport() {
   const templates = window.__importTemplates;
-  if (!templates || templates.length === 0) return;
+  if (!templates || !templates.length) return;
 
   const conflictMode = document.querySelector('input[name="import-conflict"]:checked')?.value || 'skip';
 

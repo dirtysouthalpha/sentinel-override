@@ -100,7 +100,7 @@
   // Auto-hide after 15 seconds if everything passes
   setTimeout(() => {
     const fails = results.filter(r => r.includes('❌'));
-    if (fails.length === 0) {
+    if (!fails.length) {
       container.style.borderBottom = '2px solid #3fb950';
       setTimeout(() => { container.style.display = 'none'; }, 3000);
     }

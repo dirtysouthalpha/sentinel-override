@@ -419,7 +419,7 @@ function _renderSkillStatsModal(skills) {
   const body = document.createElement('div');
   body.style.cssText = 'overflow-y:auto; padding:12px 18px; font-size:12px;';
 
-  if (skills.length === 0) {
+  if (!skills.length) {
     body.innerHTML = '<p style="color:var(--text-tertiary);">No skills registered.</p>';
   } else {
     const table = document.createElement('table');
@@ -627,7 +627,7 @@ if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
 function _renderLearnedPatterns(patterns) {
   const list = document.getElementById('learnedPatternsList');
   if (!list) return;
-  if (!patterns || !Array.isArray(patterns) || patterns.length === 0) {
+  if (!patterns || !Array.isArray(patterns) || !patterns.length) {
     list.innerHTML = '<em style="color:var(--text-tertiary,#666);">No patterns saved yet.</em>';
     return;
   }
@@ -1126,7 +1126,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         return;
       }
       const models = data.models || [];
-      if (models.length === 0) {
+      if (!models.length) {
         modelsSel.innerHTML = '<option value="">(no models returned)</option>';
         try { showToast('No models returned', 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
         return;

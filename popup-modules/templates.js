@@ -82,7 +82,7 @@ function renderTemplateList(templates) {
   const container = document.getElementById('template-list');
   if (!container) return;
 
-  if (!templates || templates.length === 0) {
+  if (!templates || !templates.length) {
     container.innerHTML = '<div class="template-empty">No templates yet. Create one from a completed task or build one from scratch.</div>';
     return;
   }
@@ -294,7 +294,7 @@ function updateParamEditor(existingParams) {
     }
   }
 
-  if (keys.length === 0) {
+  if (!keys.length) {
     container.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);">No parameters detected. Use ::key:: in the goal to add placeholders.</div>';
     return;
   }
@@ -345,7 +345,7 @@ function openRunModal(templateId) {
     container.innerHTML = '';
 
     const params = template.params || [];
-    if (params.length === 0) {
+    if (!params.length) {
       container.innerHTML = '<div style="font-size:13px;color:var(--text-tertiary);">No parameters required. Click Run to execute.</div>';
     } else {
       params.forEach(param => {

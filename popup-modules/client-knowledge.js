@@ -110,7 +110,7 @@ async function refreshClientList() {
     if (!container) return;
     const res = await _send('client_list');
     const list = (res && res.data) || [];
-    if (list.length === 0) {
+    if (!list.length) {
       container.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No clients yet. Add your first one above.</div>';
       return;
     }
@@ -205,7 +205,7 @@ async function refreshEntriesList(clientId) {
     if (!container) return;
     const res = await _send('client_get', { id: clientId });
     const c = res && res.data;
-    if (!c || !Array.isArray(c.entries) || c.entries.length === 0) {
+    if (!c || !Array.isArray(c.entries) || !c.entries.length) {
       container.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No knowledge yet for this client. Add an entry above as you learn things during runs.</div>';
       return;
     }
