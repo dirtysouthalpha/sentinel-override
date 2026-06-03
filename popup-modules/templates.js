@@ -111,7 +111,7 @@ function renderTemplateList(templates) {
       <div class="template-card-meta">
         <span>Last used: ${relativeTime(template.lastUsedAt)}</span>
         <span>Runs: ${template.runCount || 0}</span>
-        <span>${template.params && template.params.length > 0 ? template.params.length + ' param' + (template.params.length > 1 ? 's' : '') : 'No params'}</span>
+        <span>${(function() { const pl = template.params && template.params.length || 0; return pl > 0 ? pl + ' param' + (pl > 1 ? 's' : '') : 'No params'; })()}</span>
       </div>
     `;
 
