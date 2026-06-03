@@ -107,7 +107,9 @@ async function refreshClientList() {
       container.innerHTML = '<div style="text-align:center; color:var(--text-tertiary); font-size:13px; padding:24px;">No clients yet. Add your first one above.</div>';
       return;
     }
-    container.innerHTML = list.map(c => `
+    container.innerHTML = list.map(c => {
+      const entryCount = (c.entries || []).length; // Cache to avoid repeated property access
+      return `
       <div class="template-card" data-client-id="${_safeEsc(c.id)}" style="margin-bottom:8px;">
         <div class="template-card-header">
           <div class="template-card-name">${_safeEsc(c.displayName)}</div>
@@ -118,12 +120,12 @@ async function refreshClientList() {
           </div>
         </div>
         <div class="template-card-meta" style="margin-top:4px;">
-          <span>${(c.entries || []).length} entries</span>
+          <span>${entryCount} entries</span>
           <span>Runs: ${c.runCount || 0}</span>
           ${c.tenant ? `<span title="Linked tenant">${_safeEsc(c.tenant)}</span>` : ''}
         </div>
       </div>
-    `).join('');
+    `;}).join('');
     container.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
