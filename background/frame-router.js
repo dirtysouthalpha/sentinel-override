@@ -2,6 +2,8 @@
 // Cross-origin iframe enumeration and command execution via chrome.scripting API.
 // Enables the agent to interact with elements inside cross-origin iframes.
 
+import { getErrorMessage } from './error-utils.js';
+
 // ========== Content Script Files for Frame Injection ==========
 // Same set as tab-manager.js CONTENT_SCRIPT_FILES, minus index.js (handler injected separately)
 const FRAME_UTILITY_FILES = [
@@ -99,7 +101,7 @@ export async function enumerateFrames(tabId) {
       };
     });
   } catch (e) {
-    const errMsg = (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e);
+    const errMsg = getErrorMessage(e);
     console.error('[Sentinel/frame-router] enumerateFrames failed:', errMsg);
     return [];
   }
