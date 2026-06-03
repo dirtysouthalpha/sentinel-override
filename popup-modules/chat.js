@@ -1609,10 +1609,11 @@ const COMMANDS = [
 function filterCommands() {
   if (!commandInput) return;
   const query = commandInput.value.toLowerCase();
-  const filtered = COMMANDS.filter(cmd =>
-    (typeof cmd.name === 'string' && cmd.name.toLowerCase().includes(query)) ||
-    (typeof cmd.desc === 'string' && cmd.desc.toLowerCase().includes(query))
-  );
+  const filtered = COMMANDS.filter(cmd => {
+    const nameLower = typeof cmd.name === 'string' ? cmd.name.toLowerCase() : '';
+    const descLower = typeof cmd.desc === 'string' ? cmd.desc.toLowerCase() : '';
+    return nameLower.includes(query) || descLower.includes(query);
+  });
   renderCommandList(filtered);
 }
 
