@@ -534,7 +534,10 @@ export async function undoLastAction() {
       if (!selector) {
         return { success: false, reason: 'Cannot undo type: no selector recorded' };
       }
-      const code = `(function(){const el=document.querySelector(${JSON.stringify(selector)});if(!el)return'not found';el.value=${JSON.stringify(prevValue)};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return'ok';})()`;
+      // Cache JSON.stringify calls to avoid redundant serialization (perf)
+      const _selJson = JSON.stringify(selector);
+      const _valJson = JSON.stringify(prevValue);
+      const code = `(function(){const el=document.querySelector(${_selJson});if(!el)return'not found';el.value=${_valJson};el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return'ok';})()`;
       try {
         await sendMessageWithRetry(entry.tabId, { action: 'execute_command', command: { type: 'execute_js', code } }, 1);
       } catch (e) {
@@ -6211,7 +6214,10 @@ async function runAgentLoop(goal, workingTabId) {
                   });
                 } catch (_keyErr) {
                   // Fallback: set value directly via CDP JS
-                  const setCode = 'var el = document.querySelector(' + JSON.stringify(sel) + '); if (el) { el.value = ' + JSON.stringify(text) + '; el.dispatchEvent(new Event("input",{bubbles:true})); }';
+                  // Cache JSON.stringify calls to avoid redundant serialization (perf)
+                  const _selJson = JSON.stringify(sel);
+                  const _textJson = JSON.stringify(text);
+                  const setCode = 'var el = document.querySelector(' + _selJson + '); if (el) { el.value = ' + _textJson + '; el.dispatchEvent(new Event("input",{bubbles:true})); }';
                   await cdpExecuteJs(tab, setCode, { timeout: 2000 });
                   break;
                 }
