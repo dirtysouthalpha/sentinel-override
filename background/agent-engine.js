@@ -2676,15 +2676,23 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
         const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
         console.log('[Sentinel/CAPTCHA] Navigating around CAPTCHA to:', searchUrl);
         sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
-        await chrome.tabs.update(tab.id, { url: searchUrl });
-        await sleep(3000);
+        try {
+          await chrome.tabs.update(tab.id, { url: searchUrl });
+          await sleep(3000);
+        } catch (_navErr) {
+          console.warn('[Sentinel/CAPTCHA] Navigate to search URL failed:', (typeof _navErr === 'object' && _navErr !== null && typeof _navErr.message === 'string') ? _navErr.message : String(_navErr));
+        }
         return 'bypassed';
       }
       // No search query - just go to homepage
       console.log('[Sentinel/CAPTCHA] Navigating to homepage:', info.altUrl);
       sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
-      await chrome.tabs.update(tab.id, { url: info.altUrl });
-      await sleep(3000);
+      try {
+        await chrome.tabs.update(tab.id, { url: info.altUrl });
+        await sleep(3000);
+      } catch (_navErr) {
+        console.warn('[Sentinel/CAPTCHA] Navigate to homepage failed:', (typeof _navErr === 'object' && _navErr !== null && typeof _navErr.message === 'string') ? _navErr.message : String(_navErr));
+      }
       return 'bypassed';
     }
   }
