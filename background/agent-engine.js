@@ -4099,8 +4099,10 @@ async function runAgentLoop(goal, workingTabId) {
         const recentExtractCount = recentWindow.filter(h => h && h.action && ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
 
+        // Cache memory count for reuse in this section (perf: multiple uses below)
+        const memCount = Object.keys(agentMemory || {}).length;
+
         if (consecutiveNonProductive >= 3 || jsLoop) {
-          const memCount = Object.keys(agentMemory || {}).length;
           const reason = jsLoop
             ? recentJsCount + ' execute_js calls in last 8 steps with no data saved'
             : consecutiveNonProductive + ' non-productive steps in a row';
@@ -4124,7 +4126,6 @@ async function runAgentLoop(goal, workingTabId) {
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
       const recentTabActions = history.slice(-5).filter(h => h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
-      const memCount = Object.keys(agentMemory || {}).length;
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
