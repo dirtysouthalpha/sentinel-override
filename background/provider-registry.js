@@ -239,7 +239,7 @@ export const PROVIDERS = {
         const msg = typeof data.msg === 'string' ? data.msg : (typeof data.message === 'string' ? data.message : 'Unknown error');
         throw new Error(`🔑 Authentication failed: ${msg} (code ${code}). Check your API key in extension settings.`);
       }
-      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
@@ -335,7 +335,7 @@ export const PROVIDERS = {
      */
     parseToolUseResponse(data) {
       // Detect auth/API errors from providers that return HTTP 200 with error payloads
-      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
@@ -407,7 +407,7 @@ export const PROVIDERS = {
 
     parseResponse: (data) => {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
-      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.message === 'string' ? data.message : null);
@@ -420,7 +420,7 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (data.choices.length === 0 || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (!data.choices.length || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
       const msg = data.choices[0].message;
       const content = msg.content || '';
       if (!content) {
@@ -465,7 +465,7 @@ export const PROVIDERS = {
 
     parseToolUseResponse(data) {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
-      if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
+      if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
           || (typeof data.message === 'string' ? data.message : null);
