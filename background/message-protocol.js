@@ -24,7 +24,8 @@ export function sendMessage(tabId, message, timeoutMs = 10000) {
     chrome.tabs.sendMessage(tabId, message, (response) => {
       clearTimeout(timeout);
       if (chrome.runtime.lastError) {
-        reject(new Error((chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Content script message failed'));
+        const errorMsg = (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : chrome.runtime.lastError) || 'Content script message failed';
+        reject(new Error(errorMsg));
         return;
       }
       if (!response) {
@@ -57,7 +58,8 @@ export function sendRuntimeMessage(message, timeoutMs = 10000) {
     chrome.runtime.sendMessage(message, (response) => {
       clearTimeout(timeout);
       if (chrome.runtime.lastError) {
-        reject(new Error((chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) || 'Runtime message failed'));
+        const errorMsg = (typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : chrome.runtime.lastError) || 'Runtime message failed';
+        reject(new Error(errorMsg));
         return;
       }
       resolve(response);

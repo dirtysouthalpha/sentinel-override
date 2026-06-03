@@ -4781,7 +4781,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _isMultiPortal = (function() {
             try {
               const RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|m365|admin\.microsoft|portal\.azure|sentinelone|virustotal)\b/gi;
-              const matches = String(goal || '').match(RE) || [];
+              const matches = (goal || '').match(RE) || [];
               return matches.length >= 2;
             } catch (_) { return false; }
           })();

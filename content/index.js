@@ -739,7 +739,7 @@ if (window.__sentinelInitialized) {
 
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))) || String(e) };
+          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
         }
       }
 
@@ -761,7 +761,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))) || String(e) };
+          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
         }
       }
 
@@ -778,7 +778,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))) || String(e) };
+          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
         }
       }
 
