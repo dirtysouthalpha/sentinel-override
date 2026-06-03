@@ -249,7 +249,7 @@ export async function generateReport(executionData, CONFIG) {
   const _allHistory = history.map(h => ({
     step: h.step,
     action: h.action ? h.action.type : 'unknown',
-    detail: h.action && h.action.selector && typeof h.action.selector === 'string' ? h.action.selector.substring(0, 80) : (h.action && (h.action.url || h.action.text) || ''),
+    detail: (function() { const a = h.action; return a && a.selector && typeof a.selector === 'string' ? a.selector.substring(0, 80) : (a && (a.url || a.text) || ''); })(),
     result: typeof h.result === 'string' ? h.result.substring(0, 150) : (h.result != null ? String(h.result).substring(0, 150) : '')
   }));
   const condensedHistory = _allHistory.length > 14
