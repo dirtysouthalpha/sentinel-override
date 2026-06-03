@@ -212,7 +212,7 @@ export function runRecoverySkills(context) {
     if (typeof skill.autoApply === 'function') {
       try {
         const cmd = skill.autoApply(context);
-        if (cmd && typeof cmd === 'object' && cmd !== null && cmd.type) {
+        if (typeof cmd === 'object' && cmd !== null && cmd.type) {
           result.autoApply = cmd;
           result.appliedSkillIds.push(skill.id);
           break;

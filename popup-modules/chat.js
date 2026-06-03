@@ -1030,7 +1030,7 @@ function resetUI() {
 // ========== Stop Button ==========
 stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !response) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !response) {
       addMessage('Error stopping agent: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
     } else if (response && !response.ok) {
       addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
@@ -1069,7 +1069,7 @@ if (pauseBtn) {
     const isPaused = pauseBtn.dataset.paused === 'true';
     const action = isPaused ? 'resume_agent_loop' : 'pause_agent_loop';
     chrome.runtime.sendMessage({ action }, (resp) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !resp) return;
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !resp) return;
       pauseBtn.dataset.paused = isPaused ? 'false' : 'true';
       pauseBtn.innerHTML = isPaused ? PAUSE_ICON : RESUME_ICON;
       pauseBtn.title = isPaused ? 'Pause agent' : 'Resume agent';
@@ -1083,7 +1083,7 @@ if (undoBtn) {
   undoBtn.addEventListener('click', () => {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !resp) {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !resp) {
         addMessage('Undo failed: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
         return;
       }
