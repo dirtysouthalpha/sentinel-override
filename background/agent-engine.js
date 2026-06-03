@@ -6485,8 +6485,7 @@ async function runAgentLoop(goal, workingTabId) {
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
         if (_smartStrats.length > 0) {
-          _recoveryMsg += 'SMART STRATEGIES for this page:\n';
-          for (const s of _smartStrats) { _recoveryMsg += '→ ' + s + '\n'; }
+          _recoveryMsg += 'SMART STRATEGIES for this page:\n' + _smartStrats.map(s => '→ ' + s).join('\n') + '\n';
         }
         historyPush({
           step: stepCount,
