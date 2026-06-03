@@ -4,6 +4,13 @@
  * Consolidates duplicated helper functions from scheduler-ui.js and templates.js.
  * Loaded via script tag before other popup-modules so these are available globally.
  */
+
+// Time constants for readability
+const MS_PER_MINUTE = 60000;
+const MS_PER_HOUR = 3600000;
+const MS_PER_DAY = 86400000;
+const MS_PER_SECOND = 1000;
+
 window.Helpers = {};
 
 /**
@@ -18,9 +25,9 @@ Helpers.formatCountdown = function formatCountdown(timestamp) {
 
   if (diff <= 0) return 'Overdue';
 
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+  const minutes = Math.floor(diff / MS_PER_MINUTE);
+  const hours = Math.floor(diff / MS_PER_HOUR);
+  const days = Math.floor(diff / MS_PER_DAY);
 
   if (minutes < 60) return `${minutes}m away`;
   if (hours < 24) return `${hours}h ${minutes % 60}m away`;
@@ -41,9 +48,9 @@ Helpers.relativeTime = function relativeTime(timestamp) {
   if (!timestamp) return 'Never';
   const now = Date.now();
   const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+  const minutes = Math.floor(diff / MS_PER_MINUTE);
+  const hours = Math.floor(diff / MS_PER_HOUR);
+  const days = Math.floor(diff / MS_PER_DAY);
 
   if (minutes < 1) return 'Just now';
   if (minutes < 60) return `${minutes}m ago`;
@@ -61,7 +68,7 @@ Helpers.relativeTime = function relativeTime(timestamp) {
 Helpers.formatDuration = function formatDuration(startedAt, completedAt) {
   if (!startedAt || !completedAt) return '';
   const diff = completedAt - startedAt;
-  const seconds = Math.floor(diff / 1000);
+  const seconds = Math.floor(diff / MS_PER_SECOND);
   const minutes = Math.floor(seconds / 60);
   if (minutes < 1) return `${seconds}s`;
   if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
