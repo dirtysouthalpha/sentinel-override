@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, getAttachedTabIds, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 // eslint-disable-next-line no-unused-vars
 import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
 // eslint-disable-next-line no-unused-vars
