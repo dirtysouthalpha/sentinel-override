@@ -326,7 +326,7 @@ if (telemetryRedactToggle) {
   chrome.storage.local.get(['telemetryRedact'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetryRedact:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
     // Default ON: only set false if explicitly stored as false.
-    telemetryRedactToggle.checked = (result.telemetryRedact === false) ? false : true;
+    telemetryRedactToggle.checked = result.telemetryRedact !== false;
   });
   telemetryRedactToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetryRedact: telemetryRedactToggle.checked }, () => {
@@ -354,7 +354,7 @@ const telemetrySkillAdaptToggle = document.getElementById('telemetrySkillAdaptTo
 if (telemetrySkillAdaptToggle) {
   chrome.storage.local.get(['telemetrySkillAdapt'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read telemetrySkillAdapt:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError))); return; }
-    telemetrySkillAdaptToggle.checked = (result.telemetrySkillAdapt === false) ? false : true;
+    telemetrySkillAdaptToggle.checked = result.telemetrySkillAdapt !== false;
   });
   telemetrySkillAdaptToggle.addEventListener('change', () => {
     chrome.storage.local.set({ telemetrySkillAdapt: telemetrySkillAdaptToggle.checked }, () => {

@@ -87,7 +87,7 @@
   (async function maybeShow() {
     try {
       const stored = await chrome.storage.local.get({ sentinelOnboardingDone: false });
-      if (stored.sentinelOnboardingDone === true) return;
+      if (stored.sentinelOnboardingDone) return;
 
       const modal = _qs('onboarding-modal');
       if (!modal) return;

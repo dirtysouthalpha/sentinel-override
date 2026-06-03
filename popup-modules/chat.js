@@ -942,7 +942,7 @@ function sendInjectedContext() {
   const note = injectContextInput.value.trim();
   if (!note) return;
   chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
-    if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || (resp && resp.ok === false)) {
+    if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || (resp && !resp.ok)) {
       if (typeof showToast === 'function') showToast('Failed to send note: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : (resp?.error || 'Unknown')), 'error');
       return;
     }
@@ -1007,7 +1007,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
         resetUI();
         return;
       }
-      if (response && response.ok === false) {
+      if (response && !response.ok) {
         removeTypingIndicator();
         addMessage('Error: ' + (response.error || 'Unknown error'), 'assistant');
         resetUI();
@@ -1032,7 +1032,7 @@ stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError && !response) {
       addMessage('Error stopping agent: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
-    } else if (response && response.ok === false) {
+    } else if (response && !response.ok) {
       addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
     } else {
       addMessage('Agent stopped by user.', 'assistant');
@@ -1087,9 +1087,9 @@ if (undoBtn) {
         addMessage('Undo failed: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)), 'assistant');
         return;
       }
-      if (resp && resp.ok === false) {
+      if (resp && !resp.ok) {
         addMessage('Undo failed: ' + (resp.error || 'Unknown error'), 'assistant');
-      } else if (resp && resp.data && resp.data.success === false) {
+      } else if (resp && resp.data && !resp.data.success) {
         addMessage('Nothing to undo: ' + (resp.data.reason || ''), 'assistant');
       } else if (resp && resp.data && resp.data.success) {
         addMessage('Undone: ' + (resp.data.description || 'Last action reversed'), 'assistant');
