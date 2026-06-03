@@ -1991,7 +1991,7 @@ if (window.__sentinelInitialized) {
         // Tailwind UI menus react. Use PointerEvent where available.
         const view = targetDoc.defaultView;
         const baseOpts = { bubbles: true, cancelable: true, composed: true, view: view };
-        const pointerOpts = Object.assign({ pointerType: 'mouse', isPrimary: true }, baseOpts);
+        const pointerOpts = { pointerType: 'mouse', isPrimary: true, ...baseOpts };
 
         const PE = view?.PointerEvent ?? PointerEvent ?? null;
 

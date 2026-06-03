@@ -2415,10 +2415,7 @@ function showModeMismatchCard(payload) {
 
   const sendResponse = (payload) => {
     try {
-      chrome.runtime.sendMessage(Object.assign({
-        action: 'mode_mismatch_response',
-        requestId
-      }, payload)).catch(() => {});
+      chrome.runtime.sendMessage({ action: 'mode_mismatch_response', requestId, ...payload }).catch(() => {});
     } catch { /* message may fail if background not ready */ }
   };
 
@@ -2554,10 +2551,7 @@ function showAdaptedGoalCard(payload) {
   if (mode === 'approval') {
     const sendResponse = (payload) => {
       try {
-        chrome.runtime.sendMessage(Object.assign({
-          action: 'adapted_goal_response',
-          requestId
-        }, payload)).catch(() => {});
+        chrome.runtime.sendMessage({ action: 'adapted_goal_response', requestId, ...payload }).catch(() => {});
       } catch { /* message may fail if background not ready */ }
     };
     const adaptedGoalAcceptBtn = document.getElementById('adaptedGoalAcceptBtn');

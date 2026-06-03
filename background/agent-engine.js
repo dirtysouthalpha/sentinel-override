@@ -237,7 +237,7 @@ export async function restoreFromCheckpoint() {
 
     // Restore in-memory state
     if (cp.agentMemorySnapshot && typeof cp.agentMemorySnapshot === 'object') {
-      Object.assign(agentMemory, cp.agentMemorySnapshot);
+      agentMemory = { ...agentMemory, ...cp.agentMemorySnapshot };
     }
     if (Array.isArray(cp.historySnapshot)) {
       history.length = 0;
@@ -251,7 +251,7 @@ export async function restoreFromCheckpoint() {
     if (cp.expectedTenant) expectedTenant = cp.expectedTenant;
     if (cp.activeClientId) activeClientId = cp.activeClientId;
     if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
-      Object.assign(_runSettings, cp.runSettingsSnapshot);
+      _runSettings = { ...cp.runSettingsSnapshot, ..._runSettings };
     }
     if (cp.trustCounters && typeof cp.trustCounters === 'object') {
       if (typeof cp.trustCounters.failedSteps === 'number') failedSteps = cp.trustCounters.failedSteps;
@@ -1813,7 +1813,7 @@ function _splitTriedSection(summary) {
   // Pull "what's been tried" candidates from the summary — anything that reads
   // like a remediation step. Falls back to a single line if nothing matches.
   if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
-  const lines = summary.split(/\n+/).filter(s => s.trim()).map(s => s.trim());
+  const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
   const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
   return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
@@ -1826,7 +1826,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
   // as recommended next steps). If empty, leave numbered placeholders so the
   // tech can fill in.
-  const sentences = (summary || '').split(/(?<=[.!?])\s+/).filter(s => s.trim()).map(s => s.trim());
+  const sentences = (summary || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
   const tail = sentences.slice(-3);
   const pathLines = tail.length
     ? tail.map((s, i) => `${i + 1}. ${s.replace(/\s+/g, ' ').slice(0, 240)}`)
@@ -1936,7 +1936,7 @@ function formatItGlueKb(summary, goal, tech, options) {
 
   // Derive resolution steps from the summary's numbered/bulleted lines or
   // sentence breakdown.
-  const lines = (summary || '').split(/\n+/).filter(s => s.trim()).map(s => s.trim());
+  const lines = (summary || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
   const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
   const steps = stepCandidates.length
     ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[.)]|-|\*)\s+/, '')}`)
