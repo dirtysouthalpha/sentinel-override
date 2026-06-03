@@ -427,7 +427,7 @@ async function handleSaveSchedule() {
         params[input.dataset.schParam] = input.value;
       });
     }
-    scheduleData.params = Object.keys(params).length > 0 ? params : null;
+    scheduleData.params = Object.keys(params).length ? params : null;
   } else {
     const goalEl = document.getElementById('sch-goal');
     if (!goalEl) { showToast('Goal field not found', 'error'); return; }
