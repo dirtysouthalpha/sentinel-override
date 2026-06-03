@@ -110,7 +110,12 @@ describe('quick-assist-handler', () => {
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
       }
-      const body = JSON.parse(fetchCall[1].body);
+      let body;
+      try {
+        body = JSON.parse(fetchCall[1].body);
+      } catch (e) {
+        throw new Error('fetch body is not valid JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      }
 
       expect(body).toMatchObject({
         model: 'claude-3-opus-20240229',
@@ -150,7 +155,12 @@ describe('quick-assist-handler', () => {
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
       }
-      const body = JSON.parse(fetchCall[1].body);
+      let body;
+      try {
+        body = JSON.parse(fetchCall[1].body);
+      } catch (e) {
+        throw new Error('fetch body is not valid JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      }
 
       expect(body).toMatchObject({
         model: 'gpt-4',
@@ -191,7 +201,12 @@ describe('quick-assist-handler', () => {
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
       }
-      const body = JSON.parse(fetchCall[1].body);
+      let body;
+      try {
+        body = JSON.parse(fetchCall[1].body);
+      } catch (e) {
+        throw new Error('fetch body is not valid JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      }
 
       // The handler splits on --- and sends only the part after as user content
       expect(body.messages).toHaveLength(1);
@@ -223,7 +238,12 @@ describe('quick-assist-handler', () => {
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
       }
-      const body = JSON.parse(fetchCall[1].body);
+      let body;
+      try {
+        body = JSON.parse(fetchCall[1].body);
+      } catch (e) {
+        throw new Error('fetch body is not valid JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      }
 
       expect(body.messages).toHaveLength(1);
       expect(body.messages[0].content).toBe('Full prompt without separator');
@@ -364,7 +384,12 @@ describe('quick-assist-handler', () => {
       if (!fetchCall || !fetchCall[1]) {
         throw new Error('fetch not called with correct args');
       }
-      const body = JSON.parse(fetchCall[1].body);
+      let body;
+      try {
+        body = JSON.parse(fetchCall[1].body);
+      } catch (e) {
+        throw new Error('fetch body is not valid JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      }
 
       expect(body.messages).toHaveLength(2);
       expect(body.messages[1].content).toBe(multiLinePrompt);

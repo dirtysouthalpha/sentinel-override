@@ -4399,7 +4399,13 @@ async function runAgentLoop(goal, workingTabId) {
           if (_vResponse && !_vResponse.ok) {
             console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
           } else if (_vResponse && _vResponse.ok) {
-            const _vData = await _vResponse.json();
+            let _vData;
+            try {
+              _vData = await _vResponse.json();
+            } catch (_jsonErr) {
+              console.warn('[Sentinel/v4] Vision LLM response not JSON:', _vResponse.status);
+              break;
+            }
             const _vRaw = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0] && _vData.choices[0].message
               ? (_vData.choices[0].message.content || '') : '';
             

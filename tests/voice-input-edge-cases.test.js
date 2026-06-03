@@ -102,6 +102,7 @@ describe('Voice input edge cases', () => {
       target: { tabId: 1 },
       func: () => 'injected',
     });
+    expect(result1.length).toBeGreaterThan(0);
     expect(result1[0].result).toBe('injected');
 
     // Second injection should fail gracefully

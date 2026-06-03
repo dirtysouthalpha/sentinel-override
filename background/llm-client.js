@@ -1234,10 +1234,10 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   for (const [key, r] of Object.entries(_PRICING).sort((a,b) => b[0].length - a[0].length)) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
   }
-  if (!rates || !Array.isArray(rates) || rates.length < 2) {
+  if (!rates || !Array.isArray(rates) || typeof rates.length !== 'number' || rates.length < 2) {
     rates = [3.00, 15.00]; // fallback to default if pricing lookup fails
   }
-  return ((inputTokens || 0) * rates[0] + (outputTokens || 0) * rates[1]) / 1_000_000;
+  return ((inputTokens || 0) * (rates[0] || 0) + (outputTokens || 0) * (rates[1] || 0)) / 1_000_000;
 }
 
 /**
