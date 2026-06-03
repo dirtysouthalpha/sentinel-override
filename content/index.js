@@ -52,6 +52,7 @@ if (window.__sentinelInitialized) {
   // Defence-in-depth: approval gate + static regex guard still active.
    
   const _EXECUTE_JS_SANDBOX_ENABLED = true;
+  const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
 
   // Shorthand references to utility modules
   const dom = (window.__sentinelUtils && window.__sentinelUtils.dom) || null;
@@ -2130,7 +2131,6 @@ if (window.__sentinelInitialized) {
         // This is a defence-in-depth layer; the agent-engine approval gate is the
         // primary control, but this fires even if the gate is bypassed or disabled.
         if (!cmd.approvalGranted) {
-          const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
           if (_PRIV_RE.test(code)) {
             return 'BLOCKED: execute_js code accesses a privileged API (cookie / fetch / XHR / WebSocket / eval / storage). Enable approval mode and re-run — the approval card will show the full code before it executes.';
           }
