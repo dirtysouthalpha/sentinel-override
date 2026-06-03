@@ -11,6 +11,9 @@ const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'us
 const VISION_SOM = "const __sentinel_drawSoMOverlay = function() {\n  'use strict';\n\n  // ---- Remove any existing overlay ----\n  var existing = document.getElementById('sentinel-som-overlay');\n  if (existing) existing.remove();\n\n  // ---- Create canvas ----\n  var canvas = document.createElement('canvas');\n  canvas.id = 'sentinel-som-overlay';\n  canvas.style.position = 'fixed';\n  canvas.style.top = '0';\n  canvas.style.left = '0';\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n  canvas.style.zIndex = '2147483647';\n  canvas.style.pointerEvents = 'none';\n  canvas.width = window.innerWidth * (window.devicePixelRatio || 1);\n  canvas.height = window.innerHeight * (window.devicePixelRatio || 1);\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n\n  var ctx = canvas.getContext('2d');\n  var dpr = window.devicePixelRatio || 1;\n  ctx.scale(dpr, dpr);\n\n  // ---- Guard ----\n  if (!window.__sentinelElements || typeof window.__sentinelElements.forEach !== 'function') {\n    (document.body || document.documentElement).appendChild(canvas);\n    return 'ok';\n  }\n\n  var vw = window.innerWidth;\n  var vh = window.innerHeight;\n\n  // ---- Draw boxes and labels ----\n  window.__sentinelElements.forEach(function(el, idx) {\n    if (!el || !el.getBoundingClientRect) return;\n\n    var cRect = el.getBoundingClientRect();\n    var x = cRect.left;\n    var y = cRect.top;\n    var w = cRect.width;\n    var h = cRect.height;\n\n    // Skip zero-size\n    if (w <= 0 || h <= 0) return;\n\n    // Draw bounding box\n    ctx.strokeStyle = '#00ff88';\n    ctx.lineWidth = 2;\n    ctx.strokeRect(x, y, w, h);\n\n    // ---- Label dimensions ----\n    var lw = 24;\n    var lh = 18;\n    var lx = x;\n    var ly = y - lh;\n\n    // If label would go above the viewport, move it inside the box\n    if (ly < 0) {\n      ly = y;\n    }\n    // If label would go off the left edge, nudge right\n    if (lx < 0) {\n      lx = 0;\n    }\n    // If label would go off the right edge, nudge left\n    if (lx + lw > vw) {\n      lx = vw - lw;\n    }\n\n    // Draw label background\n    ctx.fillStyle = '#00ff88';\n    ctx.fillRect(lx, ly, lw, lh);\n\n    // Draw label text\n    ctx.fillStyle = '#000000';\n    ctx.font = 'bold 12px monospace';\n    ctx.textAlign = 'center';\n    ctx.textBaseline = 'middle';\n    ctx.fillText(String(idx), lx + lw / 2, ly + lh / 2);\n  });\n\n  (document.body || document.documentElement).appendChild(canvas);\n  return 'ok';\n}; __sentinel_drawSoMOverlay();";
 const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0; _ti < _tagged.length; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch(_ae) {} }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
 
+// Precompute valid agent speed modes for O(1) lookup
+const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -238,7 +241,7 @@ export async function restoreFromCheckpoint() {
     if (typeof cp.consecutiveFailures === 'number') consecutiveFailures = cp.consecutiveFailures;
     if (typeof cp.apiCallCount === 'number') apiCallCount = cp.apiCallCount;
     if (cp.runLogId) runLogId = cp.runLogId;
-    if (cp.agentSpeed && ['turbo', 'normal', 'stealth'].includes(cp.agentSpeed)) agentSpeed = cp.agentSpeed;
+    if (cp.agentSpeed && VALID_AGENT_SPEEDS.has(cp.agentSpeed)) agentSpeed = cp.agentSpeed;
     if (cp.expectedTenant) expectedTenant = cp.expectedTenant;
     if (cp.activeClientId) activeClientId = cp.activeClientId;
     if (cp.runSettingsSnapshot && typeof cp.runSettingsSnapshot === 'object') {
@@ -685,7 +688,7 @@ export async function startAgent(goal, sender) {
   try {
     const speedSettings = await chrome.storage.local.get(['agentSpeedMode']);
     const savedSpeed = speedSettings.agentSpeedMode;
-    agentSpeed = ['turbo', 'normal', 'stealth'].includes(savedSpeed) ? savedSpeed : 'turbo';
+    agentSpeed = VALID_AGENT_SPEEDS.has(savedSpeed) ? savedSpeed : 'turbo';
   } catch (_speedErr) {
     /* Non-fatal: speed mode load failed, using turbo */
     agentSpeed = 'turbo';
@@ -1060,7 +1063,7 @@ export async function resumeAgent() {
  * @returns {string} Confirmation or error message.
  */
 export function setAgentSpeed(mode) {
-  if (!['turbo', 'normal', 'stealth'].includes(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
+  if (!VALID_AGENT_SPEEDS.has(mode)) return 'Invalid speed mode. Use: turbo, normal, stealth';
   agentSpeed = mode;
   chrome.storage.local.set({ agentSpeedMode: mode }).catch((e) => {
     console.error('[setAgentSpeed] Unhandled rejection:', e);
