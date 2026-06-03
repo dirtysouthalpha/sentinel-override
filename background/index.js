@@ -2,18 +2,11 @@
 // Wires all modules together and handles message routing.
 
 import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
-// eslint-disable-next-line no-unused-vars
-import { wrapMessageHandler, sendSilentUpdate, sendActionMessage, sendActionResult } from './message-protocol.js';
-// eslint-disable-next-line no-unused-vars
-import { waitForPageLoad, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl } from './tab-manager.js';
+import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
+import { injectContentScript, sendMessageWithRetry, isValidUrl } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled } from './shared-state.js';
 import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
-// eslint-disable-next-line no-unused-vars
-import { getActiveTabId, getTabContext, getAllTabContexts, handleTabRemoved } from './tab-context.js';
-// eslint-disable-next-line no-unused-vars
-import { generateReport } from './report-generator.js';
-// eslint-disable-next-line no-unused-vars
-import { migrateLegacySettings } from './provider-registry.js';
+import { getActiveTabId, handleTabRemoved } from './tab-context.js';
 import { callLLMSimple } from './llm-client.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
