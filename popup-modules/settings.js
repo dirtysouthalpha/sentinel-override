@@ -590,7 +590,8 @@ if (ticketFormatSelect) {
       const tech = {};
       for (const key of Object.keys(__TECH_INPUTS)) {
         const el = __TECH_INPUTS[key];
-        if (el && el.value && el.value.trim()) tech[key] = el.value.trim();
+        const trimmed = el && el.value ? el.value.trim() : '';
+        if (trimmed) tech[key] = trimmed;
       }
       chrome.storage.local.set({ technicianInfo: tech }).catch((e) => { console.error('[Sentinel] Error in settings.js:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); });
     }, 400);

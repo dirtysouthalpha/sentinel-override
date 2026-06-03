@@ -220,7 +220,7 @@ export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
     scope: scope === 'url' ? 'url' : 'global',
     urlPattern: scope === 'url' && typeof urlPattern === 'string' ? urlPattern.trim() : '',
     wisdom: wisdom.trim().substring(0, 1000),
-    tags: Array.isArray(tags) ? tags.slice(0, 8).filter(t => String(t).trim()).map(t => String(t).trim()) : [],
+    tags: Array.isArray(tags) ? tags.slice(0, 8).map(t => String(t).trim()).filter(Boolean) : [],
     capturedAt: new Date().toISOString(),
     useCount: 0
   };
@@ -247,7 +247,7 @@ export async function updateEntry(clientId, entryId, updates) {
   if (typeof updates.wisdom === 'string') e.wisdom = updates.wisdom.trim().substring(0, 1000);
   if (/^(global|url)$/.test(updates.scope)) e.scope = updates.scope;
   if (typeof updates.urlPattern === 'string') e.urlPattern = updates.urlPattern.trim();
-  if (Array.isArray(updates.tags)) e.tags = updates.tags.slice(0, 8).filter(t => String(t).trim()).map(t => String(t).trim());
+  if (Array.isArray(updates.tags)) e.tags = updates.tags.slice(0, 8).map(t => String(t).trim()).filter(Boolean);
   const written = await _write(state);
   if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, entry: e };
