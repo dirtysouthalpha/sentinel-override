@@ -4,6 +4,8 @@
  * Stores macros in chrome.storage.local.
  */
 
+import { getErrorMessage } from './error-utils.js';
+
 const STORAGE_KEY = 'sentinel_macros';
 
 /**
@@ -37,7 +39,7 @@ export async function loadMacros() {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return result[STORAGE_KEY] || [];
   } catch (e) {
-    console.error('[Sentinel/macro-recorder] loadMacros failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/macro-recorder] loadMacros failed:', getErrorMessage(e));
     return [];
   }
 }
@@ -50,7 +52,7 @@ async function saveMacros(macros) {
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: macros });
   } catch (e) {
-    console.error('[Sentinel/macro-recorder] saveMacros failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/macro-recorder] saveMacros failed:', getErrorMessage(e));
     throw e;
   }
 }
@@ -143,7 +145,7 @@ export async function importMacro(jsonStr) {
   try {
     data = JSON.parse(jsonStr);
   } catch (e) {
-    throw new Error('Invalid macro JSON: ' + (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+    throw new Error('Invalid macro JSON: ' + getErrorMessage(e));
   }
   if (!data.sentinelMacro || !data.steps) {
     throw new Error('Invalid macro format');
