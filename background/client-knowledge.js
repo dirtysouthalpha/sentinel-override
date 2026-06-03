@@ -277,14 +277,15 @@ export async function deleteEntry(clientId, entryId) {
 function _urlMatches(pattern, url) {
   if (!pattern || !url) return false;
   try {
-    if (!pattern.includes('*')) return url.toLowerCase().includes(pattern.toLowerCase());
+    const _patternLower = pattern.toLowerCase(); // Cache to avoid repeated toLowerCase calls
+    const _urlLower = url.toLowerCase(); // Cache to avoid repeated toLowerCase calls
+    if (!pattern.includes('*')) return _urlLower.includes(_patternLower);
     const re = new RegExp(
-      '^' + pattern
-        .toLowerCase()
+      '^' + _patternLower
         .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
         .replace(/\*/g, '.*') + '$'
     );
-    return re.test(url.toLowerCase());
+    return re.test(_urlLower);
   } catch (e) {
     console.error('[Sentinel/client-knowledge] _matchesPattern failed:', getErrorMessage(e));
     return false;
