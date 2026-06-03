@@ -88,7 +88,10 @@ async function refreshClientPicker() {
     const list = (listRes && listRes.data) || [];
     const active = activeRes && activeRes.data;
     sel.innerHTML = '<option value="">— No client (default behavior) —</option>'
-      + list.map(c => `<option value="${_safeEsc(c.id)}" ${active && active.id === c.id ? 'selected' : ''}>${_safeEsc(c.displayName)} (${(c.entries || []).length} entries)</option>`).join('');
+      + list.map(c => {
+        const entryCount = (c.entries || []).length; // Cache to avoid repeated property access
+        return `<option value="${_safeEsc(c.id)}" ${active && active.id === c.id ? 'selected' : ''}>${_safeEsc(c.displayName)} (${entryCount} entries)</option>`;
+      }).join('');
   } catch (err) {
     console.error('[client-knowledge] refreshClientPicker error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
   }
