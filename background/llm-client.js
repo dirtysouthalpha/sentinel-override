@@ -2213,7 +2213,7 @@ export function parseLLMResponse(content) {
     //  1. Try sanitize-then-parse on the raw content (in case extractFirstJsonObject
     //     truncated something we needed).
     //  2. If that fails, regex-extract finish/note content directly.
-    if (typeof content === 'string' && content.length > 0) {
+    if (typeof content === 'string' && content.length) {
       try {
         const sanitized = sanitizeLlmJson(content.trim());
         const parsed = JSON.parse(sanitized);

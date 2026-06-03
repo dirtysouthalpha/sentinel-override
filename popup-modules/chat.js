@@ -3629,7 +3629,7 @@ chrome.runtime.onMessage.addListener((message) => {
                     await new Promise((resolve) => chrome.runtime.sendMessage({ action: 'reset_skill_stats' }, () => resolve()));
                   }
                   // Apply each (key, value) pair to chrome.storage.local.
-                  if (Array.isArray(sug.applyKeys) && sug.applyKeys.length > 0 && Array.isArray(sug.applyValues)) {
+                  if (Array.isArray(sug.applyKeys) && sug.applyKeys.length && Array.isArray(sug.applyValues)) {
                     const updates = {};
                     for (let i = 0; i < sug.applyKeys.length; i++) {
                       if (i < sug.applyValues.length) updates[sug.applyKeys[i]] = sug.applyValues[i];

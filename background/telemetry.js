@@ -134,7 +134,7 @@ function _redactString(s) {
 
 function _redactValue(value, keyHint) {
   // Field-name driven scrub (handles whole-value redaction for password-like keys)
-  if (keyHint && typeof value === 'string' && value.length > 0) {
+  if (keyHint && typeof value === 'string' && value.length) {
     for (const kre of REDACT_KEY_PATTERNS) {
       if (kre.test(keyHint)) return '[REDACTED]';
     }
