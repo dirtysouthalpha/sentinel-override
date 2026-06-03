@@ -4526,7 +4526,10 @@ async function runAgentLoop(goal, workingTabId) {
             }
           } catch (_e) { /* non-fatal */ }
           // v4.0: Clear SoM overlay so it doesn't interfere with action execution
-          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch(_e) {}
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch(e) {
+            console.warn('[Sentinel] Failed to clear SoM overlay:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+            // Non-fatal but could affect next action execution
+          }
           base64Image = null; // release screenshot memory after LLM call
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
@@ -6694,7 +6697,13 @@ async function runAgentLoop(goal, workingTabId) {
 
   // NOW safe to release keepalive — report is already generated
   try { stopSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive stop failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
-  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(_e) {}
+  try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {
+    console.warn('[Sentinel] Failed to clear agent state from session storage:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
+    // Try to force-clear individual keys
+    try { await chrome.storage.session.remove(['agentRunning']); } catch {}
+    try { await chrome.storage.session.remove(['agentGoal']); } catch {}
+    try { await chrome.storage.session.remove(['agentStartTime']); } catch {}
+  }
 
   if (finished) {
     try {
