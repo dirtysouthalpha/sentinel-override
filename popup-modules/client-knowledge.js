@@ -152,7 +152,7 @@ async function refreshClientList() {
       });
     });
   } catch (err) {
-    console.error('[client-knowledge] refreshClientList error:', err);
+    console.error('[client-knowledge] refreshClientList error:', (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err)));
   }
 }
 
@@ -253,15 +253,17 @@ async function exportClientToFile(clientId) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const safeName = (typeof (res.data.client && res.data.client.displayName) === 'string' ? (res.data.client && res.data.client.displayName) : 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const clientName = (res.data.client && res.data.client.displayName);
+    const safeName = (typeof clientName === 'string' ? clientName : 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-');
     a.download = `sentinel-client-${safeName}.json`;
     if (document.body) document.body.appendChild(a);
     a.click();
     if (document.body) document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (err) {
-    console.error('[client-knowledge] exportClientToFile error:', err);
-    alert('Export failed: ' + ((typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err))));
+    const errMsg = (typeof err === 'object' && err !== null && 'message' in err && typeof err.message === 'string' ? err.message : String(err));
+    console.error('[client-knowledge] exportClientToFile error:', errMsg);
+    alert('Export failed: ' + errMsg);
   }
 }
 
