@@ -769,7 +769,7 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
     export_format: format,
     agent_context: agentContext
   }, () => {
-    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
       console.error('[Sentinel/settings] Failed to save settings:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && 'message' in chrome.runtime.lastError && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
       showToast('Failed to save settings', 'error');
       return;
