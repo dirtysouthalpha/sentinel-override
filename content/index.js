@@ -1841,11 +1841,19 @@ if (window.__sentinelInitialized) {
         const options = Array.from(el.options);
         let targetOpt = options.find(o => o.value === cmd.value);
         if (!targetOpt) {
-          targetOpt = options.find(o => typeof o.textContent === 'string' && o.textContent.trim().toLowerCase() === String(cmd.value).toLowerCase());
+          const cmdValueLower = String(cmd.value).toLowerCase();
+          targetOpt = options.find(o => {
+            const textLower = typeof o.textContent === 'string' ? o.textContent.trim().toLowerCase() : '';
+            return textLower === cmdValueLower;
+          });
         }
         if (!targetOpt) {
           // Partial text match as fallback
-          targetOpt = options.find(o => typeof o.textContent === 'string' && o.textContent.trim().toLowerCase().includes(String(cmd.value).toLowerCase()));
+          const cmdValueLower = String(cmd.value).toLowerCase();
+          targetOpt = options.find(o => {
+            const textLower = typeof o.textContent === 'string' ? o.textContent.trim().toLowerCase() : '';
+            return textLower.includes(cmdValueLower);
+          });
         }
         if (!targetOpt) {
           const availableOpts = options.map(o => `"${o.value}" (${typeof o.textContent === 'string' ? o.textContent.trim() : ''})`).join(', ');
