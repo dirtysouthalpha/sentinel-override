@@ -267,7 +267,7 @@ export async function rewriteGoalForPlatform(rawGoal, currentUrl, technicianInfo
       return result;
     }
 
-    if (parsed.no_adaptation_needed === true) {
+    if (parsed.no_adaptation_needed) {
       result.error = 'rewriter judged no adaptation needed: ' + (parsed.reason || '');
       return result;
     }

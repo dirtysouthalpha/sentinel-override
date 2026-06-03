@@ -581,7 +581,7 @@ export function pushUndoStack(entry) {
 async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuffer) {
   try {
     const stored = await chrome.storage.local.get(['approvalMode']);
-    const actualWants = (stored.approvalMode === true) ? 'approval' : 'autonomous';
+    const actualWants = stored.approvalMode ? 'approval' : 'autonomous';
     if (modeDirective.wants === actualWants) {
       return { cancel: false };
     }
@@ -889,9 +889,9 @@ async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
         finish({
-          approved: message.approved === true,
-          useOriginal: message.useOriginal === true,
-          edited: message.edited === true,
+          approved: !!message.approved,
+          useOriginal: !!message.useOriginal,
+          edited: !!message.edited,
           editedGoal: message.editedGoal
         });
       }
@@ -995,9 +995,9 @@ async function _waitForModeMismatchDecision(info) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
         finish({
-          flip: message.flip === true,
-          continue: message.continue === true,
-          cancel: message.cancel === true
+          flip: !!message.flip,
+          continue: !!message.continue,
+          cancel: !!message.cancel
         });
       }
     };
@@ -3662,7 +3662,7 @@ async function runAgentLoop(goal, workingTabId) {
         const lastActionTypes = recentActionEntries.map(h => h.action.type);
         if (lastActionTypes.length >= 3) {
           const allSame = lastActionTypes.every(t => t === lastActionTypes[0]);
-          const allFailed = recentActionEntries.every(h => h.actionFailed === true);
+          const allFailed = recentActionEntries.every(h => h.actionFailed);
           if (allSame && allFailed) {
             const stuckAction = lastActionTypes[0];
             console.warn('[Sentinel/stuck] Detected stuck loop: ' + stuckAction + ' failed ' + lastActionTypes.length + ' times');
@@ -4868,7 +4868,7 @@ async function runAgentLoop(goal, workingTabId) {
         // ticket-style goals (legacy 3.8.0 behavior) for backward compatibility.
         try {
           // (3.41.0) Read from run-stable settings cache instead of storage.
-          const _tmEnabled = _runSettings.ticketMode === true;
+          const _tmEnabled = !!_runSettings.ticketMode;
           const _tmFormat = (_runSettings.ticketFormat || 'auto').toString();
           const _autoApplyLegacy = !_tmEnabled && isTicketInvestigationGoal(goal);
           if (_tmEnabled || _autoApplyLegacy) {
@@ -5367,8 +5367,8 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Approval gate + CDP trusted input flag (#9)
       // (3.41.0) Read from run-stable settings cache instead of per-step storage fetch.
-      const useTrustedInput = _runSettings.useTrustedInput === true;
-      if (_runSettings.approvalMode === true) {
+      const useTrustedInput = !!_runSettings.useTrustedInput;
+      if (_runSettings.approvalMode) {
         const approval = await requestApproval(command, stepCount);
         if (approval.rejected) {
           historyPush({ step: stepCount, action: command, result: 'Rejected by user' });
@@ -6963,9 +6963,9 @@ async function requestApproval(command, stepNumber) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
         finish({
-          approved: message.approved === true,
-          skipped: message.skipped === true,
-          rejected: message.rejected === true
+          approved: !!message.approved,
+          skipped: !!message.skipped,
+          rejected: !!message.rejected
         });
       }
     };
@@ -7004,9 +7004,9 @@ async function requestApproval(command, stepNumber) {
           agentPaused = false;
           chrome.runtime.onMessage.removeListener(hardTimeoutListener);
           finish({
-            approved: message.approved === true,
-            skipped: message.skipped === true,
-            rejected: message.rejected === true
+            approved: !!message.approved,
+            skipped: !!message.skipped,
+            rejected: !!message.rejected
           });
         }
       };

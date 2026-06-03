@@ -652,7 +652,7 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
     // animate the virtual cursor to (x, y), highlight the element under the
     // pointer, and show the click pulse — visuals the synthetic-events path
     // gets for free, but the CDP path used to skip entirely.
-    if (options.skipVisual !== true) {
+    if (!options.skipVisual) {
       try {
         await chrome.tabs.sendMessage(tabId, {
           action: 'cdp_pre_click_visual',

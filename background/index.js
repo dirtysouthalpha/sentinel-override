@@ -408,7 +408,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       // fire a notification and wait for the user to respond.
       try {
         const stored = await chrome.storage.local.get(['approvalMode']);
-        if (stored.approvalMode !== true) {
+        if (!stored.approvalMode) {
           // Approval mode off — auto-approve for non-privileged code.
           // Return reason:'auto' so the content script knows this wasn't
           // explicit user approval and keeps the runtime sandbox active.
@@ -462,7 +462,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
               clearTimeout(timeoutId);
               if (hardRejectId) clearTimeout(hardRejectId);
               finish({
-                approved: message.approved === true,
+                approved: !!message.approved,
                 reason: message.approved ? 'user_approved' : 'user_rejected'
               });
             }
@@ -478,7 +478,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
                 if (hardRejectId) clearTimeout(hardRejectId);
                 chrome.runtime.onMessage.removeListener(replacementListener);
                 finish({
-                  approved: message.approved === true,
+                  approved: !!message.approved,
                   reason: message.approved ? 'user_approved' : 'user_rejected'
                 });
               }
