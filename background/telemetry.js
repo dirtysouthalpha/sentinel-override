@@ -51,8 +51,6 @@ let _pendingPersistFlush = false;
 
 // In-memory cache for runs index to eliminate repetitive I/O
 let _runsIndexCache = null;
-let _runsIndexCacheTimestamp = 0;
-const RUNS_INDEX_CACHE_TTL_MS = 5000; // Cache expires after 5 seconds
 
 // (3.28.0) Redaction layer. With v3.27.0 persistence + Export JSON shipped,
 // telemetry payloads can leak across sessions and into bug-report files. We
@@ -186,6 +184,7 @@ function _redactEvent(event) {
       if (changes.telemetryPersist) {
         _persistEnabled = !!changes.telemetryPersist.newValue;
         if (!_persistEnabled) {
+          _runsIndexCache = null;
           _runBuffer = [];
           if (_persistFlushTimer) { clearInterval(_persistFlushTimer); _persistFlushTimer = null; }
         } else if (_persistEnabled && _currentRunId && !_persistFlushTimer) {
@@ -196,6 +195,9 @@ function _redactEvent(event) {
         // Default-true semantics: any explicit value sets the flag; missing/unset = true.
         const v = changes.telemetryRedact.newValue;
         _redactEnabled = (v === undefined || v === null) ? true : !!v;
+      }
+      if (changes.telemetry_runs_index) {
+        _runsIndexCache = Array.isArray(changes.telemetry_runs_index.newValue) ? changes.telemetry_runs_index.newValue : [];
       }
     });
   } catch (e) { console.warn('[Sentinel/telemetry] init error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
@@ -234,28 +236,28 @@ async function _flushRunBuffer() {
 
 /**
  * Get the runs index from cache or storage.
- * Uses in-memory cache with TTL to eliminate repetitive I/O.
+ * Uses in-memory cache to eliminate repetitive I/O.
  * @returns {Promise<Array>} The runs index array.
  */
 async function _getRunsIndex() {
-  const now = Date.now();
-  if (_runsIndexCache !== null && (now - _runsIndexCacheTimestamp) < RUNS_INDEX_CACHE_TTL_MS) {
-    return _runsIndexCache;
-  }
+  if (_runsIndexCache !== null) return _runsIndexCache;
   try {
     const stored = await chrome.storage.local.get('telemetry_runs_index');
     _runsIndexCache = Array.isArray(stored.telemetry_runs_index) ? stored.telemetry_runs_index : [];
-    _runsIndexCacheTimestamp = now;
-    return _runsIndexCache;
-  } catch { return []; }
+  } catch (e) {
+    _runsIndexCache = [];
+    throw e;
+  }
+  return _runsIndexCache;
 }
 
 /**
- * Invalidate the runs index cache (call after updating storage).
+ * Set the runs index, updating cache and storage atomically.
+ * @param {Array} index - The runs index array.
  */
-function _invalidateRunsIndexCache() {
-  _runsIndexCache = null;
-  _runsIndexCacheTimestamp = 0;
+async function _setRunsIndex(index) {
+  _runsIndexCache = index;
+  await chrome.storage.local.set({ telemetry_runs_index: index });
 }
 
 /**
@@ -271,7 +273,8 @@ export async function startRun(runId, goal) {
   _runBuffer = [];
   if (!_persistEnabled || !_currentRunId) return;
   try {
-    const index = await _getRunsIndex();
+    const cachedIndex = await _getRunsIndex();
+    const index = [...cachedIndex];
     index.unshift({
       runId: _currentRunId,
       goal: _currentRunGoal,
@@ -283,8 +286,7 @@ export async function startRun(runId, goal) {
     for (const old of toEvict) {
       try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
     }
-    await chrome.storage.local.set({ telemetry_runs_index: index });
-    _invalidateRunsIndexCache();
+    await _setRunsIndex(index);
     _scheduleFlush();
   } catch (e) { console.warn('[Sentinel/telemetry] startRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 }
@@ -303,15 +305,15 @@ export async function endRun(runId) {
   }
   try {
     await _flushRunBuffer();
-    const index = await _getRunsIndex();
-    const stored = await chrome.storage.local.get('telemetry_run_' + id);
-    const events = Array.isArray(stored['telemetry_run_' + id]) ? stored['telemetry_run_' + id] : [];
+    const cachedIndex = await _getRunsIndex();
+    const index = [...cachedIndex];
+    const storedEvents = await chrome.storage.local.get('telemetry_run_' + id);
+    const events = Array.isArray(storedEvents['telemetry_run_' + id]) ? storedEvents['telemetry_run_' + id] : [];
     const entry = index.find(e => e.runId === id);
     if (entry) {
       entry.finishedAt = Date.now();
       entry.count = events.length;
-      await chrome.storage.local.set({ telemetry_runs_index: index });
-      _invalidateRunsIndexCache();
+      await _setRunsIndex(index);
     }
   } catch (e) { console.warn('[Sentinel/telemetry] endRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
   _currentRunId = null;
@@ -348,11 +350,11 @@ export async function loadPersistedRun(runId) {
 export async function deletePersistedRun(runId) {
   if (!runId) return;
   try {
-    const index = await _getRunsIndex();
+    const cachedIndex = await _getRunsIndex();
+    const index = [...cachedIndex];
     const filtered = index.filter(e => e.runId !== runId);
-    await chrome.storage.local.set({ telemetry_runs_index: filtered });
+    await _setRunsIndex(filtered);
     await chrome.storage.local.remove('telemetry_run_' + runId);
-    _invalidateRunsIndexCache();
   } catch (e) { console.warn('[Sentinel/telemetry] deletePersistedRun error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
 }
 
@@ -442,3 +444,9 @@ export function listCategories() {
 export function getLevel() {
   return _currentLevel;
 }
+
+/**
+ * Clear the runs index cache (for testing).
+ */
+export function _clearCacheForTests() { _runsIndexCache = null; }
+
