@@ -4085,6 +4085,9 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      // Cache memory count for reuse in this section (perf: multiple uses below)
+      const memCount = Object.keys(agentMemory || {}).length;
+
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (history.length >= 3 && !loopDirective) {
         const nonProductive = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
@@ -4101,9 +4104,6 @@ async function runAgentLoop(goal, workingTabId) {
         const recentJsCount = recentWindow.filter(h => h && h.action && h.action.type === 'execute_js').length;
         const recentExtractCount = recentWindow.filter(h => h && h.action && ['extract', 'extract_list', 'note', 'finish'].includes(h.action.type)).length;
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
-
-        // Cache memory count for reuse in this section (perf: multiple uses below)
-        const memCount = Object.keys(agentMemory || {}).length;
 
         if (consecutiveNonProductive >= 3 || jsLoop) {
           const reason = jsLoop
