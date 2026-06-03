@@ -4711,12 +4711,11 @@ async function runAgentLoop(goal, workingTabId) {
           if (_articleGoal && !command.force) {
             const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
             const _openTabs = history.filter(h => h.action && h.action.type === 'open_tab').length;
-            const _notes = history.filter(h => h.action && h.action.type === 'note').length;
             const _summaryKeys = memKeys.filter(k =>
               k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
             );
             // Block: haven't opened ANY article tabs AND no summaries written
-            if (_openTabs === 0 && _summaryKeys.length === 0 && _notes === 0) {
+            if (_openTabs === 0 && _summaryKeys.length === 0 && noteCount === 0) {
               console.warn('[Sentinel/multi-article] Blocking premature finish —', _targetN, 'articles requested, 0 opened/read');
               historyPush({ step: stepCount, action: command, result: `BLOCKED: premature finish — goal asks for ${_targetN} articles. Must open_tab article URLs and read each page before finishing.` });
               await persistHistory();
