@@ -16,9 +16,16 @@ function _set(id, prop, value) {
 }
 function _get(id) { return document.getElementById(id); }
 function _safeEsc(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(s == null ? '' : s).replace(/[&<>'"]/g, (char) => {
+    switch (char) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return char;
+    }
+  });
 }
 
 // ---------- State ----------

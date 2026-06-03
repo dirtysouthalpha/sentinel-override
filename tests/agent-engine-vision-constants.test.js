@@ -104,24 +104,33 @@ describe('escapeJsString helper function', () => {
     expect(src).toContain('function escapeJsString');
   });
 
-  it('escapes backslash', () => {
-    expect(src).toContain('replace(/\\\\/g');
+  it('escapes all special characters with single regex', () => {
+    expect(src).toContain('.replace(');
+    expect(src).toContain('case \'\\\\\'');
   });
 
-  it('escapes newlines', () => {
-    expect(src).toContain("replace(/\\n/g, '\\\\n')");
+  it('uses switch for character replacement', () => {
+    expect(src).toContain('case \'\\\\\'');
+    expect(src).toContain('return \'\\\\\\\\\'');
   });
 
-  it('escapes carriage returns', () => {
-    expect(src).toContain("replace(/\\r/g, '\\\\r')");
+  it('handles newline characters', () => {
+    expect(src).toContain("case '\\n':");
+    expect(src).toContain("return '\\\\n'");
   });
 
-  it('escapes tabs', () => {
-    expect(src).toContain("replace(/\\t/g, '\\\\t')");
+  it('handles carriage returns', () => {
+    expect(src).toContain("case '\\r':");
+    expect(src).toContain("return '\\\\r'");
+  });
+
+  it('handles tabs', () => {
+    expect(src).toContain("case '\\t':");
+    expect(src).toContain("return '\\\\t'");
   });
 
   it('supports quote parameter for escaping', () => {
-    expect(src).toContain('quote =');
+    expect(src).toContain('quoteChar');
     expect(src).toContain('quote ===');
   });
 });

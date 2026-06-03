@@ -6869,9 +6869,17 @@ function sleep(ms) {
  */
 function escapeJsString(str, quote = '"') {
   if (typeof str !== 'string') return '';
-  const backslashEscaped = str.replace(/\\/g, '\\\\');
-  const quoteEscaped = quote === '"' ? backslashEscaped.replace(/"/g, '\\"') : backslashEscaped.replace(/'/g, "\\'");
-  return quoteEscaped.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+  const quoteChar = quote === '"' ? '"' : "'";
+  return str.replace(/[\\'"\n\r\t]/g, (char) => {
+    switch (char) {
+      case '\\': return '\\\\';
+      case quoteChar: return '\\' + quoteChar;
+      case '\n': return '\\n';
+      case '\r': return '\\r';
+      case '\t': return '\\t';
+      default: return char;
+    }
+  });
 }
 
 // ========== Approval Mode ==========

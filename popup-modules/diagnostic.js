@@ -8,7 +8,16 @@
   container.id = 'diag-overlay';
   container.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#0d1117;color:#58a6ff;font:11px/1.5 monospace;padding:8px 12px;border-bottom:2px solid #f85149;max-height:40vh;overflow-y:auto;';
 
-  function _esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function _esc(s) { return String(s || '').replace(/[&<>'"]/g, (char) => {
+    switch (char) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+      default: return char;
+    }
+  }); }
   function log(msg, ok) {
     const icon = ok === true ? '✅' : ok === false ? '❌' : 'ℹ️';
     results.push(`${icon} ${_esc(msg)}`);
