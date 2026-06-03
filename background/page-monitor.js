@@ -3,6 +3,8 @@
  * Watches DOM elements for content changes and notifies the user.
  */
 
+import { getErrorMessage } from './error-utils.js';
+
 const MONITOR_STORAGE_KEY = 'sentinel_monitors';
 const _CHECK_INTERVAL_MS = 30_000; // 30 seconds (reserved for future use)
 
@@ -68,7 +70,7 @@ export async function loadMonitors() {
       _cachedMonitors = result[MONITOR_STORAGE_KEY] || [];
       return _cachedMonitors;
     } catch (e) {
-      console.error('[Sentinel/page-monitor] loadMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+      console.error('[Sentinel/page-monitor] loadMonitors failed:', getErrorMessage(e));
       return [];
     } finally {
       _loadMonitorsPromise = null;
@@ -84,7 +86,7 @@ async function saveMonitors(monitors) {
     // Update cache immediately after save
     _cachedMonitors = monitors;
   } catch (e) {
-    console.error('[Sentinel/page-monitor] saveMonitors failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/page-monitor] saveMonitors failed:', getErrorMessage(e));
     throw e;
   }
 }
@@ -182,7 +184,7 @@ export async function checkMonitor(monitor) {
 
     return { changed, content, changeCount: mon ? mon.changeCount : monitor.changeCount };
   } catch (e) {
-    console.error('[Sentinel/page-monitor] checkMonitor failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    console.error('[Sentinel/page-monitor] checkMonitor failed:', getErrorMessage(e));
     return { changed: false, content: '', changeCount: monitor.changeCount };
   }
 }
@@ -235,7 +237,7 @@ export function startMonitorLoop() {
 
   _monitorAlarmHandler = alarm => {
     if (alarm.name === 'sentinel-monitor-check') {
-      runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+      runMonitorCycle().catch(e => console.error('[Sentinel/page-monitor] Cycle failed:', getErrorMessage(e)));
     }
   };
   chrome.alarms.onAlarm.addListener(_monitorAlarmHandler);

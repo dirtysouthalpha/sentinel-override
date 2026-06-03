@@ -11,6 +11,8 @@
 // happening on every appendAuditEntry call. The cache is populated on first
 // access and kept in sync; clearAuditLog evicts the cache entry.
 
+import { getErrorMessage } from './error-utils.js';
+
 const MAX_ENTRIES_PER_RUN = 500;
 const STORAGE_KEY_PREFIX = 'audit_';
 
@@ -53,7 +55,7 @@ export async function appendAuditEntry(runId, entry) {
     });
     if (log.length > MAX_ENTRIES_PER_RUN) log.splice(0, log.length - MAX_ENTRIES_PER_RUN);
     await chrome.storage.local.set({ [key]: log }).catch((e) => {
-      console.error('[audit-log] Error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) || String(e));
+      console.error('[audit-log] Error:', getErrorMessage(e) || String(e));
     });
   } catch (e) { console.warn('[Sentinel/audit-log] appendAuditEntry failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
 }
@@ -108,7 +110,7 @@ export async function clearAuditLog(runId) {
   try {
     const key = _storageKey(runId);
     await chrome.storage.local.remove(key).catch((e) => {
-      console.error('[audit-log] remove failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)) || String(e));
+      console.error('[audit-log] remove failed:', getErrorMessage(e) || String(e));
     });
   } catch (e) { console.warn('[Sentinel/audit-log] clearAuditLog failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
 }
