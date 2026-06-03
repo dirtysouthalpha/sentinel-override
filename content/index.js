@@ -1849,9 +1849,9 @@ if (window.__sentinelInitialized) {
 
         // Single select: try exact value match, then visible text match
         const options = Array.from(el.options);
+        const cmdValueLower = String(cmd.value).toLowerCase();
         let targetOpt = options.find(o => o.value === cmd.value);
         if (!targetOpt) {
-          const cmdValueLower = String(cmd.value).toLowerCase();
           targetOpt = options.find(o => {
             const textLower = typeof o.textContent === 'string' ? o.textContent.trim().toLowerCase() : '';
             return textLower === cmdValueLower;
@@ -1859,7 +1859,6 @@ if (window.__sentinelInitialized) {
         }
         if (!targetOpt) {
           // Partial text match as fallback
-          const cmdValueLower = String(cmd.value).toLowerCase();
           targetOpt = options.find(o => {
             const textLower = typeof o.textContent === 'string' ? o.textContent.trim().toLowerCase() : '';
             return textLower.includes(cmdValueLower);
