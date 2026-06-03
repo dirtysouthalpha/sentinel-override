@@ -30,6 +30,9 @@ const SKILLS = [
   slowLlmCall,
 ];
 
+// Skills map for O(1) lookups by ID (perf optimization)
+const SKILLS_MAP = new Map(SKILLS.map(s => [s.id, s]));
+
 // (3.29.0) Adaptive Skill Priority
 const STATS_KEY = 'skill_stats';
 const ADAPT_ENABLED_KEY = 'telemetrySkillAdapt';
@@ -121,7 +124,7 @@ function _recordPendingOutcomes(context) {
         successes: _stats[skillId].successes,
         failures: _stats[skillId].failures,
         successRate: _stats[skillId].fires > 0 ? _stats[skillId].successes / _stats[skillId].fires : 0,
-        adjustedPriority: _effectivePriority({ id: skillId, priority: (SKILLS.find(s => s.id === skillId) || {}).priority })
+        adjustedPriority: _effectivePriority({ id: skillId, priority: (SKILLS_MAP.get(skillId) || {}).priority })
       });
     } catch (_e) { /* telemetry logging failure is non-critical */ }
   }
@@ -152,7 +155,7 @@ export function getSkillStats() {
   const out = {};
   for (const [k, v] of Object.entries(_stats)) {
     out[k] = { ...v };
-    const skill = SKILLS.find(s => s.id === k);
+    const skill = SKILLS_MAP.get(k);
     out[k].basePriority = skill ? (skill.priority || 0) : null;
     out[k].effectivePriority = skill ? _effectivePriority(skill) : null;
     out[k].successRate = (v.fires > 0 && Number.isFinite(v.fires) && Number.isFinite(v.successes)) ? v.successes / v.fires : null;
