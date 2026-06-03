@@ -4139,7 +4139,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
-      const recentTabActions = history.slice(-5).filter(h => h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type)).length;
+      const recentTabActions = history.slice(-5).reduce((count, h) => count + (h.action && ['open_tab', 'switch_tab', 'close_tab'].includes(h.action.type) ? 1 : 0), 0);
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
