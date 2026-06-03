@@ -6280,8 +6280,9 @@ async function runAgentLoop(goal, workingTabId) {
             const cy = Math.round(bbox.y + (bbox.height || 0) / 2);
             const fallbackCmd = { type: 'click_at', x: cx, y: cy, _bboxFallback: true };
             const fallbackRes = await sendMessageWithRetry(tab, { action: 'execute_command', command: fallbackCmd });
-            if (fallbackRes && !String(fallbackRes).startsWith('Error') && !String(fallbackRes).includes('not found')) {
-              result = String(fallbackRes) + ' [bbox fallback at (' + cx + ',' + cy + ')]';
+            const resStr = String(fallbackRes);
+            if (fallbackRes && !resStr.startsWith('Error') && !resStr.includes('not found')) {
+              result = resStr + ' [bbox fallback at (' + cx + ',' + cy + ')]';
               actionFailed = false;
               sendSilentUpdate('Selector failed → retried with bbox coordinates (' + cx + ',' + cy + ')', stepCount);
               // Send a click_at action message so the crosshair shows on the mini-shot
