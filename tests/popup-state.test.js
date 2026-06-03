@@ -18,6 +18,7 @@ const sandbox = {
   JSON,
   Set,
   Error,
+  structuredClone,
 };
 
 vm.createContext(sandbox);

@@ -63,7 +63,7 @@ function initPopupState() {
   // Deep-clone defaults so each init is independent
   let fresh;
   try {
-    fresh = JSON.parse(JSON.stringify(_initialState));
+    fresh = structuredClone(_initialState);
   } catch (cloneErr) {
     console.error('[Sentinel/popup-state] Failed to deep-clone initial state, using shallow copy:', (typeof cloneErr.message === 'string' ? cloneErr.message : String(cloneErr)));
     fresh = { ..._initialState };
