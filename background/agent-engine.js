@@ -336,7 +336,11 @@ async function _updateRunLogIndex(runLogId, fields) {
     // Drop overflow and evict detail records for those runs.
     const evict = list.splice(RUN_LOG_INDEX_MAX);
     if (evict.length) {
-      const evictKeys = evict.filter(e => e && e.runLogId).map(e => 'run_log_' + e.runLogId).filter(Boolean);
+      // Single-pass optimization: filter and map in one loop
+      const evictKeys = [];
+      for (const e of evict) {
+        if (e && e.runLogId) evictKeys.push('run_log_' + e.runLogId);
+      }
       try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] History eviction failed:', getErrorMessage(e)); }
     }
     await chrome.storage.local.set({ [RUN_LOG_INDEX_KEY]: list });

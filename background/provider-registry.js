@@ -992,15 +992,38 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   let ids = [];
   if (provider.tagsResponse && Array.isArray(data.models)) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
-    ids = (data.models || []).filter(m => m != null && typeof m === 'object' && m !== null).map(m => m.name).filter(Boolean);
+    // Single-pass optimization: filter and map in one loop
+    for (const m of data.models || []) {
+      if (m != null && typeof m === 'object' && m !== null && m.name) {
+        ids.push(m.name);
+      }
+    }
   } else if (Array.isArray(data.data)) {
     // OpenAI-compatible: { data: [{ id: "gpt-4o" }] }
-    ids = (data.data || []).filter(m => m != null).map(m => m.id || m.name).filter(Boolean);
+    // Single-pass optimization: filter and map in one loop
+    for (const m of data.data || []) {
+      if (m != null) {
+        const val = m.id || m.name;
+        if (val) ids.push(val);
+      }
+    }
   } else if (Array.isArray(data.models)) {
     // Some providers: { models: [{ id }] }
-    ids = (data.models || []).filter(m => m != null).map(m => m.id || m.name).filter(Boolean);
+    // Single-pass optimization: filter and map in one loop
+    for (const m of data.models || []) {
+      if (m != null) {
+        const val = m.id || m.name;
+        if (val) ids.push(val);
+      }
+    }
   } else if (Array.isArray(data)) {
-    ids = (data || []).filter(m => m != null).map(m => (typeof m === 'string') ? m : (m.id || m.name)).filter(Boolean);
+    // Single-pass optimization: filter and map in one loop
+    for (const m of data || []) {
+      if (m != null) {
+        const val = (typeof m === 'string') ? m : (m.id || m.name);
+        if (val) ids.push(val);
+      }
+    }
   }
   if (ids.length === 0) {
     throw new Error('Could not parse models from response: ' + JSON.stringify(data).slice(0, 240));
