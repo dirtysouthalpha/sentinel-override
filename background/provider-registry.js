@@ -996,7 +996,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
     // Single-pass optimization: filter and map in one loop
     for (const m of data.models || []) {
-      if (m != null && typeof m === 'object' && m !== null && m.name) {
+      if (m != null && typeof m === 'object' && m.name) {
         ids.push(m.name);
       }
     }
