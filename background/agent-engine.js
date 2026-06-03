@@ -6069,7 +6069,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = res || 'Done';
-            actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
+            actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
           } catch (err) {
             result = 'Content script error: ' + getErrorMessage(err || 'command failed to reach page');
             actionFailed = true;
@@ -6103,7 +6103,7 @@ async function runAgentLoop(goal, workingTabId) {
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
               result = (typeof res === 'string' ? res : null) || 'Done';
-              actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.startsWith('JS Error') || result.includes('timed out') || result.includes(' not found');
+              actionFailed = /^(Error|BLOCKED:|JS Error)|timed out| not found/i.test(result);
             }
           } else {
             // (3.49.1) Push undo entry for type actions when not using CDP path.
@@ -6121,7 +6121,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = (typeof res === 'string' ? res : null) || 'Done';
-            actionFailed = result.startsWith('Error') || result.startsWith('BLOCKED:') || result.includes(' not found') || result.includes('Element not found') || result.includes('No element');
+            actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
           }
         } catch (err) {
           result = 'Content script error: ' + getErrorMessage(err || 'command failed to reach page');
