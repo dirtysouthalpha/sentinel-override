@@ -2274,7 +2274,7 @@ function detectMfaInText(text, currentUrl) {
   }
 
   // Auth URL + any tier-2 cue -> fire.
-  if (isAuthUrl && tier2Hits.length >= 1) return tier2Hits[0];
+  if (isAuthUrl && tier2Hits.length) return tier2Hits[0];
 
   // Multiple tier-2 cues on same page -> fire (covers MFA flows on
   // less-common auth domains).
@@ -3578,7 +3578,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-        if (urlMatch && urlMatch.length >= 1) {
+        if (urlMatch && urlMatch.length) {
           const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : ('https://' + (urlMatch[1] || urlMatch[0]));
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
@@ -5623,7 +5623,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHost.replace(/^www\./, '')) || _targetHost.includes(_currentHost.replace(/^www\./, '')));
         if (_alreadyThere) {
           const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
-          if (_recent.length >= 1) {
+          if (_recent.length) {
             const _msg = 'BLOCKED: already on ' + command.url + '. Do NOT navigate to the same URL. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.';
             activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
             sendActionResult(stepCount, _msg, true);

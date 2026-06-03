@@ -181,7 +181,7 @@ function computeNextRun(recurrence) {
   if (!recurrence) return Date.now();
 
   const timeParts = (typeof recurrence.time === 'string' ? recurrence.time : '09:00').split(':');
-  const hours = (timeParts.length >= 1 && timeParts[0] != null) ? parseInt(timeParts[0], 10) : 9;
+  const hours = (timeParts.length && timeParts[0] != null) ? parseInt(timeParts[0], 10) : 9;
   const validHours = Number.isFinite(hours) && hours >= 0 && hours < 24;
   const finalHours = validHours ? hours : 9;
   const minutes = (timeParts.length >= 2 && timeParts[1] != null) ? parseInt(timeParts[1], 10) : 0;
