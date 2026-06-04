@@ -4369,8 +4369,8 @@ async function runAgentLoop(goal, workingTabId) {
           // prevent the prompt from carrying 5KB of typed text or JS source
           // forever. The current step's command is passed fresh; past
           // versions only need a hint of what happened.
-          if (typeof a.text === 'string' && a.text.length > 200) a.text = a.text.slice(0, 200) + '…';
-          if (typeof a.code === 'string' && a.code.length > 300) a.code = a.code.slice(0, 300) + '…';
+          if (typeof a.text === 'string' && a.text.length > 200) a.text = `${a.text.slice(0, 200)}…`;
+          if (typeof a.code === 'string' && a.code.length > 300) a.code = `${a.code.slice(0, 300)}…`;
           cleaned.action = a;
         }
         // (3.20.0) Cap result field — 800 chars is plenty for the LLM to
@@ -5154,7 +5154,7 @@ async function runAgentLoop(goal, workingTabId) {
         // stream so the user can SEE what was captured, not just "Recording
         // a note". Truncated for display; full text remains in history.
         try {
-          const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
+          const _preview = noteText.length > 140 ? `${noteText.slice(0, 137)}…` : noteText;
           activityDone(stepCount, 'note-content', `Noted: "${_preview}"`, null);
         } catch (e) { console.warn('[Sentinel] note-content activity failed:', getErrorMessage(e)); }
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
@@ -5993,7 +5993,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const _itemCount = Array.isArray(savedValue) ? savedValue.length : null;
                 const _summary = _itemCount !== null
                   ? _itemCount + ' items captured'
-                  : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
+                  : (preview.length > 60 ? `${preview.slice(0, 57)}…` : preview);
                 activityDone(stepCount, 'js-extract-content', `Saved "${savedKey}" → ${_summary}`, null);
               } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', getErrorMessage(e)); }
             }
