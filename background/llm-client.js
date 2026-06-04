@@ -1205,8 +1205,8 @@ const _rateLimiter = {
     const now = Date.now();
     // Drop timestamps outside the sliding window
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    if (this.timestamps.length >= this.maxCalls && this.timestamps.length) {
-      const oldestInWindow = Array.isArray(this.timestamps) && this.timestamps.length ? this.timestamps[0] : now;
+    if (this.timestamps.length >= this.maxCalls) {
+      const oldestInWindow = this.timestamps.length ? this.timestamps[0] : now;
       const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
       throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
     }
