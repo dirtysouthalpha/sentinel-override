@@ -3,6 +3,7 @@
 // Enables the agent to interact with elements inside cross-origin iframes.
 
 import { getErrorMessage } from './error-utils.js';
+import { THREE_HUNDRED_MS } from './constants.js';
 
 // ========== Content Script Files for Frame Injection ==========
 // Same set as tab-manager.js CONTENT_SCRIPT_FILES, minus index.js (handler injected separately)
@@ -120,7 +121,7 @@ export async function enumerateFrames(tabId) {
  * @returns {Promise<number|null>} The Chrome frameId, or null if not found.
  */
 export async function resolveFrameForSelector(tabId, frameIndex) {
-  if (tabId == null || frameIndex == null || frameIndex < 0) return null;
+  if (tabId === null || tabId === undefined || frameIndex === null || frameIndex === undefined || frameIndex < 0) return null;
 
   try {
     const cached = frameIdsByTab.get(tabId);
@@ -162,7 +163,7 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
  */
 export async function executeInFrame(tabId, frameId, command) {
   // Note: frameId === 0 is the main frame and is a valid value, so check for nullish only.
-  if (tabId == null || frameId == null) {
+  if (tabId === null || tabId === undefined || frameId === null || frameId === undefined) {
     return { ok: false, error: 'Missing tabId or frameId' };
   }
   if (!command || !command.type) {
@@ -230,7 +231,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
@@ -257,7 +258,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }

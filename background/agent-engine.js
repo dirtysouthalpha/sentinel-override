@@ -5,7 +5,7 @@
 import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { MAX_PAGE_TEXT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n  var clickableTags = new Set(['a', 'button', 'summary']);\n  var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    // Determine interactivity\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; return __sentinel_discoverElements();";
@@ -147,7 +147,7 @@ async function _visionObserve(tab, _currentUrl) {
     catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', getErrorMessage(e)); }
 
     // Step 3: Small delay for canvas to render
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, TWO_HUNDRED_MS));
 
     // Step 4: Get page text via CDP
     let pageText = '';
@@ -1284,6 +1284,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
   if (stepCount === 0 || stepCount % PROGRESS_UPDATE_INTERVAL !== 0) return;
   try {
     const portalsSeen = new Set();
+    const histLen = history.length;
     for (const h of history) {
       if (!h || !h.action) continue;
       const url = h.action.url || '';
@@ -1299,7 +1300,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (PORTAL_VIRUSTOTAL_RE.test(url)) portalsSeen.add('VirusTotal');
     }
     const memCount = Object.keys(agentMemory).length;
-    const lastAction = history.length ? history[history.length - 1] : null;
+    const lastAction = histLen ? history[histLen - 1] : null;
     const lines = [
       `📊 PROGRESS UPDATE — step ${stepCount}`,
       `Portals visited: ${portalsSeen.size > 0 ? [...portalsSeen].join(', ') : '(none yet)'}`,
@@ -1492,13 +1493,13 @@ async function _cdpObservePage(tabId) {
       if (!r.hasBody && r.childCount === 0) {
         console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
         try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(2000);
+        await sleep(TWO_SECONDS_MS);
       }
       // If title is empty and URL is still about:blank or loading, wait
       if (!r.title && (r.url === 'about:blank' || r.url === '')) {
         console.log('[Sentinel/CDP] Page still loading — waiting 2s...');
         try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(2000);
+        await sleep(TWO_SECONDS_MS);
       }
     }
   } catch(e) {
@@ -1619,7 +1620,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
         console.log('[Sentinel/CDP] Phase1 clicking:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
         const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
         if (r && r.ok) totalRemoved++;
-        await new Promise(r => setTimeout(r, 600));
+        await new Promise(r => setTimeout(r, SIX_HUNDRED_MS));
       }
     }
   }
@@ -1722,7 +1723,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
   // Phase 3: Quick scroll test (only if overlays were found)
   if (totalRemoved > 0) try {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, TWO_HUNDRED_MS));
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
   } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', getErrorMessage(e)); }
 
@@ -2388,7 +2389,7 @@ function detectMfaInText(text, currentUrl) {
     if (re.test(url)) return null;
   }
 
-  const sample = text.substring(0, 5000);
+  const sample = text.substring(0, TEXT_SAMPLE_LENGTH);
 
   // Tier 1: any single match fires.
   for (const re of MFA_TIER1_PATTERNS) {
@@ -2833,7 +2834,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
       sendSilentUpdate(`🤖 CAPTCHA auto-solved (${clickedWhat})`, stepCount);
       try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-      await sleep(2000); // wait for page to process
+      await sleep(TWO_SECONDS_MS); // wait for page to process
       return 'solved';
     }
   } catch (e) {
@@ -2881,7 +2882,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     sendSilentUpdate('⬅️ CAPTCHA detected, going back', stepCount);
     await chrome.tabs.goBack(tab.id);
     try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-    await sleep(2000);
+    await sleep(TWO_SECONDS_MS);
     return 'went_back';
   } catch (e) {
     console.warn('[Sentinel/CAPTCHA] Go back failed:', getErrorMessage(e));
@@ -2989,8 +2990,8 @@ async function _runExecuteJsOnce(tabId, code, timeout) {
       const valStr = cdpResult.value === undefined || cdpResult.value === null
         ? ''
         : (typeof cdpResult.value === 'object'
-            ? JSON.stringify(cdpResult.value).slice(0, 3000)
-            : String(cdpResult.value).slice(0, 3000));
+            ? JSON.stringify(cdpResult.value).slice(0, MAX_CDP_RESULT_LENGTH)
+            : String(cdpResult.value).slice(0, MAX_CDP_RESULT_LENGTH));
       return `JS Result: ${valStr}`;
     } else if (cdpResult && cdpResult.attachDenied) {
       // Fall through to content-script path
@@ -3551,7 +3552,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Pause check — wait until resumed
       if (agentPaused) {
         sendSilentUpdate('⏸ Agent paused — waiting for resume', stepCount);
-        while (agentPaused && agentRunning) await sleep(500);
+        while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
         if (!agentRunning) break;
         sendSilentUpdate('▶ Agent resumed', stepCount);
       }
@@ -3694,14 +3695,14 @@ async function runAgentLoop(goal, workingTabId) {
       if (!tabInfo.url) {
         sendSilentUpdate('Tab URL unavailable. Continuing with current page...', stepCount);
         // Skip auto-navigate and restricted page checks - just proceed with current state
-        await sleep(500);
+        await sleep(FIVE_HUNDRED_MS);
         continue;
       }
       // Wait for page load
       if (tabInfo.status !== 'complete') {
         sendSilentUpdate('Waiting for page to load...', stepCount);
         await waitForPageLoad(tab);
-        await sleep(500);
+        await sleep(FIVE_HUNDRED_MS);
       }
 
       // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
@@ -3853,7 +3854,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           // Don't continue — fall through to observation with CDP data
         } else {
-          await sleep(1000); // SPEED: reduced from 2000ms — one retry, recover faster
+          await sleep(ONE_SECOND_MS); // SPEED: reduced from 2000ms — one retry, recover faster
           continue; // retry injection on first failure
         }
       } else {
@@ -3892,7 +3893,7 @@ async function runAgentLoop(goal, workingTabId) {
           const dismissed = await _cdpDismissOverlays(tab, []);
           if (dismissed > 0) {
             sendSilentUpdate(`[CDP] Nuked ${dismissed} overlay element(s)`, stepCount);
-            await sleep(800);
+            await sleep(EIGHT_HUNDRED_MS);
           }
         } catch (_) { /* non-fatal */ }
       } else {
@@ -3900,7 +3901,7 @@ async function runAgentLoop(goal, workingTabId) {
           const overlayResult = await sendMessageWithRetry(tab, { action: 'dismiss_overlays' });
           if (overlayResult && overlayResult.count > 0) {
             sendSilentUpdate(`Dismissed ${overlayResult.count} overlay(s)`, stepCount);
-            await sleep(400); // let overlay close animate
+            await sleep(FOUR_HUNDRED_MS); // let overlay close animate
           }
         } catch (_) { /* non-fatal */ }
       }
@@ -3972,7 +3973,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const dismissed = await _cdpDismissOverlays(tab, cdpObs.overlays);
                 if (dismissed > 0) {
                   sendSilentUpdate(`[CDP] Auto-dismissed ${dismissed} overlay(s) during observation`, stepCount);
-                  await sleep(800);
+                  await sleep(EIGHT_HUNDRED_MS);
                   // Re-observe after dismissal
                   const cdpObs2 = await _cdpObservePage(tab);
                   if (cdpObs2) {
@@ -4206,7 +4207,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           } catch (e) { console.warn('[Sentinel] _wallHit run log failed:', getErrorMessage(e)); }
           // Wait until user resumes (Resume button → resumeAgent message)
-          while (agentPaused && agentRunning) await sleep(500);
+          while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
           if (!agentRunning) break;
           signInWallAckUrls.add(currentUrl);
           sendSilentUpdate('▶ Resumed after sign-in', stepCount);
@@ -4240,7 +4241,7 @@ async function runAgentLoop(goal, workingTabId) {
             });
           } catch (e) { console.warn('[Sentinel] _mfaHit handler failed:', getErrorMessage(e)); }
           // Wait until user resumes
-          while (agentPaused && agentRunning) await sleep(500);
+          while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
           if (!agentRunning) break;
           mfaAckUrl = currentUrl;  // suppress re-pause for the SAME page
           sendSilentUpdate('▶ Resumed after MFA', stepCount);
@@ -4268,7 +4269,7 @@ async function runAgentLoop(goal, workingTabId) {
               title: 'Sentinel Override — CAPTCHA Detected',
               message: `Solve the CAPTCHA on ${currentUrl || 'the page'}, then click Resume.`
             });
-            while (agentPaused && agentRunning) await sleep(500);
+            while (agentPaused && agentRunning) await sleep(FIVE_HUNDRED_MS);
             if (!agentRunning) break;
             sendSilentUpdate('▶ Resumed after CAPTCHA', stepCount);
             continue;
@@ -4948,7 +4949,7 @@ async function runAgentLoop(goal, workingTabId) {
           consecutiveFailures++;
           historyPush({ step: stepCount, action: command, result: `Invalid selector "${command.selector}" -- not in element list.` });
           await persistHistory();
-          await sleep(1000);
+          await sleep(ONE_SECOND_MS);
           continue;
         }
       }
@@ -4973,7 +4974,7 @@ async function runAgentLoop(goal, workingTabId) {
             historyPush({ step: stepCount, action: command, result: `BLOCKED: pre-finish completeness -- ${_completenessGap}` });
             trimHistory();
             sendSilentUpdate('Finish blocked — completeness check requesting one more extraction pass', stepCount);
-            await sleep(800);
+            await sleep(EIGHT_HUNDRED_MS);
             continue;
           }
         } catch (_) { /* completeness check failure is non-fatal */ }
@@ -4988,7 +4989,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
-          await sleep(1000);
+          await sleep(ONE_SECOND_MS);
           continue;
         }
 
@@ -5001,7 +5002,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
-          await sleep(1000);
+          await sleep(ONE_SECOND_MS);
           continue;
         }
 
@@ -5022,7 +5023,7 @@ async function runAgentLoop(goal, workingTabId) {
               historyPush({ step: stepCount, action: command, result: `BLOCKED: premature finish — goal asks for ${_targetN} articles. Must open_tab article URLs and read each page before finishing.` });
               await persistHistory();
               sendSilentUpdate('Finish blocked — must read articles first', stepCount);
-              await sleep(1000);
+              await sleep(ONE_SECOND_MS);
               continue;
             }
           }
@@ -5043,7 +5044,7 @@ async function runAgentLoop(goal, workingTabId) {
               historyPush({ step: stepCount, action: command, result: blockMsg });
               await persistHistory();
               sendSilentUpdate('Finish blocked — change not yet committed', stepCount);
-              await sleep(1000);
+              await sleep(ONE_SECOND_MS);
               continue;
             }
             if (!hasPostCommitVerification(history)) {
@@ -5051,7 +5052,7 @@ async function runAgentLoop(goal, workingTabId) {
               historyPush({ step: stepCount, action: command, result: blockMsg });
               await persistHistory();
               sendSilentUpdate('Finish blocked — change not verified', stepCount);
-              await sleep(1000);
+              await sleep(ONE_SECOND_MS);
               continue;
             }
             sendAgentStatus('verifying', 'Change committed and verified.');
@@ -5083,7 +5084,7 @@ async function runAgentLoop(goal, workingTabId) {
             historyPush({ step: stepCount, action: command, result: blockMsg });
             await persistHistory();
             sendSilentUpdate('Finish blocked — try Graph API or alternate URL before giving up', stepCount);
-            await sleep(1000);
+            await sleep(ONE_SECOND_MS);
             continue;
           }
         } catch (_) { /* never let the guard itself crash the loop */ }
@@ -5140,7 +5141,7 @@ async function runAgentLoop(goal, workingTabId) {
               historyPush({ step: stepCount, action: command, result: blockMsg });
               await persistHistory();
               sendSilentUpdate('Finish blocked — claim density exceeds evidence', stepCount);
-              await sleep(1000);
+              await sleep(ONE_SECOND_MS);
               continue;
             }
           }
@@ -5386,7 +5387,7 @@ async function runAgentLoop(goal, workingTabId) {
         historyPush({ step: stepCount, action: command, result: _verifyOutcome });
         productiveSteps++;
         await persistHistory();
-        await sleep(400);
+        await sleep(FOUR_HUNDRED_MS);
         continue;
       }
 
@@ -5413,7 +5414,7 @@ async function runAgentLoop(goal, workingTabId) {
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
         await persistHistory();
-        await sleep(500);
+        await sleep(FIVE_HUNDRED_MS);
         continue;
       }
 
@@ -5445,7 +5446,7 @@ async function runAgentLoop(goal, workingTabId) {
           try { tel.error('network', 'Error reading console', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           sendActionResult(stepCount, `Error reading console: ${getErrorMessage(e || 'unknown')}`, true);
         }
-        await sleep(300);
+        await sleep(THREE_HUNDRED_MS);
         continue;
       }
       if (command.type === 'read_network_requests') {
@@ -5471,7 +5472,7 @@ async function runAgentLoop(goal, workingTabId) {
           try { tel.error('network', 'Error reading network', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           sendActionResult(stepCount, `Error reading network: ${getErrorMessage(e || 'unknown')}`, true);
         }
-        await sleep(300);
+        await sleep(THREE_HUNDRED_MS);
         continue;
       }
 
@@ -5521,7 +5522,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
         }
-        await sleep(300);
+        await sleep(THREE_HUNDRED_MS);
         continue;
       }
 
@@ -5554,22 +5555,22 @@ async function runAgentLoop(goal, workingTabId) {
             await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'select', selector: _typeSel, value: _typeVal } }).catch((e) => {
               console.error('[_typeVal] Unhandled rejection:', e);
             });
-            await sleep(300);
+            await sleep(THREE_HUNDRED_MS);
           }
 
           // Clear + type the command
           await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _inputSel } }).catch((e) => {
             console.error('[_typeVal] Unhandled rejection:', e);
           });
-          await sleep(200);
+          await sleep(TWO_HUNDRED_MS);
           await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'execute_js', code: `(function(){var el=document.querySelector(${JSON.stringify(_inputSel)});if(el){el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));}})()` } }).catch((e) => {
             console.error('[el] Unhandled rejection:', e);
           });
-          await sleep(150);
+          await sleep(ONE_HUNDRED_FIFTY_MS);
           await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'type', selector: _inputSel, text: _cmd } }).catch((e) => {
             console.error('[el] Unhandled rejection:', e);
           });
-          await sleep(300);
+          await sleep(THREE_HUNDRED_MS);
 
           // Submit
           await sendMessageWithRetry(tab, { action: 'dispatch_command', command: { type: 'click', selector: _submitSel } }).catch((e) => {
@@ -5602,7 +5603,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
         }
-        await sleep(500);
+        await sleep(FIVE_HUNDRED_MS);
         continue;
       }
 
@@ -5621,7 +5622,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendActionResult(stepCount, result, false);
         historyPush({ step: stepCount, action: command, result });
         await persistHistory();
-        await sleep(500);
+        await sleep(FIVE_HUNDRED_MS);
         continue;
       }
 
@@ -5660,12 +5661,12 @@ async function runAgentLoop(goal, workingTabId) {
         if (approval.rejected) {
           historyPush({ step: stepCount, action: command, result: 'Rejected by user' });
           await persistHistory();
-          await sleep(1000); continue;
+          await sleep(ONE_SECOND_MS); continue;
         }
         if (approval.skipped) {
           historyPush({ step: stepCount, action: command, result: 'Skipped by user' });
           await persistHistory();
-          await sleep(1000); continue;
+          await sleep(ONE_SECOND_MS); continue;
         }
         // User explicitly approved — mark so content-script guards pass.
         if (approval.approved) command.approvalGranted = true;
@@ -5747,7 +5748,7 @@ async function runAgentLoop(goal, workingTabId) {
                 // event was absorbed by an overlay; fire a JS .click() on the
                 // stored element reference (bypasses pointer-events and
                 // overlay interception).
-                await new Promise(r => setTimeout(r, 100));
+                await new Promise(r => setTimeout(r, ONE_HUNDRED_MS));
                 try {
                   const _jsClickRes = await cdpExecuteJs(tab,
                     `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()`,
@@ -5826,7 +5827,7 @@ async function runAgentLoop(goal, workingTabId) {
           sendActionResult(stepCount, _msg, true);
           historyPush({ step: stepCount, action: command, result: _msg });
           await persistHistory();
-          await sleep(800);
+          await sleep(EIGHT_HUNDRED_MS);
           continue;
         }
       }
@@ -5899,7 +5900,7 @@ async function runAgentLoop(goal, workingTabId) {
             sendActionResult(stepCount, _msg, true);
             historyPush({ step: stepCount, action: command, result: _msg });
             await persistHistory();
-            await sleep(800);
+            await sleep(EIGHT_HUNDRED_MS);
             continue;
           }
         }
@@ -5923,7 +5924,7 @@ async function runAgentLoop(goal, workingTabId) {
           try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           await switchToTab(ctx.tabId);
           try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          await sleep(2000);
+          await sleep(TWO_SECONDS_MS);
           await injectContentScript(ctx.tabId);
           // (3.50.1) Validate we landed where we intended.
           // Sites like Reddit can redirect to completely different content.
@@ -6072,7 +6073,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _navDelta = command.type === 'navigate_back' ? -1 : 1;
           await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'execute_js', code: `history.go(${_navDelta})`, key: '_nav_hist' } });
           await waitForPageLoad(tab);
-          await sleep(500);
+          await sleep(FIVE_HUNDRED_MS);
           const _newInfo = await getTabInfo(tab);
           const _newUrl = _newInfo?.url || '';
           if (_newUrl && _newUrl !== _prevUrl) {
@@ -6643,7 +6644,7 @@ return { ok: true, value: el.value };
 
             // Post-click: handle navigation and new tab capture
       if (/^(click|click_at|double_click)$/.test(command.type)) {
-        await sleep(1000);
+        await sleep(ONE_SECOND_MS);
         try {
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
@@ -6677,7 +6678,7 @@ return { ok: true, value: el.value };
               });
               await chrome.tabs.update(tab, { url: newUrl });
               await waitForPageLoad(tab);
-              await sleep(500);
+              await sleep(FIVE_HUNDRED_MS);
               let _host;
               try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); _host = newUrl || 'new page'; }
               result = `Clicked -> navigated to ${_host}`;
@@ -6686,7 +6687,7 @@ return { ok: true, value: el.value };
             const updatedTab = await getTabInfo(tab);
             if (updatedTab && updatedTab.url !== urlBeforeCommand) {
               await waitForPageLoad(tab);
-              await sleep(500);
+              await sleep(FIVE_HUNDRED_MS);
               try {
                 const _clickedHost = new URL(updatedTab.url).hostname.toLowerCase();
                 const _fromHost = urlBeforeCommand ? new URL(urlBeforeCommand).hostname.toLowerCase() : '';
@@ -7028,7 +7029,7 @@ return { ok: true, value: el.value };
           break;
         }
       }
-      await sleep(500);  // SPEED: reduced from 3000ms — recover faster
+      await sleep(FIVE_HUNDRED_MS);  // SPEED: reduced from 3000ms — recover faster
     }
   }
 

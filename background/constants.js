@@ -18,6 +18,14 @@ export const SCHEDULER_REFRESH_INTERVAL_MS = 30000; // 30 seconds - refresh coun
 export const MAX_WAIT_TIME_MS = 30000; // 30 seconds - maximum wait command duration
 
 // Time interval constants (in milliseconds)
+export const ONE_HUNDRED_MS = 100; // 100 milliseconds
+export const ONE_HUNDRED_FIFTY_MS = 150; // 150 milliseconds
+export const TWO_HUNDRED_MS = 200; // 200 milliseconds
+export const THREE_HUNDRED_MS = 300; // 300 milliseconds
+export const FOUR_HUNDRED_MS = 400; // 400 milliseconds
+export const FIVE_HUNDRED_MS = 500; // 500 milliseconds
+export const SIX_HUNDRED_MS = 600; // 600 milliseconds
+export const EIGHT_HUNDRED_MS = 800; // 800 milliseconds
 export const ONE_SECOND_MS = 1000; // 1 second
 export const TWO_SECONDS_MS = 2000; // 2 seconds
 export const THREE_SECONDS_MS = 3000; // 3 seconds
@@ -35,3 +43,9 @@ export const ONE_DAY_MS = 86400000; // 24 hours
 
 // Page content limits
 export const MAX_PAGE_TEXT_LENGTH = 30000; // Maximum characters to extract from page text
+export const TEXT_SAMPLE_LENGTH = 5000; // Maximum characters for text samples
+
+// Report and log limits
+export const MAX_REPORT_FINDING_LENGTH = 2000; // Maximum characters for report findings before truncation
+export const MAX_CDP_RESULT_LENGTH = 3000; // Maximum characters for CDP result strings
+export const MAX_LOG_ENTRY_LENGTH = 1000; // Maximum characters for console log entries
