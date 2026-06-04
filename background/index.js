@@ -388,7 +388,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         if (agentRunning) return { ok: false, error: 'Agent already running' };
         const result = await restoreFromCheckpoint();
         if (!result.restored) {
-          return { ok: false, error: 'Cannot resume: ' + (result.error || 'unknown') };
+          return { ok: false, error: `Cannot resume: ${result.error || 'unknown'}` };
         }
         await clearCheckpoint();
         tel.info('lifecycle', 'Agent resuming from checkpoint', {
