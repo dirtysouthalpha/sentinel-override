@@ -6925,12 +6925,12 @@ function escapeJsString(str, quote = '"') {
 function _describeTarget(cmd) {
   if (!cmd) return '(no target)';
   // Prefer human-readable labels over raw CSS selectors for approval card readability
-  if (cmd.ariaLabel) return '"' + String(cmd.ariaLabel).slice(0, 80) + '"';
-  if (cmd.elementText) return '"' + String(cmd.elementText).slice(0, 80) + '"';
-  if (cmd.label) return '"' + String(cmd.label).slice(0, 80) + '"';
+  if (cmd.ariaLabel) return `"${String(cmd.ariaLabel).slice(0, 80)}"`;
+  if (cmd.elementText) return `"${String(cmd.elementText).slice(0, 80)}"`;
+  if (cmd.label) return `"${String(cmd.label).slice(0, 80)}"`;
   if (cmd.selector) return cmd.selector;
-  if (cmd.ref) return 'ref:' + cmd.ref;
-  if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return '(' + cmd.x + ',' + cmd.y + ')';
+  if (cmd.ref) return `ref:${cmd.ref}`;
+  if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return `(${cmd.x},${cmd.y})`;
   return '(no target)';
 }
 function describeAction(command) {
