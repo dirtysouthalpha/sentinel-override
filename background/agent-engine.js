@@ -58,12 +58,8 @@ async function _visionObserve(tab, _currentUrl) {
     const elementParts = [];
     for (const el of indexedElements) {
       const tag = el.tag || 'div';
-      let attrs = '';
-      if (el.type) attrs += ` type=${el.type}`;
-      if (el.role) attrs += ` role=${el.role}`;
-      if (el.ariaLabel) attrs += ` aria-label=${JSON.stringify((el.ariaLabel || '').substring(0, 40))}`;
-      if (el.placeholder) attrs += ` placeholder=${JSON.stringify((el.placeholder || '').substring(0, 40))}`;
-      if (el.href) { const hrefLen = el.href.length; if (hrefLen > 5 && hrefLen < 100) attrs += ` href=${JSON.stringify(el.href.substring(0, 80))}`; }
+      // Template literal is more efficient than += concatenation in loop
+      const attrs = `${el.type ? ` type=${el.type}` : ''}${el.role ? ` role=${el.role}` : ''}${el.ariaLabel ? ` aria-label=${JSON.stringify((el.ariaLabel || '').substring(0, 40))}` : ''}${el.placeholder ? ` placeholder=${JSON.stringify((el.placeholder || '').substring(0, 40))}` : ''}${el.href && el.href.length > 5 && el.href.length < 100 ? ` href=${JSON.stringify(el.href.substring(0, 80))}` : ''}`;
       const text = el.text ? `>${(el.text || '').substring(0, 60)}` : '/>';
       const closing = el.text ? `</${tag}>` : '';
       elementParts.push(`[${el.index}]<${tag}${attrs}${text}${closing}\n`);
