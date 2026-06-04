@@ -157,7 +157,7 @@ class UAPServer {
       }
     } catch (error) {
       console.error('[UAP] Message handling error:', error);
-      sendResponse({ type: 'error', id, error: 'internal_error', message: error.message });
+      sendResponse({ type: 'error', id, error: 'internal_error', message: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
     }
   }
 
@@ -284,12 +284,12 @@ class UAPServer {
           type: 'goal_complete',
           id: runId,
           status: 'failed',
-          error: error.message,
+          error: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error),
           recoverable: this.isRecoverable(error)
         };
 
         this.broadcastToClient(run.clientId, errorMessage);
-        this.logAudit('goal_failed', run.clientId, { runId, error: error.message });
+        this.logAudit('goal_failed', run.clientId, { runId, error: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
       }
     }
   }

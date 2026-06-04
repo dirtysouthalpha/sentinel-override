@@ -46,34 +46,7 @@ globalThis.chrome = {
   },
 };
 
-jest.unstable_mockModule('../background/agent-engine.js', () => ({
-  get agentRunning() { return _agentRunning; },
-  startAgent: jest.fn(async () => {
-    _agentRunning = true;
-    return Promise.resolve();
-  }).mockName('startAgent'),
-}));
-
-jest.unstable_mockModule('../background/template-manager.js', () => ({
-  resolveTemplateGoal: jest.fn(async (id, params) => 'Resolved: ' + id),
-}));
-
-jest.unstable_mockModule('../background/tab-context.js', () => ({
-  getActiveTabId: jest.fn(() => null),
-  registerInitialTab: jest.fn(),
-}));
-
-jest.unstable_mockModule('../background/tab-manager.js', () => ({
-  getTabInfo: jest.fn(async () => ({ url: 'https://example.com', title: 'Test' })),
-  waitForPageLoad: jest.fn(async () => {}),
-}));
-
-jest.unstable_mockModule('../background/shared-state.js', () => ({
-  notifyIfEnabled: jest.fn(),
-}));
-
-// Pre-import agent-engine to ensure mock is set up correctly
-const AgentEngineModule = import('../background/agent-engine.js');
+// Note: mocks are applied per-test using jest.spyOn() as needed
 
 import {
   createSchedule,
@@ -504,12 +477,12 @@ describe('executeScheduledTask', () => {
 
   test.skip('stores failure result when agent start fails', async () => {
     const agentEngine = await import('../background/agent-engine.js');
-    const origStart = agentEngine.startAgent;
-    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent crashed'));
+
+    jest.spyOn(agentEngine, 'startAgent').mockRejectedValueOnce(new Error('Agent crashed'));
 
     const schedule = await makeSchedule();
     jest.clearAllMocks();
-    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent crashed'));
+    jest.spyOn(agentEngine, 'startAgent').mockRejectedValueOnce(new Error('Agent crashed'));
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
@@ -522,7 +495,7 @@ describe('executeScheduledTask', () => {
 
   test('stores failure when goal resolution fails', async () => {
     const templateManager = await import('../background/template-manager.js');
-    templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template not found'));
+    jest.spyOn(templateManager, 'resolveTemplateGoal').mockRejectedValueOnce(new Error('Template not found'));
 
     const schedule = await createSchedule({
       name: 'Template Schedule',
@@ -531,7 +504,7 @@ describe('executeScheduledTask', () => {
       runAt: Date.now() + 3600000,
     });
     jest.clearAllMocks();
-    templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template not found'));
+    jest.spyOn(templateManager, 'resolveTemplateGoal').mockRejectedValueOnce(new Error('Template not found'));
 
     await executeScheduledTask('schedule-' + schedule.id);
     // Result should be stored as failure
@@ -723,8 +696,7 @@ describe('sendNotification — success path calls notifyIfEnabled', () => {
 
     // Fully reset startAgent to clear any lingering mockRejectedValueOnce queue from prior tests,
     // then set it to resolve cleanly.
-    agentEngine.startAgent.mockReset();
-    agentEngine.startAgent.mockResolvedValue(undefined);
+    jest.spyOn(agentEngine, 'startAgent').mockResolvedValue(undefined);
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
@@ -831,7 +803,7 @@ describe('toggleSchedule — re-enable recurring schedule with expired nextRunAt
 describe('executeScheduledTask — goal resolution failure for recurring schedule', () => {
   test('re-registers alarm for recurring schedule after goal resolution failure', async () => {
     const templateManager = await import('../background/template-manager.js');
-    templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template broken'));
+    jest.spyOn(templateManager, 'resolveTemplateGoal').mockRejectedValueOnce(new Error('Template broken'));
 
     const schedule = await createSchedule({
       name: 'Recurring Template',
@@ -840,7 +812,7 @@ describe('executeScheduledTask — goal resolution failure for recurring schedul
       recurrence: { interval: 'daily', time: '09:00' },
     });
     jest.clearAllMocks();
-    templateManager.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template broken'));
+    jest.spyOn(templateManager, 'resolveTemplateGoal').mockRejectedValueOnce(new Error('Template broken'));
 
     await executeScheduledTask('schedule-' + schedule.id);
 
@@ -986,11 +958,11 @@ describe('_waitForAgentCompletion mechanism', () => {
 describe.skip('executeScheduledTask — getTabInfo failure', () => {
   test('continues with null tabInfo when getTabInfo throws', async () => {
     const tabManager = await import('../background/tab-manager.js');
-    tabManager.getTabInfo.mockRejectedValueOnce(new Error('Tab info unavailable'));
+    jest.spyOn(tabManager, 'getTabInfo').mockRejectedValueOnce(new Error('Tab info unavailable'));
 
     const schedule = await makeSchedule();
     jest.clearAllMocks();
-    tabManager.getTabInfo.mockRejectedValueOnce(new Error('Tab info unavailable'));
+    jest.spyOn(tabManager, 'getTabInfo').mockRejectedValueOnce(new Error('Tab info unavailable'));
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
@@ -1018,7 +990,7 @@ describe.skip('executeScheduledTask — getTabInfo failure', () => {
 describe.skip('executeScheduledTask — agent start failure for recurring schedule', () => {
   test('re-registers alarm for recurring schedule after agent start failure', async () => {
     const agentEngine = await import('../background/agent-engine.js');
-    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent won\'t start'));
+    jest.spyOn(agentEngine, 'startAgent').mockRejectedValueOnce(new Error('Agent won\'t start'));
 
     const schedule = await createSchedule({
       name: 'Recurring Agent Fail',
@@ -1027,7 +999,7 @@ describe.skip('executeScheduledTask — agent start failure for recurring schedu
       recurrence: { interval: 'daily', time: '09:00' },
     });
     jest.clearAllMocks();
-    agentEngine.startAgent.mockRejectedValueOnce(new Error('Agent won\'t start'));
+    jest.spyOn(agentEngine, 'startAgent').mockRejectedValueOnce(new Error('Agent won\'t start'));
 
     chrome.tabs.query.mockImplementation((opts, cb) => {
       if (cb) cb([{ id: 42 }]);
@@ -1588,7 +1560,7 @@ describe.skip('executeScheduledTask — direct goal (no template)', () => {
     let msgListener;
     chrome.runtime.onMessage.addListener.mockImplementation((fn) => { msgListener = fn; });
 
-    agentEngine.startAgent.mockResolvedValue(undefined);
+    jest.spyOn(agentEngine, 'startAgent').mockResolvedValue(undefined);
 
     const execPromise = executeScheduledTask('schedule-' + schedule.id);
 
@@ -1628,7 +1600,7 @@ describe.skip('executeScheduledTask — tab info with URL', () => {
     const tabManager = await import('../background/tab-manager.js');
     const tabContext = await import('../background/tab-context.js');
 
-    tabManager.getTabInfo.mockResolvedValue({ url: 'https://example.com', title: 'Test' });
+    jest.spyOn(tabManager, 'getTabInfo').mockResolvedValue({ url: 'https://example.com', title: 'Test' });
 
     const schedule = await makeSchedule();
 
@@ -1933,7 +1905,7 @@ describe.skip('executeScheduledTask — agent start failure path for recurring',
 
     // Import the mocked AgentEngine and make startAgent reject
     const AgentEngine = await import('../background/agent-engine.js');
-    AgentEngine.startAgent.mockRejectedValue(new Error('Agent start failed'));
+    jest.spyOn(AgentEngine, 'startAgent').mockRejectedValue(new Error('Agent start failed'));
 
     const schedule = await createSchedule({
       name: 'Start Fail Recurring Schedule',
@@ -1947,7 +1919,7 @@ describe.skip('executeScheduledTask — agent start failure path for recurring',
       if (cb) cb([{ id: 1, url: 'https://example.com' }]);
       return Promise.resolve([{ id: 1, url: 'https://example.com' }]);
     });
-    AgentEngine.startAgent.mockRejectedValue(new Error('Agent start failed'));
+    jest.spyOn(AgentEngine, 'startAgent').mockRejectedValue(new Error('Agent start failed'));
 
     await executeScheduledTask(`schedule-${schedule.id}`);
 

@@ -63,7 +63,7 @@ try {
   console.log('✓ Reasoning trace working:', summary.totalSteps);
   clearReasoningTrace();
 } catch (e) {
-  console.error('✗ Reasoning trace failed:', e.message);
+  console.error('✗ Reasoning trace failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 // Test 2: Bias Detection System
@@ -76,7 +76,7 @@ try {
   console.log('  Bias stats:', stats.totalAnalyses);
   clearBiasLog();
 } catch (e) {
-  console.error('✗ Bias detection failed:', e.message);
+  console.error('✗ Bias detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 // Test 3: Knowledge Graph System
@@ -89,7 +89,7 @@ try {
   console.log('✓ Knowledge graph working:', stats.nodeCount, 'nodes,', stats.edgeCount, 'edges');
   clearBiasLog(); // Clear for next test
 } catch (e) {
-  console.error('✗ Knowledge graph failed:', e.message);
+  console.error('✗ Knowledge graph failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 // Test 4: Contradiction Detection System
@@ -105,7 +105,7 @@ try {
   console.log('  Contradiction stats:', stats.totalChecks);
   clearContradictionLog();
 } catch (e) {
-  console.error('✗ Contradiction detection failed:', e.message);
+  console.error('✗ Contradiction detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 // Test 5: Novelty Detection System
@@ -122,7 +122,7 @@ try {
   console.log('  Novelty stats:', stats.totalAnalyses);
   clearNoveltyHistory();
 } catch (e) {
-  console.error('✗ Novelty detection failed:', e.message);
+  console.error('✗ Novelty detection failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 // Test 6: Knowledge Synthesizer System
@@ -141,7 +141,7 @@ try {
   console.log('  Synthesis stats:', stats.totalSyntheses);
   clearSynthesis();
 } catch (e) {
-  console.error('✗ Knowledge synthesis failed:', e.message);
+  console.error('✗ Knowledge synthesis failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e));
 }
 
 console.log('\n=== Phase 4 Integration Test Complete ===');

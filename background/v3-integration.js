@@ -257,7 +257,7 @@ export async function trackAgentAction(action, details) {
  */
 export async function reportAgentError(error, context) {
   await emitV3Event(EventTypes.ERROR, {
-    error: error.message || error,
+    error: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error),
     context,
     timestamp: Date.now()
   });

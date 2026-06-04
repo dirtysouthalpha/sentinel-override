@@ -104,7 +104,7 @@ class WorkflowEngine {
       return result;
     } catch (error) {
       executionState.status = 'failed';
-      executionState.error = error.message;
+      executionState.error = (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error);
       executionState.failedAt = Date.now();
       
       if (this.onWorkflowFailed) {
@@ -158,7 +158,7 @@ class WorkflowEngine {
           // Re-add to queue for retry
           continue;
         } else {
-          throw new Error(`Step ${stepId} failed: ${error.message}`);
+          throw new Error(`Step ${stepId} failed: ${(typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error)}`);
         }
       }
     }
