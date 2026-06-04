@@ -2558,24 +2558,24 @@ async function _universalCdpFallback(tab, cmd, opts) {
         + 'for(var j=0;j<_opts.length;j++){'
         +   'if(_opts[j].textContent&&_opts[j].textContent.trim().toLowerCase().indexOf(_vl)>=0&&_opts[j].offsetParent!==null){'
         +     '_opts[j].click();'
-        +     'return JSON.stringify({ok:true,result:"selected custom: ' + safeVal + '"})'
+        +     `return JSON.stringify({ok:true,result:"selected custom: ${safeVal}"})`
         +   '}'
         + '}'
         // Try aria listbox
         + 'var _lb=document.querySelector("[role=listbox]");'
         + 'if(_lb){var _li=_lb.querySelectorAll("[role=option]");for(var k=0;k<_li.length;k++){'
-        +   'if(_li[k].textContent&&_li[k].textContent.trim().toLowerCase().indexOf(_vl)>=0){_li[k].click();return JSON.stringify({ok:true,result:"selected listbox: ' + safeVal + '"})}'
+        +   `if(_li[k].textContent&&_li[k].textContent.trim().toLowerCase().indexOf(_vl)>=0){_li[k].click();return JSON.stringify({ok:true,result:"selected listbox: ${safeVal}"})}`
         + '}}'
-        + 'return JSON.stringify({ok:false,error:"option not found: ' + safeVal + '"});'
+        + `return JSON.stringify({ok:false,error:"option not found: ${safeVal}"});`
         + '})()';
       break;
     }
     case 'check':
     case 'check_all': {
       jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
+        + `var el=${finderCode};`
         + 'if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});'
-        + 'if(el.type==="checkbox"||el.type==="radio"){el.checked=' + (cmd.checked !== false) + ';el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"' + (cmd.checked !== false ? 'checked' : 'unchecked') + '"})}'
+        + `if(el.type==="checkbox"||el.type==="radio"){el.checked=${cmd.checked !== false};el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"' + (cmd.checked !== false ? 'checked' : 'unchecked') + '"})}`
         + 'el.click();return JSON.stringify({ok:true,result:"toggled"})'
         + '})()';
       break;
