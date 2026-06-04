@@ -527,7 +527,7 @@ if (window.__sentinelInitialized) {
       case 'read_iframe': {
         const frameIndex = request.frameIndex || 0;
         const iframes = document.querySelectorAll('iframe');
-        if (!iframes[frameIndex]) throw new Error('Iframe not found at index ' + frameIndex);
+        if (!iframes[frameIndex]) throw new Error(`Iframe not found at index ${frameIndex}`);
         try {
           const iframeDoc = iframes[frameIndex].contentWindow && iframes[frameIndex].contentWindow.document;
           if (!iframeDoc) throw new Error('Cannot access iframe document (detached or cross-origin)');
@@ -603,7 +603,7 @@ if (window.__sentinelInitialized) {
             screenshot: '📸', hover: '👀'
           };
           const icon = icons[actionType] || '▶️';
-          banner.textContent = `${icon} Step ${stepNum}: ${label}${targetDesc ? ' — ' + targetDesc.substring(0, 60) : ''}`;
+          banner.textContent = `${icon} Step ${stepNum}: ${label}${targetDesc ? ` — ${targetDesc.substring(0, 60)}` : ''}`;
           banner.style.opacity = '1';
           banner.style.transform = 'translateX(-50%) translateY(0)';
 
@@ -978,8 +978,8 @@ if (window.__sentinelInitialized) {
   function __sentinelKeyEventForChar(type, char) {
     let code;
     if (char === ' ') { code = 'Space'; }
-    else if (/^[a-zA-Z]$/.test(char)) { code = 'Key' + char.toUpperCase(); }
-    else if (/^[0-9]$/.test(char)) { code = 'Digit' + char; }
+    else if (/^[a-zA-Z]$/.test(char)) { code = `Key${char.toUpperCase()}`; }
+    else if (/^[0-9]$/.test(char)) { code = `Digit${char}`; }
     else { code = char; }
     const keyCode = char.length === 1 ? char.charCodeAt(0) : 0;
     return new KeyboardEvent(type, {
@@ -1259,7 +1259,7 @@ if (window.__sentinelInitialized) {
     const blocking = ov.isOverlayBlocking(targetDoc, el);
     if (!blocking) return null;
     const dismissed = ov.dismissOverlay(targetDoc, blocking);
-    if (!dismissed) return 'Element blocked by overlay that could not be dismissed: ' + describeTarget(cmd);
+    if (!dismissed) return `Element blocked by overlay that could not be dismissed: ${describeTarget(cmd)}`;
     await wait.sleep(300);
     return null;
   }
@@ -1275,7 +1275,7 @@ if (window.__sentinelInitialized) {
     if (selector && selector.startsWith('frame:')) {
       if (fm && fm.findInIframe) {
         const iframeResult = fm.findInIframe(document, selector);
-        if (!iframeResult) return 'Iframe not found for selector: ' + selector;
+        if (!iframeResult) return `Iframe not found for selector: ${selector}`;
 
         if (iframeResult.crossOrigin) {
           // Cross-origin: delegate to background script via chrome.runtime.sendMessage
@@ -1287,11 +1287,11 @@ if (window.__sentinelInitialized) {
                 command: cmd
               }, (response) => {
                 if (_hasLastError()) {
-                  resolve('Cross-origin iframe error: ' + (_getLastErrorMessage() || String(chrome.runtime.lastError)));
+                  resolve(`Cross-origin iframe error: ${_getLastErrorMessage() || String(chrome.runtime.lastError)}`);
                 } else if (response && response.ok) {
                   resolve(JSON.stringify(response.data || response));
                 } else {
-                  resolve('Cross-origin iframe error: ' + (response ? response.error : 'Unknown error'));
+                  resolve(`Cross-origin iframe error: ${response ? response.error : 'Unknown error'}`);
                 }
               });
             } catch {
@@ -1301,7 +1301,7 @@ if (window.__sentinelInitialized) {
         }
 
         // Same-origin: use the iframe's document
-        if (!iframeResult.frameDoc) return 'Iframe document unavailable for selector: ' + selector;
+        if (!iframeResult.frameDoc) return `Iframe document unavailable for selector: ${selector}`;
         targetDoc = iframeResult.frameDoc;
         selector = iframeResult.remainingSelector || '';
         cmd = { ...cmd, selector };
@@ -1309,11 +1309,11 @@ if (window.__sentinelInitialized) {
         // Fallback: basic iframe handling without frame-manager
         const parts = selector.split(':');
         const frameIndex = parts.length >= 2 ? parseInt(parts[1], 10) : NaN;
-        if (Number.isNaN(frameIndex)) return 'Invalid frame index in selector: ' + selector;
+        if (Number.isNaN(frameIndex)) return `Invalid frame index in selector: ${selector}`;
         const iframeSelector = parts.slice(2).join(':');
         const iframes = document.querySelectorAll('iframe');
         if (!iframes || !iframes[frameIndex]) {
-          return 'Iframe not found at index ' + frameIndex;
+          return `Iframe not found at index ${frameIndex}`;
         }
         if (iframes[frameIndex]) {
           try {
@@ -1324,7 +1324,7 @@ if (window.__sentinelInitialized) {
             return 'Cannot access iframe (cross-origin)';
           }
         } else {
-          return 'Iframe not found at index ' + frameIndex;
+          return `Iframe not found at index ${frameIndex}`;
         }
       }
     }
@@ -1347,7 +1347,7 @@ if (window.__sentinelInitialized) {
               url: location.href.substring(0, 200)
             });
           } catch (e) { console.warn('[Sentinel] click not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          return 'Element not found: ' + describeTarget(cmd);
+          return `Element not found: ${describeTarget(cmd)}`;
         }
 
         // (#20) Reject disabled / pointer-events:none / aria-disabled targets
@@ -1356,7 +1356,7 @@ if (window.__sentinelInitialized) {
           const reason = dom.checkInteractable(el, 'click');
           if (reason) {
             try {
-              ctel.warn('page', 'Click rejected: ' + reason, {
+              ctel.warn('page', `Click rejected: ${reason}`, {
                 selector: cmd.selector || null,
                 ref: cmd.ref || null,
                 reason: reason,
@@ -1417,7 +1417,7 @@ if (window.__sentinelInitialized) {
         // Keep highlight visible for 2 seconds so user can see what was clicked
         setTimeout(() => hl.removeHighlight(el), 2000);
 
-        return 'Clicked ' + describeTarget(cmd) + (resolved.staleRef ? ' (selector fallback after stale ref)' : '');
+        return `Clicked ${describeTarget(cmd)}${resolved.staleRef ? ' (selector fallback after stale ref)' : ''}`;
       }
 
       case 'right_click': {
@@ -1444,7 +1444,7 @@ if (window.__sentinelInitialized) {
         rcEl.dispatchEvent(new MouseEvent('mouseup',   { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, buttons: 0, clientX: rcX, clientY: rcY }));
         rcEl.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, composed: true, view: rcView, button: 2, clientX: rcX, clientY: rcY }));
         setTimeout(() => hl.removeHighlight(rcEl), 1500);
-        return 'Right-clicked ' + describeTarget(cmd) + (rcResolved.staleRef ? ' (selector fallback)' : '');
+        return `Right-clicked ${describeTarget(cmd)}${rcResolved.staleRef ? ' (selector fallback)' : ''}`;
       }
 
       case 'double_click': {
@@ -1473,7 +1473,7 @@ if (window.__sentinelInitialized) {
         dcEl.dispatchEvent(new MouseEvent('click',     { ...dcOpts, detail: 2 }));
         dcEl.dispatchEvent(new MouseEvent('dblclick',  { ...dcOpts, detail: 2 }));
         setTimeout(() => hl.removeHighlight(dcEl), 1500);
-        return 'Double-clicked ' + describeTarget(cmd) + (dcResolved.staleRef ? ' (selector fallback)' : '');
+        return `Double-clicked ${describeTarget(cmd)}${dcResolved.staleRef ? ' (selector fallback)' : ''}`;
       }
 
       case 'click_at': {
@@ -1593,8 +1593,7 @@ if (window.__sentinelInitialized) {
 
         setTimeout(() => { hl.removeHighlight(dragEl); hl.removeHighlight(dropEl); }, 1500);
         hl.highlightElement(dropEl);
-        return 'Dragged ' + describeTarget({ ref: cmd.source_ref, selector: cmd.source_selector, label: cmd.source_label }) +
-               ' to ' + describeTarget({ ref: cmd.target_ref, selector: cmd.target_selector, label: cmd.target_label });
+        return `Dragged ${describeTarget({ ref: cmd.source_ref, selector: cmd.source_selector, label: cmd.source_label })} to ${describeTarget({ ref: cmd.target_ref, selector: cmd.target_selector, label: cmd.target_label })}`;
       }
 
       case 'type': {
@@ -1612,7 +1611,7 @@ if (window.__sentinelInitialized) {
               url: location.href.substring(0, 200)
             });
           } catch (e) { console.warn('[Sentinel] type not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          return 'Element not found: ' + describeTarget(cmd);
+          return `Element not found: ${describeTarget(cmd)}`;
         }
 
         // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
@@ -2388,7 +2387,7 @@ if (window.__sentinelInitialized) {
               url: location.href.substring(0, 200)
             });
           } catch (e) { console.warn('[Sentinel] extract not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          return 'Element not found: ' + describeTarget(cmd);
+          return `Element not found: ${describeTarget(cmd)}`;
         }
         let value;
         const attr = cmd.attribute || 'text';
@@ -2435,10 +2434,10 @@ if (window.__sentinelInitialized) {
                 } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
               }
             } catch {
-              return 'Element not found: ' + describeTarget(cmd);
+              return `Element not found: ${describeTarget(cmd)}`;
             }
           } else {
-            return 'Element not found: ' + describeTarget(cmd);
+            return `Element not found: ${describeTarget(cmd)}`;
           }
         } else {
           if (!cmd.selector) return JSON.stringify({ key: cmd.key, value: [] });
