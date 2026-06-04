@@ -164,7 +164,8 @@ function extractJsonObject(text) {
   const start = s.indexOf('{');
   if (start < 0) return null;
   let depth = 0;
-  for (let i = start; i < s.length; i++) {
+  const sLen = s.length;
+  for (let i = start; i < sLen; i++) {
     const c = s[i];
     if (c === '{') depth++;
     else if (c === '}') {

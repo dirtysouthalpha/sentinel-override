@@ -4440,8 +4440,9 @@ async function runAgentLoop(goal, workingTabId) {
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
         const _visionHistoryParts = [];
-        const visionStart = Math.max(0, promptHistory.length - 6);
-        for (let i = visionStart; i < promptHistory.length; i++) {
+        const promptHistLen = promptHistory.length;
+        const visionStart = Math.max(0, promptHistLen - 6);
+        for (let i = visionStart; i < promptHistLen; i++) {
           const h = promptHistory[i];
           if (!h || !h.action) continue;
           const a = h.action;
