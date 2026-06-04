@@ -4639,7 +4639,7 @@ async function runAgentLoop(goal, workingTabId) {
           );
         } catch (e) {
           _aiCallError = e;
-          command = { type: 'note', text: 'API call failed: ' + (getErrorMessage(e)) };
+          command = { type: 'note', text: `API call failed: ${getErrorMessage(e)}` };
         } finally {
           _lastAiCallMs = Date.now() - _aiStart;
           clearInterval(progressTimer);
@@ -4663,11 +4663,11 @@ async function runAgentLoop(goal, workingTabId) {
           apiCallCount = agentState.apiCallCount;
           // (3.16.0) Mark the consult-ai activity as done or failed.
           if (_aiCallError) {
-            activityFail(stepCount, 'consult-ai', 'AI call failed: ' + getErrorMessage(_aiCallError || 'unknown'), null);
+            activityFail(stepCount, 'consult-ai', `AI call failed: ${getErrorMessage(_aiCallError || 'unknown')}`, null);
             tel.error('llm', 'LLM call failed', { durationMs: _lastAiCallMs, error: getErrorMessage(_aiCallError) });
           } else if (command && command.type) {
-            activityDone(stepCount, 'consult-ai', 'AI decided: ' + command.type, null);
-            tel.info('llm', 'LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
+            activityDone(stepCount, 'consult-ai', `AI decided: ${command.type}`, null);
+            tel.info('llm', `LLM decided: ${command.type}`, { durationMs: _lastAiCallMs, commandType: command.type, hasSelector: !!command.selector, hasRef: !!command.ref });
           } else {
             activityDone(stepCount, 'consult-ai', 'AI consultation complete', null);
             tel.info('llm', 'LLM call complete (no command)', { durationMs: _lastAiCallMs });
@@ -4751,7 +4751,7 @@ async function runAgentLoop(goal, workingTabId) {
             typeof h.result === 'string' &&
             h.result.startsWith('BLOCKED: pre-finish completeness'));
           if (_completenessGap && !_alreadyBlocked && stepCount < (dynamicMaxSteps - 5)) {
-            historyPush({ step: stepCount, action: command, result: 'BLOCKED: pre-finish completeness -- ' + _completenessGap });
+            historyPush({ step: stepCount, action: command, result: `BLOCKED: pre-finish completeness -- ${_completenessGap}` });
             trimHistory();
             sendSilentUpdate('Finish blocked — completeness check requesting one more extraction pass', stepCount);
             await sleep(800);
@@ -5223,7 +5223,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
         } catch (e) {
           try { tel.error('network', 'Error reading console', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          sendActionResult(stepCount, 'Error reading console: ' + getErrorMessage(e || 'unknown'), true);
+          sendActionResult(stepCount, `Error reading console: ${getErrorMessage(e || 'unknown')}`, true);
         }
         await sleep(300);
         continue;
@@ -5296,7 +5296,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
         } catch (e) {
-          const _r = 'lookup failed: ' + (getErrorMessage(e));
+          const _r = `lookup failed: ${getErrorMessage(e)}`;
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
@@ -5377,7 +5377,7 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ step: stepCount, action: command, result: _result });
           await persistHistory();
         } catch (e) {
-          const _r = 'run_remote_command failed: ' + (getErrorMessage(e));
+          const _r = `run_remote_command failed: ${getErrorMessage(e)}`;
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
           await persistHistory();
@@ -5388,7 +5388,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Handle wait_for actions
       if (/^wait_for_(text|element|navigation)$/.test(command.type)) {
-        sendAgentStatus('waiting', 'Waiting for: ' + (command.text || command.selector || 'navigation'));
+        sendAgentStatus('waiting', `Waiting for: ${command.text || command.selector || 'navigation'}`);
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
         sendActionMessage(command, stepCount, observation);
         // Default timeout: navigation waits need more time than element waits
@@ -5648,7 +5648,7 @@ async function runAgentLoop(goal, workingTabId) {
           console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
         } else {
           // Fallback to Google
-          command = { type: 'navigate', url: 'https://www.google.com/search?q=' + q };
+          command = { type: 'navigate', url: `https://www.google.com/search?q=${q}` };
         }
       }
 
@@ -5797,7 +5797,7 @@ async function runAgentLoop(goal, workingTabId) {
           // below so operators can see latency + landing-URL mismatches.
           try {
             const targetUrl = command.url;
-            tel.info('page', 'Navigating → ' + (typeof targetUrl === 'string' ? targetUrl.substring(0, 100) : String(targetUrl).substring(0, 100)), { stepCount, target: targetUrl, fromUrl: currentUrl });
+            tel.info('page', `Navigating → ${typeof targetUrl === 'string' ? targetUrl.substring(0, 100) : String(targetUrl).substring(0, 100)}`, { stepCount, target: targetUrl, fromUrl: currentUrl });
           } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           // (3.49.1) Push undo entry before navigating so we can go back.
           try {
@@ -5832,7 +5832,7 @@ async function runAgentLoop(goal, workingTabId) {
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
                 try {
                   const displayUrl = typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100);
-                  tel.info('page', 'Navigate ok → ' + displayUrl, { stepCount, arrivedUrl, durationMs: Date.now() - _navStart });
+                  tel.info('page', `Navigate ok → ${displayUrl}`, { stepCount, arrivedUrl, durationMs: Date.now() - _navStart });
                 } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
                 result = `Navigated to ${arrivedUrl}`;
               } else {
@@ -6240,7 +6240,7 @@ return { ok: true, value: el.value };
               const r = await cdpDispatchClick(tab, cx, cy, {
                 button: command.type === 'right_click' ? 'right' : 'left',
                 clickCount: command.type === 'double_click' ? 2 : 1,
-                description: '[CDP fallback] Clicking ' + sel
+                description: `[CDP fallback] Clicking ${sel}`
               });
               if (r && r.ok) {
                 result = `Clicked ${sel} via CDP fallback at (${cx},${cy})`;
