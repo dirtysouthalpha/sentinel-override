@@ -13,6 +13,14 @@
 // Exchange admin sub-portal. The `inferSurface` heuristic + pageTypes
 // classifier guide it to the right surface first.
 
+// Precompile regex patterns for hot-path detection
+const _M365_GOAL_RE = /\b(m365|microsoft\s*365|entra|exchange\s+admin|purview|defender|intune)\b/i;
+const _M365_EXCHANGE_RE = /(message\s+trace|mail\s+flow|shared\s+mailbox|exchange|smtp|connector|transport\s+rule|distribution\s+(?:list|group))/i;
+const _M365_ENTRA_RE = /(sign.?in\s+log|conditional\s+access|app\s+password|service\s+principal|enterprise\s+app|entra|aad|azure\s+ad|named\s+location|mfa\s+enforcement)/i;
+const _M365_PURVIEW_RE = /(audit\s+log|purview|ediscovery|retention\s+policy|data\s+loss|dlp|sensitivity\s+label)/i;
+const _M365_DEFENDER_RE = /(defender|threat\s+hunt|incident|alert|kql|advanced\s+hunting|secure\s+score)/i;
+const _M365_INTUNE_RE = /(intune|endpoint|device\s+config|compliance\s+policy|app\s+protection)/i;
+
 export const m365Admin = {
   id: 'm365_admin',
   label: 'Microsoft 365 admin surfaces',
@@ -33,16 +41,16 @@ export const m365Admin = {
       ];
       if (host && Array.isArray(m365Hosts) && m365Hosts.some(h => host === h || host.endsWith('.' + h))) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(m365|microsoft\s*365|entra|exchange\s+admin|purview|defender|intune)\b/i.test(String(goal || ''));
+    return _M365_GOAL_RE.test(String(goal || ''));
   },
 
   inferSurface(goal) {
     const t = String(goal || '').toLowerCase();
-    if (/(message\s+trace|mail\s+flow|shared\s+mailbox|exchange|smtp|connector|transport\s+rule|distribution\s+(?:list|group))/i.test(t)) return 'exchange';
-    if (/(sign.?in\s+log|conditional\s+access|app\s+password|service\s+principal|enterprise\s+app|entra|aad|azure\s+ad|named\s+location|mfa\s+enforcement)/i.test(t)) return 'entra';
-    if (/(audit\s+log|purview|ediscovery|retention\s+policy|data\s+loss|dlp|sensitivity\s+label)/i.test(t)) return 'purview';
-    if (/(defender|threat\s+hunt|incident|alert|kql|advanced\s+hunting|secure\s+score)/i.test(t)) return 'defender';
-    if (/(intune|endpoint|device\s+config|compliance\s+policy|app\s+protection)/i.test(t)) return 'intune';
+    if (_M365_EXCHANGE_RE.test(t)) return 'exchange';
+    if (_M365_ENTRA_RE.test(t)) return 'entra';
+    if (_M365_PURVIEW_RE.test(t)) return 'purview';
+    if (_M365_DEFENDER_RE.test(t)) return 'defender';
+    if (_M365_INTUNE_RE.test(t)) return 'intune';
     return 'admin';
   },
 

@@ -4,6 +4,11 @@
  * Covers the Huntress managed detection and response platform.
  * Standard React UI with custom dropdowns.
  */
+
+// Precompile regex patterns for hot-path detection
+const _HUNTRESS_HOST_RE = /huntress/i;
+const _HUNTRESS_GOAL_RE = /\bhuntress\b/i;
+
 export const huntress = {
   id: 'huntress',
   label: 'Huntress MDR',
@@ -19,11 +24,11 @@ export const huntress = {
     if (!url && !goal) return false;
     try {
       const host = (new URL(url)).host.toLowerCase();
-      if (/huntress/i.test(host)) return true;
+      if (_HUNTRESS_HOST_RE.test(host)) return true;
     } catch (e) {
       console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
     }
-    return /\bhuntress\b/i.test(String(goal || ''));
+    return _HUNTRESS_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

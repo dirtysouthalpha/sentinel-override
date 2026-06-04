@@ -6,6 +6,12 @@
 // endpoint management, threat analysis. Critical safety: always verify
 // site/scope picker before any action.
 
+// Precompile regex patterns for hot-path detection
+const _S1_NET_RE = /sentinelone\.net/i;
+const _S1_COM_RE = /(^|\.)sentinelone\.com$/i;
+const _S1_SHORT_RE = /s1\.com$/i;
+const _S1_GOAL_RE = /\b(sentinelone|singularity)\b/i;
+
 export const sentinelone = {
   id: 'sentinelone',
   label: 'SentinelOne Singularity Console',
@@ -15,11 +21,11 @@ export const sentinelone = {
     if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
-      if (/sentinelone\.net/i.test(host)) return true;
-      if (/(^|\.)sentinelone\.com$/i.test(host)) return true;
-      if (/s1\.com$/i.test(host)) return true;
+      if (_S1_NET_RE.test(host)) return true;
+      if (_S1_COM_RE.test(host)) return true;
+      if (_S1_SHORT_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(sentinelone|singularity)\b/i.test(String(goal || ''));
+    return _S1_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

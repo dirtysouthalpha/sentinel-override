@@ -6,6 +6,11 @@
 // The web UI is a SPA built on Kendo UI. The command runner tab is accessed
 // via the "Toolbox" tab inside an active session window.
 
+// Precompile regex patterns for hot-path detection
+const _SC_HOST_RE = /screenconnect\.com|connectwisecontrol\.com/i;
+const _SC_PATH_RE = /\/Host#Access|\/Host#Support|\/Backstage|\/Host#Join/i;
+const _SC_GOAL_RE = /\b(?:screenconnect|control\.connectwise|sc\.local|schost)\b/i;
+
 export const screenconnect = {
   id: 'screenconnect',
   label: 'ConnectWise ScreenConnect (Control)',
@@ -16,10 +21,10 @@ export const screenconnect = {
     if (url) try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/screenconnect\.com|connectwisecontrol\.com/i.test(host)) return true;
-      if (/\/Host#Access|\/Host#Support|\/Backstage|\/Host#Join/i.test(u.href)) return true;
+      if (_SC_HOST_RE.test(host)) return true;
+      if (_SC_PATH_RE.test(u.href)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(?:screenconnect|control\.connectwise|sc\.local|schost)\b/i.test(String(goal || ''));
+    return _SC_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [
