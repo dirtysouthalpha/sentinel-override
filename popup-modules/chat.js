@@ -3045,7 +3045,7 @@ async function toggleSourceChipExpansion(chip) {
     if (value === null || value === undefined) {
       exp.textContent = `(memory key "${key}" not found in current agent_memory; may have been cleared since the run completed)`;
     } else {
-      exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value, null, 2).slice(0, 4000);
+      exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value).slice(0, 4000);
     }
   } catch (e) {
     exp.textContent = `Error reading source: ${String(e)}`;
