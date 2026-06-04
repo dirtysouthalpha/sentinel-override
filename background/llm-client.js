@@ -7,7 +7,7 @@ import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
 import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage, sleep } from './error-utils.js';
-import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS } from './constants.js';
+import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
 
 // Constants for response parsing - avoid recreating on every call
 const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
@@ -1225,8 +1225,8 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
     const isRetryable = (msg.includes('429') || msg.includes('502') || msg.includes('503') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
       const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
-      const delay = Math.min(baseDelay * Math.pow(2, retryCount) + Math.floor(Math.random() * 2000), CONFIG.maxRetryDelay);
-      sendSilentUpdate(`Retrying in ${Math.round(delay/1000)}s...`, stepCount);
+      const delay = Math.min(baseDelay * Math.pow(2, retryCount) + Math.floor(Math.random() * TWO_SECONDS_MS), CONFIG.maxRetryDelay);
+      sendSilentUpdate(`Retrying in ${Math.round(delay/ONE_SECOND_MS)}s...`, stepCount);
       await sleep(delay);
       return callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount + 1, CONFIG, agentState);
     }
@@ -1248,8 +1248,8 @@ const _rateLimiter = {
     this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
     if (this.timestamps.length >= this.maxCalls) {
       const oldestInWindow = this.timestamps.length ? this.timestamps[0] : now;
-      const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / 1000);
-      throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / 1000}s. Resets in ~${resetIn}s.`);
+      const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / ONE_SECOND_MS);
+      throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / ONE_SECOND_MS}s. Resets in ~${resetIn}s.`);
     }
     this.timestamps.push(now);
   },
@@ -1911,7 +1911,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     });
   } catch (err) {
     clearTimeout(fetchTimeout);
-    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
+    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
   }
   clearTimeout(fetchTimeout);
 
@@ -1943,7 +1943,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         _fbResp = await fetch(endpoint, { method: 'POST', headers: requestHeaders, body: _fbBody, signal: _fbCtrl.signal });
       } catch (err) {
         clearTimeout(_fbTimeout);
-        throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/1000}s`) : err;
+        throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
       }
       clearTimeout(_fbTimeout);
       if (!_fbResp.ok) {
