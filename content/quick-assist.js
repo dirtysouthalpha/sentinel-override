@@ -531,7 +531,7 @@ ${selectedText}`;
         if (text) {
           setResponse(text);
         } else if (response && response.ok === false) {
-          setResponseHTML('<span class="qa-error">Error: ' + (response.error || 'Unknown error') + '</span>');
+          setResponseHTML(`<span class="qa-error">Error: ${response.error || 'Unknown error'}</span>`);
         } else {
           setResponseHTML('<span class="qa-error">No response received.</span>');
         }
@@ -557,9 +557,9 @@ ${selectedText}`;
     if (!shadow) return;
     var area = shadow.querySelector('#qa-response-area');
     if (!area) return;
-    area.innerHTML = '<div class="qa-loading-indicator">' +
-      '<div class="qa-dots"><span></span><span></span><span></span></div>' +
-      '<span>Analyzing...</span></div>';
+    area.innerHTML = `<div class="qa-loading-indicator">` +
+      `<div class="qa-dots"><span></span><span></span><span></span></div>` +
+      `<span>Analyzing...</span></div>`;
   }
 
   function setResponse(text) {

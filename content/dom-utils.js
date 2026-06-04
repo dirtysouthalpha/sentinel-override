@@ -119,7 +119,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
         if (sibling.tagName === current.tagName) index++;
         sibling = sibling.previousElementSibling;
       }
-      path.unshift(current.tagName.toLowerCase() + ':nth-of-type(' + (index + 1) + ')');
+      path.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${index + 1})`);
       current = current.parentElement;
       depth++;
     }

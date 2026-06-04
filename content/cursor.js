@@ -120,11 +120,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       c.style.left = `${lastX}px`;
       c.style.top = `${lastY}px`;
       c.innerHTML =
-        '<div class="sentinel-cursor-halo"></div>' +
-        '<svg width="22" height="24" viewBox="0 0 22 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-          '<path d="M3 2 L3 18 L7 14 L10 21 L13 20 L10 13 L17 13 Z"' +
-                ' fill="#ff6b00" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"/>' +
-        '</svg>';
+        `<div class="sentinel-cursor-halo"></div>` +
+        `<svg width="22" height="24" viewBox="0 0 22 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
+          `<path d="M3 2 L3 18 L7 14 L10 21 L13 20 L10 13 L17 13 Z"` +
+                ` fill="#ff6b00" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"/>` +
+        `</svg>`;
 
       // (3.8.1) Attach to documentElement (the <html> node), NOT body.
       // documentElement is far less likely to be replaced/rewritten by the
