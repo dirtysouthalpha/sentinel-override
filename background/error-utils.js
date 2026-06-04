@@ -48,3 +48,14 @@ export function getLastErrorMessage() {
   if (!hasLastError()) return '';
   return getErrorMessage(chrome.runtime.lastError);
 }
+
+/**
+ * Sleep for a specified number of milliseconds.
+ * Used for adding delays in async operations (e.g., retry logic, polling).
+ *
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>} Resolves after the specified delay
+ */
+export function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}

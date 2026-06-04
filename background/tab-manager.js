@@ -2,7 +2,7 @@
 // Tab locking, page load waiting, content script injection, screenshot capture.
 // Imports from message-protocol.js only (no circular dependency risk).
 
-import { getErrorMessage } from './error-utils.js';
+import { getErrorMessage, sleep } from './error-utils.js';
 
 // ========== Page Load Waiting ==========
 let pageLoadConfig = {
@@ -1045,10 +1045,3 @@ export async function getTabInfo(tabId) {
 }
 
 // ========== Utilities ==========
-/**
- * Resolve a Promise after a given delay.
- *
- * @param {number} ms - Milliseconds to wait.
- * @returns {Promise<void>} Resolves after the specified delay.
- */
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }

@@ -6,7 +6,7 @@ import { sendSilentUpdate } from './message-protocol.js';
 import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
 import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { getErrorMessage } from './error-utils.js';
+import { getErrorMessage, sleep } from './error-utils.js';
 import { API_TIMEOUT_MS, API_CACHE_TTL_MS, PLATFORM_CTX_CACHE_TTL_MS } from './constants.js';
 
 // Constants for response parsing - avoid recreating on every call
@@ -2323,10 +2323,3 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   }
 }
 
-// ========== Utilities ==========
-/**
- * Promise-based sleep utility.
- * @param {number} ms - Duration to sleep in milliseconds.
- * @returns {Promise<void>} Resolves after the specified delay.
- */
-function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
