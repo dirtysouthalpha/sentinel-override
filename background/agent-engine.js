@@ -5620,7 +5620,9 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'navigate' && typeof command.url === 'string') {
         const _currentHost = (() => { try { return new URL(currentUrl).hostname.toLowerCase(); } catch(_) { return ''; } })();
         const _targetHost = (() => { try { return new URL(command.url).hostname.toLowerCase(); } catch(_) { return ''; } })();
-        const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHost.replace(/^www\./, '')) || _targetHost.includes(_currentHost.replace(/^www\./, '')));
+                const _targetHostNoWww = _targetHost.replace(/^www\./, '');
+        const _currentHostNoWww = _currentHost.replace(/^www\./, '');
+        const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
         if (_alreadyThere) {
           const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
           if (_recent.length) {
@@ -6410,7 +6412,9 @@ return { ok: true, value: el.value };
               try {
                 const _clickedHost = new URL(updatedTab.url).hostname.toLowerCase();
                 const _fromHost = urlBeforeCommand ? new URL(urlBeforeCommand).hostname.toLowerCase() : '';
-                const _crossDomain = _fromHost && _clickedHost && !_clickedHost.includes(_fromHost.replace(/^www\./, '')) && !_fromHost.includes(_clickedHost.replace(/^www\./, ''));
+                const _clickedHostNoWww = _clickedHost.replace(/^www\./, '');
+                const _fromHostNoWww = _fromHost.replace(/^www\./, '');
+                const _crossDomain = _fromHost && _clickedHost && !_clickedHost.includes(_fromHostNoWww) && !_fromHost.includes(_clickedHostNoWww);
                 if (_crossDomain) {
                   result = 'WARNING: Click navigated away from ' + _fromHost + ' to ' + _clickedHost + '. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ' + _fromHost + ' and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).';
                   actionFailed = true;
