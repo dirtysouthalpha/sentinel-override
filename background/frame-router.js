@@ -3,6 +3,7 @@
 // Enables the agent to interact with elements inside cross-origin iframes.
 
 import { getErrorMessage } from './error-utils.js';
+import { THREE_HUNDRED_MS } from './constants.js';
 
 // ========== Content Script Files for Frame Injection ==========
 // Same set as tab-manager.js CONTENT_SCRIPT_FILES, minus index.js (handler injected separately)
@@ -230,7 +231,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
@@ -257,7 +258,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }

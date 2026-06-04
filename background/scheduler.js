@@ -8,7 +8,7 @@ import { resolveTemplateGoal } from './template-manager.js';
 import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
-import { ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS } from './constants.js';
+import { FIVE_HUNDRED_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS } from './constants.js';
 import { tel } from './telemetry.js';
 import { getErrorMessage } from './error-utils.js';
 
@@ -644,7 +644,7 @@ async function _getOrCreateTab() {
   });
   if (tabs?.[0]?.id && typeof tabs[0].id === 'number') return tabs[0].id;
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, FIVE_HUNDRED_MS));
   if (newTab && newTab.id) return newTab.id;
   throw new Error('Failed to create tab');
 }
