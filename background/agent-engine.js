@@ -5,7 +5,7 @@
 import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { MAX_PAGE_TEXT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_SECOND_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { MAX_PAGE_TEXT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    var clickableTags = new Set(['a', 'button', 'summary']);\n    var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n    // Determine interactivity\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; return __sentinel_discoverElements();";
@@ -114,7 +114,7 @@ async function _visionObserve(tab, _currentUrl) {
     console.log(`[Sentinel/v4] Discovered ${indexedElements.length} interactive elements`);
 
     // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
-    try { await cdpExecuteJs(tab, VISION_SOM, { timeout: 5000 }); }
+    try { await cdpExecuteJs(tab, VISION_SOM, { timeout: FIVE_SECONDS_MS }); }
     catch (e) { console.warn('[Sentinel/v4] SoM overlay failed:', getErrorMessage(e)); }
 
     // Step 3: Small delay for canvas to render
@@ -125,7 +125,7 @@ async function _visionObserve(tab, _currentUrl) {
     try {
       const textResult = await cdpExecuteJs(tab,
         `return document.body ? document.body.innerText.substring(0, ${MAX_PAGE_TEXT_LENGTH}) : "";`,
-        { timeout: 5000 });
+        { timeout: FIVE_SECONDS_MS });
       pageText = (textResult && textResult.value) || '';
     } catch (e) { console.warn('[Sentinel/v4] Page text failed:', getErrorMessage(e)); }
 
@@ -482,10 +482,10 @@ function activityUpdate(stepNumber, key, label) {
 const CONFIG = {
   minDelayBetweenCalls: 500,
   maxRetries: 2,
-  retryDelay: 2000,
-  maxRetryDelay: 10000,
+  retryDelay: TWO_SECONDS_MS,
+  maxRetryDelay: TEN_SECONDS_MS,
   screenshotQuality: 30,
-  fetchTimeout: 30000,
+  fetchTimeout: THIRTY_SECONDS_MS,
   pageLoadTimeout: 25000,
   maxSteps: 100,
   maxPageContentLength: 16000,
@@ -1532,7 +1532,7 @@ async function _cdpObservePage(tabId) {
     return _cachedObservation;
   }
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
-  const result = await cdpExecuteJs(tabId, code, { timeout: 3000 });
+  const result = await cdpExecuteJs(tabId, code, { timeout: THREE_SECONDS_MS });
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
   if (result?.ok && result?.value) {
     console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
@@ -1638,7 +1638,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
     console.log('[Sentinel/CDP] Skipping nuke — no overlays and last nuke was clean');
   } else try {
     console.log(`[Sentinel/CDP] Phase2: sending surgical nuke (${nukeCode.length} chars) to tab`, tabId);
-    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 5000 });
+    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: FIVE_SECONDS_MS });
     console.log('[Sentinel/CDP] Phase2 raw result:', JSON.stringify(nukeResult));
     if (nukeResult && nukeResult.ok) {
       const removed = (nukeResult.value || 0);
@@ -1647,7 +1647,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
       _lastNukeClean = (removed === 0); // Track for skip optimization
       // (v3.59) Post-nuke integrity check: verify page still has content
       if ((nukeResult.value || 0) > 0) {
-        const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: 3000 });
+        const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: THREE_SECONDS_MS });
         console.log('[Sentinel/CDP] Post-nuke integrity:', JSON.stringify(integrityCheck && integrityCheck.value));
         if (integrityCheck && integrityCheck.ok && integrityCheck.value) {
           if (!integrityCheck.value.hasBody || !integrityCheck.value.title) {
@@ -2777,7 +2777,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       if (amzInput) return 'amazon_captcha_needs_input';
       return null;
     `;
-    const result = await cdpExecuteJs(tab.id, clickCode, { timeout: 3000 });
+    const result = await cdpExecuteJs(tab.id, clickCode, { timeout: THREE_SECONDS_MS });
     const clickedWhat = (result && result.ok) ? result.value : null;
     if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
       console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
@@ -2804,8 +2804,8 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
         sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
         try {
           await chrome.tabs.update(tab.id, { url: searchUrl });
-          try { tel.trace('sleep', 'Sleep 3000ms', { ms: 3000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          await sleep(3000);
+          try { tel.trace('sleep', 'Sleep 3000ms', { ms: THREE_SECONDS_MS }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          await sleep(THREE_SECONDS_MS);
         } catch (_navErr) {
           console.warn('[Sentinel/CAPTCHA] Navigate to search URL failed:', getErrorMessage(_navErr));
         }
@@ -2816,8 +2816,8 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
       try {
         await chrome.tabs.update(tab.id, { url: info.altUrl });
-        try { tel.trace('sleep', 'Sleep 3000ms', { ms: 3000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(3000);
+        try { tel.trace('sleep', 'Sleep 3000ms', { ms: THREE_SECONDS_MS }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+        await sleep(THREE_SECONDS_MS);
       } catch (_navErr) {
         console.warn('[Sentinel/CAPTCHA] Navigate to homepage failed:', getErrorMessage(_navErr));
       }
@@ -3743,7 +3743,7 @@ async function runAgentLoop(goal, workingTabId) {
           // If empty (no body, no title), reload the page via CDP.
           if (consecutiveInjectionFailures === 2) {
             try {
-              const pgCheck = await cdpExecuteJs(tab, 'return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};', { timeout: 3000 });
+              const pgCheck = await cdpExecuteJs(tab, 'return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};', { timeout: THREE_SECONDS_MS });
               console.log('[Sentinel/CDP] Page check on first CDP activation:', JSON.stringify(pgCheck && pgCheck.value));
               if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
                 console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
@@ -4398,7 +4398,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else if (apiWaitSeconds >= 60 && apiWaitSeconds % 30 === 0) {
           sendAgentStatus('waiting', `⚠️ API still responding (${apiWaitSeconds}s) — you can Pause to cancel`);
         }
-      }, 5000);
+      }, FIVE_SECONDS_MS);
 
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
@@ -4492,7 +4492,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (_pendingCommandQueue.length) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
         command = _pendingCommandQueue.shift();
         activityDone(stepCount, 'consult-ai', `Queued sub-command: ${command.type}`, null);
         _lastAiCallMs = 0;
@@ -4502,7 +4502,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else if (_skillAutoCommand) {
         clearInterval(progressTimer);
         base64Image = null;
-        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
+        if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
         command = _skillAutoCommand;
         activityDone(stepCount, 'consult-ai', 'Skipped (skill auto-applied)', null);
         _lastAiCallMs = 0;
@@ -4688,7 +4688,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (e) {
           console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', getErrorMessage(e));
-          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         }
       }
 
@@ -4699,7 +4699,7 @@ async function runAgentLoop(goal, workingTabId) {
         _lastAiCallMs = Date.now() - _aiStart;
         try { sendHeartbeat(_lastAiCallMs); } catch (_e) { /* non-fatal */ }
         // Clear SoM overlay so it doesn't interfere with action execution
-        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
+        try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
         base64Image = null; // release screenshot memory
         agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
@@ -4732,7 +4732,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           } catch (_e) { /* non-fatal */ }
           // v4.0: Clear SoM overlay so it doesn't interfere with action execution
-          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch(e) {
+          try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch(e) {
             console.warn('[Sentinel] Failed to clear SoM overlay:', getErrorMessage(e));
             // Non-fatal but could affect next action execution
           }
@@ -5405,7 +5405,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _inputSel = (_ci && _ci.inputSelector) || 'textarea[data-command], .command-input textarea, .code-editor textarea';
           const _submitSel = (_ci && _ci.submitSelector) || 'button[type="submit"]:has-text("Run"), button:has-text("Execute")';
           const _outputSel = (_ci && _ci.outputSelector) || '#commandOutput, .command-output, .job-result pre';
-          const _outputMs = (_ci && _ci.outputTimeoutMs) || 15000;
+          const _outputMs = (_ci && _ci.outputTimeoutMs) || FIFTEEN_SECONDS_MS;
           const _readyText = (_ci && _ci.outputReadyText) || null;
 
           // Optionally set command type via a select element
@@ -5473,7 +5473,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate(`Waiting for: ${command.text || command.selector || 'navigation'}`, stepCount);
         sendActionMessage(command, stepCount, observation);
         // Default timeout: navigation waits need more time than element waits
-        const _waitTimeout = command.timeout || (command.type === 'wait_for_navigation' ? 20000 : 10000);
+        const _waitTimeout = command.timeout || (command.type === 'wait_for_navigation' ? TWENTY_SECONDS_MS : TEN_SECONDS_MS);
         const waitResult = await sendMessageWithRetry(tab, {
           action: 'wait_for',
           condition: { ...command, currentUrl: tabInfo.url, timeout: _waitTimeout }
@@ -5573,7 +5573,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _rectRes = await cdpExecuteJs(tab,
                   `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()`,
-                  { timeout: 3000 });
+                  { timeout: THREE_SECONDS_MS });
                 if (_rectRes && _rectRes.value) {
                   const _parsed = typeof _rectRes.value === 'string' ? JSON.parse(_rectRes.value) : _rectRes.value;
                   if (_parsed && _parsed.visible) _liveRect = _parsed;
@@ -5612,7 +5612,7 @@ async function runAgentLoop(goal, workingTabId) {
                 try {
                   const _jsClickRes = await cdpExecuteJs(tab,
                     `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()`,
-                    { timeout: 3000 });
+                    { timeout: THREE_SECONDS_MS });
                   const _val = _jsClickRes && _jsClickRes.value;
                   if (_val === 'js-clicked') {
                     result = `${result || `Clicked [${command._visionIndex}]`} + js-fallback`;
@@ -5623,7 +5623,7 @@ async function runAgentLoop(goal, workingTabId) {
                     try {
                       const _attrRes = await cdpExecuteJs(tab,
                         `return (function(){var e=document.querySelector('[data-sentinel-index="${command._visionIndex}"]');if(e){e.click();return"clicked";}return"not found";})()`,
-                        { timeout: 3000 });
+                        { timeout: THREE_SECONDS_MS });
                       result = `Clicked [${command._visionIndex}] via attr selector: ${_attrRes && _attrRes.value || 'unknown'}`;
                     } catch (_cme2) {
                       result = `Click failed for [${command._visionIndex}]`;
@@ -5638,7 +5638,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _typeRes = await cdpExecuteJs(tab,
                   `return (function(){var e=document.querySelector('[data-sentinel-index="${command._visionIndex}"]');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"${_safeText}");else e.value="${_safeText}";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()`,
-                  { timeout: 5000 });
+                  { timeout: FIVE_SECONDS_MS });
                 const _typeVal = _typeRes && _typeRes.value;
                 if (_typeVal === 'not found') {
                   result = `Type failed for [${command._visionIndex}]: element not found`;
@@ -6218,7 +6218,7 @@ for (var i = 0; i < opts.length; i++) {
 if (!found) return { ok: false, error: "Option not found: " + ${_valJson} };
 return { ok: true, value: el.value };
 })()`;
-              const selResult = await cdpExecuteJs(tab, selCode, { timeout: 3000 });
+              const selResult = await cdpExecuteJs(tab, selCode, { timeout: THREE_SECONDS_MS });
               if (selResult && selResult.ok && selResult.value && selResult.value.ok) {
                 result = `Selected "${command.value}" via CDP fallback`;
                 cdpDone = true;
@@ -6315,7 +6315,7 @@ return { ok: true, value: el.value };
               + 'if (!el) return null;'
               + 'var r = el.getBoundingClientRect();'
               + 'return { x: r.left + r.width/2, y: r.top + r.height/2, w: r.width, h: r.height };'
-            const cdpBbox = await cdpExecuteJs(tab, cdpCode, { timeout: 3000 });
+            const cdpBbox = await cdpExecuteJs(tab, cdpCode, { timeout: THREE_SECONDS_MS });
             if (cdpBbox && cdpBbox.ok && cdpBbox.value && cdpBbox.value.x != null && cdpBbox.value.y != null) {
               const cx = Math.round(cdpBbox.value.x);
               const cy = Math.round(cdpBbox.value.y);
@@ -6353,7 +6353,7 @@ return { ok: true, value: el.value };
             + '}'
             + 'return null;'
             + '})()';
-          const selRes = await cdpExecuteJs(tab, 'return ' + selJs, { timeout: 3000 });
+          const selRes = await cdpExecuteJs(tab, 'return ' + selJs, { timeout: THREE_SECONDS_MS });
           if (selRes && selRes.ok && selRes.value != null) {
             result = `Selected "${command.value}" via CDP fallback`;
             actionFailed = false;
@@ -6374,7 +6374,7 @@ return { ok: true, value: el.value };
               + 'if (!el) return null;'
               + 'el.focus(); el.value = "";'
               + 'return el.tagName;'
-            const focusResult = await cdpExecuteJs(tab, focusCode, { timeout: 3000 });
+            const focusResult = await cdpExecuteJs(tab, focusCode, { timeout: THREE_SECONDS_MS });
             if (focusResult && focusResult.ok && focusResult.value) {
               // Type each character via CDP Input.dispatchKeyEvent
               const text = command.text || '';
@@ -6424,7 +6424,7 @@ return { ok: true, value: el.value };
       // ═══════════════════════════════════════════════════════════════
       if (actionFailed && _cdpFallbackActive) {
         try {
-          const _ufbResult = await _universalCdpFallback(tab, command, { timeout: 5000 });
+          const _ufbResult = await _universalCdpFallback(tab, command, { timeout: FIVE_SECONDS_MS });
           if (_ufbResult && _ufbResult.ok) {
             result = _ufbResult.result || 'Executed via universal CDP fallback';
             actionFailed = false;
@@ -6492,7 +6492,7 @@ return { ok: true, value: el.value };
             _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');if(el){el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));return"hovered";}return null;})()';
           }
           if (_universalJs) {
-            const _uniRes = await cdpExecuteJs(tab, 'return ' + _universalJs, { timeout: 3000 });
+            const _uniRes = await cdpExecuteJs(tab, 'return ' + _universalJs, { timeout: THREE_SECONDS_MS });
             if (_uniRes && _uniRes.ok && _uniRes.value != null && _uniRes.value !== 'not_found') {
               result = `${command.type} via CDP universal fallback`;
               actionFailed = false;
@@ -6608,7 +6608,7 @@ return { ok: true, value: el.value };
           //      Accept/Agree/OK/Continue/I agree/Got it (handles bespoke
           //      overlays like CNN's that don't use a known framework).
           try {
-            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0;i<p.length;i++){var es=document.querySelectorAll(p[i]);for(var j=0;j<es.length;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}if(!d){var rx=/^(accept(\\s+all)?|i\\s+agree|agree|allow(\\s+all)?|got\\s+it|ok|okay|continue|yes,?\\s+i\\s+(agree|accept)|consent)$/i;var btns=document.querySelectorAll(\'button, [role="button"], a.button, input[type="submit"], input[type="button"]\');for(var k=0;k<btns.length;k++){var b=btns[k];var t=((b.innerText||b.value||b.getAttribute("aria-label")||"")+"").trim();if(!t||t.length>40)continue;if(!rx.test(t))continue;var br=b.getBoundingClientRect();if(br.width<=0||br.height<=0)continue;var cs=window.getComputedStyle(b);if(cs.visibility==="hidden"||cs.display==="none")continue;try{b.click();d=true;break;}catch(_e){}}}return d?"dismissed":"no-overlay";})()', { timeout: 5000 });
+            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0;i<p.length;i++){var es=document.querySelectorAll(p[i]);for(var j=0;j<es.length;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}if(!d){var rx=/^(accept(\\s+all)?|i\\s+agree|agree|allow(\\s+all)?|got\\s+it|ok|okay|continue|yes,?\\s+i\\s+(agree|accept)|consent)$/i;var btns=document.querySelectorAll(\'button, [role="button"], a.button, input[type="submit"], input[type="button"]\');for(var k=0;k<btns.length;k++){var b=btns[k];var t=((b.innerText||b.value||b.getAttribute("aria-label")||"")+"").trim();if(!t||t.length>40)continue;if(!rx.test(t))continue;var br=b.getBoundingClientRect();if(br.width<=0||br.height<=0)continue;var cs=window.getComputedStyle(b);if(cs.visibility==="hidden"||cs.display==="none")continue;try{b.click();d=true;break;}catch(_e){}}}return d?"dismissed":"no-overlay";})()', { timeout: FIVE_SECONDS_MS });
           } catch(_oe) { /* non-fatal */ }
           historyPush({
             step: stepCount,
@@ -7176,7 +7176,7 @@ async function requestApproval(command, stepNumber) {
         }
       };
       chrome.runtime.onMessage.addListener(hardTimeoutListener);
-    }, 60000);
+    }, ONE_MINUTE_MS);
   });
 }
 

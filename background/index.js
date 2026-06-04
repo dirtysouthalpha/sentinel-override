@@ -18,6 +18,7 @@ import { exportTemplate, exportAllTemplates, validateImport, importTemplates, ex
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
 import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
+import { ONE_MINUTE_MS } from './constants.js';
 
 // Precompute valid log levels for O(1) lookup
 const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
@@ -110,7 +111,7 @@ initScheduler();
         }
       } else {
         // Stale run — clear the flag
-        console.log('[Sentinel/self-heal] Stale run detected (', Math.floor(age/60000), 'min old), clearing');
+        console.log('[Sentinel/self-heal] Stale run detected (', Math.floor(age/ONE_MINUTE_MS), 'min old), clearing');
         await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']);
       }
     }
@@ -496,7 +497,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             }, 240000);
 
             chrome.runtime.onMessage.addListener(replacementListener);
-          }, 60000);
+          }, ONE_MINUTE_MS);
         });
       } catch (e) {
         return { approved: false, reason: getErrorMessage(e) };

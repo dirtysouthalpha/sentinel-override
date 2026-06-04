@@ -3,7 +3,7 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { getErrorMessage, sleep } from './error-utils.js';
-import { ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
+import { ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, ONE_MINUTE_MS } from './constants.js';
 
 // ========== Page Load Waiting ==========
 let pageLoadConfig = {
@@ -127,8 +127,8 @@ async function _checkDomReadyState(tabId) {
  * @param {number} [maxWaitMs=5000] - Maximum milliseconds to wait.
  * @returns {Promise<void>}
  */
-export async function waitForPageReady(tabId, maxWaitMs = 5000) {
-  const cap = Math.min(Math.max(0, Number(maxWaitMs) || 5000), pageLoadConfig.pageLoadTimeout);
+export async function waitForPageReady(tabId, maxWaitMs = FIVE_SECONDS_MS) {
+  const cap = Math.min(Math.max(0, Number(maxWaitMs) || FIVE_SECONDS_MS), pageLoadConfig.pageLoadTimeout);
   const startTime = Date.now();
   const pollInterval = 200;
   const networkIdleMs = 500;
@@ -172,7 +172,7 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
  * @param {number} [timeout=3000] - Maximum wait in milliseconds.
  * @returns {{ promise: Promise<boolean>, cancel: () => void }}
  */
-export function createContentScriptListener(tabId, timeout = 3000) {
+export function createContentScriptListener(tabId, timeout = THREE_SECONDS_MS) {
   let timer, listener, resolved = false;
   const promise = new Promise((resolve) => {
     timer = setTimeout(() => { if (resolved) return; resolved = true; chrome.runtime.onMessage.removeListener(listener); resolve(false); }, timeout);
@@ -876,7 +876,7 @@ export async function cdpExecuteJs(tabId, code, options = {}) {
   if (typeof code !== 'string' || !code.length) {
     return { ok: false, error: 'No code provided' };
   }
-  const timeout = Math.max(500, Math.min(60000, Number(options.timeout) || 8000)) || 8000;
+  const timeout = Math.max(500, Math.min(ONE_MINUTE_MS, Number(options.timeout) || 8000)) || 8000;
   try {
     await ensureDebuggerAttached(tabId);
     const expression = `(async () => { ${code} \n })()`;
