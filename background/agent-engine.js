@@ -96,6 +96,35 @@ const ACTION_FAILED_TIMEOUT_RE = /^(Error|BLOCKED:|JS Error)|timed out| not foun
 // Precompile regex for page-mutating action detection (hot path in observation loop)
 const PAGE_MUTATING_ACTIONS_RE = /^(click|click_at|type|press_key|select|check|check_all)$/;
 
+// Bare site name mapping for heuristic plan generation ("go to Amazon" -> "amazon.com")
+const BARE_SITE_MAP = {
+  amazon: 'amazon.com',
+  reddit: 'reddit.com',
+  youtube: 'youtube.com',
+  twitter: 'twitter.com',
+  x: 'x.com',
+  github: 'github.com',
+  wikipedia: 'wikipedia.org',
+  hackernews: 'news.ycombinator.com',
+  'hacker news': 'news.ycombinator.com',
+  hn: 'news.ycombinator.com',
+  google: 'google.com',
+  facebook: 'facebook.com',
+  instagram: 'instagram.com',
+  linkedin: 'linkedin.com',
+  netflix: 'netflix.com',
+  yahoo: 'yahoo.com',
+  bing: 'bing.com',
+  duckduckgo: 'duckduckgo.com',
+  stackoverflow: 'stackoverflow.com',
+  'stack overflow': 'stackoverflow.com',
+  cnn: 'cnn.com',
+  bbc: 'bbc.com',
+  nytimes: 'nytimes.com',
+  espn: 'espn.com',
+  weather: 'weather.gov'
+};
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -3173,17 +3202,16 @@ function generateHeuristicPlan(goal, currentUrl) {
   const urlMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i)
     || goal.match(/(https?:\/\/[^\s]+)/);
   // v3.63: Also match bare site names ("go to Amazon", "go to Reddit")
-  const _bareSiteMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
   let _urlMatch = urlMatch;
   if (!_urlMatch) {
     const _bareMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
     if (_bareMatch && _bareMatch[1]) {
       const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
-      if (_bareSiteMap[_siteKey]) {
-        _urlMatch = [`go to ${_bareMatch[1]}`, `https://${_bareSiteMap[_siteKey]}`];
+      if (BARE_SITE_MAP[_siteKey]) {
+        _urlMatch = [`go to ${_bareMatch[1]}`, `https://${BARE_SITE_MAP[_siteKey]}`];
       } else {
         // Try partial match
-        for (const [k, v] of Object.entries(_bareSiteMap)) {
+        for (const [k, v] of Object.entries(BARE_SITE_MAP)) {
           if (_siteKey.includes(k) || k.includes(_siteKey)) {
             _urlMatch = [`go to ${_bareMatch[1]}`, `https://${v}`];
             break;
@@ -3647,14 +3675,13 @@ async function runAgentLoop(goal, workingTabId) {
         }
         // v3.66: Bare site name fallback for Step 1 auto-navigate
         if (!urlMatch && _isExplicitNav) {
-          const _step1BareMap = { amazon: 'amazon.com', reddit: 'reddit.com', youtube: 'youtube.com', twitter: 'twitter.com', x: 'x.com', github: 'github.com', wikipedia: 'wikipedia.org', hackernews: 'news.ycombinator.com', 'hacker news': 'news.ycombinator.com', hn: 'news.ycombinator.com', google: 'google.com', facebook: 'facebook.com', instagram: 'instagram.com', linkedin: 'linkedin.com', netflix: 'netflix.com', yahoo: 'yahoo.com', bing: 'bing.com', duckduckgo: 'duckduckgo.com', stackoverflow: 'stackoverflow.com', 'stack overflow': 'stackoverflow.com', cnn: 'cnn.com', bbc: 'bbc.com', nytimes: 'nytimes.com', espn: 'espn.com', weather: 'weather.gov' };
           const _step1Bare = _goalForUrlExtract.match(/(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
           if (_step1Bare && typeof _step1Bare[1] === 'string') {
             const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
-            if (_step1BareMap[_step1Key]) {
-              urlMatch = [`go to ${_step1Bare[1]}`, _step1BareMap[_step1Key]];
+            if (BARE_SITE_MAP[_step1Key]) {
+              urlMatch = [`go to ${_step1Bare[1]}`, BARE_SITE_MAP[_step1Key]];
             } else {
-              for (const [k, v] of Object.entries(_step1BareMap)) {
+              for (const [k, v] of Object.entries(BARE_SITE_MAP)) {
                 if (_step1Key.includes(k) || k.includes(_step1Key)) {
                   urlMatch = [`go to ${_step1Bare[1]}`, v];
                   break;
