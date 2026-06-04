@@ -242,7 +242,7 @@ export async function restoreFromCheckpoint() {
     }
     if (Array.isArray(cp.historySnapshot)) {
       history.length = 0;
-      cp.historySnapshot.forEach(h => { if (h) history.push(h); });
+      history.push(...cp.historySnapshot.filter(h => h));
     }
     if (typeof cp.productiveSteps === 'number') productiveSteps = cp.productiveSteps;
     if (typeof cp.consecutiveFailures === 'number') consecutiveFailures = cp.consecutiveFailures;
