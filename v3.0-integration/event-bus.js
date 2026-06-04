@@ -183,7 +183,7 @@ class EventBus {
    */
   _addToHistory(eventData) {
     this.history.push(eventData);
-    
+
     if (this.history.length > this.maxHistory) {
       this.history.shift();
     }

@@ -147,7 +147,7 @@ class LoadMonitor {
    */
   _addReading(reading) {
     this.readings.push(reading);
-    
+
     if (this.readings.length > this.maxReadings) {
       this.readings.shift();
     }

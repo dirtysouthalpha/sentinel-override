@@ -365,7 +365,7 @@ class TaskQueue {
    * Generate unique task ID
    */
   _generateId() {
-    return `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `task_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 }
 

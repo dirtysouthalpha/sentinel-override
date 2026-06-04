@@ -423,7 +423,9 @@ describe('UAP Client', () => {
         payload: { runId: 'run-999' }
       });
 
-      await client.disconnect();
+      // Disconnect should reject the active goal
+      client.disconnect();
+      await expect(goalPromise).rejects.toThrow('Client disconnected');
 
       expect(client.connected).toBe(false);
       expect(client.activeRuns.size).toBe(0);
