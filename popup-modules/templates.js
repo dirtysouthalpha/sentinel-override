@@ -198,7 +198,7 @@ function saveNewTemplate() {
     template: { name, goal, tags, params }
   }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error saving template', 'error');
+      showToast(_getLastErrorMessage() || 'Error saving template', 'error');
       return;
     }
     if (response && response.error) {
@@ -222,7 +222,7 @@ function parseTags(tagString) {
 function openEditTemplateModal(templateId) {
   chrome.runtime.sendMessage({ action: 'template_get', id: templateId }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error loading template', 'error');
+      showToast(_getLastErrorMessage() || 'Error loading template', 'error');
       return;
     }
     if (!response || !response.ok || !response.data) {
@@ -274,7 +274,7 @@ function saveEditedTemplate() {
     updates: { name, goal, tags, params }
   }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error updating template', 'error');
+      showToast(_getLastErrorMessage() || 'Error updating template', 'error');
       return;
     }
     if (response && response.error) {
@@ -337,7 +337,7 @@ function updateParamEditor(existingParams) {
 function openRunModal(templateId) {
   chrome.runtime.sendMessage({ action: 'template_get', id: templateId }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error loading template', 'error');
+      showToast(_getLastErrorMessage() || 'Error loading template', 'error');
       return;
     }
     if (!response || !response.ok || !response.data) {
@@ -391,7 +391,7 @@ function executeTemplate() {
     params
   }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error running template', 'error');
+      showToast(_getLastErrorMessage() || 'Error running template', 'error');
       return;
     }
     if (response && response.error) {
@@ -416,7 +416,7 @@ function deleteTemplate(templateId, templateName) {
     id: templateId
   }, (response) => {
     if (_hasLastError()) {
-      showToast(getLastErrorMessage() || 'Error deleting template', 'error');
+      showToast(_getLastErrorMessage() || 'Error deleting template', 'error');
       return;
     }
     if (response && response.error) {

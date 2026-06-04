@@ -101,7 +101,6 @@ function showToast(message, type = 'success') {
  *
  * @returns {boolean} True if chrome.runtime.lastError has a value
  */
-// eslint-disable-next-line no-unused-vars
 function hasLastError() {
   return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
 }
@@ -111,8 +110,7 @@ function hasLastError() {
  *
  * @returns {string} The lastError message or empty string if no error
  */
-// eslint-disable-next-line no-unused-vars
-function getLastErrorMessage() {
+function _getLastErrorMessage() {
   if (!hasLastError()) return '';
   const err = chrome.runtime.lastError;
   if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;

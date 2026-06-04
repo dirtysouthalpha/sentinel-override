@@ -7,7 +7,7 @@ import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
 import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage, sleep } from './error-utils.js';
-import { API_TIMEOUT_MS, API_CACHE_TTL_MS, PLATFORM_CTX_CACHE_TTL_MS } from './constants.js';
+import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS } from './constants.js';
 
 // Constants for response parsing - avoid recreating on every call
 const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
