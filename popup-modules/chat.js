@@ -479,7 +479,6 @@ const RETRY_PREFIX_RE = /^⚠️|Retrying/;
 const NAVIGATE_SEARCH_RE = /go to|navigate|search/;
 const INPUT_TEXTAREA_RE = /^(INPUT|TEXTAREA)$/;
 const CSV_QUOTE_RE = /[",\n\r]/;
-const DECISION_RE = /releases?|approves?|rejects?|skips?/i;
 const SOURCE_TAG_RE = /\[src:([a-z0-9_-]+)\]|\[unverified\]/gi;
 
 
