@@ -64,7 +64,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
   try {
     if (Array.isArray(profile.pageTypes) && profile.pageTypes.length) {
       const lines = profile.pageTypes.reduce((acc, pt) => {
-        if (pt && pt.name && pt.hint) {
+        if (pt?.name && pt?.hint) {
           acc.push(`  ${pt.name}: ${pt.hint}`);
         }
         return acc;
@@ -80,7 +80,7 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
   try {
     if (Array.isArray(profile.workflowHints)) {
       for (const wh of profile.workflowHints) {
-        if (wh && wh.match instanceof RegExp && wh.hint && wh.match.test(rawGoal)) {
+        if (wh?.match instanceof RegExp && wh?.hint && wh.match.test(rawGoal)) {
           workflowScaffold = `\nWORKFLOW SCAFFOLD (goal matches a known task pattern — use as the phase structure unless the user already provided one):\n${wh.hint}`;
           break;
         }

@@ -115,7 +115,7 @@ function registerAlarm(schedule) {
   }
 
   const _alarmPromise = chrome.alarms.create(`schedule-${schedule.id}`, alarmInfo);
-  if (_alarmPromise && typeof _alarmPromise.catch === 'function') {
+  if (typeof _alarmPromise?.catch === 'function') {
     _alarmPromise.catch((e) => {
       console.error('[_alarmPromise] Unhandled rejection:', getErrorMessage(e));
     });
@@ -135,7 +135,7 @@ function registerAlarm(schedule) {
  */
 function clearAlarm(scheduleId) {
   const _p = chrome.alarms.clear(`schedule-${scheduleId}`);
-  if (_p && typeof _p.catch === 'function') {
+  if (typeof _p?.catch === 'function') {
     _p.catch((e) => {
       console.error('[_p] Unhandled rejection:', getErrorMessage(e));
     });
@@ -258,13 +258,13 @@ function sendNotification(schedule, result) {
  */
 function setBadge(status) {
   const _t = chrome.action.setBadgeText({ text: '1' });
-  if (_t && typeof _t.catch === 'function') _t.catch((e) => {
+  if (typeof _t?.catch === 'function') _t.catch((e) => {
     console.error('[_t] Unhandled rejection:', getErrorMessage(e));
   });
   const _b = chrome.action.setBadgeBackgroundColor({
     color: status === 'success' ? '#22c55e' : '#ef4444',
   });
-  if (_b && typeof _b.catch === 'function') _b.catch((e) => {
+  if (typeof _b?.catch === 'function') _b.catch((e) => {
     console.error('[_b] Unhandled rejection:', getErrorMessage(e));
   });
 }

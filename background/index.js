@@ -766,7 +766,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       return { cleared: true };
 
     case 'schedule_clear_badge':
-      { const _p = chrome.action.setBadgeText({ text: '' }); if (_p && typeof _p.catch === 'function') _p.catch((e) => {
+      { const _p = chrome.action.setBadgeText({ text: '' }); if (typeof _p?.catch === 'function') _p.catch((e) => {
         console.error('[_p] Unhandled rejection:', getErrorMessage(e));
       }); }
       return { cleared: true };

@@ -1454,7 +1454,7 @@ async function _cdpObservePage(tabId) {
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: 3000 });
   console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
-  if (result && result.ok && result.value) {
+  if (result?.ok && result?.value) {
     console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
     _pageWasReady = true; // Mark page as ready for next step
     return result.value;
