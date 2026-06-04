@@ -702,7 +702,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
 
   const parts = [];
   parts.push('');
-  parts.push('━━━ PLATFORM SELECTOR PROFILE (' + (profile.label || profile.id) + ') ━━━');
+  parts.push(`━━━ PLATFORM SELECTOR PROFILE (${profile.label || profile.id}) ━━━`);
   parts.push('These are KNOWN selectors for this platform. Try them FIRST before falling back to runtime element scanning. Each entry is a defensive comma-separated alternatives list — the content script will resolve whichever matches.');
   parts.push('');
 
@@ -783,7 +783,7 @@ const _PLATFORM_CTX_TTL_MS = 30000;
  * @returns {string} Formatted platform context block for the system prompt.
  */
 export function getPlatformContext(currentUrl, goal) {
-  const _cacheKey = (currentUrl || '') + '||' + (goal || '').slice(0, 50);
+  const _cacheKey = `${currentUrl || ''}||${(goal || '').slice(0, 50)}`;
   const _cached = _platformContextCache.get(_cacheKey);
   if (_cached && Date.now() - _cached.ts < _PLATFORM_CTX_TTL_MS) return _cached.ctx;
 
@@ -1336,14 +1336,14 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
   }
   return `\nSTRATEGY SHIFT REQUIRED -- You have failed ${agentState.consecutiveFailures} times in a row.\n` +
     `Approaches already tried: ${(agentState.currentStrategies || []).join(', ')}\n` +
-    'You MUST try a COMPLETELY DIFFERENT approach. Consider:\n' +
-    '- Using "execute_js" to write custom JavaScript to accomplish the task\n' +
-    '- Using "read_network_requests" to read the underlying API response\n' +
-    '- Scrolling to find different elements\n' +
-    '- Navigating to a different page\n' +
-    '- Using "extract" + memory to build data step by step\n' +
+    `You MUST try a COMPLETELY DIFFERENT approach. Consider:\n` +
+    `- Using "execute_js" to write custom JavaScript to accomplish the task\n` +
+    `- Using "read_network_requests" to read the underlying API response\n` +
+    `- Scrolling to find different elements\n` +
+    `- Navigating to a different page\n` +
+    `- Using "extract" + memory to build data step by step\n` +
     platformHints +
-    'Do NOT repeat the same failed action.\n';
+    `Do NOT repeat the same failed action.\n`;
 }
 
 // Build the execution-plan status block injected before the prompt schema.

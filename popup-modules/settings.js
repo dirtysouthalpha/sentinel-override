@@ -446,12 +446,12 @@ function _renderSkillStatsModal(skills) {
       const deltaStr = delta === 0 ? '' : (delta > 0 ? ` (+${delta})` : ` (${delta})`);
       const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
       tr.innerHTML =
-        '<td style="padding:6px 4px;"><strong>' + escapeHtml(s.id) + '</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">' + escapeHtml(s.description || '') + '</div></td>' +
-        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.fires + '</td>' +
-        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + stats.successes + ' / ' + stats.failures + '</td>' +
-        '<td style="padding:6px 4px; text-align:right; color:' + rateColor + '; font-variant-numeric:tabular-nums;">' + rateStr + '</td>' +
-        '<td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">' + (s.priority || 0) + '</td>' +
-        '<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">' + (s.effectivePriority || 0) + '<span style="color:' + deltaColor + ';">' + deltaStr + '</span></td>';
+        `<td style="padding:6px 4px;"><strong>${escapeHtml(s.id)}</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">${escapeHtml(s.description || '')}</div></td>` +
+        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.fires}</td>` +
+        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.successes} / ${stats.failures}</td>` +
+        `<td style="padding:6px 4px; text-align:right; color:${rateColor}; font-variant-numeric:tabular-nums;">${rateStr}</td>` +
+        `<td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">${s.priority || 0}</td>` +
+        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${s.effectivePriority || 0}<span style="color:${deltaColor};">${deltaStr}</span></td>`;
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);
@@ -696,7 +696,7 @@ if (downloadAuditLogBtn) {
       if (document.body) document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e) {
-      downloadAuditLogBtn.textContent = 'Error: ' + (window.getErrorMessage ? window.getErrorMessage(e) : String(e));
+      downloadAuditLogBtn.textContent = `Error: ${window.getErrorMessage ? window.getErrorMessage(e) : String(e)}`;
       setTimeout(() => { downloadAuditLogBtn.textContent = 'Download Audit Log CSV'; }, 3000);
     }
   });
@@ -1028,7 +1028,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const isAnthropic = endpoint.includes('api.anthropic.com');
     const headers = isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-      : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+      : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
     const body = JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] });
 
     const controller = new AbortController();
@@ -1037,13 +1037,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     clearTimeout(timer);
 
     if (resp.ok) {
-      showToast('Connection OK (' + resp.status + ')', 'success');
+      showToast(`Connection OK (${resp.status})`, 'success');
     } else {
       const errText = (await resp.text()).slice(0, 200);
-      showToast('Connection failed: ' + resp.status + ' ' + errText, 'error');
+      showToast(`Connection failed: ${resp.status} ${errText}`, 'error');
     }
   } catch (err) {
-    showToast('Connection error: ' + String(err), 'error');
+    showToast(`Connection error: ${String(err)}`, 'error');
   } finally {
     testConnectionBtn.textContent = prevText;
     testConnectionBtn.disabled = false;

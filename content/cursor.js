@@ -40,57 +40,57 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       const style = document.createElement('style');
       style.id = STYLE_ID;
       style.textContent =
-        '#' + CURSOR_ID + ' {' +
-          'position: fixed !important;' +
-          'z-index: 2147483647 !important;' +
-          'pointer-events: none !important;' +
-          'width: 48px !important;' +
-          'height: 48px !important;' +
-          'transform: translate(-6px, -3px);' +
-          'transition: left 380ms cubic-bezier(0.4, 0, 0.2, 1),' +
-          '            top 380ms cubic-bezier(0.4, 0, 0.2, 1),' +
-          '            opacity 200ms ease;' +
-          'opacity: 1 !important;' +
-          'will-change: left, top, opacity;' +
-          'isolation: isolate;' +
-          'contain: layout style;' +
-          'filter: drop-shadow(0 0 6px #ff0000) drop-shadow(0 0 12px #ff4444) !important;' +
-          'animation: sentinelCursorBreathe 2.4s ease-in-out infinite;' +
-        '}' +
-        '#' + CURSOR_ID + '.dimmed { opacity: 0 !important; }' +
-        '#' + CURSOR_ID + ' .sentinel-cursor-halo {' +
-          'position: absolute;' +
-          'top: 50%;' +
-          'left: 50%;' +
-          'width: 40px;' +
-          'height: 40px;' +
-          'border-radius: 50%;' +
-          'background: radial-gradient(circle, rgba(255,107,0,0.55) 0%, rgba(255,107,0,0) 72%);' +
-          'transform: translate(-50%, -50%);' +
-          'transition: width 180ms ease, height 180ms ease, background 180ms ease;' +
-        '}' +
-        '#' + CURSOR_ID + '.pressing .sentinel-cursor-halo {' +
-          'width: 24px;' +
-          'height: 24px;' +
-          'background: radial-gradient(circle, rgba(255,68,68,0.75) 0%, rgba(255,68,68,0) 72%);' +
-        '}' +
-        '#' + CURSOR_ID + ' svg {' +
-          'position: relative;' +
-          'z-index: 1;' +
-          'filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(255,107,0,0.5));' +
-        '}' +
-        '@keyframes sentinelCursorBreathe {' +
-          '0%, 100% { filter: drop-shadow(0 0 4px rgba(255,107,0,0.45)); }' +
-          '50% { filter: drop-shadow(0 0 12px rgba(255,107,0,0.85)); }' +
-        '}' +
-        '@keyframes sentinelCursorPress {' +
-          '0% { transform: translate(-4px, -2px) scale(1); }' +
-          '50% { transform: translate(-4px, -2px) scale(0.78); }' +
-          '100% { transform: translate(-4px, -2px) scale(1); }' +
-        '}' +
-        '#' + CURSOR_ID + '.pressing {' +
-          'animation: sentinelCursorPress 220ms ease-out;' +
-        '}';
+        `#${CURSOR_ID} {` +
+          `position: fixed !important;` +
+          `z-index: 2147483647 !important;` +
+          `pointer-events: none !important;` +
+          `width: 48px !important;` +
+          `height: 48px !important;` +
+          `transform: translate(-6px, -3px);` +
+          `transition: left 380ms cubic-bezier(0.4, 0, 0.2, 1),` +
+          `            top 380ms cubic-bezier(0.4, 0, 0.2, 1),` +
+          `            opacity 200ms ease;` +
+          `opacity: 1 !important;` +
+          `will-change: left, top, opacity;` +
+          `isolation: isolate;` +
+          `contain: layout style;` +
+          `filter: drop-shadow(0 0 6px #ff0000) drop-shadow(0 0 12px #ff4444) !important;` +
+          `animation: sentinelCursorBreathe 2.4s ease-in-out infinite;` +
+        `}` +
+        `#${CURSOR_ID}.dimmed { opacity: 0 !important; }` +
+        `#${CURSOR_ID} .sentinel-cursor-halo {` +
+          `position: absolute;` +
+          `top: 50%;` +
+          `left: 50%;` +
+          `width: 40px;` +
+          `height: 40px;` +
+          `border-radius: 50%;` +
+          `background: radial-gradient(circle, rgba(255,107,0,0.55) 0%, rgba(255,107,0,0) 72%);` +
+          `transform: translate(-50%, -50%);` +
+          `transition: width 180ms ease, height 180ms ease, background 180ms ease;` +
+        `}` +
+        `#${CURSOR_ID}.pressing .sentinel-cursor-halo {` +
+          `width: 24px;` +
+          `height: 24px;` +
+          `background: radial-gradient(circle, rgba(255,68,68,0.75) 0%, rgba(255,68,68,0) 72%);` +
+        `}` +
+        `#${CURSOR_ID} svg {` +
+          `position: relative;` +
+          `z-index: 1;` +
+          `filter: drop-shadow(0 2px 4px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(255,107,0,0.5));` +
+        `}` +
+        `@keyframes sentinelCursorBreathe {` +
+          `0%, 100% { filter: drop-shadow(0 0 4px rgba(255,107,0,0.45)); }` +
+          `50% { filter: drop-shadow(0 0 12px rgba(255,107,0,0.85)); }` +
+        `}` +
+        `@keyframes sentinelCursorPress {` +
+          `0% { transform: translate(-4px, -2px) scale(1); }` +
+          `50% { transform: translate(-4px, -2px) scale(0.78); }` +
+          `100% { transform: translate(-4px, -2px) scale(1); }` +
+        `}` +
+        `#${CURSOR_ID}.pressing {` +
+          `animation: sentinelCursorPress 220ms ease-out;` +
+        `}`;
       // (3.8.1) Append to documentElement so a body wipe doesn't kill us.
       (document.head || document.documentElement).appendChild(style);
     } catch { /* non-fatal */ }
