@@ -23,6 +23,9 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
   const MIN_BLOCKING_Z_INDEX = 1000;
   const VIEWPORT_COVERAGE_THRESHOLD = 0.8;
 
+  // Precompile regex for dismiss button text matching (hot path in overlay detection)
+  const DISMISS_TEXT_RE = /^(close|dismiss|accept|ok|got it|agree|yes|continue|understood)$/i;
+
   // ========== Detect Overlay ==========
   /**
    * Checks for modals, dialogs, cookie banners blocking the page.
@@ -191,13 +194,12 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     }
 
     // 3. Text match: buttons/links with dismiss text
-    const dismissTextPattern = /^(close|dismiss|accept|ok|got it|agree|yes|continue|understood)$/i;
     const clickableEls = overlay.querySelectorAll('button, a, [role="button"]');
     for (let i = 0; i < clickableEls.length; i++) {
       const el = clickableEls[i];
       if (!dom || !dom.isVisible(el)) continue;
       const text = (el.innerText || el.textContent || '').trim();
-      if (dismissTextPattern.test(text)) {
+      if (DISMISS_TEXT_RE.test(text)) {
         el.click();
         el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
         el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, composed: true }));
