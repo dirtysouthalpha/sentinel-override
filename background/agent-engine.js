@@ -6504,22 +6504,11 @@ return { ok: true, value: el.value };
       if (_sameCmdCount >= 2 && !LOOP_EXCLUDE_TYPES.has(command.type)) {
         const _pageUnchanged = currentUrl === (_lastLoopUrl || '');
         console.warn(`[Sentinel/RECOVERY] Same-command loop:`, command.type, `used ${_sameCmdCount + 1} times. Page unchanged:`, _pageUnchanged);
-        let _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row`;
-        if (_pageUnchanged) _recoveryMsg += ' with NO page change';
-        _recoveryMsg += `. STOP using ${command.type}. `;
-        if (_cdpFallbackActive) {
-          _recoveryMsg += 'The content script is NOT available on this page (CDP fallback active). ';
-        }
-        _recoveryMsg += 'Switch to a completely different approach. Examples:\n';
-        _recoveryMsg += '- Use execute_js to extract data or interact with the DOM directly\n';
-        _recoveryMsg += '- Use click with a specific selector to interact with elements\n';
-        _recoveryMsg += '- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n';
-        _recoveryMsg += '- Read the page text content and extract what you need without interacting\n\n';
+        // Template literal more efficient than repeated += concatenation
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
-        if (_smartStrats.length) {
-          _recoveryMsg += `SMART STRATEGIES for this page:\n${_smartStrats.map(s => `→ ${s}`).join('\n')}\n`;
-        }
+        const _smartStratMsg = _smartStrats.length ? `SMART STRATEGIES for this page:\n${_smartStrats.map(s => `→ ${s}`).join('\n')}\n` : '';
+        const _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row${_pageUnchanged ? ' with NO page change' : ''}. STOP using ${command.type}. ${_cdpFallbackActive ? 'The content script is NOT available on this page (CDP fallback active). ' : ''}Switch to a completely different approach. Examples:\n- Use execute_js to extract data or interact with the DOM directly\n- Use click with a specific selector to interact with elements\n- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n- Read the page text content and extract what you need without interacting\n\n${_smartStratMsg}`;
         historyPush({
           step: stepCount,
           action: { type: 'note', text: _recoveryMsg },
