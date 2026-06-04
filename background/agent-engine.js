@@ -59,11 +59,11 @@ async function _visionObserve(tab, _currentUrl) {
     for (const el of indexedElements) {
       const tag = el.tag || 'div';
       let attrs = '';
-      if (el.type) attrs += ' type=' + el.type;
-      if (el.role) attrs += ' role=' + el.role;
-      if (el.ariaLabel) attrs += ' aria-label=' + JSON.stringify((el.ariaLabel || '').substring(0, 40));
-      if (el.placeholder) attrs += ' placeholder=' + JSON.stringify((el.placeholder || '').substring(0, 40));
-      if (el.href) { const hrefLen = el.href.length; if (hrefLen > 5 && hrefLen < 100) attrs += ' href=' + JSON.stringify(el.href.substring(0, 80)); }
+      if (el.type) attrs += ` type=${el.type}`;
+      if (el.role) attrs += ` role=${el.role}`;
+      if (el.ariaLabel) attrs += ` aria-label=${JSON.stringify((el.ariaLabel || '').substring(0, 40))}`;
+      if (el.placeholder) attrs += ` placeholder=${JSON.stringify((el.placeholder || '').substring(0, 40))}`;
+      if (el.href) { const hrefLen = el.href.length; if (hrefLen > 5 && hrefLen < 100) attrs += ` href=${JSON.stringify(el.href.substring(0, 80))}`; }
       const text = el.text ? `>${(el.text || '').substring(0, 60)}` : '/>';
       const closing = el.text ? `</${tag}>` : '';
       elementParts.push(`[${el.index}]<${tag}${attrs}${text}${closing}\n`);
@@ -3016,7 +3016,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   // [unverified] tagging.
   if (!rawFields.length || missing.length / rawFields.length < 0.5) return null;
 
-  return 'Goal asked for: ' + rawFields.join(', ') + '. Memory is missing token-evidence for: ' + missing.join(', ') + '. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.';
+  return `Goal asked for: ${rawFields.join(', ')}. Memory is missing token-evidence for: ${missing.join(', ')}. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.`;
 }
 
 /**
@@ -3530,7 +3530,7 @@ async function runAgentLoop(goal, workingTabId) {
         tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')
       );
       if (_isRestrictedPage) {
-        const _restrictedMsg = 'Cannot operate on internal browser page (' + tabInfo.url + '). Switch to a normal web tab or open a new tab before starting the agent.';
+        const _restrictedMsg = `Cannot operate on internal browser page (${tabInfo.url}). Switch to a normal web tab or open a new tab before starting the agent.`;
         historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
         finished = true;
@@ -4816,8 +4816,8 @@ async function runAgentLoop(goal, workingTabId) {
           })();
           const _hasIncompleteMarker = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i.test(_summary);
           if (_isMultiPortal && stepCount < 80 && _hasIncompleteMarker) {
-            const blockMsg = 'BLOCKED: finish called early with "incomplete" markers on a multi-portal investigation (' + stepCount + ' steps; threshold 80). You have substantial budget remaining (dynamic cap 300, +25 per productive action). Try alternative strategies before declaring done:\n' +
-              '  1. Microsoft Graph API: read_network_requests filter for graph.microsoft.com to capture the underlying JSON the UI is rendering.\n' +
+            const blockMsg = `BLOCKED: finish called early with "incomplete" markers on a multi-portal investigation (${stepCount} steps; threshold 80). You have substantial budget remaining (dynamic cap 300, +25 per productive action). Try alternative strategies before declaring done:\n` +
+              `  1. Microsoft Graph API: read_network_requests filter for graph.microsoft.com to capture the underlying JSON the UI is rendering.\n` +
               '  2. Alternate URL paths: Purview audit moved to purview.microsoft.com/audit/auditsearch (NOT /auditlogsearch).\n' +
               '  3. Cross-origin iframes block DOM scraping but the Graph API is visible. Use it.\n' +
               '  4. Log Analytics KQL for >60-day windows that the UI doesn\'t support.\n' +
@@ -4853,7 +4853,7 @@ async function runAgentLoop(goal, workingTabId) {
         const cleanKeys = Object.keys(cleanMemory);
         if (cleanKeys.length) {
           // Let the LLM's summary stand on its own — the report will incorporate the data
-          finalSummary += '\n\n📊 **' + cleanKeys.length + ' data points collected** — full analysis in the report below.';
+          finalSummary += `\n\n📊 **${cleanKeys.length} data points collected** — full analysis in the report below.`;
         }
 
         // Capture report data BEFORE history gets cleared at loop exit
