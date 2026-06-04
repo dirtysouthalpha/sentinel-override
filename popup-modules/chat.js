@@ -72,7 +72,7 @@ function renderTenantChip(tenant, expected) {
     return;
   }
   // Display priority: chipText > onmicrosoft > tid (truncated)
-  const display = tenant.chipText || tenant.onmicrosoft || (tenant.tid ? ('tid:' + String(tenant.tid).slice(0, 8) + '…') : 'tenant');
+  const display = tenant.chipText || tenant.onmicrosoft || (tenant.tid ? (`tid:${String(tenant.tid).slice(0, 8)}…`) : 'tenant');
   chip.textContent = display;
   chip.style.display = 'inline-flex';
 

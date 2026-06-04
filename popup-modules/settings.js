@@ -1098,7 +1098,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
     modelsSel.disabled = true;
     useBtn.disabled = true;
-    try { showToast('Endpoint set for ' + provider.label, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+    try { showToast(`Endpoint set for ${provider.label}`, 'info'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
   });
 
   detectBtn.addEventListener('click', async () => {
@@ -1125,7 +1125,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast('Detect failed: ' + msg, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+        try { showToast(`Detect failed: ${msg}`, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
         modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
         return;
       }
@@ -1138,7 +1138,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       modelsSel.innerHTML = '';
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = '- Select a model (' + models.length + ' available) -';
+      placeholder.textContent = `- Select a model (${models.length} available) -`;
       modelsSel.appendChild(placeholder);
       for (const m of models) {
         const o = document.createElement('option');
@@ -1148,9 +1148,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       }
       modelsSel.disabled = false;
       useBtn.disabled = false;
-      try { showToast('Detected ' + models.length + ' models', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+      try { showToast(`Detected ${models.length} models`, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     } catch (e) {
-      try { showToast('Error: ' + String(e), 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+      try { showToast(`Error: ${String(e)}`, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
       modelsSel.innerHTML = '<option value="">(error - see toast)</option>';
     } finally {
       detectBtn.textContent = prevText;
@@ -1167,7 +1167,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
-      try { showToast('Model set to ' + value, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+      try { showToast(`Model set to ${value}`, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     }
   });
 })();
@@ -1283,7 +1283,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
           if (allThemePresets.length) {
             allThemePresets.forEach(b => b.classList.toggle('active', b.dataset.theme === theme));
           }
-          try { showToast('Theme: ' + theme + ' (saved)', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+          try { showToast(`Theme: ${theme} (saved)`, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
         });
       });
     }
