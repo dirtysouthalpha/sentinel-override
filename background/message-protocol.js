@@ -5,6 +5,8 @@
 // because tab-context.js does not re-export anything from message-protocol.js, and
 // message-protocol.js never imports from tab-context.js.
 
+import { TEN_SECONDS_MS } from './constants.js';
+
 /**
  * Promise wrapper around chrome.tabs.sendMessage.
  * Checks chrome.runtime.lastError, rejects on error,
@@ -15,7 +17,7 @@
  * @param {number} [timeoutMs=10000]
  * @returns {Promise<any>} response.data on success
  */
-export function sendMessage(tabId, message, timeoutMs = 10000) {
+export function sendMessage(tabId, message, timeoutMs = TEN_SECONDS_MS) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error(`Message to tab ${tabId} timed out after ${timeoutMs}ms`));
@@ -49,7 +51,7 @@ export function sendMessage(tabId, message, timeoutMs = 10000) {
  * @param {number} [timeoutMs=10000]
  * @returns {Promise<any>} response on success
  */
-export function sendRuntimeMessage(message, timeoutMs = 10000) {
+export function sendRuntimeMessage(message, timeoutMs = TEN_SECONDS_MS) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error(`Runtime message timed out after ${timeoutMs}ms`));

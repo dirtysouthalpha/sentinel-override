@@ -11,6 +11,7 @@
 // No circular imports.
 
 import { getErrorMessage } from './error-utils.js';
+import { TWENTY_SECONDS_MS } from './constants.js';
 
 let _spaTransitionPending = false;
 
@@ -62,7 +63,7 @@ export function startSwKeepalive(name) {
     } catch (_e) { /* chrome API not available */ }
   };
   tick();
-  const handle = setInterval(tick, 20000);
+  const handle = setInterval(tick, TWENTY_SECONDS_MS);
   _keepaliveHandles.set(name, handle);
 }
 

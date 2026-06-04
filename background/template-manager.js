@@ -4,6 +4,7 @@
 // Storage: chrome.storage.local key 'sentinel_templates'
 
 import { getErrorMessage } from './error-utils.js';
+import { ONE_MINUTE_MS } from './constants.js';
 
 const STORAGE_KEY = 'sentinel_templates';
 const PARAM_REGEX = /:{2}(\w+):{2}/g;
@@ -11,7 +12,7 @@ const PARAM_REGEX = /:{2}(\w+):{2}/g;
 // ========== In-Memory Cache ==========
 let templatesCache = null;
 let cacheTimestamp = 0;
-const CACHE_TTL = 60000; // 1 minute TTL
+const CACHE_TTL = ONE_MINUTE_MS; // 1 minute TTL
 
 // Invalidate cache when storage changes externally (e.g., from popup)
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {

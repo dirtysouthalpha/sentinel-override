@@ -20,6 +20,7 @@
 // the panel UI. Keep them stable — the panel's filter chips use them.
 
 import { getErrorMessage } from './error-utils.js';
+import { FIVE_SECONDS_MS } from './constants.js';
 
 const LEVELS = { error: 4, warn: 3, info: 2, debug: 1, trace: 0 };
 
@@ -41,7 +42,7 @@ let _currentLevel = 'normal';
 let _seq = 0;
 
 const MAX_PERSISTED_RUNS = 5;
-const PERSIST_FLUSH_INTERVAL_MS = 5000;
+const PERSIST_FLUSH_INTERVAL_MS = FIVE_SECONDS_MS;
 const PERSIST_MAX_EVENTS_PER_RUN = 1000;
 let _currentRunId = null;
 let _currentRunGoal = '';
