@@ -1316,34 +1316,38 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
   const _u = (currentUrl || '').toLowerCase();
   let platformHints = '';
   if (/entra|admin\.microsoft|admin\.exchange|purview|defender|security\.microsoft|portal\.azure|intune|endpoint\.microsoft/.test(_u)) {
-    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):\n` +
-      `- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.\n` +
-      `- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.\n` +
-      `- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.\n`;
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):
+- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.
+- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.
+- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.
+`;
   } else if (/virustotal/.test(_u)) {
-    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):\n` +
-      `- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.\n` +
-      `- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.\n`;
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):
+- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.
+- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.
+`;
   } else if (/sentinelone|singularity/.test(_u)) {
-    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):\n` +
-      `- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.\n` +
-      `- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".\n`;
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):
+- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.
+- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".
+`;
   } else if (/sonicwall|sonicos|fortigate|paloalto/.test(_u)) {
-    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (network device UI):\n` +
-      `- Custom dropdowns: click trigger to open, then click option (NOT the select action).\n` +
-      `- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n` +
-      `- Long log loads: use wait_for_text with 30000ms timeout.\n`;
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (network device UI):
+- Custom dropdowns: click trigger to open, then click option (NOT the select action).
+- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.
+- Long log loads: use wait_for_text with 30000ms timeout.
+`;
   }
-  return `\nSTRATEGY SHIFT REQUIRED -- You have failed ${agentState.consecutiveFailures} times in a row.\n` +
-    `Approaches already tried: ${(agentState.currentStrategies || []).join(', ')}\n` +
-    `You MUST try a COMPLETELY DIFFERENT approach. Consider:\n` +
-    `- Using "execute_js" to write custom JavaScript to accomplish the task\n` +
-    `- Using "read_network_requests" to read the underlying API response\n` +
-    `- Scrolling to find different elements\n` +
-    `- Navigating to a different page\n` +
-    `- Using "extract" + memory to build data step by step\n` +
-    platformHints +
-    `Do NOT repeat the same failed action.\n`;
+  return `\nSTRATEGY SHIFT REQUIRED -- You have failed ${agentState.consecutiveFailures} times in a row.
+Approaches already tried: ${(agentState.currentStrategies || []).join(', ')}
+You MUST try a COMPLETELY DIFFERENT approach. Consider:
+- Using "execute_js" to write custom JavaScript to accomplish the task
+- Using "read_network_requests" to read the underlying API response
+- Scrolling to find different elements
+- Navigating to a different page
+- Using "extract" + memory to build data step by step
+${platformHints}Do NOT repeat the same failed action.
+`;
 }
 
 // Build the execution-plan status block injected before the prompt schema.
@@ -1663,26 +1667,24 @@ ${base64Image ? (function() {
     const _visionHeader = _visionCapable
       ? 'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n'
       : `SCREENSHOT ACTIVE — a screenshot is attached for visual context, but you cannot determine pixel coordinates from it.\nUse selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n`;
-    return metaLine +
-    _visionHeader +
-    `1. Look at the screenshot to find the element you want to interact with.\n` +
-    `2. ${_visionCapable
-      ? `Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n` +
-        `3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n`
-      : `Use the element list below to find the right ref or selector, then use click with that ref.\n` +
-        `3. Example: { "type": "click", "ref": "ref_12" } or { "type": "click", "selector": "button.accept" }.\n`}` +
-    `4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n` +
-    `RULES:\n` +
-    (_visionCapable
-      ? `- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n` +
-        `- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n` +
-        `- If click_at misses, fall back to click with a selector from the element list.\n`
-      : `- Use click with ref/selector from the element list for ALL interactions.\n` +
-        `- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n` +
-        `- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n`) +
-    `- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n` +
-    dprLine +
-    `Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n`;
+    return `${metaLine}${_visionHeader}1. Look at the screenshot to find the element you want to interact with.
+2. ${_visionCapable
+      ? `Estimate the x,y CSS pixel coordinates of the element center from the screenshot.
+3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.`
+      : `Use the element list below to find the right ref or selector, then use click with that ref.
+3. Example: { "type": "click", "ref": "ref_12" } or { "type": "click", "selector": "button.accept" }.`}
+4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).
+RULES:
+${_visionCapable
+      ? `- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.
+- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.
+- If click_at misses, fall back to click with a selector from the element list.`
+      : `- Use click with ref/selector from the element list for ALL interactions.
+- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.
+- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.`}
+- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.
+${dprLine}Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.
+`;
 })() : ''}
 
 ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.'}`;

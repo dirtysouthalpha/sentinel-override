@@ -445,13 +445,12 @@ function _renderSkillStatsModal(skills) {
       const delta = (s.effectivePriority || 0) - (s.priority || 0);
       const deltaStr = delta === 0 ? '' : (delta > 0 ? ` (+${delta})` : ` (${delta})`);
       const deltaColor = delta > 0 ? '#9ece6a' : delta < 0 ? '#f44' : 'var(--text-tertiary)';
-      tr.innerHTML =
-        `<td style="padding:6px 4px;"><strong>${escapeHtml(s.id)}</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">${escapeHtml(s.description || '')}</div></td>` +
-        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.fires}</td>` +
-        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.successes} / ${stats.failures}</td>` +
-        `<td style="padding:6px 4px; text-align:right; color:${rateColor}; font-variant-numeric:tabular-nums;">${rateStr}</td>` +
-        `<td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">${s.priority || 0}</td>` +
-        `<td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${s.effectivePriority || 0}<span style="color:${deltaColor};">${deltaStr}</span></td>`;
+      tr.innerHTML = `<td style="padding:6px 4px;"><strong>${escapeHtml(s.id)}</strong><div style="font-size:10px; color:var(--text-tertiary); margin-top:1px;">${escapeHtml(s.description || '')}</div></td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.fires}</td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${stats.successes} / ${stats.failures}</td>
+        <td style="padding:6px 4px; text-align:right; color:${rateColor}; font-variant-numeric:tabular-nums;">${rateStr}</td>
+        <td style="padding:6px 4px; text-align:right; color:var(--text-tertiary); font-variant-numeric:tabular-nums;">${s.priority || 0}</td>
+        <td style="padding:6px 4px; text-align:right; font-variant-numeric:tabular-nums;">${s.effectivePriority || 0}<span style="color:${deltaColor};">${deltaStr}</span></td>`;
       tbody.appendChild(tr);
     }
     table.appendChild(tbody);

@@ -386,9 +386,10 @@ function setupApprovalModeToggle() {
     // Disabling approvals is the dangerous direction -- confirm first.
     if (!isApprovalMode) {
       const ok = window.confirm(
-        `Disabling approvals lets the agent submit forms, click buy/send, and run JavaScript without asking. Continue?\n\n` +
-        `OK = I understand the risks (continue without approvals)\n` +
-        `Cancel = Keep approvals on (recommended)`
+        `Disabling approvals lets the agent submit forms, click buy/send, and run JavaScript without asking. Continue?
+
+OK = I understand the risks (continue without approvals)
+Cancel = Keep approvals on (recommended)`
       );
       if (!ok) {
         // Revert the toggle; do NOT persist.
@@ -2302,10 +2303,9 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
     durationStr = ` <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ${_formatDuration(detail.durationMs)}</span>`;
   }
 
-  item.innerHTML =
-    `<span style="color:${statusColor}; display:inline-flex;">${_activityIcon(status)}</span>` +
-    `<span style="color:${status === 'failed' ? 'var(--error-color, #f44336)' : 'var(--text-primary)'}; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(label || '')}</span>` +
-    durationStr;
+  item.innerHTML = `<span style="color:${statusColor}; display:inline-flex;">${_activityIcon(status)}</span>
+    <span style="color:${status === 'failed' ? 'var(--error-color, #f44336)' : 'var(--text-primary)'}; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(label || '')}</span>
+    ${durationStr}`;
 
   // (3.19.1) When the consult-ai item finalizes, if no agent_action message
   // has updated the step headline yet (typical for internal actions like
@@ -3006,11 +3006,11 @@ function renderSourceChipsIn(rootEl) {
       chip.title = isUnverified
         ? 'This claim has no verified source — treat with caution'
         : `Source: agentMemory["${key}"]. Click to view.`;
-      chip.style.cssText = `display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin:0 2px; ` +
-        `border-radius:9px; font-size:10px; font-weight:600; cursor:pointer; vertical-align:baseline; ` +
-        (isUnverified
+      chip.style.cssText = `display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin:0 2px;
+        border-radius:9px; font-size:10px; font-weight:600; cursor:pointer; vertical-align:baseline;
+        ${isUnverified
           ? 'background:rgba(220,60,60,0.20); color:#ff8a8a; border:1px solid rgba(220,60,60,0.5);'
-          : 'background:rgba(255,107,0,0.18); color:#ff9a4a; border:1px solid rgba(255,107,0,0.45);');
+          : 'background:rgba(255,107,0,0.18); color:#ff9a4a; border:1px solid rgba(255,107,0,0.45);'}`;
       chip.addEventListener('click', () => toggleSourceChipExpansion(chip));
       frag.appendChild(chip);
       last = m.index + m[0].length;
@@ -3030,9 +3030,9 @@ async function toggleSourceChipExpansion(chip) {
   }
   const exp = document.createElement('div');
   exp.className = 'sentinel-src-expansion';
-  exp.style.cssText = `margin: 6px 0 6px 22px; padding: 8px 12px; background: rgba(255,255,255,0.05); ` +
-    `border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; ` +
-    `font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto;`;
+  exp.style.cssText = `margin: 6px 0 6px 22px; padding: 8px 12px; background: rgba(255,255,255,0.05);
+    border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px;
+    font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto;`;
   if (unverified || !key) {
     exp.textContent = 'No verified source for this claim. Treat as model-prior or caveat content.';
     chip.parentNode.insertBefore(exp, chip.nextSibling);
