@@ -75,11 +75,11 @@ function _slugify(name) {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .substring(0, 50) || 'client-' + Date.now();
+    .substring(0, 50) || `client-${Date.now()}`;
 }
 
 function _genEntryId() {
-  return 'entry_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+  return `entry_${Math.random().toString(36).substring(2, 10)}_${Date.now().toString(36)}`;
 }
 
 // ========== Client CRUD ==========

@@ -714,7 +714,7 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
       try { if (pt && pt.urlMatch && pt.urlMatch.test(currentUrl)) { detected = pt; break; } } catch (e) { console.error('[Sentinel] Error in llm-client.js:', getErrorMessage(e)); }
     }
     if (detected) {
-      parts.push('CURRENT PAGE TYPE: ' + detected.name + ' — ' + (detected.hint || ''));
+      parts.push(`CURRENT PAGE TYPE: ${detected.name} — ${detected.hint || ''}`);
       parts.push('');
     }
   }
@@ -751,12 +751,12 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
   }
 
   if (profile.liveDataCaveats) {
-    parts.push('LIVE DATA NOTE: ' + profile.liveDataCaveats);
+    parts.push(`LIVE DATA NOTE: ${profile.liveDataCaveats}`);
     parts.push('');
   }
 
   if (Array.isArray(profile.commitFlow) && profile.commitFlow.length) {
-    parts.push('COMMIT SEQUENCE: After any config change, click in order: ' + profile.commitFlow.join(' → ') + '. Do not skip steps — each platform requires this exact sequence to persist changes.');
+    parts.push(`COMMIT SEQUENCE: After any config change, click in order: ${profile.commitFlow.join(' → ')}. Do not skip steps — each platform requires this exact sequence to persist changes.`);
     parts.push('');
   }
 
@@ -1077,7 +1077,7 @@ export async function generatePlan(goal, settings, context = {}) {
       if (numberedLines.length >= 2) {
         const steps = numberedLines.map(l => l.replace(/^\d+[.)]\s+/, '').replace(/^[Ss]tep\s+\d+[:.)\s]+/, '').trim()).filter(s => s.length >= 8);
         if (steps.length >= 2) {
-          console.warn('Plan generation: extracted ' + steps.length + ' numbered steps from prose');
+          console.warn(`Plan generation: extracted ${steps.length} numbered steps from prose`);
           return steps;
         }
       }
@@ -1086,7 +1086,7 @@ export async function generatePlan(goal, settings, context = {}) {
       if (bulletLines.length >= 2) {
         const steps = bulletLines.map(l => l.replace(/^[-*•→]\s+/, '').trim()).filter(s => s.length >= 8);
         if (steps.length >= 2) {
-          console.warn('Plan generation: extracted ' + steps.length + ' bullet steps from prose');
+          console.warn(`Plan generation: extracted ${steps.length} bullet steps from prose`);
           return steps;
         }
       }
