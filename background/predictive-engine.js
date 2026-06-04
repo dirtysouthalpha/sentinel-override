@@ -388,8 +388,8 @@ export function generateOptimizedPlan(tasks) {
   while (queue.length > 0) {
     const id = queue.shift();
     executionOrder.push(id);
-    
-    const level = tasks.find(t => t.id === id)?.dependencies?.length || 0;
+
+    const level = taskMap.get(id)?.dependencies?.length || 0;
     levels.set(id, level);
     
     for (const nextId of adjList.get(id)) {

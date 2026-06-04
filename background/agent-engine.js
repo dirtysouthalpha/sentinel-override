@@ -6519,7 +6519,8 @@ return { ok: true, value: el.value };
               // Type each character via CDP Input.dispatchKeyEvent
               const text = command.text || '';
               // Note: no additional reference used - CDP sends directly to tab
-              for (let ci = 0; ci < text.length; ci++) {
+              const textLen = text.length;
+              for (let ci = 0; ci < textLen; ci++) {
                 const ch = text[ci];
                 try {
                   await new Promise((res, rej) => {
