@@ -5,6 +5,11 @@
 // NinjaOne is a React SPA with hash-based routing. The "Run Automation"
 // / "Scripting" pane is the primary command surface.
 
+// Precompile regex patterns for hot-path detection
+const _NINJA_HOST_RE = /ninjarmm\.com|ninjarmm\.io|app\.ninjarmm/i;
+const _NINJA_HOST_SHORT_RE = /ninjarmm/i;
+const _NINJA_GOAL_RE = /\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i;
+
 export const ninjarmm = {
   id: 'ninjarmm',
   label: 'NinjaOne (NinjaRMM)',
@@ -15,10 +20,10 @@ export const ninjarmm = {
     try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/ninjarmm\.com|ninjarmm\.io|app\.ninjarmm/i.test(host)) return true;
-      if (/ninjarmm/i.test(host)) return true;
+      if (_NINJA_HOST_RE.test(host)) return true;
+      if (_NINJA_HOST_SHORT_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(?:ninjarmm|ninjaone|ninja[\s-]?rmm)\b/i.test(String(goal || ''));
+    return _NINJA_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

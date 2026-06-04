@@ -10,6 +10,12 @@
 // agent must understand the difference between editing in FortiManager (which
 // stages the change) and installing to the device (which applies it).
 
+// Precompile regex patterns for hot-path detection
+const _FORTI_HOST_RE = /fortinet|fortigate|fortimanager|fortiweb|forticloud/i;
+const _FORTI_PATH_RE = /\/ng\/|\/p\/login|\/p\/dashboard/;
+const _IP_ADDRESS_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
+const _FORTI_GOAL_RE = /\b(fortigate|fortimanager|fortinet|fortiweb|fortianalyzer)\b/i;
+
 export const fortigate = {
   id: 'fortigate',
   label: 'FortiGate / FortiManager',
@@ -21,10 +27,10 @@ export const fortigate = {
       const u = new URL(url);
       const host = u.host.toLowerCase();
       const path = u.pathname.toLowerCase();
-      if (/fortinet|fortigate|fortimanager|fortiweb|forticloud/i.test(host)) return true;
-      if (/\/ng\/|\/p\/login|\/p\/dashboard/.test(path) && /\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host)) return true;
+      if (_FORTI_HOST_RE.test(host)) return true;
+      if (_FORTI_PATH_RE.test(path) && _IP_ADDRESS_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(fortigate|fortimanager|fortinet|fortiweb|fortianalyzer)\b/i.test(String(goal || ''));
+    return _FORTI_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

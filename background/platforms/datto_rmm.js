@@ -8,6 +8,13 @@
 // Both products are owned by Kaseya. They are separate UIs; detect() covers
 // both so the agent gets relevant hints whichever surface is open.
 
+// Precompile regex patterns for hot-path detection
+const _DATTO_HOST_RE = /centrastage\.net|dattormm\.com/i;
+const _DATTO_SITE_RE = /datto\.com/i;
+const _RMM_PATH_RE = /\/rmm/i;
+const _AUTOTASK_HOST_RE = /autotask\.net|atask\.net/i;
+const _DATTO_GOAL_RE = /\b(?:datto\s+rmm|autotask|centrastage)\b/i;
+
 export const dattoRmm = {
   id: 'datto_rmm',
   label: 'Datto RMM / Autotask PSA',
@@ -18,11 +25,11 @@ export const dattoRmm = {
     try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/centrastage\.net|dattormm\.com/i.test(host)) return true;
-      if (/datto\.com/i.test(host) && /\/rmm/i.test(u.pathname)) return true;
-      if (/autotask\.net|atask\.net/i.test(host)) return true;
+      if (_DATTO_HOST_RE.test(host)) return true;
+      if (_DATTO_SITE_RE.test(host) && _RMM_PATH_RE.test(u.pathname)) return true;
+      if (_AUTOTASK_HOST_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(?:datto\s+rmm|autotask|centrastage)\b/i.test(String(goal || ''));
+    return _DATTO_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

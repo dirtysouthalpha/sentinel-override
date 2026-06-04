@@ -5,6 +5,13 @@
 // Each sub-portal has distinct DOM patterns. The detect() heuristic
 // + pageTypes classifier guide the agent to the right surface.
 
+// Precompile regex patterns for hot-path detection
+const _CISCO_HOST_RE = /cisco/i;
+const _MERAKI_HOST_RE = /meraki\.com/i;
+const _CISCO_PATH_RE = /\/asdm|\/fmc/;
+const _ISE_HOST_RE = /\.ise\./i;
+const _CISCO_GOAL_RE = /\b(cisco\s*asa|firepower|meraki|cisco\s*ise)\b/i;
+
 export const cisco = {
   id: 'cisco',
   label: 'Cisco Management (ASA/FMC/Meraki/ISE)',
@@ -16,13 +23,13 @@ export const cisco = {
       const u = new URL(url);
       const host = u.hostname.toLowerCase();
       const path = u.pathname.toLowerCase();
-      if (/cisco/i.test(host)) return true;
-      if (/meraki\.com/i.test(host)) return true;
-      if (/\/asdm|\/fmc/.test(path)) return true;
-      if (/\.ise\./i.test(host)) return true;
+      if (_CISCO_HOST_RE.test(host)) return true;
+      if (_MERAKI_HOST_RE.test(host)) return true;
+      if (_CISCO_PATH_RE.test(path)) return true;
+      if (_ISE_HOST_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     const t = String(goal || '').toLowerCase();
-    return /\b(cisco\s*asa|firepower|meraki|cisco\s*ise)\b/i.test(t);
+    return _CISCO_GOAL_RE.test(t);
   },
 
   inferSurface(goal) {

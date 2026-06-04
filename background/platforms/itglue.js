@@ -12,6 +12,11 @@
 // IT technician whose JOB is to retrieve credentials from this documentation
 // system. The agent will click Reveal/Copy buttons and return the full value.
 
+// Precompile regex patterns for hot-path detection
+const _ITGLUE_HOST_RE = /(^|\.)itglue\.com$/i;
+const _ITGLUE_PARTNER_HOST_RE = /(^|\.)partner\.itglue\.com$/i;
+const _ITGLUE_GOAL_RE = /\bit\s*glue\b/i;
+
 export const itglue = {
   id: 'itglue',
   label: 'IT Glue',
@@ -21,10 +26,10 @@ export const itglue = {
     if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
-      if (/(^|\.)itglue\.com$/i.test(host)) return true;
-      if (/(^|\.)partner\.itglue\.com$/i.test(host)) return true;
+      if (_ITGLUE_HOST_RE.test(host)) return true;
+      if (_ITGLUE_PARTNER_HOST_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\bit\s*glue\b/i.test(String(goal || ''));
+    return _ITGLUE_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [
