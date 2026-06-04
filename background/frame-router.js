@@ -191,7 +191,7 @@ export async function executeInFrame(tabId, frameId, command) {
 
     return { ok: false, error: 'No result returned from frame command execution' };
   } catch (e) {
-    return { ok: false, error: 'Frame execution failed: ' + getErrorMessage(e) };
+    return { ok: false, error: `Frame execution failed: ${getErrorMessage(e)}` };
   }
 }
 
@@ -223,7 +223,7 @@ async function runCommandInFrame(command) {
     switch (command.type) {
       case 'click': {
         const el = dom.findElementBySelector(doc, command.selector);
-        if (!el) return { ok: false, error: 'Element not found: ' + command.selector };
+        if (!el) return { ok: false, error: `Element not found: ${command.selector}` };
 
         // Overlay check
         if (ov && ov.isOverlayBlocking) {
@@ -245,12 +245,12 @@ async function runCommandInFrame(command) {
         el.click();
         el.dispatchEvent(new MouseEvent('mouseout', mouseOpts));
         if (hl) hl.removeHighlight(el);
-        return { ok: true, data: 'Clicked ' + command.selector };
+        return { ok: true, data: `Clicked ${command.selector}` };
       }
 
       case 'type': {
         const el = dom.findElementBySelector(doc, command.selector);
-        if (!el) return { ok: false, error: 'Element not found: ' + command.selector };
+        if (!el) return { ok: false, error: `Element not found: ${command.selector}` };
 
         // Overlay check
         if (ov && ov.isOverlayBlocking) {
@@ -322,7 +322,7 @@ async function runCommandInFrame(command) {
           }
           el.dispatchEvent(new Event('change', eventOpts));
           if (hl) hl.removeHighlight(el);
-          return { ok: true, data: 'Typed into ' + command.selector };
+          return { ok: true, data: `Typed into ${command.selector}` };
         }
 
         // Fallback
@@ -370,14 +370,14 @@ async function runCommandInFrame(command) {
           }
           content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
         }
-        return { ok: true, data: 'Page Title: ' + title + '\nURL: ' + url + '\n\n' + content };
+        return { ok: true, data: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
       }
 
       default:
-        return { ok: false, error: 'Unknown command type in frame: ' + command.type };
+        return { ok: false, error: `Unknown command type in frame: ${command.type}` };
     }
   } catch (e) {
-    return { ok: false, error: 'Frame command error: ' + getErrorMessage(e) };
+    return { ok: false, error: `Frame command error: ${getErrorMessage(e)}` };
   }
 }
 
