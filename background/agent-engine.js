@@ -98,7 +98,7 @@ import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.j
 // run-log index entry.
 import { computeTrustScore, suggestRetryActions } from './trust-score.js';
 import { getSkillStats } from './skills/index.js';
-import { getErrorMessage } from './error-utils.js';
+import { getErrorMessage, sleep } from './error-utils.js';
 
 // ========== Agent State ==========
 let agentRunning = false;
@@ -1361,11 +1361,13 @@ async function _cdpObservePage(tabId) {
       // If page has no body and no children, wait a moment and try again
       if (!r.hasBody && r.childCount === 0) {
         console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
+        try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
         await sleep(2000);
       }
       // If title is empty and URL is still about:blank or loading, wait
       if (!r.title && (r.url === 'about:blank' || r.url === '')) {
         console.log('[Sentinel/CDP] Page still loading — waiting 2s...');
+        try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
         await sleep(2000);
       }
     }
@@ -2701,6 +2703,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
       console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
       sendSilentUpdate(`🤖 CAPTCHA auto-solved (${clickedWhat})`, stepCount);
+      try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
       await sleep(2000); // wait for page to process
       return 'solved';
     }
@@ -2722,6 +2725,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
         sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
         try {
           await chrome.tabs.update(tab.id, { url: searchUrl });
+          try { tel.trace('sleep', 'Sleep 3000ms', { ms: 3000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           await sleep(3000);
         } catch (_navErr) {
           console.warn('[Sentinel/CAPTCHA] Navigate to search URL failed:', getErrorMessage(_navErr));
@@ -2733,6 +2737,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
       try {
         await chrome.tabs.update(tab.id, { url: info.altUrl });
+        try { tel.trace('sleep', 'Sleep 3000ms', { ms: 3000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
         await sleep(3000);
       } catch (_navErr) {
         console.warn('[Sentinel/CAPTCHA] Navigate to homepage failed:', getErrorMessage(_navErr));
@@ -2746,6 +2751,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     console.log('[Sentinel/CAPTCHA] Going back to previous page');
     sendSilentUpdate('⬅️ CAPTCHA detected, going back', stepCount);
     await chrome.tabs.goBack(tab.id);
+    try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
     await sleep(2000);
     return 'went_back';
   } catch (e) {
@@ -5654,6 +5660,7 @@ async function runAgentLoop(goal, workingTabId) {
           // sees it linked in the tab bar.
           try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           await switchToTab(ctx.tabId);
+          try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           await sleep(2000);
           await injectContentScript(ctx.tabId);
           // (3.50.1) Validate we landed where we intended.
@@ -6886,15 +6893,7 @@ async function enforceRateLimit() {
   lastApiCallTime = Date.now();
 }
 
-function sleep(ms) {
-  // (3.25.1) Telemetry at trace level for longer sleeps only. We deliberately
-  // skip short (<300ms) sleeps because they fire dozens of times per step
-  // (between CDP mouse events, between content-script roundtrips) and would
-  // drown out the panel. >=1500ms sleeps are usually post-navigate / page-load
-  // waits, which are exactly what operators want to see.
-  try { if (ms >= 1500) tel.trace('sleep', 'Sleep ' + ms + 'ms', { ms }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+/**
 
 /**
  * Escape a string for safe inclusion in JavaScript code (CDP injection).

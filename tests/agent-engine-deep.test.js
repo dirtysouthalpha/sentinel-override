@@ -694,25 +694,6 @@ describe('sleep', () => {
     jest.advanceTimersByTime(0);
     await promise;
   });
-
-  test('calls tel.trace for sleeps >= 1500ms', async () => {
-    const { tel } = await import('../background/telemetry.js');
-    jest.useFakeTimers();
-    const promise = sleep(2000);
-    jest.advanceTimersByTime(2000);
-    await promise;
-    expect(tel.trace).toHaveBeenCalledWith('sleep', 'Sleep 2000ms', { ms: 2000 });
-  });
-
-  test('does NOT call tel.trace for sleeps < 1500ms', async () => {
-    const { tel } = await import('../background/telemetry.js');
-    tel.trace.mockClear();
-    jest.useFakeTimers();
-    const promise = sleep(500);
-    jest.advanceTimersByTime(500);
-    await promise;
-    expect(tel.trace).not.toHaveBeenCalled();
-  });
 });
 
 // ══════════════════════════════════════════════════════════════════════
