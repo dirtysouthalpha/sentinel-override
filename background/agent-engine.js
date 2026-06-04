@@ -1740,7 +1740,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
   const stepCount = opts.stepCount || 0;
   const apiCallCount = opts.apiCallCount || 0;
   const now = new Date();
-  const stamp = now.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const stamp = `${now.toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   // Default to "ticket-resolved" framing. If the agent indicates partial
   // results (step-limit / extraction failure), shift to "waiting" framing.
@@ -1750,7 +1750,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
   const summaryStr = typeof summary === 'string' ? summary : '';
   let actionTaken = summaryStr.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ').trim();
   if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
-  if (actionTaken.length > 240) actionTaken = actionTaken.slice(0, 237) + '...';
+  if (actionTaken.length > 240) actionTaken = `${actionTaken.slice(0, 237)}...`;
 
   const nextStep = partial
     ? 'Manual review required — see investigation findings below. Recommend follow-up within 1 business day.'
@@ -1807,7 +1807,7 @@ function _ticketHeader(ticketNum, label) {
 }
 
 function _ticketStamp() {
-  return new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  return `${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 }
 
 function _splitTriedSection(summary) {
@@ -1864,7 +1864,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
-  const followUp = new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const followUp = `${new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
     '## ' + _ticketHeader(ticketNum, 'Waiting on Client'),
@@ -1879,7 +1879,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
     `- Follow up by ${followUp} (or sooner if client responds).`,
     '',
     '**Ownership Statement:**',
-    '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will re-engage once client responds.',
+    `- ${tech.name} (${tech.title}, ${tech.company}) — will re-engage once client responds.`,
     '',
     '---',
     '',
@@ -1889,7 +1889,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
     '',
     '---',
     '',
-    '_' + tech.name + ' · Phone: ' + tech.phone + ' · Email: ' + tech.email + '_'
+    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
   ];
   return lines.join('\n');
 }
@@ -1899,7 +1899,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
   const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
-  const followUp = new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  const followUp = `${new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
     '## ' + _ticketHeader(ticketNum, 'Waiting on Vendor'),
@@ -1914,7 +1914,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
     `- Follow up by ${followUp} (or on vendor response).`,
     '',
     '**Ownership Statement:**',
-    '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will follow up with vendor and update ticket.',
+    `- ${tech.name} (${tech.title}, ${tech.company}) — will follow up with vendor and update ticket.`,
     '',
     '---',
     '',
@@ -1924,7 +1924,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
     '',
     '---',
     '',
-    '_' + tech.name + ' · Phone: ' + tech.phone + ' · Email: ' + tech.email + '_'
+    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
   ];
   return lines.join('\n');
 }
@@ -1979,7 +1979,7 @@ function formatItGlueKb(summary, goal, tech, options) {
     '',
     '---',
     '',
-    '_Documented by ' + tech.name + ' · ' + tech.company + '_'
+    `_Documented by ${tech.name} · ${tech.company}_`
   ];
   return out.join('\n');
 }
@@ -2031,7 +2031,7 @@ function formatClientEmail(summary, goal, tech, options) {
 // 'WAITING_ON_CLIENT', 'WAITING_ON_VENDOR', 'IT_GLUE_KB', 'CLIENT_EMAIL', or
 // 'auto'. 'auto' picks based on goal/summary heuristics.
 function _autoPickFormat(summary, goal) {
-  const text = (goal + ' ' + summary).toLowerCase();
+  const text = `${goal} ${summary}`.toLowerCase();
   if (/waiting on (the )?vendor|vendor (case|ticket)|vendor support/.test(text)) return 'WAITING_ON_VENDOR';
   if (/waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/.test(text)) return 'WAITING_ON_CLIENT';
   if (/(create|document|write).*(kb|knowledge base|it glue)/.test(text)) return 'IT_GLUE_KB';
