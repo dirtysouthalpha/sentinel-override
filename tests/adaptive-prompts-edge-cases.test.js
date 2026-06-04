@@ -18,58 +18,6 @@ global.fetch = jest.fn(() => Promise.resolve({
   }),
 }));
 
-jest.unstable_mockModule('../background/telemetry.js', () => ({
-  emit: jest.fn(),
-  tel: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
-jest.unstable_mockModule('../background/llm-client.js', () => ({
-  callLLM: jest.fn(async () => ({
-    content: '{"adapted_goal": "test goal", "summary": "test summary"}',
-  })),
-}));
-
-jest.unstable_mockModule('../background/provider-registry.js', () => ({
-  getActiveProvider: jest.fn(() => ({
-    apiKey: 'test-key',
-    endpoint: 'https://test.example.com/v1',
-    model: 'test-model',
-    supportsToolUse: false,
-    buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
-    buildBody: jest.fn((model, system, user, opts) => ({
-      model,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ],
-      ...opts
-    })),
-    parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
-  })),
-}));
-
-jest.unstable_mockModule('../background/platforms/index.js', () => ({
-  getPlatformProfile: jest.fn(() => ({
-    id: 'test',
-    label: 'Test Platform',
-    memoryKeyPrefix: 'test-',
-    liveDataCaveats: 'Data may be delayed',
-    knownGotchas: 'Login required',
-    needsTargetSelection: false,
-    preflightInstructions: 'Select a device first',
-    rewriteInstructions: 'Use cloud paths',
-    waitStrings: { loading: ['Loading...', 'Please wait'] },
-    pageTypes: [{ name: 'Dashboard', hint: 'Main overview' }],
-    workflowHints: [{ match: /test/i, hint: 'Test workflow' }],
-  })),
-  findMismatchHints: jest.fn(() => []),
-}));
-
 describe('adaptive-prompts edge cases', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -113,10 +61,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle no matching platform profile', async () => {
-      const { getPlatformProfile } = await import('../background/platforms/index.js');
+      const platforms = await import('../background/platforms/index.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getPlatformProfile.mockReturnValueOnce(null);
+      jest.spyOn(platforms, 'getPlatformProfile').mockReturnValueOnce(null);
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://unknown.com', null, 'light');
 
@@ -125,10 +73,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle expansion mode off with no mismatches', async () => {
-      const { findMismatchHints } = await import('../background/platforms/index.js');
+      const platforms = await import('../background/platforms/index.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      findMismatchHints.mockReturnValueOnce([]);
+      jest.spyOn(platforms, 'findMismatchHints').mockReturnValueOnce([]);
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'off');
 
@@ -139,10 +87,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform LLM response handling', () => {
     test('should handle LLM call returning null content', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -174,10 +122,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle LLM call returning undefined content', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -209,10 +157,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle empty LLM response', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -244,10 +192,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle no_adaptation_needed response', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -279,10 +227,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle missing adapted_goal', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -314,10 +262,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle short adapted_goal', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -349,10 +297,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle LLM call throwing error', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -379,11 +327,32 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle successful adaptation', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -395,16 +364,37 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle adaptation with mismatch hints', async () => {
-      const { callLLM } = await import('../background/llm-client.js');
-      const { findMismatchHints } = await import('../background/platforms/index.js');
+      const providerRegistry = await import('../background/provider-registry.js');
+      const platforms = await import('../background/platforms/index.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      findMismatchHints.mockReturnValueOnce([
+      jest.spyOn(platforms, 'findMismatchHints').mockReturnValueOnce([
         { onbox: 'Settings > Network', target: 'Network > Settings' },
       ]);
 
-      callLLM.mockResolvedValueOnce({
-        content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}',
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
+        apiKey: 'test-key',
+        endpoint: 'https://test.example.com/v1',
+        model: 'test-model',
+        supportsToolUse: false,
+        buildHeaders: jest.fn(() => ({ 'Content-Type': 'application/json' })),
+        buildBody: jest.fn((model, system, user, opts) => ({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          ...opts
+        })),
+        parseResponse: jest.fn((data) => data?.choices?.[0]?.message?.content || data?.content || ''),
+      });
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: '{"adapted_goal": "This is a properly adapted goal that is long enough", "summary": "Test summary"}' } }],
+        }),
       });
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
@@ -416,10 +406,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform technician info handling', () => {
     test('should handle technician info with name', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -457,10 +447,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle technician info with minimal data', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -495,10 +485,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle missing technician info', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -531,10 +521,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform expansion modes', () => {
     test('should handle full expansion mode', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -565,10 +555,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle light expansion mode', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -599,15 +589,15 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('should handle off expansion mode with mismatches', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
-      const { findMismatchHints } = await import('../background/platforms/index.js');
+      const providerRegistry = await import('../background/provider-registry.js');
+      const platforms = await import('../background/platforms/index.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      findMismatchHints.mockReturnValueOnce([
+      jest.spyOn(platforms, 'findMismatchHints').mockReturnValueOnce([
         { onbox: 'Settings > Network', target: 'Network > Settings' },
       ]);
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -641,10 +631,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('extractJsonObject edge cases', () => {
     test('handles code fence with json label', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -676,10 +666,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles code fence without json label', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -711,10 +701,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles incomplete JSON (opening brace but no closing)', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -746,10 +736,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles JSON with extra text before and after', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -780,10 +770,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles response with no opening brace', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -817,10 +807,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform API error handling', () => {
     test('handles non-OK HTTP response', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -851,10 +841,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles API rate limit error', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -885,10 +875,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles JSON parse error in response', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -920,8 +910,8 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform profile parsing error handling', () => {
     test('handles waitStrings parse error (line 55)', async () => {
-      const { getPlatformProfile } = await import('../background/platforms/index.js');
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const platforms = await import('../background/platforms/index.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
       // Create a profile with waitStrings that throws during Object.entries
@@ -942,8 +932,8 @@ describe('adaptive-prompts edge cases', () => {
         workflowHints: [{ match: /test/i, hint: 'Test workflow' }],
       };
 
-      getPlatformProfile.mockReturnValueOnce(badProfile);
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(platforms, 'getPlatformProfile').mockReturnValueOnce(badProfile);
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -982,8 +972,8 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles pageTypes parse error (line 66)', async () => {
-      const { getPlatformProfile } = await import('../background/platforms/index.js');
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const platforms = await import('../background/platforms/index.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
       // Create a profile with pageTypes that throws during map
@@ -1005,8 +995,8 @@ describe('adaptive-prompts edge cases', () => {
         workflowHints: [{ match: /test/i, hint: 'Test workflow' }],
       };
 
-      getPlatformProfile.mockReturnValueOnce(badProfile);
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(platforms, 'getPlatformProfile').mockReturnValueOnce(badProfile);
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -1045,8 +1035,8 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles workflowHints parse error (line 79)', async () => {
-      const { getPlatformProfile } = await import('../background/platforms/index.js');
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const platforms = await import('../background/platforms/index.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
       // Create a profile with workflowHints that throws during RegExp.test
@@ -1068,8 +1058,8 @@ describe('adaptive-prompts edge cases', () => {
         workflowHints: [{ match: badRegExp, hint: 'Test workflow' }],
       };
 
-      getPlatformProfile.mockReturnValueOnce(badProfile);
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(platforms, 'getPlatformProfile').mockReturnValueOnce(badProfile);
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         apiKey: 'test-key',
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
@@ -1111,10 +1101,10 @@ describe('adaptive-prompts edge cases', () => {
 
   describe('rewriteGoalForPlatform provider errors', () => {
     test('handles no active provider configured (lines 223-224)', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce(null);
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce(null);
 
       const result = await rewriteGoalForPlatform('test goal for rewrite', 'https://example.com', null, 'light');
 
@@ -1123,10 +1113,10 @@ describe('adaptive-prompts edge cases', () => {
     });
 
     test('handles provider without apiKey', async () => {
-      const { getActiveProvider } = await import('../background/provider-registry.js');
+      const providerRegistry = await import('../background/provider-registry.js');
       const { rewriteGoalForPlatform } = await import('../background/adaptive-prompts.js');
 
-      getActiveProvider.mockResolvedValueOnce({
+      jest.spyOn(providerRegistry, 'getActiveProvider').mockResolvedValueOnce({
         endpoint: 'https://test.example.com/v1',
         model: 'test-model',
         apiKey: null,
