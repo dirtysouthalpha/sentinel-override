@@ -5,7 +5,7 @@
 import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
-import { ONE_SECOND_MS } from './constants.js';
+import { ONE_SECOND_MS, MAX_REPORT_FINDING_LENGTH } from './constants.js';
 
 // Precompute action types to filter from step history for O(1) lookup
 const FILTERED_ACTION_TYPES = new Set(['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation']);
@@ -419,9 +419,9 @@ function buildStructuredData(executionData, timestamp) {
     } else if (typeof val === 'object' && val !== null) {
       try {
         const str = JSON.stringify(val);
-        findings[key] = str.length > 2000 ? `${str.substring(0, 2000)}... [truncated]` : str;
+        findings[key] = str.length > MAX_REPORT_FINDING_LENGTH ? `${str.substring(0, MAX_REPORT_FINDING_LENGTH)}... [truncated]` : str;
       } catch {
-        findings[key] = String(val).substring(0, 2000);
+        findings[key] = String(val).substring(0, MAX_REPORT_FINDING_LENGTH);
       }
     } else {
       const str = String(val != null ? val : '');

@@ -3,7 +3,7 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { getErrorMessage, sleep } from './error-utils.js';
-import { ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, ONE_MINUTE_MS } from './constants.js';
+import { ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, ONE_MINUTE_MS, MAX_LOG_ENTRY_LENGTH } from './constants.js';
 
 // ========== Page Load Waiting ==========
 let pageLoadConfig = {
@@ -429,14 +429,14 @@ function installObservabilityEventHook() {
           const e = params.entry;
           pushConsoleEntry(tabId, {
             level: e.level || 'info',
-            text: (e && typeof e.text === 'string' ? e.text : '').substring(0, 1000),
+            text: (e && typeof e.text === 'string' ? e.text : '').substring(0, MAX_LOG_ENTRY_LENGTH),
             url: e.url || '',
             line: e.lineNumber || 0,
             ts: Date.now()
           });
         } else if (method === 'Runtime.consoleAPICalled' && params) {
           // console.log/error/warn/info — most app-level logs come through here
-          const args = (Array.isArray(params.args) ? params.args : []).map(a => String(a?.value ?? a?.description ?? '')).join(' ').substring(0, 1000);
+          const args = (Array.isArray(params.args) ? params.args : []).map(a => String(a?.value ?? a?.description ?? '')).join(' ').substring(0, MAX_LOG_ENTRY_LENGTH);
           pushConsoleEntry(tabId, {
             level: params.type || 'log',
             text: args,
@@ -449,7 +449,7 @@ function installObservabilityEventHook() {
           const txt = ((ex.exception && typeof ex.exception === 'object') && (ex.exception.description || ex.exception.value)) || ex.text || 'exception';
           pushConsoleEntry(tabId, {
             level: 'error',
-            text: (typeof txt === 'string' ? txt : '').substring(0, 1000),
+            text: (typeof txt === 'string' ? txt : '').substring(0, MAX_LOG_ENTRY_LENGTH),
             url: ex.url || '',
             line: ex.lineNumber || 0,
             ts: Date.now()
