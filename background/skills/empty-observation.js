@@ -3,6 +3,8 @@ import { getErrorMessage } from '../error-utils.js';
 
 // Precompute post-observe action types for O(1) lookup
 const POST_OBSERVE_ACTIONS = new Set(['read_page', 'navigate']);
+// Precompile regex for restricted URL protocols
+const RESTRICTED_PROTOCOL_RE = /^(about:|chrome:|data:|file:)/i;
 
 // Fires when observe_page returns < 5 elements — either the page hasn't
 // loaded yet or it's a render-blocked SPA. The LLM can't pick a target if
@@ -32,7 +34,7 @@ export const emptyObservation = {
       const textLength = (ctx.pageText || '').length;
       // Empty + on-a-real-url qualifies; if URL is about: / chrome: / data: skip
       const currentUrl = ctx.currentUrl || '';
-      if (/^(about:|chrome:|data:|file:)/i.test(currentUrl)) return false;
+      if (RESTRICTED_PROTOCOL_RE.test(currentUrl)) return false;
       return elementCount < 5 && textLength < 200;
     } catch (error) {
       console.error('Error in emptyObservation matches:', getErrorMessage(error));
