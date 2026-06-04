@@ -3992,8 +3992,8 @@ async function runAgentLoop(goal, workingTabId) {
         const _wallHit = detectSignInWall(allElements, currentUrl, pageText);
         if (_wallHit && !signInWallAckUrls.has(currentUrl)) {
           agentPaused = true;
-          sendSilentUpdate('⏸ Sign-in wall detected (' + _wallHit.host + ') — sign in manually, then click Resume', stepCount);
-          notifyIfEnabled('sign_in_wall_' + Date.now(), {
+          sendSilentUpdate(`⏸ Sign-in wall detected (${_wallHit.host}) — sign in manually, then click Resume`, stepCount);
+          notifyIfEnabled(`sign_in_wall_${Date.now()}`, {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icon-48.png'),
             title: 'Sentinel Override — Sign in required',
@@ -4045,7 +4045,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (_mfaHit && mfaAckUrl !== currentUrl) {
           agentPaused = true;
           sendSilentUpdate(`⏸ MFA challenge detected (${_mfaHit}) — agent paused`, stepCount);
-          notifyIfEnabled('mfa_pause_' + Date.now(), {
+          notifyIfEnabled(`mfa_pause_${Date.now()}`, {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icon-48.png'),
             title: 'Sentinel Override — MFA required',
@@ -4084,7 +4084,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (_captchaResult === 'needs_user') {
             agentPaused = true;
             sendSilentUpdate('⏸ CAPTCHA requires manual solve — agent paused', stepCount);
-            notifyIfEnabled('captcha_' + Date.now(), {
+            notifyIfEnabled(`captcha_${Date.now()}`, {
               type: 'basic',
               iconUrl: chrome.runtime.getURL('icon-48.png'),
               title: 'Sentinel Override — CAPTCHA Detected',
@@ -4242,8 +4242,8 @@ async function runAgentLoop(goal, workingTabId) {
         };
         const _recovery = runRecoverySkills(_skillCtx);
         if (_recovery.appliedSkillIds.length) {
-          sendSilentUpdate('Recovery skills consulted: ' + _recovery.appliedSkillIds.join(', '), stepCount);
-          tel.info('skill', 'Recovery skills fired: ' + _recovery.appliedSkillIds.join(', '), { autoApplied: !!_recovery.autoApply, autoApplyType: _recovery.autoApply ? _recovery.autoApply.type : null, lastResult: _skillCtx.lastResult });
+          sendSilentUpdate(`Recovery skills consulted: ${_recovery.appliedSkillIds.join(', ')}`, stepCount);
+          tel.info('skill', `Recovery skills fired: ${_recovery.appliedSkillIds.join(', ')}`, { autoApplied: !!_recovery.autoApply, autoApplyType: _recovery.autoApply ? _recovery.autoApply.type : null, lastResult: _skillCtx.lastResult });
           // Forensic log
           try {
             if (runLogId) {
@@ -4263,8 +4263,8 @@ async function runAgentLoop(goal, workingTabId) {
           // Activity stream surface — single item showing which skills fired
           try {
             const _label = _recovery.autoApply
-              ? 'Skill auto-applied: ' + (_recovery.appliedSkillIds[0] || 'unknown')
-              : 'Skills consulted: ' + _recovery.appliedSkillIds.join(', ');
+              ? `Skill auto-applied: ${_recovery.appliedSkillIds[0] || 'unknown'}`
+              : `Skills consulted: ${_recovery.appliedSkillIds.join(', ')}`;
             activityDone(stepCount, 'recovery-skills', _label, null);
           } catch (e) { console.warn('[Sentinel] recovery skills activity failed:', getErrorMessage(e)); }
         }
@@ -4289,7 +4289,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.16.0) Begin the consult-ai activity item with a spinner. The
       // periodic timer updates the label with elapsed seconds so the user
       // sees the spinner DOING something even on long calls.
-      activityStart(stepCount, 'consult-ai', 'Consulting AI · call #' + (apiCallCount + 1));
+      activityStart(stepCount, 'consult-ai', `Consulting AI · call #${apiCallCount + 1}`);
       const progressTimer = setInterval(() => {
         apiWaitSeconds += 5;
         sendSilentUpdate(`Consulting AI... (${apiWaitSeconds}s)`, stepCount);
@@ -4304,7 +4304,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
-      tel.info('llm', 'LLM call #' + (apiCallCount + 1) + ' starting', { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
+      tel.info('llm', `LLM call #${apiCallCount + 1} starting`, { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
       command = null;
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
@@ -4378,7 +4378,7 @@ async function runAgentLoop(goal, workingTabId) {
         // large outputs would otherwise bloat every subsequent step's
         // prompt by thousands of tokens.
         if (typeof cleaned.result === 'string' && cleaned.result.length > 800) {
-          cleaned.result = cleaned.result.slice(0, 800) + '… [truncated; ' + (cleaned.result.length - 800) + ' more chars in memory]';
+          cleaned.result = `${cleaned.result.slice(0, 800)}… [truncated; ${cleaned.result.length - 800} more chars in memory]`;
         }
         return cleaned;
       });
@@ -4389,7 +4389,7 @@ async function runAgentLoop(goal, workingTabId) {
         base64Image = null;
         if (_visionMode) { try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: 3000 }); } catch (_e) { /* vision cleanup failed - non-fatal */ } }
         command = _pendingCommandQueue.shift();
-        activityDone(stepCount, 'consult-ai', 'Queued sub-command: ' + command.type, null);
+        activityDone(stepCount, 'consult-ai', `Queued sub-command: ${command.type}`, null);
         _lastAiCallMs = 0;
       // (3.21.0) If a recovery skill auto-applied, use that command and
       // skip the LLM consult entirely. Saves ~5-30s per recovery + an LLM
@@ -4411,7 +4411,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionHistory = promptHistory.slice(-6).map(h => {
           if (!h || !h.action) return '';
           const a = h.action;
-          return 'Step ' + (h.step||'?') + ': ' + a.type + (a.index ? '(' + a.index + ')' : '') + (a.text ? ' "' + (typeof a.text === 'string' ? a.text.substring(0,40) : String(a.text || '').substring(0,40)) + '"' : '') + ' -> ' + (typeof h.result === 'string' ? h.result.substring(0,80) : String(h.result || '').substring(0,80));
+          return `Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${a.text ? ` "${typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)}"` : ''} -> ${typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80)}`;
         }).filter(Boolean).join('\n');
 
         const _visionSystemPrompt = [
@@ -4446,8 +4446,8 @@ async function runAgentLoop(goal, workingTabId) {
         ].join('\n');
 
         const _visionUserContent = [
-          'Goal: ' + goal,
-          'URL: ' + currentUrl,
+          `Goal: ${goal}`,
+          `URL: ${currentUrl}`,
           `Step: ${stepCount}/${dynamicMaxSteps}`,
           '',
           'Elements:',
@@ -4563,10 +4563,10 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
                   break;
                 default:
-                  command = { type: 'note', text: 'Vision: unknown action ' + _va.type, _visionAction: true };
+                  command = { type: 'note', text: `Vision: unknown action ${_va.type}`, _visionAction: true };
               }
               // Store thinking/evaluation for logging
-              if (_vParsed.thinking) sendSilentUpdate('[Vision] ' + _vParsed.thinking, stepCount);
+              if (_vParsed.thinking) sendSilentUpdate(`[Vision] ${_vParsed.thinking}`, stepCount);
               console.log('[Sentinel/v4] Vision decided:', _va.type, 'index:', _va.index || 'N/A');
             } else {
               // Fallback: couldn't parse structured output, try the legacy LLM path
