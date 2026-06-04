@@ -55,7 +55,7 @@ export async function appendAuditEntry(runId, entry) {
     });
     if (log.length > MAX_ENTRIES_PER_RUN) log.splice(0, log.length - MAX_ENTRIES_PER_RUN);
     await chrome.storage.local.set({ [key]: log }).catch((e) => {
-      console.error('[audit-log] Error:', getErrorMessage(e) || String(e));
+      console.error('[audit-log] Error:', getErrorMessage(e));
     });
   } catch (e) { console.warn('[Sentinel/audit-log] appendAuditEntry failed:', getErrorMessage(e)); }
 }
@@ -110,7 +110,7 @@ export async function clearAuditLog(runId) {
   try {
     const key = _storageKey(runId);
     await chrome.storage.local.remove(key).catch((e) => {
-      console.error('[audit-log] remove failed:', getErrorMessage(e) || String(e));
+      console.error('[audit-log] remove failed:', getErrorMessage(e));
     });
   } catch (e) { console.warn('[Sentinel/audit-log] clearAuditLog failed:', getErrorMessage(e)); }
 }
