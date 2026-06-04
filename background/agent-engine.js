@@ -205,7 +205,10 @@ import { initKnowledgeGraph, addKnowledgeNode, updateKnowledgeNode, addKnowledge
 import { analyzeForContradictions, compareResponsesForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
 import { analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics, clearNoveltyHistory } from './novelty-detector.js';
 import { synthesizeKnowledge, getSynthesis, getSynthesisStatistics, clearSynthesis } from './knowledge-synthesizer.js';
-import { getSkillStats } from './skills/index.js';
+import { addComplianceEntry } from './audit-log.js';
+// v10.0 Advanced Intelligence Systems Integration (Phase 5)
+import { PredictiveEngine } from './predictive-engine.js';
+import { RuntimeProfiler } from './runtime-profiler.js';
 import { getErrorMessage, sleep } from './error-utils.js';
 // ========== Agent State ==========
 let agentRunning = false;
@@ -244,7 +247,14 @@ let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of th
 let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
-
+// Phase 5: Advanced Intelligence State
+let predictiveAnalysisEnabled = false;  // Predictive analytics enabled
+let profilingEnabled = false;            // Runtime profiling enabled
+let mutationProposals = [];              // Proposed mutations for review
+let activeCanaryDeployment = null;       // Active canary deployment status
+let selfHealingEnabled = false;          // Self-healing system enabled
+let healingHistory = [];                 // Self-healing attempt history
+// Expose agentRunning for index.js
 // Expose agentRunning for index.js
 export { agentRunning };
 
@@ -618,6 +628,13 @@ export function resetAgentState() {
   // page ready check and overlay nuke on its first observation.
   _pageWasReady = false;
   _lastNukeClean = false;
+  // Phase 5: Reset advanced intelligence state
+  predictiveAnalysisEnabled = false;
+  profilingEnabled = false;
+  mutationProposals = [];
+  activeCanaryDeployment = null;
+  selfHealingEnabled = false;
+  healingHistory = [];
   resetAllContexts();
 }
 
@@ -3510,7 +3527,15 @@ async function runAgentLoop(goal, workingTabId) {
   const _loopKaName = `sentinel_loop_${runLogId || crypto.randomUUID()}`;
   try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', getErrorMessage(e)); }
 
-  let command;  // v3.66: Moved declaration here so batch skip can assign it
+  // Phase 5: v8.0/v9.0 Advanced Intelligence - Start profiling and predictive analysis
+  profilingEnabled = true;
+  predictiveAnalysisEnabled = true;
+  selfHealingEnabled = true;
+  RuntimeProfiler.startProfiling();
+  console.log('[Sentinel Phase 5] Runtime profiling started');
+  const _profilingInterval = 10; // Take sample every 10 steps
+
+  let command;
   // Loop-detector state — declared here so they survive across iterations without
   // relying on `var` hoisting inside the loop body (fragile in strict mode).
   let _clickAtLoopCount = 0;
@@ -3548,6 +3573,17 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
       try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      
+      // Phase 5: Take profiling sample periodically (every _profilingInterval steps)
+      if (profilingEnabled && stepCount % _profilingInterval === 0) {
+        try {
+          RuntimeProfiler.takeProfilingSample();
+          console.log('[Sentinel Phase 5] Profiling sample taken at step', stepCount);
+        } catch (e) {
+          console.warn('[Sentinel Phase 5] Profiling sample failed:', getErrorMessage(e));
+        }
+      }
+      
       // (3.8.2) Dynamic step limit. Baseline = CONFIG.maxSteps (100). Each
       // productive action bumps `productiveSteps` and extends the cap by +25.
       // Hard cap = 300. Multi-portal investigations get a +50 head-start so
@@ -6674,6 +6710,30 @@ return { ok: true, value: el.value };
       // Track success/failure for self-healing
       if (actionFailed) {
         consecutiveFailures++;
+        
+        // Phase 5: Trigger self-healing on repeated failures
+        if (selfHealingEnabled && consecutiveFailures >= 3) {
+          try {
+            const issue = {
+              type: 'consecutive_failures',
+              count: consecutiveFailures,
+              lastAction: command.type,
+              strategies: currentStrategies.slice(),
+              timestamp: Date.now()
+            };
+            const healingResult = RuntimeProfiler.attemptHealing(issue);
+            if (healingResult.healed) {
+              console.log('[Sentinel Phase 5] Self-healing successful:', healingResult.strategy);
+              healingHistory.push(healingResult);
+              consecutiveFailures = 0; // Reset after successful heal
+            } else {
+              console.warn('[Sentinel Phase 5] Self-healing failed:', healingResult.reason);
+            }
+          } catch (e) {
+            console.warn('[Sentinel Phase 5] Self-healing error:', getErrorMessage(e));
+          }
+        }
+        
         // (3.30.0) Trust-score counters — failedSteps accumulates over the run,
         // consecutiveFailureMax tracks the worst streak so even runs that
         // recover get penalized for getting stuck in the middle.
@@ -7074,6 +7134,55 @@ return { ok: true, value: el.value };
 
   agentRunning = false;
   console.log(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
+  
+  // Phase 5: v8.0/v9.0 Advanced Intelligence - Final analytics
+  try {
+    // Stop profiling and generate summary
+    const profilingSummary = RuntimeProfiler.stopProfiling();
+    console.log('[Sentinel Phase 5] Profiling stopped:', profilingSummary);
+    
+    // Run predictive analysis on this run
+    const predictiveData = {
+      goal: _lastGoal,
+      duration: Date.now() - agentReport.startTime,
+      stepCount: stepCount,
+      apiCalls: apiCallCount,
+      history: history,
+      failures: failedSteps,
+      stagnation: _pageStagnation
+    };
+    const predictiveInsights = PredictiveEngine.analyzePredictively(predictiveData);
+    console.log('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);
+    
+    // Generate mutation proposals for optimization
+    if (predictiveInsights.riskScore > 50) {
+      const currentState = {
+        profiling: profilingSummary,
+        predictive: predictiveInsights,
+        metrics: {
+          totalSteps: stepCount,
+          apiCalls: apiCallCount,
+          failures: failedSteps,
+          productiveSteps: productiveSteps
+        }
+      };
+      const mutations = RuntimeProfiler.proposeMutations(currentState);
+      mutationProposals = mutations.proposals || [];
+      console.log('[Sentinel Phase 5] Mutation proposals generated:', mutationProposals.length);
+    }
+    
+    // Store Phase 5 results in audit log
+    await appendAuditEntry(agentReport.runId, 'phase5_intelligence', {
+      message: 'Phase 5 Predictive & Profiling Analysis',
+      profiling: profilingSummary,
+      predictive: predictiveInsights,
+      mutations: mutationProposals
+    });
+    
+  } catch (e) {
+    console.warn('[Sentinel Phase 5] Advanced analytics failed:', getErrorMessage(e));
+  }
+  
   // v10.0: Run novelty detection on completed actions
   try {
     const noveltyResults = analyzeForNovelty(history, {
