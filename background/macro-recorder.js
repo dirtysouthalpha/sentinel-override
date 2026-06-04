@@ -132,7 +132,7 @@ export async function exportMacro(id) {
   const macros = await loadMacros();
   const macro = macros.find(m => m.id === id);
   if (!macro) throw new Error(`Macro ${id} not found`);
-  return JSON.stringify({ sentinelMacro: 1, ...macro }, null, 2);
+  return JSON.stringify({ sentinelMacro: 1, ...macro });
 }
 
 /**
