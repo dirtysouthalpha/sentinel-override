@@ -756,7 +756,7 @@ export async function startAgent(goal, sender) {
     } catch (_) { /* non-fatal */ }
     // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
     // for matching telemetry events to forensic log entries during postmortems.
-    try { tel.info('storage', 'Run log opened: ' + runLogId, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+    try { tel.info('storage', `Run log opened: ${runLogId}`, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
     // (3.27.0) Tell the telemetry persistence layer this is a new run. If the
     // user has telemetryPersist enabled in settings, events start streaming
     // to chrome.storage.local from this point onward.
@@ -875,7 +875,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
 // keeps the SW alive during the wait.
 async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
   const requestId = crypto.randomUUID();
-  const kaName = 'adaptive_prompt_' + requestId;
+  const kaName = `adaptive_prompt_${requestId}`;
   try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
@@ -983,7 +983,7 @@ function _detectGoalModeDirective(goal) {
 // { continue: true } (proceed as-is), { cancel: true } (stop run).
 async function _waitForModeMismatchDecision(info) {
   const requestId = crypto.randomUUID();
-  const kaName = 'mode_mismatch_' + requestId;
+  const kaName = `mode_mismatch_${requestId}`;
   try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
@@ -1764,19 +1764,19 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
 
   // Build the formatted block.
   const block = [
-    '## ' + header,
+    `## ${header}`,
     '',
     '**Action Taken:**',
-    '- ' + actionTaken,
+    `- ${actionTaken}`,
     '',
     '**Contact Attempt Details:**',
     `- Automated investigation via Sentinel Override agent at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
     '',
     '**Next Step and Time:**',
-    '- ' + nextStep,
+    `- ${nextStep}`,
     '',
     '**Ownership Statement:**',
-    '- ' + ownership,
+    `- ${ownership}`,
     '',
     '---',
     '',
@@ -1823,7 +1823,7 @@ function _splitTriedSection(summary) {
 function formatTicketKickoff(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
-  const tried = _splitTriedSection(summary).map(s => '- ' + s).join('\n');
+  const tried = _splitTriedSection(summary).map(s => `- ${s}`).join('\n');
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
   // as recommended next steps). If empty, leave numbered placeholders so the
   // tech can fill in.
@@ -1834,10 +1834,10 @@ function formatTicketKickoff(summary, goal, tech, options) {
     : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
 
   const lines = [
-    '## ' + _ticketHeader(ticketNum, 'Ticket Kickoff'),
+    `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
     '',
     '**MAIN ISSUE:**',
-    '- ' + ((goal || '').split(/\n/)[0] || '').slice(0, 280),
+    `- ${((goal || '').split(/\n/)[0] || '').slice(0, 280)}`,
     '',
     '**WHAT HAS BEEN TRIED:**',
     tried,
@@ -1867,10 +1867,10 @@ function formatWaitingOnClient(summary, goal, tech, options) {
   const followUp = `${new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
-    '## ' + _ticketHeader(ticketNum, 'Waiting on Client'),
+    `## ${_ticketHeader(ticketNum, 'Waiting on Client')}`,
     '',
     '**Action Taken:**',
-    '- ' + firstSentence,
+    `- ${firstSentence}`,
     '',
     '**Contact Attempt Details:**',
     `- Automated investigation completed at ${stamp}. Awaiting client confirmation or additional details.`,
@@ -1902,10 +1902,10 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
   const followUp = `${new Date(Date.now() + 24 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
-    '## ' + _ticketHeader(ticketNum, 'Waiting on Vendor'),
+    `## ${_ticketHeader(ticketNum, 'Waiting on Vendor')}`,
     '',
     '**Action Taken:**',
-    '- ' + firstSentence,
+    `- ${firstSentence}`,
     '',
     '**Contact Attempt Details:**',
     `- Vendor case opened at ${stamp}. Awaiting vendor response / ETA.`,
@@ -1957,10 +1957,10 @@ function formatItGlueKb(summary, goal, tech, options) {
     '- ' + (title || 'Untitled'),
     '',
     '**Issue:**',
-    '- ' + ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240),
+    `- ${((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240)}`,
     '',
     '**Environment:**',
-    '- ' + envBits.join('; '),
+    `- ${envBits.join('; ')}`,
     '',
     '**Resolution Steps:**',
     steps.length ? steps.join('\n') : '1. (steps not auto-derivable — fill in manually)',
@@ -2011,7 +2011,7 @@ function formatClientEmail(summary, goal, tech, options) {
   const block = [
     '## Client Email',
     '',
-    '**Subject:** ' + subject,
+    `**Subject:** ${subject}`,
     '',
     '**Body:**',
     '',
@@ -6312,9 +6312,9 @@ return { ok: true, value: el.value };
             const fallbackRes = await sendMessageWithRetry(tab, { action: 'execute_command', command: fallbackCmd });
             const resStr = String(fallbackRes);
             if (fallbackRes && !resStr.startsWith('Error') && !resStr.includes('not found')) {
-              result = resStr + ' [bbox fallback at (' + cx + ',' + cy + ')]';
+              result = `${resStr} [bbox fallback at (${cx},${cy})]`;
               actionFailed = false;
-              sendSilentUpdate('Selector failed → retried with bbox coordinates (' + cx + ',' + cy + ')', stepCount);
+              sendSilentUpdate(`Selector failed → retried with bbox coordinates (${cx},${cy})`, stepCount);
               // Send a click_at action message so the crosshair shows on the mini-shot
               sendActionMessage({ ...command, type: 'click_at', x: cx, y: cy, _bboxFallback: true }, stepCount, observation);
             }
