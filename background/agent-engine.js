@@ -71,6 +71,28 @@ const TICKET_ITGLUE_RE = /(create|document|write).*(kb|knowledge base|it glue)/;
 const TICKET_EMAIL_RE = /draft (an?|the) email|send (an?|the) email|email the client/;
 const TICKET_KICKOFF_RE = /kickoff|new ticket|just opened|investigate this ticket/;
 
+// Precompile regex for overlay dismissal (hot path in CDP observe)
+const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
+
+// Precompile regex for plan step analysis
+const PLAN_PARTIAL_RE = /step limit|extraction.*fail|not yet|incomplete|manually search/i;
+
+// Precompile regex for incomplete marker detection (hot path in reporting)
+const INCOMPLETE_MARKER_RE = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i;
+
+// Precompile regex for tried action detection
+const TRIED_ACTION_RE = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
+
+// Precompile regex for multi-page goal detection
+const MULTI_PAGE_GOAL_RE = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i;
+
+// Precompile regex for useless JavaScript result detection
+const USELESS_OBJECT_RE = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLElement|HTMLCollection|NodeList|Window|Document|Map|Set)\]\s*$/i;
+
+// Precompile regex for action failure detection (hot path in error checking)
+const ACTION_FAILED_RE = /^(Error|BLOCKED:)| not found|Element not found|No element/i;
+const ACTION_FAILED_TIMEOUT_RE = /^(Error|BLOCKED:|JS Error)|timed out| not found/i;
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -1522,13 +1544,12 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
   // Phase 1: Click accept/agree buttons if we have overlay detection data
   if (overlays && overlays.length) {
-    const acceptRegex = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
     for (const overlay of overlays) {
       const buttons = Array.isArray(overlay.buttons) ? overlay.buttons : [];
       // Single-pass button selection: prefer accept button, fallback to any button with text
       let dismissBtn = null;
       for (const b of buttons) {
-        if (b && acceptRegex.test(b.text)) {
+        if (b && OVERLAY_ACCEPT_RE.test(b.text)) {
           dismissBtn = b;
           break; // Found accept button, use it immediately
         }
@@ -1800,7 +1821,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
 
   // Default to "ticket-resolved" framing. If the agent indicates partial
   // results (step-limit / extraction failure), shift to "waiting" framing.
-  const partial = /step limit|extraction.*fail|not yet|incomplete|manually search/i.test(summary || '');
+  const partial = PLAN_PARTIAL_RE.test(summary || '');
 
   // Action Taken: take the first 2 sentences from the summary (or up to 240 chars).
   const summaryStr = typeof summary === 'string' ? summary : '';
@@ -1871,7 +1892,7 @@ function _splitTriedSection(summary) {
   // like a remediation step. Falls back to a single line if nothing matches.
   if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
   const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
-  const triedRe = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
+  const triedRe = TRIED_ACTION_RE;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
   return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
 }
@@ -3140,7 +3161,7 @@ function generateHeuristicPlan(goal, currentUrl) {
   const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch (_urlErr) { return ''; } })();
 
   // Detect multi-page research patterns
-  const isMultiPage = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i.test(g)
+  const isMultiPage = MULTI_PAGE_GOAL_RE.test(g)
     || /\b(open|visit|browse|check)\b.*\b(each|and|then)\b/i.test(g)
     || /\b(summarize?|brief|report)\b.*\b(all|each|every)\b/i.test(g);
 
@@ -4908,7 +4929,7 @@ async function runAgentLoop(goal, workingTabId) {
               return matches.length >= 2;
             } catch (_) { return false; }
           })();
-          const _hasIncompleteMarker = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i.test(_summary);
+          const _hasIncompleteMarker = INCOMPLETE_MARKER_RE.test(_summary);
           if (_isMultiPortal && stepCount < 80 && _hasIncompleteMarker) {
             const blockMsg = `BLOCKED: finish called early with "incomplete" markers on a multi-portal investigation (${stepCount} steps; threshold 80). You have substantial budget remaining (dynamic cap 300, +25 per productive action). Try alternative strategies before declaring done:\n` +
               `  1. Microsoft Graph API: read_network_requests filter for graph.microsoft.com to capture the underlying JSON the UI is rendering.\n` +
@@ -6038,7 +6059,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           // (3.9.0) Reject useless toString'd values — '[object Object]', null,
           // undefined, empty objects/arrays. Saving these is worse than failing.
-          const _useless = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLElement|HTMLCollection|NodeList|Window|Document|Map|Set)\]\s*$/i;
+          const _useless = USELESS_OBJECT_RE;
           const _trim = String(jsValue).trim();
           if (_useless.test(_trim) || _trim === 'undefined' || _trim === 'null') {
             actionFailed = true;
@@ -6212,7 +6233,7 @@ return { ok: true, value: el.value };
           try {
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = res || 'Done';
-            actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
+            actionFailed = ACTION_FAILED_RE.test(result);
           } catch (err) {
             result = `Content script error: ${getErrorMessage(err || 'command failed to reach page')}`;
             actionFailed = true;
@@ -6246,7 +6267,7 @@ return { ok: true, value: el.value };
             if (!cdpUsed) {
               const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
               result = (typeof res === 'string' ? res : null) || 'Done';
-              actionFailed = /^(Error|BLOCKED:|JS Error)|timed out| not found/i.test(result);
+              actionFailed = ACTION_FAILED_TIMEOUT_RE.test(result);
             }
           } else {
             // (3.49.1) Push undo entry for type actions when not using CDP path.
@@ -6264,7 +6285,7 @@ return { ok: true, value: el.value };
             }
             const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
             result = (typeof res === 'string' ? res : null) || 'Done';
-            actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
+            actionFailed = ACTION_FAILED_RE.test(result);
           }
         } catch (err) {
           result = `Content script error: ${getErrorMessage(err || 'command failed to reach page')}`;
