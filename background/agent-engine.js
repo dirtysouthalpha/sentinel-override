@@ -1956,7 +1956,7 @@ function formatItGlueKb(summary, goal, tech, options) {
     '## IT Glue Knowledge Base Entry',
     '',
     '**Title:**',
-    '- ' + (title || 'Untitled'),
+    `- ${(title || 'Untitled')}`,
     '',
     '**Issue:**',
     `- ${((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240)}`,
@@ -2783,7 +2783,7 @@ function detectSignInWall(allElements, currentUrl, pageText) {
     });
   }
   if (pwField) {
-    return { matched: true, host, evidence: 'password input on ' + host, selector: pwField.selector || '' };
+    return { matched: true, host, evidence: `password input on ${host}`, selector: pwField.selector || '' };
   }
 
   // Signal 2 (fallback): page text contains sign-in cues AND we're on a known auth host
@@ -2800,7 +2800,7 @@ function detectSignInWall(allElements, currentUrl, pageText) {
         return /(email|username|loginfmt|user_?id|user_?name|signin)/i.test(sel);
       });
       if (emailField) {
-        return { matched: true, host, evidence: 'email/username input on ' + host, selector: emailField.selector || '' };
+        return { matched: true, host, evidence: `email/username input on ${host}`, selector: emailField.selector || '' };
       }
     }
   }
@@ -2862,7 +2862,7 @@ async function _runExecuteJsOnce(tabId, code, timeout) {
         : (typeof cdpResult.value === 'object'
             ? JSON.stringify(cdpResult.value).slice(0, 3000)
             : String(cdpResult.value).slice(0, 3000));
-      return 'JS Result: ' + valStr;
+      return `JS Result: ${valStr}`;
     } else if (cdpResult && cdpResult.attachDenied) {
       // Fall through to content-script path
     } else if (cdpResult && cdpResult.error) {
@@ -2878,7 +2878,7 @@ async function _runExecuteJsOnce(tabId, code, timeout) {
     });
     return csRes || 'Done';
   } catch (e) {
-    return 'JS Error: ' + getErrorMessage(e);
+    return `JS Error: ${getErrorMessage(e)}`;
   }
 }
 
@@ -2959,7 +2959,7 @@ function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
     if (existingKey === key) continue;
     const evStr = typeof ev === 'string' ? ev : JSON.stringify(ev);
     if (evStr === valStr) {
-      return { ok: false, reason: 'duplicates existing key ' + existingKey };
+      return { ok: false, reason: `duplicates existing key ${existingKey}` };
     }
   }
 
@@ -3277,7 +3277,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
     if (errorEl) details.push('⚠ error message visible');
 
     const summary = `${parts.join(' — ')}${details.length ? ` (${details.join(', ')})` : ''}`;
-    return 'I can see: ' + (summary || host);
+    return `I can see: ${summary || host}`;
   } catch (_) {
     return '';
   }
@@ -3363,7 +3363,7 @@ async function runAgentLoop(goal, workingTabId) {
 
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
-  const _loopKaName = 'sentinel_loop_' + (runLogId || crypto.randomUUID());
+  const _loopKaName = `sentinel_loop_${runLogId || crypto.randomUUID()}`;
   try { startSwKeepalive(_loopKaName); } catch (e) { console.error('[Sentinel] SW keepalive start failed:', getErrorMessage(e)); }
 
   let command;  // v3.66: Moved declaration here so batch skip can assign it
@@ -3394,8 +3394,8 @@ async function runAgentLoop(goal, workingTabId) {
       if (_pendingContextInjections.length) {
         const notes = _pendingContextInjections.splice(0);
         for (const n of notes) {
-          historyPush({ role: 'user', content: '📌 Technician note (mid-run): ' + n });
-          sendSilentUpdate('📌 Context injected: ' + n, stepCount);
+          historyPush({ role: 'user', content: `📌 Technician note (mid-run): ${n}` });
+          sendSilentUpdate(`📌 Context injected: ${n}`, stepCount);
         }
       }
 
@@ -3541,7 +3541,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
         finished = true;
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⚠️ ' + _restrictedMsg }).catch((e) => {
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⚠️ ${_restrictedMsg}` }).catch((e) => {
           console.error('[restrictedPage] Unhandled rejection:', e);
         });
         sendReportUpdate('generating');
@@ -3573,11 +3573,11 @@ async function runAgentLoop(goal, workingTabId) {
           if (_step1Bare && typeof _step1Bare[1] === 'string') {
             const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
             if (_step1BareMap[_step1Key]) {
-              urlMatch = ['go to ' + _step1Bare[1], _step1BareMap[_step1Key]];
+              urlMatch = [`go to ${_step1Bare[1]}`, _step1BareMap[_step1Key]];
             } else {
               for (const [k, v] of Object.entries(_step1BareMap)) {
                 if (_step1Key.includes(k) || k.includes(_step1Key)) {
-                  urlMatch = ['go to ' + _step1Bare[1], v];
+                  urlMatch = [`go to ${_step1Bare[1]}`, v];
                   break;
                 }
               }
@@ -3585,12 +3585,12 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }
         if (urlMatch && urlMatch.length) {
-          const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : ('https://' + (urlMatch[1] || urlMatch[0]));
+          const goalUrl = urlMatch[0].startsWith('http') ? urlMatch[0] : `https://${urlMatch[1] || urlMatch[0]}`;
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
             const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
             if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
-              sendSilentUpdate('Navigating to: ' + goalUrl, stepCount);
+              sendSilentUpdate(`Navigating to: ${goalUrl}`, stepCount);
               sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
               await chrome.tabs.update(tab, { url: goalUrl });
               await waitForPageLoad(tab);
@@ -3598,7 +3598,7 @@ async function runAgentLoop(goal, workingTabId) {
               _cachedObservation = null; // Invalidate cache after navigation
               const reinjected = await injectContentScript(tab);
               if (reinjected) {
-                historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: 'Navigated to ' + goalUrl });
+                historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: `Navigated to ${goalUrl}` });
                 await persistHistory();
               }
               // Defensive: re-register the tab after navigation in case the tab
@@ -3849,7 +3849,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (err) {
           const errMsg = getErrorMessage(err);
-          activityFail(stepCount, 'observe', 'Page read failed: ' + errMsg, null);
+          activityFail(stepCount, 'observe', `Page read failed: ${errMsg}`, null);
           sendSilentUpdate(`Error reading page: ${errMsg}`, stepCount);
           // sendMessageWithRetry already retried 3× with content-script re-injection
           // between each attempt. By the time we reach here the page is truly unreachable
@@ -3960,7 +3960,7 @@ async function runAgentLoop(goal, workingTabId) {
       const pageIsEmpty = pageText.length < 150 || (pageText.includes('Page Title:') && pageText.length < 300);
       const elementsEmpty = allElements.length < 3;
       if (pageIsEmpty) {
-        pageText = '[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n' + pageText;
+        pageText = `[WARNING: Page content is empty or nearly empty. This site may block automation or use heavy JavaScript rendering. Try execute_js with key to extract data directly, or navigate to a different URL.]\n\n${pageText}`;
       }
       const { priorityEls, otherEls } = allElements.reduce((acc, e) => {
         const selectorLower = e.selector?.toLowerCase() || '';

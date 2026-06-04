@@ -330,7 +330,7 @@ async function runCommandInFrame(command) {
         el.dispatchEvent(new Event('input', eventOpts));
         el.dispatchEvent(new Event('change', eventOpts));
         if (hl) hl.removeHighlight(el);
-        return { ok: true, data: 'Typed into ' + command.selector };
+        return { ok: true, data: `Typed into ${command.selector}` };
       }
 
       case 'observe_page': {
