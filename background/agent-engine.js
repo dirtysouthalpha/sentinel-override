@@ -1263,6 +1263,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
   if (stepCount === 0 || stepCount % PROGRESS_UPDATE_INTERVAL !== 0) return;
   try {
     const portalsSeen = new Set();
+    const histLen = history.length;
     for (const h of history) {
       if (!h || !h.action) continue;
       const url = h.action.url || '';
@@ -1278,7 +1279,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (PORTAL_VIRUSTOTAL_RE.test(url)) portalsSeen.add('VirusTotal');
     }
     const memCount = Object.keys(agentMemory).length;
-    const lastAction = history.length ? history[history.length - 1] : null;
+    const lastAction = histLen ? history[histLen - 1] : null;
     const lines = [
       `📊 PROGRESS UPDATE — step ${stepCount}`,
       `Portals visited: ${portalsSeen.size > 0 ? [...portalsSeen].join(', ') : '(none yet)'}`,
