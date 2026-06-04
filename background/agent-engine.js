@@ -4925,7 +4925,7 @@ async function runAgentLoop(goal, workingTabId) {
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
             // full slice between them.
-            try { tel.info('storage', 'Run log finalized: ' + runLogId + ' (' + runLogBuffer.length + ' entries)', { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+            try { tel.info('storage', `Run log finalized: ${runLogId} (${runLogBuffer.length} entries)`, { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
             // (3.27.0) Tell the persistence layer this run is done. Flushes
             // the buffer one last time and stamps finishedAt on the index.
             // Awaited so the storage write completes before the SW potentially
@@ -4947,7 +4947,7 @@ async function runAgentLoop(goal, workingTabId) {
                 planLength: Array.isArray(agentPlan) ? agentPlan.length : 0,
                 planCompleted: Math.min(currentPlanStep, Array.isArray(agentPlan) ? agentPlan.length : 0)
               });
-              tel.info('lifecycle', 'Trust score: ' + _trustScore.score + '/100 (' + _trustScore.band + ')', {
+              tel.info('lifecycle', `Trust score: ${_trustScore.score}/100 (${_trustScore.band})`, {
                 score: _trustScore.score,
                 band: _trustScore.band,
                 breakdown: _trustScore.breakdown,
@@ -5006,7 +5006,7 @@ async function runAgentLoop(goal, workingTabId) {
         // count + ids, individual suggestions visible by expanding payload.
         try {
           if (_retrySuggestions.length) {
-            tel.info('lifecycle', 'Retry suggestions: ' + _retrySuggestions.length + ' (' + _retrySuggestions.map(s => s.id).join(', ') + ')', {
+            tel.info('lifecycle', `Retry suggestions: ${_retrySuggestions.length} (${_retrySuggestions.map(s => s.id).join(', ')})`, {
               count: _retrySuggestions.length,
               suggestions: _retrySuggestions.map(s => ({ id: s.id, severity: s.severity, applyKeys: s.applyKeys })),
               scoreBand: _finalTrustScore ? _finalTrustScore.band : null
@@ -5051,7 +5051,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
         const MAX_REPEAT_ITEMS = 50;
         if (items.length > MAX_REPEAT_ITEMS) {
-          historyPush({ step: stepCount, action: command, result: 'repeat_for_each: capped at ' + MAX_REPEAT_ITEMS + ' items (list had ' + items.length + ')' });
+          historyPush({ step: stepCount, action: command, result: `repeat_for_each: capped at ${MAX_REPEAT_ITEMS} items (list had ${items.length})` });
           items.splice(MAX_REPEAT_ITEMS);
         }
         sendSilentUpdate(`repeat_for_each: ${items.length} items × ${doActions.length} actions`, stepCount);
@@ -5077,7 +5077,7 @@ async function runAgentLoop(goal, workingTabId) {
             _pendingCommandQueue.push(_resolved);
           }
         }
-        historyPush({ step: stepCount, action: command, result: 'repeat_for_each queued ' + _pendingCommandQueue.length + ' sub-actions for ' + items.length + ' items' });
+        historyPush({ step: stepCount, action: command, result: `repeat_for_each queued ${_pendingCommandQueue.length} sub-actions for ${items.length} items` });
         productiveSteps++;
         await persistHistory();
         continue;
@@ -5205,7 +5205,7 @@ async function runAgentLoop(goal, workingTabId) {
           // count so 4xx/5xx spikes during a run are easy to spot.
           try {
             const _failed = entries.reduce((acc, e) => acc + ((e.failed || (e.status >= 400)) ? 1 : 0), 0);
-            tel.info('network', 'Agent read network: ' + entries.length + ' requests (' + _failed + ' failed)', { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
+            tel.info('network', `Agent read network: ${entries.length} requests (${_failed} failed)`, { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
           } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', getErrorMessage(_e)); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
@@ -5479,7 +5479,7 @@ async function runAgentLoop(goal, workingTabId) {
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: _cx, y: _cy, button: 'left', clickCount: 1 });
                   await new Promise(r => setTimeout(r, 30));
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: _cx, y: _cy, button: 'left', clickCount: 1 });
-                  result = 'Clicked [' + command._visionIndex + '] at (' + _cx + ',' + _cy + ')' + (_liveRect ? ' [live-rect]' : ' [cached-rect]');
+                  result = `Clicked [${command._visionIndex}] at (${_cx},${_cy})${_liveRect ? ' [live-rect]' : ' [cached-rect]'}`;
                   console.log('[Sentinel/v4]', result);
                   _cdpClickOk = true;
                 } catch (_cme) { /* fall through to JS .click() */ }
@@ -5783,7 +5783,7 @@ async function runAgentLoop(goal, workingTabId) {
                 result = 'Navigated to ' + arrivedUrl;
               } else {
                 try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-                result = 'Navigated but landed on ' + arrivedUrl + ' instead of ' + command.url;
+                result = `Navigated but landed on ${arrivedUrl} instead of ${command.url}`;
                 actionFailed = true;
               }
             } catch (_) {
@@ -5852,8 +5852,8 @@ async function runAgentLoop(goal, workingTabId) {
               if (u.includes('virustotal')) return 'virustotal';
               return null;
             })();
-            const _finalKey = (_portalKey && !String(parsed.key).startsWith(_portalKey + '_'))
-              ? (_portalKey + '_' + parsed.key)
+            const _finalKey = (_portalKey && !String(parsed.key).startsWith(`${_portalKey}_`))
+              ? `${_portalKey}_${parsed.key}`
               : parsed.key;
             agentMemory[_finalKey] = parsed.value;
             const memKeys = Object.keys(agentMemory || {});
@@ -6083,7 +6083,7 @@ return { ok: true, value: el.value };
               if (selResult && selResult.ok && selResult.value && selResult.value.ok) {
                 result = 'Selected "' + command.value + '" via CDP fallback';
                 cdpDone = true;
-                sendSilentUpdate('[CDP] Selected ' + command.value + ' in ' + (command.selector || 'dropdown'), stepCount);
+                sendSilentUpdate(`[CDP] Selected ${command.value} in ${command.selector || 'dropdown'}`, stepCount);
               } else {
                 console.warn('[CDP] Select failed:', selResult);
               }
@@ -6186,9 +6186,9 @@ return { ok: true, value: el.value };
                 description: '[CDP fallback] Clicking ' + sel
               });
               if (r && r.ok) {
-                result = 'Clicked ' + sel + ' via CDP fallback at (' + cx + ',' + cy + ')';
+                result = `Clicked ${sel} via CDP fallback at (${cx},${cy})`;
                 actionFailed = false;
-                sendSilentUpdate('[CDP] Clicked ' + sel + ' at (' + cx + ',' + cy + ')', stepCount);
+                sendSilentUpdate(`[CDP] Clicked ${sel} at (${cx},${cy})`, stepCount);
               }
             }
           }
@@ -6416,7 +6416,7 @@ return { ok: true, value: el.value };
                 const _fromHostNoWww = _fromHost.replace(/^www\./, '');
                 const _crossDomain = _fromHost && _clickedHost && !_clickedHost.includes(_fromHostNoWww) && !_fromHost.includes(_clickedHostNoWww);
                 if (_crossDomain) {
-                  result = 'WARNING: Click navigated away from ' + _fromHost + ' to ' + _clickedHost + '. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ' + _fromHost + ' and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).';
+                  result = `WARNING: Click navigated away from ${_fromHost} to ${_clickedHost}. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ${_fromHost} and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).`;
                   actionFailed = true;
                 } else {
                   result = 'Clicked -> navigated to ' + _clickedHost;
