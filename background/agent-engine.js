@@ -63,8 +63,8 @@ async function _visionObserve(tab, _currentUrl) {
       if (el.ariaLabel) attrs += ' aria-label=' + JSON.stringify((el.ariaLabel || '').substring(0, 40));
       if (el.placeholder) attrs += ' placeholder=' + JSON.stringify((el.placeholder || '').substring(0, 40));
       if (el.href) { const hrefLen = el.href.length; if (hrefLen > 5 && hrefLen < 100) attrs += ' href=' + JSON.stringify(el.href.substring(0, 80)); }
-      const text = el.text ? '>' + (el.text || '').substring(0, 60) : '/>';
-      const closing = el.text ? '</' + tag + '>' : '';
+      const text = el.text ? `>${(el.text || '').substring(0, 60)}` : '/>';
+      const closing = el.text ? `</${tag}>` : '';
       elementParts.push('[' + el.index + ']<' + tag + attrs + text + closing + '\n');
     }
     const elementTree = elementParts.join('');
@@ -551,9 +551,9 @@ export async function undoLastAction() {
       try {
         await sendMessageWithRetry(entry.tabId, { action: 'execute_command', command: { type: 'execute_js', code } }, 1);
       } catch (e) {
-        return { success: false, reason: 'Could not restore field: ' + (getErrorMessage(e)) };
+        return { success: false, reason: `Could not restore field: ${getErrorMessage(e)}` };
       }
-      return { success: true, description: 'Restored field "' + selector + '" to previous value' };
+      return { success: true, description: `Restored field "${selector}" to previous value` };
     }
     return { success: false, reason: 'Unknown undo entry type: ' + entry.type };
   } catch (e) {
@@ -1445,7 +1445,7 @@ async function _cdpObservePage(tabId) {
   const _cacheTTL = _inBatchMode ? 60000 : 30000; // 60s in batch mode, 30s normal
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
-    console.log('[Sentinel/CDP] Observation CACHE HIT #' + _observeCacheHits + ' — reusing last result for', currentUrl);
+    console.log(`[Sentinel/CDP] Observation CACHE HIT #${_observeCacheHits} — reusing last result for`, currentUrl);
     return _cachedObservation;
   }
   console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
@@ -1769,7 +1769,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
     '- ' + actionTaken,
     '',
     '**Contact Attempt Details:**',
-    '- Automated investigation via Sentinel Override agent at ' + stamp + ' (' + stepCount + ' steps, ' + apiCallCount + ' AI calls).',
+    `- Automated investigation via Sentinel Override agent at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
     '',
     '**Next Step and Time:**',
     '- ' + nextStep,
@@ -1872,10 +1872,10 @@ function formatWaitingOnClient(summary, goal, tech, options) {
     '- ' + firstSentence,
     '',
     '**Contact Attempt Details:**',
-    '- Automated investigation completed at ' + stamp + '. Awaiting client confirmation or additional details.',
+    `- Automated investigation completed at ${stamp}. Awaiting client confirmation or additional details.`,
     '',
     '**Next Step and Time:**',
-    '- Follow up by ' + followUp + ' (or sooner if client responds).',
+    `- Follow up by ${followUp} (or sooner if client responds).`,
     '',
     '**Ownership Statement:**',
     '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will re-engage once client responds.',
@@ -1907,10 +1907,10 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
     '- ' + firstSentence,
     '',
     '**Contact Attempt Details:**',
-    '- Vendor case opened at ' + stamp + '. Awaiting vendor response / ETA.',
+    `- Vendor case opened at ${stamp}. Awaiting vendor response / ETA.`,
     '',
     '**Next Step and Time:**',
-    '- Follow up by ' + followUp + ' (or on vendor response).',
+    `- Follow up by ${followUp} (or on vendor response).`,
     '',
     '**Ownership Statement:**',
     '- ' + tech.name + ' (' + tech.title + ', ' + tech.company + ') — will follow up with vendor and update ticket.',
@@ -2153,19 +2153,19 @@ function evaluateHallucinationRisk(summary, agentMemory, history) {
 
   // 3+ claims with 0 evidence is a clear fabrication.
   if (claims >= 3 && evidence === 0) {
-    return { risky: true, reason: 'Summary lists ' + claims + ' items but no data was extracted to memory or recorded as notes.' };
+    return { risky: true, reason: `Summary lists ${claims} items but no data was extracted to memory or recorded as notes.` };
   }
   // claims > 2x evidence with no caveats is suspicious.
   if (claims >= 4 && evidence > 0 && claims > evidence * 2 && !hasCaveats) {
-    return { risky: true, reason: 'Summary lists ' + claims + ' items but only ' + evidence + ' evidence sources (memory keys + notes) and no "headline only / not read" caveats.' };
+    return { risky: true, reason: `Summary lists ${claims} items but only ${evidence} evidence sources (memory keys + notes) and no "headline only / not read" caveats.` };
   }
   // (3.10.0) Lots of specific numeric/date claims with no [src:*] tags
   if (specificClaims >= 5 && sourceTags === 0) {
-    return { risky: true, reason: 'Summary contains ' + specificClaims + ' specific claims (numbers, dates, statistics) but no [src:memory_key] citations. Per the SOURCE-CITED OUTPUTS rule, every specific claim must be tagged.' };
+    return { risky: true, reason: `Summary contains ${specificClaims} specific claims (numbers, dates, statistics) but no [src:memory_key] citations. Per the SOURCE-CITED OUTPUTS rule, every specific claim must be tagged.` };
   }
   // Specific claims wildly outnumber tags
   if (specificClaims >= 8 && sourceTags > 0 && specificClaims > sourceTags * 3) {
-    return { risky: true, reason: 'Summary has ' + specificClaims + ' specific claims but only ' + sourceTags + ' source tags. Tag each specific claim with [src:memory_key] or move it to a Caveats section as [unverified].' };
+    return { risky: true, reason: `Summary has ${specificClaims} specific claims but only ${sourceTags} source tags. Tag each specific claim with [src:memory_key] or move it to a Caveats section as [unverified].` };
   }
   return { risky: false, claims, evidence, hasCaveats, specificClaims, sourceTags };
 }
@@ -2699,7 +2699,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     const clickedWhat = (result && result.ok) ? result.value : null;
     if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
       console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
-      sendSilentUpdate('🤖 CAPTCHA auto-solved (' + clickedWhat + ')', stepCount);
+      sendSilentUpdate(`🤖 CAPTCHA auto-solved (${clickedWhat})`, stepCount);
       await sleep(2000); // wait for page to process
       return 'solved';
     }
@@ -3420,10 +3420,10 @@ async function runAgentLoop(goal, workingTabId) {
       // hanging every run. The "let dynamicMaxSteps" in the outer block-scope
       // is in TDZ until the line that initializes it runs, so the previous
       // ordering blew up before any LLM call could fire.
-      tel.info('lifecycle', 'Step ' + stepCount + ' starting', { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
+      tel.info('lifecycle', `Step ${stepCount} starting`, { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
       if (stepCount > dynamicMaxSteps) {
         sendSilentUpdate(`Reached step limit (${dynamicMaxSteps}, baseline ${CONFIG.maxSteps} + ${productiveSteps} productive bumps). Finishing.`, stepCount);
-        const _hardLimitSummary = 'Reached step limit of ' + dynamicMaxSteps + '. Task may be incomplete — ' + productiveSteps + ' productive actions extended the run.';
+        const _hardLimitSummary = `Reached step limit of ${dynamicMaxSteps}. Task may be incomplete — ${productiveSteps} productive actions extended the run.`;
         finished = true;
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
         chrome.runtime.sendMessage({ action: 'agent_finished', summary: _hardLimitSummary }).catch((e) => {
