@@ -10,7 +10,7 @@ import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CA
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n  var clickableTags = new Set(['a', 'button', 'summary']);\n  var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    // Determine interactivity\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; return __sentinel_discoverElements();";
 const VISION_SOM = "const __sentinel_drawSoMOverlay = function() {\n  'use strict';\n\n  // ---- Remove any existing overlay ----\n  var existing = document.getElementById('sentinel-som-overlay');\n  if (existing) existing.remove();\n\n  // ---- Create canvas ----\n  var canvas = document.createElement('canvas');\n  canvas.id = 'sentinel-som-overlay';\n  canvas.style.position = 'fixed';\n  canvas.style.top = '0';\n  canvas.style.left = '0';\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n  canvas.style.zIndex = '2147483647';\n  canvas.style.pointerEvents = 'none';\n  canvas.width = window.innerWidth * (window.devicePixelRatio || 1);\n  canvas.height = window.innerHeight * (window.devicePixelRatio || 1);\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n\n  var ctx = canvas.getContext('2d');\n  var dpr = window.devicePixelRatio || 1;\n  ctx.scale(dpr, dpr);\n\n  // ---- Guard ----\n  if (!window.__sentinelElements || typeof window.__sentinelElements.forEach !== 'function') {\n    (document.body || document.documentElement).appendChild(canvas);\n    return 'ok';\n  }\n\n  var vw = window.innerWidth;\n  var vh = window.innerHeight;\n\n  // ---- Draw boxes and labels ----\n  window.__sentinelElements.forEach(function(el, idx) {\n    if (!el || !el.getBoundingClientRect) return;\n\n    var cRect = el.getBoundingClientRect();\n    var x = cRect.left;\n    var y = cRect.top;\n    var w = cRect.width;\n    var h = cRect.height;\n\n    // Skip zero-size\n    if (w <= 0 || h <= 0) return;\n\n    // Draw bounding box\n    ctx.strokeStyle = '#00ff88';\n    ctx.lineWidth = 2;\n    ctx.strokeRect(x, y, w, h);\n\n    // ---- Label dimensions ----\n    var lw = 24;\n    var lh = 18;\n    var lx = x;\n    var ly = y - lh;\n\n    // If label would go above the viewport, move it inside the box\n    if (ly < 0) {\n      ly = y;\n    }\n    // If label would go off the left edge, nudge right\n    if (lx < 0) {\n      lx = 0;\n    }\n    // If label would go off the right edge, nudge left\n    if (lx + lw > vw) {\n      lx = vw - lw;\n    }\n\n    // Draw label background\n    ctx.fillStyle = '#00ff88';\n    ctx.fillRect(lx, ly, lw, lh);\n\n    // Draw label text\n    ctx.fillStyle = '#000000';\n    ctx.font = 'bold 12px monospace';\n    ctx.textAlign = 'center';\n    ctx.textBaseline = 'middle';\n    ctx.fillText(String(idx), lx + lw / 2, ly + lh / 2);\n  });\n\n  (document.body || document.documentElement).appendChild(canvas);\n  return 'ok';\n}; __sentinel_drawSoMOverlay();";
-const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0; _ti < _tagged.length; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch(_ae) {} }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
+const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0, _taggedLen = _tagged.length; _ti < _taggedLen; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch(_ae) {} }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
 
 // Precompute valid agent speed modes for O(1) lookup
 const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
@@ -1514,7 +1514,7 @@ async function _cdpObservePage(tabId) {
     // Interactive elements
     + '  var els = document.querySelectorAll("a[href], button, input, select, textarea, [role=\\"button\\"], [role=\\"link\\"], [onclick]");'
     + '  var seen = new Set();'
-    + '  for (var i = 0; i < els.length; i++) {'
+    + '  for (var i = 0, elsLen = els.length; i < elsLen; i++) {'
     + '    if (seen.size >= 60) break;'
     + '    var el = els[i];'
     + '    var rect = el.getBoundingClientRect();'
@@ -1541,7 +1541,7 @@ async function _cdpObservePage(tabId) {
     // Detect overlays — only if we have a body
     + '  if (document.body) {'
     + '    var overlayEls = document.querySelectorAll("div, section, aside, dialog");'
-    + '    for (var o = 0; o < overlayEls.length; o++) {'
+    + '    for (var o = 0, overlayElsLen = overlayEls.length; o < overlayElsLen; o++) {'
     + '      try {'
     + '        var node = overlayEls[o];'
     + '        var nst = window.getComputedStyle(node);'
@@ -1553,7 +1553,7 @@ async function _cdpObservePage(tabId) {
     + '          if (nrect.width > 200 && nrect.height > 100) {'
     + '            var buttons = node.querySelectorAll("button, a, [role=\\"button\\"]");'
     + '            var btnList = [];'
-    + '            for (var b = 0; b < buttons.length; b++) {'
+    + '            for (var b = 0, buttonsLen = buttons.length; b < buttonsLen; b++) {'
     + '              var bContent = typeof buttons[b].textContent === "string" ? buttons[b].textContent : "";'
     + '              var bText = bContent.trim().substring(0, 40);'
     + '              var bRect = buttons[b].getBoundingClientRect();'
@@ -1631,7 +1631,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
         'var n = 0;',
         'var btns = document.querySelectorAll("button, a, [role=\\"button\\"], input[type=\\"submit\\"]");',
         'var consentClicked = false;',
-        'for (var b = 0; b < btns.length; b++) {',
+        'for (var b = 0, btnsLen = btns.length; b < btnsLen; b++) {',
         '  var btnContent = typeof btns[b].textContent === "string" ? btns[b].textContent : "";',
         '  var t = btnContent.trim().toLowerCase();',
         '  if (t === "accept" || t === "agree" || t === "i agree" || t === "ok" || t === "got it" || t === "accept all" || t === "agree all" || t === "consent" || t === "allow all" || t === "yes, i agree" || t.indexOf("accept") === 0 || t.indexOf("agree") === 0) {',
@@ -1652,16 +1652,16 @@ async function _cdpDismissOverlays(tabId, overlays) {
         '}',
         'if (!consentClicked && n === 0) {',
         '  var overlaySels = ["#onetrust-consent-sdk","#onetrust-banner-sdk","#cookieConsent","#cookie-notice","#cookie-banner",".cky-consent-container",".cc-window",".cc-banner",".cc-floating","[aria-modal=true]","[role=dialog]","div[id^=sp_message]",".sp_message",".sp_veil"];',
-        '  for (var s = 0; s < overlaySels.length; s++) {',
+        '  for (var s = 0, overlaySelsLen = overlaySels.length; s < overlaySelsLen; s++) {',
         '    try {',
         '      var els = document.querySelectorAll(overlaySels[s]);',
-        '      for (var j = 0; j < els.length; j++) { els[j].remove(); n++; }',
+        '      for (var j = 0, elsLen = els.length; j < elsLen; j++) { els[j].remove(); n++; }',
         '    } catch(e) {}',
         '  }',
         '}',
         'if (!consentClicked && n === 0) {',
         '  var allDivs = document.querySelectorAll("div, section, aside, dialog");',
-        '  for (var k = 0; k < allDivs.length; k++) {',
+        '  for (var k = 0, allDivsLen = allDivs.length; k < allDivsLen; k++) {',
         '    try {',
         '      var st = window.getComputedStyle(allDivs[k]);',
         '      var pos = st.position || "";',
@@ -2617,16 +2617,16 @@ async function _universalCdpFallback(tab, cmd, opts) {
     + 'if(_t){'
     +   'var _tl=_t.toLowerCase();'
     +   'var _cands=document.querySelectorAll("button,a,input,select,[role=button],[role=link],span,div");'
-    +   'for(var i=0;i<_cands.length;i++){'
+    +   'for(var i=0,_candsLen=_cands.length;i<_candsLen;i++){'
     +     'if(_cands[i].textContent&&_cands[i].textContent.trim().toLowerCase().indexOf(_tl)>=0&&_cands[i].offsetParent!==null)return _cands[i]'
     +   '}'
     + '}'
     + 'if(_s){'
     +   'var _parts=_s.replace(/[.#\\[\\]]/g," ").trim().split(/\\s+/);'
-    +   'for(var p=0;p<_parts.length;p++){'
+    +   'for(var p=0,_partsLen=_parts.length;p<_partsLen;p++){'
     +     'if(_parts[p].length>3){'
     +       'var _w=document.querySelectorAll("[class*="+_parts[p]+"],[id*="+_parts[p]+"]");'
-    +       'for(var w=0;w<_w.length;w++){if(_w[w].offsetParent!==null)return _w[w]}'
+    +       'for(var w=0,_wLen=_w.length;w<_wLen;w++){if(_w[w].offsetParent!==null)return _w[w]}'
     +     '}'
     +   '}'
     + '}'
@@ -2673,7 +2673,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
         // Native select
         + 'if(el.tagName==="SELECT"&&el.options){'
-        +   'for(var i=0;i<el.options.length;i++){'
+        +   'for(var i=0,optsLen=el.options.length;i<optsLen;i++){'
         +     `if(el.options[i].value==="${safeVal}"||el.options[i].text.trim().toLowerCase()==="${safeVal.toLowerCase()}"){`
         +       'el.selectedIndex=i;el.value=el.options[i].value;'
         +       'el.dispatchEvent(new Event("change",{bubbles:true}));'
@@ -2685,7 +2685,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         + 'el.click();'
         + `var _vl="${safeVal}".toLowerCase();`
         + 'var _opts=document.querySelectorAll("[role=option],li,[data-value],.option,[class*=option],[class*=item]");'
-        + 'for(var j=0;j<_opts.length;j++){'
+        + 'for(var j=0,_optsLen=_opts.length;j<_optsLen;j++){'
         +   'if(_opts[j].textContent&&_opts[j].textContent.trim().toLowerCase().indexOf(_vl)>=0&&_opts[j].offsetParent!==null){'
         +     '_opts[j].click();'
         +     `return JSON.stringify({ok:true,result:"selected custom: ${safeVal}"})`
@@ -2693,7 +2693,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         + '}'
         // Try aria listbox
         + 'var _lb=document.querySelector("[role=listbox]");'
-        + 'if(_lb){var _li=_lb.querySelectorAll("[role=option]");for(var k=0;k<_li.length;k++){'
+        + 'if(_lb){var _li=_lb.querySelectorAll("[role=option]");for(var k=0,_liLen=_li.length;k<_liLen;k++){'
         +   `if(_li[k].textContent&&_li[k].textContent.trim().toLowerCase().indexOf(_vl)>=0){_li[k].click();return JSON.stringify({ok:true,result:"selected listbox: ${safeVal}"})}`
         + '}}'
         + `return JSON.stringify({ok:false,error:"option not found: ${safeVal}"});`
@@ -2750,7 +2750,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
       jsCode = `(function(){
         var sel=${JSON.stringify(cmd.selector || '')};
         if(sel){var els=document.querySelectorAll(sel);if(els.length){
-          var items=[];for(var i=0;i<els.length;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}
+          var items=[];for(var i=0,elsLen=els.length;i<elsLen;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}
           return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})
         }}
         return JSON.stringify({ok:false,error:"nothing to extract"})
@@ -6340,10 +6340,10 @@ async function runAgentLoop(goal, workingTabId) {
               const _valJson = JSON.stringify(command.value || '');
               const selCode = `return (function(){
 var el = document.querySelector(${_selJson});
-if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }
+if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0, selsLen = sels.length; i < selsLen; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }
 if (!el) return { ok: false, error: "No select element found" };
 var opts = el.options; var found = false;
-for (var i = 0; i < opts.length; i++) {
+for (var i = 0, optsLen = opts.length; i < optsLen; i++) {
   if (opts[i].value === ${_valJson} || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (${_valJson}).toLowerCase())) {
     el.selectedIndex = i; el.value = opts[i].value;
     el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -6477,10 +6477,10 @@ return { ok: true, value: el.value };
           const _valJson = JSON.stringify(command.value || '');
           const selJs = '(function(){'
             + 'var el = document.querySelector(' + _selJson + ');'
-            + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
+            + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0, selsLen = sels.length; i < selsLen; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
             + 'if (!el) return null;'
             + 'var opts = el.options;'
-            + 'for (var i = 0; i < opts.length; i++) {'
+            + 'for (var i = 0, optsLen = opts.length; i < optsLen; i++) {'
             + '  if (opts[i].value === ' + _valJson + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + _valJson + ').toLowerCase())) {'
             + '    el.selectedIndex = i; el.value = opts[i].value;'
             + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
@@ -6506,7 +6506,7 @@ return { ok: true, value: el.value };
           if (sel) {
             // Focus the input via CDP
             const focusCode = 'var el = document.querySelector(' + JSON.stringify(sel) + ');'
-              + 'if (!el) { var inputs = document.querySelectorAll("input, textarea, [contenteditable]"); for (var i = 0; i < inputs.length; i++) { if (inputs[i].offsetParent !== null) { el = inputs[i]; break; } } }'
+              + 'if (!el) { var inputs = document.querySelectorAll("input, textarea, [contenteditable]"); for (var i = 0, inputsLen = inputs.length; i < inputsLen; i++) { if (inputs[i].offsetParent !== null) { el = inputs[i]; break; } } }'
               + 'if (!el) return null;'
               + 'el.focus(); el.value = "";'
               + 'return el.tagName;'
@@ -6612,9 +6612,9 @@ return { ok: true, value: el.value };
             const _valJson = JSON.stringify(command.value);
             const _valLowerJson = JSON.stringify(String(command.value).toLowerCase());
             _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');'
-              + 'if(!el){var ss=document.querySelectorAll("select");for(var i=0;i<ss.length;i++){if(ss[i].offsetParent!==null){el=ss[i];break;}}}'
+              + 'if(!el){var ss=document.querySelectorAll("select");for(var i=0,ssLen=ss.length;i<ssLen;i++){if(ss[i].offsetParent!==null){el=ss[i];break;}}}'
               + 'if(!el)return null;var opts=el.options;'
-              + 'for(var i=0;i<opts.length;i++){if(opts[i].value===' + _valJson + '||opts[i].text.toLowerCase().includes(' + _valLowerJson + ')){'
+              + 'for(var i=0,optsLen=opts.length;i<optsLen;i++){if(opts[i].value===' + _valJson + '||opts[i].text.toLowerCase().includes(' + _valLowerJson + ')){'
               + 'el.selectedIndex=i;el.value=opts[i].value;el.dispatchEvent(new Event("change",{bubbles:true}));return el.value;}}return null;})()';
           } else if (command.type === 'check' && _sel) {
             _universalJs = '(function(){var el=document.querySelector(' + _selJson + ');if(!el)el=document.querySelector("[type=checkbox]");if(el){el.checked=true;el.dispatchEvent(new Event("change",{bubbles:true}));return"checked";}return null;})()';
