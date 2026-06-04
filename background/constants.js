@@ -18,6 +18,9 @@ export const SCHEDULER_REFRESH_INTERVAL_MS = 30000; // 30 seconds - refresh coun
 export const MAX_WAIT_TIME_MS = 30000; // 30 seconds - maximum wait command duration
 
 // Time interval constants (in milliseconds)
+export const ONE_SECOND_MS = 1000; // 1 second
+export const ONE_MINUTE_MS = 60000; // 1 minute
+export const FIVE_MINUTES_MS = 300000; // 5 minutes
 export const ONE_HOUR_MS = 3600000; // 1 hour
 export const ONE_DAY_MS = 86400000; // 24 hours
 
