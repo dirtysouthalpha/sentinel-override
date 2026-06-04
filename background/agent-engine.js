@@ -1113,7 +1113,7 @@ function summarizeHistoryBatch(batch) {
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'note' && h.action.text) notes.push(typeof h.action.text === 'string' ? h.action.text.substring(0, 200) : String(h.action.text).substring(0, 200));
     const r = (h && typeof h.result === 'string') ? h.result : '';
-    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(`${t}: ${typeof r === 'string' ? r.substring(0, 120) : String(r).substring(0, 120)}`);
+    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(`${t}: ${r.substring(0, 120)}`);
   }
   const summaryParts = [];
   summaryParts.push(`Action counts: ${Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(', ')}`);
@@ -5545,7 +5545,7 @@ async function runAgentLoop(goal, workingTabId) {
           // Skip the legacy execution path for this action
           command._visionExecuted = true;
         } else {
-          result = 'Element [' + (command._visionIndex || 'invalid') + '] not found in vision elements';
+          result = `Element [${command._visionIndex || 'invalid'}] not found in vision elements`;
           actionFailed = true;
           command._visionExecuted = true;
         }
@@ -5774,7 +5774,7 @@ async function runAgentLoop(goal, workingTabId) {
               result = 'Navigated to ' + command.url;
               // Don't set actionFailed — navigation succeeded, CDP will handle observation
             } else {
-              result = 'Navigated to ' + command.url + ' (content script failed to load)';
+              result = `Navigated to ${command.url} (content script failed to load)`;
               actionFailed = true;
             }
           } else {
@@ -5813,7 +5813,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           actionFailed = false;
         } catch (e) {
-          result = (command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward') + ' failed: ' + getErrorMessage(e || 'unknown');
+          result = `${command.type === 'navigate_back' ? 'navigate_back' : 'navigate_forward'} failed: ${getErrorMessage(e || 'unknown')}`;
           actionFailed = true;
         }
       } else if (command.type === 'read_page') {
@@ -5939,7 +5939,7 @@ async function runAgentLoop(goal, workingTabId) {
             // recovery patterns rather than vague "wrap in JSON.stringify".
             // The wrapper already does that; the bug is usually returning a
             // DOM node, a null query, or an unawaited Promise.
-            result = 'JS returned a non-serializable value ("' + _trim.slice(0, 60) + '"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: `return document.body.innerText.substring(0, 5000)` and parse in finish. (2) Use regex on body text: `const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;`. (3) Fall back to `read_page` action. (4) If you returned a DOM element, change to `el.innerText` instead. (5) If you returned a query that may be null, guard with `(document.querySelector(sel) || {}).innerText || null`.';
+            result = `JS returned a non-serializable value ("${_trim.slice(0, 60)}"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: \`return document.body.innerText.substring(0, 5000)\` and parse in finish. (2) Use regex on body text: \`const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;\`. (3) Fall back to \`read_page\` action. (4) If you returned a DOM element, change to \`el.innerText\` instead. (5) If you returned a query that may be null, guard with \`(document.querySelector(sel) || {}).innerText || null\`.`;
           } else {
             let savedKey = command.key;
             let savedValue = jsValue;
@@ -5950,7 +5950,7 @@ async function runAgentLoop(goal, workingTabId) {
               const isEmptyArr = Array.isArray(parsed) && !parsed.length;
               if (parsed === null || isEmptyObj || isEmptyArr) {
                 actionFailed = true;
-                result = 'JS returned ' + (isEmptyArr ? 'an empty array []' : (isEmptyObj ? 'an empty object {}' : 'null')) + '. Re-run the query or extract specific fields directly.';
+                result = `JS returned ${isEmptyArr ? 'an empty array []' : (isEmptyObj ? 'an empty object {}' : 'null')}. Re-run the query or extract specific fields directly.`;
                 savedValue = null;
               } else {
                 savedValue = parsed;
@@ -5964,7 +5964,7 @@ async function runAgentLoop(goal, workingTabId) {
               const hygiene = _shouldAcceptMemoryWrite(savedKey, savedValue, agentMemory);
               if (!hygiene.ok) {
                 actionFailed = true;
-                result = 'JS result rejected by memory hygiene: ' + hygiene.reason + '. This data is already captured — use the existing memory key and proceed to finish or next step. Do NOT retry extraction.';
+                result = `JS result rejected by memory hygiene: ${hygiene.reason}. This data is already captured — use the existing memory key and proceed to finish or next step. Do NOT retry extraction.`;
                 savedValue = null;
               }
             }
@@ -6087,7 +6087,7 @@ return { ok: true, value: el.value };
 })()`;
               const selResult = await cdpExecuteJs(tab, selCode, { timeout: 3000 });
               if (selResult && selResult.ok && selResult.value && selResult.value.ok) {
-                result = 'Selected "' + command.value + '" via CDP fallback';
+                result = `Selected "${command.value}" via CDP fallback`;
                 cdpDone = true;
                 sendSilentUpdate(`[CDP] Selected ${command.value} in ${command.selector || 'dropdown'}`, stepCount);
               } else {
