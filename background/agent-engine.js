@@ -4136,14 +4136,16 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
-        const recentWindow = history.slice(-8);
-        const _recentCounts = recentWindow.reduce((acc, h) => {
-          if (!h || !h.action) return acc;
+        // Iterate directly over history to avoid array copy (perf)
+        const _recentCounts = { js: 0, extract: 0 };
+        const last8Start = Math.max(0, history.length - 8);
+        for (let i = last8Start; i < history.length; i++) {
+          const h = history[i];
+          if (!h || !h.action) continue;
           const type = h.action.type;
-          if (type === 'execute_js') acc.js++;
-          if (DATA_ACTIONS.has(type)) acc.extract++;
-          return acc;
-        }, { js: 0, extract: 0 });
+          if (type === 'execute_js') _recentCounts.js++;
+          if (DATA_ACTIONS.has(type)) _recentCounts.extract++;
+        }
         const recentJsCount = _recentCounts.js;
         const recentExtractCount = _recentCounts.extract;
         const jsLoop = recentJsCount >= 4 && recentExtractCount === 0;
@@ -4160,10 +4162,16 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 1b. Empty page detection — page didn't render (SPA, anti-bot, loading failure)
       if ((pageIsEmpty || elementsEmpty) && !loopDirective) {
-        const emptyCount = history.slice(-4).reduce((acc, h) => {
-          const r = h.result || '';
-          return acc + ((r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) ? 1 : 0);
-        }, 0);
+        // Iterate directly over history to avoid array copy (perf)
+        const emptyCount = (() => {
+          let count = 0;
+          const last4Start = Math.max(0, history.length - 4);
+          for (let i = last4Start; i < history.length; i++) {
+            const r = history[i].result || '';
+            if (r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) count++;
+          }
+          return count;
+        })();
         if (emptyCount >= 2) {
           loopDirective = '\n⚠ EMPTY PAGE -- The page content has been empty for multiple attempts. This site may block automation or use heavy JavaScript rendering. You MUST try a different approach:\n1. Use "execute_js" with key to extract data directly: return document.body.innerText\n2. Navigate to a simpler URL (e.g., the homepage instead of search results)\n3. Try a different site for the same information\nDo NOT read_page again on this empty page.\n';
         }
