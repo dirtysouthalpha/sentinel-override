@@ -120,8 +120,10 @@ class UAPServer {
    * Handle incoming UAP message
    */
   async handleMessage(message, sender, sendResponse) {
+    let id;
     try {
-      const { type, id, payload } = message;
+      const { type, id: messageId, payload } = message;
+      id = messageId;
 
       switch (type) {
         case 'goal_request':
@@ -157,7 +159,7 @@ class UAPServer {
       }
     } catch (error) {
       console.error('[UAP] Message handling error:', error);
-      sendResponse({ type: 'error', id, error: 'internal_error', message: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
+      sendResponse({ type: 'error', id: id || 'unknown', error: 'internal_error', message: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
     }
   }
 

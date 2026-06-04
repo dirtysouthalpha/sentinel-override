@@ -1,10 +1,39 @@
 /**
  * UAP Server Tests
- * 
+ *
  * Tests for Universal Agent Protocol server functionality
- * 
+ *
  * @version 10.0.0
  */
+
+import { jest } from '@jest/globals';
+
+// ── Chrome API mock ──
+const storageData = {};
+globalThis.chrome = {
+  storage: {
+    local: {
+      get: jest.fn((keys, callback) => {
+        const result = {};
+        const keyList = Array.isArray(keys) ? keys : (typeof keys === 'string' ? [keys] : Object.keys(keys || {}));
+        for (const k of keyList) {
+          result[k] = storageData[k] !== undefined ? storageData[k] : (Array.isArray(keys) || typeof keys === 'string' ? undefined : keys[k]);
+        }
+        if (callback) {
+          process.nextTick(() => callback(result));
+        }
+        return Promise.resolve(result);
+      }),
+      set: jest.fn((obj, callback) => {
+        Object.assign(storageData, obj);
+        if (callback) {
+          process.nextTick(() => callback());
+        }
+        return Promise.resolve();
+      }),
+    },
+  },
+};
 
 import { uapServer } from '../background/uap-server.js';
 
