@@ -2843,7 +2843,7 @@ function _isUnproductiveJsResult(raw) {
     const p = JSON.parse(trim);
     if (p === null) return true;
     if (Array.isArray(p) && !p.length) return true;
-    if (typeof p === 'object' && p !== null && !Object.keys(p).length) return true;
+    if (typeof p === 'object' && !Object.keys(p).length) return true;
   } catch (_) { /* not JSON, that's fine */ }
 
   return false;
