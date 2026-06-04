@@ -5216,7 +5216,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
         } catch (e) {
           try { tel.error('network', 'Error reading network', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          sendActionResult(stepCount, 'Error reading network: ' + getErrorMessage(e || 'unknown'), true);
+          sendActionResult(stepCount, `Error reading network: ${getErrorMessage(e || 'unknown')}`, true);
         }
         await sleep(300);
         continue;
@@ -5877,7 +5877,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const _isArr = Array.isArray(parsed.value);
               const _len = _isArr ? parsed.value.length : (typeof parsed.value === 'string' ? parsed.value.length : null);
-              tel.info('memory', 'Wrote "' + _finalKey + '" (extract)', { key: _finalKey, isArray: _isArr, length: _len, totalKeys: memKeys.length });
+              tel.info('memory', `Wrote "${_finalKey}" (extract)`, { key: _finalKey, isArray: _isArr, length: _len, totalKeys: memKeys.length });
             } catch (e) { console.warn('[Sentinel] extract telemetry failed:', getErrorMessage(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
@@ -5887,7 +5887,7 @@ async function runAgentLoop(goal, workingTabId) {
             productiveSteps++;  // (3.8.0)
             // (3.20.0) Show extraction outcome in the activity stream
             try {
-              activityDone(stepCount, 'extract-content', 'Extracted "' + parsed.key + '" → ' + preview, null);
+              activityDone(stepCount, 'extract-content', `Extracted "${parsed.key}" → ${preview}`, null);
             } catch (e) { console.warn('[Sentinel] extract-content activity failed:', getErrorMessage(e)); }
             } // close else (error-string guard)
           }
@@ -5983,7 +5983,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _isArr = Array.isArray(savedValue);
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
-                tel.info('memory', 'Wrote "' + savedKey + '" (execute_js, strategy=' + (ladder.strategy || 'original') + ')', { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
+                tel.info('memory', `Wrote "${savedKey}" (execute_js, strategy=${ladder.strategy || 'original'})`, { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
               } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', getErrorMessage(e)); }
               const preview = String(jsValue).substring(0, 100);
               result = `JS result saved to "${savedKey}": ${preview}`;
