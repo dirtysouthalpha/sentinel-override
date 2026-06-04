@@ -3997,7 +3997,7 @@ async function runAgentLoop(goal, workingTabId) {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icon-48.png'),
             title: 'Sentinel Override — Sign in required',
-            message: 'Sign in to ' + _wallHit.host + ' in the browser, then click Resume.'
+            message: `Sign in to ${_wallHit.host} in the browser, then click Resume.`
           });
           try {
             chrome.runtime.sendMessage({
@@ -4154,8 +4154,8 @@ async function runAgentLoop(goal, workingTabId) {
 
         if (consecutiveNonProductive >= 3 || jsLoop) {
           const reason = jsLoop
-            ? recentJsCount + ' execute_js calls in last 8 steps with no data saved'
-            : consecutiveNonProductive + ' non-productive steps in a row';
+            ? `${recentJsCount} execute_js calls in last 8 steps with no data saved`
+            : `${consecutiveNonProductive} non-productive steps in a row`;
           loopDirective = memCount === 0
             ? `\n⚠ LOOP DETECTED -- ${reason}. You MUST use "execute_js" with a "key" to save results, or use "note" to record findings. Do NOT run more JS without saving.\n`
             : `\n⚠ LOOP DETECTED -- ${reason}. You have ${memCount} items in memory. You MUST use "finish" NOW with a summary of your extracted data.\n`;
@@ -5181,11 +5181,11 @@ async function runAgentLoop(goal, workingTabId) {
           const result = JSON.stringify(entries);
           sendActionMessage(command, stepCount, observation);
           if (entries.length) productiveSteps++;  // (3.8.0)
-          sendActionResult(stepCount, 'Console: ' + entries.length + ' entries', false);
+          sendActionResult(stepCount, `Console: ${entries.length} entries`, false);
           // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
           // tab-manager already emits a debug-level read summary; this one is
           // at info level because the LLM explicitly chose to consume it.
-          try { tel.info('network', 'Agent read console: ' + entries.length + ' entries', { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.info('network', `Agent read console: ${entries.length} entries`, { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           historyPush({ step: stepCount, action: command, result });
           await persistHistory();
         } catch (e) {
@@ -5205,7 +5205,7 @@ async function runAgentLoop(goal, workingTabId) {
           const result = JSON.stringify(entries);
           sendActionMessage(command, stepCount, observation);
           if (entries.length) productiveSteps++;  // (3.8.0)
-          sendActionResult(stepCount, 'Network: ' + entries.length + ' requests', false);
+          sendActionResult(stepCount, `Network: ${entries.length} requests`, false);
           // (3.25.1) Telemetry: LLM-requested network read. Tag the failed
           // count so 4xx/5xx spikes during a run are easy to spot.
           try {
@@ -5247,7 +5247,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           continue;
         }
-        sendSilentUpdate(`DNS lookup: ${_domain} (${_type})${_preset ? ' [' + _preset + ']' : ''}`, stepCount);
+        sendSilentUpdate(`DNS lookup: ${_domain} (${_type})${_preset ? ` [${_preset}]` : ''}`, stepCount);
         sendActionMessage(command, stepCount, observation);
         try {
           const _dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(_domain)}&type=${encodeURIComponent(_type)}`;
@@ -5911,7 +5911,7 @@ async function runAgentLoop(goal, workingTabId) {
           console.log('[Sentinel] execute_js auto-recovered via:', ladder.strategy);
           // Append a hint to the result so the LLM knows which strategy
           // succeeded. Helps it adapt subsequent extractions on this page.
-          ladder.raw = ladder.raw + '\n\n[ENGINE NOTE: original execute_js was unproductive; auto-recovered via ' + ladder.strategy + ' strategy. The data above is from ' + (ladder.strategy === 'body_text_fallback' ? 'document.body.innerText' : 'aggregated visible-element text') + '. Parse it with regex/string ops in your finish summary.]';
+          ladder.raw = `${ladder.raw}\n\n[ENGINE NOTE: original execute_js was unproductive; auto-recovered via ${ladder.strategy} strategy. The data above is from ${ladder.strategy === 'body_text_fallback' ? 'document.body.innerText' : 'aggregated visible-element text'}. Parse it with regex/string ops in your finish summary.]`;
         }
         let res = ladder.raw;
         result = res || 'Done';
@@ -5994,7 +5994,7 @@ async function runAgentLoop(goal, workingTabId) {
                 const _summary = _itemCount !== null
                   ? _itemCount + ' items captured'
                   : (preview.length > 60 ? preview.slice(0, 57) + '…' : preview);
-                activityDone(stepCount, 'js-extract-content', 'Saved "' + savedKey + '" → ' + _summary, null);
+                activityDone(stepCount, 'js-extract-content', `Saved "${savedKey}" → ${_summary}`, null);
               } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', getErrorMessage(e)); }
             }
           }
@@ -6014,9 +6014,9 @@ async function runAgentLoop(goal, workingTabId) {
             const r = await cdpDispatchClick(tab, x, y, {
               button: command.button,
               clickCount: command.clickCount,
-              description: 'Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')'
+              description: `Clicking at (${Math.round(x)}, ${Math.round(y)})`
             });
-            if (r.ok) { result = 'Clicked at (' + Math.round(x) + ',' + Math.round(y) + ') via CDP'; cdpDone = true; }
+            if (r.ok) { result = `Clicked at (${Math.round(x)},${Math.round(y)}) via CDP`; cdpDone = true; }
             else { console.warn('[CDP] dispatchClick failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'click') {
             // Resolve ref/selector to a bbox center via the content script.
@@ -6033,9 +6033,9 @@ async function runAgentLoop(goal, workingTabId) {
                 } catch (_) { /* keep original */ }
                 const targetLabel = command.ref || command.selector || 'element';
                 const r = await cdpDispatchClick(tab, cx, cy, {
-                  description: 'Clicking ' + targetLabel
+                  description: `Clicking ${targetLabel}`
                 });
-                if (r.ok) { result = 'Clicked ' + targetLabel + ' via CDP'; cdpDone = true; }
+                if (r.ok) { result = `Clicked ${targetLabel} via CDP`; cdpDone = true; }
                 else { console.warn('[CDP] dispatchClick failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
               }
             } catch (e) { console.warn('[CDP] get_bbox failed, falling back:', getErrorMessage(e)); }
@@ -6057,11 +6057,11 @@ async function runAgentLoop(goal, workingTabId) {
               await sendMessageWithRetry(tab, { action: 'focus_element', ref: command.ref, selector: command.selector }, 1);
             } catch (_) { /* non-fatal: insertText may still hit the active element */ }
             const r = await cdpDispatchType(tab, command.text || '');
-            if (r.ok) { result = 'Typed ' + (command.text ? command.text.length : 0) + ' chars via CDP'; cdpDone = true; }
+            if (r.ok) { result = `Typed ${command.text ? command.text.length : 0} chars via CDP`; cdpDone = true; }
             else { console.warn('[CDP] dispatchType failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'press_key') {
             const r = await cdpDispatchKey(tab, command.key);
-            if (r.ok) { result = 'Pressed ' + command.key + ' via CDP'; cdpDone = true; }
+            if (r.ok) { result = `Pressed ${command.key} via CDP`; cdpDone = true; }
             else { console.warn('[CDP] dispatchKey failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'select') {
             // v3.66: CDP select - find the <select> element and set its value
@@ -6295,7 +6295,7 @@ return { ok: true, value: el.value };
           if (_ufbResult && _ufbResult.ok) {
             result = _ufbResult.result || 'Executed via universal CDP fallback';
             actionFailed = false;
-            sendSilentUpdate('[CDP-UFB] ' + command.type + ' success', stepCount);
+            sendSilentUpdate(`[CDP-UFB] ${command.type} success`, stepCount);
             console.log('[Sentinel/UFB] Universal fallback succeeded for', command.type);
           } else if (_ufbResult && _ufbResult.result) {
             result = _ufbResult.result;
@@ -6361,9 +6361,9 @@ return { ok: true, value: el.value };
           if (_universalJs) {
             const _uniRes = await cdpExecuteJs(tab, 'return ' + _universalJs, { timeout: 3000 });
             if (_uniRes && _uniRes.ok && _uniRes.value != null && _uniRes.value !== 'not_found') {
-              result = command.type + ' via CDP universal fallback';
+              result = `${command.type} via CDP universal fallback`;
               actionFailed = false;
-              sendSilentUpdate('[CDP] ' + command.type + ' executed via universal fallback', stepCount);
+              sendSilentUpdate(`[CDP] ${command.type} executed via universal fallback`, stepCount);
             }
           }
         } catch (_uniErr) { /* universal CDP fallback non-fatal */ }
@@ -6479,7 +6479,7 @@ return { ok: true, value: el.value };
           } catch(_oe) { /* non-fatal */ }
           historyPush({
             step: stepCount,
-            action: { type: 'note', text: 'SYSTEM: click_at loop detected! ' + _clickAtLoopCount + ' clicks with no progress. Auto-dismissed common overlays. ' +
+            action: { type: 'note', text: `SYSTEM: click_at loop detected! ${_clickAtLoopCount} clicks with no progress. Auto-dismissed common overlays. ` +
               'If the overlay is still visible: (1) Check the element list for consent/agree buttons. ' +
               '(2) Use execute_js with a CSS selector to click it. ' +
               '(3) Try scrolling to reveal the button.' },
@@ -6508,9 +6508,9 @@ return { ok: true, value: el.value };
       if (_sameCmdCount >= 2 && !LOOP_EXCLUDE_TYPES.has(command.type)) {
         const _pageUnchanged = currentUrl === (_lastLoopUrl || '');
         console.warn(`[Sentinel/RECOVERY] Same-command loop:`, command.type, `used ${_sameCmdCount + 1} times. Page unchanged:`, _pageUnchanged);
-        let _recoveryMsg = 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row';
+        let _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row`;
         if (_pageUnchanged) _recoveryMsg += ' with NO page change';
-        _recoveryMsg += '. STOP using ' + command.type + '. ';
+        _recoveryMsg += `. STOP using ${command.type}. `;
         if (_cdpFallbackActive) {
           _recoveryMsg += 'The content script is NOT available on this page (CDP fallback active). ';
         }
@@ -6522,12 +6522,12 @@ return { ok: true, value: el.value };
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
         if (_smartStrats.length) {
-          _recoveryMsg += 'SMART STRATEGIES for this page:\n' + _smartStrats.map(s => '→ ' + s).join('\n') + '\n';
+          _recoveryMsg += `SMART STRATEGIES for this page:\n${_smartStrats.map(s => `→ ${s}`).join('\n')}\n`;
         }
         historyPush({
           step: stepCount,
           action: { type: 'note', text: _recoveryMsg },
-          result: 'Recovery from ' + command.type + ' loop'
+          result: `Recovery from ${command.type} loop`
         });
         await persistHistory();
         _sameCmdCount = 0;
