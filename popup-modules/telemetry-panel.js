@@ -492,7 +492,7 @@
       if (!_viewingPastRun) _liveBuffer = events.slice();
       _viewingPastRun = runMeta;
       events.length = 0;
-      for (const ev of pastEvents) events.push(ev);
+      events.push(...pastEvents);
       _renderAll();
       _renderViewingBanner();
     } catch { /* loading past run may fail gracefully */ }
@@ -502,7 +502,7 @@
     if (!_viewingPastRun) return;
     events.length = 0;
     if (Array.isArray(_liveBuffer)) {
-      for (const ev of _liveBuffer) events.push(ev);
+      events.push(..._liveBuffer);
     }
     _liveBuffer = null;
     _viewingPastRun = null;
