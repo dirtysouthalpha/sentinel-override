@@ -36,7 +36,7 @@ async function _visionObserve(tab, _currentUrl) {
         indexedElements = Array.isArray(parsed) ? parsed : [];
       } catch (e) { console.warn('[Sentinel/v4] Element parse error:', getErrorMessage(e)); }
     }
-    console.log('[Sentinel/v4] Discovered ' + indexedElements.length + ' interactive elements');
+    console.log(`[Sentinel/v4] Discovered ${indexedElements.length} interactive elements`);
 
     // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
     try { await cdpExecuteJs(tab, VISION_SOM, { timeout: 5000 }); }
@@ -66,7 +66,7 @@ async function _visionObserve(tab, _currentUrl) {
       if (el.href) { const hrefLen = el.href.length; if (hrefLen > 5 && hrefLen < 100) attrs += ' href=' + JSON.stringify(el.href.substring(0, 80)); }
       const text = el.text ? `>${(el.text || '').substring(0, 60)}` : '/>';
       const closing = el.text ? `</${tag}>` : '';
-      elementParts.push('[' + el.index + ']<' + tag + attrs + text + closing + '\n');
+      elementParts.push(`[${el.index}]<${tag}${attrs}${text}${closing}\n`);
     }
     const elementTree = elementParts.join('');
 
@@ -233,7 +233,7 @@ export async function restoreFromCheckpoint() {
     const cp = stored && stored.agent_checkpoint;
     if (!cp) return { restored: false, error: 'no checkpoint' };
     const age = Date.now() - (cp.lastUpdate || 0);
-    if (age > 60 * 60 * 1000) return { restored: false, error: 'checkpoint too old (>' + Math.floor(age / 60000) + ' min)' };
+    if (age > 60 * 60 * 1000) return { restored: false, error: `checkpoint too old (>${Math.floor(age / 60000)} min)` };
     if (!cp.lastGoal) return { restored: false, error: 'no goal in checkpoint' };
 
     // Restore in-memory state
@@ -371,7 +371,7 @@ async function _updateRunLogIndex(runLogId, fields) {
 // State of in-flight items so we can compute duration on completion.
 const _activityStartedAt = new Map(); // key: `${stepNumber}:${key}` -> Date.now()
 
-function _activityKey(stepNumber, key) { return (stepNumber || 0) + ':' + (key || 'misc'); }
+function _activityKey(stepNumber, key) { return `${stepNumber || 0}:${key || 'misc'}`; }
 
 /** Mark a sub-action as in-progress. Auto-records start time for duration calc. */
 function activityStart(stepNumber, key, label) {
@@ -459,7 +459,7 @@ async function persistHistory() {
   } catch (e) {
     console.warn('[Sentinel] persistHistory storage write failed:', getErrorMessage(e));
   }
-  try { tel.trace('storage', 'agent_history persisted (' + slice.length + ' entries)', { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { tel.trace('storage', `agent_history persisted (${slice.length} entries)`, { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
@@ -786,7 +786,7 @@ export async function startAgent(goal, sender) {
     try { await _enableSidePanelEverywhere(); } catch (_sidePanelErr) {
       /* Non-fatal: side panel re-enable failed */
     } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-      chrome.runtime.sendMessage({ action: 'agent_finished', summary: '⏹ Run cancelled — mode mismatch between goal directive ("' + modeDirective.wants + '") and current Approval Mode setting.' }).catch((e) => {
+      chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⏹ Run cancelled — mode mismatch between goal directive ("${modeDirective.wants}") and current Approval Mode setting.` }).catch((e) => {
         console.error('[startAgent] mode mismatch cancel sendMessage failed:', getErrorMessage(e));
       });
       return 'Agent cancelled by user (mode mismatch)';
@@ -1113,18 +1113,18 @@ function summarizeHistoryBatch(batch) {
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'note' && h.action.text) notes.push(typeof h.action.text === 'string' ? h.action.text.substring(0, 200) : String(h.action.text).substring(0, 200));
     const r = (h && typeof h.result === 'string') ? h.result : '';
-    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(t + ': ' + (typeof r === 'string' ? r.substring(0, 120) : String(r).substring(0, 120)));
+    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(`${t}: ${typeof r === 'string' ? r.substring(0, 120) : String(r).substring(0, 120)}`);
   }
   const summaryParts = [];
-  summaryParts.push('Action counts: ' + Object.entries(counts).map(([k, v]) => k + '×' + v).join(', '));
-  if (navUrls.length) summaryParts.push('Navigated to: ' + [...new Set(navUrls)].slice(0, 5).join(' | '));
-  if (extractedKeys.length) summaryParts.push('Memory keys saved: ' + [...new Set(extractedKeys)].slice(0, 8).join(', '));
-  if (notes.length) summaryParts.push('Notes recorded: ' + notes.slice(0, 3).join(' || '));
-  if (failures.length) summaryParts.push('Failures: ' + failures.slice(0, 3).join(' || '));
+  summaryParts.push(`Action counts: ${Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(', ')}`);
+  if (navUrls.length) summaryParts.push(`Navigated to: ${[...new Set(navUrls)].slice(0, 5).join(' | ')}`);
+  if (extractedKeys.length) summaryParts.push(`Memory keys saved: ${[...new Set(extractedKeys)].slice(0, 8).join(', ')}`);
+  if (notes.length) summaryParts.push(`Notes recorded: ${notes.slice(0, 3).join(' || ')}`);
+  if (failures.length) summaryParts.push(`Failures: ${failures.slice(0, 3).join(' || ')}`);
   return {
-    step: (firstValid?.step || '?') + '-' + (lastValid?.step || '?'),
+    step: `${firstValid?.step || '?'}-${lastValid?.step || '?'}`,
     action: { type: 'history_summary' },
-    result: '[ROLLED-UP SUMMARY of steps ' + (firstValid?.step || '?') + '-' + (lastValid?.step || '?') + '] ' + summaryParts.join(' • ')
+    result: `[ROLLED-UP SUMMARY of steps ${firstValid?.step || '?'}-${lastValid?.step || '?'}] ${summaryParts.join(' • ')}`
   };
 }
 

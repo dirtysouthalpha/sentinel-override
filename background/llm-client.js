@@ -1662,8 +1662,7 @@ ${base64Image ? (function() {
     const _visionCapable = supportsVision(agentState && agentState.model);
     const _visionHeader = _visionCapable
       ? 'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n'
-      : 'SCREENSHOT ACTIVE — a screenshot is attached for visual context, but you cannot determine pixel coordinates from it.\n'
-        + 'Use selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n';
+      : `SCREENSHOT ACTIVE — a screenshot is attached for visual context, but you cannot determine pixel coordinates from it.\nUse selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n`;
     return metaLine +
     _visionHeader +
     `1. Look at the screenshot to find the element you want to interact with.\n` +
@@ -1675,12 +1674,12 @@ ${base64Image ? (function() {
     `4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n` +
     `RULES:\n` +
     (_visionCapable
-      ? `- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n`
-        + `- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n`
-        + `- If click_at misses, fall back to click with a selector from the element list.\n`
-      : `- Use click with ref/selector from the element list for ALL interactions.\n`
-        + `- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n`
-        + `- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n`) +
+      ? `- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n` +
+        `- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n` +
+        `- If click_at misses, fall back to click with a selector from the element list.\n`
+      : `- Use click with ref/selector from the element list for ALL interactions.\n` +
+        `- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n` +
+        `- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n`) +
     `- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n` +
     dprLine +
     `Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n`;
@@ -2241,7 +2240,7 @@ export function parseLLMResponse(content) {
       try {
         const salvaged = regexSalvageFinishOrNote(content);
         if (salvaged) {
-          console.warn('[Sentinel] Recovered ' + salvaged.type + ' action via regex salvage');
+          console.warn(`[Sentinel] Recovered ${salvaged.type} action via regex salvage`);
           return salvaged;
         }
       } catch (e) { console.warn('[Sentinel/llm] Parse failed:', getErrorMessage(e)); }
