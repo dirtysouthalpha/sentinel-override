@@ -205,7 +205,6 @@ import { initKnowledgeGraph, addKnowledgeNode, updateKnowledgeNode, addKnowledge
 import { analyzeForContradictions, compareResponsesForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
 import { analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics, clearNoveltyHistory } from './novelty-detector.js';
 import { synthesizeKnowledge, getSynthesis, getSynthesisStatistics, clearSynthesis } from './knowledge-synthesizer.js';
-import { addComplianceEntry } from './audit-log.js';
 // v10.0 Advanced Intelligence Systems Integration (Phase 5)
 import { PredictiveEngine } from './predictive-engine.js';
 import { RuntimeProfiler } from './runtime-profiler.js';
@@ -254,7 +253,6 @@ let mutationProposals = [];              // Proposed mutations for review
 let activeCanaryDeployment = null;       // Active canary deployment status
 let selfHealingEnabled = false;          // Self-healing system enabled
 let healingHistory = [];                 // Self-healing attempt history
-// Expose agentRunning for index.js
 // Expose agentRunning for index.js
 export { agentRunning };
 
@@ -3531,7 +3529,7 @@ async function runAgentLoop(goal, workingTabId) {
   profilingEnabled = true;
   predictiveAnalysisEnabled = true;
   selfHealingEnabled = true;
-  RuntimeProfiler.startProfiling();
+  RuntimeProfiler.start();
   console.log('[Sentinel Phase 5] Runtime profiling started');
   const _profilingInterval = 10; // Take sample every 10 steps
 
@@ -3577,7 +3575,7 @@ async function runAgentLoop(goal, workingTabId) {
       // Phase 5: Take profiling sample periodically (every _profilingInterval steps)
       if (profilingEnabled && stepCount % _profilingInterval === 0) {
         try {
-          RuntimeProfiler.takeProfilingSample();
+          RuntimeProfiler.sample();
           console.log('[Sentinel Phase 5] Profiling sample taken at step', stepCount);
         } catch (e) {
           console.warn('[Sentinel Phase 5] Profiling sample failed:', getErrorMessage(e));
@@ -6721,7 +6719,7 @@ return { ok: true, value: el.value };
               strategies: currentStrategies.slice(),
               timestamp: Date.now()
             };
-            const healingResult = RuntimeProfiler.attemptHealing(issue);
+            const healingResult = RuntimeProfiler.heal(issue);
             if (healingResult.healed) {
               console.log('[Sentinel Phase 5] Self-healing successful:', healingResult.strategy);
               healingHistory.push(healingResult);
@@ -7138,7 +7136,7 @@ return { ok: true, value: el.value };
   // Phase 5: v8.0/v9.0 Advanced Intelligence - Final analytics
   try {
     // Stop profiling and generate summary
-    const profilingSummary = RuntimeProfiler.stopProfiling();
+    const profilingSummary = RuntimeProfiler.stop();
     console.log('[Sentinel Phase 5] Profiling stopped:', profilingSummary);
     
     // Run predictive analysis on this run

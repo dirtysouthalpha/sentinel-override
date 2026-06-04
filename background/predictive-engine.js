@@ -575,7 +575,6 @@ export const PredictiveEngine = {
   analyzePatterns: analyzeFailurePatterns,
   
   // Risk assessment
-  calculateRisk,
   assessRisk: calculateRiskScore,
   
   // Simulation

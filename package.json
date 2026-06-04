@@ -17,6 +17,7 @@
     "linkedom": "^0.18.12"
   },
   "dependencies": {
-    "archiver": "^6.0.2"
+    "archiver": "^6.0.2",
+    "uuid": "^14.0.0"
   }
 }
