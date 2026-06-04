@@ -2221,11 +2221,11 @@ function _activityIcon(status) {
 
 function _formatDuration(ms) {
   if (!ms || ms < 0) return '';
-  if (ms < 1000) return ms + 'ms';
-  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   const m = Math.floor(ms / 60000);
   const s = Math.round((ms % 60000) / 1000);
-  return m + 'm ' + s + 's';
+  return `${m}m ${s}s`;
 }
 
 /** Ensure a step card exists for this stepNumber and return its activity stream container. */
@@ -2710,9 +2710,9 @@ async function renderRunLogHistoryList() {
     const fmtDuration = (start, end) => {
       if (!start || !end) return '';
       const sec = Math.max(0, Math.round((end - start) / 1000));
-      if (sec < 60) return sec + 's';
+      if (sec < 60) return `${sec}s`;
       const m = Math.floor(sec / 60), s = sec % 60;
-      return m + 'm ' + s + 's';
+      return `${m}m ${s}s`;
     };
     const rowsHtml = list.map((entry) => {
       const id = entry.runLogId || '';
@@ -2836,7 +2836,7 @@ async function exportRunLog(format) {
       const escape = (v) => {
         if (v == null) return '';
         const s = String(v).replace(/"/g, '""');
-        return /[",\n\r]/.test(s) ? '"' + s + '"' : s;
+        return /[",\n\r]/.test(s) ? `"${s}"` : s;
       };
       const rows = (log.entries || []).map(e => [
         e.step, e.timestamp, e.kind, e.url || '', e.tenant || '',

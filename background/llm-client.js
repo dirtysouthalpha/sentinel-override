@@ -723,13 +723,13 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
     parts.push('KNOWN SELECTORS (use as preferred targets):');
     for (const [k, v] of Object.entries(sel)) {
       if (typeof v === 'string') {
-        parts.push('  ' + k + ': ' + v);
+        parts.push(`  ${k}: ${v}`);
       } else if (Array.isArray(v)) {
-        parts.push('  ' + k + ': [' + v.map(s => '"' + s + '"').join(', ') + ']');
+        parts.push(`  ${k}: [${v.map(s => `"${s}"`).join(', ')}]`);
       } else if (typeof v === 'function') {
         // Function-valued selectors are parameterized — describe the slot
         // rather than dump source.
-        parts.push('  ' + k + ': (parameterized — pass label or text to resolve)');
+        parts.push(`  ${k}: (parameterized — pass label or text to resolve)`);
       }
     }
     parts.push('');
@@ -739,14 +739,14 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
     parts.push('WAIT-TEXT SIGNALS (use with wait_for_text):');
     for (const [k, v] of Object.entries(wait)) {
       if (Array.isArray(v) && v.length) {
-        parts.push('  ' + k + ': any of [' + v.map(s => '"' + s + '"').join(', ') + ']');
+        parts.push(`  ${k}: any of [${v.map(s => `"${s}"`).join(', ')}]`);
       }
     }
     parts.push('');
   }
 
   if (profile.knownGotchas) {
-    parts.push('KNOWN GOTCHAS: ' + profile.knownGotchas);
+    parts.push(`KNOWN GOTCHAS: ${profile.knownGotchas}`);
     parts.push('');
   }
 

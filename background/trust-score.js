@@ -222,11 +222,11 @@ export function suggestRetryActions(scoreResult) {
 
   if (failureGap > 0.4) {
     const streakLen = (bd.failure && bd.failure.consecutiveFailureMax) || 0;
-    const streakNote = streakLen > 2 ? ' with a ' + streakLen + '+ failure streak' : '';
+    const streakNote = streakLen > 2 ? ` with a ${streakLen}+ failure streak` : '';
     suggestions.push({
       id: 'retry-approval-mode',
       label: 'Re-run with approval mode',
-      reason: 'High failure rate' + streakNote + ' - approval mode lets you catch each step before it commits.',
+      reason: `High failure rate${streakNote} - approval mode lets you catch each step before it commits.`,
       severity,
       applyKeys: ['approvalMode'],
       applyValues: [true]

@@ -3256,20 +3256,20 @@ function _buildPageNarration(url, title, observation, pageContent) {
 
     if (headings[0]) {
       const hText = typeof headings[0] === 'string' ? headings[0] : '';
-      const h = hText.length > 60 ? hText.substring(0, 57) + '...' : hText;
+      const h = hText.length > 60 ? `${hText.substring(0, 57)}...` : hText;
       const hLower = typeof h === 'string' ? h.toLowerCase() : '';
       const pTitleLower = typeof pageTitle === 'string' ? pageTitle.toLowerCase() : '';
-      if (hLower !== pTitleLower) parts.push('"' + h + '"');
+      if (hLower !== pTitleLower) parts.push(`"${h}"`);
     }
 
     const details = [];
-    if (forms > 0) details.push(forms + ' form' + (forms > 1 ? 's' : ''));
-    if (inputs > 0) details.push(inputs + ' input' + (inputs > 1 ? 's' : ''));
-    if (buttons > 0) details.push(buttons + ' button' + (buttons > 1 ? 's' : ''));
-    if (links > 5) details.push(links + ' links');
+    if (forms > 0) details.push(`${forms} form${forms > 1 ? 's' : ''}`);
+    if (inputs > 0) details.push(`${inputs} input${inputs > 1 ? 's' : ''}`);
+    if (buttons > 0) details.push(`${buttons} button${buttons > 1 ? 's' : ''}`);
+    if (links > 5) details.push(`${links} links`);
     if (errorEl) details.push('⚠ error message visible');
 
-    const summary = parts.join(' — ') + (details.length ? ' (' + details.join(', ') + ')' : '');
+    const summary = `${parts.join(' — ')}${details.length ? ` (${details.join(', ')})` : ''}`;
     return 'I can see: ' + (summary || host);
   } catch (_) {
     return '';
@@ -4185,11 +4185,11 @@ async function runAgentLoop(goal, workingTabId) {
       if (stepCount >= _softCap) {
         const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
           const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
-          return '- ' + k + ': ' + vStr;
+          return `- ${k}: ${vStr}`;
         }).join('\n');
         const summary = memCount > 0
-          ? 'Task completed after ' + stepCount + ' steps with ' + memCount + ' data points extracted:\n\n' + memLines + (memCount > 10 ? '\n...and ' + (memCount - 10) + ' more items.' : '')
-          : 'Task timed out after ' + stepCount + ' steps without extracting useful data.';
+          ? `Task completed after ${stepCount} steps with ${memCount} data points extracted:\n\n${memLines}${memCount > 10 ? `\n...and ${memCount - 10} more items.` : ''}`
+          : `Task timed out after ${stepCount} steps without extracting useful data.`;
         finished = true;
         sendSilentUpdate('Step limit reached -- finishing', stepCount);
         sendActionResult(stepCount, { type: 'finish', summary }, false);
@@ -5495,7 +5495,7 @@ async function runAgentLoop(goal, workingTabId) {
                     { timeout: 3000 });
                   const _val = _jsClickRes && _jsClickRes.value;
                   if (_val === 'js-clicked') {
-                    result = (result || 'Clicked [' + command._visionIndex + ']') + ' + js-fallback';
+                    result = `${result || `Clicked [${command._visionIndex}]`} + js-fallback`;
                   } else if (!_cdpClickOk && _val !== 'dismissed') {
                     // CDP failed AND JS fallback couldn't find element — last
                     // resort: try by old attribute (only works if VISION_CLEAR
@@ -6060,22 +6060,22 @@ async function runAgentLoop(goal, workingTabId) {
               // Cache JSON.stringify calls to avoid redundant serialization (perf)
               const _selJson = JSON.stringify(command.selector || '');
               const _valJson = JSON.stringify(command.value || '');
-              const selCode = 'return (function(){'
-                + 'var el = document.querySelector(' + _selJson + ');'
-                + 'if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }'
-                + 'if (!el) return { ok: false, error: "No select element found" };'
-                + 'var opts = el.options; var found = false;'
-                + 'for (var i = 0; i < opts.length; i++) {'
-                + '  if (opts[i].value === ' + _valJson + ' || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (' + _valJson + ').toLowerCase())) {'
-                + '    el.selectedIndex = i; el.value = opts[i].value;'
-                + '    el.dispatchEvent(new Event("change", { bubbles: true }));'
-                + '    el.dispatchEvent(new Event("input", { bubbles: true }));'
-                + '    found = true; break;'
-                + '  }'
-                + '}'
-                + 'if (!found) return { ok: false, error: "Option not found: " + ' + _valJson + ' };'
-                + 'return { ok: true, value: el.value };'
-                + '})()';
+              const selCode = `return (function(){
+var el = document.querySelector(${_selJson});
+if (!el) { var sels = document.querySelectorAll("select"); for (var i = 0; i < sels.length; i++) { if (sels[i].offsetParent !== null) { el = sels[i]; break; } } }
+if (!el) return { ok: false, error: "No select element found" };
+var opts = el.options; var found = false;
+for (var i = 0; i < opts.length; i++) {
+  if (opts[i].value === ${_valJson} || (typeof opts[i].text === "string" && opts[i].text.trim().toLowerCase() === (${_valJson}).toLowerCase())) {
+    el.selectedIndex = i; el.value = opts[i].value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    found = true; break;
+  }
+}
+if (!found) return { ok: false, error: "Option not found: " + ${_valJson} };
+return { ok: true, value: el.value };
+})()`;
               const selResult = await cdpExecuteJs(tab, selCode, { timeout: 3000 });
               if (selResult && selResult.ok && selResult.value && selResult.value.ok) {
                 result = 'Selected "' + command.value + '" via CDP fallback';

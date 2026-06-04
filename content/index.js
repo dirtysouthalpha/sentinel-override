@@ -1485,18 +1485,18 @@ if (window.__sentinelInitialized) {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         if (x < 0 || y < 0 || x > vw || y > vh) {
-          return 'click_at coordinates out of viewport (x=' + x + ', y=' + y + ', viewport=' + vw + 'x' + vh + ')';
+          return `click_at coordinates out of viewport (x=${x}, y=${y}, viewport=${vw}x${vh})`;
         }
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('click_at', `Clicking at (${x}, ${y})`);
 
         const el = targetDoc.elementFromPoint(x, y);
-        if (!el) return 'No element found at coordinates (' + x + ', ' + y + ')';
+        if (!el) return `No element found at coordinates (${x}, ${y})`;
 
         // (#20) Reject disabled / pointer-events:none / aria-disabled targets.
         if (dom.checkInteractable) {
           const reason = dom.checkInteractable(el, 'click');
-          if (reason) return 'Cannot click_at (' + x + ', ' + y + '): ' + reason;
+          if (reason) return `Cannot click_at (${x}, ${y}): ${reason}`;
         }
 
         hl.highlightElement(el);
@@ -1530,8 +1530,8 @@ if (window.__sentinelInitialized) {
         setTimeout(() => hl.removeHighlight(el), 2000);
         const classes = String(el.className || '').split(' ').filter(Boolean);
         const _classesLen = classes.length; // Cache to avoid repeated property access
-        const classSuffix = _classesLen > 0 ? '.' + classes[0] : '';
-        return 'Clicked at (' + x + ', ' + y + ') on element: ' + el.tagName + (el.id ? '#' + el.id : '') + classSuffix;
+        const classSuffix = _classesLen > 0 ? `.${classes[0]}` : '';
+        return `Clicked at (${x}, ${y}) on element: ${el.tagName}${el.id ? `#${el.id}` : ''}${classSuffix}`;
       }
 
       case 'drag_and_drop': {
