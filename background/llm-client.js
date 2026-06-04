@@ -28,6 +28,10 @@ const SONICWALL_TEXT_RE = /sonicwall|sonicos/;
 const SONICWALL_PATH_RE = /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/;
 const FORTINET_URL_RE = /fortinet|fortigate|fortimanager/;
 const FORTINET_TEXT_RE = /fortinet|fortigate/;
+
+// Precompiled regex patterns for salvaging finish/note from malformed LLM responses
+const FINISH_SALVAGE_REGEX = /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/m;
+const NOTE_SALVAGE_REGEX = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/m;
 const CISCO_URL_RE = /cisco|\/asdm|\/fmc|meraki|\.ise\./;
 const CISCO_TEXT_RE = /cisco asa|firepower|meraki|cisco ise/;
 const PALOALTO_URL_RE = /paloalto|panorama|\/php\/rest\/pan/;
@@ -2204,10 +2208,8 @@ function regexSalvageFinishOrNote(content) {
   const noteIdx = content.indexOf('"text"');
   if (finishIdx === -1 && noteIdx === -1) return null;
   const useFinish = finishIdx !== -1 && (noteIdx === -1 || finishIdx < noteIdx);
-  const key = useFinish ? 'summary' : 'text';
-  // Match the value up to the closing quote, handling escaped quotes (\") inside
-  // the string so "Found \"X\"" doesn't truncate at the first escaped quote.
-  const re = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*\\}`, 'm');
+  // Use precompiled regex to avoid recreating on every call
+  const re = useFinish ? FINISH_SALVAGE_REGEX : NOTE_SALVAGE_REGEX;
   const m = content.match(re);
   if (!m) return null;
   let raw = m[1];
