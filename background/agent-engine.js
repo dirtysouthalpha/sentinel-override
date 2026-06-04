@@ -4179,7 +4179,11 @@ async function runAgentLoop(goal, workingTabId) {
 
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
-      const recentTabActions = history.slice(-5).reduce((count, h) => count + (h.action && TAB_ACTIONS.has(h.action.type) ? 1 : 0), 0);
+      let recentTabActions = 0;
+      const recentStart = Math.max(0, history.length - 5);
+      for (let i = recentStart; i < history.length; i++) {
+        if (history[i].action && TAB_ACTIONS.has(history[i].action.type)) recentTabActions++;
+      }
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
         loopDirective = `\n⚠ STEP LIMIT -- You are on step ${stepCount} with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n`;
@@ -4358,8 +4362,14 @@ async function runAgentLoop(goal, workingTabId) {
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
-      const promptHistory = history.slice(-CONFIG.historyWindow).map(h => {
-        if (!h || typeof h !== 'object' || h === null) return h;
+      const promptHistory = [];
+      const historyStart = Math.max(0, history.length - CONFIG.historyWindow);
+      for (let i = historyStart; i < history.length; i++) {
+        const h = history[i];
+        if (!h || typeof h !== 'object' || h === null) {
+          promptHistory.push(h);
+          continue;
+        }
         const cleaned = { ...h };
         // Strip screenshots (large) from past entries — only the most recent
         // observation needs the image (passed separately as base64Image).
@@ -4384,8 +4394,8 @@ async function runAgentLoop(goal, workingTabId) {
         if (typeof cleaned.result === 'string' && cleaned.result.length > 800) {
           cleaned.result = `${cleaned.result.slice(0, 800)}… [truncated; ${cleaned.result.length - 800} more chars in memory]`;
         }
-        return cleaned;
-      });
+        promptHistory.push(cleaned);
+      }
       let _aiCallError = null;
       // Drain one sub-command from the repeat_for_each queue before consulting LLM
       if (_pendingCommandQueue.length) {
@@ -4412,11 +4422,15 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
-        const _visionHistory = promptHistory.slice(-6).map(h => {
-          if (!h || !h.action) return '';
+        const _visionHistoryParts = [];
+        const visionStart = Math.max(0, promptHistory.length - 6);
+        for (let i = visionStart; i < promptHistory.length; i++) {
+          const h = promptHistory[i];
+          if (!h || !h.action) continue;
           const a = h.action;
-          return `Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${a.text ? ` "${typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)}"` : ''} -> ${typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80)}`;
-        }).filter(Boolean).join('\n');
+          _visionHistoryParts.push(`Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${a.text ? ` "${typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)}"` : ''} -> ${typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80)}`);
+        }
+        const _visionHistory = _visionHistoryParts.join('\n');
 
         const _visionSystemPrompt = [
           'You are Sentinel, an AI agent that automates browser tasks by looking at screenshots with numbered elements.',
@@ -5633,8 +5647,15 @@ async function runAgentLoop(goal, workingTabId) {
         const _currentHostNoWww = _currentHost.replace(/^www\./, '');
         const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
         if (_alreadyThere) {
-          const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
-          if (_recent.length) {
+          let _recent = false;
+          const checkStart = Math.max(0, history.length - 2);
+          for (let i = checkStart; i < history.length; i++) {
+            if (history[i] && history[i].action && history[i].action.type === 'navigate' && history[i].action.url === command.url) {
+              _recent = true;
+              break;
+            }
+          }
+          if (_recent) {
             const _msg = `BLOCKED: already on ${command.url}. Do NOT navigate to the same URL. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.`;
             activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
             sendActionResult(stepCount, _msg, true);
