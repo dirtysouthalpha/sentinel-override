@@ -7,6 +7,10 @@
 // into detail pages unless the user specifically needs CPE enumeration
 // or reference links.
 
+// Precompile regex patterns for hot-path detection
+const _NVD_HOST_RE = /nvd\.nist\.gov|cve\.mitre\.org|cve\.org/;
+const _NVD_GOAL_RE = /\b(nvd|cve\s*database|nist\s*nvd|cve\s*search)\b/i;
+
 export const nvd = {
   id: 'nvd',
   label: 'NIST NVD / CVE Database',
@@ -16,9 +20,9 @@ export const nvd = {
     if (!url && !goal) return false;
     try {
       const host = new URL(url).host.toLowerCase();
-      if (/nvd\.nist\.gov|cve\.mitre\.org|cve\.org/.test(host)) return true;
+      if (_NVD_HOST_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(nvd|cve\s*database|nist\s*nvd|cve\s*search)\b/i.test(String(goal || ''));
+    return _NVD_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

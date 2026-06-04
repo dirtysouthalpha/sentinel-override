@@ -12,6 +12,14 @@
 // Most MSP work happens in Central (cloud), so that gets the deepest
 // selector coverage. Instant + OS-CX selectors are best-effort starters.
 
+// Precompile regex patterns for hot-path detection
+const _ARUBA_HOST_RE = /aruba/i;
+const _ARUBA_CENTRAL_RE = /(^|\.)central\.arubanetworks\.com$/i;
+const _ARUBA_PORTAL_RE = /(^|\.)portal\.central\.arubanetworks\.com$/i;
+const _ARUBA_PATH_RE = /\/(?:p\/login|aruba|swarm\.html|monitoring|configuration)\b/;
+const _IP_ADDRESS_RE3 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
+const _ARUBA_GOAL_RE = /\b(aruba|arubaos|aruba\s+central|aruba\s+instant|aos-?cx|hpe\s+aruba)\b/i;
+
 export const aruba = {
   id: 'aruba',
   label: 'Aruba Central / Instant / OS-CX',
@@ -23,15 +31,14 @@ export const aruba = {
       const u = new URL(url);
       const host = u.host.toLowerCase();
       const path = u.pathname.toLowerCase();
-      if (/aruba/i.test(host)) return true;
+      if (_ARUBA_HOST_RE.test(host)) return true;
       // Aruba Central cloud
-      if (/(^|\.)central\.arubanetworks\.com$/i.test(host)) return true;
-      if (/(^|\.)portal\.central\.arubanetworks\.com$/i.test(host)) return true;
+      if (_ARUBA_CENTRAL_RE.test(host)) return true;
+      if (_ARUBA_PORTAL_RE.test(host)) return true;
       // Aruba Instant / on-IP — IP-based hosts with characteristic paths
-      if (/\/(?:p\/login|aruba|swarm\.html|monitoring|configuration)\b/.test(path) &&
-          /\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host)) return true;
+      if (_ARUBA_PATH_RE.test(path) && _IP_ADDRESS_RE3.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(aruba|arubaos|aruba\s+central|aruba\s+instant|aos-?cx|hpe\s+aruba)\b/i.test(String(goal || ''));
+    return _ARUBA_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

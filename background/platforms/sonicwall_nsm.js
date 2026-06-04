@@ -2,8 +2,13 @@
 // SonicWall Network Security Manager (cloud orchestrator) — v3.15.0
 //
 // NSM is a multi-tenant cloud management layer over SonicWall firewalls. The
-// on-box SonicOS menus (System > Licenses, VPN > Settings, Firewall > Access
+// on-board SonicOS menus (System > Licenses, VPN > Settings, Firewall > Access
 // Rules) DO NOT exist at the NSM root. Drill into a specific firewall first.
+
+// Precompile regex patterns for hot-path detection
+const _NSM_HOST_RE = /(^|\.)nsm[\w.-]*\.sonicwall\.com$/i;
+const _NSM_CLOUD_HOST_RE = /(^|\.)cloud\.sonicwall\.com$/i;
+const _NSM_GOAL_RE = /\bsonicwall\s+nsm|network\s+security\s+manager\b/i;
 
 export const sonicwallNsm = {
   id: 'sonicwall_nsm',
@@ -16,10 +21,10 @@ export const sonicwallNsm = {
     if (!url && !goal) return false;
     if (url) try {
       const host = new URL(url).host;
-      if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$/i.test(host)) return true;
-      if (/(^|\.)cloud\.sonicwall\.com$/i.test(host)) return true;
+      if (_NSM_HOST_RE.test(host)) return true;
+      if (_NSM_CLOUD_HOST_RE.test(host)) return true;
     } catch (e) { console.warn('[Sentinel] NSM detect URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\bsonicwall\s+nsm|network\s+security\s+manager\b/i.test(String(goal || ''));
+    return _NSM_GOAL_RE.test(String(goal || ''));
   },
 
   // Watch for goals written against the on-box console while user is on NSM.

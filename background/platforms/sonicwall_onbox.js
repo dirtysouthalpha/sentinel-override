@@ -11,6 +11,14 @@
 // time logs), the agent should fall through to direct on-box access via
 // this profile.
 
+// Precompile regex patterns for hot-path detection
+const _SONICOS_NSM_EXCLUDE_RE = /(^|\.)nsm[\w.-]*\.sonicwall\.com$|cloud\.sonicwall\.com$/i;
+const _SONICOS_PATH_RE = /\/sonicui\/|\/main\.html|\/auth\.html|\/getsystem|\/getlogout/i;
+const _IP_ADDRESS_RE2 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
+const _DASHBOARD_PATH_RE = /\/(?:main|dashboard|policy|network|vpn|users|log|system)/i;
+const _CISCO_PATH_EXCLUDE_RE = /\/(?:fmc|asdm)/i;
+const _SONICOS_GOAL_RE = /\b(?:sonicwall|sonicos|tz\d+|nsa\d+|soho|gen[57]\b)/i;
+
 export const sonicwallOnbox = {
   id: 'sonicwall_onbox',
   label: 'SonicWall on-box web admin (SonicOS)',
@@ -22,15 +30,15 @@ export const sonicwallOnbox = {
       const u = new URL(url);
       const host = u.host;
       // Skip NSM hosts explicitly
-      if (/(^|\.)nsm[\w.-]*\.sonicwall\.com$|cloud\.sonicwall\.com$/i.test(host)) return false;
+      if (_SONICOS_NSM_EXCLUDE_RE.test(host)) return false;
       // SonicOS URL patterns
-      if (/\/sonicui\/|\/main\.html|\/auth\.html|\/getsystem|\/getlogout/i.test(u.pathname + u.search)) return true;
+      if (_SONICOS_PATH_RE.test(u.pathname + u.search)) return true;
       // IP-based on-box: typical paths during admin sessions
       // Exclude /fmc (Cisco Firepower Management Center) and /asdm (Cisco ASA) paths
       // that also match the dashboard/system patterns on IP hosts.
-      if (/\b(?:\d{1,3}\.){3}\d{1,3}\b/.test(host) && /\/(?:main|dashboard|policy|network|vpn|users|log|system)/i.test(u.pathname) && !/\/(?:fmc|asdm)/i.test(u.pathname)) return true;
+      if (_IP_ADDRESS_RE2.test(host) && _DASHBOARD_PATH_RE.test(u.pathname) && !_CISCO_PATH_EXCLUDE_RE.test(u.pathname)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(?:sonicwall|sonicos|tz\d+|nsa\d+|soho|gen[57]\b)/i.test(String(goal || ''));
+    return _SONICOS_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [
