@@ -3,6 +3,7 @@
 // Centralizes provider definitions, API format handling, and settings migration.
 
 import { getErrorMessage } from './error-utils.js';
+import { TWELVE_SECONDS_MS } from './constants.js';
 
 // ========== Provider Definitions ==========
 // Each provider defines how to build headers, request bodies, parse responses,
@@ -967,7 +968,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   if (provider.headers) Object.assign(headers, provider.headers);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(() => controller.abort(), TWELVE_SECONDS_MS);
   let resp;
   try {
     resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
