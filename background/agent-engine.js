@@ -3529,16 +3529,17 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
+	      const _tabUrl = tabInfo.url; // Cache to avoid repeated property access
       // EXCEPTION: chrome://newtab/ is a blank tab — the auto-navigate code below
       // will navigate it to the goal URL, so don't block it here.
-      const _isNewTab = tabInfo.url === 'chrome://newtab/' || tabInfo.url === 'chrome://newtab'
-        || tabInfo.url === 'about:blank' || tabInfo.url === 'about:newtab' || tabInfo.url === 'about:newtab/'
-        || tabInfo.url === 'edge://newtab/' || tabInfo.url === 'edge://newtab';
+      const _isNewTab = _tabUrl === 'chrome://newtab/' || _tabUrl === 'chrome://newtab'
+        || _tabUrl === 'about:blank' || _tabUrl === 'about:newtab' || _tabUrl === 'about:newtab/'
+        || _tabUrl === 'edge://newtab/' || _tabUrl === 'edge://newtab';
       const _isRestrictedPage = !_isNewTab && (
-        tabInfo.url.startsWith('chrome://') || tabInfo.url.startsWith('edge://') || tabInfo.url.startsWith('about:')
+        _tabUrl.startsWith('chrome://') || _tabUrl.startsWith('edge://') || _tabUrl.startsWith('about:')
       );
       if (_isRestrictedPage) {
-        const _restrictedMsg = `Cannot operate on internal browser page (${tabInfo.url}). Switch to a normal web tab or open a new tab before starting the agent.`;
+        const _restrictedMsg = `Cannot operate on internal browser page (${_tabUrl}). Switch to a normal web tab or open a new tab before starting the agent.`;
         historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
         sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
         finished = true;
