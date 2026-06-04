@@ -1399,7 +1399,8 @@ function setupVoiceInput() {
             let interim = '';
             const results = event.results || [];
             const resultIndex = event.resultIndex || 0;
-            for (let i = resultIndex; i < results.length; i++) {
+            const resultsLen = results.length;
+            for (let i = resultIndex; i < resultsLen; i++) {
               if (results[i] && results[i][0] && results[i][0].transcript) {
                 if (results[i].isFinal) {
                   finalTranscript += results[i][0].transcript;
