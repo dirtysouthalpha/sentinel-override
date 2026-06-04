@@ -19,10 +19,13 @@ export const MAX_WAIT_TIME_MS = 30000; // 30 seconds - maximum wait command dura
 
 // Time interval constants (in milliseconds)
 export const ONE_HUNDRED_MS = 100; // 100 milliseconds
+export const ONE_HUNDRED_FIFTY_MS = 150; // 150 milliseconds
 export const TWO_HUNDRED_MS = 200; // 200 milliseconds
 export const THREE_HUNDRED_MS = 300; // 300 milliseconds
+export const FOUR_HUNDRED_MS = 400; // 400 milliseconds
 export const FIVE_HUNDRED_MS = 500; // 500 milliseconds
 export const SIX_HUNDRED_MS = 600; // 600 milliseconds
+export const EIGHT_HUNDRED_MS = 800; // 800 milliseconds
 export const ONE_SECOND_MS = 1000; // 1 second
 export const TWO_SECONDS_MS = 2000; // 2 seconds
 export const THREE_SECONDS_MS = 3000; // 3 seconds
