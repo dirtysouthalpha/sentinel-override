@@ -6666,12 +6666,21 @@ return { ok: true, value: el.value };
               ref: command.ref,
               url: command.url,
               key: command.key,
-              text: (typeof command.text === 'string') ? command.text.substring(0, 200) : undefined,
+              text: (() => {
+                const t = command.text;
+                return (typeof t === 'string') ? t.substring(0, 200) : undefined;
+              })(),
               x: command.x, y: command.y
             },
-            result: typeof result === 'string' ? result.substring(0, 500) : JSON.stringify(result || '').substring(0, 500),
+            result: (() => {
+              const r = result;
+              return typeof r === 'string' ? r.substring(0, 500) : JSON.stringify(r || '').substring(0, 500);
+            })(),
             failed: !!actionFailed,
-            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning) ? command.__reasoning.substring(0, 400) : undefined,
+            reasoning: (() => {
+              const r = command.__reasoning;
+              return (typeof r === 'string' && r) ? r.substring(0, 400) : undefined;
+            })(),
             screenshot: _stepScreenshots.get(stepCount) || undefined,
           });
           // Keep last 200 entries; older ones get rolled into a summary.
