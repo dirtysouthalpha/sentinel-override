@@ -297,7 +297,8 @@ function pushConsoleEntry(tabId, entry) {
   if (!buf) { buf = []; consoleBuffers.set(tabId, buf); }
   if (!Array.isArray(buf)) { buf = []; consoleBuffers.set(tabId, buf); }
   buf.push(entry);
-  while (buf.length > CONSOLE_BUFFER_MAX) buf.shift();
+  const toRemove = buf.length - CONSOLE_BUFFER_MAX;
+  if (toRemove > 0) buf.splice(0, toRemove);
 }
 
 /**
