@@ -304,10 +304,11 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
     const view = doc.defaultView;
     let currentEl = null;
+    const menuPathLen = menuPath.length;
 
-    for (let level = 0; level < menuPath.length; level++) {
+    for (let level = 0; level < menuPathLen; level++) {
       const targetText = menuPath[level].toLowerCase().trim();
-      const isLastLevel = level === menuPath.length - 1;
+      const isLastLevel = level === menuPathLen - 1;
 
       // Find menu item matching the text at this level
       const menuItems = dd.findDropdownOptions(doc, currentEl);

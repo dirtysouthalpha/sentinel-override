@@ -4283,9 +4283,11 @@ async function runAgentLoop(goal, workingTabId) {
       // Anti-loop directives: force the model to make progress
       let loopDirective = '';
 
+      // Cache history length once per iteration (perf: accessed many times below)
+      const _histLen = history.length;
+
       // (3.8.0) Tightened read_page loop guard: 2+ consecutive read_page on the
       // same URL is a stall (page hasn't changed; rereading achieves nothing).
-      const _histLen = history.length;
       if (_histLen >= 2) {
         const last = history[_histLen - 1] || null;
         const prior = history[_histLen - 2] || null;
@@ -4310,10 +4312,9 @@ async function runAgentLoop(goal, workingTabId) {
       const memCount = Object.keys(agentMemory).length;
 
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
-      const _hl1 = history.length;
-      if (_hl1 >= 3 && !loopDirective) {
+      if (_histLen >= 3 && !loopDirective) {
         let consecutiveNonProductive = 0;
-        for (let i = _hl1 - 1; i >= 0; i--) {
+        for (let i = _histLen - 1; i >= 0; i--) {
           const h = history[i];
           if (h.action && NON_PRODUCTIVE_READ_ACTIONS.has(h.action.type)) {
             consecutiveNonProductive++;
@@ -4324,8 +4325,8 @@ async function runAgentLoop(goal, workingTabId) {
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
         // Iterate directly over history to avoid array copy (perf)
         const _recentCounts = { js: 0, extract: 0 };
-        const last8Start = Math.max(0, _hl1 - 8);
-        for (let i = last8Start; i < _hl1; i++) {
+        const last8Start = Math.max(0, _histLen - 8);
+        for (let i = last8Start; i < _histLen; i++) {
           const h = history[i];
           if (!h || !h.action) continue;
           const type = h.action.type;
@@ -4351,9 +4352,8 @@ async function runAgentLoop(goal, workingTabId) {
         // Iterate directly over history to avoid array copy (perf)
         const emptyCount = (() => {
           let count = 0;
-          const _historyLen = history.length;
-          const last4Start = Math.max(0, _historyLen - 4);
-          for (let i = last4Start; i < _historyLen; i++) {
+          const last4Start = Math.max(0, _histLen - 4);
+          for (let i = last4Start; i < _histLen; i++) {
             const r = history[i].result || '';
             if (r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) count++;
           }
@@ -4367,9 +4367,8 @@ async function runAgentLoop(goal, workingTabId) {
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
       let recentTabActions = 0;
-      const _hl2 = history.length;
-      const recentStart = Math.max(0, _hl2 - 5);
-      for (let i = recentStart; i < _hl2; i++) {
+      const recentStart = Math.max(0, _histLen - 5);
+      for (let i = recentStart; i < _histLen; i++) {
         const h = history[i];
         if (h.action && TAB_ACTIONS.has(h.action.type)) recentTabActions++;
       }
@@ -4413,8 +4412,7 @@ async function runAgentLoop(goal, workingTabId) {
       // accumulated in history + consecutiveFailures + _lastAiCallMs.
       let _skillAutoCommand = null;
       try {
-        const _histLen2 = history.length;
-        const _lastHistEntry = _histLen2 ? history[_histLen2 - 1] : null;
+        const _lastHistEntry = _histLen ? history[_histLen - 1] : null;
         const _lastResult = _lastHistEntry && typeof _lastHistEntry.result === 'string' ? _lastHistEntry.result : '';
         const _lastFailed = _lastResult.startsWith('BLOCKED:') ||
                             _lastResult.startsWith('Element not found') ||
@@ -4502,7 +4500,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
-      tel.info('llm', `LLM call #${apiCallCount + 1} starting`, { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: history.length, hasScreenshot: !!base64Image });
+      tel.info('llm', `LLM call #${apiCallCount + 1} starting`, { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: _histLen, hasScreenshot: !!base64Image });
       command = null;
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
@@ -4553,9 +4551,8 @@ async function runAgentLoop(goal, workingTabId) {
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
       const promptHistory = [];
-      const _hl3 = history.length;
-      const historyStart = Math.max(0, _hl3 - CONFIG.historyWindow);
-      for (let i = historyStart; i < _hl3; i++) {
+      const historyStart = Math.max(0, _histLen - CONFIG.historyWindow);
+      for (let i = historyStart; i < _histLen; i++) {
         const h = history[i];
         if (!h || typeof h !== 'object' || h === null) {
           promptHistory.push(h);
@@ -5885,9 +5882,8 @@ async function runAgentLoop(goal, workingTabId) {
         const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
         if (_alreadyThere) {
           let _recent = false;
-          const _hl4 = history.length;
-          const checkStart = Math.max(0, _hl4 - 2);
-          for (let i = checkStart; i < _hl4; i++) {
+          const checkStart = Math.max(0, _histLen - 2);
+          for (let i = checkStart; i < _histLen; i++) {
             const h = history[i];
             if (h && h.action && h.action.type === 'navigate' && h.action.url === command.url) {
               _recent = true;

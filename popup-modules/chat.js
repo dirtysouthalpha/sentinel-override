@@ -3211,12 +3211,13 @@ function _ensureHeartbeatDot() {
 function _updateHeartbeat(durationMs) {
   __heartbeat.samples.push(durationMs);
   if (__heartbeat.samples.length > 5) __heartbeat.samples.shift();
-  const avg = __heartbeat.samples.length
-    ? Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / __heartbeat.samples.length)
+  const samplesLen = __heartbeat.samples.length;
+  const avg = samplesLen
+    ? Math.round(__heartbeat.samples.reduce((a, b) => a + b, 0) / samplesLen)
     : 0;
   const dot = _ensureHeartbeatDot();
   dot.style.background = avg < 3000 ? '#4caf50' : avg < 10000 ? '#e0af68' : '#f44336';
-  dot.title = `API: ${(avg / 1000).toFixed(1)}s avg (last ${__heartbeat.samples.length} calls)`;
+  dot.title = `API: ${(avg / 1000).toFixed(1)}s avg (last ${samplesLen} calls)`;
 }
 
 // ========== Cost Display (9.2) ==========
@@ -3635,7 +3636,8 @@ chrome.runtime.onMessage.addListener((message) => {
                   // Apply each (key, value) pair to chrome.storage.local.
                   if (Array.isArray(sug.applyKeys) && sug.applyKeys.length && Array.isArray(sug.applyValues)) {
                     const updates = {};
-                    for (let i = 0; i < sug.applyKeys.length; i++) {
+                    const applyKeysLen = sug.applyKeys.length;
+                    for (let i = 0; i < applyKeysLen; i++) {
                       if (i < sug.applyValues.length) updates[sug.applyKeys[i]] = sug.applyValues[i];
                     }
                     await chrome.storage.local.set(updates);
