@@ -2348,7 +2348,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
 function updateStepCardAction(stepNumber, actionDescription) {
   if (!stepNumber || stepNumber < 1) return;
   const state = __activityState.get(stepNumber);
-  const card = state ? state.card : chatContainer.querySelector('.agent-action-group[data-step="' + stepNumber + '"]');
+  const card = state ? state.card : chatContainer.querySelector(`.agent-action-group[data-step="${stepNumber}"]`);
   if (!card) return;
   const actionEl = card.querySelector('.activity-step-action');
   if (actionEl) actionEl.textContent = actionDescription || '';
@@ -2385,7 +2385,7 @@ function showModeMismatchCard(payload) {
   const card = document.createElement('div');
   card.id = 'mode-mismatch-card';
   card.className = 'safety-banner';
-  card.style.cssText = 'border: 2px solid ' + borderColor + '; background: ' + bgGrad + '; margin: 8px 14px; padding: 14px 16px; border-radius: 8px;';
+  card.style.cssText = `border: 2px solid ${borderColor}; background: ${bgGrad}; margin: 8px 14px; padding: 14px 16px; border-radius: 8px;`;
   card.innerHTML = `
     <div style="display:flex; align-items:center; gap:8px; color:${headerColor}; font-weight:700; font-size:13px; margin-bottom:8px;">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -2396,13 +2396,13 @@ function showModeMismatchCard(payload) {
       <span>Approval Mode mismatch — confirm before running</span>
     </div>
     <div style="font-size: 12px; line-height: 1.55; margin-bottom: 10px;">
-      Your goal asks for <strong style="text-transform:uppercase;">${escapeHtml(goalWants)}</strong> mode${evidence ? ' (matched: <em>"' + escapeHtml(evidence) + '"</em>)' : ''}, but the toggle is currently <strong style="text-transform:uppercase;">${escapeHtml(actualMode)}</strong>.
+      Your goal asks for <strong style="text-transform:uppercase;">${escapeHtml(goalWants)}</strong> mode${evidence ? ` (matched: <em>"${escapeHtml(evidence)}"</em>)` : ''}, but the toggle is currently <strong style="text-transform:uppercase;">${escapeHtml(actualMode)}</strong>.
       ${dangerous ? '<br><span style="color:#FF8A8A;">Running in AUTONOMOUS mode will execute every action without pausing — including clicks that modify settings.</span>' : ''}
     </div>
     <div style="font-size:11px; line-height:1.5; padding:8px 10px; background:rgba(0,0,0,0.18); border-radius:4px; margin-bottom:10px;">
       <div style="font-family:monospace;"><span style="color:#888;">Goal wants:</span> <strong>${escapeHtml(goalWants.toUpperCase())}</strong></div>
       <div style="font-family:monospace;"><span style="color:#888;">Toggle is:</span> <strong>${escapeHtml(actualMode.toUpperCase())}</strong></div>
-      ${confidence ? '<div style="margin-top:2px; color:#bbb;">Match confidence: ' + escapeHtml(confidence) + '</div>' : ''}
+      ${confidence ? `<div style="margin-top:2px; color:#bbb;">Match confidence: ${escapeHtml(confidence)}</div>` : ''}
     </div>
     <div style="display:flex; flex-wrap:wrap; gap:6px;">
       <button id="modeMismatchFlipBtn" style="flex:1; min-width:140px; padding:9px 12px; border-radius:6px; border:1px solid ${borderColor}; background:${borderColor}; color:white; cursor:pointer; font-size:12px; font-weight:600;">Flip to ${escapeHtml(goalWants.toUpperCase())} &amp; continue</button>
@@ -2489,7 +2489,7 @@ function showAdaptedGoalCard(payload) {
     : 'no on-box menu mismatches detected';
   const collapsedByDefault = mode === 'auto';
   const summaryHtml = summary
-    ? '<pre style="white-space: pre-wrap; font-family: inherit; font-size: 12px; line-height: 1.5; margin: 0; color: var(--text-secondary);">' + escapeHtml(summary) + '</pre>'
+    ? `<pre style="white-space: pre-wrap; font-family: inherit; font-size: 12px; line-height: 1.5; margin: 0; color: var(--text-secondary);">${escapeHtml(summary)}</pre>`
     : '<div style="font-size: 12px; color: var(--text-tertiary); font-style: italic;">(no summary provided)</div>';
 
   const actionsHtml = (mode === 'approval')
@@ -2723,8 +2723,8 @@ async function renderRunLogHistoryList() {
       const duration = fmtDuration(entry.startedAt, entry.finishedAt);
       const subtitle = [
         fmtDate(entry.startedAt),
-        (entry.stepCount || 0) + ' steps',
-        (entry.apiCallCount || 0) + ' AI calls',
+        `${entry.stepCount || 0} steps`,
+        `${entry.apiCallCount || 0} AI calls`,
         duration
       ].filter(Boolean).join(' · ');
       return `
@@ -2756,7 +2756,7 @@ async function renderRunLogHistoryList() {
       b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
     });
   } catch (e) {
-    listEl.innerHTML = '<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ' + getErrorMessage(e) + '</div>';
+    listEl.innerHTML = `<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ${getErrorMessage(e)}</div>`;
   }
 }
 
@@ -2775,11 +2775,11 @@ async function deleteRunLogById(runLogId) {
     const list = Array.isArray(stored.run_log_index) ? stored.run_log_index : [];
     const next = list.filter(e => e && e.runLogId !== runLogId);
     await chrome.storage.local.set({ run_log_index: next });
-    await chrome.storage.local.remove('run_log_' + runLogId);
+    await chrome.storage.local.remove(`run_log_${runLogId}`);
     try { showToast('Run log deleted', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Delete failed: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast(`Delete failed: ${getErrorMessage(e)}`, 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2791,7 +2791,7 @@ async function clearAllRunLogs() {
     // Single-pass optimization: filter and map in one loop
     const keys = [];
     for (const e of list) {
-      if (e && e.runLogId) keys.push('run_log_' + e.runLogId);
+      if (e && e.runLogId) keys.push(`run_log_${e.runLogId}`);
     }
     if (keys.length) {
       try { await chrome.storage.local.remove(keys); } catch { /* storage write may fail */ }
@@ -2800,7 +2800,7 @@ async function clearAllRunLogs() {
     try { showToast('All run logs cleared', 'info'); } catch { /* showToast may fail in detached popup */ }
     await renderRunLogHistoryList();
   } catch (e) {
-    try { showToast('Clear failed: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast(`Clear failed: ${getErrorMessage(e)}`, 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2846,7 +2846,7 @@ async function exportRunLog(format) {
         e.result || (e.summary_preview || ''),
         e.failed === true ? 'true' : (e.failed === false ? 'false' : '')
       ].map(escape).join(','));
-      content = headers.join(',') + '\n' + rows.join('\n');
+      content = `${headers.join(',')}\n${rows.join('\n')}`;
       mime = 'text/csv';
       ext = 'csv';
     } else {
@@ -2858,13 +2858,13 @@ async function exportRunLog(format) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sentinel_run_log_' + ((__lastRunLogId || '').slice(0, 8) || 'unknown') + '.' + ext;
+    a.download = `sentinel_run_log_${((__lastRunLogId || '').slice(0, 8) || 'unknown')}.${ext}`;
     if (document.body) document.body.appendChild(a);
     a.click();
     if (document.body) document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } catch (e) {
-    try { showToast('Export failed: ' + String(e), 'error'); } catch { /* showToast may fail in detached popup */ }
+    try { showToast(`Export failed: ${String(e)}`, 'error'); } catch { /* showToast may fail in detached popup */ }
   }
 }
 
@@ -2884,8 +2884,8 @@ function showResumeBanner(goal, stepCount, ageSeconds) {
   banner.className = 'safety-banner';
   banner.style.borderColor = 'var(--accent-primary, #ff6b00)';
   const ageText = (!ageSeconds || Number.isNaN(ageSeconds)) ? 'unknown ago'
-    : ageSeconds < 60 ? ageSeconds + 's ago' : Math.floor(ageSeconds / 60) + 'm ago';
-  const preview = (goal || '').slice(0, 200) + ((goal || '').length > 200 ? '…' : '');
+    : ageSeconds < 60 ? `${ageSeconds}s ago` : `${Math.floor(ageSeconds / 60)}m ago`;
+  const preview = `${(goal || '').slice(0, 200)}${(goal || '').length > 200 ? '…' : ''}`;
   banner.innerHTML = `
     <div class="safety-banner-header" style="color: var(--accent-primary, #ff6b00);">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3005,7 +3005,7 @@ function renderSourceChipsIn(rootEl) {
       chip.dataset.unverified = isUnverified ? '1' : '0';
       chip.title = isUnverified
         ? 'This claim has no verified source — treat with caution'
-        : 'Source: agentMemory["' + key + '"]. Click to view.';
+        : `Source: agentMemory["${key}"]. Click to view.`;
       chip.style.cssText = 'display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin:0 2px; ' +
         'border-radius:9px; font-size:10px; font-weight:600; cursor:pointer; vertical-align:baseline; ' +
         (isUnverified
@@ -3043,7 +3043,7 @@ async function toggleSourceChipExpansion(chip) {
     const mem = stored && stored.agent_memory;
     const value = mem && Object.prototype.hasOwnProperty.call(mem, key) ? mem[key] : null;
     if (value === null || value === undefined) {
-      exp.textContent = '(memory key "' + key + '" not found in current agent_memory; may have been cleared since the run completed)';
+      exp.textContent = `(memory key "${key}" not found in current agent_memory; may have been cleared since the run completed)`;
     } else {
       exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value, null, 2).slice(0, 4000);
     }
@@ -3206,7 +3206,7 @@ function _updateHeartbeat(durationMs) {
     : 0;
   const dot = _ensureHeartbeatDot();
   dot.style.background = avg < 3000 ? '#4caf50' : avg < 10000 ? '#e0af68' : '#f44336';
-  dot.title = 'API: ' + (avg / 1000).toFixed(1) + 's avg (last ' + __heartbeat.samples.length + ' calls)';
+  dot.title = `API: ${(avg / 1000).toFixed(1)}s avg (last ${__heartbeat.samples.length} calls)`;
 }
 
 // ========== Cost Display (9.2) ==========
@@ -3227,7 +3227,7 @@ function _updateCostDisplay(estimatedCostUsd, callCount) {
   const cents = estimatedCostUsd * 100;
   const label = cents < 0.1 ? '<$0.01' : '$' + estimatedCostUsd.toFixed(cents < 1 ? 3 : 2);
   el.textContent = label;
-  el.title = 'Run cost: ~' + label + ' (' + callCount + ' API call' + (callCount !== 1 ? 's' : '') + ')';
+  el.title = `Run cost: ~${label} (${callCount} API call${callCount !== 1 ? 's' : ''})`;
 }
 
 // ========== Live Status Ticker (6.0) ==========
@@ -3235,8 +3235,8 @@ let __lastStatusState = '';
 const _STATE_ICONS = { observing: '👁', thinking: '🧠', planning: '📋', executing: '⚡', verifying: '✔', waiting: '⏳', idle: '·' };
 function _showStatusTicker(state, text, timestamp) {
   const icon = _STATE_ICONS[state] || '·';
-  const label = timestamp ? timestamp + ' — ' + text : text;
-  updateStatus(icon + ' ' + label);
+  const label = timestamp ? `${timestamp} — ${text}` : text;
+  updateStatus(`${icon} ${label}`);
 }
 
 // ========== Background Message Handler ==========
@@ -3294,13 +3294,13 @@ chrome.runtime.onMessage.addListener((message) => {
           const header = document.createElement('div');
           header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
           const _factsLen = facts.length; // Cache to avoid repeated property access
-          header.innerHTML = '<span style="font-weight:600; color:#4a9eff;">🧠 ' + _factsLen + ' fact' + (_factsLen !== 1 ? 's' : '') + ' for ' + (message.clientName || 'client') + '</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
+          header.innerHTML = `<span style="font-weight:600; color:#4a9eff;">🧠 ${_factsLen} fact${_factsLen !== 1 ? 's' : ''} for ${message.clientName || 'client'}</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>`;
           const list = document.createElement('div');
           list.style.cssText = 'margin-top:6px;';
           facts.forEach(f => {
             const item = document.createElement('div');
             item.style.cssText = 'padding:3px 0; border-top:1px solid var(--border,#333); color:var(--text-secondary,#aaa); line-height:1.5;';
-            const wisdom = (f.wisdom || '').length > 120 ? (f.wisdom || '').substring(0, 117) + '...' : (f.wisdom || '');
+            const wisdom = (f.wisdom || '').length > 120 ? `${(f.wisdom || '').substring(0, 117)}...` : (f.wisdom || '');
             item.textContent = wisdom;
             list.appendChild(item);
           });
@@ -3332,7 +3332,7 @@ chrome.runtime.onMessage.addListener((message) => {
           card.style.cssText = 'margin:8px 0; padding:10px 12px; background:var(--bg-secondary,#1a1a1a); border:1px solid var(--border,#333); border-radius:6px; font-size:12px;';
           const header = document.createElement('div');
           header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
-          header.innerHTML = '<span style="font-weight:600; color:var(--text-primary,#eee);">📋 Plan (' + steps.length + ' steps)</span><span class="plan-chevron" style="color:var(--text-secondary,#aaa);">▼</span>';
+          header.innerHTML = `<span style="font-weight:600; color:var(--text-primary,#eee);">📋 Plan (${steps.length} steps)</span><span class="plan-chevron" style="color:var(--text-secondary,#aaa);">▼</span>`;
           const list = document.createElement('ol');
           list.style.cssText = 'margin:8px 0 0; padding-left:20px; color:var(--text-secondary,#aaa); line-height:1.6;';
           steps.forEach(s => {
@@ -3497,13 +3497,13 @@ chrome.runtime.onMessage.addListener((message) => {
           const ratio = (typeof max === 'number' && max !== 0 && !Number.isNaN(max)) ? (Math.abs(pts) / Math.max(1, Math.abs(max))) : 0;
           const barColor = pts < 0 ? '#f44' : (ratio > 0.7 ? '#9ece6a' : ratio > 0.4 ? '#e0af68' : '#f44');
           const widthPct = Math.min(100, Math.round(ratio * 100));
-          return '<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">' +
-                   '<span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">' + label + '</span>' +
-                   '<div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">' +
-                     '<div style="width:' + widthPct + '%; height:100%; background:' + barColor + ';"></div>' +
-                   '</div>' +
-                   '<span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">' + pts + ' / ' + max + '</span>' +
-                 '</div>';
+          return `<div style="display:flex; justify-content:space-between; align-items:center; margin:4px 0; gap:8px;">
+                   <span style="color:var(--text-secondary); flex-shrink:0; min-width:110px;">${label}</span>
+                   <div style="flex:1; height:5px; background:rgba(255,255,255,0.04); border-radius:3px; overflow:hidden;">
+                     <div style="width:${widthPct}%; height:100%; background:${barColor};"></div>
+                   </div>
+                   <span style="color:var(--text-tertiary); flex-shrink:0; min-width:48px; text-align:right; font-variant-numeric:tabular-nums;">${pts} / ${max}</span>
+                 </div>`;
         };
         const ts = message.trustScore;
         if (ts && typeof ts.score === 'number') {
@@ -3518,24 +3518,24 @@ chrome.runtime.onMessage.addListener((message) => {
           const bd = ts.breakdown || {};
           const card = document.createElement('div');
           card.className = 'trust-score-card';
-          card.style.cssText = 'margin:8px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ' + bandColor + '; border-left-width:4px; border-radius:6px; font-size:12px;';
+          card.style.cssText = `margin:8px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ${bandColor}; border-left-width:4px; border-radius:6px; font-size:12px;`;
           // Header line: score + band label + collapse toggle
           card.innerHTML =
-            '<div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-tcs-toggle="1">' +
-              '<div>' +
-                '<strong style="color:' + bandColor + '; font-size:14px;">Trust ' + ts.score + '/100</strong>' +
-                '<span style="color:var(--text-secondary); margin-left:8px;">' + bandLabel + '</span>' +
-              '</div>' +
-              '<span style="font-size:10px; color:var(--text-tertiary);">▾ details</span>' +
-            '</div>' +
-            '<div style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color, rgba(255,255,255,0.06));" data-tcs-body="1">' +
-              _trustRow('Failure rate',  bd.failure)      +
-              _trustRow('Productivity',  bd.productivity) +
-              _trustRow('Recovery',      bd.recovery)     +
-              _trustRow('Plan',          bd.plan)         +
-              _trustRow('Efficiency',    bd.efficiency)   +
-              (bd.safety && bd.safety.blocks > 0 ? _trustRow('Safety (deduct)', bd.safety) : '') +
-            '</div>';
+            `<div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" data-tcs-toggle="1">
+              <div>
+                <strong style="color:${bandColor}; font-size:14px;">Trust ${ts.score}/100</strong>
+                <span style="color:var(--text-secondary); margin-left:8px;">${bandLabel}</span>
+              </div>
+              <span style="font-size:10px; color:var(--text-tertiary);">▾ details</span>
+            </div>
+            <div style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border-color, rgba(255,255,255,0.06));" data-tcs-body="1">
+              ${_trustRow('Failure rate',  bd.failure)}
+              ${_trustRow('Productivity',  bd.productivity)}
+              ${_trustRow('Recovery',      bd.recovery)}
+              ${_trustRow('Plan',          bd.plan)}
+              ${_trustRow('Efficiency',    bd.efficiency)}
+              ${bd.safety && bd.safety.blocks > 0 ? _trustRow('Safety (deduct)', bd.safety) : ''}
+            </div>`;
           // Click-to-expand
           card.addEventListener('click', () => {
             const body = card.querySelector('[data-tcs-body]');
@@ -3592,14 +3592,14 @@ chrome.runtime.onMessage.addListener((message) => {
             const sCard = document.createElement('div');
             sCard.className = 'retry-suggestion-card';
             sCard.dataset.suggestionId = sug.id;
-            sCard.style.cssText = 'margin:6px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ' + sevColor + '; border-left-width:3px; border-radius:6px; font-size:12px;';
+            sCard.style.cssText = `margin:6px 0; padding:10px 12px; background:var(--bg-tertiary, #1f1f1f); border:1px solid ${sevColor}; border-left-width:3px; border-radius:6px; font-size:12px;`;
             // Header + reason
             const header = document.createElement('div');
             header.style.cssText = 'display:flex; justify-content:space-between; align-items:flex-start; gap:10px;';
             const textWrap = document.createElement('div');
             textWrap.style.cssText = 'flex:1; min-width:0;';
             const lbl = document.createElement('div');
-            lbl.style.cssText = 'font-weight:600; color:' + sevColor + '; margin-bottom:3px;';
+            lbl.style.cssText = `font-weight:600; color:${sevColor}; margin-bottom:3px;`;
             lbl.textContent = sug.label || '(no label)';
             textWrap.appendChild(lbl);
             const why = document.createElement('div');
@@ -3613,7 +3613,7 @@ chrome.runtime.onMessage.addListener((message) => {
             if (isAutoApply || isResetSkills) {
               const applyBtn = document.createElement('button');
               applyBtn.textContent = isResetSkills ? 'Reset & retry' : 'Apply & retry';
-              applyBtn.style.cssText = 'padding:5px 10px; font-size:11px; background:' + sevColor + '; color:#fff; border:none; border-radius:4px; cursor:pointer; white-space:nowrap;';
+              applyBtn.style.cssText = `padding:5px 10px; font-size:11px; background:${sevColor}; color:#fff; border:none; border-radius:4px; cursor:pointer; white-space:nowrap;`;
               applyBtn.addEventListener('click', async () => {
                 applyBtn.disabled = true;
                 applyBtn.textContent = '⏳';
