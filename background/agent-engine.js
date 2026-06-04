@@ -6949,7 +6949,7 @@ function describeAction(command) {
     case 'check':       return `Check: ${_describeTarget(command)}`;
     case 'check_all':   return `Check all matching ${_describeTarget(command)}`;
     case 'press_key':   return `Press: ${command.key || '(no key)'}`;
-    case 'execute_js':  return `Run JS: ${(command.code || '').toString().slice(0, 60)}${command.key ? ' → ' + command.key : ''}`;
+    case 'execute_js':  return `Run JS: ${(command.code || '').toString().slice(0, 60)}${command.key ? ` → ${command.key}` : ''}`;
     case 'extract':     return `Extract "${command.key || ''}" from ${_describeTarget(command)}`;
     case 'extract_list':return `Extract list "${command.key || ''}" from ${_describeTarget(command)}`;
     case 'open_tab':    return `Open tab: ${command.label || command.url || '(no url)'}`;
