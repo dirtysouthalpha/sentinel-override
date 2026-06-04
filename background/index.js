@@ -78,7 +78,7 @@ initScheduler();
       const age = Date.now() - (stored.agentStartTime || 0);
       // Only auto-resume if the run started less than 10 minutes ago
       if (age < 10 * 60 * 1000) {
-        console.log('[Sentinel/self-heal] Detected interrupted run. Goal:', stored.agentGoal, 'Age:', Math.floor(age/1000) + 's');
+        console.log('[Sentinel/self-heal] Detected interrupted run. Goal:', stored.agentGoal, 'Age:', `${Math.floor(age/1000)}s`);
         // Check for checkpoint with more state
         const cp = await chrome.storage.session.get('agent_checkpoint');
         if (cp && cp.agent_checkpoint && cp.agent_checkpoint.lastGoal) {
@@ -349,7 +349,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
             const u = new URL(ep);
             // Strip any /chat/completions or trailing path
             const base = `${u.protocol}//${u.host}${u.pathname.replace(/\/(chat\/completions|messages|completions)\/?$/i, '')}`;
-            modelsUrl = base.replace(/\/$/, '') + '/models';
+            modelsUrl = `${base.replace(/\/$/, '')}/models`;
           } catch (e) {
             return { ok: false, error: `Could not parse custom endpoint: ${getErrorMessage(e)}` };
           }

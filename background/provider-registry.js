@@ -619,7 +619,7 @@ export function getModelSupportsVision(providerId, model) {
     // Short keys (< 5 chars) require an exact match or a clear word boundary.
     const isExact = m === k;
     const isSafeSubstring = k.length >= 5 && m.includes(k);
-    const isShortPrefix = k.length < 5 && (m === k || m.startsWith(k + '-') || m.startsWith(k + '.') || m.startsWith(k + '_'));
+    const isShortPrefix = k.length < 5 && (m === k || m.startsWith(`${k}-`) || m.startsWith(`${k}.`) || m.startsWith(`${k}_`));
     if (isExact || isSafeSubstring || isShortPrefix) {
       return MODEL_VISION_OVERRIDES[key];
     }

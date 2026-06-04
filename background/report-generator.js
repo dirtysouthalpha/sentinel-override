@@ -29,7 +29,7 @@ function _truncateMemoryValue(val, maxChars) {
     valStr = String(val);
   }
   if (valStr.length > maxChars) {
-    valStr = valStr.substring(0, maxChars) + '... [truncated; full value in run log]';
+    valStr = `${valStr.substring(0, maxChars)}... [truncated; full value in run log]`;
   }
   return valStr;
 }
@@ -281,7 +281,7 @@ export async function generateReport(executionData, CONFIG) {
     const reportResult = await generateReportViaLLM(reportPrompt, CONFIG, reportSystemPrompt);
     const fullReport = String(reportResult).trim();
     const firstParagraph = fullReport.split('\n\n')[0] || '';
-    const summary = firstParagraph.length > 300 ? firstParagraph.substring(0, 297) + '...' : firstParagraph;
+    const summary = firstParagraph.length > 300 ? `${firstParagraph.substring(0, 297)}...` : firstParagraph;
     return { summary, fullReport, structuredData, goal, timestamp };
   } catch (err) {
     console.error('Report generation failed:', getErrorMessage(err));
@@ -418,13 +418,13 @@ function buildStructuredData(executionData, timestamp) {
     } else if (typeof val === 'object' && val !== null) {
       try {
         const str = JSON.stringify(val);
-        findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : str;
+        findings[key] = str.length > 2000 ? `${str.substring(0, 2000)}... [truncated]` : str;
       } catch {
         findings[key] = String(val).substring(0, 2000);
       }
     } else {
       const str = String(val != null ? val : '');
-      findings[key] = str.length > 2000 ? str.substring(0, 2000) + '... [truncated]' : str;
+      findings[key] = str.length > 2000 ? `${str.substring(0, 2000)}... [truncated]` : str;
     }
   }
 

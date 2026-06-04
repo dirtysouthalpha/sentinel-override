@@ -258,5 +258,5 @@ function escapeHtml(str) {
  */
 function truncate(str, max) {
   const s = (str == null) ? '' : String(str);
-  return s.length > max ? s.slice(0, max) + '…' : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 }

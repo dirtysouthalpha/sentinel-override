@@ -160,10 +160,10 @@ export function describeTrustScore(scoreResult) {
     { name: 'efficiency',   delta: safeDelta(breakdown.efficiency) },
   ];
   components.sort((a, b) => b.delta - a.delta);
-  if (components[0]?.delta > 5) parts.push('weak ' + components[0].name);
-  if (breakdown.safety) { const blocks = breakdown.safety.blocks; if (blocks > 0) parts.push(blocks + ' safety block' + (blocks > 1 ? 's' : '')); }
-  const suffix = parts.length ? ' (' + parts.join(', ') + ')' : '';
-  return 'Trust ' + score + '/100 · ' + band + suffix;
+  if (components[0]?.delta > 5) parts.push(`weak ${components[0].name}`);
+  if (breakdown.safety) { const blocks = breakdown.safety.blocks; if (blocks > 0) parts.push(`${blocks} safety block${blocks > 1 ? 's' : ''}`); }
+  const suffix = parts.length ? ` (${parts.join(', ')})` : '';
+  return `Trust ${score}/100 · ${band}${suffix}`;
 }
 
 function round(n, digits = 0) {
@@ -237,7 +237,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'reset-skills-and-retry',
       label: 'Reset skill stats and retry',
-      reason: 'Recovery skills fired ' + bd.recovery.fires + ' times but only succeeded ' + (bd.recovery.successes || 0) + '. The adaptive priorities may be miscalibrated - reset to start fresh.',
+      reason: `Recovery skills fired ${bd.recovery.fires} times but only succeeded ${bd.recovery.successes || 0}. The adaptive priorities may be miscalibrated - reset to start fresh.`,
       severity,
       applyKeys: [],
       applyValues: []
@@ -248,7 +248,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'enable-adaptive-prompts',
       label: 'Re-run with Adaptive Prompts',
-      reason: 'Only completed ' + bd.plan.planCompleted + '/' + bd.plan.planLength + ' planned steps. Adaptive Prompts will rewrite the goal for the detected platform before execution.',
+      reason: `Only completed ${bd.plan.planCompleted}/${bd.plan.planLength} planned steps. Adaptive Prompts will rewrite the goal for the detected platform before execution.`,
       severity,
       applyKeys: ['adaptivePromptsMode', 'adaptiveExpansionMode'],
       applyValues: ['auto', 'light']
@@ -259,7 +259,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'refine-goal',
       label: 'Refine the goal and retry',
-      reason: 'Only ' + Math.round(bd.productivity.rate * 100) + '% of steps produced output. Try a more concrete goal - name the specific portal, the exact data to extract, and the deliverable format.',
+      reason: `Only ${Math.round(bd.productivity.rate * 100)}% of steps produced output. Try a more concrete goal - name the specific portal, the exact data to extract, and the deliverable format.`,
       severity: 'medium',
       applyKeys: [],
       applyValues: []
@@ -270,7 +270,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'try-leaner-model',
       label: 'Try a leaner model',
-      reason: 'Used ' + bd.efficiency.ratio + ' API calls per productive step. A smaller/faster model may give cleaner runs at lower cost.',
+      reason: `Used ${bd.efficiency.ratio} API calls per productive step. A smaller/faster model may give cleaner runs at lower cost.`,
       severity: 'low',
       applyKeys: [],
       applyValues: []
@@ -281,7 +281,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'verify-tenant-before-retry',
       label: 'Verify expected tenant',
-      reason: safetyBlocks + ' safety block' + (safetyBlocks > 1 ? 's' : '') + ' fired (cross-tenant or sensitive-field). Confirm the expected tenant in Settings before re-running so the agent stays scoped.',
+      reason: `${safetyBlocks} safety block${safetyBlocks > 1 ? 's' : ''} fired (cross-tenant or sensitive-field). Confirm the expected tenant in Settings before re-running so the agent stays scoped.`,
       severity: 'high',
       applyKeys: [],
       applyValues: []

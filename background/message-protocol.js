@@ -134,7 +134,7 @@ function _describeCommand(command, observation) {
   if (INTERACTIVE_COMMANDS.has(command.type) && observation && observation.elements) {
     const el = observation.elements.find(e => e.selector === command.selector);
     if (el && el.text && el.text !== 'No label') {
-      const label = el.text.length > 50 ? el.text.substring(0, 47) + '...' : el.text;
+      const label = el.text.length > 50 ? `${el.text.substring(0, 47)}...` : el.text;
       if (command.type === 'click')    return `Click "${label}"`;
       if (command.type === 'hover')    return `Hover "${label}"`;
       if (command.type === 'select')   return `Select in "${label}"`;
@@ -177,10 +177,10 @@ export function sendActionMessage(command, stepNumber, observation) {
   // URL, key name, etc. Truncate `text` and `code` so we don't ship huge
   // payloads through the message bus.
   const enrichedText = (typeof command.text === 'string' && command.text.length > 200)
-    ? command.text.slice(0, 200) + '…'
+    ? `${command.text.slice(0, 200)}…`
     : command.text;
   const enrichedCode = (typeof command.code === 'string' && command.code.length > 200)
-    ? command.code.slice(0, 200) + '…'
+    ? `${command.code.slice(0, 200)}…`
     : command.code;
   // Resolve the visible text of the clicked/hovered element so the popup can
   // show "Clicking 'Save'" rather than "Clicking button.save-btn".

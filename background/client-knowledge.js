@@ -281,9 +281,9 @@ function _urlMatches(pattern, url) {
     const _urlLower = url.toLowerCase(); // Cache to avoid repeated toLowerCase calls
     if (!pattern.includes('*')) return _urlLower.includes(_patternLower);
     const re = new RegExp(
-      '^' + _patternLower
+      `^${_patternLower
         .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*') + '$'
+        .replace(/\*/g, '.*')}$`
     );
     return re.test(_urlLower);
   } catch (e) {

@@ -2165,7 +2165,7 @@ function regexSalvageFinishOrNote(content) {
   const key = useFinish ? 'summary' : 'text';
   // Match the value up to the closing quote, handling escaped quotes (\") inside
   // the string so "Found \"X\"" doesn't truncate at the first escaped quote.
-  const re = new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*\\}', 'm');
+  const re = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"\\s*\\}`, 'm');
   const m = content.match(re);
   if (!m) return null;
   let raw = m[1];
