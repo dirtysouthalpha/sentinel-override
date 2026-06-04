@@ -5194,7 +5194,8 @@ async function runAgentLoop(goal, workingTabId) {
 
       if (command.type === 'note') {
         const noteText = typeof command.text === 'string' ? command.text : (typeof command.summary === 'string' ? command.summary : 'No note text');
-        sendSilentUpdate(`${noteText.slice(0, 200)}${noteText.length > 200 ? '...' : ''}`, stepCount);
+        const _notePreview = noteText.length > 200 ? `${noteText.slice(0, 200)}...` : noteText;
+        sendSilentUpdate(_notePreview, stepCount);
         // (3.20.0) Surface the actual note content in the per-step activity
         // stream so the user can SEE what was captured, not just "Recording
         // a note". Truncated for display; full text remains in history.
