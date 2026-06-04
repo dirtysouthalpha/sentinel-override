@@ -9,6 +9,9 @@
 let editingTemplateId = null;
 let runningTemplateId = null;
 
+// Precompile regex for template parameter parsing (for performance)
+const TEMPLATE_PARAM_RE = /:{2}(\w+):{2}/g;
+
 // ========== Relative Time Helper ==========
 // relativeTime is in window.Helpers (popup-modules/helpers.js)
 
@@ -294,12 +297,11 @@ function updateParamEditor(existingParams) {
   const container = document.getElementById('tmpl-params-container');
   const goalText = goalEl ? goalEl.value : '';
   if (!container) return;
-  const regex = /:{2}(\w+):{2}/g;
 
   const seen = new Set();
   const keys = [];
   let match;
-  while ((match = regex.exec(goalText)) !== null) {
+  while ((match = TEMPLATE_PARAM_RE.exec(goalText)) !== null) {
     if (!seen.has(match[1])) {
       seen.add(match[1]);
       keys.push(match[1]);
