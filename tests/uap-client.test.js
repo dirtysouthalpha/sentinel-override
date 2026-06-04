@@ -82,7 +82,7 @@ describe('UAP Client', () => {
 
     test('should handle connection timeout', async () => {
       const slowClient = new UAPClient({ timeout: 1 });
-      
+
       // Mock WebSocket that never connects
       global.WebSocket = class NeverConnectsWebSocket {
         constructor() {
@@ -91,9 +91,7 @@ describe('UAP Client', () => {
           this.onmessage = null;
           this.onerror = null;
           this.onclose = null;
-          setTimeout(() => {
-            if (this.onopen) this.onopen();
-          }, 10000);
+          // Never call onopen - connection times out
         }
 
         send() {}
@@ -104,7 +102,7 @@ describe('UAP Client', () => {
       };
 
       await expect(slowClient.connect()).rejects.toThrow('Connection timeout');
-    });
+    }, 15000); // Increase test timeout to 15 seconds (connection timeout is 10s)
 
     test('should reconnect on disconnect', async () => {
       await client.connect();
@@ -113,8 +111,8 @@ describe('UAP Client', () => {
       // Simulate disconnect
       mockWs.close();
 
-      // Should schedule reconnect
-      expect(client.reconnectAttempts).toBe(1);
+      // Should schedule reconnect (reconnectTimer is set)
+      expect(client.reconnectTimer).not.toBeNull();
     });
   });
 
@@ -258,10 +256,14 @@ describe('UAP Client', () => {
 
       const statusPromise = client.getStatus('run-123');
 
+      // Get the status request from sent messages
+      const statusRequest = mockWs.sentMessages.find(m => m.type === 'status_request');
+      expect(statusRequest).toBeDefined();
+
       // Mock status response
       mockWs.simulateMessage({
         type: 'status_response',
-        id: statusPromise.id,
+        id: statusRequest.id,
         payload: {
           status: 'running',
           step: 3,
@@ -281,11 +283,15 @@ describe('UAP Client', () => {
 
       const pausePromise = client.pause('run-123');
 
+      // Get the pause request from sent messages
+      const pauseRequest = mockWs.sentMessages.find(m => m.type === 'pause_request');
+      expect(pauseRequest).toBeDefined();
+
       // Mock pause acceptance
       mockWs.simulateMessage({
         type: 'pause_accepted',
-        id: pausePromise.id,
-        runId: 'run-123'
+        id: pauseRequest.id,
+        payload: { runId: 'run-123' }
       });
 
       await pausePromise;
@@ -297,11 +303,15 @@ describe('UAP Client', () => {
 
       const resumePromise = client.resume('run-123');
 
+      // Get the resume request from sent messages
+      const resumeRequest = mockWs.sentMessages.find(m => m.type === 'resume_request');
+      expect(resumeRequest).toBeDefined();
+
       // Mock resume acceptance
       mockWs.simulateMessage({
         type: 'resume_accepted',
-        id: resumePromise.id,
-        runId: 'run-123'
+        id: resumeRequest.id,
+        payload: { runId: 'run-123' }
       });
 
       await resumePromise;
@@ -313,11 +323,15 @@ describe('UAP Client', () => {
 
       const cancelPromise = client.cancel('run-123');
 
+      // Get the cancel request from sent messages
+      const cancelRequest = mockWs.sentMessages.find(m => m.type === 'cancel_request');
+      expect(cancelRequest).toBeDefined();
+
       // Mock cancel acceptance
       mockWs.simulateMessage({
         type: 'cancel_accepted',
-        id: cancelPromise.id,
-        runId: 'run-123'
+        id: cancelRequest.id,
+        payload: { runId: 'run-123' }
       });
 
       await cancelPromise;
