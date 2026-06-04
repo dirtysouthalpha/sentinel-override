@@ -5116,7 +5116,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (e) { console.warn('[Sentinel] verify extract parse failed:', getErrorMessage(e)); _verifyActual = null; }
         let _verifyOutcome;
         if (!_verifyActual) {
-          _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
+          _verifyOutcome = `verify: element not found or empty (${command.selector || command.ref || 'no selector'})`;
         } else if (!_verifyExpected) {
           _verifyOutcome = `verified (read-back): ${_verifyActual.slice(0, 200)}`;
         } else if (typeof _verifyActual === 'string' && typeof _verifyExpected === 'string') {
@@ -5645,14 +5645,14 @@ async function runAgentLoop(goal, workingTabId) {
       // Handle open_tab
       if (command.type === 'open_tab') {
         if (!isValidUrl(command.url)) {
-          result = 'Invalid URL: ' + command.url;
+          result = `Invalid URL: ${command.url}`;
           actionFailed = true;
         } else {
           sendActionMessage(command, stepCount, null); // Show action card in popup
           sendSilentUpdate(`Opening tab: ${command.label || command.url}`, stepCount);
           const ctx = await openTab(command.url, command.label);
           if (!ctx) {
-            result = 'Failed to open tab: browser rejected chrome.tabs.create for ' + command.url;
+            result = `Failed to open tab: browser rejected chrome.tabs.create for ${command.url}`;
             actionFailed = true;
           } else {
           // (3.7.2) Attach the new tab to the Sentinel group so the user
@@ -5748,7 +5748,7 @@ async function runAgentLoop(goal, workingTabId) {
           // (3.25.1) Telemetry: invalid navigate URL — usually means the LLM
           // hallucinated a URL or pasted a fragment without a scheme.
           try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          result = 'Invalid URL: ' + command.url;
+          result = `Invalid URL: ${command.url}`;
           actionFailed = true;
         } else {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
@@ -5771,7 +5771,7 @@ async function runAgentLoop(goal, workingTabId) {
             try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
             // In CDP mode, content script failure is expected — don't mark as action failure
             if (_cdpFallbackActive) {
-              result = 'Navigated to ' + command.url;
+              result = `Navigated to ${command.url}`;
               // Don't set actionFailed — navigation succeeded, CDP will handle observation
             } else {
               result = `Navigated to ${command.url} (content script failed to load)`;
@@ -5786,14 +5786,14 @@ async function runAgentLoop(goal, workingTabId) {
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
                 try { tel.info('page', 'Navigate ok → ' + (typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100)), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-                result = 'Navigated to ' + arrivedUrl;
+                result = `Navigated to ${arrivedUrl}`;
               } else {
                 try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
                 result = `Navigated but landed on ${arrivedUrl} instead of ${command.url}`;
                 actionFailed = true;
               }
             } catch (_) {
-              result = 'Navigated to ' + arrivedUrl;
+              result = `Navigated to ${arrivedUrl}`;
             }
           }
         }
@@ -6107,7 +6107,7 @@ return { ok: true, value: el.value };
             result = res || 'Done';
             actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
           } catch (err) {
-            result = 'Content script error: ' + getErrorMessage(err || 'command failed to reach page');
+            result = `Content script error: ${getErrorMessage(err || 'command failed to reach page')}`;
             actionFailed = true;
           }
         }
@@ -6128,7 +6128,7 @@ return { ok: true, value: el.value };
                   : (typeof cdpResult.value === 'object'
                       ? JSON.stringify(cdpResult.value).slice(0, 3000)
                       : String(cdpResult.value).slice(0, 3000));
-                result = 'JS Result: ' + valStr;
+                result = `JS Result: ${valStr}`;
                 actionFailed = false;
               } else if (cdpResult && !cdpResult.attachDenied && cdpResult.error) {
                 console.warn('[CDP] execute_js failed, falling back:', (typeof cdpResult === 'object' && cdpResult !== null && typeof cdpResult.error === 'string' ? cdpResult.error : String(cdpResult?.error || 'unknown')));
@@ -6160,7 +6160,7 @@ return { ok: true, value: el.value };
             actionFailed = /^(Error|BLOCKED:)| not found|Element not found|No element/i.test(result);
           }
         } catch (err) {
-          result = 'Content script error: ' + getErrorMessage(err || 'command failed to reach page');
+          result = `Content script error: ${getErrorMessage(err || 'command failed to reach page')}`;
           actionFailed = true;
         }
       }
@@ -6222,7 +6222,7 @@ return { ok: true, value: el.value };
             + '})()';
           const selRes = await cdpExecuteJs(tab, 'return ' + selJs, { timeout: 3000 });
           if (selRes && selRes.ok && selRes.value != null) {
-            result = 'Selected "' + command.value + '" via CDP fallback';
+            result = `Selected "${command.value}" via CDP fallback`;
             actionFailed = false;
             sendSilentUpdate('[CDP] Selected ' + command.value, stepCount);
           }
@@ -6274,7 +6274,7 @@ return { ok: true, value: el.value };
                   break;
                 }
               }
-              result = 'Typed via CDP fallback into ' + sel;
+              result = `Typed via CDP fallback into ${sel}`;
               actionFailed = false;
               sendSilentUpdate('[CDP] Typed into ' + sel, stepCount);
             }
@@ -6397,7 +6397,7 @@ return { ok: true, value: el.value };
               try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
               let _host;
               try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); _host = newUrl || 'new page'; }
-              result = 'Clicked -> new tab opened: ' + _host;
+              result = `Clicked -> new tab opened: ${_host}`;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
               chrome.tabs.remove(newTabs.map(t => t.id)).catch((e) => {
@@ -6408,7 +6408,7 @@ return { ok: true, value: el.value };
               await sleep(500);
               let _host;
               try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); _host = newUrl || 'new page'; }
-              result = 'Clicked -> navigated to ' + _host;
+              result = `Clicked -> navigated to ${_host}`;
             }
           } else {
             const updatedTab = await getTabInfo(tab);
@@ -6425,7 +6425,7 @@ return { ok: true, value: el.value };
                   result = `WARNING: Click navigated away from ${_fromHost} to ${_clickedHost}. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ${_fromHost} and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).`;
                   actionFailed = true;
                 } else {
-                  result = 'Clicked -> navigated to ' + _clickedHost;
+                  result = `Clicked -> navigated to ${_clickedHost}`;
                 }
               } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); result = 'Clicked -> page navigated'; }
             }
