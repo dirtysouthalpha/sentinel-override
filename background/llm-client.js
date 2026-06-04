@@ -1560,11 +1560,11 @@ ${pageContent}
 </UNTRUSTED_PAGE_CONTENT>
 
 AVAILABLE INTERACTIVE ELEMENTS (use ONLY these selectors -- ${trimmedElements.length} of ${totalElementCount} shown, prioritized by type):
-${JSON.stringify(trimmedElements, null, 2)}
+${JSON.stringify(trimmedElements)}
 ${agentState && agentState.visionMode && agentState.visionElementTree ? `\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n${agentState.visionElementTree}` : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows green numbered boxes [1], [2], etc. on interactive elements. Each element in AVAILABLE INTERACTIVE ELEMENTS has a selector like "[data-sentinel-index=\\"N\\"]" — use THAT selector in your click/type/select commands. Example: { "type": "click", "selector": "[data-sentinel-index=\\"5\\"]" } to click element [5]. The element tree and screenshot labels match these indexes.\n' : ''}
 
 RECENT HISTORY (last ${historyWindowSize} steps${isRunbook ? ' -- extended for runbook context' : ''}, screenshots from prior steps stripped):
-${JSON.stringify(sanitizedHistory, null, 2)}
+${JSON.stringify(sanitizedHistory)}
 
 ${last_action && last_result && String(last_result).includes('not found') ? 'CRITICAL: Last action FAILED. You MUST pick a selector from the AVAILABLE INTERACTIVE ELEMENTS list.' : ''}
 
@@ -1786,7 +1786,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   // Memory context
   const memoryKeys = Object.keys(agentState?.agentMemory || {});
   const memoryCtx = memoryKeys.length
-    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState?.agentMemory || {}, null, 2)}\n`
+    ? `\nAGENT MEMORY (data extracted from pages, use ::key:: to reference):\n${JSON.stringify(agentState?.agentMemory || {})}\n`
     : '';
 
   // (3.12.0) Client knowledge context. agent-engine.js pre-formats this
