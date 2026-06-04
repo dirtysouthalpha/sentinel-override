@@ -1666,24 +1666,24 @@ ${base64Image ? (function() {
         + 'Use selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n';
     return metaLine +
     _visionHeader +
-    '1. Look at the screenshot to find the element you want to interact with.\n' +
-    '2. ' + (_visionCapable
-      ? 'Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n' +
-        '3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n'
-      : 'Use the element list below to find the right ref or selector, then use click with that ref.\n' +
-        '3. Example: { "type": "click", "ref": "ref_12" } or { "type": "click", "selector": "button.accept" }.\n') +
-    '4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n' +
-    'RULES:\n' +
+    `1. Look at the screenshot to find the element you want to interact with.\n` +
+    `2. ${_visionCapable
+      ? `Estimate the x,y CSS pixel coordinates of the element center from the screenshot.\n` +
+        `3. Use { "type": "click_at", "x": NUMBER, "y": NUMBER } to click it.\n`
+      : `Use the element list below to find the right ref or selector, then use click with that ref.\n` +
+        `3. Example: { "type": "click", "ref": "ref_12" } or { "type": "click", "selector": "button.accept" }.\n`}` +
+    `4. Use { "type": "type", "ref": "CSS_SELECTOR", "value": "TEXT" } for text input (use selectors for input fields).\n` +
+    `RULES:\n` +
     (_visionCapable
-      ? '- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n'
-        + '- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n'
-        + '- If click_at misses, fall back to click with a selector from the element list.\n'
-      : '- Use click with ref/selector from the element list for ALL interactions.\n'
-        + '- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n'
-        + '- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n') +
-    '- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n' +
+      ? `- PREFER click_at over click when you can see the element in the screenshot. Coordinate clicking works on shadow DOM, canvas, and custom elements where selectors fail.\n`
+        + `- Use click (selector-based) only for form inputs, text fields, and elements with stable selectors.\n`
+        + `- If click_at misses, fall back to click with a selector from the element list.\n`
+      : `- Use click with ref/selector from the element list for ALL interactions.\n`
+        + `- Do NOT use click_at — you cannot determine pixel coordinates without vision capability.\n`
+        + `- For overlays/popups: find the dismiss/accept button in the element list and click it by ref.\n`) +
+    `- For scroll: use { "type": "scroll", "direction": "down" } or { "type": "scroll_to", "selector": "CSS_SELECTOR" }.\n` +
     dprLine +
-    'Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n';
+    `Coordinates are CSS pixels (same as bbox in element data). The screenshot may be higher resolution if DPR > 1, but always emit CSS-pixel coordinates — do NOT scale by DPR.\n`;
 })() : ''}
 
 ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object like { "type": "read_page" }. No thinking, no explanation, no markdown, no text before or after the JSON.'}`;
@@ -1919,7 +1919,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   try {
     data = await response.json();
   } catch (e) {
-    throw new Error('API returned invalid JSON: ' + (getErrorMessage(e)));
+    throw new Error(`API returned invalid JSON: ${getErrorMessage(e)}`);
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -1991,7 +1991,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // but the content or reasoning_content contains the tool intent. Detect and construct action.
     if (choice && choice.finish_reason === 'tool_calls') {
       const _msg = choice.message || {}; // Cache to avoid repeated property access
-      const _intentText = ((typeof _msg.content === 'string' ? _msg.content : '') || '') + ' ' + ((typeof _msg.reasoning_content === 'string' ? _msg.reasoning_content : '') || '');
+      const _intentText = `${(typeof _msg.content === 'string' ? _msg.content : '') || ''} ${(typeof _msg.reasoning_content === 'string' ? _msg.reasoning_content : '') || ''}`;
       // Detect smart_navigate intent from content
       if (/smart[._-]?navigate/i.test(_intentText)) {
         const _goal = goal || ''; // Cache to avoid repeated fallback
