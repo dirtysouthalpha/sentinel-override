@@ -5631,7 +5631,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (_alreadyThere) {
           const _recent = history.slice(-2).filter(h => h && h.action && h.action.type === 'navigate' && h.action.url === command.url);
           if (_recent.length) {
-            const _msg = 'BLOCKED: already on ' + command.url + '. Do NOT navigate to the same URL. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.';
+            const _msg = `BLOCKED: already on ${command.url}. Do NOT navigate to the same URL. Instead: read_page, execute_js to inspect the DOM, or click an in-page nav element to drill deeper.`;
             activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
             sendActionResult(stepCount, _msg, true);
             historyPush({ step: stepCount, action: command, result: _msg });
@@ -5992,7 +5992,7 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const _itemCount = Array.isArray(savedValue) ? savedValue.length : null;
                 const _summary = _itemCount !== null
-                  ? _itemCount + ' items captured'
+                  ? `${_itemCount} items captured`
                   : (preview.length > 60 ? `${preview.slice(0, 57)}…` : preview);
                 activityDone(stepCount, 'js-extract-content', `Saved "${savedKey}" → ${_summary}`, null);
               } catch (e) { console.warn('[Sentinel] js-extract-content activity failed:', getErrorMessage(e)); }
