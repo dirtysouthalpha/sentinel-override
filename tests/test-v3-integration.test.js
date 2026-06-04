@@ -1,9 +1,278 @@
 /**
  * v3.0 Integration Tests
  * Comprehensive tests for v3.0 runtime components
- * 
+ *
  * Tests cover: circuit breaker, task queue, state manager, load monitor, event bus, orchestrator
  */
+
+// Setup chrome API mocks BEFORE any imports
+const storageData = {};
+global.chrome = {
+  storage: {
+    local: {
+      get: (keys) => Promise.resolve(storageData),
+      set: (data) => {
+        Object.assign(storageData, data);
+        return Promise.resolve();
+      },
+      remove: (keys) => {
+        if (Array.isArray(keys)) {
+          keys.forEach(key => delete storageData[key]);
+        } else {
+          delete storageData[keys];
+        }
+        return Promise.resolve();
+      },
+      clear: () => {
+        Object.keys(storageData).forEach(key => delete storageData[key]);
+        return Promise.resolve();
+      }
+    },
+    session: {
+      get: (keys) => Promise.resolve(storageData),
+      set: (data) => {
+        Object.assign(storageData, data);
+        return Promise.resolve();
+      },
+      remove: (keys) => {
+        if (Array.isArray(keys)) {
+          keys.forEach(key => delete storageData[key]);
+        } else {
+          delete storageData[keys];
+        }
+        return Promise.resolve();
+      },
+      clear: () => {
+        Object.keys(storageData).forEach(key => delete storageData[key]);
+        return Promise.resolve();
+      }
+    }
+  },
+  runtime: {
+    lastError: null
+  }
+};
+
+// Setup IDBKeyRange mock
+global.IDBKeyRange = {
+  only: (value) => ({ value }),
+  lowerBound: (value) => ({ value, type: 'lowerBound' }),
+  upperBound: (value) => ({ value, type: 'upperBound' }),
+  bound: (lower, upper) => ({ lower, upper, type: 'bound' })
+};
+
+// Setup indexedDB mock BEFORE any imports
+const idbStores = {
+  tasks: [],
+  metadata: []
+};
+
+const createMockStore = (storeName) => {
+  const store = idbStores[storeName] || [];
+
+  const createRequest = (result) => {
+    const request = {
+      onsuccess: null,
+      onerror: null,
+      result: result,
+      error: null,
+      readyState: 'pending'
+    };
+
+    // Trigger callback asynchronously after it's set
+    setImmediate(() => {
+      if (request.onsuccess) {
+        request.onsuccess({ target: request });
+        request.readyState = 'done';
+      }
+    });
+
+    return request;
+  };
+
+  return {
+    createIndex: (name, keyPath, options) => {},
+    add: (data) => {
+      const item = { ...data, id: data.id || Date.now() + Math.random() };
+      store.push(item);
+      return createRequest(item);
+    },
+    put: (data) => {
+      const index = store.findIndex(t => t.id === data.id);
+      if (index >= 0) {
+        store[index] = data;
+      } else {
+        store.push({ ...data, id: data.id || Date.now() + Math.random() });
+      }
+      return createRequest(data);
+    },
+    get: (key) => {
+      return createRequest(store.find(t => t.id === key));
+    },
+    getAll: () => {
+      return createRequest([...store]);
+    },
+    delete: (key) => {
+      const index = store.findIndex(t => t.id === key);
+      if (index >= 0) {
+        store.splice(index, 1);
+      }
+      return createRequest(undefined);
+    },
+    clear: () => {
+      store.length = 0;
+      return createRequest(undefined);
+    },
+    count: () => {
+      return createRequest(store.length);
+    },
+    index: (name) => {
+      return {
+        count: (keyRange) => {
+          const value = keyRange?.value || keyRange;
+          const filtered = store.filter(t => t[name] === value);
+          return createRequest(filtered.length);
+        },
+        get: (key) => {
+          return createRequest(store.filter(t => t[name] === key));
+        },
+        getAll: () => {
+          return createRequest([...store]);
+        },
+        openCursor: (keyRange) => {
+          const value = keyRange?.value || keyRange;
+          const filtered = store.filter(t => t[name] === value);
+          const cursor = {
+            value: null,
+            key: null,
+            continue: () => {},
+            advance: () => {},
+            delete: () => {},
+            update: () => {}
+          };
+
+          const request = {
+            onsuccess: null,
+            onerror: null,
+            result: null,
+            error: null,
+            readyState: 'pending'
+          };
+
+          // Simulate cursor iteration
+          setImmediate(() => {
+            if (filtered.length > 0) {
+              // Return the first item as the cursor
+              const item = filtered[0];
+              cursor.value = item;
+              cursor.key = item.id;
+              cursor.continue = () => {
+                // Move to next item
+                const index = filtered.indexOf(item);
+                if (index < filtered.length - 1) {
+                  const nextItem = filtered[index + 1];
+                  cursor.value = nextItem;
+                  cursor.key = nextItem.id;
+                  if (request.onsuccess) {
+                    request.onsuccess({ target: request });
+                  }
+                } else {
+                  cursor.value = null;
+                  cursor.key = null;
+                  if (request.onsuccess) {
+                    request.onsuccess({ target: request });
+                  }
+                }
+              };
+              request.result = cursor;
+            }
+            if (request.onsuccess) {
+              request.onsuccess({ target: request });
+            }
+            request.readyState = 'done';
+          });
+
+          return request;
+        }
+      };
+    }
+  };
+};
+
+// Track created object stores
+const createdStores = new Set();
+
+global.indexedDB = {
+  open: (dbName, version) => {
+    const request = {
+      result: null,
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+      onblocked: null,
+      error: null,
+      readyState: 'pending',
+      transaction: (storeNames, mode) => {
+        const stores = Array.isArray(storeNames) ? storeNames : [storeNames];
+        const transaction = {
+          objectStore: (name) => createMockStore(name),
+          oncomplete: null,
+          onerror: null,
+          abort: () => {},
+          db: {
+            close: () => {},
+            objectStoreNames: {
+              contains: (name) => createdStores.has(name),
+              length: createdStores.size
+            }
+          }
+        };
+        return transaction;
+      },
+      close: () => {},
+      createObjectStore: (name, options) => {
+        createdStores.add(name);
+        return createMockStore(name);
+      },
+      objectStoreNames: {
+        contains: (name) => createdStores.has(name),
+        length: createdStores.size
+      }
+    };
+
+    // Simulate asynchronous database opening
+    setImmediate(() => {
+      // Trigger onupgradeneeded if needed
+      if (request.onupgradeneeded) {
+        request.onupgradeneeded({
+          target: {
+            result: request,
+            oldVersion: 0,
+            newVersion: version
+          }
+        });
+      }
+      // Then trigger onsuccess
+      request.result = request;
+      request.readyState = 'done';
+      if (request.onsuccess) {
+        request.onsuccess({ target: { result: request } });
+      }
+    });
+
+    return request;
+  },
+  deleteDatabase: (dbName) => {
+    const request = {
+      onsuccess: null,
+      onerror: null
+    };
+    setImmediate(() => {
+      if (request.onsuccess) request.onsuccess({ target: {} });
+    });
+    return request;
+  }
+};
 
 describe('v3.0 Circuit Breaker', () => {
   let CircuitBreaker, CircuitState, CircuitBreakerRegistry;
