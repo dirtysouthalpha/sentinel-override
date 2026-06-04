@@ -2639,21 +2639,21 @@ async function _universalCdpFallback(tab, cmd, opts) {
     }
     default: {
       if (sel) {
-        jsCode = '(function(){'
-          + 'var el=' + finderCode + ';'
-          + 'if(!el)return JSON.stringify({ok:false,error:"not found for ' + cmd.type + '"});'
-          + 'el.scrollIntoView({block:"center",behavior:"instant"});'
-          + 'el.click();'
-          + 'return JSON.stringify({ok:true,result:"generic fallback clicked for ' + cmd.type + '"})'
-          + '})()';
+        jsCode = `(function(){
+          var el=${finderCode};
+          if(!el)return JSON.stringify({ok:false,error:"not found for ${cmd.type}"});
+          el.scrollIntoView({block:"center",behavior:"instant"});
+          el.click();
+          return JSON.stringify({ok:true,result:"generic fallback clicked for ${cmd.type}"})
+        })()`;
       }
       break;
     }
   }
   
-  if (!jsCode) return { ok: false, result: 'No UFB for: ' + cmd.type };
-  
-  var ufbRes = await cdpExecuteJs(tab, 'return ' + jsCode, { timeout: timeout });
+  if (!jsCode) return { ok: false, result: `No UFB for: ${cmd.type}` };
+
+  var ufbRes = await cdpExecuteJs(tab, `return ${jsCode}`, { timeout: timeout });
   if (ufbRes && ufbRes.ok && ufbRes.value != null) {
     try {
       var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
@@ -3101,12 +3101,12 @@ function generateHeuristicPlan(goal, currentUrl) {
     if (_bareMatch && _bareMatch[1]) {
       const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
       if (_bareSiteMap[_siteKey]) {
-        _urlMatch = ['go to ' + _bareMatch[1], 'https://' + _bareSiteMap[_siteKey]];
+        _urlMatch = [`go to ${_bareMatch[1]}`, `https://${_bareSiteMap[_siteKey]}`];
       } else {
         // Try partial match
         for (const [k, v] of Object.entries(_bareSiteMap)) {
           if (_siteKey.includes(k) || k.includes(_siteKey)) {
-            _urlMatch = ['go to ' + _bareMatch[1], 'https://' + v];
+            _urlMatch = [`go to ${_bareMatch[1]}`, `https://${v}`];
             break;
           }
         }
@@ -4334,7 +4334,7 @@ async function runAgentLoop(goal, workingTabId) {
               pageText = visionResult.pageText;
             }
             trimmedElements = visionResult.elements.slice(0, CONFIG.maxElements).map(e => ({
-              selector: '[data-sentinel-index="' + e.index + '"]',
+              selector: `[data-sentinel-index="${e.index}"]`,
               text: e.text || '',
               type: e.tag || 'div',
               index: e.index,
@@ -4466,7 +4466,7 @@ async function runAgentLoop(goal, workingTabId) {
             role: 'user',
             content: [
               { type: 'text', text: _visionUserContent },
-              ...(base64Image ? [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + base64Image } }] : [])
+              ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
             ]
           }
         ];
@@ -4503,7 +4503,7 @@ async function runAgentLoop(goal, workingTabId) {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': 'Bearer ' + _vApiKey
+                  'Authorization': `Bearer ${_vApiKey}`
                 },
                 body: _visionBody,
                 signal: _vCtrl.signal
@@ -4590,8 +4590,8 @@ async function runAgentLoop(goal, workingTabId) {
         base64Image = null; // release screenshot memory
         agentState.apiCallCount++; // vision path bypasses callLLMWithRetry which normally increments this
         apiCallCount = agentState.apiCallCount;
-        activityDone(stepCount, 'consult-ai', 'Vision decided: ' + command.type, null);
-        tel.info('llm', 'Vision LLM decided: ' + command.type, { durationMs: _lastAiCallMs, commandType: command.type });
+        activityDone(stepCount, 'consult-ai', `Vision decided: ${command.type}`, null);
+        tel.info('llm', `Vision LLM decided: ${command.type}`, { durationMs: _lastAiCallMs, commandType: command.type });
       }
 
       // Legacy LLM fallback (only if vision didn't produce a command)
