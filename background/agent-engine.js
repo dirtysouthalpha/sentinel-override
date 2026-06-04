@@ -4186,7 +4186,8 @@ async function runAgentLoop(goal, workingTabId) {
       const _hl2 = history.length;
       const recentStart = Math.max(0, _hl2 - 5);
       for (let i = recentStart; i < _hl2; i++) {
-        if (history[i].action && TAB_ACTIONS.has(history[i].action.type)) recentTabActions++;
+        const h = history[i];
+        if (h.action && TAB_ACTIONS.has(h.action.type)) recentTabActions++;
       }
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
@@ -5656,7 +5657,8 @@ async function runAgentLoop(goal, workingTabId) {
           const _hl4 = history.length;
           const checkStart = Math.max(0, _hl4 - 2);
           for (let i = checkStart; i < _hl4; i++) {
-            if (history[i] && history[i].action && history[i].action.type === 'navigate' && history[i].action.url === command.url) {
+            const h = history[i];
+            if (h && h.action && h.action.type === 'navigate' && h.action.url === command.url) {
               _recent = true;
               break;
             }
