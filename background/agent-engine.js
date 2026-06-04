@@ -1104,10 +1104,16 @@ function summarizeHistoryBatch(batch) {
     if (!h || !h.action) continue;
     const t = h.action.type;
     counts[t] = (counts[t] || 0) + 1;
-    if (t === 'navigate' && h.action.url) navUrls.push(typeof h.action.url === 'string' ? h.action.url.substring(0, 100) : String(h.action.url).substring(0, 100));
+    if (t === 'navigate' && h.action.url) {
+      const url = h.action.url;
+      navUrls.push(typeof url === 'string' ? url.substring(0, 100) : String(url).substring(0, 100));
+    }
     if ((/^extract(_list)?$/.test(t)) && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
-    if (t === 'note' && h.action.text) notes.push(typeof h.action.text === 'string' ? h.action.text.substring(0, 200) : String(h.action.text).substring(0, 200));
+    if (t === 'note' && h.action.text) {
+      const text = h.action.text;
+      notes.push(typeof text === 'string' ? text.substring(0, 200) : String(text).substring(0, 200));
+    }
     const r = (h && typeof h.result === 'string') ? h.result : '';
     if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(`${t}: ${r.substring(0, 120)}`);
   }
@@ -5786,7 +5792,10 @@ async function runAgentLoop(goal, workingTabId) {
         } else {
           // (3.25.1) Telemetry: navigate kickoff. Pair with the result emit
           // below so operators can see latency + landing-URL mismatches.
-          try { tel.info('page', 'Navigating → ' + (typeof command.url === 'string' ? command.url.substring(0, 100) : String(command.url).substring(0, 100)), { stepCount, target: command.url, fromUrl: currentUrl }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try {
+            const targetUrl = command.url;
+            tel.info('page', 'Navigating → ' + (typeof targetUrl === 'string' ? targetUrl.substring(0, 100) : String(targetUrl).substring(0, 100)), { stepCount, target: targetUrl, fromUrl: currentUrl });
+          } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
           // (3.49.1) Push undo entry before navigating so we can go back.
           try {
             undoStack.push({ type: 'navigate', tabId: tab, previousUrl: currentUrl || '' });
@@ -5818,7 +5827,10 @@ async function runAgentLoop(goal, workingTabId) {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
               if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
-                try { tel.info('page', 'Navigate ok → ' + (typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100)), { stepCount, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+                try {
+                  const displayUrl = typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100);
+                  tel.info('page', 'Navigate ok → ' + displayUrl, { stepCount, arrivedUrl, durationMs: Date.now() - _navStart });
+                } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
                 result = `Navigated to ${arrivedUrl}`;
               } else {
                 try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
@@ -5914,7 +5926,10 @@ async function runAgentLoop(goal, workingTabId) {
             } catch (e) { console.warn('[Sentinel] extract telemetry failed:', getErrorMessage(e)); }
             const preview = Array.isArray(parsed.value)
               ? `${parsed.value.length} items extracted`
-              : `"${typeof parsed.value === 'string' ? parsed.value.substring(0, 100) : String(parsed.value).substring(0, 100)}"`;
+              : (() => {
+                  const v = parsed.value;
+                  return `"${typeof v === 'string' ? v.substring(0, 100) : String(v).substring(0, 100)}"`;
+                })();
             result = `Extracted ${parsed.key} = ${preview}`;
             extractSucceeded = true;
             productiveSteps++;  // (3.8.0)
