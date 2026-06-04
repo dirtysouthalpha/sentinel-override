@@ -370,7 +370,7 @@ export const PROVIDERS = {
           return { type: tc.function.name, ...input };
         }
       }
-      throw new Error('OpenAI response had no tool_calls: ' + JSON.stringify(data).slice(0, 300));
+      throw new Error(`OpenAI response had no tool_calls: ${JSON.stringify(data).slice(0, 300)}`);
     },
 
     /** Whether this provider supports structured tool use. */
@@ -495,7 +495,7 @@ export const PROVIDERS = {
           return { type: tc.function.name, ...input };
         }
       }
-      throw new Error('OpenAI response had no tool_calls: ' + JSON.stringify(data).slice(0, 300));
+      throw new Error(`OpenAI response had no tool_calls: ${JSON.stringify(data).slice(0, 300)}`);
     },
 
     supportsToolUse: true,
@@ -959,10 +959,10 @@ export function getCatalogProvider(id) {
 export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   if (!provider) throw new Error('No provider given');
   const url = customModelsUrl || (provider && provider.modelsUrl);
-  if (!url) throw new Error('Provider "' + provider.label + '" does not expose a /models endpoint. Enter the model name manually.');
+  if (!url) throw new Error(`Provider "${provider.label}" does not expose a /models endpoint. Enter the model name manually.`);
 
   const headers = { 'Content-Type': 'application/json' };
-  if (provider.auth === 'bearer' && apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+  if (provider.auth === 'bearer' && apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
   if (provider.auth === 'x-api-key' && apiKey) headers['x-api-key'] = apiKey;
   if (provider.headers) Object.assign(headers, provider.headers);
 
@@ -973,7 +973,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     resp = await fetch(url, { method: 'GET', headers, signal: controller.signal });
   } catch (e) {
     clearTimeout(timer);
-    throw new Error('Network error fetching models from ' + url + ': ' + getErrorMessage(e));
+    throw new Error(`Network error fetching models from ${url}: ${getErrorMessage(e)}`);
   }
   clearTimeout(timer);
   if (!resp.ok) {
@@ -982,13 +982,13 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
       const t = await resp.text();
       errText = t || '(empty body)';
     } catch (_) { errText = '(unreadable body)'; }
-    throw new Error('Models endpoint returned ' + resp.status + ': ' + errText.slice(0, 240));
+    throw new Error(`Models endpoint returned ${resp.status}: ${errText.slice(0, 240)}`);
   }
   let data;
   try { data = await resp.json(); }
   catch (e) {
     console.error('[Sentinel/provider-registry] Models JSON parse error:', getErrorMessage(e));
-    throw new Error('Models endpoint did not return JSON: ' + getErrorMessage(e));
+    throw new Error(`Models endpoint did not return JSON: ${getErrorMessage(e)}`);
   }
   if (!data) throw new Error('Models endpoint returned null response body');
 
@@ -1030,7 +1030,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     }
   }
   if (!ids.length) {
-    throw new Error('Could not parse models from response: ' + JSON.stringify(data).slice(0, 240));
+    throw new Error(`Could not parse models from response: ${JSON.stringify(data).slice(0, 240)}`);
   }
   return ids.sort();
 }
