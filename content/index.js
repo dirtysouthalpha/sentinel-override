@@ -532,7 +532,7 @@ if (window.__sentinelInitialized) {
           } else {
             content = (iframeDoc.body ? iframeDoc.body.innerText : '').replace(/\n{3,}/g, '\n\n').trim();
           }
-          return { content: 'Iframe Title: ' + title + '\nURL: ' + url + '\n\n' + content };
+          return { content: `Iframe Title: ${title}\nURL: ${url}\n\n${content}` };
         } catch {
           throw new Error('Cross-origin iframe -- use background routing');
         }
@@ -704,7 +704,7 @@ if (window.__sentinelInitialized) {
         try {
           const x = Number(request.x) || 0;
           const y = Number(request.y) || 0;
-          const desc = request.description || ('Clicking at (' + Math.round(x) + ', ' + Math.round(y) + ')');
+          const desc = request.description || `Clicking at (${Math.round(x)}, ${Math.round(y)})`;
 
           // Animate cursor first (awaits ~380ms internally; tab-manager only
           // pauses 220ms before firing the click, so the cursor often arrives
@@ -756,7 +756,7 @@ if (window.__sentinelInitialized) {
             const preview = text.substring(0, 40) + (text.length > 40 ? '...' : '');
             window.__sentinelOverlay.showActionBanner(
               'type',
-              'Typing: "' + preview + '" (' + position + '/' + text.length + ')'
+              `Typing: "${preview}" (${position}/${text.length})`
             );
           }
           return { ok: true };
@@ -834,7 +834,7 @@ if (window.__sentinelInitialized) {
       if (overlay) return overlay;
 
       const style = document.createElement('style');
-      style.id = SENTINEL_OVERLAY_ID + '_style';
+      style.id = `${SENTINEL_OVERLAY_ID}_style`;
       style.textContent = `
         #__sentinel_overlay__ {
           position: fixed; top: 12px; right: 12px; z-index: 2147483647;
@@ -907,8 +907,8 @@ if (window.__sentinelInitialized) {
       if (existing) existing.remove();
       const indicator = document.createElement('div');
       indicator.id = '__sentinel_click_indicator__';
-      indicator.style.left = x + 'px';
-      indicator.style.top = y + 'px';
+      indicator.style.left = `${x}px`;
+      indicator.style.top = `${y}px`;
       (document.body || document.documentElement).appendChild(indicator);
       setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); } }, 700);
     } catch (e) { console.warn('[Sentinel] Extension context invalidated:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
@@ -1155,12 +1155,12 @@ if (window.__sentinelInitialized) {
       // Ref stale — try semantic identity matches before falling back to the
       // brittle nth-of-type selector chain, which breaks on SPA re-renders.
       try {
-        console.warn('[Sentinel Override] ' + cmd.ref + ' stale, attempting semantic fallback');
+        console.warn(`[Sentinel Override] ${cmd.ref} stale, attempting semantic fallback`);
       } catch (e) { console.warn('[Sentinel] stale ref log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
       // 1. aria-label match (most reliable stable identifier)
       if (cmd.ariaLabel) {
         try {
-          const byAria = targetDoc.querySelector('[aria-label="' + (cmd.ariaLabel || '').replace(/"/g, '\\"') + '"]');
+          const byAria = targetDoc.querySelector(`[aria-label="${(cmd.ariaLabel || '').replace(/"/g, '\\"')}"]`);
           if (byAria) return { el: byAria, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] aria-label fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
       }
@@ -1186,8 +1186,8 @@ if (window.__sentinelInitialized) {
         try {
           const needle = String(cmd.elementText).trim().substring(0, 60);
           const byXPath = targetDoc.evaluate(
-            "//*[not(self::script or self::style or self::noscript)]" +
-            "[normalize-space(text())=" + JSON.stringify(needle) + "]",
+            `//*[not(self::script or self::style or self::noscript)]` +
+            `[normalize-space(text())=${JSON.stringify(needle)}]`,
             targetDoc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null
           ).singleNodeValue;
           if (byXPath) return { el: byXPath, viaRef: false, staleRef: true };
@@ -1209,7 +1209,7 @@ if (window.__sentinelInitialized) {
       if (cmd.elementText) {
         try {
           const needle = String(cmd.elementText).trim().substring(0, 30).toLowerCase().replace(/\s+/g, '-');
-          const byTestId = targetDoc.querySelector('[data-testid*="' + needle + '" i], [data-id*="' + needle + '" i]');
+          const byTestId = targetDoc.querySelector(`[data-testid*="${needle}" i], [data-id*="${needle}" i]`);
           if (byTestId) return { el: byTestId, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] testid fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
       }
@@ -1233,7 +1233,7 @@ if (window.__sentinelInitialized) {
   // make sense when the LLM only supplied a ref.
   function describeTarget(cmd) {
     if (!cmd) return '';
-    if (cmd.ref && cmd.selector) return cmd.ref + ' (' + cmd.selector + ')';
+    if (cmd.ref && cmd.selector) return `${cmd.ref} (${cmd.selector})`;
     if (cmd.ref) return cmd.ref;
     return cmd.selector || '';
   }
@@ -1351,7 +1351,7 @@ if (window.__sentinelInitialized) {
                 url: location.href.substring(0, 200)
               });
             } catch (e) { console.warn('[Sentinel] click rejected tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-            return 'Cannot click ' + describeTarget(cmd) + ': ' + reason;
+            return `Cannot click ${describeTarget(cmd)}: ${reason}`;
           }
         }
 
@@ -1476,7 +1476,7 @@ if (window.__sentinelInitialized) {
         try {
           const liveDpr = window.devicePixelRatio || 1;
           if (typeof cmd.dpr === 'number' && !Number.isNaN(cmd.dpr) && Math.abs(cmd.dpr - liveDpr) > 0.01) {
-            console.warn('[sentinel] click_at dpr mismatch: cmd.dpr=' + cmd.dpr + ' live=' + liveDpr + ' (still treating x,y as CSS pixels)');
+            console.warn(`[sentinel] click_at dpr mismatch: cmd.dpr=${cmd.dpr} live=${liveDpr} (still treating x,y as CSS pixels)`);
           }
         } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
 
@@ -1606,7 +1606,7 @@ if (window.__sentinelInitialized) {
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
           try {
-            ctel.info('page', 'Type: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', {
+            ctel.info('page', `Type: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, {
               match: __sensitiveMatch,
               tag: (el.tagName || '').toLowerCase(),
               type: el.type || null,
@@ -1630,7 +1630,7 @@ if (window.__sentinelInitialized) {
                 url: location.href.substring(0, 200)
               });
             } catch (e) { console.warn('[Sentinel] type rejected tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-            return 'Cannot type into ' + describeTarget(cmd) + ': ' + reason;
+            return `Cannot type into ${describeTarget(cmd)}: ${reason}`;
           }
         }
 
@@ -1658,7 +1658,7 @@ if (window.__sentinelInitialized) {
         if (si && si.isRichTextEditor && si.isRichTextEditor(el)) {
           const result = si.setRichTextValue(el, text);
           hl.removeHighlight(el);
-          return 'Typed into rich text editor ' + describeTarget(cmd) + ' (' + result.method + ')';
+          return `Typed into rich text editor ${describeTarget(cmd)} (${result.method})`;
         }
 
         // Date input

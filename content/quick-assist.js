@@ -653,8 +653,8 @@ ${selectedText}`;
       var dy = e.clientY - startY;
       var newLeft = Math.max(0, Math.min(startLeft + dx, window.innerWidth - 420));
       var newTop = Math.max(0, Math.min(startTop + dy, window.innerHeight - 100));
-      panel.style.left = newLeft + 'px';
-      panel.style.top = newTop + 'px';
+      panel.style.left = `${newLeft}px`;
+      panel.style.top = `${newTop}px`;
     }
 
     function onMouseUp() {

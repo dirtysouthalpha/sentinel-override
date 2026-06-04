@@ -17,12 +17,12 @@ window.__sentinelUtils.highlight = window.__sentinelUtils.highlight || {};
       const style = document.createElement('style');
       style.id = STYLE_ID;
       style.textContent =
-        '.' + HIGHLIGHT_CLASS + ' {' +
-          'outline: 3px solid #ff6b00 !important;' +
-          'outline-offset: 2px !important;' +
-          'box-shadow: 0 0 12px rgba(255,107,0,0.6) !important;' +
-          'transition: outline 0.15s ease !important;' +
-        '}';
+        `.${HIGHLIGHT_CLASS} {
+          outline: 3px solid #ff6b00 !important;
+          outline-offset: 2px !important;
+          box-shadow: 0 0 12px rgba(255,107,0,0.6) !important;
+          transition: outline 0.15s ease !important;
+        }`;
       // Append to head if available, else documentElement
       (document.head || document.documentElement).appendChild(style);
     } catch { /* non-fatal */ }
