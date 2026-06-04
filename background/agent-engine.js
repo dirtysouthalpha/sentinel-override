@@ -24,6 +24,14 @@ const EXTRACT_TYPE_RE = /^extract(_list)?$/;
 // Precompile regex for non-mutating action types
 const NON_MUTATING_ACTIONS_RE = /^(note|extract|extract_list|scroll|wait_for_text|wait_for_element|wait_for_navigation|read_page)$/;
 
+// Precompile regex for element tag matching in hot-path observation loop
+const ELEMENT_TAG_FORM_RE = /^form$/i;
+const ELEMENT_TAG_BUTTON_RE = /^button$/i;
+const ELEMENT_TAG_INPUT_RE = /^(input|textarea|select)$/i;
+const ELEMENT_TAG_A_RE = /^a$/i;
+const ELEMENT_TAG_HEADING_RE = /^h[1-3]$/i;
+const ELEMENT_ERROR_TEXT_RE = /error|invalid|failed/i;
+
 // Priority element types for O(1) lookup in element sorting
 const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
@@ -3236,24 +3244,23 @@ function _buildPageNarration(url, title, observation, pageContent) {
     // Single-pass optimization: count all element types and collect headings in one loop
     let forms = 0, buttons = 0, inputs = 0, links = 0, errorEl = null;
     const headings = [];
-    const headingRegex = /^h[1-3]$/i;
 
     for (const e of els) {
       const tag = e.tag || '';
 
       // Count element types
-      if (/^form$/i.test(tag)) {
+      if (ELEMENT_TAG_FORM_RE.test(tag)) {
         forms++;
-      } else if (/^button$/i.test(tag) || e.role === 'button') {
+      } else if (ELEMENT_TAG_BUTTON_RE.test(tag) || e.role === 'button') {
         buttons++;
-      } else if (/^(input|textarea|select)$/i.test(tag)) {
+      } else if (ELEMENT_TAG_INPUT_RE.test(tag)) {
         inputs++;
-      } else if (/^a$/i.test(tag)) {
+      } else if (ELEMENT_TAG_A_RE.test(tag)) {
         links++;
       }
 
       // Collect headings
-      if (headingRegex.test(tag)) {
+      if (ELEMENT_TAG_HEADING_RE.test(tag)) {
         const text = e.text || '';
         if (text) headings.push(text);
       }
@@ -3261,7 +3268,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
       // Find error element (if not already found)
       if (!errorEl) {
         const t = typeof e.text === 'string' ? e.text.toLowerCase() : '';
-        if (/error|invalid|failed/i.test(t)) {
+        if (ELEMENT_ERROR_TEXT_RE.test(t)) {
           errorEl = e;
         }
       }
