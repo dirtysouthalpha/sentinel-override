@@ -5564,8 +5564,8 @@ async function runAgentLoop(goal, workingTabId) {
       // Catch it here and return a clear error to the LLM so it picks a
       // different strategy next step.
       if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
-        const _hasSelector = typeof command.selector === 'string' && command.selector.length;
-        const _hasRef      = typeof command.ref === 'string' && command.ref.length;
+        const _hasSelector = typeof command.selector === 'string' && command.selector;
+        const _hasRef      = typeof command.ref === 'string' && command.ref;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
         if (!_hasSelector && !_hasRef && !_hasCoords) {
           const _msg = `BLOCKED: ${command.type} command has no target — supply at least one of selector, ref, or x/y coords. The observation panel above lists usable selectors/refs.`;
@@ -5824,7 +5824,7 @@ async function runAgentLoop(goal, workingTabId) {
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
       } else if (/^extract(_list)?$/.test(command.type)) {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
-        result = (typeof res === 'string' && res.length) ? res : 'Error: no response from content script';
+        result = (typeof res === 'string' && res) ? res : 'Error: no response from content script';
         let extractSucceeded = false;
         try {
           if (!result || typeof result !== 'string') {
@@ -6634,7 +6634,7 @@ return { ok: true, value: el.value };
             },
             result: typeof result === 'string' ? result.substring(0, 500) : JSON.stringify(result || '').substring(0, 500),
             failed: !!actionFailed,
-            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning.length) ? command.__reasoning.substring(0, 400) : undefined,
+            reasoning: (typeof command.__reasoning === 'string' && command.__reasoning) ? command.__reasoning.substring(0, 400) : undefined,
             screenshot: _stepScreenshots.get(stepCount) || undefined,
           });
           // Keep last 200 entries; older ones get rolled into a summary.
