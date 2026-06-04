@@ -1,11 +1,12 @@
 /**
  * UAP Client Tests
- * 
+ *
  * Tests for Universal Agent Protocol client SDK
- * 
+ *
  * @version 10.0.0
  */
 
+import { jest } from '@jest/globals';
 import { UAPClient } from '../lib/uap-client.js';
 
 // Mock WebSocket
@@ -48,18 +49,20 @@ global.WebSocket = MockWebSocket;
 describe('UAP Client', () => {
   let client;
   let mockWs;
+  let originalWebSocket;
 
   beforeEach(() => {
+    originalWebSocket = global.WebSocket;
     client = new UAPClient({
       serverUrl: 'ws://localhost:8765/uap',
       authToken: 'test-token',
       timeout: 5000
     });
-    mockWs = client.ws;
   });
 
   afterEach(async () => {
     await client.disconnect();
+    global.WebSocket = originalWebSocket;
   });
 
   describe('Connection', () => {
@@ -70,6 +73,7 @@ describe('UAP Client', () => {
 
     test('should authenticate on connect', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const authMessage = mockWs.sentMessages.find(m => m.type === 'auth');
       expect(authMessage).toBeDefined();
@@ -83,9 +87,19 @@ describe('UAP Client', () => {
       global.WebSocket = class NeverConnectsWebSocket {
         constructor() {
           this.readyState = WebSocket.CONNECTING;
+          this.onopen = null;
+          this.onmessage = null;
+          this.onerror = null;
+          this.onclose = null;
           setTimeout(() => {
             if (this.onopen) this.onopen();
           }, 10000);
+        }
+
+        send() {}
+        close() {
+          this.readyState = WebSocket.CLOSED;
+          if (this.onclose) this.onclose();
         }
       };
 
@@ -94,10 +108,11 @@ describe('UAP Client', () => {
 
     test('should reconnect on disconnect', async () => {
       await client.connect();
-      
+      mockWs = client.ws;
+
       // Simulate disconnect
       mockWs.close();
-      
+
       // Should schedule reconnect
       expect(client.reconnectAttempts).toBe(1);
     });
@@ -106,6 +121,7 @@ describe('UAP Client', () => {
   describe('Goal Execution', () => {
     test('should execute goal', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       // Mock goal acceptance
       mockWs.simulateMessage({
@@ -127,17 +143,18 @@ describe('UAP Client', () => {
         }
       });
 
-      const result = await client.execute('Test goal');
+      const result = await client.execute('Test completed goal');
       
       expect(result.summary).toBe('Test completed successfully');
     });
 
     test('should call onStep callback', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const onStep = jest.fn();
 
-      const executePromise = client.execute('Test goal', { onStep });
+      const executePromise = client.execute('Test completed goal', { onStep });
 
       // Mock goal acceptance
       mockWs.simulateMessage({
@@ -173,12 +190,13 @@ describe('UAP Client', () => {
       await timeoutClient.connect();
 
       await expect(
-        timeoutClient.execute('Slow goal')
+        timeoutClient.execute('Slow execution goal')
       ).rejects.toThrow('Goal execution timeout');
     });
 
     test('should handle goal failure', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       // Mock goal acceptance
       mockWs.simulateMessage({
@@ -203,6 +221,7 @@ describe('UAP Client', () => {
   describe('Status Operations', () => {
     test('should get run status', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const statusPromise = client.getStatus('run-123');
 
@@ -225,6 +244,7 @@ describe('UAP Client', () => {
 
     test('should pause run', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const pausePromise = client.pause('run-123');
 
@@ -240,6 +260,7 @@ describe('UAP Client', () => {
 
     test('should resume run', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const resumePromise = client.resume('run-123');
 
@@ -255,6 +276,7 @@ describe('UAP Client', () => {
 
     test('should cancel run', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const cancelPromise = client.cancel('run-123');
 
@@ -272,6 +294,7 @@ describe('UAP Client', () => {
   describe('Event Handling', () => {
     test('should emit events', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const handler = jest.fn();
       client.addEventListener('step_update', handler);
@@ -291,6 +314,7 @@ describe('UAP Client', () => {
 
     test('should remove event listeners', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const handler = jest.fn();
       client.addEventListener('step_update', handler);
@@ -308,6 +332,7 @@ describe('UAP Client', () => {
   describe('Ping Health Check', () => {
     test('should ping server', async () => {
       await client.connect();
+      mockWs = client.ws;
 
       const pingPromise = client.ping();
 
@@ -333,9 +358,10 @@ describe('UAP Client', () => {
   describe('Disconnect', () => {
     test('should disconnect and clean up', async () => {
       await client.connect();
-      
+      mockWs = client.ws;
+
       // Start a goal
-      const goalPromise = client.execute('Test goal');
+      const goalPromise = client.execute('Test goal execution');
       mockWs.simulateMessage({
         type: 'goal_accepted',
         id: 'req-4',
@@ -350,7 +376,8 @@ describe('UAP Client', () => {
 
     test('should not reconnect after manual disconnect', async () => {
       await client.connect();
-      
+      mockWs = client.ws;
+
       client.autoReconnect = false;
       mockWs.close();
 
@@ -371,10 +398,11 @@ describe('UAP Client', () => {
       client.send({ type: 'test2', data: 'value2' });
 
       await client.connect();
+      mockWs = client.ws;
 
       // Queue should be flushed
       expect(client.messageQueue.length).toBe(0);
-      
+
       // Messages should have been sent
       expect(mockWs.sentMessages.length).toBeGreaterThanOrEqual(2);
     });
