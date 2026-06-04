@@ -68,7 +68,10 @@ const idbStores = {
 };
 
 const createMockStore = (storeName) => {
-  const store = idbStores[storeName] || [];
+  // Ensure store array exists
+  if (!idbStores[storeName]) {
+    idbStores[storeName] = [];
+  }
 
   const createRequest = (result) => {
     const request = {
@@ -94,54 +97,56 @@ const createMockStore = (storeName) => {
     createIndex: (name, keyPath, options) => {},
     add: (data) => {
       const item = { ...data, id: data.id || Date.now() + Math.random() };
-      store.push(item);
+      idbStores[storeName].push(item);
       return createRequest(item);
     },
     put: (data) => {
-      const index = store.findIndex(t => t.id === data.id);
+      const index = idbStores[storeName].findIndex(t => t.id === data.id);
       if (index >= 0) {
-        store[index] = data;
+        idbStores[storeName][index] = data;
       } else {
-        store.push({ ...data, id: data.id || Date.now() + Math.random() });
+        idbStores[storeName].push({ ...data, id: data.id || Date.now() + Math.random() });
       }
       return createRequest(data);
     },
     get: (key) => {
-      return createRequest(store.find(t => t.id === key));
+      return createRequest(idbStores[storeName].find(t => t.id === key));
     },
     getAll: () => {
-      return createRequest([...store]);
+      return createRequest([...idbStores[storeName]]);
     },
     delete: (key) => {
-      const index = store.findIndex(t => t.id === key);
+      const index = idbStores[storeName].findIndex(t => t.id === key);
       if (index >= 0) {
-        store.splice(index, 1);
+        idbStores[storeName].splice(index, 1);
       }
       return createRequest(undefined);
     },
     clear: () => {
-      store.length = 0;
+      idbStores[storeName].length = 0;
       return createRequest(undefined);
     },
     count: () => {
-      return createRequest(store.length);
+      return createRequest(idbStores[storeName].length);
     },
     index: (name) => {
       return {
         count: (keyRange) => {
           const value = keyRange?.value || keyRange;
-          const filtered = store.filter(t => t[name] === value);
+          const filtered = idbStores[storeName].filter(t => t[name] === value);
           return createRequest(filtered.length);
         },
         get: (key) => {
-          return createRequest(store.filter(t => t[name] === key));
+          return createRequest(idbStores[storeName].filter(t => t[name] === key));
         },
         getAll: () => {
-          return createRequest([...store]);
+          return createRequest([...idbStores[storeName]]);
         },
         openCursor: (keyRange) => {
           const value = keyRange?.value || keyRange;
-          const filtered = store.filter(t => t[name] === value);
+          const filtered = idbStores[storeName].filter(t => t[name] === value);
+          let currentIndex = 0;
+
           const cursor = {
             value: null,
             key: null,
@@ -159,35 +164,39 @@ const createMockStore = (storeName) => {
             readyState: 'pending'
           };
 
-          // Simulate cursor iteration
+          // Set up cursor continue method
+          cursor.continue = () => {
+            currentIndex++;
+            if (currentIndex < filtered.length) {
+              const item = filtered[currentIndex];
+              cursor.value = item;
+              cursor.key = item.id;
+              request.result = cursor;
+              if (request.onsuccess) {
+                request.onsuccess({ target: { result: cursor } });
+              }
+            } else {
+              // No more items - signal end by setting result to undefined
+              request.result = undefined;
+              if (request.onsuccess) {
+                request.onsuccess({ target: { result: undefined } });
+              }
+            }
+          };
+
+          // Simulate asynchronous cursor opening
           setImmediate(() => {
             if (filtered.length > 0) {
-              // Return the first item as the cursor
               const item = filtered[0];
               cursor.value = item;
               cursor.key = item.id;
-              cursor.continue = () => {
-                // Move to next item
-                const index = filtered.indexOf(item);
-                if (index < filtered.length - 1) {
-                  const nextItem = filtered[index + 1];
-                  cursor.value = nextItem;
-                  cursor.key = nextItem.id;
-                  if (request.onsuccess) {
-                    request.onsuccess({ target: request });
-                  }
-                } else {
-                  cursor.value = null;
-                  cursor.key = null;
-                  if (request.onsuccess) {
-                    request.onsuccess({ target: request });
-                  }
-                }
-              };
               request.result = cursor;
+            } else {
+              request.result = undefined;
             }
+
             if (request.onsuccess) {
-              request.onsuccess({ target: request });
+              request.onsuccess({ target: { result: request.result } });
             }
             request.readyState = 'done';
           });
@@ -204,31 +213,8 @@ const createdStores = new Set();
 
 global.indexedDB = {
   open: (dbName, version) => {
-    const request = {
-      result: null,
-      onsuccess: null,
-      onerror: null,
-      onupgradeneeded: null,
-      onblocked: null,
-      error: null,
-      readyState: 'pending',
-      transaction: (storeNames, mode) => {
-        const stores = Array.isArray(storeNames) ? storeNames : [storeNames];
-        const transaction = {
-          objectStore: (name) => createMockStore(name),
-          oncomplete: null,
-          onerror: null,
-          abort: () => {},
-          db: {
-            close: () => {},
-            objectStoreNames: {
-              contains: (name) => createdStores.has(name),
-              length: createdStores.size
-            }
-          }
-        };
-        return transaction;
-      },
+    // Create a database-like object
+    const db = {
       close: () => {},
       createObjectStore: (name, options) => {
         createdStores.add(name);
@@ -237,7 +223,28 @@ global.indexedDB = {
       objectStoreNames: {
         contains: (name) => createdStores.has(name),
         length: createdStores.size
+      },
+      transaction: (storeNames, mode) => {
+        const stores = Array.isArray(storeNames) ? storeNames : [storeNames];
+        const transaction = {
+          objectStore: (name) => createMockStore(name),
+          oncomplete: null,
+          onerror: null,
+          abort: () => {},
+          db: db
+        };
+        return transaction;
       }
+    };
+
+    const request = {
+      result: null,
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+      onblocked: null,
+      error: null,
+      readyState: 'pending'
     };
 
     // Simulate asynchronous database opening
@@ -246,17 +253,17 @@ global.indexedDB = {
       if (request.onupgradeneeded) {
         request.onupgradeneeded({
           target: {
-            result: request,
+            result: db,
             oldVersion: 0,
             newVersion: version
           }
         });
       }
       // Then trigger onsuccess
-      request.result = request;
+      request.result = db;
       request.readyState = 'done';
       if (request.onsuccess) {
-        request.onsuccess({ target: { result: request } });
+        request.onsuccess({ target: { result: db } });
       }
     });
 
@@ -385,6 +392,11 @@ describe('v3.0 Task Queue', () => {
     let taskQueue;
 
     beforeEach(async () => {
+      // Clear stores before each test
+      idbStores.tasks = [];
+      idbStores.metadata = [];
+      createdStores.clear();
+
       taskQueue = new TaskQueue({ dbName: 'TestTaskQueue', maxQueueSize: 100 });
       await taskQueue.init();
     });
@@ -405,6 +417,9 @@ describe('v3.0 Task Queue', () => {
         payload: { value: 'test_data' },
         priority: TaskPriority.NORMAL
       });
+
+      // Wait for async processing
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       expect(taskId).toBeDefined();
       expect(processorCalled).toBe(true);
