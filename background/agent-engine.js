@@ -4108,9 +4108,10 @@ async function runAgentLoop(goal, workingTabId) {
 
       // (3.8.0) Tightened read_page loop guard: 2+ consecutive read_page on the
       // same URL is a stall (page hasn't changed; rereading achieves nothing).
-      if (history.length >= 2) {
-        const last = history[history.length - 1] || null;
-        const prior = history[history.length - 2] || null;
+      const _histLen = history.length;
+      if (_histLen >= 2) {
+        const last = history[_histLen - 1] || null;
+        const prior = history[_histLen - 2] || null;
         const isReadPage = h => h && h.action && h.action.type === 'read_page';
         if (last && prior && isReadPage(last) && isReadPage(prior)) {
           loopDirective = '\n⚠ READ_PAGE LOOP DETECTED — Two consecutive read_page actions returned the same content. The page state has not changed. You MUST take a different approach now: use "extract" / "extract_list" with specific selectors, "execute_js" to query the DOM directly, "scroll" to reveal more content, or "click" to interact. Do NOT call read_page again on this same page.\n';
@@ -4235,7 +4236,8 @@ async function runAgentLoop(goal, workingTabId) {
       // accumulated in history + consecutiveFailures + _lastAiCallMs.
       let _skillAutoCommand = null;
       try {
-        const _lastHistEntry = history.length ? history[history.length - 1] : null;
+        const _histLen2 = history.length;
+        const _lastHistEntry = _histLen2 ? history[_histLen2 - 1] : null;
         const _lastResult = _lastHistEntry && typeof _lastHistEntry.result === 'string' ? _lastHistEntry.result : '';
         const _lastFailed = _lastResult.startsWith('BLOCKED:') ||
                             _lastResult.startsWith('Element not found') ||
