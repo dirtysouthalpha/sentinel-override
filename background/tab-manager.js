@@ -776,16 +776,17 @@ export async function cdpDispatchType(tabId, text, options = {}) {
     if (usePerChar) {
       // Pace banner updates: every char for very short strings, every Nth
       // char for medium strings so the popup stream isn't spammy.
-      const updateInterval = Math.max(1, Math.floor(text.length / 12));
+      const textLen = text.length;
+      const updateInterval = Math.max(1, Math.floor(textLen / 12));
       let consecutiveErrors = 0;
       const MAX_CONSECUTIVE_ERRORS = 3;
 
-      for (let i = 0; i < text.length; i++) {
+      for (let i = 0; i < textLen; i++) {
         const ch = text[i];
 
         // Stream typing-progress to the content script so showTypingBanner
         // can update with the current position.
-        if (i % updateInterval === 0 || i === text.length - 1) {
+        if (i % updateInterval === 0 || i === textLen - 1) {
           try {
             await chrome.tabs.sendMessage(tabId, {
               action: 'cdp_typing_progress',
