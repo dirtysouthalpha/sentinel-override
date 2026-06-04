@@ -1726,8 +1726,9 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   agentState.model = model; // needed by _buildAgentPrompt → supportsVision
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
-  const last_action = Array.isArray(history) && history.length ? history[history.length - 1].action : null;
-  const last_result = Array.isArray(history) && history.length ? history[history.length - 1].result : null;
+  const hasHistory = Array.isArray(history) && history.length;
+  const last_action = hasHistory ? history[history.length - 1].action : null;
+  const last_result = hasHistory ? history[history.length - 1].result : null;
 
   // Runbook detection
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
