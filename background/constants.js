@@ -17,5 +17,9 @@ export const SCHEDULER_REFRESH_INTERVAL_MS = 30000; // 30 seconds - refresh coun
 // Maximum wait time for commands (in milliseconds)
 export const MAX_WAIT_TIME_MS = 30000; // 30 seconds - maximum wait command duration
 
+// Time interval constants (in milliseconds)
+export const ONE_HOUR_MS = 3600000; // 1 hour
+export const ONE_DAY_MS = 86400000; // 24 hours
+
 // Page content limits
 export const MAX_PAGE_TEXT_LENGTH = 30000; // Maximum characters to extract from page text

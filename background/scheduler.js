@@ -10,6 +10,7 @@ import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
 import { tel } from './telemetry.js';
 import { getErrorMessage } from './error-utils.js';
+import { ONE_HOUR_MS } from './constants.js';
 
 // ========== Storage Constants ==========
 const SCHEDULES_KEY = 'sentinel_schedules';
@@ -206,7 +207,7 @@ function computeNextRun(recurrence) {
 
   if (recurrence.interval === 'custom') {
     const periodMs = (recurrence.periodInMinutes || 60) * 60 * 1000;
-    if (periodMs <= 0) return now.getTime() + 3600000;
+    if (periodMs <= 0) return now.getTime() + ONE_HOUR_MS;
     const nowMs = now.getTime();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const periodsElapsed = Math.floor((nowMs - midnight) / periodMs);
@@ -215,7 +216,7 @@ function computeNextRun(recurrence) {
     return nextPeriod;
   }
 
-  return now.getTime() + 3600000;
+  return now.getTime() + ONE_HOUR_MS;
 }
 
 // ========== Notifications ==========
@@ -299,7 +300,7 @@ function _validateScheduleData(data) {
  */
 function _buildScheduleTiming(data, now) {
   if (data.type === 'once') {
-    return { recurrence: null, nextRunAt: (data.runAt && data.runAt > now) ? data.runAt : now + 3600000 };
+    return { recurrence: null, nextRunAt: (data.runAt && data.runAt > now) ? data.runAt : now + ONE_HOUR_MS };
   }
   if (data.type === 'recurring' && data.recurrence) {
     const recurrence = {
@@ -841,7 +842,7 @@ export async function initScheduler() {
           if (schedule.recurrence) {
             schedule.nextRunAt = computeNextRun(schedule.recurrence);
           } else {
-            schedule.nextRunAt = Date.now() + 3600000; // 1 hour from now
+            schedule.nextRunAt = Date.now() + ONE_HOUR_MS; // 1 hour from now
           }
           schedules[id] = schedule;
         }
