@@ -1727,8 +1727,9 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
 
   const hasHistory = Array.isArray(history) && history.length;
-  const last_action = hasHistory ? history[history.length - 1].action : null;
-  const last_result = hasHistory ? history[history.length - 1].result : null;
+  const lastEntry = hasHistory ? history[history.length - 1] : null;
+  const last_action = lastEntry ? lastEntry.action : null;
+  const last_result = lastEntry ? lastEntry.result : null;
 
   // Runbook detection
   const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
@@ -2068,13 +2069,14 @@ export function extractFirstJsonObject(str) {
   // This handles models that prepend reasoning text before the actual JSON.
 
   let searchFrom = 0;
-  while (searchFrom < str.length) {
+  const strLen = str.length;
+  while (searchFrom < strLen) {
     const start = str.indexOf('{', searchFrom);
     if (start === -1) return null;
 
     let depth = 0, inString = false, escape = false;
     let end = -1;
-    for (let i = start; i < str.length; i++) {
+    for (let i = start; i < strLen; i++) {
       const ch = str[i];
       if (escape) { escape = false; continue; }
       if (ch === '\\' && inString) { escape = true; continue; }
@@ -2112,7 +2114,8 @@ function sanitizeLlmJson(jsonStr) {
   if (typeof jsonStr !== 'string') return jsonStr;
   let out = '';
   let inStr = false;
-  for (let i = 0; i < jsonStr.length; i++) {
+  const len = jsonStr.length;
+  for (let i = 0; i < len; i++) {
     const ch = jsonStr[i];
     if (!inStr) {
       if (ch === '"') { inStr = true; out += ch; continue; }
