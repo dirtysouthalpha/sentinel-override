@@ -16,6 +16,9 @@ const SCHEDULES_KEY = 'sentinel_schedules';
 const RESULTS_KEY = 'sentinel_schedule_results';
 const MAX_RESULTS = 50;
 
+// Precompile regex for crash detection in agent summary messages
+const CRASH_SUMMARY_RE = /crash|unexpected/i;
+
 // ========== Agent Completion Callback ==========
 let agentCompleteCallbacks = [];
 
@@ -668,7 +671,7 @@ function _waitForAgentCompletion(timeoutMs) {
       clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(listener);
       _resolve({ status: 'success', error: null, report: msg.report || null });
-    } else if (msg.action === 'agent_finished' && msg.summary && /crash|unexpected/i.test(msg.summary)) {
+    } else if (msg.action === 'agent_finished' && msg.summary && CRASH_SUMMARY_RE.test(msg.summary)) {
       // runAgentLoop crashed — agent_loop_complete will never come; fail fast instead of waiting 5 min
       clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(listener);
