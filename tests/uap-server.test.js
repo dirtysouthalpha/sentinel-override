@@ -47,6 +47,9 @@ describe('UAP Server', () => {
       origin: 'https://example.com'
     };
     mockSendResponse = jest.fn();
+
+    // Clear audit log before each test
+    uapServer.auditLog = [];
   });
 
   afterEach(async () => {
@@ -235,7 +238,9 @@ describe('UAP Server', () => {
 
     test('should persist audit log to storage', async () => {
       chrome.storage.local.set.mockImplementation((data, callback) => {
-        callback();
+        if (typeof callback === 'function') {
+          callback();
+        }
       });
 
       uapServer.logAudit('persist_test', 'client-1', {});
