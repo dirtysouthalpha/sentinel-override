@@ -474,7 +474,7 @@ export const PROVIDERS = {
         }
         if (data.code && !data.success) {
           const msg = (typeof data.msg === 'string' ? data.msg : null) || (typeof data.message === 'string' ? data.message : null);
-          throw new Error(`🔑 API Authentication Failed: ${msg || 'Unknown error (code ' + data.code + ')'}. Check your API key in extension settings.`);
+          throw new Error(`🔑 API Authentication Failed: ${msg || `Unknown error (code ${data.code})`}. Check your API key in extension settings.`);
         }
         throw new Error(`OpenAI response had no valid choice: ${JSON.stringify(data).slice(0, 300)}`);
       }

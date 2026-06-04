@@ -128,7 +128,7 @@ function _redactString(s) {
   }
   // URL query-param scrub (string-level; we don't try to parse — just match)
   out = out.replace(/([?&])(token|access_token|refresh_token|auth_token|id_token|apikey|api_key|key|secret|password|pwd|sig|signature|code|state)=([^&\s"'<>]+)/gi,
-    (m, sep, k) => sep + k + '=[REDACTED]');
+    (m, sep, k) => `${sep}${k}=[REDACTED]`);
   return out;
 }
 
