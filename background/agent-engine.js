@@ -1578,7 +1578,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
             try {
               await chrome.debugger.sendCommand({ tabId: tabId }, 'Page.reload', { ignoreCache: true });
               await new Promise(r => setTimeout(r, 2000));
-              console.log('[Sentinel/CDP] Page reloaded after integrity failure');
+              console.warn('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
               console.warn('[Sentinel/CDP] Reload failed:', getErrorMessage(reloadErr));
             }
@@ -3650,7 +3650,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (consecutiveInjectionFailures < 3) {
         scriptReady = await injectContentScript(tab);
       } else {
-        console.log(`[Sentinel/SPEED] Skipping content script injection (${consecutiveInjectionFailures} failures)`);
+        console.warn(`[Sentinel/SPEED] Skipping content script injection (${consecutiveInjectionFailures} failures)`);
       }
       _cdpFallbackActive = false;
       if (!scriptReady) {
