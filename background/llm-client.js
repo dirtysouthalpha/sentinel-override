@@ -23,6 +23,38 @@ const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'sele
 // Precompiled regex for extracting JSON from markdown code blocks
 const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
 
+// Precompiled regex patterns for platform detection (performance optimization)
+const SONICWALL_TEXT_RE = /sonicwall|sonicos/;
+const SONICWALL_PATH_RE = /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/;
+const FORTINET_URL_RE = /fortinet|fortigate|fortimanager/;
+const FORTINET_TEXT_RE = /fortinet|fortigate/;
+const CISCO_URL_RE = /cisco|\/asdm|\/fmc|meraki|\.ise\./;
+const CISCO_TEXT_RE = /cisco asa|firepower|meraki|cisco ise/;
+const PALOALTO_URL_RE = /paloalto|panorama|\/php\/rest\/pan/;
+const PALOALTO_TEXT_RE = /palo alto|pan-os|panorama/;
+const SENTINELONE_URL_RE = /sentinelone\.net|\.sentinelone\.com|s1\.com/;
+const SENTINELONE_TEXT_RE = /sentinelone|singularity/;
+const NVD_URL_RE = /(nvd\.nist\.gov|cve\.mitre\.org|cve\.org)/;
+const VIRUSTOTAL_URL_RE = /virustotal\.com|vt-api/;
+const VIRUSTOTAL_TEXT_RE = /virustotal| vt /;
+const M365_ADMIN_URL_RE = /admin\.microsoft\.com|admin\.exchange\.microsoft\.com|admin\.exchange\.outlook\.com|compliance\.microsoft\.com|security\.microsoft\.com|purview\.microsoft\.com/;
+const ENTRA_URL_RE = /entra\.microsoft\.com|aad\.portal\.azure\.com|myapps\.microsoft\.com/;
+const ENTRA_TEXT_RE = /entra/;
+const AZURE_AD_TEXT_RE = /azure ad/;
+const MICROSOFT_URL_RE = /microsoft/;
+const AZURE_PORTAL_RE = /portal\.azure\.com|preview\.portal\.azure\.com/;
+const CONNECTWISE_URL_RE = /connectwise|cw\.manage|my\.connectwise|cwautomate/;
+const CONNECTWISE_TEXT_RE = /connectwise/;
+const NINJAONE_URL_RE = /ninjarmm|ninja\.io|ninjabe/;
+const NINJAONE_TEXT_RE = /ninjaone|ninja rmm/;
+const DATTO_URL_RE = /datto|centrestage|autotask|adra/;
+const DATTO_TEXT_RE = /datto rmm|autotask/;
+const ITGLUE_RE = /itglue|it-glue/;
+const HUNTRESS_RE = /huntress/;
+const SCREENCONNECT_URL_RE = /screenconnect|connectwisecontrol/;
+const SCREENCONNECT_TEXT_RE = /screenconnect/;
+const GENERIC_NETWORK_RE = /firewall|router|switch|access point|management ui|admin panel|web ui/;
+
 // Site name to domain mapping - avoid recreating on every call
 const SITE_DOMAIN_MAP = {
   amazon: 'amazon.com',
@@ -244,8 +276,8 @@ will overflow your budget. Use this BATCH pattern instead:
 const _PLATFORM_SPECS = [
   {
     test: (url, text) =>
-      url.includes('sonicwall') || /sonicwall|sonicos/.test(text) ||
-      /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/security/.test(url),
+      url.includes('sonicwall') || SONICWALL_TEXT_RE.test(text) ||
+      SONICWALL_PATH_RE.test(url),
     prose: `
 PLATFORM: SonicWall Management UI (SonicOS)
 UI-SPECIFIC RULES -- follow these exactly:
@@ -283,8 +315,8 @@ IFRAMES: Some SonicWall panels (especially older 6.5 UI) embed content in iframe
   },
   {
     test: (url, text) =>
-      /fortinet|fortigate|fortimanager/.test(url) ||
-      /fortinet|fortigate/.test(text),
+      FORTINET_URL_RE.test(url) ||
+      FORTINET_TEXT_RE.test(text),
     prose: `
 PLATFORM: Fortinet / FortiGate Management UI
 UI-SPECIFIC RULES:
@@ -297,8 +329,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      /cisco|\/asdm|\/fmc|meraki|\.ise\./.test(url) ||
-      /cisco asa|firepower|meraki|cisco ise/.test(text),
+      CISCO_URL_RE.test(url) ||
+      CISCO_TEXT_RE.test(text),
     prose: `
 PLATFORM: Cisco Management UI (ASA/FMC/Meraki/ISE)
 UI-SPECIFIC RULES:
@@ -311,8 +343,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      /paloalto|panorama|\/php\/rest\/pan/.test(url) ||
-      /palo alto|pan-os|panorama/.test(text),
+      PALOALTO_URL_RE.test(url) ||
+      PALOALTO_TEXT_RE.test(text),
     prose: `
 PLATFORM: Palo Alto Networks (PAN-OS / Panorama)
 UI-SPECIFIC RULES:
@@ -325,8 +357,8 @@ UI-SPECIFIC RULES:
   },
   {
     test: (url, text) =>
-      /sentinelone\.net|\.sentinelone\.com|s1\.com/.test(url) ||
-      /sentinelone|singularity/.test(text),
+      SENTINELONE_URL_RE.test(url) ||
+      SENTINELONE_TEXT_RE.test(text),
     prose: `
 [SentinelOne Singularity Console — Platform Context]
 - Top-bar global search accepts SHA1, SHA256, MD5 hashes, filenames, IPs, URLs.
@@ -355,7 +387,7 @@ UI-SPECIFIC RULES:
 `
   },
   {
-    test: (url) => /(nvd\.nist\.gov|cve\.mitre\.org|cve\.org)/.test(url),
+    test: (url) => NVD_URL_RE.test(url),
     prose: `[NIST NVD / CVE Database -- Platform Context (3.12.6)]
 
 ## CRITICAL RULE: When you have the listing data, you are DONE.
@@ -441,8 +473,8 @@ recommend the user check NVD directly. The hallucination gate enforces.`
   },
   {
     test: (url, text) =>
-      /virustotal\.com|vt-api/.test(url) ||
-      /virustotal| vt /.test(text),
+      VIRUSTOTAL_URL_RE.test(url) ||
+      VIRUSTOTAL_TEXT_RE.test(text),
     prose: `
 [VirusTotal — Platform Context]
 - The GUI is built with Lit shadow-DOM web components (vt-ui-main-generic-report,
@@ -474,7 +506,7 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url) =>
-      /admin\.microsoft\.com|admin\.exchange\.microsoft\.com|admin\.exchange\.outlook\.com|compliance\.microsoft\.com|security\.microsoft\.com|purview\.microsoft\.com/.test(url),
+      M365_ADMIN_URL_RE.test(url),
     prose: `
 [Microsoft 365 Admin Center — Platform Context]
 - Built on Microsoft Fluent UI / FluentUI React. Prefer selectors using:
@@ -511,9 +543,9 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      /entra\.microsoft\.com|aad\.portal\.azure\.com|myapps\.microsoft\.com/.test(url) ||
-      /entra/.test(text) ||
-      (/azure ad/.test(text) && /microsoft/.test(url)),
+      ENTRA_URL_RE.test(url) ||
+      ENTRA_TEXT_RE.test(text) ||
+      (AZURE_AD_TEXT_RE.test(text) && MICROSOFT_URL_RE.test(url)),
     prose: `
 [Microsoft Entra ID — Platform Context]
 - Identity admin UI built on FluentUI React + Monaco editor for JSON details.
@@ -542,7 +574,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url) => /portal\.azure\.com|preview\.portal\.azure\.com/.test(url),
+    test: (url) => AZURE_PORTAL_RE.test(url),
     prose: `
 [Azure Portal — Platform Context]
 - Heavy use of iframes and Monaco editor. iframe-aware element scanning is
@@ -560,8 +592,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      /connectwise|cw\.manage|my\.connectwise|cwautomate/.test(url) ||
-      /connectwise/.test(text),
+      CONNECTWISE_URL_RE.test(url) ||
+      CONNECTWISE_TEXT_RE.test(text),
     prose: `
 [ConnectWise Platform Context]
 - Navigation uses a left sidebar with expandable menu sections (Service, Sales, Procurement, etc.)
@@ -596,8 +628,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      /datto|centrestage|autotask|adra/.test(url) ||
-      /datto rmm|autotask/.test(text),
+      DATTO_URL_RE.test(url) ||
+      DATTO_TEXT_RE.test(text),
     prose: `
 [Datto/Autotask Platform Context]
 - Autotask PSA: navigation via top menu (Dispatch, Service Desk, Projects, etc.)
@@ -612,7 +644,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url, text) => /itglue|it-glue/.test(url) || /it glue/.test(text),
+    test: (url, text) => ITGLUE_RE.test(url) || /it glue/.test(text),
     prose: `
 [IT Glue Platform Context]
 - Navigation: left sidebar with Organizations, Passwords, Documents, Configurations, etc.
@@ -626,7 +658,7 @@ Report the failure honestly and recommend a manual lookup.
 `
   },
   {
-    test: (url, text) => /huntress/.test(url) || /huntress/.test(text),
+    test: (url, text) => HUNTRESS_RE.test(url) || /huntress/.test(text),
     prose: `
 [Huntress Platform Context]
 - Dashboard shows threat summary with alert counts
@@ -640,8 +672,8 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (url, text) =>
-      /screenconnect|connectwisecontrol/.test(url) ||
-      /screenconnect/.test(text),
+      SCREENCONNECT_URL_RE.test(url) ||
+      SCREENCONNECT_TEXT_RE.test(text),
     prose: `
 [ScreenConnect Platform Context]
 - Access page lists all managed machines with status (online/offline)
@@ -655,7 +687,7 @@ Report the failure honestly and recommend a manual lookup.
   },
   {
     test: (_, text) =>
-      /firewall|router|switch|access point|management ui|admin panel|web ui/.test(text),
+      GENERIC_NETWORK_RE.test(text),
     prose: `
 PLATFORM: Network/Security Device Management UI (generic)
 UI-SPECIFIC RULES:
