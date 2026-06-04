@@ -4122,7 +4122,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (!loopDirective) {
         const typeLoop = _detectActionTypeLoop(history, agentMemory);
         if (typeLoop.isLoop) {
-          loopDirective = '\n⚠ ACTION-TYPE LOOP -- ' + typeLoop.count + ' of last 4 actions were "' + typeLoop.type + '" with no productive memory write. The current strategy is not yielding data. You MUST switch action types now:\n1. If you have been navigating, STOP -- run execute_js with a key on the current page to extract whatever data is visible. The retry ladder will fall back to body.innerText automatically.\n2. If you have been clicking, try a different selector or use execute_js to read the DOM directly.\n3. If you have been read_page-ing, switch to extract / extract_list with a key.\n4. If extraction has failed twice on this page, finish() with what you have and move on rather than retrying.\n';
+          loopDirective = `\n⚠ ACTION-TYPE LOOP -- ${typeLoop.count} of last 4 actions were "${typeLoop.type}" with no productive memory write. The current strategy is not yielding data. You MUST switch action types now:\n1. If you have been navigating, STOP -- run execute_js with a key on the current page to extract whatever data is visible. The retry ladder will fall back to body.innerText automatically.\n2. If you have been clicking, try a different selector or use execute_js to read the DOM directly.\n3. If you have been read_page-ing, switch to extract / extract_list with a key.\n4. If extraction has failed twice on this page, finish() with what you have and move on rather than retrying.\n`;
         }
       }
 
@@ -4884,8 +4884,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (!_isTicketStyle) {
             const _risk = evaluateHallucinationRisk(finalSummary, agentMemory, history);
             if (_risk && _risk.risky) {
-              const blockMsg = 'BLOCKED: hallucination risk detected — ' + _risk.reason +
-                ' Either: (a) trim the summary to ONLY items you actually read/extracted, or (b) clearly tag unread items with "headline only — not read in this run". Then call finish again.';
+              const blockMsg = `BLOCKED: hallucination risk detected — ${_risk.reason} Either: (a) trim the summary to ONLY items you actually read/extracted, or (b) clearly tag unread items with "headline only — not read in this run". Then call finish again.`;
               historyPush({ step: stepCount, action: command, result: blockMsg });
               await persistHistory();
               sendSilentUpdate('Finish blocked — claim density exceeds evidence', stepCount);
@@ -5119,15 +5118,15 @@ async function runAgentLoop(goal, workingTabId) {
         if (!_verifyActual) {
           _verifyOutcome = 'verify: element not found or empty (' + (command.selector || command.ref || 'no selector') + ')';
         } else if (!_verifyExpected) {
-          _verifyOutcome = 'verified (read-back): ' + _verifyActual.slice(0, 200);
+          _verifyOutcome = `verified (read-back): ${_verifyActual.slice(0, 200)}`;
         } else if (typeof _verifyActual === 'string' && typeof _verifyExpected === 'string') {
           // Cache toLowerCase() to avoid redundant string operations (perf)
           const _actualLower = _verifyActual.toLowerCase();
           const _expectedLower = _verifyExpected.toLowerCase();
           if (_actualLower.includes(_expectedLower)) {
-            _verifyOutcome = 'verified: "' + _verifyActual.slice(0, 100) + '" contains expected "' + _verifyExpected + '"';
+            _verifyOutcome = `verified: "${_verifyActual.slice(0, 100)}" contains expected "${_verifyExpected}"`;
           } else {
-            _verifyOutcome = 'MISMATCH: expected "' + _verifyExpected + '", got "' + _verifyActual.slice(0, 100) + '"';
+            _verifyOutcome = `MISMATCH: expected "${_verifyExpected}", got "${_verifyActual.slice(0, 100)}"`;
           }
         }
         sendSilentUpdate(_verifyOutcome.slice(0, 120), stepCount);
@@ -5235,7 +5234,7 @@ async function runAgentLoop(goal, workingTabId) {
           _type = 'TXT';  // SPF lives in TXT at the root domain
         } else if (_preset === 'dmarc') {
           _type = 'TXT';
-          _domain = '_dmarc.' + _domain.replace(/^_dmarc\./i, '');
+          _domain = `_dmarc.${_domain.replace(/^_dmarc\./i, '')}`;
         } else if (_preset === 'dkim') {
           const _sel = String(command.selector || 'default').trim().replace(/\._domainkey.*$/i, '');
           _type = 'TXT';
@@ -5469,7 +5468,7 @@ async function runAgentLoop(goal, workingTabId) {
 
               const _rect = _liveRect || _viEl.rect;
               if (!_rect) {
-                result = 'Click failed for [' + command._visionIndex + ']: no bounding rect available';
+                result = `Click failed for [${command._visionIndex}]: no bounding rect available`;
                 actionFailed = true;
               } else {
                 // CDP Input.dispatchMouseEvent uses CSS pixels (see
@@ -5511,9 +5510,9 @@ async function runAgentLoop(goal, workingTabId) {
                       const _attrRes = await cdpExecuteJs(tab,
                         'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
                         { timeout: 3000 });
-                      result = 'Clicked [' + command._visionIndex + '] via attr selector: ' + (_attrRes && _attrRes.value || 'unknown');
+                      result = `Clicked [${command._visionIndex}] via attr selector: ${_attrRes && _attrRes.value || 'unknown'}`;
                     } catch (_cme2) {
-                      result = 'Click failed for [' + command._visionIndex + ']';
+                      result = `Click failed for [${command._visionIndex}]`;
                       actionFailed = true;
                     }
                   }
@@ -5528,19 +5527,19 @@ async function runAgentLoop(goal, workingTabId) {
                   { timeout: 5000 });
                 const _typeVal = _typeRes && _typeRes.value;
                 if (_typeVal === 'not found') {
-                  result = 'Type failed for [' + command._visionIndex + ']: element not found';
+                  result = `Type failed for [${command._visionIndex}]: element not found`;
                   actionFailed = true;
                 } else {
-                  result = 'Typed into [' + command._visionIndex + ']: ' + (_typeVal || 'unknown');
+                  result = `Typed into [${command._visionIndex}]: ${_typeVal || 'unknown'}`;
                   console.log('[Sentinel/v4]', result);
                 }
               } catch (_te) {
-                result = 'Type failed for [' + command._visionIndex + ']';
+                result = `Type failed for [${command._visionIndex}]`;
                 actionFailed = true;
               }
             }
           } catch (_ve) {
-            result = 'Vision action error: ' + getErrorMessage(_ve);
+            result = `Vision action error: ${getErrorMessage(_ve)}`;
             actionFailed = true;
           }
           // Skip the legacy execution path for this action
@@ -5569,7 +5568,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _hasRef      = typeof command.ref === 'string' && command.ref.length;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
         if (!_hasSelector && !_hasRef && !_hasCoords) {
-          const _msg = 'BLOCKED: ' + command.type + ' command has no target — supply at least one of selector, ref, or x/y coords. The observation panel above lists usable selectors/refs.';
+          const _msg = `BLOCKED: ${command.type} command has no target — supply at least one of selector, ref, or x/y coords. The observation panel above lists usable selectors/refs.`;
           activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
           sendActionResult(stepCount, _msg, true);
           historyPush({ step: stepCount, action: command, result: _msg });
@@ -5604,13 +5603,13 @@ async function runAgentLoop(goal, workingTabId) {
         const site = command.site || 'google';
         const q = encodeURIComponent(command.query);
         let smartUrl = '';
-        if (site === 'google') smartUrl = 'https://www.google.com/search?q=' + q;
-        else if (site === 'weather.gov') smartUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' + q;
-        else if (site === 'wikipedia') smartUrl = 'https://en.wikipedia.org/wiki/Special:Search?search=' + q;
-        else if (site === 'youtube') smartUrl = 'https://www.youtube.com/results?search_query=' + q;
-        else if (site === 'amazon') smartUrl = 'https://www.amazon.com/s?k=' + q;
-        else if (site === 'reddit') smartUrl = 'https://www.reddit.com/search/?q=' + q;
-        else if (/^(twitter|x)$/.test(site)) smartUrl = 'https://x.com/search?q=' + q;
+        if (site === 'google') smartUrl = `https://www.google.com/search?q=${q}`;
+        else if (site === 'weather.gov') smartUrl = `https://forecast.weather.gov/zipcity.php?inputstring=${q}`;
+        else if (site === 'wikipedia') smartUrl = `https://en.wikipedia.org/wiki/Special:Search?search=${q}`;
+        else if (site === 'youtube') smartUrl = `https://www.youtube.com/results?search_query=${q}`;
+        else if (site === 'amazon') smartUrl = `https://www.amazon.com/s?k=${q}`;
+        else if (site === 'reddit') smartUrl = `https://www.reddit.com/search/?q=${q}`;
+        else if (/^(twitter|x)$/.test(site)) smartUrl = `https://x.com/search?q=${q}`;
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
           console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
