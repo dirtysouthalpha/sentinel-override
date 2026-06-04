@@ -5238,7 +5238,7 @@ async function runAgentLoop(goal, workingTabId) {
         } else if (_preset === 'dkim') {
           const _sel = String(command.selector || 'default').trim().replace(/\._domainkey.*$/i, '');
           _type = 'TXT';
-          _domain = `${_sel}._domainkey.${_domain.replace(new RegExp('\\.' + _sel + '\\._domainkey\\.', 'i'), '.')}`;
+          _domain = `${_sel}._domainkey.${_domain.replace(new RegExp(`\\.${_sel}\\._domainkey\\.`, 'i'), '.')}`;
         }
         if (!_domain) {
           const _r = 'lookup: domain is required';
