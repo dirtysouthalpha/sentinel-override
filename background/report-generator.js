@@ -5,6 +5,7 @@
 import { sendSilentUpdate } from './message-protocol.js';
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
+import { ONE_SECOND_MS } from './constants.js';
 
 // Precompute action types to filter from step history for O(1) lookup
 const FILTERED_ACTION_TYPES = new Set(['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation']);
@@ -342,7 +343,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       } catch (err) {
         clearTimeout(timeout);
         if (err.name === 'AbortError') {
-          lastError = new Error(`Report LLM timed out after ${REPORT_TIMEOUT / 1000}s (attempt ${attempt}/${MAX_ATTEMPTS})`);
+          lastError = new Error(`Report LLM timed out after ${REPORT_TIMEOUT / ONE_SECOND_MS}s (attempt ${attempt}/${MAX_ATTEMPTS})`);
           if (attempt < MAX_ATTEMPTS) {
             console.warn('[Sentinel/report] Attempt', attempt, 'timed out, retrying with shorter output...');
             continue;
@@ -389,7 +390,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       if (isNonRetryable) break;
       if (attempt < MAX_ATTEMPTS) {
         console.warn('[Sentinel/report] Attempt', attempt, 'failed:', errMsg, 'retrying...');
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, ONE_SECOND_MS));
       }
     }
   }
