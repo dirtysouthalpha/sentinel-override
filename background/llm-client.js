@@ -1561,7 +1561,7 @@ ${pageContent}
 
 AVAILABLE INTERACTIVE ELEMENTS (use ONLY these selectors -- ${trimmedElements.length} of ${totalElementCount} shown, prioritized by type):
 ${JSON.stringify(trimmedElements, null, 2)}
-${agentState && agentState.visionMode && agentState.visionElementTree ? '\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n' + agentState.visionElementTree : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows green numbered boxes [1], [2], etc. on interactive elements. Each element in AVAILABLE INTERACTIVE ELEMENTS has a selector like "[data-sentinel-index=\\"N\\"]" — use THAT selector in your click/type/select commands. Example: { "type": "click", "selector": "[data-sentinel-index=\\"5\\"]" } to click element [5]. The element tree and screenshot labels match these indexes.\n' : ''}
+${agentState && agentState.visionMode && agentState.visionElementTree ? `\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n${agentState.visionElementTree}` : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows green numbered boxes [1], [2], etc. on interactive elements. Each element in AVAILABLE INTERACTIVE ELEMENTS has a selector like "[data-sentinel-index=\\"N\\"]" — use THAT selector in your click/type/select commands. Example: { "type": "click", "selector": "[data-sentinel-index=\\"5\\"]" } to click element [5]. The element tree and screenshot labels match these indexes.\n' : ''}
 
 RECENT HISTORY (last ${historyWindowSize} steps${isRunbook ? ' -- extended for runbook context' : ''}, screenshots from prior steps stripped):
 ${JSON.stringify(sanitizedHistory, null, 2)}
