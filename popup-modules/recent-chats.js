@@ -217,7 +217,8 @@
       listEl.innerHTML = '<div style="text-align:center; color:var(--text-tertiary, #888); font-size:13px; padding:24px;">No recent chats yet. Start an agent run; it will be archived automatically when the side panel closes or the run finishes.</div>';
       return;
     }
-    const rowsHtml = chats.filter(c => c).map(c => {
+    const rowsHtml = chats.reduce((acc, c) => {
+      if (!c) return acc;
       const goal = _escapeHtml((c.goal || '(no goal)').substring(0, 200));
       const ageStr = _formatAge(c.createdAt);
       const stats = [
@@ -226,7 +227,7 @@
         c.runLogId ? '<span style="color: var(--accent-primary, #ff6b00);">run-logged</span>' : null,
         c.archivedReason ? c.archivedReason : null,
       ].filter(Boolean).join(' · ');
-      return `
+      acc.push(`
         <div class="recent-chat-row" data-id="${_escapeHtml(c.id)}" style="padding:10px 12px; border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; background:var(--bg-secondary);">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px;">
             <div style="flex:1; min-width:0;">
@@ -239,8 +240,9 @@
             <button class="recent-delete-btn small-btn" data-id="${_escapeHtml(c.id)}" style="font-size:11px; color:var(--error-color, #f44); margin-left:auto;">Delete</button>
           </div>
         </div>
-      `;
-    }).join('');
+      `);
+      return acc;
+    }, []).join('');
     listEl.innerHTML = rowsHtml;
     listEl.querySelectorAll('.recent-restore-btn').forEach(b => {
       b.addEventListener('click', async () => {

@@ -2981,7 +2981,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
     .filter(h => h && h.action && h.action.type === 'note' && h.action.text)
     .map(h => String(h.action.text).toLowerCase())
     .join(' ');
-  const allEvidence = memorySerialized + ' ' + noteText;
+  const allEvidence = `${memorySerialized} ${noteText}`;
 
   // Patterns we care about: "extract X" / "give me X" / "find X" + commas
   // For each: the CVE ID, CVSS v3 base score, affected FortiOS versions, ...
