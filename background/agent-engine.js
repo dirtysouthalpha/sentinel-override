@@ -2480,7 +2480,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
   // Build the fuzzy element finder as a self-contained JS string
   // This gets embedded into each action's JS code
   var finderCode = '(function(){'
-    + 'var _s=' + JSON.stringify(sel) + ',_t=' + JSON.stringify(textHint) + ';'
+    + `var _s=${JSON.stringify(sel)},_t=${JSON.stringify(textHint)};`
     + 'var el=null;'
     + 'try{el=document.querySelector(_s)}catch(e){}'
     + 'if(el&&el.offsetParent!==null)return el;'
@@ -2512,10 +2512,10 @@ async function _universalCdpFallback(tab, cmd, opts) {
       var btn = cmd.type === 'right_click' ? '2' : '0';
       var detail = cmd.type === 'double_click' ? '2' : '1';
       jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
+        + `var el=${finderCode};`
         + 'if(!el)return JSON.stringify({ok:false,error:"not found"});'
         + 'el.scrollIntoView({block:"center",behavior:"instant"});'
-        + 'el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,button:' + btn + ',detail:' + detail + '}));'
+        + `el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,button:${btn},detail:${detail}}));`
         + 'if(typeof el.click==="function")try{el.click()}catch(e){}'
         + 'return JSON.stringify({ok:true,result:"clicked "+el.tagName});'
         + '})()';
@@ -2524,36 +2524,36 @@ async function _universalCdpFallback(tab, cmd, opts) {
     case 'type': {
       var safeText = escapeJsString(cmd.text || '', '"');
       jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
+        + `var el=${finderCode};`
         + 'if(!el)return JSON.stringify({ok:false,error:"input not found"});'
         + 'el.scrollIntoView({block:"center",behavior:"instant"});'
         + 'el.focus();'
         + 'var _s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");'
-        + 'if(_s)_s.set.call(el,"' + safeText + '");else el.value="' + safeText + '";'
+        + `if(_s)_s.set.call(el,"${safeText}");else el.value="${safeText}";`
         + 'el.dispatchEvent(new Event("input",{bubbles:true}));'
         + 'el.dispatchEvent(new Event("change",{bubbles:true}));'
-        + 'return JSON.stringify({ok:true,result:"typed ' + safeText.length + ' chars"});'
+        + `return JSON.stringify({ok:true,result:"typed ${safeText.length} chars"});`
         + '})()';
       break;
     }
     case 'select': {
       var safeVal = escapeJsString(cmd.value || '', '"');
       jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
+        + `var el=${finderCode};`
         + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
         // Native select
         + 'if(el.tagName==="SELECT"&&el.options){'
         +   'for(var i=0;i<el.options.length;i++){'
-        +     'if(el.options[i].value==="' + safeVal + '"||el.options[i].text.trim().toLowerCase()==="' + safeVal.toLowerCase() + '"){'
+        +     `if(el.options[i].value==="${safeVal}"||el.options[i].text.trim().toLowerCase()==="${safeVal.toLowerCase()}"){`
         +       'el.selectedIndex=i;el.value=el.options[i].value;'
         +       'el.dispatchEvent(new Event("change",{bubbles:true}));'
-        +       'return JSON.stringify({ok:true,result:"selected ' + safeVal + '"})'
+        +       `return JSON.stringify({ok:true,result:"selected ${safeVal}"})`
         +     '}'
         +   '}'
         + '}'
         // Custom dropdown - click to open, then find option
         + 'el.click();'
-        + 'var _vl="' + safeVal + '".toLowerCase();'
+        + `var _vl="${safeVal}".toLowerCase();`
         + 'var _opts=document.querySelectorAll("[role=option],li,[data-value],.option,[class*=option],[class*=item]");'
         + 'for(var j=0;j<_opts.length;j++){'
         +   'if(_opts[j].textContent&&_opts[j].textContent.trim().toLowerCase().indexOf(_vl)>=0&&_opts[j].offsetParent!==null){'
