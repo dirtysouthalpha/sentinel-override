@@ -41,7 +41,7 @@ class DistributedMesh {
    * Generate unique node ID
    */
   generateNodeId() {
-    return `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `node-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -381,7 +381,7 @@ class DistributedMesh {
    * Generate proposal ID
    */
   generateProposalId() {
-    return `proposal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `proposal-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
