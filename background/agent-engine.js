@@ -4440,7 +4440,10 @@ async function runAgentLoop(goal, workingTabId) {
           const h = promptHistory[i];
           if (!h || !h.action) continue;
           const a = h.action;
-          _visionHistoryParts.push(`Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${a.text ? ` "${typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)}"` : ''} -> ${typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80)}`);
+          const actionText = a.text ? (typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)) : null;
+          const actionTextStr = actionText ? ` "${actionText}"` : '';
+          const stepResult = typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80);
+          _visionHistoryParts.push(`Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${actionTextStr} -> ${stepResult}`);
         }
         const _visionHistory = _visionHistoryParts.join('\n');
 
