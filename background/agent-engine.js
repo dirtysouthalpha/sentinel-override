@@ -1556,7 +1556,7 @@ async function _cdpDismissOverlays(tabId, overlays) {
   if (!overlays.length && _lastNukeClean) {
     console.log('[Sentinel/CDP] Skipping nuke — no overlays and last nuke was clean');
   } else try {
-    console.log('[Sentinel/CDP] Phase2: sending surgical nuke (' + nukeCode.length + ' chars) to tab', tabId);
+    console.log(`[Sentinel/CDP] Phase2: sending surgical nuke (${nukeCode.length} chars) to tab`, tabId);
     const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: 5000 });
     console.log('[Sentinel/CDP] Phase2 raw result:', JSON.stringify(nukeResult));
     if (nukeResult && nukeResult.ok) {
@@ -2445,7 +2445,7 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
     if (goalLower.includes(site) && !urlLower.includes(site)) {
       var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
       if (qm && qm[1]) {
-        strategies.push('Navigate directly to https://www.' + siteUrl + encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : ''));
+        strategies.push(`Navigate directly to https://www.${siteUrl}${encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : '')}`);
       }
     }
   }
@@ -3642,7 +3642,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (consecutiveInjectionFailures < 3) {
         scriptReady = await injectContentScript(tab);
       } else {
-        console.log('[Sentinel/SPEED] Skipping content script injection (' + consecutiveInjectionFailures + ' failures)');
+        console.log(`[Sentinel/SPEED] Skipping content script injection (${consecutiveInjectionFailures} failures)`);
       }
       _cdpFallbackActive = false;
       if (!scriptReady) {
@@ -3652,7 +3652,7 @@ async function runAgentLoop(goal, workingTabId) {
         // (v3.54) CDP Fallback: bypass CSP by using Chrome DevTools Protocol directly.
         // After 2 failures, switch to CDP mode — observe, dismiss overlays, read page.
         if (consecutiveInjectionFailures >= 2) {
-          console.warn('[Sentinel] Content script failed ' + consecutiveInjectionFailures + ' times — activating CDP fallback');
+          console.warn(`[Sentinel] Content script failed ${consecutiveInjectionFailures} times — activating CDP fallback`);
           _cdpFallbackActive = true;
           // (v3.57) On first CDP activation, check if page has any DOM at all.
           // If empty (no body, no title), reload the page via CDP.
@@ -3687,7 +3687,7 @@ async function runAgentLoop(goal, workingTabId) {
           const allFailed = recentActionEntries.every(h => h.actionFailed);
           if (allSame && allFailed) {
             const stuckAction = lastActionTypes[0];
-            console.warn('[Sentinel/stuck] Detected stuck loop: ' + stuckAction + ' failed ' + lastActionTypes.length + ' times');
+            console.warn(`[Sentinel/stuck] Detected stuck loop: ${stuckAction} failed ${lastActionTypes.length} times`);
             // Inject a forced recovery note into history
             historyPush({
               role: 'user',
@@ -3707,7 +3707,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const dismissed = await _cdpDismissOverlays(tab, []);
           if (dismissed > 0) {
-            sendSilentUpdate('[CDP] Nuked ' + dismissed + ' overlay element(s)', stepCount);
+            sendSilentUpdate(`[CDP] Nuked ${dismissed} overlay element(s)`, stepCount);
             await sleep(800);
           }
         } catch (_) { /* non-fatal */ }
@@ -3828,7 +3828,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
           const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
           const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
-          activityDone(stepCount, 'observe', 'Observed ' + elemCount + ' elements, ' + textLen + ' chars of text', null);
+          activityDone(stepCount, 'observe', `Observed ${elemCount} elements, ${textLen} chars of text`, null);
           _cachedObservation = observation;
           _cachedPageContent = pageContent;
           _lastObservedUrl = _obsUrl;
@@ -4038,7 +4038,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _mfaHit = detectMfaInText(pageText, currentUrl);
         if (_mfaHit && mfaAckUrl !== currentUrl) {
           agentPaused = true;
-          sendSilentUpdate('⏸ MFA challenge detected (' + _mfaHit + ') — agent paused', stepCount);
+          sendSilentUpdate(`⏸ MFA challenge detected (${_mfaHit}) — agent paused`, stepCount);
           notifyIfEnabled('mfa_pause_' + Date.now(), {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icon-48.png'),
@@ -4151,8 +4151,8 @@ async function runAgentLoop(goal, workingTabId) {
             ? recentJsCount + ' execute_js calls in last 8 steps with no data saved'
             : consecutiveNonProductive + ' non-productive steps in a row';
           loopDirective = memCount === 0
-            ? '\n⚠ LOOP DETECTED -- ' + reason + '. You MUST use "execute_js" with a "key" to save results, or use "note" to record findings. Do NOT run more JS without saving.\n'
-            : '\n⚠ LOOP DETECTED -- ' + reason + '. You have ' + memCount + ' items in memory. You MUST use "finish" NOW with a summary of your extracted data.\n';
+            ? `\n⚠ LOOP DETECTED -- ${reason}. You MUST use "execute_js" with a "key" to save results, or use "note" to record findings. Do NOT run more JS without saving.\n`
+            : `\n⚠ LOOP DETECTED -- ${reason}. You have ${memCount} items in memory. You MUST use "finish" NOW with a summary of your extracted data.\n`;
         }
       }
 
@@ -4172,11 +4172,11 @@ async function runAgentLoop(goal, workingTabId) {
       const recentTabActions = history.slice(-5).reduce((count, h) => count + (h.action && TAB_ACTIONS.has(h.action.type) ? 1 : 0), 0);
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
       if (stepCount >= 15 && !loopDirective && !isMakingProgress) {
-        loopDirective = '\n⚠ STEP LIMIT -- You are on step ' + stepCount + ' with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n';
+        loopDirective = `\n⚠ STEP LIMIT -- You are on step ${stepCount} with no data extracted and no active tab work. You MUST call "finish" NOW with what you know, or use "execute_js" to extract data. Do not continue reading the same page.\n`;
       } else if (stepCount >= 20 && !loopDirective) {
         loopDirective = memCount > 0
-          ? '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. You have ' + memCount + ' extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n'
-          : '\n⚠ STEP LIMIT -- You are on step ' + stepCount + '. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n';
+          ? `\n⚠ STEP LIMIT -- You are on step ${stepCount}. You have ${memCount} extracted items. You MUST call "finish" NOW with a summary. No more reading or extracting.\n`
+          : `\n⚠ STEP LIMIT -- You are on step ${stepCount}. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n`;
       }
 
       // 3. Step-based soft cap: force a clean finish ~5 steps before the
@@ -4304,8 +4304,8 @@ async function runAgentLoop(goal, workingTabId) {
       // it can pace itself. Multi-portal investigations especially benefit
       // from knowing they have 200 vs 50 steps remaining.
       const _stepsRemaining = Math.max(0, dynamicMaxSteps - stepCount);
-      const _budgetHint = 'Current step: ' + stepCount + ' of ' + dynamicMaxSteps +
-        ' (' + _stepsRemaining + ' remaining; ' + productiveSteps + ' productive bumps so far). ' +
+      const _budgetHint = `Current step: ${stepCount} of ${dynamicMaxSteps} ` +
+        `(${_stepsRemaining} remaining; ${productiveSteps} productive bumps so far). ` +
         'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
         'Aimless read_page / scroll = unproductive (does not extend).';
       
@@ -4337,7 +4337,7 @@ async function runAgentLoop(goal, workingTabId) {
               isInput: e.isInput
             }));
             allElements = [...trimmedElements]; // reassign (not mutate) so cached observation.elements stays intact
-            console.log('[Sentinel/v4] Vision: ' + _visionElements.length + ' indexed elements');
+            console.log(`[Sentinel/v4] Vision: ${_visionElements.length} indexed elements`);
           }
         } catch (e) {
           console.warn('[Sentinel/v4] Vision observe failed:', e);
@@ -4442,7 +4442,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionUserContent = [
           'Goal: ' + goal,
           'URL: ' + currentUrl,
-          'Step: ' + stepCount + '/' + dynamicMaxSteps,
+          `Step: ${stepCount}/${dynamicMaxSteps}`,
           '',
           'Elements:',
           _visionElementTree || '(none)',
@@ -4674,7 +4674,7 @@ async function runAgentLoop(goal, workingTabId) {
         const refExists = trimmedElements.some(e => e.ref === command.ref);
         if (!refExists) {
           try {
-            console.warn('[agent-engine] LLM returned unknown ref "' + command.ref + '" not in latest observation. Content script will fall back to selector if available.');
+            console.warn(`[agent-engine] LLM returned unknown ref "${command.ref}" not in latest observation. Content script will fall back to selector if available.`);
           } catch (e) { console.warn('[Sentinel] unknown ref logging failed:', getErrorMessage(e)); }
         }
       }
@@ -5579,13 +5579,13 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'batch' && Array.isArray(command.actions)) {
         const batchActions = command.actions.filter(a => a && a.type);
         if (batchActions.length) {
-          console.log('[Sentinel/SPEED] Batch: queuing ' + batchActions.length + ' actions');
+          console.log(`[Sentinel/SPEED] Batch: queuing ${batchActions.length} actions`);
           // Push in reverse so shift() gets them in order
           for (let i = batchActions.length - 1; i >= 0; i--) {
             _pendingCommandQueue.unshift(batchActions[i]);
           }
           command = _pendingCommandQueue.shift();
-          console.log('[Sentinel/SPEED] Batch: executing first action: ' + command.type);
+          console.log(`[Sentinel/SPEED] Batch: executing first action: ${command.type}`);
         } else {
           result = 'Batch contained no valid actions';
           actionFailed = true;
@@ -5607,7 +5607,7 @@ async function runAgentLoop(goal, workingTabId) {
         else if (/^(twitter|x)$/.test(site)) smartUrl = 'https://x.com/search?q=' + q;
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
-          console.log('[Sentinel/SPEED] smart_navigate → ' + smartUrl);
+          console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
         } else {
           // Fallback to Google
           command = { type: 'navigate', url: 'https://www.google.com/search?q=' + q };
@@ -6501,7 +6501,7 @@ return { ok: true, value: el.value };
       // v3.68: Trigger on 2 repeats (not 3), cover ALL action types, and be more specific
       if (_sameCmdCount >= 2 && !LOOP_EXCLUDE_TYPES.has(command.type)) {
         const _pageUnchanged = currentUrl === (_lastLoopUrl || '');
-        console.warn('[Sentinel/RECOVERY] Same-command loop:', command.type, 'used', _sameCmdCount + 1, 'times. Page unchanged:', _pageUnchanged);
+        console.warn(`[Sentinel/RECOVERY] Same-command loop:`, command.type, `used ${_sameCmdCount + 1} times. Page unchanged:`, _pageUnchanged);
         let _recoveryMsg = 'SYSTEM: ' + command.type + ' loop detected! You have used ' + command.type + ' ' + (_sameCmdCount + 1) + ' times in a row';
         if (_pageUnchanged) _recoveryMsg += ' with NO page change';
         _recoveryMsg += '. STOP using ' + command.type + '. ';
