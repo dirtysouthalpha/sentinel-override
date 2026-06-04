@@ -4049,7 +4049,7 @@ async function runAgentLoop(goal, workingTabId) {
             type: 'basic',
             iconUrl: chrome.runtime.getURL('icon-48.png'),
             title: 'Sentinel Override — MFA required',
-            message: 'Approve / enter the code on ' + (currentUrl || 'the page') + ', then click Resume.'
+            message: `Approve / enter the code on ${currentUrl || 'the page'}, then click Resume.`
           });
           try {
             chrome.runtime.sendMessage({
@@ -4088,7 +4088,7 @@ async function runAgentLoop(goal, workingTabId) {
               type: 'basic',
               iconUrl: chrome.runtime.getURL('icon-48.png'),
               title: 'Sentinel Override — CAPTCHA Detected',
-              message: 'Solve the CAPTCHA on ' + (currentUrl || 'the page') + ', then click Resume.'
+              message: `Solve the CAPTCHA on ${currentUrl || 'the page'}, then click Resume.`
             });
             while (agentPaused && agentRunning) await sleep(500);
             if (!agentRunning) break;
@@ -5050,7 +5050,7 @@ async function runAgentLoop(goal, workingTabId) {
         const items = itemsKey && Array.isArray(agentMemory[itemsKey]) ? agentMemory[itemsKey] : (Array.isArray(command.items) ? command.items : []);
         const doActions = Array.isArray(command.do) ? command.do : [];
         if (!items.length || !doActions.length) {
-          historyPush({ step: stepCount, action: command, result: 'repeat_for_each: nothing to iterate (items=' + items.length + ', actions=' + doActions.length + ')' });
+          historyPush({ step: stepCount, action: command, result: `repeat_for_each: nothing to iterate (items=${items.length}, actions=${doActions.length})` });
           await persistHistory();
           continue;
         }
@@ -5155,7 +5155,7 @@ async function runAgentLoop(goal, workingTabId) {
         // a note". Truncated for display; full text remains in history.
         try {
           const _preview = noteText.length > 140 ? noteText.slice(0, 137) + '…' : noteText;
-          activityDone(stepCount, 'note-content', 'Noted: "' + _preview + '"', null);
+          activityDone(stepCount, 'note-content', `Noted: "${_preview}"`, null);
         } catch (e) { console.warn('[Sentinel] note-content activity failed:', getErrorMessage(e)); }
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
@@ -5252,7 +5252,7 @@ async function runAgentLoop(goal, workingTabId) {
         try {
           const _dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(_domain)}&type=${encodeURIComponent(_type)}`;
           const _dohResp = await fetch(_dohUrl, { headers: { Accept: 'application/dns-json' } });
-          if (!_dohResp.ok) throw new Error('DoH HTTP ' + _dohResp.status);
+          if (!_dohResp.ok) throw new Error(`DoH HTTP ${_dohResp.status}`);
           const _dohJson = await _dohResp.json();
           if (!_dohJson) throw new Error('Invalid DNS response');
           const _answers = (_dohJson.Answer || []).map(a => ({ name: a.name, type: a.type, ttl: a.TTL, data: a.data }));
@@ -5458,7 +5458,7 @@ async function runAgentLoop(goal, workingTabId) {
               let _liveRect = null;
               try {
                 const _rectRes = await cdpExecuteJs(tab,
-                  'return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()',
+                  `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e||!e.getBoundingClientRect)return null;e.scrollIntoView&&e.scrollIntoView({block:"center",inline:"center"});var r=e.getBoundingClientRect();return JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,visible:r.width>0&&r.height>0});})()`,
                   { timeout: 3000 });
                 if (_rectRes && _rectRes.value) {
                   const _parsed = typeof _rectRes.value === 'string' ? JSON.parse(_rectRes.value) : _rectRes.value;
@@ -5497,7 +5497,7 @@ async function runAgentLoop(goal, workingTabId) {
                 await new Promise(r => setTimeout(r, 100));
                 try {
                   const _jsClickRes = await cdpExecuteJs(tab,
-                    'return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(' + command._visionIndex + '):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()',
+                    `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()`,
                     { timeout: 3000 });
                   const _val = _jsClickRes && _jsClickRes.value;
                   if (_val === 'js-clicked') {
@@ -5508,7 +5508,7 @@ async function runAgentLoop(goal, workingTabId) {
                     // hasn't run yet on this step).
                     try {
                       const _attrRes = await cdpExecuteJs(tab,
-                        'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(e){e.click();return"clicked";}return"not found";})()',
+                        `return (function(){var e=document.querySelector('[data-sentinel-index="${command._visionIndex}"]');if(e){e.click();return"clicked";}return"not found";})()`,
                         { timeout: 3000 });
                       result = `Clicked [${command._visionIndex}] via attr selector: ${_attrRes && _attrRes.value || 'unknown'}`;
                     } catch (_cme2) {
@@ -5523,7 +5523,7 @@ async function runAgentLoop(goal, workingTabId) {
               const _safeText = escapeJsString(command.text || '', "'");
               try {
                 const _typeRes = await cdpExecuteJs(tab,
-                  'return (function(){var e=document.querySelector(\'[data-sentinel-index="' + command._visionIndex + '"]\');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"' + _safeText + '");else e.value="' + _safeText + '";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()',
+                  `return (function(){var e=document.querySelector('[data-sentinel-index="${command._visionIndex}"]');if(!e)return"not found";e.focus();e.scrollIntoView({block:"center"});var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");if(s)s.set.call(e,"${_safeText}");else e.value="${_safeText}";e.dispatchEvent(new Event("input",{bubbles:true}));e.dispatchEvent(new Event("change",{bubbles:true}));return"typed";})()`,
                   { timeout: 5000 });
                 const _typeVal = _typeRes && _typeRes.value;
                 if (_typeVal === 'not found') {
