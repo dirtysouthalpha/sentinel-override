@@ -132,7 +132,7 @@ export async function saveTemplate(templateData) {
   if (!templateData || typeof templateData !== 'object' || Array.isArray(templateData)) {
     throw new Error('Template data must be an object');
   }
-  if (!templateData.name || typeof templateData.name !== 'string' || templateData.name.trim() === '') {
+  if (!templateData.name || typeof templateData.name !== 'string' || !templateData.name.trim()) {
     throw new Error('Template name is required');
   }
   if (!templateData.goal || typeof templateData.goal !== 'string' || templateData.goal.trim() === '') {
@@ -266,12 +266,12 @@ export async function resolveTemplateGoal(templateId, paramValues) {
 
   const resolvedGoal = template.goal.replace(PARAM_REGEX, (_, key) => {
     // If value provided and non-empty, use it
-    if (values[key] && typeof values[key] === 'string' && values[key].trim() !== '') {
+    if (values[key] && typeof values[key] === 'string' && values[key].trim()) {
       return values[key];
     }
     // Check for default value in template params
     const paramDef = (template.params || []).find(p => p.key === key);
-    if (paramDef && paramDef.defaultValue && paramDef.defaultValue.trim() !== '') {
+    if (paramDef && paramDef.defaultValue && paramDef.defaultValue.trim()) {
       return paramDef.defaultValue;
     }
     // Leave placeholder as-is (user skipped an optional param)

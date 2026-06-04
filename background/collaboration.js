@@ -128,11 +128,11 @@ export function validateImport(importedData) {
   // Validate each template
   const validated = [];
   templates.forEach((t, i) => {
-    if (!t.name || typeof t.name !== 'string' || t.name.trim() === '') {
+    if (!t.name || typeof t.name !== 'string' || !t.name.trim()) {
       result.errors.push(`Template ${i + 1}: missing name`);
       return;
     }
-    if (!t.goal || typeof t.goal !== 'string' || t.goal.trim() === '') {
+    if (!t.goal || typeof t.goal !== 'string' || !t.goal.trim()) {
       result.errors.push(`Template "${t.name}": missing goal`);
       return;
     }

@@ -282,8 +282,8 @@ function setBadge(status) {
  */
 function _validateScheduleData(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Schedule data must be an object');
-  if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') throw new Error('Schedule name is required');
-  if (!data.templateId && (!data.goal || typeof data.goal !== 'string' || data.goal.trim() === '')) {
+  if (!data.name || typeof data.name !== 'string' || !data.name.trim()) throw new Error('Schedule name is required');
+  if (!data.templateId && (!data.goal || typeof data.goal !== 'string' || !data.goal.trim())) {
     throw new Error('Either templateId or goal is required');
   }
 }
