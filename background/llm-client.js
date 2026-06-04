@@ -1316,23 +1316,23 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
   const _u = (currentUrl || '').toLowerCase();
   let platformHints = '';
   if (/entra|admin\.microsoft|admin\.exchange|purview|defender|security\.microsoft|portal\.azure|intune|endpoint\.microsoft/.test(_u)) {
-    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):\n' +
-      '- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.\n' +
-      '- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.\n' +
-      '- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.\n';
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (M365 admin centers):\n` +
+      `- Try { type: "read_network_requests", url_includes: "graph.microsoft.com|graphbeta", limit: 30 } to read the underlying Graph API JSON. UI tables are in cross-origin iframes that block DOM extraction; the Graph data is not.\n` +
+      `- After identifying the right Graph URL, fetch it via execute_js with credentials: include — the JSON has every field shown in the UI.\n` +
+      `- Common Graph paths: /beta/auditLogs/signIns, /beta/security/auditLog/queries, /v1.0/users/{upn}, /beta/deviceManagement/managedDevices.\n`;
   } else if (/virustotal/.test(_u)) {
-    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):\n' +
-      '- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.\n' +
-      '- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.\n';
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (VirusTotal):\n` +
+      `- Try { type: "read_network_requests", url_includes: "ui/files|api/v3/files", limit: 30 } — VT calls its own JSON API.\n` +
+      `- Or use execute_js with window.__sentinelUtils.shadow.queryDeep(document, "[class*=detection]") to pierce Lit shadow roots.\n`;
   } else if (/sentinelone|singularity/.test(_u)) {
-    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):\n' +
-      '- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.\n' +
-      '- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".\n';
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (SentinelOne):\n` +
+      `- Use the global top-bar search instead of navigating tabs. SHA1/SHA256/filename/IP all work as queries.\n` +
+      `- For Deep Visibility: SrcProcDisplayName contains "X", TgtFileSha1 = "...", TgtFileSha256 = "...".\n`;
   } else if (/sonicwall|sonicos|fortigate|paloalto/.test(_u)) {
-    platformHints = '\nPLATFORM-SPECIFIC RECOVERY (network device UI):\n' +
-      '- Custom dropdowns: click trigger to open, then click option (NOT the select action).\n' +
-      '- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n' +
-      '- Long log loads: use wait_for_text with 30000ms timeout.\n';
+    platformHints = `\nPLATFORM-SPECIFIC RECOVERY (network device UI):\n` +
+      `- Custom dropdowns: click trigger to open, then click option (NOT the select action).\n` +
+      `- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n` +
+      `- Long log loads: use wait_for_text with 30000ms timeout.\n`;
   }
   return `\nSTRATEGY SHIFT REQUIRED -- You have failed ${agentState.consecutiveFailures} times in a row.\n` +
     `Approaches already tried: ${(agentState.currentStrategies || []).join(', ')}\n` +
