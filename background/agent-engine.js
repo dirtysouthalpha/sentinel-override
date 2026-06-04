@@ -93,6 +93,9 @@ const USELESS_OBJECT_RE = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLE
 const ACTION_FAILED_RE = /^(Error|BLOCKED:)| not found|Element not found|No element/i;
 const ACTION_FAILED_TIMEOUT_RE = /^(Error|BLOCKED:|JS Error)|timed out| not found/i;
 
+// Precompile regex for page-mutating action detection (hot path in observation loop)
+const PAGE_MUTATING_ACTIONS_RE = /^(click|click_at|type|press_key|select|check|check_all)$/;
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -6581,7 +6584,7 @@ return { ok: true, value: el.value };
       // or any page-changing action.
       // navigate always changes the page, but its new DOM hash isn't captured until
       // the next iteration's observation phase — exclude it to avoid false stagnation.
-      const _isPageMutating = /^(click|click_at|type|press_key|select|check|check_all)$/.test(command.type);
+      const _isPageMutating = PAGE_MUTATING_ACTIONS_RE.test(command.type);
       const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
         _pageStagnation++;

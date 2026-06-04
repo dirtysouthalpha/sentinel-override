@@ -195,6 +195,10 @@ end-to-end. You have the budget and the tools — execute the sweep.
 // read_page + note WITHOUT close, then close at the end.
 const MULTI_ARTICLE_PATTERN = /\b(top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b|\b(give|provide|write|do)\s+(?:me\s+)?(?:a\s+)?(?:full\s+)?(?:breakdown|summary|recap|briefing|overview)\s+(?:on|for|of)\s+each\b/i;
 
+// Precompile regex for runbook pattern detection (hot paths in adaptive prompts)
+const RUNBOOK_PATTERN_RE = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|runbook|investigation/i;
+const RUNBOOK_COMPREHENSIVE_RE = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i;
+
 /**
  * Build the multi-article directive for news/reading goals that request
  * summarizing multiple articles. Returns '' if not a multi-article goal.
@@ -1325,7 +1329,7 @@ export function isSimpleStep(agentState, stepCount, history) {
   if (!agentState) return false;
   if (agentState.consecutiveFailures > 0) return false;
   if (agentState.quickMode) return false; // quick mode already uses fewer tokens
-  const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|runbook|investigation/i.test(agentState.goal || '');
+  const isRunbook = RUNBOOK_PATTERN_RE.test(agentState.goal || '');
   if (isRunbook) return false;
   if (stepCount > 6) return false;
   if ((history || []).length > 8) return false;
@@ -1765,7 +1769,7 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   const last_result = lastEntry ? lastEntry.result : null;
 
   // Runbook detection
-  const isRunbook = /STEP\s+\d|PHASE\s+\d|INVESTIGATION|RUNBOOK|Navigation:|Success Indicator|TICKET|checkpoint|rollback|decision tree|Phase [0-9]|what has been tried|fastest.*resolution/i.test(goal);
+  const isRunbook = RUNBOOK_COMPREHENSIVE_RE.test(goal);
 
   const runbookCtx = isRunbook ? `
 RUNBOOK / INVESTIGATION MODE ACTIVE

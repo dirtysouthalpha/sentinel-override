@@ -1,5 +1,9 @@
 // background/skills/navigate-loop.js
 import { getErrorMessage } from '../error-utils.js';
+
+// Precompile regex for blocked navigation detection (hot path in skill matching)
+const BLOCKED_NAVIGATE_RE = /^BLOCKED:\s*already navigated to/i;
+
 // Fires after the v3.20.1 navigate-loop guard catches 2+ navigates to the
 // same URL. The agent is re-navigating instead of interacting with the page.
 // Recovery: read the current page (deterministic) so the LLM sees what's
@@ -15,8 +19,7 @@ export const navigateLoop = {
       if (!ctx || !ctx.lastResult || !ctx.lastActionFailed) return false;
       const resultString = ctx.lastResult;
       if (typeof resultString !== 'string') return false;
-      const blockedPattern = /^BLOCKED:\s*already navigated to/i;
-      return blockedPattern.test(resultString);
+      return BLOCKED_NAVIGATE_RE.test(resultString);
     } catch (error) {
       console.error('Error in navigateLoop matches:', getErrorMessage(error));
       return false;
