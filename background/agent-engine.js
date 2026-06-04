@@ -18,6 +18,12 @@ const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
 // Precompile regex for extracting JSON from markdown code blocks
 const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
 
+// Precompile regex for extract command type checks
+const EXTRACT_TYPE_RE = /^extract(_list)?$/;
+
+// Precompile regex for non-mutating action types
+const NON_MUTATING_ACTIONS_RE = /^(note|extract|extract_list|scroll|wait_for_text|wait_for_element|wait_for_navigation|read_page)$/;
+
 // Priority element types for O(1) lookup in element sorting
 const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
@@ -1110,7 +1116,7 @@ function summarizeHistoryBatch(batch) {
       const url = h.action.url;
       navUrls.push(typeof url === 'string' ? url.substring(0, 100) : String(url).substring(0, 100));
     }
-    if ((/^extract(_list)?$/.test(t)) && h.action.key) extractedKeys.push(h.action.key);
+    if ((EXTRACT_TYPE_RE.test(t)) && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
     if (t === 'note' && h.action.text) {
       const text = h.action.text;
@@ -3069,7 +3075,7 @@ function _detectActionTypeLoop(history, _agentMemory) {
     if (!h || !h.action) return false;
     const t = h.action.type;
     if (t === 'note') return true;
-    if (/^extract(_list)?$/.test(t)) return !!h.action.key;
+    if (EXTRACT_TYPE_RE.test(t)) return !!h.action.key;
     if (t === 'execute_js') return !!h.action.key;
     return false;
   });
@@ -3739,7 +3745,7 @@ async function runAgentLoop(goal, workingTabId) {
       let observation, pageContent;
       const _prevAction = history.length ? history[history.length - 1] : null;
       const _prevType = _prevAction && _prevAction.action ? _prevAction.action.type : '';
-      const _nonMutating = /^(note|extract|extract_list|scroll|wait_for_text|wait_for_element|wait_for_navigation|read_page)$/.test(_prevType);
+      const _nonMutating = NON_MUTATING_ACTIONS_RE.test(_prevType);
       const _obsUrl = (tabInfo && tabInfo.url) || '';
 
       // Compute a lightweight DOM content hash via the content script to detect
@@ -5204,7 +5210,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Handle extract / extract_list (save to agent memory)
-      if (/^extract(_list)?$/.test(command.type)) {
+      if (EXTRACT_TYPE_RE.test(command.type)) {
         sendSilentUpdate(`Extracting: ${command.key}`, stepCount);
       }
 
@@ -5876,7 +5882,7 @@ async function runAgentLoop(goal, workingTabId) {
           result = freshContent ? 'Page content re-read' : 'Failed to re-read page';
           actionFailed = !freshContent;
         } catch (_err) { result = 'Could not re-read page'; actionFailed = true; }
-      } else if (/^extract(_list)?$/.test(command.type)) {
+      } else if (EXTRACT_TYPE_RE.test(command.type)) {
         const res = await sendMessageWithRetry(tab, { action: 'execute_command', command });
         result = (typeof res === 'string' && res) ? res : 'Error: no response from content script';
         let extractSucceeded = false;
