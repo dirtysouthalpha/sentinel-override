@@ -8,9 +8,9 @@ import { resolveTemplateGoal } from './template-manager.js';
 import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
 import { getTabInfo } from './tab-manager.js';
 import { notifyIfEnabled } from './shared-state.js';
+import { ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS } from './constants.js';
 import { tel } from './telemetry.js';
 import { getErrorMessage } from './error-utils.js';
-import { ONE_HOUR_MS } from './constants.js';
 
 // ========== Storage Constants ==========
 const SCHEDULES_KEY = 'sentinel_schedules';
@@ -206,13 +206,13 @@ function computeNextRun(recurrence) {
   }
 
   if (recurrence.interval === 'custom') {
-    const periodMs = (recurrence.periodInMinutes || 60) * 60 * 1000;
+    const periodMs = (recurrence.periodInMinutes || 60) * ONE_MINUTE_MS;
     if (periodMs <= 0) return now.getTime() + ONE_HOUR_MS;
     const nowMs = now.getTime();
     const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const periodsElapsed = Math.floor((nowMs - midnight) / periodMs);
     const nextPeriod = midnight + (periodsElapsed + 1) * periodMs;
-    if (nextPeriod <= nowMs + 60000) return midnight + (periodsElapsed + 2) * periodMs;
+    if (nextPeriod <= nowMs + ONE_MINUTE_MS) return midnight + (periodsElapsed + 2) * periodMs;
     return nextPeriod;
   }
 
@@ -555,7 +555,7 @@ export async function executeScheduledTask(alarmName) {
 
   // Register listener BEFORE startAgent so agent_loop_complete can't fire and be missed
   // if startAgent ever completes synchronously in a fast-path (e.g. cached single-step plan).
-  const { promise: completionPromise, cancel: cancelCompletion } = _waitForAgentCompletion(5 * 60 * 1000);
+  const { promise: completionPromise, cancel: cancelCompletion } = _waitForAgentCompletion(FIVE_MINUTES_MS);
 
   try {
     await AgentEngine.startAgent(goal, { tab: { id: tabId } });
