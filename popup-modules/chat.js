@@ -362,12 +362,12 @@ function loadApprovalMode() {
   chrome.storage.local.get(['approvalMode'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadApprovalMode failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     let isApprovalMode;
-    if (typeof result.approvalMode === 'undefined' || result.approvalMode === null) {
+    if (typeof result.approvalMode !== 'undefined' && result.approvalMode !== null) {
+      isApprovalMode = result.approvalMode;
+    } else {
       // First run -- default to ON and persist so subsequent reads are deterministic.
       isApprovalMode = true;
       chrome.storage.local.set({ approvalMode: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
-    } else {
-      isApprovalMode = result.approvalMode;
     }
     if (approvalModeToggle) approvalModeToggle.checked = isApprovalMode;
     updateApprovalModeUI(isApprovalMode);
