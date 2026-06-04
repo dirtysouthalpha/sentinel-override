@@ -1334,8 +1334,8 @@ function _buildStrategyCtx(agentState, currentUrl, CONFIG) {
       '- After config changes: look for Apply/Commit/Save button explicitly. Changes do NOT save until committed.\n' +
       '- Long log loads: use wait_for_text with 30000ms timeout.\n';
   }
-  return '\nSTRATEGY SHIFT REQUIRED -- You have failed ' + agentState.consecutiveFailures + ' times in a row.\n' +
-    'Approaches already tried: ' + (agentState.currentStrategies || []).join(', ') + '\n' +
+  return `\nSTRATEGY SHIFT REQUIRED -- You have failed ${agentState.consecutiveFailures} times in a row.\n` +
+    `Approaches already tried: ${(agentState.currentStrategies || []).join(', ')}\n` +
     'You MUST try a COMPLETELY DIFFERENT approach. Consider:\n' +
     '- Using "execute_js" to write custom JavaScript to accomplish the task\n' +
     '- Using "read_network_requests" to read the underlying API response\n' +
@@ -1416,7 +1416,7 @@ function _sanitizeHistory(history, isRunbook, CONFIG) {
     const safeAction = {
       type: action.type,
       selector: action.selector
-        ? (action.selector.length > 60 ? '...' + action.selector.slice(-60) : action.selector)
+        ? (action.selector.length > 60 ? `...${action.selector.slice(-60)}` : action.selector)
         : undefined,
       text: action.text,
       url: action.url
@@ -1546,7 +1546,7 @@ older runtimes that don't emit \`ref\` continue to work as before.
 
 ${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
 Current step: ${stepCount}
-${agentState && agentState.budgetHint ? 'Budget: ' + agentState.budgetHint + '\n' : ''}<GOAL>
+${agentState && agentState.budgetHint ? `Budget: ${agentState.budgetHint}\n` : ''}<GOAL>
 ${goal}
 </GOAL>
 
@@ -1718,7 +1718,7 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   const { endpoint, apiKey } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
-  if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
+  if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
   const model = _useSimple ? providerConfig.fastModel : providerConfig.model;
@@ -2297,7 +2297,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   const { endpoint, apiKey, model } = providerConfig;
   if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
   const provider = resolveProvider(endpoint);
-  if (!provider) throw new Error('Unknown provider for endpoint: ' + endpoint);
+  if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
