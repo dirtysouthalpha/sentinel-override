@@ -2,6 +2,11 @@
 // Shared popup utilities: HTML sanitization, URL validation, toasts, markdown config.
 // Loaded first (before settings.js and chat.js) so these utilities are available globally.
 
+// Precompile regex patterns for performance in hot-path sanitization
+const URL_ATTR_RE = /^(href|src|action|formaction|xlink:href)$/;
+const DANGEROUS_PROTO_RE = /^\s*(javascript\s*:|data\s*:|vbscript\s*:)/i;
+const DANGEROUS_STYLE_RE = /expression\s*\(|url\s*\(\s*['"]?\s*javascript/i;
+
 // ========== Shared Helpers ==========
 // getState is defined in popup-state.js (loaded before this file).
 
@@ -42,13 +47,13 @@ function sanitizeHtml(dirtyHtml) {
         continue;
       }
       // Remove javascript:, data:, vbscript: URLs in href/src/action/formaction/xlink:href
-      if (/^(href|src|action|formaction|xlink:href)$/.test(name)
-          && /^\s*(javascript\s*:|data\s*:|vbscript\s*:)/i.test(val)) {
+      if (URL_ATTR_RE.test(name)
+          && DANGEROUS_PROTO_RE.test(val)) {
         el.removeAttribute(attr.name);
         continue;
       }
       // Remove style attributes that could contain expression() or url(javascript:)
-      if (name === 'style' && /expression\s*\(|url\s*\(\s*['"]?\s*javascript/i.test(val)) {
+      if (name === 'style' && DANGEROUS_STYLE_RE.test(val)) {
         el.removeAttribute(attr.name);
       }
     }

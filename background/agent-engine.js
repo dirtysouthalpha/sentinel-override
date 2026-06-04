@@ -35,6 +35,42 @@ const ELEMENT_ERROR_TEXT_RE = /error|invalid|failed/i;
 // Priority element types for O(1) lookup in element sorting
 const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
+// Precompile regex for approval mode detection (Tier 3: pause phrases)
+const APPROVAL_PAUSE_AGENT_RE = /\b(?:agent|sentinel)\s+(?:pauses?|must\s+pause|should\s+pause|will\s+pause)\s+(?:for|before|on|to\s+wait|until)/i;
+const APPROVAL_PAUSE_GENERIC_RE = /\b(?:PAUSE|pause)\s+(?:and\s+)?wait\s+for\s+(?:technician|user|operator|human|brandon)\s+approval/i;
+const APPROVAL_WAIT_BEFORE_RE = /\bwait\s+for\s+(?:technician|user|operator|brandon)\s+approval\s+(?:before|prior\s+to)\s+(?:each|every|any)/i;
+
+// Precompile regex for approval mode detection (Tier 4: autonomous phrases)
+const AUTONOMOUS_MODE_RE = /\b(?:no\s+approvals?\s+required|execute\s+all\s+steps?\s+(?:autonomously|without\s+pausing)|do\s+not\s+pause)\b/i;
+
+// Precompile regex for Microsoft platform detection in history loop
+const PORTAL_ENTRA_RE = /entra/i;
+const PORTAL_EXCHANGE_RE = /admin\.exchange/i;
+const PORTAL_PURVIEW_RE = /purview/i;
+const PORTAL_M365_ADMIN_RE = /admin\.microsoft/i;
+const PORTAL_ONEDRIVE_RE = /onedrive|sharepoint/i;
+const PORTAL_TEAMS_RE = /teams/i;
+const PORTAL_INTUNE_RE = /intune|endpoint\.microsoft/i;
+const PORTAL_DEFENDER_RE = /defender|security\.microsoft/i;
+const PORTAL_SENTINELONE_RE = /sentinelone/i;
+const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
+
+// Precompile regex for stall detection
+const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
+
+// Precompile regex for environment detection in ticket formatting
+const ENV_M365_RE = /m365|microsoft|entra|exchange|defender|purview/i;
+const ENV_FIREWALL_RE = /sonicwall|fortigate|firewall/i;
+const ENV_EDR_RE = /sentinelone|crowdstrike|defender for endpoint/i;
+const ENV_RMM_RE = /connectwise|ninjaone|kaseya|datto/i;
+
+// Precompile regex for ticket state detection
+const TICKET_VENDOR_RE = /waiting on (the )?vendor|vendor (case|ticket)|vendor support/;
+const TICKET_CLIENT_RE = /waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/;
+const TICKET_ITGLUE_RE = /(create|document|write).*(kb|knowledge base|it glue)/;
+const TICKET_EMAIL_RE = /draft (an?|the) email|send (an?|the) email|email the client/;
+const TICKET_KICKOFF_RE = /kickoff|new ticket|just opened|investigate this ticket/;
+
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
 // ═══════════════════════════════════════════════════════════════
@@ -965,9 +1001,9 @@ function _detectGoalModeDirective(goal) {
   }
 
   // Tier 3: phrases that imply approval-required behavior
-  if (/\b(?:agent|sentinel)\s+(?:pauses?|must\s+pause|should\s+pause|will\s+pause)\s+(?:for|before|on|to\s+wait|until)/i.test(text) ||
-      /\b(?:PAUSE|pause)\s+(?:and\s+)?wait\s+for\s+(?:technician|user|operator|human|brandon)\s+approval/i.test(text) ||
-      /\bwait\s+for\s+(?:technician|user|operator|brandon)\s+approval\s+(?:before|prior\s+to)\s+(?:each|every|any)/i.test(text)) {
+  if (APPROVAL_PAUSE_AGENT_RE.test(text) ||
+      APPROVAL_PAUSE_GENERIC_RE.test(text) ||
+      APPROVAL_WAIT_BEFORE_RE.test(text)) {
     return {
       detected: true,
       wants: 'approval',
@@ -977,7 +1013,7 @@ function _detectGoalModeDirective(goal) {
   }
 
   // Tier 4: phrases implying autonomous behavior (less common but possible)
-  if (/\b(?:no\s+approvals?\s+required|execute\s+all\s+steps?\s+(?:autonomously|without\s+pausing)|do\s+not\s+pause)\b/i.test(text)) {
+  if (AUTONOMOUS_MODE_RE.test(text)) {
     return {
       detected: true,
       wants: 'autonomous',
@@ -1175,16 +1211,16 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
     for (const h of history) {
       if (!h || !h.action) continue;
       const url = h.action.url || '';
-      if (/entra/i.test(url)) portalsSeen.add('Entra');
-      else if (/admin\.exchange/i.test(url)) portalsSeen.add('Exchange');
-      else if (/purview/i.test(url)) portalsSeen.add('Purview');
-      else if (/admin\.microsoft/i.test(url)) portalsSeen.add('M365 Admin');
-      else if (/onedrive|sharepoint/i.test(url)) portalsSeen.add('OneDrive/SharePoint');
-      else if (/teams/i.test(url)) portalsSeen.add('Teams');
-      else if (/intune|endpoint\.microsoft/i.test(url)) portalsSeen.add('Intune');
-      else if (/defender|security\.microsoft/i.test(url)) portalsSeen.add('Defender');
-      else if (/sentinelone/i.test(url)) portalsSeen.add('SentinelOne');
-      else if (/virustotal/i.test(url)) portalsSeen.add('VirusTotal');
+      if (PORTAL_ENTRA_RE.test(url)) portalsSeen.add('Entra');
+      else if (PORTAL_EXCHANGE_RE.test(url)) portalsSeen.add('Exchange');
+      else if (PORTAL_PURVIEW_RE.test(url)) portalsSeen.add('Purview');
+      else if (PORTAL_M365_ADMIN_RE.test(url)) portalsSeen.add('M365 Admin');
+      else if (PORTAL_ONEDRIVE_RE.test(url)) portalsSeen.add('OneDrive/SharePoint');
+      else if (PORTAL_TEAMS_RE.test(url)) portalsSeen.add('Teams');
+      else if (PORTAL_INTUNE_RE.test(url)) portalsSeen.add('Intune');
+      else if (PORTAL_DEFENDER_RE.test(url)) portalsSeen.add('Defender');
+      else if (PORTAL_SENTINELONE_RE.test(url)) portalsSeen.add('SentinelOne');
+      else if (PORTAL_VIRUSTOTAL_RE.test(url)) portalsSeen.add('VirusTotal');
     }
     const memCount = Object.keys(agentMemory).length;
     const lastAction = history.length ? history[history.length - 1] : null;
@@ -1209,7 +1245,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     const allSameResult = recent.every(h => h.result === firstResult);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';
-      return /^(Error|Timeout)|not found|timed out|Element not found|No element/i.test(r);
+      return STALL_ERROR_RE.test(r);
     });
 
     if (allSameType && allSameResult && allFailed) {
@@ -1964,10 +2000,10 @@ function formatItGlueKb(summary, goal, tech, options) {
     : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
 
   const envBits = [];
-  if (/m365|microsoft|entra|exchange|defender|purview/i.test(goal || '')) envBits.push('Microsoft 365 / Entra ID');
-  if (/sonicwall|fortigate|firewall/i.test(goal || '')) envBits.push('Firewall (vendor-specific)');
-  if (/sentinelone|crowdstrike|defender for endpoint/i.test(goal || '')) envBits.push('EDR platform');
-  if (/connectwise|ninjaone|kaseya|datto/i.test(goal || '')) envBits.push('RMM/PSA platform');
+  if (ENV_M365_RE.test(goal || '')) envBits.push('Microsoft 365 / Entra ID');
+  if (ENV_FIREWALL_RE.test(goal || '')) envBits.push('Firewall (vendor-specific)');
+  if (ENV_EDR_RE.test(goal || '')) envBits.push('EDR platform');
+  if (ENV_RMM_RE.test(goal || '')) envBits.push('RMM/PSA platform');
   if (!envBits.length) envBits.push('General — see investigation findings for specifics');
 
   const out = [
@@ -2052,11 +2088,11 @@ function formatClientEmail(summary, goal, tech, options) {
 // 'auto'. 'auto' picks based on goal/summary heuristics.
 function _autoPickFormat(summary, goal) {
   const text = `${goal} ${summary}`.toLowerCase();
-  if (/waiting on (the )?vendor|vendor (case|ticket)|vendor support/.test(text)) return 'WAITING_ON_VENDOR';
-  if (/waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/.test(text)) return 'WAITING_ON_CLIENT';
-  if (/(create|document|write).*(kb|knowledge base|it glue)/.test(text)) return 'IT_GLUE_KB';
-  if (/draft (an?|the) email|send (an?|the) email|email the client/.test(text)) return 'CLIENT_EMAIL';
-  if (/kickoff|new ticket|just opened|investigate this ticket/.test(text)) return 'TICKET_KICKOFF';
+  if (TICKET_VENDOR_RE.test(text)) return 'WAITING_ON_VENDOR';
+  if (TICKET_CLIENT_RE.test(text)) return 'WAITING_ON_CLIENT';
+  if (TICKET_ITGLUE_RE.test(text)) return 'IT_GLUE_KB';
+  if (TICKET_EMAIL_RE.test(text)) return 'CLIENT_EMAIL';
+  if (TICKET_KICKOFF_RE.test(text)) return 'TICKET_KICKOFF';
   return 'FINAL_NOTES';  // default
 }
 

@@ -13,6 +13,9 @@
 //   - We listen for new modals appearing via MutationObserver so dynamically
 //     created modals (template modal, run log history, etc.) get wired up.
 
+// Precompile regex for input tag check in hot path
+const INPUT_TAG_RE = /^(INPUT|BUTTON|SELECT)$/;
+
 (function setupModalDrag() {
   const ATTACHED = new WeakSet();
   const POSITIONS = new WeakMap(); // modal-content element -> {tx, ty}
@@ -28,7 +31,7 @@
 
     titleBar.addEventListener('pointerdown', (e) => {
       // Ignore clicks on inputs / buttons that might happen to be inside the title.
-      if (e.target && (/^(INPUT|BUTTON|SELECT)$/.test(e.target.tagName))) return;
+      if (e.target && (INPUT_TAG_RE.test(e.target.tagName))) return;
       // Only start drag on primary button.
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       e.preventDefault();

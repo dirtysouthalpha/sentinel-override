@@ -471,7 +471,18 @@ function maybeShowSafetyBanner() {
 // Words that indicate a high-risk action — used to highlight the approval card.
 const RISKY_ACTION_PATTERN = /\b(submit|buy|send|transfer|wire|delete|publish|purchase|checkout|post|confirm|accept terms)\b/i;
 
- 
+// Precompile regex patterns for performance
+const EXECUTE_JS_ACTION_RE = /^(execute_js|run_js)$/;
+const REJECTED_SKIPPED_RE = /^(rejected|skipped)$/;
+const ERROR_PREFIX_RE = /^❌|Error|failed/;
+const RETRY_PREFIX_RE = /^⚠️|Retrying/;
+const NAVIGATE_SEARCH_RE = /go to|navigate|search/;
+const INPUT_TEXTAREA_RE = /^(INPUT|TEXTAREA)$/;
+const CSV_QUOTE_RE = /[",\n\r]/;
+const DECISION_RE = /releases?|approves?|rejects?|skips?/i;
+const SOURCE_TAG_RE = /\[src:([a-z0-9_-]+)\]|\[unverified\]/gi;
+
+
 function showApprovalCard(payload) {
   if (!approvalCardContainer) return;
   removeApprovalCard();
@@ -486,7 +497,7 @@ function showApprovalCard(payload) {
   // names are tolerated so this card stays compatible regardless of which one
   // the background sends.
   const code = payload && (payload.code || payload.script || payload.js);
-  const isCode = (/^(execute_js|run_js)$/.test(actionType) || !!code);
+  const isCode = (EXECUTE_JS_ACTION_RE.test(actionType) || !!code);
   const isRisky = RISKY_ACTION_PATTERN.test(description);
 
   const card = document.createElement('div');
@@ -565,7 +576,7 @@ function respondApproval(decision, context) {
   // Show a UX-only system note for skip/reject so the user can see the
   // rejection in the chat history. The actual injection into the LLM history
   // is handled server-side.
-  if (/^(rejected|skipped)$/.test(decision)) {
+  if (REJECTED_SKIPPED_RE.test(decision)) {
     appendSkipRejectionNote(decision, ctx.description);
   }
 }
@@ -678,9 +689,9 @@ function appendLogLine(stepNumber, text) {
   const line = document.createElement('div');
   line.className = 'step-log-line';
   // Detect error/warning state for styling
-  if (/^❌|Error|failed/.test(text)) {
+  if (ERROR_PREFIX_RE.test(text)) {
     line.classList.add('log-error');
-  } else if (/^⚠️|Retrying/.test(text)) {
+  } else if (RETRY_PREFIX_RE.test(text)) {
     line.classList.add('log-warn');
   } else if (text.startsWith('✅')) {
     line.classList.add('log-success');
@@ -994,7 +1005,7 @@ function sendMessage() {
     // If the message is short and looks like a follow-up (not a URL or specific instruction), prepend context
     const isFollowUp = goal.length < 50 && history.length &&
       !goal.startsWith('http') &&
-      !/go to|navigate|search/.test(goal);
+      !NAVIGATE_SEARCH_RE.test(goal);
     if (isFollowUp && lastGoal) {
       fullGoal = `Previous task: "${lastGoal}"
 Follow-up instruction: ${goal}
@@ -1106,7 +1117,7 @@ if (undoBtn) {
 // Space key while agent is running: toggle pause/resume
 document.addEventListener('keydown', (e) => {
   const active = document.activeElement;
-  const inText = active && (/^(INPUT|TEXTAREA)$/.test(active.tagName) || active.isContentEditable);
+  const inText = active && (INPUT_TEXTAREA_RE.test(active.tagName) || active.isContentEditable);
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
     if (inText) return;
     if (!undoBtn || undoBtn.disabled || undoBtn.style.display === 'none') return;
@@ -2837,7 +2848,7 @@ async function exportRunLog(format) {
       const escape = (v) => {
         if (v == null) return '';
         const s = String(v).replace(/"/g, '""');
-        return /[",\n\r]/.test(s) ? `"${s}"` : s;
+        return CSV_QUOTE_RE.test(s) ? `"${s}"` : s;
       };
       const rows = (log.entries || []).map(e => [
         e.step, e.timestamp, e.kind, e.url || '', e.tenant || '',
@@ -2988,14 +2999,13 @@ function renderSourceChipsIn(rootEl) {
   const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, null);
   const texts = [];
   let n; while ((n = walker.nextNode())) texts.push(n);
-  const re = /\[src:([a-z0-9_-]+)\]|\[unverified\]/gi;
   for (const tn of texts) {
-    if (!re.test(tn.textContent)) continue;
-    re.lastIndex = 0;
+    if (!SOURCE_TAG_RE.test(tn.textContent)) continue;
+    SOURCE_TAG_RE.lastIndex = 0;
     const frag = document.createDocumentFragment();
     let last = 0; let m;
     const tnContent = typeof tn.textContent === 'string' ? tn.textContent : '';
-    while ((m = re.exec(tnContent)) !== null) {
+    while ((m = SOURCE_TAG_RE.exec(tnContent)) !== null) {
       if (m.index > last) frag.appendChild(document.createTextNode(tnContent.slice(last, m.index)));
       const chip = document.createElement('span');
       chip.className = 'sentinel-src-chip';

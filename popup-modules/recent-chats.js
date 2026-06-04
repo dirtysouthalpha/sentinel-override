@@ -18,6 +18,10 @@
 // sessions are display-only — buttons inside historical action cards
 // don't work (no live agent to dispatch to).
 
+// Precompile regex patterns for performance
+const REPORT_CARD_RE = /report-group|report-card-title|Investigation Report/i;
+const WELCOME_MESSAGE_RE = /^\s*<div class="welcome-message"/i;
+
 (function setupRecentChats() {
   const RECENT_MAX = 10;
   const STORAGE_KEY = 'recent_chats';
@@ -49,7 +53,7 @@
 
   /** Check if the snapshot contains the final report card (post-agent-finish). */
   function _hasReport(htmlSnapshot) {
-    return typeof htmlSnapshot === 'string' && /report-group|report-card-title|Investigation Report/i.test(htmlSnapshot);
+    return typeof htmlSnapshot === 'string' && REPORT_CARD_RE.test(htmlSnapshot);
   }
 
   /** Capture current chat state. Called from visibilitychange / agent_finished / new-chat. */
@@ -59,7 +63,7 @@
       if (!chatContainer) return null;
       const html = chatContainer.innerHTML || '';
       // Skip archiving if the chat is essentially empty (just the welcome message)
-      if (html.length < 200 || /^\s*<div class="welcome-message"/i.test(html.trim())) {
+      if (html.length < 200 || WELCOME_MESSAGE_RE.test(html.trim())) {
         return null;
       }
       const state = (typeof getState === 'function') ? getState() : null;

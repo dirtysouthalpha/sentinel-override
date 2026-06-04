@@ -19,6 +19,9 @@
 //
 // Rail button toggles the panel.
 
+// Precompile regex for error level filtering
+const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
+
 (function setupTelemetryPanel() {
   const MAX_BUFFER = 500;
   const events = [];           // Circular buffer
@@ -102,7 +105,7 @@
       return ev.level !== 'trace';
     }
     if (activeFilter === 'errors') {
-      return /^(error|warn)$/.test(ev.level);
+      return ERROR_WARN_LEVEL_RE.test(ev.level);
     }
     return ev.category === activeFilter;
   }
