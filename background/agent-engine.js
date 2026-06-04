@@ -1166,7 +1166,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
     const portalsSeen = new Set();
     for (const h of history) {
       if (!h || !h.action) continue;
-      const url = (h.action && h.action.url) || '';
+      const url = h.action.url || '';
       if (/entra/i.test(url)) portalsSeen.add('Entra');
       else if (/admin\.exchange/i.test(url)) portalsSeen.add('Exchange');
       else if (/purview/i.test(url)) portalsSeen.add('Purview');
