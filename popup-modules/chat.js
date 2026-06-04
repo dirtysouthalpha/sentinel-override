@@ -144,7 +144,7 @@ function updateActiveTabPage(url, title) {
     // Use Google's favicon service as a stable, no-CORS path. Fallback to a
     // tiny blank if we can't compute a clean URL.
     try {
-      elFav.src = 'https://www.google.com/s2/favicons?sz=32&domain_url=' + encodeURIComponent(host);
+      elFav.src = `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(host)}`;
     } catch (_favErr) { elFav.src = ''; }
   }
   showActiveTabStrip();
@@ -185,7 +185,7 @@ function describeActionPlain(payload) {
     case 'select':      return `Selecting "${payload.value || ''}"${payload.targetText ? ` in "${payload.targetText}"` : (desc ? ` in ${desc}` : '')}`;
     case 'check':       return `${payload.checked ? 'Checking ' : 'Unchecking '}${payload.targetText ? `"${payload.targetText}"` : (desc || payload.selector || 'element')}`;
     case 'hover':       return `Hovering over ${payload.targetText ? `"${payload.targetText}"` : (desc || payload.selector || 'element')}`;
-    case 'press_key':   return 'Pressing ' + (payload.key || 'key');
+    case 'press_key':   return `Pressing ${payload.key || 'key'}`;
     case 'execute_js':  return `Running JavaScript${payload.key ? ` → memory["${payload.key}"]` : ''}`;
     case 'extract':     return `Extracting ${payload.attribute || 'text'} from ${desc || payload.selector || 'element'}`;
     case 'extract_list':return `Extracting list of items${payload.fields && typeof payload.fields === 'object' ? ` (${Object.keys(payload.fields).join(', ')})` : ''}`;
@@ -324,7 +324,7 @@ function updateMiniShot(base64Image) {
   if (!base64Image) return;
   const panel = ensureMiniShotPanel();
   const img = panel.querySelector('#mini-shot-img');
-  if (img) img.src = 'data:image/jpeg;base64,' + base64Image;
+  if (img) img.src = `data:image/jpeg;base64,${base64Image}`;
 }
 
 function hideMiniShot() {
@@ -386,9 +386,9 @@ function setupApprovalModeToggle() {
     // Disabling approvals is the dangerous direction -- confirm first.
     if (!isApprovalMode) {
       const ok = window.confirm(
-        'Disabling approvals lets the agent submit forms, click buy/send, and run JavaScript without asking. Continue?\n\n' +
-        'OK = I understand the risks (continue without approvals)\n' +
-        'Cancel = Keep approvals on (recommended)'
+        `Disabling approvals lets the agent submit forms, click buy/send, and run JavaScript without asking. Continue?\n\n` +
+        `OK = I understand the risks (continue without approvals)\n` +
+        `Cancel = Keep approvals on (recommended)`
       );
       if (!ok) {
         // Revert the toggle; do NOT persist.
@@ -943,11 +943,11 @@ function sendInjectedContext() {
   if (!note) return;
   chrome.runtime.sendMessage({ action: 'inject_context', note }, (resp) => {
     if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) || (resp && !resp.ok)) {
-      if (typeof showToast === 'function') showToast('Failed to send note: ' + getErrorMessage(chrome.runtime.lastError || resp?.error || 'Unknown'), 'error');
+      if (typeof showToast === 'function') showToast(`Failed to send note: ${getErrorMessage(chrome.runtime.lastError || resp?.error || 'Unknown')}`, 'error');
       return;
     }
     injectContextInput.value = '';
-    addMessage('📌 Note sent to agent: ' + note, 'user');
+    addMessage(`📌 Note sent to agent: ${note}`, 'user');
   });
 }
 if (injectContextBtn) injectContextBtn.addEventListener('click', sendInjectedContext);
@@ -984,7 +984,7 @@ function sendMessage() {
   chrome.storage.local.get(['last_agent_goal', 'agent_history'], (stored) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
       removeTypingIndicator();
-      addMessage('Error reading stored goal: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
+      addMessage(`Error reading stored goal: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
       resetUI();
       return;
     }
@@ -1003,13 +1003,13 @@ The user wants you to continue or adjust the previous task. Look at the current 
     chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
         removeTypingIndicator();
-        addMessage('Error: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
+        addMessage(`Error: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
         resetUI();
         return;
       }
       if (response && !response.ok) {
         removeTypingIndicator();
-        addMessage('Error: ' + (response.error || 'Unknown error'), 'assistant');
+        addMessage(`Error: ${response.error || 'Unknown error'}`, 'assistant');
         resetUI();
       }
     });
@@ -1031,9 +1031,9 @@ function resetUI() {
 stopBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !response) {
-      addMessage('Error stopping agent: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
+      addMessage(`Error stopping agent: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
     } else if (response && !response.ok) {
-      addMessage('Error stopping agent: ' + (response.error || 'Unknown error'), 'assistant');
+      addMessage(`Error stopping agent: ${response.error || 'Unknown error'}`, 'assistant');
     } else {
       addMessage('Agent stopped by user.', 'assistant');
     }
@@ -1084,15 +1084,15 @@ if (undoBtn) {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !resp) {
-        addMessage('Undo failed: ' + getErrorMessage(chrome.runtime.lastError), 'assistant');
+        addMessage(`Undo failed: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
         return;
       }
       if (resp && !resp.ok) {
-        addMessage('Undo failed: ' + (resp.error || 'Unknown error'), 'assistant');
+        addMessage(`Undo failed: ${resp.error || 'Unknown error'}`, 'assistant');
       } else if (resp && resp.data && !resp.data.success) {
-        addMessage('Nothing to undo: ' + (resp.data.reason || ''), 'assistant');
+        addMessage(`Nothing to undo: ${resp.data.reason || ''}`, 'assistant');
       } else if (resp && resp.data && resp.data.success) {
-        addMessage('Undone: ' + (resp.data.description || 'Last action reversed'), 'assistant');
+        addMessage(`Undone: ${resp.data.description || 'Last action reversed'}`, 'assistant');
       }
     });
   });
@@ -1480,7 +1480,7 @@ function setupVoiceInput() {
       }
     }
     if (msg.action === 'voice_error') {
-      showToast('Voice error: ' + (msg.error || 'Unknown error'), 'error');
+      showToast(`Voice error: ${msg.error || 'Unknown error'}`, 'error');
       _voiceListening = false;
       _voiceListeningTabId = null;
       if (voiceBtn) { voiceBtn.classList.remove('listening'); voiceBtn.title = 'Voice input (click to speak)'; }
@@ -1694,7 +1694,7 @@ window.executeCommand = (action) => {
       document.getElementById('theme-modal')?.classList.add('show');
       break;
     case 'run-log-history':
-      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); try { showToast('Run log history unavailable: ' + getErrorMessage(e), 'error'); } catch { /* showToast may fail in detached popup */ } }
+      try { openRunLogHistoryModal(); } catch (e) { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); try { showToast(`Run log history unavailable: ${getErrorMessage(e)}`, 'error'); } catch { /* showToast may fail in detached popup */ } }
       break;
     case 'about':
       showToast('Sentinel Override v2.0 - AI-powered browser automation', 'success');
@@ -1751,7 +1751,7 @@ function renderTabBar(tabs) {
         if (ctx.tabId) chrome.tabs.update(ctx.tabId, { active: true }).catch((e) => { console.error('[Sentinel] Error in chat.js:', getErrorMessage(e)); });
       });
     }
-    tab.className = 'agent-tab-item' + (ctx.isActive ? ' active' : '');
+    tab.className = `agent-tab-item${ctx.isActive ? ' active' : ''}`;
     tab.textContent = displayText;
     tab.title = ctx.url;
     _tabBarCache.set(ctx.tabId, { text: displayText, title: ctx.url, isActive: !!ctx.isActive });
@@ -2011,7 +2011,7 @@ if (exportReportPdfBtn) {
       await chrome.tabs.create({ url });
       showToast('Print dialog opening — pick "Save as PDF" as destination', 'info');
     } catch (e) {
-      showToast('PDF export failed: ' + String(e), 'error');
+      showToast(`PDF export failed: ${String(e)}`, 'error');
     }
   });
 }
@@ -2824,8 +2824,8 @@ async function clearAllRunLogs() {
 async function exportRunLog(format) {
   if (!__lastRunLogId) return;
   try {
-    const stored = await chrome.storage.local.get('run_log_' + __lastRunLogId);
-    const log = stored['run_log_' + __lastRunLogId];
+    const stored = await chrome.storage.local.get(`run_log_${__lastRunLogId}`);
+    const log = stored[`run_log_${__lastRunLogId}`];
     if (!log) {
       try { showToast('Run log not found in storage', 'error'); } catch { /* showToast may fail in detached popup */ }
       return;
@@ -3000,14 +3000,14 @@ function renderSourceChipsIn(rootEl) {
       chip.className = 'sentinel-src-chip';
       const isUnverified = typeof m[0] === 'string' && m[0].toLowerCase() === '[unverified]';
       const key = isUnverified ? null : (typeof m[1] === 'string' ? m[1] : null);
-      chip.textContent = isUnverified ? '⚠ unverified' : ('🔖 ' + key);
+      chip.textContent = isUnverified ? '⚠ unverified' : `🔖 ${key}`;
       chip.dataset.key = key || '';
       chip.dataset.unverified = isUnverified ? '1' : '0';
       chip.title = isUnverified
         ? 'This claim has no verified source — treat with caution'
         : `Source: agentMemory["${key}"]. Click to view.`;
-      chip.style.cssText = 'display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin:0 2px; ' +
-        'border-radius:9px; font-size:10px; font-weight:600; cursor:pointer; vertical-align:baseline; ' +
+      chip.style.cssText = `display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin:0 2px; ` +
+        `border-radius:9px; font-size:10px; font-weight:600; cursor:pointer; vertical-align:baseline; ` +
         (isUnverified
           ? 'background:rgba(220,60,60,0.20); color:#ff8a8a; border:1px solid rgba(220,60,60,0.5);'
           : 'background:rgba(255,107,0,0.18); color:#ff9a4a; border:1px solid rgba(255,107,0,0.45);');
@@ -3030,9 +3030,9 @@ async function toggleSourceChipExpansion(chip) {
   }
   const exp = document.createElement('div');
   exp.className = 'sentinel-src-expansion';
-  exp.style.cssText = 'margin: 6px 0 6px 22px; padding: 8px 12px; background: rgba(255,255,255,0.05); ' +
-    'border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; ' +
-    'font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto;';
+  exp.style.cssText = `margin: 6px 0 6px 22px; padding: 8px 12px; background: rgba(255,255,255,0.05); ` +
+    `border-left: 3px solid var(--accent-primary, #ff6b00); border-radius: 4px; ` +
+    `font-size: 11px; font-family: monospace; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto;`;
   if (unverified || !key) {
     exp.textContent = 'No verified source for this claim. Treat as model-prior or caveat content.';
     chip.parentNode.insertBefore(exp, chip.nextSibling);
@@ -3048,7 +3048,7 @@ async function toggleSourceChipExpansion(chip) {
       exp.textContent = (typeof value === 'string') ? value.slice(0, 4000) : JSON.stringify(value, null, 2).slice(0, 4000);
     }
   } catch (e) {
-    exp.textContent = 'Error reading source: ' + String(e);
+    exp.textContent = `Error reading source: ${String(e)}`;
   }
   chip.parentNode.insertBefore(exp, chip.nextSibling);
 }
@@ -3163,12 +3163,12 @@ if (pasteTicketBtn && pasteTicketModal) {
       }
 
       const parts = [];
-      if (ticketNum) parts.push('Ticket: ' + ticketNum);
-      if (client)    parts.push('Client: ' + client);
-      parts.push('Issue: ' + issue);
-      if (prior)     parts.push('Prior attempts: ' + prior);
-      if (target)    parts.push('Target: ' + target);
-      if (success)   parts.push('Success criteria: ' + success);
+      if (ticketNum) parts.push(`Ticket: ${ticketNum}`);
+      if (client)    parts.push(`Client: ${client}`);
+      parts.push(`Issue: ${issue}`);
+      if (prior)     parts.push(`Prior attempts: ${prior}`);
+      if (target)    parts.push(`Target: ${target}`);
+      if (success)   parts.push(`Success criteria: ${success}`);
 
       if (goalInput) {
         goalInput.value = parts.join('\n');
@@ -3225,7 +3225,7 @@ function _ensureCostEl() {
 function _updateCostDisplay(estimatedCostUsd, callCount) {
   const el = _ensureCostEl();
   const cents = estimatedCostUsd * 100;
-  const label = cents < 0.1 ? '<$0.01' : '$' + estimatedCostUsd.toFixed(cents < 1 ? 3 : 2);
+  const label = cents < 0.1 ? '<$0.01' : `$${estimatedCostUsd.toFixed(cents < 1 ? 3 : 2)}`;
   el.textContent = label;
   el.title = `Run cost: ~${label} (${callCount} API call${callCount !== 1 ? 's' : ''})`;
 }
@@ -3248,7 +3248,7 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   }
   if (message.action === 'cdp_reattach_warning') {
-    updateStatus('⚠️ ' + (typeof message.message === 'string' ? message.message : 'Debugger re-attached after banner was dismissed.'));
+    updateStatus(`⚠️ ${typeof message.message === 'string' ? message.message : 'Debugger re-attached after banner was dismissed.'}`);
   }
   // (3.51) Report display — show report card in chat when report is ready
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {
@@ -3425,9 +3425,9 @@ chrome.runtime.onMessage.addListener((message) => {
     if (message.url) {
       try {
         const hostname = new URL(message.url).hostname;
-        updateStatus(`On: ${hostname}${message.title ? ' — ' + message.title.substring(0, 50) : ''}`);
+        updateStatus(`On: ${hostname}${message.title ? ` — ${message.title.substring(0, 50)}` : ''}`);
       } catch {
-        updateStatus('On: ' + (message.url || 'unknown').substring(0, 60));
+        updateStatus(`On: ${(message.url || 'unknown').substring(0, 60)}`);
       }
       updateActiveTabPage(message.url, message.title || '');
       if (message.stepNumber) updateActiveTabStep(message.stepNumber, message.totalSteps || 0);

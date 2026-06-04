@@ -957,7 +957,7 @@ function applyThemePreset(theme) {
     // Add theme glow class for themed presets
     if (!baseThemes.has(theme)) {
       if (document.body) {
-        document.body.classList.add('theme-' + theme);
+        document.body.classList.add(`theme-${theme}`);
       }
     }
 
@@ -1272,7 +1272,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
           if (!theme) return;
           document.body.className = (document.body.className || '').split(/\s+/).filter(c => !c.startsWith('theme-')).join(' ');
           if (theme !== 'light' && theme !== 'dark') {
-            document.body.classList.add('theme-' + theme);
+            document.body.classList.add(`theme-${theme}`);
           }
           if (theme === 'dark') document.body.classList.add('dark-mode');
           else document.body.classList.remove('dark-mode');
