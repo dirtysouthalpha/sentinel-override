@@ -350,7 +350,7 @@ async function _updateRunLogIndex(runLogId, fields) {
       // Single-pass optimization: filter and map in one loop
       const evictKeys = [];
       for (const e of evict) {
-        if (e && e.runLogId) evictKeys.push('run_log_' + e.runLogId);
+        if (e && e.runLogId) evictKeys.push(`run_log_${e.runLogId}`);
       }
       try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] History eviction failed:', getErrorMessage(e)); }
     }
@@ -538,7 +538,7 @@ export async function undoLastAction() {
         return { success: true, description: 'Navigated back (no previous URL recorded)' };
       }
       await chrome.tabs.update(entry.tabId, { url: prevUrl });
-      return { success: true, description: 'Navigated back to ' + prevUrl };
+      return { success: true, description: `Navigated back to ${prevUrl}` };
     } else if (entry.type === 'type') {
       const selector = entry.selector;
       const prevValue = entry.previousValue || '';
@@ -556,9 +556,9 @@ export async function undoLastAction() {
       }
       return { success: true, description: `Restored field "${selector}" to previous value` };
     }
-    return { success: false, reason: 'Unknown undo entry type: ' + entry.type };
+    return { success: false, reason: `Unknown undo entry type: ${entry.type}` };
   } catch (e) {
-    return { success: false, reason: 'Undo failed: ' + (getErrorMessage(e)) };
+    return { success: false, reason: `Undo failed: ${getErrorMessage(e)}` };
   }
 }
 
@@ -608,7 +608,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           evidence: modeDirective.evidence,
           confidence: modeDirective.confidence
         });
-        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+        chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
           console.error('[_handleModeMismatchCheck] run log set failed:', getErrorMessage(e));
         });
       }
@@ -630,7 +630,7 @@ async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuf
           kind: 'mode_mismatch_decision',
           decision: decision.flip ? 'flip' : (decision.continue ? 'continue' : 'cancel')
         });
-        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+        chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
           console.error('[_handleModeMismatchCheck] decision log set failed:', getErrorMessage(e));
         });
       }
@@ -802,7 +802,7 @@ export async function startAgent(goal, sender) {
     agentRunning = false;
     chrome.runtime.sendMessage({
       action: 'agent_finished',
-      summary: 'Agent crashed unexpectedly: ' + getErrorMessage(err)
+      summary: `Agent crashed unexpectedly: ${getErrorMessage(err)}`
     }).catch(() => {});
   });
   return 'Agent started in background';
@@ -837,7 +837,7 @@ async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
           originalLength: (result.originalGoal || '').length,
           adaptedLength: (result.adaptedGoal || '').length
         });
-        chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+        chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
           console.error('[_applyAdaptivePrompts] Unhandled rejection:', getErrorMessage(e));
         });
       }
@@ -1075,7 +1075,7 @@ export function setAgentSpeed(mode) {
   chrome.storage.local.set({ agentSpeedMode: mode }).catch((e) => {
     console.error('[setAgentSpeed] Unhandled rejection:', e);
   });
-  return 'Speed set to ' + mode;
+  return `Speed set to ${mode}`;
 }
 
 // ========== Rolling History Summarization (3.8.2) ==========
@@ -1171,10 +1171,10 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
     const memCount = Object.keys(agentMemory).length;
     const lastAction = history.length ? history[history.length - 1] : null;
     const lines = [
-      '📊 PROGRESS UPDATE — step ' + stepCount,
-      'Portals visited: ' + (portalsSeen.size > 0 ? [...portalsSeen].join(', ') : '(none yet)'),
-      'Data points in memory: ' + memCount,
-      'Recent action: ' + (lastAction?.action ? lastAction.action.type : '(none)')
+      `📊 PROGRESS UPDATE — step ${stepCount}`,
+      `Portals visited: ${portalsSeen.size > 0 ? [...portalsSeen].join(', ') : '(none yet)'}`,
+      `Data points in memory: ${memCount}`,
+      `Recent action: ${lastAction?.action ? lastAction.action.type : '(none)'}`
     ];
     sendSilentUpdate(lines.join(' | '), stepCount);
   } catch (e) { console.warn('[Sentinel] HUD update failed:', getErrorMessage(e)); }
@@ -4016,7 +4016,7 @@ async function runAgentLoop(goal, workingTabId) {
                 host: _wallHit.host,
                 evidence: _wallHit.evidence
               });
-              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+              chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
                 console.error('[_wallHit] Unhandled rejection:', e);
               });
             }
@@ -4249,7 +4249,7 @@ async function runAgentLoop(goal, workingTabId) {
                 auto_applied: !!_recovery.autoApply,
                 auto_apply_type: _recovery.autoApply ? _recovery.autoApply.type : null
               });
-              chrome.storage.local.set({ ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
+              chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
                 console.error('[_recovery] Unhandled rejection:', getErrorMessage(e));
               });
             }
@@ -4920,7 +4920,7 @@ async function runAgentLoop(goal, workingTabId) {
               summary_preview: typeof finalSummary === 'string' ? finalSummary.substring(0, 500) : ''
             });
             await chrome.storage.local.set({
-              ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now(), completed: true }
+              [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now(), completed: true }
             });
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
@@ -6637,7 +6637,7 @@ return { ok: true, value: el.value };
           }
           // Persist to storage every step.
           chrome.storage.local.set({
-            ['run_log_' + runLogId]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
+            [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
           }).catch((e) => {
             console.error('[agent-engine] Unhandled rejection:', e);
           });

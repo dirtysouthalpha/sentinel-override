@@ -2030,7 +2030,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         const _mapped = SITE_DOMAIN_MAP[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
         if (_mapped) {
           console.warn('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
-          return { type: 'navigate', url: 'https://' + _mapped };
+          return { type: 'navigate', url: `https://${_mapped}` };
         }
       }
       // v3.63: Detect finish intent from content
@@ -2216,13 +2216,13 @@ export function parseLLMResponse(content) {
     try {
       parsed = JSON.parse(jsonStr);
     } catch (e) {
-      throw new Error('Failed to parse action JSON: ' + getErrorMessage(e));
+      throw new Error(`Failed to parse action JSON: ${getErrorMessage(e)}`);
     }
     if (!parsed.type && parsed.action && typeof parsed.action === 'object') parsed = parsed.action;
     if (!parsed.type && parsed.command && typeof parsed.command === 'object') parsed = parsed.command;
     if (!parsed.type && parsed.next_action && typeof parsed.next_action === 'object') parsed = parsed.next_action;
     if (!parsed.type) throw new Error('Missing type field');
-    if (!VALID_ACTION_TYPES.has(parsed.type)) throw new Error('Invalid command type: ' + parsed.type);
+    if (!VALID_ACTION_TYPES.has(parsed.type)) throw new Error(`Invalid command type: ${parsed.type}`);
     if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;
   } catch (err) {

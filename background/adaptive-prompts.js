@@ -40,9 +40,9 @@ function buildRewriterPrompt(rawGoal, currentUrl, profile, expansionMode, techni
     : '';
 
   const mismatchLines = (mismatchHints && mismatchHints.length)
-    ? '\n\nDETECTED MENU MISMATCHES (user wrote on-box menu paths but you are on the cloud portal):\n' +
-      mismatchHints.map(h => `  - "${h.onbox}"  →  "${h.target}"`).join('\n') +
-      '\nReplace each occurrence in the rewritten goal.'
+    ? `\n\nDETECTED MENU MISMATCHES (user wrote on-box menu paths but you are on the cloud portal):\n${
+      mismatchHints.map(h => `  - "${h.onbox}"  →  "${h.target}"`).join('\n')
+    }\nReplace each occurrence in the rewritten goal.`
     : '';
 
   // Build NAVIGATION SIGNALS block from profile.waitStrings
