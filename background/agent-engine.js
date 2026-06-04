@@ -198,9 +198,15 @@ import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.j
 // of the loop and stamp the result onto both the report card and the
 // run-log index entry.
 import { computeTrustScore, suggestRetryActions } from './trust-score.js';
+// v10.0 Intelligence Systems Integration
+import { initReasoningTrace, captureReasoningStep, getReasoningSummary, clearReasoningTrace } from './reasoning-trace.js';
+import { analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, generateBiasReport, logBiasDetection, getBiasStatistics, clearBiasLog } from './bias-detector.js';
+import { initKnowledgeGraph, addKnowledgeNode, updateKnowledgeNode, addKnowledgeEdge, findKnowledgeContradictions, getKnowledgeGraphStats, persistKnowledgeGraph } from './knowledge-graph.js';
+import { analyzeForContradictions, compareResponsesForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
+import { analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics, clearNoveltyHistory } from './novelty-detector.js';
+import { synthesizeKnowledge, getSynthesis, getSynthesisStatistics, clearSynthesis } from './knowledge-synthesizer.js';
 import { getSkillStats } from './skills/index.js';
 import { getErrorMessage, sleep } from './error-utils.js';
-
 // ========== Agent State ==========
 let agentRunning = false;
 let apiCallCount = 0;
@@ -3315,6 +3321,19 @@ async function _initRunState(goal) {
   } catch (e) {
     console.warn('[Sentinel] agent_history clear failed:', getErrorMessage(e));
   }
+  // v10.0: Initialize intelligence systems for each new run
+  try {
+    await initReasoningTrace();
+    await initKnowledgeGraph();
+    // Clear previous run's detection logs
+    clearBiasLog();
+    clearContradictionLog();
+    clearNoveltyHistory();
+    clearSynthesis();
+    console.log('[Sentinel] Intelligence systems initialized');
+  } catch (e) {
+    console.warn('[Sentinel] Intelligence systems initialization failed:', getErrorMessage(e));
+  }
   if (stored.agent_context && stored.agent_context.trim()) {
     return `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
   }
@@ -3409,15 +3428,34 @@ async function _generateInitialPlan(goal, workingTabId) {
     api_key: planProviderConfig.apiKey,
     model: planProviderConfig.model
   };
-  const currentTabInfo = await getTabInfo(workingTabId);
+  const currentTabInfo = await getTabContext(workingTabId);
   const platformCtx = getPlatformContext(currentTabInfo?.url || '', goal);
   const patterns = await getRelevantPatterns(goal);
+  // v10.0: Capture reasoning for plan generation
+  await captureReasoningStep('plan_generation', 'input', {
+    goal,
+    url: currentTabInfo?.url || '',
+    title: currentTabInfo?.title || '',
+    platformContext: platformCtx,
+    patterns: patterns.length
+  });
   let plan = await generatePlan(goal, planSettings, {
     currentUrl: currentTabInfo?.url || '',
     pageTitle: currentTabInfo?.title || '',
     platformContext: platformCtx,
     relevantPatterns: patterns
   });
+  // v10.0: Capture plan result and check for bias
+  await captureReasoningStep('plan_generation', 'output', {
+    planSteps: plan?.length || 0,
+    firstStep: plan?.[0] || 'none'
+  });
+  // Analyze plan for potential bias
+  const planBiasAnalysis = analyzeForBias(plan?.join('\n') || '', 'plan', goal);
+  if (planBiasAnalysis.hasBias && shouldTriggerBiasWarning(planBiasAnalysis)) {
+    console.warn('[Sentinel] Plan bias detected:', planBiasAnalysis);
+    logBiasDetection(planBiasAnalysis, 'plan_generation');
+  }
   if (plan) {
     sendSilentUpdate(`📋 Plan ready (${plan.length} steps): ${plan[0] || ''}`);
     return plan;
@@ -4736,6 +4774,22 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Legacy LLM fallback (only if vision didn't produce a command)
       if (!command || !command.type) {
+        // v10.0: Capture reasoning before LLM call
+        await captureReasoningStep('action_decision', 'input', {
+          stepCount,
+          goal,
+          url: currentUrl,
+          historyItems: promptHistory.length,
+          elementsCount: trimmedElements.length
+        });
+        // v10.0: Check prompt history for contradictions before LLM call
+        if (promptHistory.length > 1) {
+          const contradictionCheck = analyzeForContradictions(promptHistory, 'action_selection');
+          if (contradictionCheck.hasContradictions) {
+            logContradictionDetection(contradictionCheck, 'prompt_history', stepCount);
+            console.warn('[Sentinel] Contradictions detected in prompt history:', contradictionCheck);
+          }
+        }
         try {
           command = await callLLMWithRetry(
             trimmedElements, allElements.length, pageText, base64Image,
@@ -4744,6 +4798,30 @@ async function runAgentLoop(goal, workingTabId) {
             CONFIG,
             agentState
           );
+          // v10.0: Capture reasoning result and analyze for bias
+          await captureReasoningStep('action_decision', 'output', {
+            commandType: command?.type || 'none',
+            commandText: command?.text || 'none',
+            reasoning: command?.reasoning || 'none'
+          });
+          // Analyze action decision for potential bias
+          if (command && command.type) {
+            const actionBiasAnalysis = analyzeActionForBias(command, goal);
+            if (actionBiasAnalysis.hasBias && shouldTriggerBiasWarning(actionBiasAnalysis)) {
+              console.warn('[Sentinel] Action bias detected:', actionBiasAnalysis);
+              logBiasDetection(actionBiasAnalysis, 'action_decision', stepCount);
+            }
+            // Store action in knowledge graph
+            try {
+              await addKnowledgeNode('action', command.type, {
+                stepCount,
+                goal: goal.substring(0, 100),
+                url: currentUrl
+              });
+            } catch (e) {
+              console.warn('[Sentinel] Failed to store action in knowledge graph:', getErrorMessage(e));
+            }
+          }
         } catch (e) {
           _aiCallError = e;
           command = { type: 'note', text: `API call failed: ${getErrorMessage(e)}` };
@@ -6996,7 +7074,60 @@ return { ok: true, value: el.value };
 
   agentRunning = false;
   console.log(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
-
+  // v10.0: Run novelty detection on completed actions
+  try {
+    const noveltyResults = analyzeForNovelty(history, {
+      goal: _lastGoal,
+      stepCount: history.length,
+      apiCallCount
+    });
+    storeNoveltyResult(noveltyResults);
+    console.log('[Sentinel] Novelty detection complete:', noveltyResults.summary);
+  } catch (e) {
+    console.warn('[Sentinel] Novelty detection failed:', getErrorMessage(e));
+  }
+  // v10.0: Generate knowledge synthesis from this run
+  try {
+    const synthesis = await synthesizeKnowledge({
+      goal: _lastGoal,
+      history: history,
+      reasoningTrace: await getReasoningSummary(),
+      biasStats: await getBiasStatistics(),
+      contradictionStats: await getContradictionStatistics(),
+      noveltyStats: await getNoveltyStatistics()
+    });
+    console.log('[Sentinel] Knowledge synthesis generated:', synthesis.summary);
+  } catch (e) {
+    console.warn('[Sentinel] Knowledge synthesis failed:', getErrorMessage(e));
+  }
+  // v10.0: Generate compliance report
+  try {
+    const complianceReport = {
+      timestamp: new Date().toISOString(),
+      goal: _lastGoal,
+      duration: Date.now() - agentReport.startTime,
+      apiCalls: apiCallCount,
+      biasDetections: await getBiasStatistics(),
+      contradictionDetections: await getContradictionStatistics(),
+      noveltyDetections: await getNoveltyStatistics(),
+      synthesisStats: await getSynthesisStatistics(),
+      reasoningTrace: await getReasoningSummary()
+    };
+    // Append compliance report to audit log
+    await appendAuditEntry(agentReport.runId, 'compliance_report', {
+      message: 'V10.0 Intelligence Compliance Report',
+      report: complianceReport
+    });
+    console.log('[Sentinel] Compliance report generated and added to audit log');
+  } catch (e) {
+    console.warn('[Sentinel] Compliance report generation failed:', getErrorMessage(e));
+  }
+  // v10.0: Persist knowledge graph to storage
+  try {
+    await persistKnowledgeGraph();
+  } catch (e) {
+    console.warn('[Sentinel] Failed to persist knowledge graph:', getErrorMessage(e));
+  }
   // (3.12.0) Tally client-knowledge entries used and bump the client's runCount.
   // Quiet, non-fatal — never let knowledge bookkeeping break the run finish path.
   try {
@@ -7004,7 +7135,6 @@ return { ok: true, value: el.value };
       await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
     }
   } catch (_) { /* non-fatal */ }
-
   // Signal completion via messaging (replaces polling for scheduler)
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
     console.error('[agentReport] Unhandled rejection:', e);
