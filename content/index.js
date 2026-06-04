@@ -276,11 +276,9 @@ if (window.__sentinelInitialized) {
     const SKIP_TAGS = new Set(['HTML', 'BODY', 'MAIN']);
     const allEls = document.querySelectorAll(
       '[role="dialog"],[role="alertdialog"],[aria-modal="true"],' +
-      '[class*="modal"],[class*="overlay"],[class*="popup"],' +
-      '[class*="backdrop"],[class*="lightbox"],[class*="cookie"],' +
-      '[class*="dialog"],[class*="drawer"],[class*="sheet"],' +
-      '[class*="consent"],[class*="policy"],[class*="notice"],[class*="gdpr"],' +
-      '[id*="consent"],[id*="cookie"],[id*="policy"]'
+      '[class*="modal"],[class*="overlay"],[class*="popup"],[class*="backdrop"],[class*="lightbox"],[class*="cookie"],' +
+      '[class*="dialog"],[class*="drawer"],[class*="sheet"],[class*="consent"],[class*="policy"],' +
+      '[class*="notice"],[class*="gdpr"],[id*="consent"],[id*="cookie"],[id*="policy"]'
     );
     for (const el of allEls) {
       if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) break;
@@ -585,12 +583,11 @@ if (window.__sentinelInitialized) {
           if (!banner || !banner.parentElement) {
             banner = document.createElement('div');
             banner.id = '__sentinel_action_banner';
-            banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);' +
-              'z-index:2147483647;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);' +
-              'color:#e94560;font-family:system-ui,sans-serif;font-size:14px;font-weight:600;' +
-              'padding:8px 20px;border-radius:8px;border:1px solid #e94560;' +
-              'box-shadow:0 4px 20px rgba(233,69,96,0.3);pointer-events:none;' +
-              'transition:opacity 0.3s,transform 0.3s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;';
+            banner.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
+              'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e94560;font-family:system-ui,sans-serif;' +
+              'font-size:14px;font-weight:600;padding:8px 20px;border-radius:8px;border:1px solid #e94560;' +
+              'box-shadow:0 4px 20px rgba(233,69,96,0.3);pointer-events:none;transition:opacity 0.3s,transform 0.3s;' +
+              'white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;';
             // (3.51) Attach to documentElement like cursor — body gets replaced by React/Lit SPAs
             (document.documentElement || document.body).appendChild(banner);
           }
@@ -1759,13 +1756,13 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
-        return 'Typed into ' + describeTarget(cmd);
+        return `Typed into ${describeTarget(cmd)}`;
       }
 
       case 'upload_file': {
         const resolvedUpload = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedUpload.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) return `Element not found: ${describeTarget(cmd)}`;
         if (el.type !== 'file') return `Element is not a file input: ${describeTarget(cmd)}`;
         hl.highlightElement(el);
         const uploaded = si && si.uploadFile && si.uploadFile(el, cmd.file_name || 'file.txt', cmd.mime_type || 'text/plain', cmd.content || '');
@@ -1796,7 +1793,7 @@ if (window.__sentinelInitialized) {
       case 'select': {
         const resolvedSel = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedSel.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) return `Element not found: ${describeTarget(cmd)}`;
 
         // Reactive overlay check: is the target element blocked?
         const selOverlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
@@ -1982,7 +1979,7 @@ if (window.__sentinelInitialized) {
       case 'hover': {
         const resolvedHover = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedHover.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) return `Element not found: ${describeTarget(cmd)}`;
 
         // Reactive overlay check: is the target element blocked?
         const hoverOverlayBlock = await guardOverlayBlocking(targetDoc, el, cmd);
@@ -2482,7 +2479,7 @@ if (window.__sentinelInitialized) {
       case 'open_dropdown': {
         const resolvedDD = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedDD.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) return `Element not found: ${describeTarget(cmd)}`;
         hl.highlightElement(el);
         // (G3) Cursor travels to the dropdown trigger before opening.
         try {
@@ -2526,7 +2523,7 @@ if (window.__sentinelInitialized) {
         // on a settled rect (matters for lazy-loaded images / virtualized lists).
         const resolvedScroll = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedScroll.el;
-        if (!el) return 'Element not found: ' + describeTarget(cmd);
+        if (!el) return `Element not found: ${describeTarget(cmd)}`;
         if (window.__sentinelOverlay) {
           window.__sentinelOverlay.showActionBanner('scroll_to', `Scrolling to: ${(el.innerText || el.tagName || '').substring(0, 60)}`);
         }
