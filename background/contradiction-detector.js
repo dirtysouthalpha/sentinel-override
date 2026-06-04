@@ -184,7 +184,7 @@ function findNumericalContradictions(text) {
 
   while ((match = numberPattern.exec(text)) !== null) {
     matches.push({
-      number: parseInt(match[1]),
+      number: parseInt(match[1], 10),
       unit: match[2].toLowerCase(),
       context: text.substring(Math.max(0, match.index - 50), match.index + 50)
     });

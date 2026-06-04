@@ -290,7 +290,7 @@ export async function generateReport(executionData, CONFIG) {
     const fb = buildFallbackReport(executionData);
     // Prepend a note about the LLM failure
     const fallbackReport = `> ⚠️ AI report formatting failed (${getErrorMessage(err)}). Showing raw collected data.\n\n---\n\n${fb}`;
-    return { summary: fb.split('\n\n')[0], fullReport: fallbackReport, structuredData, goal, timestamp };
+    return { summary: fb.split('\n\n')[0] || '', fullReport: fallbackReport, structuredData, goal, timestamp };
   }
 }
 
