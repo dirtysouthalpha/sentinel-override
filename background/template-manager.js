@@ -49,8 +49,8 @@ export function extractParameters(goalText) {
   const params = [];
 
   let match;
-  const regex = new RegExp(PARAM_REGEX.source, PARAM_REGEX.flags);
-  while ((match = regex.exec(goalText)) !== null) {
+  PARAM_REGEX.lastIndex = 0; // Reset lastIndex for fresh search
+  while ((match = PARAM_REGEX.exec(goalText)) !== null) {
     const key = match[1];
     if (!seen.has(key)) {
       seen.add(key);
