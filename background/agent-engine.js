@@ -2572,69 +2572,69 @@ async function _universalCdpFallback(tab, cmd, opts) {
     }
     case 'check':
     case 'check_all': {
-      jsCode = '(function(){'
-        + `var el=${finderCode};`
-        + 'if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});'
-        + `if(el.type==="checkbox"||el.type==="radio"){el.checked=${cmd.checked !== false};el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"' + (cmd.checked !== false ? 'checked' : 'unchecked') + '"})}`
-        + 'el.click();return JSON.stringify({ok:true,result:"toggled"})'
-        + '})()';
+      jsCode = `(function(){
+        var el=${finderCode};
+        if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});
+        if(el.type==="checkbox"||el.type==="radio"){el.checked=${cmd.checked !== false};el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"${cmd.checked !== false ? 'checked' : 'unchecked'}"})}
+        el.click();return JSON.stringify({ok:true,result:"toggled"})
+      })()`;
       break;
     }
     case 'hover': {
-      jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
-        + 'if(!el)return JSON.stringify({ok:false,error:"hover target not found"});'
-        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
-        + 'el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));'
-        + 'el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));'
-        + 'return JSON.stringify({ok:true,result:"hovered"})'
-        + '})()';
+      jsCode = `(function(){
+        var el=${finderCode};
+        if(!el)return JSON.stringify({ok:false,error:"hover target not found"});
+        el.scrollIntoView({block:"center",behavior:"instant"});
+        el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));
+        el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));
+        return JSON.stringify({ok:true,result:"hovered"})
+      })()`;
       break;
     }
     case 'scroll_to': {
-      jsCode = '(function(){'
-        + 'var el=' + finderCode + ';'
-        + 'if(el){el.scrollIntoView({block:"center",behavior:"instant"});return JSON.stringify({ok:true,result:"scrolled to element"})}'
-        + 'window.scrollBy(0,window.innerHeight*0.8);'
-        + 'return JSON.stringify({ok:true,result:"scrolled down"})'
-        + '})()';
+      jsCode = `(function(){
+        var el=${finderCode};
+        if(el){el.scrollIntoView({block:"center",behavior:"instant"});return JSON.stringify({ok:true,result:"scrolled to element"})}
+        window.scrollBy(0,window.innerHeight*0.8);
+        return JSON.stringify({ok:true,result:"scrolled down"})
+      })()`;
       break;
     }
     case 'wait_for_element':
     case 'wait_for_text': {
       var searchFor = cmd.text || cmd.value || cmd.selector || '';
-      jsCode = '(function(){'
-        + 'var body=(document.body&&document.body.innerText)||"";'
-        + 'var _s=' + JSON.stringify(searchFor) + ';'
-        + 'if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});'
-        + 'if(_s&&body.toLowerCase().indexOf(_s.toLowerCase())>=0)return JSON.stringify({ok:true,result:"found case-insensitive"});'
+      jsCode = `(function(){
+        var body=(document.body&&document.body.innerText)||"";
+        var _s=${JSON.stringify(searchFor)};
+        if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});
+        if(_s&&body.toLowerCase().indexOf(_s.toLowerCase())>=0)return JSON.stringify({ok:true,result:"found case-insensitive"});
         // Also try finding by selector
-        + 'var _el=document.querySelector(' + JSON.stringify(cmd.selector || '') + ');'
-        + 'if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});'
-        + 'return JSON.stringify({ok:false,error:"not found: "+(typeof _s==="string"?_s:String(_s)).slice(0,50)})'
-        + '})()';
+        var _el=document.querySelector(${JSON.stringify(cmd.selector || '')});
+        if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});
+        return JSON.stringify({ok:false,error:"not found: "+(typeof _s==="string"?_s:String(_s)).slice(0,50)})
+      })()`;
       break;
     }
     case 'extract':
     case 'extract_list': {
-      jsCode = '(function(){'
-        + 'var sel=' + JSON.stringify(cmd.selector || '') + ';'
-        + 'if(sel){var els=document.querySelectorAll(sel);if(els.length){'
-        +   'var items=[];for(var i=0;i<els.length;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}'
-        +   'return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})'
-        + '}}'
-        + 'return JSON.stringify({ok:false,error:"nothing to extract"})'
-        + '})()';
+      jsCode = `(function(){
+        var sel=${JSON.stringify(cmd.selector || '')};
+        if(sel){var els=document.querySelectorAll(sel);if(els.length){
+          var items=[];for(var i=0;i<els.length;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}
+          return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})
+        }}
+        return JSON.stringify({ok:false,error:"nothing to extract"})
+      })()`;
       break;
     }
     case 'verify': {
-      jsCode = '(function(){'
-        + 'var body=(document.body&&document.body.innerText)||"";'
-        + 'var _c=' + JSON.stringify(cmd.text || cmd.value || '') + ';'
-        + 'if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});'
-        + 'if(_c&&body.toLowerCase().indexOf(_c.toLowerCase())>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"});'
-        + 'return JSON.stringify({ok:false,error:"verification failed"})'
-        + '})()';
+      jsCode = `(function(){
+        var body=(document.body&&document.body.innerText)||"";
+        var _c=${JSON.stringify(cmd.text || cmd.value || '')};
+        if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});
+        if(_c&&body.toLowerCase().indexOf(_c.toLowerCase())>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"});
+        return JSON.stringify({ok:false,error:"verification failed"})
+      })()`;
       break;
     }
     default: {
@@ -7012,11 +7012,11 @@ async function requestApproval(command, stepNumber) {
       agentPaused = true;
       sendSilentUpdate('⏸ Approval pending — agent paused. Click Approve/Reject in the chat or the notification to continue.', stepNumber);
       try {
-        await notifyIfEnabled('approval_pending_' + requestId, {
+        await notifyIfEnabled(`approval_pending_${requestId}`, {
           type: 'basic',
           iconUrl: chrome.runtime.getURL('icon-48.png'),
           title: 'Sentinel Override — Approval needed',
-          message: 'Step ' + stepNumber + ': ' + description.substring(0, 100) + '. Open Sentinel to approve or reject.'
+          message: `Step ${stepNumber}: ${description.substring(0, 100)}. Open Sentinel to approve or reject.`
         });
       } catch (_e) {
         // Notification create failed non-fatally
