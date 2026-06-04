@@ -4129,7 +4129,8 @@ async function runAgentLoop(goal, workingTabId) {
       if (history.length >= 3 && !loopDirective) {
         let consecutiveNonProductive = 0;
         for (let i = history.length - 1; i >= 0; i--) {
-          if (history[i].action && NON_PRODUCTIVE_READ_ACTIONS.has(history[i].action.type)) {
+          const h = history[i];
+          if (h.action && NON_PRODUCTIVE_READ_ACTIONS.has(h.action.type)) {
             consecutiveNonProductive++;
           } else {
             break;
