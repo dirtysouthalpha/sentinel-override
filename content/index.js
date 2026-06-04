@@ -807,7 +807,7 @@ if (window.__sentinelInitialized) {
         // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
-          try { ctel && ctel.info && ctel.info('page', 'Focus: sensitive field detected (matched "' + __sensitiveMatch + '") — proceeding per IT-tech authorization', { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { ctel && ctel.info && ctel.info('page', `Focus: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', ((e2 && typeof e2.message === 'string') ? e2.message : String(e2))); } }
         try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
@@ -1678,8 +1678,8 @@ if (window.__sentinelInitialized) {
         if (si && si.isDateInput && si.isDateInput(el)) {
           const result = si.setDatePickerValue(el, text);
           hl.removeHighlight(el);
-          if (result.success) return 'Set date to ' + text + ' (' + result.method + ')';
-          return 'Failed to set date: ' + (result.error || 'unknown error');
+          if (result.success) return `Set date to ${text} (${result.method})`;
+          return `Failed to set date: ${result.error || 'unknown error'}`;
         }
 
         // contenteditable div/span — Lexical / Slate / ProseMirror compat path (#8).
@@ -1767,12 +1767,12 @@ if (window.__sentinelInitialized) {
         const resolvedUpload = resolveCommandTarget(cmd, targetDoc);
         const el = resolvedUpload.el;
         if (!el) return 'Element not found: ' + describeTarget(cmd);
-        if (el.type !== 'file') return 'Element is not a file input: ' + describeTarget(cmd);
+        if (el.type !== 'file') return `Element is not a file input: ${describeTarget(cmd)}`;
         hl.highlightElement(el);
         const uploaded = si && si.uploadFile && si.uploadFile(el, cmd.file_name || 'file.txt', cmd.mime_type || 'text/plain', cmd.content || '');
         hl.removeHighlight(el);
-        if (uploaded) return 'Uploaded file ' + (cmd.file_name || 'file.txt') + ' to ' + describeTarget(cmd);
-        return 'Failed to upload file to ' + describeTarget(cmd);
+        if (uploaded) return `Uploaded file ${cmd.file_name || 'file.txt'} to ${describeTarget(cmd)}`;
+        return `Failed to upload file to ${describeTarget(cmd)}`;
       }
 
       case 'scroll': {
@@ -1784,14 +1784,14 @@ if (window.__sentinelInitialized) {
           if (scrollEl) {
             scrollEl.scrollBy({ top: scrollAmount, behavior: 'smooth' });
             await new Promise(r => setTimeout(r, 400));
-            return 'Scrolled element ' + describeTarget(cmd) + ' by ' + scrollAmount;
+            return `Scrolled element ${describeTarget(cmd)} by ${scrollAmount}`;
           }
-          return 'Element not found: ' + describeTarget(cmd);
+          return `Element not found: ${describeTarget(cmd)}`;
         }
         if (!targetDoc.defaultView) return 'Cannot scroll: no window context for target document';
         targetDoc.defaultView.scrollBy({ top: scrollAmount, behavior: 'smooth' });
         await new Promise(r => setTimeout(r, 400)); // Wait for smooth scroll animation
-        return 'Scrolled ' + scrollAmount;
+        return `Scrolled ${scrollAmount}`;
       }
 
       case 'select': {
@@ -1814,33 +1814,33 @@ if (window.__sentinelInitialized) {
             const retryOptions = dd.findDropdownOptions(targetDoc, el);
             if (!retryOptions || retryOptions.length === 0) {
               hl.removeHighlight(el);
-              return 'Failed to open dropdown: ' + describeTarget(cmd);
+              return `Failed to open dropdown: ${describeTarget(cmd)}`;
             }
             const selected = await dd.selectDropdownOption(targetDoc, retryOptions, cmd.value);
             if (!selected) {
               const availableTexts = retryOptions.map(o => (o.innerText || o.textContent || '').trim()).join(', ');
               dd.dismissDropdown(targetDoc);
               hl.removeHighlight(el);
-              return 'Error: No matching option "' + cmd.value + '". Available: ' + availableTexts;
+              return `Error: No matching option "${cmd.value}". Available: ${availableTexts}`;
             }
             dd.dismissDropdown(targetDoc);
             hl.removeHighlight(el);
-            return 'Selected "' + cmd.value + '" in dropdown ' + describeTarget(cmd);
+            return `Selected "${cmd.value}" in dropdown ${describeTarget(cmd)}`;
           }
           const selected = await dd.selectDropdownOption(targetDoc, options, cmd.value);
           if (!selected) {
             const availableTexts = options.map(o => (o.innerText || o.textContent || '').trim()).join(', ');
             dd.dismissDropdown(targetDoc);
             hl.removeHighlight(el);
-            return 'Error: No matching option "' + cmd.value + '". Available: ' + availableTexts;
+            return `Error: No matching option "${cmd.value}". Available: ${availableTexts}`;
           }
           dd.dismissDropdown(targetDoc);
           hl.removeHighlight(el);
-          return 'Selected "' + cmd.value + '" in dropdown ' + describeTarget(cmd);
+          return `Selected "${cmd.value}" in dropdown ${describeTarget(cmd)}`;
         }
 
         // Native <select> element — support select by value, visible text, and multi-select
-        if (el.tagName !== 'SELECT') return 'Element is not a <select>: ' + describeTarget(cmd);
+        if (el.tagName !== 'SELECT') return `Element is not a <select>: ${describeTarget(cmd)}`;
         hl.highlightElement(el);
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         await new Promise(r => setTimeout(r, 300));
@@ -1857,7 +1857,7 @@ if (window.__sentinelInitialized) {
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
-          return 'Multi-selected [' + cmd.value.join(', ') + '] in ' + describeTarget(cmd);
+          return `Multi-selected [${cmd.value.join(', ')}] in ${describeTarget(cmd)}`;
         }
 
         // Single select: try exact value match, then visible text match
@@ -1880,7 +1880,7 @@ if (window.__sentinelInitialized) {
         if (!targetOpt) {
           const availableOpts = options.map(o => `"${o.value}" (${typeof o.textContent === 'string' ? o.textContent.trim() : ''})`).join(', ');
           hl.removeHighlight(el);
-          return 'Error: No matching option "' + cmd.value + '". Available: ' + availableOpts;
+          return `Error: No matching option "${cmd.value}". Available: ${availableOpts}`;
         }
         // (#24) Use the native HTMLSelectElement value setter so React-controlled
         // selects don't revert to their previous value on the synthetic change.
@@ -1901,14 +1901,14 @@ if (window.__sentinelInitialized) {
         el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
         el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
         hl.removeHighlight(el);
-        return 'Selected "' + targetOpt.textContent.trim() + '" (value: ' + targetOpt.value + ') in ' + describeTarget(cmd);
+        return `Selected "${targetOpt.textContent.trim()}" (value: ${targetOpt.value}) in ${describeTarget(cmd)}`;
       }
 
       case 'check': {
         // Checkbox and radio button support — set to explicit checked state
         const resolvedCheck = resolveCommandTarget(cmd, targetDoc);
         const checkEl = resolvedCheck.el;
-        if (!checkEl) return 'Element not found: ' + describeTarget(cmd);
+        if (!checkEl) return `Element not found: ${describeTarget(cmd)}`;
         hl.highlightElement(checkEl);
         checkEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         await new Promise(r => setTimeout(r, 300));
@@ -1934,10 +1934,10 @@ if (window.__sentinelInitialized) {
             await humanDelay(80, 180);
             checkEl.click();
             hl.removeHighlight(checkEl);
-            return (desiredState ? 'Checked' : 'Unchecked') + ' ' + describeTarget(cmd);
+            return `${desiredState ? 'Checked' : 'Unchecked'} ${describeTarget(cmd)}`;
           }
           hl.removeHighlight(checkEl);
-          return describeTarget(cmd) + ' was already ' + (desiredState ? 'checked' : 'unchecked');
+          return `${describeTarget(cmd)} was already ${desiredState ? 'checked' : 'unchecked'}`;
         }
         // Handle ARIA checkbox roles (common in SPA frameworks)
         if (/^(checkbox|switch)$/.test(checkEl.getAttribute('role'))) {
@@ -1948,13 +1948,13 @@ if (window.__sentinelInitialized) {
             checkEl.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
             await humanDelay(100, 200);
             hl.removeHighlight(checkEl);
-            return (desiredState ? 'Checked' : 'Unchecked') + ' ARIA ' + describeTarget(cmd);
+            return `${desiredState ? 'Checked' : 'Unchecked'} ARIA ${describeTarget(cmd)}`;
           }
           hl.removeHighlight(checkEl);
-          return describeTarget(cmd) + ' was already ' + (desiredState ? 'checked' : 'unchecked');
+          return `${describeTarget(cmd)} was already ${desiredState ? 'checked' : 'unchecked'}`;
         }
         hl.removeHighlight(checkEl);
-        return 'Element is not a checkbox or radio: ' + describeTarget(cmd);
+        return `Element is not a checkbox or radio: ${describeTarget(cmd)}`;
       }
 
       case 'check_all': {
@@ -1977,7 +1977,7 @@ if (window.__sentinelInitialized) {
             count++;
           }
         }
-        return (desiredState ? 'Checked' : 'Unchecked') + ' ' + count + '/' + checkboxes.length + ' matching checkboxes';
+        return `${desiredState ? 'Checked' : 'Unchecked'} ${count}/${checkboxes.length} matching checkboxes`;
       }
 
       case 'hover': {
@@ -2063,7 +2063,7 @@ if (window.__sentinelInitialized) {
         activeEl.dispatchEvent(new KeyboardEvent('keypress', keyOpts));
         activeEl.dispatchEvent(new KeyboardEvent('keyup', keyOpts));
         const modStr = [(modifiers.ctrl || modifiers.control) && 'Ctrl', modifiers.shift && 'Shift', modifiers.alt && 'Alt', (modifiers.meta || modifiers.cmd) && 'Meta'].filter(Boolean).join('+');
-        return 'Pressed key: ' + (modStr ? modStr + '+' : '') + key;
+        return `Pressed key: ${modStr ? `${modStr}+` : ''}${key}`;
       }
 
       case 'execute_js': {
@@ -2117,7 +2117,7 @@ if (window.__sentinelInitialized) {
               new Promise((resolve) => setTimeout(() => resolve({ approved: false, reason: 'timeout' }), 60000))
             ]);
             if (!approvalResult || approvalResult.approved !== true) {
-              return 'BLOCKED: execute_js not approved by operator' + (approvalResult && approvalResult.reason ? ' (' + approvalResult.reason + ')' : '');
+              return `BLOCKED: execute_js not approved by operator${approvalResult && approvalResult.reason ? ` (${approvalResult.reason})` : ''}`;
             }
             // Track approval. If the background auto-approved (approval mode off),
             // the reason is 'auto' — we set approvalGranted but NOT explicitApproval.
@@ -2167,9 +2167,9 @@ if (window.__sentinelInitialized) {
           execTimeout = 8000;
         }
 
-        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('execute_js', `Running JS${cmd.key ? ' → "' + cmd.key + '"' : ''}: ${code.substring(0, 60)}...`);
+        if (window.__sentinelOverlay) window.__sentinelOverlay.showActionBanner('execute_js', `Running JS${cmd.key ? ` → "${cmd.key}"` : ''}: ${code.substring(0, 60)}...`);
         try {
-          const eventId = '__sentinel_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+          const eventId = `__sentinel_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
           // (3.21.1) CSP-violation detector. Pages with strict Content-Security-
           // Policy (SentinelOne, GitHub, etc.) block inline <script> injection.
@@ -2345,14 +2345,14 @@ if (window.__sentinelInitialized) {
             // from CSP — usually a long-running script, infinite loop in the
             // LLM-generated code, or a page that's not responding.
             try {
-              ctel.warn('page', 'execute_js timed out (' + execTimeout + 'ms)', {
+              ctel.warn('page', `execute_js timed out (${execTimeout}ms)`, {
                 timeoutMs: execTimeout,
                 key: cmd.key || null,
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
             } catch (e) { console.warn('[Sentinel] exec_js timeout tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-            return 'Code execution timed out (' + execTimeout + 'ms)';
+            return `Code execution timed out (${execTimeout}ms)`;
           }
           if (execResult.__error) {
             try {
@@ -2424,7 +2424,7 @@ if (window.__sentinelInitialized) {
             containers = [root];
           } else if (cmd.selector) {
             try {
-              console.warn('[Sentinel Override] ' + cmd.ref + ' stale, falling back to selector');
+              console.warn(`[Sentinel Override] ${cmd.ref} stale, falling back to selector`);
             } catch (e) { console.warn('[Sentinel] extract_list stale log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
             try {
               containers = [...targetDoc.querySelectorAll(cmd.selector)];
@@ -2560,17 +2560,17 @@ if (window.__sentinelInitialized) {
       case 'switch_to_frame': {
         var frameIdx = cmd.frame_index || 0;
         var iframeEls = document.querySelectorAll('iframe');
-        if (!iframeEls[frameIdx]) return 'Iframe not found at index ' + frameIdx;
+        if (!iframeEls[frameIdx]) return `Iframe not found at index ${frameIdx}`;
         try {
           const cw = iframeEls[frameIdx].contentWindow;
-          if (!cw) return 'Cannot access iframe ' + frameIdx + ' (no content window)';
+          if (!cw) return `Cannot access iframe ${frameIdx} (no content window)`;
           var frameDoc = cw.document;
           __sentinelActiveFrameDoc = frameDoc;
           var frameTitle = frameDoc.title || '';
           var frameUrl = iframeEls[frameIdx].src || '';
-          return 'Switched to iframe ' + frameIdx + ': ' + frameTitle + ' (' + frameUrl + '). Subsequent actions target this frame. Use switch_to_parent_frame to return.';
+          return `Switched to iframe ${frameIdx}: ${frameTitle} (${frameUrl}). Subsequent actions target this frame. Use switch_to_parent_frame to return.`;
         } catch {
-          return 'Cannot access iframe ' + frameIdx + ' (cross-origin)';
+          return `Cannot access iframe ${frameIdx} (cross-origin)`;
         }
       }
 
