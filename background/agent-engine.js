@@ -1163,9 +1163,10 @@ const HISTORY_SUMMARIZE_BATCH = 15;
 
 function summarizeHistoryBatch(batch) {
   if (!batch || !batch.length) return null;
+  const batchLen = batch.length;
   const firstValid = batch.find(h => h && h.step !== undefined);
   let lastValid = null;
-  for (let i = batch.length - 1; i >= 0; i--) {
+  for (let i = batchLen - 1; i >= 0; i--) {
     if (batch[i] && batch[i].step !== undefined) {
       lastValid = batch[i];
       break;
@@ -4209,9 +4210,10 @@ async function runAgentLoop(goal, workingTabId) {
       const memCount = Object.keys(agentMemory).length;
 
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
-      if (history.length >= 3 && !loopDirective) {
+      const _hl1 = history.length;
+      if (_hl1 >= 3 && !loopDirective) {
         let consecutiveNonProductive = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
+        for (let i = _hl1 - 1; i >= 0; i--) {
           const h = history[i];
           if (h.action && NON_PRODUCTIVE_READ_ACTIONS.has(h.action.type)) {
             consecutiveNonProductive++;
@@ -4222,7 +4224,6 @@ async function runAgentLoop(goal, workingTabId) {
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
         // Iterate directly over history to avoid array copy (perf)
         const _recentCounts = { js: 0, extract: 0 };
-        const _hl1 = history.length;
         const last8Start = Math.max(0, _hl1 - 8);
         for (let i = last8Start; i < _hl1; i++) {
           const h = history[i];
@@ -5696,10 +5697,11 @@ async function runAgentLoop(goal, workingTabId) {
       // SPEED (v3.60): Handle batch actions — execute multiple actions without re-observing
       if (command.type === 'batch' && Array.isArray(command.actions)) {
         const batchActions = command.actions.filter(a => a && a.type);
-        if (batchActions.length) {
-          console.log(`[Sentinel/SPEED] Batch: queuing ${batchActions.length} actions`);
+        const batchLen = batchActions.length;
+        if (batchLen) {
+          console.log(`[Sentinel/SPEED] Batch: queuing ${batchLen} actions`);
           // Push in reverse so shift() gets them in order
-          for (let i = batchActions.length - 1; i >= 0; i--) {
+          for (let i = batchLen - 1; i >= 0; i--) {
             _pendingCommandQueue.unshift(batchActions[i]);
           }
           command = _pendingCommandQueue.shift();
