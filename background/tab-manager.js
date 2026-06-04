@@ -3,6 +3,7 @@
 // Imports from message-protocol.js only (no circular dependency risk).
 
 import { getErrorMessage, sleep } from './error-utils.js';
+import { ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
 
 // ========== Page Load Waiting ==========
 let pageLoadConfig = {
@@ -151,10 +152,10 @@ export async function waitForPageReady(tabId, maxWaitMs = 5000) {
 
     // 4. If DOM is ready and we've been waiting for network idle for a while,
     //    don't block forever — proceed if we've waited at least 1s total
-    if (domReady && Date.now() - startTime >= 1000) return;
+    if (domReady && Date.now() - startTime >= ONE_SECOND_MS) return;
 
     // 5. If no content script is available and we've waited 2s, proceed
-    if (Date.now() - startTime >= 2000 && !domReady) return;
+    if (Date.now() - startTime >= TWO_SECONDS_MS && !domReady) return;
 
     await sleep(pollInterval);
   }
@@ -258,7 +259,7 @@ export async function sendMessageWithRetry(tabId, message, maxRetries = 3) {
       return data;
     } catch (err) {
       if (i < maxRetries - 1) {
-        const csListener = createContentScriptListener(tabId, 2000);
+        const csListener = createContentScriptListener(tabId, TWO_SECONDS_MS);
         try { await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_SCRIPT_FILES }); await csListener.promise; } catch { csListener.cancel(); }
         await sleep(500 * (i + 1));
       } else { throw err; }
