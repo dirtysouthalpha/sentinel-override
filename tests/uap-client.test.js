@@ -123,10 +123,17 @@ describe('UAP Client', () => {
       await client.connect();
       mockWs = client.ws;
 
+      const executePromise = client.execute('Test completed goal');
+
+      // Get the request ID from the sent message
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      expect(goalRequest).toBeDefined();
+      const requestId = goalRequest.id;
+
       // Mock goal acceptance
       mockWs.simulateMessage({
         type: 'goal_accepted',
-        id: 'req-1',
+        id: requestId,
         payload: { runId: 'run-123' }
       });
 
@@ -134,17 +141,19 @@ describe('UAP Client', () => {
       mockWs.simulateMessage({
         type: 'goal_complete',
         id: 'run-123',
-        status: 'success',
-        result: {
-          summary: 'Test completed successfully',
-          findings: [],
-          evidence: {},
-          trust_score: 95
+        payload: {
+          status: 'success',
+          result: {
+            summary: 'Test completed successfully',
+            findings: [],
+            evidence: {},
+            trust_score: 95
+          }
         }
       });
 
-      const result = await client.execute('Test completed goal');
-      
+      const result = await executePromise;
+
       expect(result.summary).toBe('Test completed successfully');
     });
 
@@ -156,10 +165,14 @@ describe('UAP Client', () => {
 
       const executePromise = client.execute('Test completed goal', { onStep });
 
+      // Get the request ID from the sent message
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      const requestId = goalRequest.id;
+
       // Mock goal acceptance
       mockWs.simulateMessage({
         type: 'goal_accepted',
-        id: 'req-2',
+        id: requestId,
         payload: { runId: 'run-456' }
       });
 
@@ -167,10 +180,22 @@ describe('UAP Client', () => {
       mockWs.simulateMessage({
         type: 'step_update',
         id: 'run-456',
-        step: 1,
-        total: 5,
-        action: 'click',
-        target: 'submit button'
+        payload: {
+          step: 1,
+          total: 5,
+          action: 'click',
+          target: 'submit button'
+        }
+      });
+
+      // Mock completion
+      mockWs.simulateMessage({
+        type: 'goal_complete',
+        id: 'run-456',
+        payload: {
+          status: 'success',
+          result: { summary: 'Done', findings: [], evidence: {}, trust_score: 100 }
+        }
       });
 
       await executePromise;
@@ -198,10 +223,16 @@ describe('UAP Client', () => {
       await client.connect();
       mockWs = client.ws;
 
+      const executePromise = client.execute('Failing goal execution');
+
+      // Get the request ID from the sent message
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      const requestId = goalRequest.id;
+
       // Mock goal acceptance
       mockWs.simulateMessage({
         type: 'goal_accepted',
-        id: 'req-3',
+        id: requestId,
         payload: { runId: 'run-789' }
       });
 
@@ -209,12 +240,14 @@ describe('UAP Client', () => {
       mockWs.simulateMessage({
         type: 'goal_complete',
         id: 'run-789',
-        status: 'failed',
-        error: 'Element not found',
-        recoverable: false
+        payload: {
+          status: 'failed',
+          error: 'Element not found',
+          recoverable: false
+        }
       });
 
-      await expect(client.execute('Failing goal')).rejects.toThrow('Element not found');
+      await expect(executePromise).rejects.toThrow('Element not found');
     });
   });
 
@@ -302,7 +335,9 @@ describe('UAP Client', () => {
       mockWs.simulateMessage({
         type: 'step_update',
         id: 'run-123',
-        step: 1
+        payload: {
+          step: 1
+        }
       });
 
       expect(handler).toHaveBeenCalledWith(
@@ -322,7 +357,8 @@ describe('UAP Client', () => {
 
       mockWs.simulateMessage({
         type: 'step_update',
-        id: 'run-123'
+        id: 'run-123',
+        payload: {}
       });
 
       expect(handler).not.toHaveBeenCalled();
@@ -336,10 +372,14 @@ describe('UAP Client', () => {
 
       const pingPromise = client.ping();
 
+      // Get the ping request from sent messages
+      const pingRequest = mockWs.sentMessages.find(m => m.type === 'ping');
+      expect(pingRequest).toBeDefined();
+
       // Mock pong
       mockWs.simulateMessage({
         type: 'pong',
-        id: pingPromise.id,
+        id: pingRequest.id,
         timestamp: Date.now()
       });
 
@@ -362,9 +402,10 @@ describe('UAP Client', () => {
 
       // Start a goal
       const goalPromise = client.execute('Test goal execution');
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
       mockWs.simulateMessage({
         type: 'goal_accepted',
-        id: 'req-4',
+        id: goalRequest.id,
         payload: { runId: 'run-999' }
       });
 
