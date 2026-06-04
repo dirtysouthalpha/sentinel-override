@@ -55,6 +55,18 @@ if (window.__sentinelInitialized) {
   const _EXECUTE_JS_MAX_TIMEOUT_MS = 30000; // Maximum timeout for execute_js commands (30 seconds)
   const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
 
+  // Helper function to check chrome.runtime.lastError
+  function _hasLastError() {
+    return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
+  }
+
+  function _getLastErrorMessage() {
+    if (!_hasLastError()) return '';
+    const err = chrome.runtime.lastError;
+    if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+    return String(err || '');
+  }
+
   // Shorthand references to utility modules
   const dom = (window.__sentinelUtils && window.__sentinelUtils.dom) || null;
   const hl = (window.__sentinelUtils && window.__sentinelUtils.highlight) || null;
@@ -1274,8 +1286,8 @@ if (window.__sentinelInitialized) {
                 frameIndex: iframeResult.frameIndex,
                 command: cmd
               }, (response) => {
-                if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-                  resolve('Cross-origin iframe error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)));
+                if (_hasLastError()) {
+                  resolve('Cross-origin iframe error: ' + (_getLastErrorMessage() || String(chrome.runtime.lastError)));
                 } else if (response && response.ok) {
                   resolve(JSON.stringify(response.data || response));
                 } else {
@@ -2095,8 +2107,8 @@ if (window.__sentinelInitialized) {
                   key: cmd.key || null,
                   url: window.location.href
                 }, (response) => {
-                  if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
-                    resolve({ approved: false, reason: 'extension error: ' + (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)) });
+                  if (_hasLastError()) {
+                    resolve({ approved: false, reason: 'extension error: ' + (_getLastErrorMessage() || String(chrome.runtime.lastError)) });
                   } else {
                     resolve(response || null);
                   }

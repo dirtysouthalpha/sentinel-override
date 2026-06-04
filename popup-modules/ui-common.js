@@ -94,6 +94,31 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
+/**
+ * Check if chrome.runtime.lastError has a value.
+ * This replaces the repeated pattern:
+ *   typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError
+ *
+ * @returns {boolean} True if chrome.runtime.lastError has a value
+ */
+// eslint-disable-next-line no-unused-vars
+function hasLastError() {
+  return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
+}
+
+/**
+ * Get chrome.runtime.lastError message safely.
+ *
+ * @returns {string} The lastError message or empty string if no error
+ */
+// eslint-disable-next-line no-unused-vars
+function getLastErrorMessage() {
+  if (!hasLastError()) return '';
+  const err = chrome.runtime.lastError;
+  if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+  return String(err || '');
+}
+
 // ========== Markdown Configuration ==========
 marked.setOptions({
   breaks: true,

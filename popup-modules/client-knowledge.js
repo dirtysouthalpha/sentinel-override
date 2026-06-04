@@ -28,6 +28,17 @@ function _safeEsc(s) {
   });
 }
 
+function _hasLastError() {
+  return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
+}
+
+function _getLastErrorMessage() {
+  if (!_hasLastError()) return '';
+  const err = chrome.runtime.lastError;
+  if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+  return String(err || '');
+}
+
 // ---------- State ----------
 let _editingClientId = null;
  
@@ -37,7 +48,7 @@ let _activeClientCache = null;
 function _send(action, body) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ action, ...(body || {}) }, (res) => {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) {
+      if (_hasLastError()) {
         resolve({ ok: false, error: getErrorMessage(chrome.runtime.lastError) || 'Unknown error' });
         return;
       }

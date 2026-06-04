@@ -5,6 +5,18 @@
 // ========== Constants ==========
 const SCHEDULER_REFRESH_INTERVAL_MS = 30000; // 30 seconds - refresh countdown timers
 
+// ========== Helper Functions ==========
+function _hasLastError() {
+  return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
+}
+
+function _getLastErrorMessage() {
+  if (!_hasLastError()) return '';
+  const err = chrome.runtime.lastError;
+  if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
+  return String(err || '');
+}
+
 // ========== Module-level State ==========
 let refreshIntervalId = null;
 let templatesCache = [];
@@ -62,8 +74,8 @@ function hideSchedulesPanel() {
 // ========== Templates Cache ==========
 function loadTemplatesCache() {
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
-    if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !response) {
-      console.warn('[Sentinel/scheduler-ui] Template list fetch failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response'));
+    if (_hasLastError() || !response) {
+      console.warn('[Sentinel/scheduler-ui] Template list fetch failed:', _getLastErrorMessage() || 'No response');
       return;
     }
     if (response.ok && Array.isArray(response.data)) {
@@ -80,7 +92,7 @@ async function loadAndRenderSchedules() {
   try {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_list' }, (resp) => {
-        if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
+        if (_hasLastError() || !resp) {
           reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
@@ -282,7 +294,7 @@ function populateTemplateDropdown(preselectId) {
   dropdown.innerHTML = '<option value="">-- Select a template --</option>';
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
-    if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !response) {
+    if (_hasLastError() || !response) {
       console.warn('[Sentinel/scheduler-ui] Template list fetch failed in populateTemplateDropdown:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response'));
       dropdown.innerHTML = '<option value="">Error loading templates</option>';
       return;
@@ -499,7 +511,7 @@ async function handleSaveSchedule() {
   try {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_create', schedule: scheduleData }, (resp) => {
-        if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
+        if (_hasLastError() || !resp) {
           reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
@@ -527,7 +539,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
   try {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_toggle', id: scheduleId, enabled }, (resp) => {
-        if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
+        if (_hasLastError() || !resp) {
           reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
@@ -556,7 +568,7 @@ async function handleDeleteSchedule(scheduleId, name) {
   try {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_delete', id: scheduleId }, (resp) => {
-        if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
+        if (_hasLastError() || !resp) {
           reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
@@ -585,7 +597,7 @@ async function showRunHistory(scheduleId, scheduleName) {
   try {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'schedule_results', id: scheduleId }, (resp) => {
-        if ((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError) || !resp) {
+        if (_hasLastError() || !resp) {
           reject(new Error(getErrorMessage(chrome.runtime.lastError) || 'No response'));
           return;
         }
