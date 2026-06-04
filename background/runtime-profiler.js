@@ -805,11 +805,12 @@ function crossover(parent1, parent2, geneSpace) {
 
 function mutate(individual, geneSpace) {
   const mutated = { ...individual };
-  const gene = Object.keys(geneSpace)[Math.floor(Math.random() * Object.keys(geneSpace).length)];
+  const geneKeys = Object.keys(geneSpace);
+  const gene = geneKeys[Math.floor(Math.random() * geneKeys.length)];
   const range = geneSpace[gene];
-  
+
   mutated[gene] = randomInRange(range.min, range.max);
-  
+
   return mutated;
 }
 
