@@ -170,13 +170,13 @@ function describeActionPlain(payload) {
   const t = payload.type;
   const desc = payload.description || '';
   switch (t) {
-    case 'click':       return `Clicking ${payload.targetText ? `"${payload.targetText.length > 50 ? payload.targetText.slice(0, 50) + '…' : payload.targetText}"` : (desc || payload.selector || 'element')}`;
+    case 'click':       return `Clicking ${payload.targetText ? `"${payload.targetText.length > 50 ? `${payload.targetText.slice(0, 50)}…` : payload.targetText}"` : (desc || payload.selector || 'element')}`;
     case 'click_at':    return `Clicking at coordinates${payload.x !== undefined ? ` (${Math.round(payload.x)},${Math.round(payload.y)})` : ''}`;
     case 'type': {
       const text = String(payload.text || payload.value || '');
-      const safe = (payload.sensitive ? '[sensitive — blocked]' : (text.length > 60 ? text.slice(0, 60) + '…' : text));
+      const safe = (payload.sensitive ? '[sensitive — blocked]' : (text.length > 60 ? `${text.slice(0, 60)}…` : text));
       const target = payload.targetText
-        ? `"${payload.targetText.length > 40 ? payload.targetText.slice(0, 40) + '…' : payload.targetText}"`
+        ? `"${payload.targetText.length > 40 ? `${payload.targetText.slice(0, 40)}…` : payload.targetText}"`
         : (desc || '');
       return `Typing "${safe}"${target ? ` into ${target}` : ''}`;
     }
@@ -242,7 +242,7 @@ function updateActiveTabAction(payload) {
     // Fallback 2: query by hostname pattern
     if (!tabId && __atsStripState.hostname) {
       try {
-        const pattern = '*://*.' + __atsStripState.hostname.replace(/^www\./, '') + '/*';
+        const pattern = `*://*.${__atsStripState.hostname.replace(/^www\./, '')}/*`;
         const tabs = await chrome.tabs.query({ url: pattern });
         if (tabs && tabs.length) tabId = tabs[0].id;
       } catch (_apiErr) { /* extension API may fail */ }
@@ -343,8 +343,8 @@ function showCrosshair(x, y, viewportW, viewportH) {
   const svg = panel.querySelector('#mini-shot-crosshair');
   if (!svg) return;
   if (!viewportW || !viewportH || viewportW <= 0 || viewportH <= 0 || typeof x !== 'number' || typeof y !== 'number') { svg.style.display = 'none'; return; }
-  const px = (x / viewportW * 100).toFixed(2) + '%';
-  const py = (y / viewportH * 100).toFixed(2) + '%';
+  const px = `${(x / viewportW * 100).toFixed(2)}%`;
+  const py = `${(y / viewportH * 100).toFixed(2)}%`;
   const h = svg.querySelector('#msc-h'); const v = svg.querySelector('#msc-v'); const dot = svg.querySelector('#msc-dot');
   if (h) { h.setAttribute('x1', '0%'); h.setAttribute('x2', '100%'); h.setAttribute('y1', py); h.setAttribute('y2', py); }
   if (v) { v.setAttribute('x1', px); v.setAttribute('x2', px); v.setAttribute('y1', '0%'); v.setAttribute('y2', '100%'); }
@@ -516,7 +516,7 @@ function showApprovalCard(payload) {
       </svg>
       <span>Agent requests approval${isRisky ? ' — risky' : ''}</span>
     </div>
-    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ' &middot; ' + escapeHtml(String(actionType)) : ''}${targetLabel ? ' &middot; <em>' + escapeHtml(String(targetLabel).slice(0, 80)) + '</em>' : ''}</div>
+    <div class="approval-card-step">Step #${escapeHtml(String(stepNumber))}${actionType ? ` &middot; ${escapeHtml(String(actionType))}` : ''}${targetLabel ? ` &middot; <em>${escapeHtml(String(targetLabel).slice(0, 80))}</em>` : ''}</div>
     ${bodyHtml}
     <div class="approval-card-buttons">
       <button class="approval-btn approve" id="approvalApprove">Approve</button>
@@ -891,7 +891,7 @@ function hideStatus() {
 // ========== Input Area ==========
 goalInput.addEventListener('input', () => {
   goalInput.style.height = 'auto';
-  goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+  goalInput.style.height = `${Math.min(goalInput.scrollHeight, 100)}px`;
   updateMarkdownPreview();
 });
 
@@ -901,7 +901,7 @@ document.querySelectorAll('.example-prompt-btn').forEach(btn => {
     const prompt = btn.dataset.prompt || (typeof btn.textContent === 'string' ? btn.textContent.trim() : '');
     goalInput.value = prompt;
     goalInput.style.height = 'auto';
-    goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+    goalInput.style.height = `${Math.min(goalInput.scrollHeight, 100)}px`;
     goalInput.focus();
     // Position cursor at first [bracket] placeholder if present, so the
     // user can immediately fill in their value.
@@ -1464,7 +1464,7 @@ function setupVoiceInput() {
       if (goalInput) {
         goalInput.value = msg.text;
         goalInput.style.height = 'auto';
-        goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+        goalInput.style.height = `${Math.min(goalInput.scrollHeight, 100)}px`;
         goalInput.focus();
       }
       _voiceListening = false;
@@ -1476,7 +1476,7 @@ function setupVoiceInput() {
       if (goalInput) {
         goalInput.value = msg.text;
         goalInput.style.height = 'auto';
-        goalInput.style.height = Math.min(goalInput.scrollHeight, 100) + 'px';
+        goalInput.style.height = `${Math.min(goalInput.scrollHeight, 100)}px`;
       }
     }
     if (msg.action === 'voice_error') {
@@ -2033,11 +2033,11 @@ if (exportReplayBtn) {
       }
       const blob = new Blob([resp.data.html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
-      await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+      await chrome.downloads.download({ url, filename: `sentinel-replay-${Date.now()}.html`, saveAs: true });
       setTimeout(() => URL.revokeObjectURL(url), 5000);
       showToast('Replay report downloading…', 'info');
     } catch (e) {
-      showToast('Replay export failed: ' + String(e), 'error');
+      showToast(`Replay export failed: ${String(e)}`, 'error');
     } finally {
       exportReplayBtn.disabled = false;
       exportReplayBtn.textContent = 'Export Replay';
@@ -2238,7 +2238,7 @@ function _ensureActivityStream(stepNumber) {
   // card so the activity items have somewhere to go.
   const welcome = chatContainer.querySelector('.welcome-message');
   if (welcome) welcome.remove();
-  let card = chatContainer.querySelector('.agent-action-group[data-step="' + stepNumber + '"]');
+  let card = chatContainer.querySelector(`.agent-action-group[data-step="${stepNumber}"]`);
   if (!card) {
     // Create a placeholder step card
     card = document.createElement('div');
@@ -2281,7 +2281,7 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
   const stream = _ensureActivityStream(stepNumber);
   if (!stream) return;
 
-  let item = stream.querySelector('.activity-item[data-key="' + CSS.escape(String(key)) + '"]');
+  let item = stream.querySelector(`.activity-item[data-key="${CSS.escape(String(key))}"]`);
   if (!item) {
     item = document.createElement('div');
     item.className = 'activity-item';
@@ -2299,12 +2299,12 @@ function showAgentActivity(stepNumber, key, label, status, detail) {
   // Duration string from detail
   let durationStr = '';
   if (detail && typeof detail.durationMs === 'number' && status !== 'in_progress') {
-    durationStr = ' <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ' + _formatDuration(detail.durationMs) + '</span>';
+    durationStr = ` <span style="color:var(--text-tertiary); font-size:11px; margin-left:6px;">· ${_formatDuration(detail.durationMs)}</span>`;
   }
 
   item.innerHTML =
-    '<span style="color:' + statusColor + '; display:inline-flex;">' + _activityIcon(status) + '</span>' +
-    '<span style="color:' + (status === 'failed' ? 'var(--error-color, #f44336)' : 'var(--text-primary)') + '; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">' + escapeHtml(label || '') + '</span>' +
+    `<span style="color:${statusColor}; display:inline-flex;">${_activityIcon(status)}</span>` +
+    `<span style="color:${status === 'failed' ? 'var(--error-color, #f44336)' : 'var(--text-primary)'}; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(label || '')}</span>` +
     durationStr;
 
   // (3.19.1) When the consult-ai item finalizes, if no agent_action message
@@ -3471,11 +3471,11 @@ chrome.runtime.onMessage.addListener((message) => {
             if (!resp || !resp.ok || !resp.data || !resp.data.html) throw new Error((resp && resp.error) || 'No replay data');
             const blob = new Blob([resp.data.html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
-            await chrome.downloads.download({ url, filename: 'sentinel-replay-' + Date.now() + '.html', saveAs: true });
+            await chrome.downloads.download({ url, filename: `sentinel-replay-${Date.now()}.html`, saveAs: true });
             setTimeout(() => URL.revokeObjectURL(url), 5000);
             showToast('Replay report downloading…', 'info');
           } catch (e) {
-            showToast('Replay export failed: ' + String(e), 'error');
+            showToast(`Replay export failed: ${String(e)}`, 'error');
           } finally {
             replayBtn.disabled = false;
             replayBtn.textContent = '↓ Export Replay';

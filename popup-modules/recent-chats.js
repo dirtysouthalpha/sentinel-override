@@ -221,7 +221,7 @@
       const goal = _escapeHtml((c.goal || '(no goal)').substring(0, 200));
       const ageStr = _formatAge(c.createdAt);
       const stats = [
-        (c.messagesCount || 0) + ' msgs',
+        `${c.messagesCount || 0} msgs`,
         c.hadReport ? '<span style="color: var(--success-color, #6fcf80);">report</span>' : null,
         c.runLogId ? '<span style="color: var(--accent-primary, #ff6b00);">run-logged</span>' : null,
         c.archivedReason ? c.archivedReason : null,

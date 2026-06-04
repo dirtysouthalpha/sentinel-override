@@ -16,7 +16,7 @@ async function exportTemplateFile(templateId) {
 
     const data = response.data;
     if (!data || !data.template) throw new Error('Malformed export response');
-    const filename = sanitizeFilename(data.template.name) + '.json';
+    const filename = `${sanitizeFilename(data.template.name)}.json`;
     downloadJson(data, filename);
     showToast('Template exported', 'success');
   } catch (err) {

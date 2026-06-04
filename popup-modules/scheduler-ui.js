@@ -111,7 +111,7 @@ async function loadAndRenderSchedules() {
 function renderScheduleCard(schedule) {
   const isEnabled = schedule.enabled;
   const goalPreview = schedule.goal
-    ? escapeHtml(schedule.goal.length > 80 ? schedule.goal.substring(0, 80) + '...' : schedule.goal)
+    ? escapeHtml(schedule.goal.length > 80 ? `${schedule.goal.substring(0, 80)}...` : schedule.goal)
     : (schedule.templateId ? '<em>Template task</em>' : '<em>No goal</em>');
 
   // Recurrence display
