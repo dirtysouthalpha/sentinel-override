@@ -2263,12 +2263,12 @@ if (window.__sentinelInitialized) {
                     // Window proxy — intercepts reads/writes/has on dangerous globals
                     'var __wp = new Proxy(window, {' +
                       'get(t,p) {' +
-                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked window."+String(p));' +
+                        'if(__blk.has(p)) throw new Error(`Sentinel Sandbox: blocked window.${String(p)}`);' +
                         'var v=t[p];' +
                         'return typeof v==="function"?v.bind(t):v;' +
                       '},' +
                       'set(t,p,v) {' +
-                        'if(__blk.has(p)) throw new Error("Sentinel Sandbox: blocked write window."+String(p));' +
+                        'if(__blk.has(p)) throw new Error(`Sentinel Sandbox: blocked write window.${String(p)}`);' +
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
@@ -2279,12 +2279,12 @@ if (window.__sentinelInitialized) {
                     // Document proxy — intercepts reads/writes/has on sensitive doc props
                     'var __dp = new Proxy(document, {' +
                       'get(t,p) {' +
-                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked document."+String(p));' +
+                        'if(__blkDoc.has(p)) throw new Error(`Sentinel Sandbox: blocked document.${String(p)}`);' +
                         'var v=t[p];' +
                         'return typeof v==="function"?v.bind(t):v;' +
                       '},' +
                       'set(t,p,v) {' +
-                        'if(__blkDoc.has(p)) throw new Error("Sentinel Sandbox: blocked write document."+String(p));' +
+                        'if(__blkDoc.has(p)) throw new Error(`Sentinel Sandbox: blocked write document.${String(p)}`);' +
                         't[p]=v; return true;' +
                       '},' +
                       'has(t,p) {' +
