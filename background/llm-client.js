@@ -7,6 +7,7 @@ import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
 import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage } from './error-utils.js';
+import { API_TIMEOUT_MS, API_CACHE_TTL_MS, PLATFORM_CTX_CACHE_TTL_MS } from './constants.js';
 
 // Constants for response parsing - avoid recreating on every call
 const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
@@ -773,7 +774,6 @@ function _formatProfileSelectorsBlock(profile, currentUrl) {
 // block and prose on every LLM call (50-100 times per run) is wasteful when
 // the URL is stable. TTL of 30s covers SPA route transitions.
 const _platformContextCache = new Map();
-const _PLATFORM_CTX_TTL_MS = 30000;
 
 /**
  * Build platform-specific context (selectors, guidance) for the current URL and goal.
@@ -785,7 +785,7 @@ const _PLATFORM_CTX_TTL_MS = 30000;
 export function getPlatformContext(currentUrl, goal) {
   const _cacheKey = `${currentUrl || ''}||${(goal || '').slice(0, 50)}`;
   const _cached = _platformContextCache.get(_cacheKey);
-  if (_cached && Date.now() - _cached.ts < _PLATFORM_CTX_TTL_MS) return _cached.ctx;
+  if (_cached && Date.now() - _cached.ts < PLATFORM_CTX_CACHE_TTL_MS) return _cached.ctx;
 
   const prose = _getPlatformProseInternal(currentUrl, goal);
   let selectorBlock = '';
@@ -944,7 +944,7 @@ export async function generatePlan(goal, settings, context = {}) {
   const planPrompt = _buildPlanPrompt(goal, context);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const provider = resolveProvider(endpoint);
     if (!provider) {
@@ -2300,7 +2300,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const body = JSON.stringify(provider.buildBody(model, systemPrompt, userPrompt, { maxTokens, temperature: 0.4 }));
     const headers = provider.buildHeaders(apiKey);

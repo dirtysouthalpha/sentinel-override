@@ -5,6 +5,7 @@
  */
 
 import { getActiveProvider, resolveProvider } from './provider-registry.js';
+import { API_TIMEOUT_MS } from './constants.js';
 
 /**
  * Build and send a single chat completion request for Quick Assist.
@@ -48,7 +49,7 @@ export async function handleQuickAssist(prompt) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
   try {
     const response = await fetch(config.endpoint, {

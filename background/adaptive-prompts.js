@@ -15,8 +15,9 @@
 import { getActiveProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
 import { getPlatformProfile, findMismatchHints } from './platforms/index.js';
+import { API_TIMEOUT_MS } from './constants.js';
 
-const REWRITER_TIMEOUT_MS = 30000;
+const REWRITER_TIMEOUT_MS = API_TIMEOUT_MS;
 const REWRITER_MAX_TOKENS = 4000;
 
 // Precompiled regex for extracting JSON from markdown code blocks

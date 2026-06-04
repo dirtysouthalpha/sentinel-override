@@ -52,6 +52,7 @@ if (window.__sentinelInitialized) {
   // Defence-in-depth: approval gate + static regex guard still active.
    
   const _EXECUTE_JS_SANDBOX_ENABLED = true;
+  const _EXECUTE_JS_MAX_TIMEOUT_MS = 30000; // Maximum timeout for execute_js commands (30 seconds)
   const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
 
   // Shorthand references to utility modules
@@ -2149,7 +2150,7 @@ if (window.__sentinelInitialized) {
         // timeout in the fallback path is fine.
         let execTimeout;
         if (typeof cmd.timeout === 'number' && isFinite(cmd.timeout)) {
-          execTimeout = Math.max(100, Math.min(30000, cmd.timeout));
+          execTimeout = Math.max(100, Math.min(_EXECUTE_JS_MAX_TIMEOUT_MS, cmd.timeout));
         } else {
           execTimeout = 8000;
         }

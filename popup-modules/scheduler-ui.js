@@ -2,6 +2,9 @@
 // Schedule management UI: list, create, enable/disable, delete, run history.
 // Communicates with background via chrome.runtime.sendMessage (schedule_* actions).
 
+// ========== Constants ==========
+const SCHEDULER_REFRESH_INTERVAL_MS = 30000; // 30 seconds - refresh countdown timers
+
 // ========== Module-level State ==========
 let refreshIntervalId = null;
 let templatesCache = [];
@@ -35,7 +38,7 @@ function showSchedulesPanel() {
   if (refreshIntervalId) clearInterval(refreshIntervalId);
   refreshIntervalId = setInterval(() => {
     loadAndRenderSchedules();
-  }, 30000);
+  }, SCHEDULER_REFRESH_INTERVAL_MS);
 }
 
 function hideSchedulesPanel() {
