@@ -324,7 +324,7 @@ if (window.__sentinelInitialized) {
         if (closeBtn) {
           closeBtn.click();
           __sentinelDismissalCount++;
-          dismissed.push('overlay-close: ' + (typeof closeBtn.textContent === 'string' ? closeBtn.textContent.trim().substring(0, 30) : 'unnamed'));
+          dismissed.push(`overlay-close: ${(typeof closeBtn.textContent === 'string' ? closeBtn.textContent.trim().substring(0, 30) : 'unnamed')}`);
         } else {
           el.style.display = 'none';
           __sentinelDismissalCount++;
@@ -638,7 +638,7 @@ if (window.__sentinelInitialized) {
         const fakeCmd = { ref: request.ref, selector: request.selector };
         const resolved = resolveCommandTarget(fakeCmd, document);
         const el = resolved.el;
-        if (!el) throw new Error('Element not found for bbox: ' + (request.ref || request.selector || ''));
+        if (!el) throw new Error(`Element not found for bbox: ${request.ref || request.selector || ''}`);
         const rect = el.getBoundingClientRect();
         if (!rect || (rect.width === 0 && rect.height === 0)) {
           throw new Error('Element has zero size');
@@ -802,7 +802,7 @@ if (window.__sentinelInitialized) {
         const fakeCmd = { ref: request.ref, selector: request.selector };
         const resolved = resolveCommandTarget(fakeCmd, document);
         const el = resolved.el;
-        if (!el) throw new Error('Element not found for focus: ' + (request.ref || request.selector || ''));
+        if (!el) throw new Error(`Element not found for focus: ${request.ref || request.selector || ''}`);
 
         // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
@@ -1423,7 +1423,7 @@ if (window.__sentinelInitialized) {
       case 'right_click': {
         var rcResolved = resolveCommandTarget(cmd, targetDoc);
         var rcEl = rcResolved.el;
-        if (!rcEl) return 'Element not found: ' + describeTarget(cmd);
+        if (!rcEl) return `Element not found: ${describeTarget(cmd)}`;
         var rcBlock = await guardOverlayBlocking(targetDoc, rcEl, cmd);
         if (rcBlock) return rcBlock;
         hl.highlightElement(rcEl);
@@ -1450,7 +1450,7 @@ if (window.__sentinelInitialized) {
       case 'double_click': {
         var dcResolved = resolveCommandTarget(cmd, targetDoc);
         var dcEl = dcResolved.el;
-        if (!dcEl) return 'Element not found: ' + describeTarget(cmd);
+        if (!dcEl) return `Element not found: ${describeTarget(cmd)}`;
         var dcBlock = await guardOverlayBlocking(targetDoc, dcEl, cmd);
         if (dcBlock) return dcBlock;
         hl.highlightElement(dcEl);
@@ -1634,7 +1634,7 @@ if (window.__sentinelInitialized) {
           const reason = dom.checkInteractable(el, 'type');
           if (reason) {
             try {
-              ctel.warn('page', 'Type rejected: ' + reason, {
+              ctel.warn('page', `Type rejected: ${reason}`, {
                 selector: cmd.selector || null,
                 ref: cmd.ref || null,
                 reason: reason,
@@ -1712,7 +1712,7 @@ if (window.__sentinelInitialized) {
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
-          return 'Typed into contenteditable ' + describeTarget(cmd);
+          return `Typed into contenteditable ${describeTarget(cmd)}`;
         }
 
         // Standard INPUT / TEXTAREA — full key sequence per character with native
@@ -1751,7 +1751,7 @@ if (window.__sentinelInitialized) {
           // Final change event after the full string is typed.
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           hl.removeHighlight(el);
-          return 'Typed into ' + describeTarget(cmd);
+          return `Typed into ${describeTarget(cmd)}`;
         }
 
         // Fallback for any other focusable element
@@ -1960,7 +1960,7 @@ if (window.__sentinelInitialized) {
         // Check all matching checkboxes — bulk MSP operations (select multiple policies, devices, etc.)
         const checkSelector = cmd.selector || 'input[type="checkbox"]';
         const checkboxes = targetDoc.querySelectorAll(checkSelector);
-        if (checkboxes.length === 0) return 'No checkboxes found matching: ' + checkSelector;
+        if (checkboxes.length === 0) return `No checkboxes found matching: ${checkSelector}`;
         const desiredState = cmd.checked !== undefined ? cmd.checked : true;
         let count = 0;
         for (const cb of checkboxes) {
@@ -2020,7 +2020,7 @@ if (window.__sentinelInitialized) {
         hl.removeHighlight(el);
 
         // Check if a submenu appeared after hovering
-        let result = 'Hovered over ' + describeTarget(cmd);
+        let result = `Hovered over ${describeTarget(cmd)}`;
         if (dd) {
           await wait.sleep(500);
           const subItems = dd.findDropdownOptions(targetDoc, el);
@@ -2029,7 +2029,7 @@ if (window.__sentinelInitialized) {
               .map(item => (item.innerText || item.textContent || '').trim())
               .filter(t => t.length > 0)
               .slice(0, 20);
-            result += '. Submenu items available: ' + submenuTexts.join(', ');
+            result += `. Submenu items available: ${submenuTexts.join(', ')}`;
           }
         }
         return result;
@@ -2107,7 +2107,7 @@ if (window.__sentinelInitialized) {
                   url: window.location.href
                 }, (response) => {
                   if (_hasLastError()) {
-                    resolve({ approved: false, reason: 'extension error: ' + (_getLastErrorMessage() || String(chrome.runtime.lastError)) });
+                    resolve({ approved: false, reason: `extension error: ${_getLastErrorMessage() || String(chrome.runtime.lastError)}` });
                   } else {
                     resolve(response || null);
                   }
@@ -2188,7 +2188,7 @@ if (window.__sentinelInitialized) {
                 // blocking inline scripts. Useful for distinguishing strict
                 // SentinelOne-style policies from looser CDN-only policies.
                 try {
-                  ctel.warn('page', 'CSP violation: ' + dir, {
+                  ctel.warn('page', `CSP violation: ${dir}`, {
                     directive: dir,
                     blockedURI: blocked,
                     effectiveDirective: (e && e.effectiveDirective) || '',
@@ -2355,19 +2355,19 @@ if (window.__sentinelInitialized) {
           }
           if (execResult.__error) {
             try {
-              ctel.warn('page', 'execute_js threw: ' + String(execResult.__error).slice(0, 80), {
+              ctel.warn('page', `execute_js threw: ${String(execResult.__error).slice(0, 80)}`, {
                 error: execResult.__error,
                 key: cmd.key || null,
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
             } catch (e) { console.warn('[Sentinel] exec_js error tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-            return 'Execution error: ' + execResult.__error;
+            return `Execution error: ${execResult.__error}`;
           }
-          return 'JS Result: ' + (execResult.__value || '');
+          return `JS Result: ${execResult.__value || ''}`;
         } catch (err) {
           try { ctel.error('page', 'execute_js outer failure', { error: ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          return 'JS Error: ' + ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err));
+          return `JS Error: ${((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}`;
         }
       }
 
@@ -2451,10 +2451,10 @@ if (window.__sentinelInitialized) {
               } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
             }
           } catch {
-            return 'Element not found: ' + cmd.selector;
+            return `Element not found: ${cmd.selector}`;
           }
         }
-        if (!containers.length) return 'Element not found: ' + describeTarget(cmd);
+        if (!containers.length) return `Element not found: ${describeTarget(cmd)}`;
         const limit = cmd.limit || 20;
         const fields = cmd.fields || {};
         if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) return 'Invalid fields parameter';
@@ -2494,14 +2494,14 @@ if (window.__sentinelInitialized) {
           const options = await dd.openDropdown(targetDoc, el);
           if (!options || options.length === 0) {
             hl.removeHighlight(el);
-            return 'Failed to open dropdown or no options found: ' + describeTarget(cmd);
+            return `Failed to open dropdown or no options found: ${describeTarget(cmd)}`;
           }
           const optionTexts = options
             .map(o => (o.innerText || o.textContent || '').trim())
             .filter(t => t.length > 0)
             .slice(0, 50);
           hl.removeHighlight(el);
-          return 'Dropdown opened. Options: ' + optionTexts.join(', ');
+          return `Dropdown opened. Options: ${optionTexts.join(', ')}`;
         }
         hl.removeHighlight(el);
         return 'Dropdown utilities not available';
@@ -2553,7 +2553,7 @@ if (window.__sentinelInitialized) {
         } catch (e) { console.warn('[Sentinel] scroll_to indicator:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
         setTimeout(() => hl.removeHighlight(el), 1500);
         const note = resolvedScroll.staleRef ? ' (selector fallback after stale ref)' : '';
-        return 'Scrolled to ' + describeTarget(cmd) + note;
+        return `Scrolled to ${describeTarget(cmd)}${note}`;
       }
 
       case 'switch_to_frame': {
@@ -2579,7 +2579,7 @@ if (window.__sentinelInitialized) {
       }
 
       default:
-        return 'Unknown command type: ' + cmd.type;
+        return `Unknown command type: ${cmd.type}`;
     }
   }
 
