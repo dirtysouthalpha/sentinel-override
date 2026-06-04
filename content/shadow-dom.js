@@ -108,7 +108,7 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
     try {
       const direct = root.querySelectorAll(selector);
       if (direct && typeof direct.forEach === 'function') {
-        direct.forEach(function(el) { if (el) results.push(el); });
+        results.push(...Array.from(direct).filter(el => el));
       }
     } catch { /* invalid selector */ }
 

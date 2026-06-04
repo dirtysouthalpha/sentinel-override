@@ -429,7 +429,7 @@ if (window.__sentinelInitialized) {
               try {
                 const iframeResult = fm.scanIframes(document);
                 if (iframeResult.elements && Array.isArray(iframeResult.elements)) {
-                  iframeResult.elements.forEach(el => interactiveElements.push(el));
+                  interactiveElements.push(...iframeResult.elements);
                 }
               } catch (e) { console.warn('[Sentinel] Iframe scan error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
             }
