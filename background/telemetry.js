@@ -122,8 +122,8 @@ function _redactString(s) {
   for (const { re, label } of REDACT_PATTERNS) {
     out = out.replace(re, (full, p1, p2) => {
       // Special case: auth headers — preserve scheme, redact credential
-      if (label === 'auth-header' && p1 && p2) return p1 + ' [REDACTED:' + label + ']';
-      return '[REDACTED:' + label + ']';
+      if (label === 'auth-header' && p1 && p2) return `${p1} [REDACTED:${label}]`;
+      return `[REDACTED:${label}]`;
     });
   }
   // URL query-param scrub (string-level; we don't try to parse — just match)
@@ -221,7 +221,7 @@ function _scheduleFlush() {
 
 async function _flushRunBuffer() {
   if (!_persistEnabled || !_currentRunId || !_runBuffer.length) return;
-  const key = 'telemetry_run_' + _currentRunId;
+  const key = `telemetry_run_${_currentRunId}`;
   try {
     const stored = await chrome.storage.local.get(key);
     const existing = Array.isArray(stored[key]) ? stored[key] : [];
@@ -297,7 +297,7 @@ export async function startRun(runId, goal) {
     });
     const toEvict = index.splice(MAX_PERSISTED_RUNS);
     for (const old of toEvict) {
-      try { await chrome.storage.local.remove('telemetry_run_' + old.runId); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', getErrorMessage(e)); }
+      try { await chrome.storage.local.remove(`telemetry_run_${old.runId}`); } catch (e) { console.warn('[Sentinel/telemetry] evict error:', getErrorMessage(e)); }
     }
     await _setRunsIndex(index);
     _scheduleFlush();
@@ -320,8 +320,8 @@ export async function endRun(runId) {
     await _flushRunBuffer();
     const cachedIndex = await _getRunsIndex();
     const index = [...cachedIndex];
-    const storedEvents = await chrome.storage.local.get('telemetry_run_' + id);
-    const events = Array.isArray(storedEvents['telemetry_run_' + id]) ? storedEvents['telemetry_run_' + id] : [];
+    const storedEvents = await chrome.storage.local.get(`telemetry_run_${id}`);
+    const events = Array.isArray(storedEvents[`telemetry_run_${id}`]) ? storedEvents[`telemetry_run_${id}`] : [];
     const entry = index.find(e => e.runId === id);
     if (entry) {
       entry.finishedAt = Date.now();
@@ -351,8 +351,8 @@ export async function listPersistedRuns() {
 export async function loadPersistedRun(runId) {
   if (!runId) return [];
   try {
-    const stored = await chrome.storage.local.get('telemetry_run_' + runId);
-    return Array.isArray(stored['telemetry_run_' + runId]) ? stored['telemetry_run_' + runId] : [];
+    const stored = await chrome.storage.local.get(`telemetry_run_${runId}`);
+    return Array.isArray(stored[`telemetry_run_${runId}`]) ? stored[`telemetry_run_${runId}`] : [];
   } catch { return []; }
 }
 
@@ -367,7 +367,7 @@ export async function deletePersistedRun(runId) {
     const index = [...cachedIndex];
     const filtered = index.filter(e => e.runId !== runId);
     await _setRunsIndex(filtered);
-    await chrome.storage.local.remove('telemetry_run_' + runId);
+    await chrome.storage.local.remove(`telemetry_run_${runId}`);
   } catch (e) { console.warn('[Sentinel/telemetry] deletePersistedRun error:', getErrorMessage(e)); }
 }
 
@@ -411,7 +411,7 @@ export function emit(category, level, message, payload) {
   try {
     // SW console shows rawEvent — chrome://extensions DevTools access is
     // already a trust boundary, and unredacted output helps deep debugging.
-    const consoleArgs = ['[Sentinel/' + rawEvent.category + ']', rawEvent.message];
+    const consoleArgs = [`[Sentinel/${rawEvent.category}]`, rawEvent.message];
     if (payload) consoleArgs.push(payload);
     if (level === 'error') console.error.apply(console, consoleArgs);
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
