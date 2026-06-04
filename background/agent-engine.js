@@ -4138,8 +4138,9 @@ async function runAgentLoop(goal, workingTabId) {
         // Also count execute_js in the last 8 steps — if too many without extract/note/finish, it's a loop
         // Iterate directly over history to avoid array copy (perf)
         const _recentCounts = { js: 0, extract: 0 };
-        const last8Start = Math.max(0, history.length - 8);
-        for (let i = last8Start; i < history.length; i++) {
+        const _hl1 = history.length;
+        const last8Start = Math.max(0, _hl1 - 8);
+        for (let i = last8Start; i < _hl1; i++) {
           const h = history[i];
           if (!h || !h.action) continue;
           const type = h.action.type;
@@ -4165,8 +4166,9 @@ async function runAgentLoop(goal, workingTabId) {
         // Iterate directly over history to avoid array copy (perf)
         const emptyCount = (() => {
           let count = 0;
-          const last4Start = Math.max(0, history.length - 4);
-          for (let i = last4Start; i < history.length; i++) {
+          const _historyLen = history.length;
+          const last4Start = Math.max(0, _historyLen - 4);
+          for (let i = last4Start; i < _historyLen; i++) {
             const r = history[i].result || '';
             if (r.includes('empty') || r.includes('no content') || (r.includes('Page Title:') && r.length < 300)) count++;
           }
@@ -4180,8 +4182,9 @@ async function runAgentLoop(goal, workingTabId) {
       // 2. Step-based soft cap: warn model to finish after 15 steps
       //    But skip the warning if agent is actively making progress (opening tabs, switching tabs)
       let recentTabActions = 0;
-      const recentStart = Math.max(0, history.length - 5);
-      for (let i = recentStart; i < history.length; i++) {
+      const _hl2 = history.length;
+      const recentStart = Math.max(0, _hl2 - 5);
+      for (let i = recentStart; i < _hl2; i++) {
         if (history[i].action && TAB_ACTIONS.has(history[i].action.type)) recentTabActions++;
       }
       const isMakingProgress = recentTabActions > 0 || memCount > 0;
@@ -4363,8 +4366,9 @@ async function runAgentLoop(goal, workingTabId) {
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
       const promptHistory = [];
-      const historyStart = Math.max(0, history.length - CONFIG.historyWindow);
-      for (let i = historyStart; i < history.length; i++) {
+      const _hl3 = history.length;
+      const historyStart = Math.max(0, _hl3 - CONFIG.historyWindow);
+      for (let i = historyStart; i < _hl3; i++) {
         const h = history[i];
         if (!h || typeof h !== 'object' || h === null) {
           promptHistory.push(h);
@@ -5648,8 +5652,9 @@ async function runAgentLoop(goal, workingTabId) {
         const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
         if (_alreadyThere) {
           let _recent = false;
-          const checkStart = Math.max(0, history.length - 2);
-          for (let i = checkStart; i < history.length; i++) {
+          const _hl4 = history.length;
+          const checkStart = Math.max(0, _hl4 - 2);
+          for (let i = checkStart; i < _hl4; i++) {
             if (history[i] && history[i].action && history[i].action.type === 'navigate' && history[i].action.url === command.url) {
               _recent = true;
               break;
