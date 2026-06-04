@@ -1017,11 +1017,12 @@ export async function generatePlan(goal, settings, context = {}) {
     // Uses contentNoThink so thinking-block JSON doesn't get selected over the real plan.
     try {
       let s2from = 0;
-      while (s2from < contentNoThink.length) {
+      const contentLen = contentNoThink.length;
+      while (s2from < contentLen) {
         const s2start = contentNoThink.indexOf('{', s2from);
         if (s2start === -1) break;
         let depth = 0, inStr = false, esc = false, s2end = -1;
-        for (let i = s2start; i < contentNoThink.length; i++) {
+        for (let i = s2start; i < contentLen; i++) {
           const ch = contentNoThink[i];
           if (esc) { esc = false; continue; }
           if (ch === '\\' && inStr) { esc = true; continue; }
