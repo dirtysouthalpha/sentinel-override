@@ -5062,7 +5062,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendSilentUpdate(`repeat_for_each: ${items.length} items × ${doActions.length} actions`, stepCount);
         const iterVar = command.item_var || 'item';
         // Pre-compile regex for template substitution - created once, reused for all iterations
-        const _templateRegex = new RegExp('\\{\\{' + iterVar + '(?:\\.([\\w]+))?\\}\\}', 'g');
+        const _templateRegex = new RegExp(`\\{\\{${iterVar}(?:\\.([\\w]+))?\\}\\}`, 'g');
         for (const _item of items) {
           for (const _act of doActions) {
             if (!_act || !_act.type) continue;
