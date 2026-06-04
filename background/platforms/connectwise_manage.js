@@ -6,6 +6,12 @@
 // Kendo-based grid controls. The primary MSP workflow surfaces are:
 // Service Desk (tickets), Companies, Contacts, Configurations, Time Entries.
 
+// Precompile regex patterns for hot-path detection
+const _CW_CLOUD_HOST_RE = /my\.connectwise\.com|connectwise\.net|cw\.local/i;
+const _CW_ONPREM_HOST_RE = /cw\.manage|connectwisemanage/i;
+const _CW_API_PATH_RE = /\/v4_6_release\/services\/system_io\/router\/api\.rails/i;
+const _CW_GOAL_RE = /\b(?:connectwise\s+manage|cw\s+manage|cwmanage|connectwise\s+psa)\b/i;
+
 export const connectwiseManage = {
   id: 'connectwise_manage',
   label: 'ConnectWise Manage (PSA)',
@@ -16,11 +22,11 @@ export const connectwiseManage = {
     try {
       const u = new URL(url);
       const host = u.hostname;
-      if (/my\.connectwise\.com|connectwise\.net|cw\.local/i.test(host)) return true;
-      if (/cw\.manage|connectwisemanage/i.test(host)) return true;
-      if (/\/v4_6_release\/services\/system_io\/router\/api\.rails/i.test(u.pathname)) return true;
+      if (_CW_CLOUD_HOST_RE.test(host)) return true;
+      if (_CW_ONPREM_HOST_RE.test(host)) return true;
+      if (_CW_API_PATH_RE.test(u.pathname)) return true;
     } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
-    return /\b(?:connectwise\s+manage|cw\s+manage|cwmanage|connectwise\s+psa)\b/i.test(String(goal || ''));
+    return _CW_GOAL_RE.test(String(goal || ''));
   },
 
   pageTypes: [

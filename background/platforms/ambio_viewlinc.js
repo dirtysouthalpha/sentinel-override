@@ -13,6 +13,13 @@
 // Most common MSP workflows here are OQ test execution (creating disposable
 // test thresholds, watching alarm fire, verifying notification email).
 
+// Precompile regex patterns for hot-path detection
+const _VIEWLINC_HOST_RE = /(^|\.)viewlinc\b/i;
+const _VIEWLINC_IP_RE = /^192\.168\.100\.\d+$/;
+const _VIEWLINC_GOAL_RE = /viewlinc|ambio\b/i;
+const _VALIDATION_CODE_RE = /\boq[\s_-]?\d|\biq[\s_-]?\d|\bpq[\s_-]?\d/;
+const _CHAMBER_RE = /threshold|rfl100|chamber|stability/;
+
 export const ambioViewlinc = {
   id: 'ambio_viewlinc',
   label: 'Ambio viewLinc',
@@ -28,13 +35,13 @@ export const ambioViewlinc = {
       try {
         const host = new URL(url).host.toLowerCase();
         // Common internal viewLinc deployments — IP-based + DNS-based.
-        if (/(^|\.)viewlinc\b/i.test(host)) return true;
-        if (/^192\.168\.100\.\d+$/.test(host)) return true;  // user's specific server
+        if (_VIEWLINC_HOST_RE.test(host)) return true;
+        if (_VIEWLINC_IP_RE.test(host)) return true;  // user's specific server
       } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
     }
     const g = String(goal || '').toLowerCase();
-    if (/viewlinc|ambio\b/.test(g)) return true;
-    if (/\boq[\s_-]?\d|\biq[\s_-]?\d|\bpq[\s_-]?\d/.test(g) && /threshold|rfl100|chamber|stability/.test(g)) return true;
+    if (_VIEWLINC_GOAL_RE.test(g)) return true;
+    if (_VALIDATION_CODE_RE.test(g) && _CHAMBER_RE.test(g)) return true;
     return false;
   },
 
