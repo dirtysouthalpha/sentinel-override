@@ -4,27 +4,48 @@
 
 import { getErrorMessage } from './error-utils.js';
 
-const STORAGE_KEY = 'synthesized_knowledge';
+const STORAGE_KEY = 'synthesized_knowledge_current';
 const MAX_SYNTHESIS_ENTRIES = 1000;
 
 // Precompile regex for performance optimization
 const WHITESPACE_SPLIT_RE = /\s+/;
 
 /**
- * Synthesize knowledge from multiple sources
- * @param {string} runId - Run identifier
- * @param {Array} sources - Array of knowledge sources { type, content, confidence, source }
- * @returns {Promise<object>} Synthesized knowledge
+ * Synthesize knowledge from a run summary or array of sources.
+ * Accepts either an object { goal, history, reasoningTrace, biasStats, ... }
+ * or an array of { type, content, confidence, source } objects.
+ * @param {object|Array} sources - Run summary object or knowledge sources array
+ * @returns {Promise<object>} Synthesized knowledge with summary string
  */
-export async function synthesizeKnowledge(runId, sources) {
-  if (!sources || sources.length === 0) {
-    return { synthesized: [], conflicts: [], gaps: [] };
+export async function synthesizeKnowledge(sources) {
+  // Accept run-summary object form (agent-engine.js usage)
+  if (sources && !Array.isArray(sources) && typeof sources === 'object') {
+    const runData = sources;
+    const stepCount = Array.isArray(runData.history) ? runData.history.length : 0;
+    const biasDetections = runData.biasStats?.totalDetections ?? 0;
+    const contradictions = runData.contradictionStats?.totalDetections ?? 0;
+    const reasoningSteps = runData.reasoningTrace?.totalSteps ?? 0;
+
+    const synthesis = {
+      synthesized: [{ type: 'run_summary', goal: runData.goal || '', stepCount, reasoningSteps, biasDetections, contradictions }],
+      conflicts: [],
+      gaps: [],
+      summary: `Goal: ${runData.goal || '(none)'} | Steps: ${stepCount} | Reasoning: ${reasoningSteps} | Biases: ${biasDetections} | Contradictions: ${contradictions}`
+    };
+
+    await storeSynthesis(synthesis);
+    return synthesis;
+  }
+
+  if (!sources || (Array.isArray(sources) && sources.length === 0)) {
+    return { synthesized: [], conflicts: [], gaps: [], summary: 'No sources provided.' };
   }
 
   const synthesis = {
     synthesized: [],
     conflicts: [],
     gaps: [],
+    summary: '',
     metadata: {
       timestamp: Date.now(),
       sourceCount: sources.length,
@@ -32,10 +53,8 @@ export async function synthesizeKnowledge(runId, sources) {
     }
   };
 
-  // Group by type
   const byType = groupByType(sources);
 
-  // Synthesize each type
   for (const [type, typeSources] of Object.entries(byType)) {
     const typeSynthesis = await synthesizeByType(type, typeSources);
     synthesis.synthesized.push(...typeSynthesis.synthesized);
@@ -44,14 +63,12 @@ export async function synthesizeKnowledge(runId, sources) {
     synthesis.metadata.types.add(type);
   }
 
-  // Cross-type synthesis
   const crossSynthesis = await crossTypeSynthesis(synthesis.synthesized);
   synthesis.synthesized.push(...crossSynthesis.synthesized);
   synthesis.conflicts.push(...crossSynthesis.conflicts);
+  synthesis.summary = `${synthesis.synthesized.length} items synthesized, ${synthesis.conflicts.length} conflicts`;
 
-  // Store synthesis
-  await storeSynthesis(runId, synthesis);
-
+  await storeSynthesis(synthesis);
   return synthesis;
 }
 
@@ -442,40 +459,34 @@ function areContradictory(item1, item2) {
 }
 
 /**
- * Store synthesis result
- * @param {string} runId - Run identifier
+ * Store synthesis result for the current run.
  * @param {object} synthesis - Synthesis result
  */
-export async function storeSynthesis(runId, synthesis) {
+export async function storeSynthesis(synthesis) {
   try {
-    const key = `${STORAGE_KEY}_${runId}`;
-    const result = await chrome.storage.local.get([key]);
-    const existing = result[key] || { entries: [] };
+    const result = await chrome.storage.local.get([STORAGE_KEY]);
+    const existing = result[STORAGE_KEY] || { entries: [] };
 
-    // Add new entry
     existing.entries.push(synthesis);
 
-    // Cap entries
     if (existing.entries.length > MAX_SYNTHESIS_ENTRIES) {
       existing.entries = existing.entries.slice(-MAX_SYNTHESIS_ENTRIES);
     }
 
-    await chrome.storage.local.set({ [key]: existing });
+    await chrome.storage.local.set({ [STORAGE_KEY]: existing });
   } catch (e) {
     console.error('[Sentinel] Failed to store synthesis:', getErrorMessage(e));
   }
 }
 
 /**
- * Get synthesis history for a run
- * @param {string} runId - Run identifier
+ * Get synthesis history for the current run.
  * @returns {Promise<object>} Synthesis history
  */
-export async function getSynthesis(runId) {
+export async function getSynthesis() {
   try {
-    const key = `${STORAGE_KEY}_${runId}`;
-    const result = await chrome.storage.local.get([key]);
-    return result[key] || { entries: [] };
+    const result = await chrome.storage.local.get([STORAGE_KEY]);
+    return result[STORAGE_KEY] || { entries: [] };
   } catch (e) {
     console.error('[Sentinel] Failed to get synthesis:', getErrorMessage(e));
     return { entries: [] };
@@ -483,12 +494,11 @@ export async function getSynthesis(runId) {
 }
 
 /**
- * Get synthesis statistics for a run
- * @param {string} runId - Run identifier
+ * Get synthesis statistics for the current run.
  * @returns {Promise<object>} Synthesis statistics
  */
-export async function getSynthesisStatistics(runId) {
-  const synthesis = await getSynthesis(runId);
+export async function getSynthesisStatistics() {
+  const synthesis = await getSynthesis();
   const entries = synthesis.entries || [];
 
   if (entries.length === 0) {
@@ -524,13 +534,11 @@ export async function getSynthesisStatistics(runId) {
 }
 
 /**
- * Clear synthesis for a run
- * @param {string} runId - Run identifier
+ * Clear synthesis for the current run.
  */
-export async function clearSynthesis(runId) {
+export async function clearSynthesis() {
   try {
-    const key = `${STORAGE_KEY}_${runId}`;
-    await chrome.storage.local.remove(key);
+    await chrome.storage.local.remove(STORAGE_KEY);
   } catch (e) {
     console.error('[Sentinel] Failed to clear synthesis:', getErrorMessage(e));
   }

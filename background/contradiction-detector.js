@@ -376,21 +376,21 @@ function areContradictoryStatements(stmt1, stmt2) {
   return false;
 }
 
+const CONTRADICTION_LOG_KEY = 'contradiction_log_current';
+
 /**
- * Log contradiction detection for a run
- * @param {string} runId - Run identifier
+ * Log contradiction detection for the current run.
  * @param {object} contradictionAnalysis - Analysis result
  * @param {number} step - Step number
  */
-export async function logContradictionDetection(runId, contradictionAnalysis, step = 0) {
+export async function logContradictionDetection(contradictionAnalysis, step = 0) {
   if (!contradictionAnalysis || !contradictionAnalysis.hasContradictions) {
     return;
   }
 
   try {
-    const key = `contradiction_log_${runId}`;
-    const result = await chrome.storage.local.get([key]);
-    const log = result[key] || [];
+    const result = await chrome.storage.local.get([CONTRADICTION_LOG_KEY]);
+    const log = result[CONTRADICTION_LOG_KEY] || [];
 
     log.push({
       step,
@@ -399,22 +399,20 @@ export async function logContradictionDetection(runId, contradictionAnalysis, st
       totalScore: contradictionAnalysis.totalScore
     });
 
-    await chrome.storage.local.set({ [key]: log });
+    await chrome.storage.local.set({ [CONTRADICTION_LOG_KEY]: log });
   } catch (e) {
     console.error('[Sentinel] Failed to log contradiction detection:', getErrorMessage(e));
   }
 }
 
 /**
- * Get contradiction log for a run
- * @param {string} runId - Run identifier
+ * Get contradiction log for the current run.
  * @returns {Promise<Array>} Contradiction log
  */
-export async function getContradictionLog(runId) {
+export async function getContradictionLog() {
   try {
-    const key = `contradiction_log_${runId}`;
-    const result = await chrome.storage.local.get([key]);
-    return result[key] || [];
+    const result = await chrome.storage.local.get([CONTRADICTION_LOG_KEY]);
+    return result[CONTRADICTION_LOG_KEY] || [];
   } catch (e) {
     console.error('[Sentinel] Failed to retrieve contradiction log:', getErrorMessage(e));
     return [];
@@ -422,12 +420,11 @@ export async function getContradictionLog(runId) {
 }
 
 /**
- * Get contradiction statistics for a run
- * @param {string} runId - Run identifier
+ * Get contradiction statistics for the current run.
  * @returns {Promise<object>} Contradiction statistics
  */
-export async function getContradictionStatistics(runId) {
-  const log = await getContradictionLog(runId);
+export async function getContradictionStatistics() {
+  const log = await getContradictionLog();
 
   if (log.length === 0) {
     return {
@@ -468,12 +465,10 @@ export async function getContradictionStatistics(runId) {
 
 /**
  * Clear contradiction log for a run
- * @param {string} runId - Run identifier
  */
-export async function clearContradictionLog(runId) {
+export async function clearContradictionLog() {
   try {
-    const key = `contradiction_log_${runId}`;
-    await chrome.storage.local.remove(key);
+    await chrome.storage.local.remove(CONTRADICTION_LOG_KEY);
   } catch (e) {
     console.error('[Sentinel] Failed to clear contradiction log:', getErrorMessage(e));
   }

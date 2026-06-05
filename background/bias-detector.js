@@ -241,19 +241,20 @@ function getSeverityLabel(severity) {
   }
 }
 
+const BIAS_LOG_KEY = 'bias_log_current';
+
 /**
  * Store bias detection in run log
- * @param {string} runId - The run identifier
  * @param {object} biasAnalysis - The bias analysis result
  * @param {number} step - The step number
  */
-export async function logBiasDetection(runId, biasAnalysis, step = 0) {
+export async function logBiasDetection(biasAnalysis, step = 0) {
   if (!biasAnalysis || !biasAnalysis.hasBias) {
     return;
   }
 
   try {
-    const key = `bias_log_${runId}`;
+    const key = BIAS_LOG_KEY;
     const result = await chrome.storage.local.get([key]);
     const log = result[key] || [];
 
@@ -272,15 +273,13 @@ export async function logBiasDetection(runId, biasAnalysis, step = 0) {
 }
 
 /**
- * Retrieve bias log for a run
- * @param {string} runId - The run identifier
+ * Retrieve bias log for the current run.
  * @returns {Promise<Array>} Array of bias detection logs
  */
-export async function getBiasLog(runId) {
+export async function getBiasLog() {
   try {
-    const key = `bias_log_${runId}`;
-    const result = await chrome.storage.local.get([key]);
-    return result[key] || [];
+    const result = await chrome.storage.local.get([BIAS_LOG_KEY]);
+    return result[BIAS_LOG_KEY] || [];
   } catch (e) {
     console.error('[Sentinel] Failed to retrieve bias log:', getErrorMessage(e));
     return [];
@@ -288,12 +287,11 @@ export async function getBiasLog(runId) {
 }
 
 /**
- * Get overall bias statistics for a run
- * @param {string} runId - The run identifier
+ * Get overall bias statistics for the current run.
  * @returns {Promise<object>} Bias statistics
  */
-export async function getBiasStatistics(runId) {
-  const log = await getBiasLog(runId);
+export async function getBiasStatistics() {
+  const log = await getBiasLog();
 
   if (log.length === 0) {
     return {
@@ -335,13 +333,11 @@ export async function getBiasStatistics(runId) {
 }
 
 /**
- * Clear bias log for a run
- * @param {string} runId - The run identifier
+ * Clear bias log for the current run.
  */
-export async function clearBiasLog(runId) {
+export async function clearBiasLog() {
   try {
-    const key = `bias_log_${runId}`;
-    await chrome.storage.local.remove(key);
+    await chrome.storage.local.remove(BIAS_LOG_KEY);
   } catch (e) {
     console.error('[Sentinel] Failed to clear bias log:', getErrorMessage(e));
   }

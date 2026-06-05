@@ -7,6 +7,9 @@ import { getErrorMessage } from './error-utils.js';
 const STORAGE_KEY = 'novelty_history';
 const MAX_HISTORY = 5000;
 
+// Track the most recently used runId so stats/clear work without explicit runId
+let _currentRunId = null;
+
 // Precompile regex patterns for performance optimization
 const WHITESPACE_SPLIT_RE = /\s+/;
 const NON_ALPHA_RE = /[^a-z]/g;
@@ -356,6 +359,7 @@ async function checkBehavioralNovelty(data, history) {
  * @param {object} result - Novelty analysis result
  */
 export async function storeNoveltyResult(runId, data, result) {
+  _currentRunId = runId;
   try {
     const history = await getNoveltyHistory(runId);
 
@@ -400,12 +404,12 @@ export async function getNoveltyHistory(runId) {
 }
 
 /**
- * Get novelty statistics for a run
- * @param {string} runId - Run identifier
+ * Get novelty statistics for the current (or specified) run.
+ * @param {string} [runId] - Run identifier; defaults to the most recent run
  * @returns {Promise<object>} Novelty statistics
  */
 export async function getNoveltyStatistics(runId) {
-  const history = await getNoveltyHistory(runId);
+  const history = await getNoveltyHistory(runId || _currentRunId);
 
   if (history.length === 0) {
     return {
@@ -442,13 +446,15 @@ export async function getNoveltyStatistics(runId) {
 }
 
 /**
- * Clear novelty history for a run
- * @param {string} runId - Run identifier
+ * Clear novelty history for the current (or specified) run.
+ * @param {string} [runId] - Run identifier; defaults to the most recent run
  */
 export async function clearNoveltyHistory(runId) {
+  const id = runId || _currentRunId;
+  if (!id) return; // nothing stored yet
+  _currentRunId = null;
   try {
-    const key = `${STORAGE_KEY}_${runId}`;
-    await chrome.storage.local.remove(key);
+    await chrome.storage.local.remove(`${STORAGE_KEY}_${id}`);
   } catch (e) {
     console.error('[Sentinel] Failed to clear novelty history:', getErrorMessage(e));
   }
