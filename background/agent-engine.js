@@ -1773,6 +1773,7 @@ export { auditLogToCsv };
 const CHANGE_VERBS_RE = /\b(add|create|delete|modify|update|enable|disable|block|allow|configure|grant|revoke|assign|remove|change|deploy|push)\b/i;
 const COMMIT_TARGET_RE = /\b(apply|applied|save|saved|commit|committed|deploy|deployed|accept|accepted|update|updated|create|created|delete|deleted|publish|published|submit|submitted|confirm|confirmed|ok)\b/i;
 const CONFIG_PLATFORM_RE = /(sonicwall|sonicos|fortinet|fortigate|cisco|paloalto|pan-os|panorama|admin\.microsoft|admin\.exchange|entra\.microsoft|portal\.azure|connectwise|ninjaone|ninja\.io|ninjarmm|datto|autotask|itglue|it-glue|huntress|screenconnect)/i;
+const MULTI_PORTAL_RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/gi;
 
 function isConfigChangeGoal(goal, currentUrl) {
   const text = String(goal || '');
@@ -3595,7 +3596,7 @@ async function runAgentLoop(goal, workingTabId) {
       try {
         // Use global match to count distinct platform keywords safely (avoids ReDoS from .*  pattern)
         if (typeof goal === 'string') {
-          const _multiPortalMatches = goal.match(/\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/gi);
+          const _multiPortalMatches = goal.match(MULTI_PORTAL_RE);
           if (_multiPortalMatches && _multiPortalMatches.length >= 2) {
             dynamicBaseline = CONFIG.maxSteps + 50;
           }
