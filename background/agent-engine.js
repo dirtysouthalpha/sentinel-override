@@ -6288,12 +6288,14 @@ async function runAgentLoop(goal, workingTabId) {
             const y = Number(command.y);
             if (typeof x !== 'number' || Number.isNaN(x)) throw new Error('Invalid x coordinate: must be a number');
             if (typeof y !== 'number' || Number.isNaN(y)) throw new Error('Invalid y coordinate: must be a number');
+            // Cache rounded coordinates (perf)
+            const rx = Math.round(x), ry = Math.round(y);
             const r = await cdpDispatchClick(tab, x, y, {
               button: command.button,
               clickCount: command.clickCount,
-              description: `Clicking at (${Math.round(x)}, ${Math.round(y)})`
+              description: `Clicking at (${rx}, ${ry})`
             });
-            if (r.ok) { result = `Clicked at (${Math.round(x)},${Math.round(y)}) via CDP`; cdpDone = true; }
+            if (r.ok) { result = `Clicked at (${rx},${ry}) via CDP`; cdpDone = true; }
             else { console.warn('[CDP] dispatchClick failed, falling back:', (typeof r === 'object' && r !== null && typeof r.error === 'string' ? r.error : String(r?.error || 'unknown'))); }
           } else if (command.type === 'click') {
             // Resolve ref/selector to a bbox center via the content script.
