@@ -2767,7 +2767,7 @@ async function renderRunLogHistoryList() {
       b.addEventListener('click', () => deleteRunLogById(b.dataset.runid));
     });
   } catch (e) {
-    listEl.innerHTML = `<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ${getErrorMessage(e)}</div>`;
+    listEl.innerHTML = `<div style="text-align:center; color:var(--error-color); font-size:13px; padding:24px;">Failed to load run log index: ${escapeHtml(getErrorMessage(e))}</div>`;
   }
 }
 
