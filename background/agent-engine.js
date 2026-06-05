@@ -90,8 +90,7 @@ const GOAL_BARE_SITE_RE = /(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?(
 // Precompile regex for selector prefix
 const REF_SELECTOR_RE = /^ref_/;
 
-// Precompile regex for IP address redaction
-const IP_ADDRESS_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+// IP_ADDRESS_RE removed - unused (PII_IP_RE is used for PII redaction instead)
 
 // Precompile regex for memory variable replacement
 const MEMORY_VAR_RE = /::(\w+)::/g;
@@ -263,12 +262,12 @@ import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.j
 // run-log index entry.
 import { computeTrustScore, suggestRetryActions } from './trust-score.js';
 // v10.0 Intelligence Systems Integration
-import { initReasoningTrace, captureReasoningStep, getReasoningSummary, clearReasoningTrace } from './reasoning-trace.js';
-import { analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, generateBiasReport, logBiasDetection, getBiasStatistics, clearBiasLog } from './bias-detector.js';
-import { initKnowledgeGraph, addKnowledgeNode, updateKnowledgeNode, addKnowledgeEdge, findKnowledgeContradictions, getKnowledgeGraphStats, persistKnowledgeGraph } from './knowledge-graph.js';
-import { analyzeForContradictions, compareResponsesForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
+import { initReasoningTrace, captureReasoningStep, getReasoningSummary } from './reasoning-trace.js';
+import { analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics, clearBiasLog } from './bias-detector.js';
+import { initKnowledgeGraph, addKnowledgeNode, persistKnowledgeGraph } from './knowledge-graph.js';
+import { analyzeForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
 import { analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics, clearNoveltyHistory } from './novelty-detector.js';
-import { synthesizeKnowledge, getSynthesis, getSynthesisStatistics, clearSynthesis } from './knowledge-synthesizer.js';
+import { synthesizeKnowledge, getSynthesisStatistics, clearSynthesis } from './knowledge-synthesizer.js';
 // v10.0 Advanced Intelligence Systems Integration (Phase 5)
 import { PredictiveEngine } from './predictive-engine.js';
 import { RuntimeProfiler } from './runtime-profiler.js';
@@ -311,10 +310,10 @@ let _pendingContextInjections = []; // Mid-run context notes queued by the user;
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 // Phase 5: Advanced Intelligence State
-let predictiveAnalysisEnabled = false;  // Predictive analytics enabled
+let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
 let profilingEnabled = false;            // Runtime profiling enabled
 let mutationProposals = [];              // Proposed mutations for review
-let activeCanaryDeployment = null;       // Active canary deployment status
+let _activeCanaryDeployment = null;       // Active canary deployment status (reserved for future)
 let selfHealingEnabled = false;          // Self-healing system enabled
 let healingHistory = [];                 // Self-healing attempt history
 // Expose agentRunning for index.js
@@ -691,10 +690,10 @@ export function resetAgentState() {
   _pageWasReady = false;
   _lastNukeClean = false;
   // Phase 5: Reset advanced intelligence state
-  predictiveAnalysisEnabled = false;
+  _predictiveAnalysisEnabled = false;
   profilingEnabled = false;
   mutationProposals = [];
-  activeCanaryDeployment = null;
+  _activeCanaryDeployment = null;
   selfHealingEnabled = false;
   healingHistory = [];
   resetAllContexts();
@@ -3616,7 +3615,7 @@ async function runAgentLoop(goal, workingTabId) {
 
   // Phase 5: v8.0/v9.0 Advanced Intelligence - Start profiling and predictive analysis
   profilingEnabled = true;
-  predictiveAnalysisEnabled = true;
+  _predictiveAnalysisEnabled = true;
   selfHealingEnabled = true;
   RuntimeProfiler.start();
   console.log('[Sentinel Phase 5] Runtime profiling started');
