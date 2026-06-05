@@ -903,8 +903,9 @@ export async function startAgent(goal, sender) {
   }
 
   agentRunning = true;
+  const _runStartTime = Date.now();
   // Persist running state so SW restarts can detect an interrupted run
-  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: Date.now() }); } catch(_sessionErr) {
+  try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: _runStartTime }); } catch(_sessionErr) {
     /* Non-fatal: session storage set failed */
   }
   resetAgentState();
@@ -7280,7 +7281,7 @@ return { ok: true, value: el.value };
     // Run predictive analysis on this run
     const predictiveData = {
       goal: _lastGoal,
-      duration: Date.now() - (agentReport?.startTime || Date.now()),
+      duration: Date.now() - _runStartTime,
       stepCount: stepCount,
       apiCalls: apiCallCount,
       history: history,
@@ -7308,7 +7309,7 @@ return { ok: true, value: el.value };
     }
     
     // Store Phase 5 results in audit log
-    await appendAuditEntry(agentReport?.runId || 'unknown', 'phase5_intelligence', {
+    await appendAuditEntry(runLogId || 'unknown', 'phase5_intelligence', {
       message: 'Phase 5 Predictive & Profiling Analysis',
       profiling: profilingSummary,
       predictive: predictiveInsights,
@@ -7326,7 +7327,7 @@ return { ok: true, value: el.value };
       content: JSON.stringify(history.slice(-10)), // last 10 steps for novelty check
       context: { goal: _lastGoal, stepCount: history.length, apiCallCount }
     };
-    const runId = agentReport?.runId || 'current';
+    const runId = runLogId || 'current';
     const noveltyResults = await analyzeForNovelty(runId, noveltyData);
     await storeNoveltyResult(runId, noveltyData, noveltyResults);
     console.log('[Sentinel] Novelty detection complete:', noveltyResults.isNovel ? 'novel' : 'familiar');
@@ -7360,7 +7361,7 @@ return { ok: true, value: el.value };
     const complianceReport = {
       timestamp: new Date().toISOString(),
       goal: _lastGoal,
-      duration: Date.now() - (agentReport?.startTime || Date.now()),
+      duration: Date.now() - _runStartTime,
       apiCalls: apiCallCount,
       biasDetections,
       contradictionDetections,
@@ -7369,7 +7370,7 @@ return { ok: true, value: el.value };
       reasoningTrace
     };
     // Append compliance report to audit log
-    await appendAuditEntry(agentReport?.runId || 'unknown', 'compliance_report', {
+    await appendAuditEntry(runLogId || 'unknown', 'compliance_report', {
       message: 'V10.0 Intelligence Compliance Report',
       report: complianceReport
     });
