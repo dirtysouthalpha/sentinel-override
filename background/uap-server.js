@@ -24,6 +24,7 @@ class UAPServer {
     this.activeRuns = new Map(); // runId → { clientId, goal, context, startTime }
     this.rateLimits = new Map(); // clientId → { requests: [], count }
     this.auditLog = [];
+    this.startTime = Date.now();
     this.config = {
       enabled: false,
       port: 8765,
