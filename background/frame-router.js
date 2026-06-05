@@ -5,6 +5,10 @@
 import { getErrorMessage } from './error-utils.js';
 import { THREE_HUNDRED_MS } from './constants.js';
 
+// Precompile regex patterns for hot path optimization
+const INPUT_TEXTAREA_TAG_RE = /^(INPUT|TEXTAREA)$/;
+const MULTIPLE_NEWLINES_RE = /\n{3,}/g;
+
 // ========== Content Script Files for Frame Injection ==========
 // Same set as tab-manager.js CONTENT_SCRIPT_FILES, minus index.js (handler injected separately)
 const FRAME_UTILITY_FILES = [
@@ -300,7 +304,7 @@ async function runCommandInFrame(command) {
         }
 
         // Standard INPUT/TEXTAREA
-        if (/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+        if (INPUT_TEXTAREA_TAG_RE.test(el.tagName)) {
           const proto = el.tagName === 'TEXTAREA'
             ? (view.HTMLTextAreaElement && view.HTMLTextAreaElement.prototype)
             : (view.HTMLInputElement && view.HTMLInputElement.prototype);
@@ -359,7 +363,7 @@ async function runCommandInFrame(command) {
           } catch(e) {
             console.warn('[Sentinel/frame-router] DOM cleanup failed:', getErrorMessage(e));
           }
-          content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+          content = (clone.innerText || clone.textContent || '').replace(MULTIPLE_NEWLINES_RE, '\n\n').trim();
         }
         if ((!content || content.length < 200) && doc.body) {
           const bodyClone = doc.body.cloneNode(true);
@@ -369,7 +373,7 @@ async function runCommandInFrame(command) {
           } catch(e) {
             console.warn('[Sentinel/frame-router] Body cleanup failed:', getErrorMessage(e));
           }
-          content = (bodyClone.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+          content = (bodyClone.innerText || '').replace(MULTIPLE_NEWLINES_RE, '\n\n').trim();
         }
         return { ok: true, data: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
       }
