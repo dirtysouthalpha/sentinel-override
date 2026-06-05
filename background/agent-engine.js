@@ -293,6 +293,7 @@ let detectedTenant = null;      // (3.7.0) {tid, onmicrosoft, chipText, hostname
 let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in storage
 let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
 const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped at 20 entries for replay export
+const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
 // (3.30.0) Trust-score counters. Module-level so the loop can update them
@@ -5339,6 +5340,11 @@ async function runAgentLoop(goal, workingTabId) {
             });
           }
         } catch (_e) { /* mode directive logging non-fatal */ }
+        // (10.0.1) Cache agentState property access for performance
+        const _inputTokens = agentState.totalInputTokens || 0;
+        const _outputTokens = agentState.totalOutputTokens || 0;
+        const _cacheReadTokens = agentState.totalCacheReadTokens || 0;
+        const _cacheWriteTokens = agentState.totalCacheWriteTokens || 0;
         chrome.runtime.sendMessage({
           action: 'agent_finished',
           summary: finalSummary,
@@ -5349,11 +5355,11 @@ async function runAgentLoop(goal, workingTabId) {
           originalGoal: goal,
           // (3.38.0) Real token counts accumulated from API response.usage each step.
           tokenUsage: {
-            input:       agentState.totalInputTokens   || 0,
-            output:      agentState.totalOutputTokens  || 0,
-            total:      (agentState.totalInputTokens   || 0) + (agentState.totalOutputTokens || 0),
-            cacheRead:   agentState.totalCacheReadTokens  || 0,
-            cacheWrite:  agentState.totalCacheWriteTokens || 0,
+            input: _inputTokens,
+            output: _outputTokens,
+            total: _inputTokens + _outputTokens,
+            cacheRead: _cacheReadTokens,
+            cacheWrite: _cacheWriteTokens,
           }
         }).catch((e) => {
           console.error('[_retrySuggestions] Unhandled rejection:', e);
@@ -5560,7 +5566,13 @@ async function runAgentLoop(goal, workingTabId) {
         } else if (_preset === 'dkim') {
           const _sel = String(command.selector || 'default').trim().replace(DOMAINKEY_SUFFIX_RE, '');
           _type = 'TXT';
-          _domain = `${_sel}._domainkey.${_domain.replace(new RegExp(`\\.${_sel}\\._domainkey\\.`, 'i'), '.')}`;
+          // (10.0.1) Cache regex pattern for this selector to avoid repeated RegExp creation
+          let _dkimDomainKeyRe = _dkimDomainKeyCache.get(_sel);
+          if (!_dkimDomainKeyRe) {
+            _dkimDomainKeyRe = new RegExp(`\\.${_sel}\\._domainkey\\.`, 'i');
+            _dkimDomainKeyCache.set(_sel, _dkimDomainKeyRe);
+          }
+          _domain = `${_sel}._domainkey.${_domain.replace(_dkimDomainKeyRe, '.')}`;
         }
         if (!_domain) {
           const _r = 'lookup: domain is required';
