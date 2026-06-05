@@ -117,6 +117,20 @@ const getObjectLength = (obj) => {
   return count;
 };
 
+// Helper function to get first line without creating array
+const getFirstLine = (str) => {
+  if (!str) return '';
+  const idx = str.indexOf('\n');
+  return idx === -1 ? str : str.slice(0, idx);
+};
+
+// Helper function to get first sentence without creating array
+const getFirstSentence = (str) => {
+  if (!str) return '';
+  const idx = str.indexOf('. ');
+  return idx === -1 ? str : str.slice(0, idx + 1);
+};
+
 // Precompile regex for PII redaction (error logging)
 const PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
 const PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -2062,7 +2076,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
     `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
     '',
     '**MAIN ISSUE:**',
-    `- ${((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').slice(0, 280)}`,
+    `- ${getFirstLine(goal || '').slice(0, 280)}`,
     '',
     '**WHAT HAS BEEN TRIED:**',
     tried,
@@ -2088,7 +2102,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
-  const firstSentence = ((summary || '').split(SENTENCE_SPLIT_RE)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
+  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
   const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
@@ -2123,7 +2137,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
-  const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
+  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
   const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
@@ -2156,7 +2170,7 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
 
 function formatItGlueKb(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
-  const goalShort = ((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').slice(0, 100);
+  const goalShort = getFirstLine(goal || '').slice(0, 100);
   const ticketNum = extractTicketNumber(goal);
   const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
 
@@ -2182,7 +2196,7 @@ function formatItGlueKb(summary, goal, tech, options) {
     `- ${(title || 'Untitled')}`,
     '',
     '**Issue:**',
-    `- ${((summary || '').split(SENTENCE_SPLIT_RE)[0] || '').slice(0, 240)}`,
+    `- ${getFirstSentence(summary || '').slice(0, 240)}`,
     '',
     '**Environment:**',
     `- ${envBits.join('; ')}`,
@@ -2214,8 +2228,8 @@ function formatClientEmail(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
-  const briefIssue = ((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
-  const oneLine = ((summary || '').split(SENTENCE_SPLIT_RE)[0] || 'The issue has been investigated and addressed.').slice(0, 240);
+  const briefIssue = getFirstLine(goal || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
+  const oneLine = getFirstSentence(summary || 'The issue has been investigated and addressed.').slice(0, 240);
 
   const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
 
