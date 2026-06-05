@@ -48,6 +48,58 @@ const PORTAL_ENTRA_RE = /entra/i;
 const PORTAL_EXCHANGE_RE = /admin\.exchange/i;
 const PORTAL_PURVIEW_RE = /purview/i;
 const PORTAL_M365_ADMIN_RE = /admin\.microsoft/i;
+
+// Precompile regex for ticket number extraction
+const TICKET_NUMBER_RE1 = /(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i;
+const TICKET_NUMBER_RE2 = /#(\d{3,8})/;
+
+// Precompile regex for string operations (performance optimization)
+const NEWLINE_SPLIT_RE = /\n+/;
+const SINGLE_NEWLINE_SPLIT_RE = /\n/;
+const WHITESPACE_NORMALIZE_RE = /\s+/g;
+const WHITESPACE_SPLIT_RE = /\s+/;
+
+// Precompile regex for email removal (URL extraction)
+const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
+
+// Precompile regex for URL extraction
+const URL_EXTRACT_RE = /https?:\/\/[^\s"'<>,]+/i;
+const NAVIGATE_URL_EXTRACT_RE = /(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i;
+
+// Precompile regex for hostname cleaning
+const WWW_PREFIX_RE = /^www\./;
+const TRAILING_SLASH_RE = /\/$/;
+
+// Precompile regex for field list parsing
+const FIELD_LIST_SPLIT_RE = /[,]|\s+and\s+|\s+&\s+/i;
+const FIELD_PREFIX_CLEAN_RE = /^the\s+|\.$/gi;
+
+// Precompile regex for ticket prefix removal
+const TICKET_PREFIX_RE = /^(ticket|incident)\s*#?\d*[:\-\s]+/i;
+
+// Precompile regex for domain cleaning
+const DOMAIN_CLEAN_RE = /^https?:\/\/|\/.*$/gi;
+const DMARC_PREFIX_RE = /^_dmarc\./i;
+const DOMAINKEY_SUFFIX_RE = /\._domainkey.*$/i;
+
+// Precompile regex for selector prefix
+const REF_SELECTOR_RE = /^ref_/;
+
+// Precompile regex for IP address redaction
+const IP_ADDRESS_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+
+// Precompile regex for memory variable replacement
+const MEMORY_VAR_RE = /::(\w+)::/g;
+
+// Precompile regex for step list prefix
+const STEP_PREFIX_RE = /^(\d+[.)]|-|\*)\s+/;
+
+// Precompile regex for PII redaction (error logging)
+const PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+const PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
+const PII_TICKET_RE = /(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi;
+const PII_CLIENT_STRING_RE = /"[^"]{2,60}"/g;
+const PII_CLIENT_SINGLE_RE = /'[^']{2,60}'/g;
 const PORTAL_ONEDRIVE_RE = /onedrive|sharepoint/i;
 const PORTAL_TEAMS_RE = /teams/i;
 const PORTAL_INTUNE_RE = /intune|endpoint\.microsoft/i;
@@ -1890,8 +1942,8 @@ async function getTechnicianInfo() {
 // "incident #NNN", or a leading "#NNN" pattern.
 function extractTicketNumber(goal) {
   if (!goal) return '';
-  const m = goal.match(/(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i)
-         || goal.match(/#(\d{3,8})/);
+  const m = goal.match(TICKET_NUMBER_RE1)
+         || goal.match(TICKET_NUMBER_RE2);
   return m ? m[1] : '';
 }
 
@@ -1975,7 +2027,7 @@ function _splitTriedSection(summary) {
   // Pull "what's been tried" candidates from the summary — anything that reads
   // like a remediation step. Falls back to a single line if nothing matches.
   if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
-  const lines = summary.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const lines = summary.split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
   const triedRe = TRIED_ACTION_RE;
   const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
   return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
@@ -1991,14 +2043,14 @@ function formatTicketKickoff(summary, goal, tech, options) {
   const sentences = (summary || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
   const tail = sentences.slice(-3);
   const pathLines = tail.length
-    ? tail.map((s, i) => `${i + 1}. ${s.replace(/\s+/g, ' ').slice(0, 240)}`)
+    ? tail.map((s, i) => `${i + 1}. ${s.replace(WHITESPACE_NORMALIZE_RE, ' ').slice(0, 240)}`)
     : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
 
   const lines = [
     `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
     '',
     '**MAIN ISSUE:**',
-    `- ${((goal || '').split(/\n/)[0] || '').slice(0, 280)}`,
+    `- ${((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').slice(0, 280)}`,
     '',
     '**WHAT HAS BEEN TRIED:**',
     tried,
@@ -2092,16 +2144,16 @@ function formatWaitingOnVendor(summary, goal, tech, options) {
 
 function formatItGlueKb(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
-  const goalShort = ((goal || '').split(/\n/)[0] || '').slice(0, 100);
+  const goalShort = ((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').slice(0, 100);
   const ticketNum = extractTicketNumber(goal);
   const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
 
   // Derive resolution steps from the summary's numbered/bulleted lines or
   // sentence breakdown.
-  const lines = (summary || '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const lines = (summary || '').split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
   const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
   const steps = stepCandidates.length
-    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(/^(\d+[.)]|-|\*)\s+/, '')}`)
+    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(STEP_PREFIX_RE, '')}`)
     : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
 
   const envBits = [];
@@ -2150,7 +2202,7 @@ function formatClientEmail(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
-  const briefIssue = ((goal || '').split(/\n/)[0] || '').replace(/^(ticket|incident)\s*#?\d*[:\-\s]+/i, '').slice(0, 80) || 'your reported issue';
+  const briefIssue = ((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
   const oneLine = ((summary || '').split(/(?<=[.!?])\s+/)[0] || 'The issue has been investigated and addressed.').slice(0, 240);
 
   const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
@@ -2633,7 +2685,7 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
 // ═══════════════════════════════════════════════════════════════════
 async function _universalCdpFallback(tab, cmd, opts) {
   var timeout = (opts && opts.timeout) || 5000;
-  var sel = cmd.selector || (cmd.ref ? cmd.ref.replace(/^ref_/, '#') : '') || '';
+  var sel = cmd.selector || (cmd.ref ? cmd.ref.replace(REF_SELECTOR_RE, '#') : '') || '';
   var textHint = cmd.text || cmd.value || '';
   
   // Build the fuzzy element finder as a self-contained JS string
@@ -2872,7 +2924,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
   
   // Strategy 2: Navigate to an alternative URL for the same site
   let host;
-  try { host = new URL(currentUrl).hostname.replace(/^www\./, ''); } catch (_urlErr) { host = ''; }
+  try { host = new URL(currentUrl).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { host = ''; }
   
   for (const [key, info] of Object.entries(CAPTCHA_HOST_MAP)) {
     if (host.includes(key) && goal) {
@@ -3156,8 +3208,8 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
 
   const fieldList = fieldListMatch[1];
   // Split on commas / "and" / "&" -- get individual field names
-  const rawFields = fieldList.split(/[,]|\s+and\s+|\s+&\s+/i)
-    .map(f => f.trim().replace(/^the\s+|\.$/gi, ''))
+  const rawFields = fieldList.split(FIELD_LIST_SPLIT_RE)
+    .map(f => f.trim().replace(FIELD_PREFIX_CLEAN_RE, ''))
     .filter(f => f.length > 3 && f.length < 60);
 
   if (rawFields.length < 2) return null;  // not a structured field list
@@ -3167,7 +3219,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
   const missing = [];
   for (const field of rawFields) {
     // Pull "key" tokens from the field name (skip filler words)
-    const tokens = typeof field === 'string' ? field.toLowerCase().split(/\s+/).filter(t => t.length > 3 && !FILLER_WORDS.has(t)) : [];
+    const tokens = typeof field === 'string' ? field.toLowerCase().split(WHITESPACE_SPLIT_RE).filter(t => t.length > 3 && !FILLER_WORDS.has(t)) : [];
     if (!tokens.length) continue;
     // Match if ANY meaningful token from this field shows up in evidence
     const found = typeof allEvidence === 'string' && tokens.some(t => allEvidence.includes(t));
@@ -3257,7 +3309,7 @@ function generateHeuristicPlan(goal, currentUrl) {
   if (!_urlMatch) {
     const _bareMatch = goal.match(BARE_SITE_RE);
     if (_bareMatch && _bareMatch[1]) {
-      const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
+      const _siteKey = _bareMatch[1].trim().toLowerCase().replace(WHITESPACE_NORMALIZE_RE, '');
       if (BARE_SITE_MAP[_siteKey]) {
         _urlMatch = [`go to ${_bareMatch[1]}`, `https://${BARE_SITE_MAP[_siteKey]}`];
       } else {
@@ -3273,8 +3325,8 @@ function generateHeuristicPlan(goal, currentUrl) {
   }
   const urlMatchFinal = _urlMatch;
   const targetUrl = urlMatchFinal && urlMatchFinal[1] ? urlMatchFinal[1] : null;
-  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(/^www\./, ''); } catch (_urlErr) { return ''; } })() : '';
-  const _normHost = currentHost.replace(/^www\./, '');
+  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { return ''; } })() : '';
+  const _normHost = currentHost.replace(WWW_PREFIX_RE, '');
   const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
 
   // Extract search query from goal
@@ -3391,7 +3443,7 @@ function _buildPageNarration(url, title, observation, pageContent) {
   try {
     const els = (observation && observation.elements) || [];
     const _text = (pageContent && pageContent.content) || '';
-    const host = (() => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (_urlErr) { return url; } })();
+    const host = (() => { try { return new URL(url).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { return url; } })();
     const pageTitle = (title || '').trim();
 
     // Single-pass optimization: count all element types and collect headings in one loop
@@ -3762,7 +3814,7 @@ async function runAgentLoop(goal, workingTabId) {
       if (stepCount === 1 && goal) {
         // Strip email addresses before URL extraction so "support@example.com" is
         // never mistaken for a navigation target.
-        const _goalForUrlExtract = goal.replace(/[\w.+-]+@[\w.-]+/g, '');
+        const _goalForUrlExtract = goal.replace(EMAIL_RE, '');
         // Only auto-navigate when the goal starts with an explicit navigation
         // imperative OR contains a full https:// URL. Avoid triggering on ticket
         // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
@@ -3779,7 +3831,7 @@ async function runAgentLoop(goal, workingTabId) {
         if (!urlMatch && _isExplicitNav) {
           const _step1Bare = _goalForUrlExtract.match(/(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
           if (_step1Bare && typeof _step1Bare[1] === 'string') {
-            const _step1Key = _step1Bare[1].trim().toLowerCase().replace(/\s+/g, '');
+            const _step1Key = _step1Bare[1].trim().toLowerCase().replace(WHITESPACE_NORMALIZE_RE, '');
             if (BARE_SITE_MAP[_step1Key]) {
               urlMatch = [`go to ${_step1Bare[1]}`, BARE_SITE_MAP[_step1Key]];
             } else {
@@ -3797,7 +3849,7 @@ async function runAgentLoop(goal, workingTabId) {
           try {
             const goalHostname = new URL(goalUrl).hostname.toLowerCase();
             const currentHostname = new URL(tabInfo.url).hostname.toLowerCase();
-            if (!currentHostname.includes(goalHostname.replace(/^www\./, ''))) {
+            if (!currentHostname.includes(goalHostname.replace(WWW_PREFIX_RE, ''))) {
               sendSilentUpdate(`Navigating to: ${goalUrl}`, stepCount);
               sendActionMessage({ type: 'navigate', url: goalUrl }, stepCount, null);
               await chrome.tabs.update(tab, { url: goalUrl });
@@ -4946,13 +4998,13 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Template substitution: replace ::key:: with memory values
       if (typeof command.text === 'string') {
-        command.text = command.text.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
+        command.text = command.text.replace(MEMORY_VAR_RE, (_, key) => agentMemory[key] || `::${key}::`);
       }
       if (typeof command.url === 'string') {
-        command.url = command.url.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
+        command.url = command.url.replace(MEMORY_VAR_RE, (_, key) => agentMemory[key] || `::${key}::`);
       }
       if (typeof command.value === 'string') {
-        command.value = command.value.replace(/::(\w+)::/g, (_, key) => agentMemory[key] || `::${key}::`);
+        command.value = command.value.replace(MEMORY_VAR_RE, (_, key) => agentMemory[key] || `::${key}::`);
       }
 
       // (#10) Sanity-check ref ids the LLM returns. A ref that doesn't appear
@@ -5510,7 +5562,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.39.0) preset: 'spf' | 'dmarc' | 'dkim' expand to the correct query target.
       if (command.type === 'lookup') {
         let _domain = typeof command.domain === 'string' ? command.domain.trim() : (typeof command.host === 'string' ? command.host.trim() : '');
-        _domain = _domain.replace(/^https?:\/\/|\/.*$/gi, '');
+        _domain = _domain.replace(DOMAIN_CLEAN_RE, '');
         let _type = typeof command.record_type === 'string' ? command.record_type.toUpperCase() : (typeof command.type_field === 'string' ? command.type_field.toUpperCase() : 'A');
         const _preset = typeof command.preset === 'string' ? command.preset.toLowerCase() : '';
         // Expand preset shortcuts into canonical DNS query parameters
@@ -5518,9 +5570,9 @@ async function runAgentLoop(goal, workingTabId) {
           _type = 'TXT';  // SPF lives in TXT at the root domain
         } else if (_preset === 'dmarc') {
           _type = 'TXT';
-          _domain = `_dmarc.${_domain.replace(/^_dmarc\./i, '')}`;
+          _domain = `_dmarc.${_domain.replace(DMARC_PREFIX_RE, '')}`;
         } else if (_preset === 'dkim') {
-          const _sel = String(command.selector || 'default').trim().replace(/\._domainkey.*$/i, '');
+          const _sel = String(command.selector || 'default').trim().replace(DOMAINKEY_SUFFIX_RE, '');
           _type = 'TXT';
           _domain = `${_sel}._domainkey.${_domain.replace(new RegExp(`\\.${_sel}\\._domainkey\\.`, 'i'), '.')}`;
         }
@@ -5910,8 +5962,8 @@ async function runAgentLoop(goal, workingTabId) {
       if (command.type === 'navigate' && typeof command.url === 'string') {
         const _currentHost = (() => { try { return new URL(currentUrl).hostname.toLowerCase(); } catch(_) { return ''; } })();
         const _targetHost = (() => { try { return new URL(command.url).hostname.toLowerCase(); } catch(_) { return ''; } })();
-                const _targetHostNoWww = _targetHost.replace(/^www\./, '');
-        const _currentHostNoWww = _currentHost.replace(/^www\./, '');
+                const _targetHostNoWww = _targetHost.replace(WWW_PREFIX_RE, '');
+        const _currentHostNoWww = _currentHost.replace(WWW_PREFIX_RE, '');
         const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
         if (_alreadyThere) {
           let _recent = false;
@@ -5964,8 +6016,8 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               if (!command.url || typeof command.url !== 'string') throw new Error('Invalid command.url');
               if (!_arrivedUrl || typeof _arrivedUrl !== 'string') throw new Error('Invalid _arrivedUrl');
-              const _intendedPath = new URL(command.url).pathname.replace(/\/$/, '');
-              const _arrivedPath = new URL(_arrivedUrl).pathname.replace(/\/$/, '');
+              const _intendedPath = new URL(command.url).pathname.replace(TRAILING_SLASH_RE, '');
+              const _arrivedPath = new URL(_arrivedUrl).pathname.replace(TRAILING_SLASH_RE, '');
               if (_intendedPath !== _arrivedPath) {
                 result += ` — WARNING: redirected to ${_arrivedUrl}. The page may not contain the expected content. Check the URL and try a different link.`;
                 console.warn('[Sentinel/open_tab] URL mismatch. Intended:', command.url, 'Arrived:', _arrivedUrl);
@@ -6080,7 +6132,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const intendedHost = new URL(command.url).hostname.toLowerCase();
               const arrivedHost = new URL(arrivedUrl).hostname.toLowerCase();
-              if (arrivedHost.includes(intendedHost.replace(/^www\./, ''))) {
+              if (arrivedHost.includes(intendedHost.replace(WWW_PREFIX_RE, ''))) {
                 try {
                   const displayUrl = typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100);
                   tel.info('page', `Navigate ok → ${displayUrl}`, { stepCount, arrivedUrl, durationMs: Date.now() - _navStart });
@@ -6473,7 +6525,7 @@ return { ok: true, value: el.value };
       // resolve the element via CDP and click its center coordinates.
       if (actionFailed && _cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
         try {
-          const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
             const cdpCode = 'var el = null;'
               + 'try { el = document.querySelector(' + JSON.stringify(sel) + '); } catch(e) {}'
@@ -6537,7 +6589,7 @@ return { ok: true, value: el.value };
       // resolve the input element via CDP, focus it, and dispatch keyboard events.
       if (actionFailed && _cdpFallbackActive && command.type === 'type') {
         try {
-          const sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
             // Focus the input via CDP
             const focusCode = 'var el = document.querySelector(' + JSON.stringify(sel) + ');'
@@ -6639,7 +6691,7 @@ return { ok: true, value: el.value };
       if (actionFailed && _cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
         try {
           let _universalJs = '';
-          const _sel = command.selector || (command.ref ? command.ref.replace(/^ref_/, '#') : '');
+          const _sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           // Cache JSON.stringify(_sel) to avoid redundant serialization (perf)
           const _selJson = JSON.stringify(_sel);
           if (command.type === 'select' && _sel && command.value) {
@@ -6723,8 +6775,8 @@ return { ok: true, value: el.value };
               try {
                 const _clickedHost = new URL(updatedTab.url).hostname.toLowerCase();
                 const _fromHost = urlBeforeCommand ? new URL(urlBeforeCommand).hostname.toLowerCase() : '';
-                const _clickedHostNoWww = _clickedHost.replace(/^www\./, '');
-                const _fromHostNoWww = _fromHost.replace(/^www\./, '');
+                const _clickedHostNoWww = _clickedHost.replace(WWW_PREFIX_RE, '');
+                const _fromHostNoWww = _fromHost.replace(WWW_PREFIX_RE, '');
                 const _crossDomain = _fromHost && _clickedHost && !_clickedHost.includes(_fromHostNoWww) && !_fromHost.includes(_clickedHostNoWww);
                 if (_crossDomain) {
                   result = `WARNING: Click navigated away from ${_fromHost} to ${_clickedHost}. You likely clicked an EXTERNAL link instead of an on-page element. Navigate back to ${_fromHost} and look for the correct in-page link (e.g., "comments", "discuss", or "N comments" text).`;
@@ -7294,11 +7346,11 @@ async function saveLearnedPattern(goal, history, success) {
     // strings (often client names) are replaced with safe placeholders so
     // chrome.storage.local doesn't accumulate identifiable client data.
     const _scrubPii = (str) => String(str)
-      .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[REDACTED:ip]')
-      .replace(/[\w.+-]+@[\w.-]+/g, '[REDACTED:email]')
-      .replace(/(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi, '[REDACTED:ticket]')
-      .replace(/"[^"]{2,60}"/g, '"[REDACTED:client]"')
-      .replace(/'[^']{2,60}'/g, "'[REDACTED:client]'");
+      .replace(PII_IP_RE, '[REDACTED:ip]')
+      .replace(PII_EMAIL_RE, '[REDACTED:email]')
+      .replace(PII_TICKET_RE, '[REDACTED:ticket]')
+      .replace(PII_CLIENT_STRING_RE, '"[REDACTED:client]"')
+      .replace(PII_CLIENT_SINGLE_RE, "'[REDACTED:client]'");
     const steps = [];
     for (const h of history) {
       if (h.action) {
