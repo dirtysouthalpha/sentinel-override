@@ -480,6 +480,7 @@ const NAVIGATE_SEARCH_RE = /go to|navigate|search/;
 const INPUT_TEXTAREA_RE = /^(INPUT|TEXTAREA)$/;
 const CSV_QUOTE_RE = /[",\n\r]/;
 const SOURCE_TAG_RE = /\[src:([a-z0-9_-]+)\]|\[unverified\]/gi;
+const COST_EXTRACTION_RE = /\$[\d.]+/;
 
 
 function showApprovalCard(payload) {
@@ -2037,7 +2038,7 @@ if (exportReplayBtn) {
       exportReplayBtn.textContent = 'Generating…';
       const costEl = document.getElementById('run-cost');
       const costText = costEl ? costEl.title : '';
-      const costMatch = costText.match(/\$[\d.]+/);
+      const costMatch = costText.match(COST_EXTRACTION_RE);
       const estimatedCostUsd = costMatch && costMatch[0] && typeof costMatch[0] === 'string' ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
       const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
       if (!resp || !resp.ok || !resp.data || !resp.data.html) {
@@ -3476,7 +3477,7 @@ chrome.runtime.onMessage.addListener((message) => {
           try {
             const costEl = document.getElementById('run-cost');
             const costText = costEl ? costEl.title : '';
-            const costMatch = costText.match(/\$[\d.]+/);
+            const costMatch = costText.match(COST_EXTRACTION_RE);
             const estimatedCostUsd = costMatch && costMatch[0] && typeof costMatch[0] === 'string' ? (parseFloat(costMatch[0].slice(1)) || 0) : 0;
             const resp = await chrome.runtime.sendMessage({ action: 'export_replay_report', params: { estimatedCostUsd } });
             if (!resp || !resp.ok || !resp.data || !resp.data.html) throw new Error((resp && resp.error) || 'No replay data');
