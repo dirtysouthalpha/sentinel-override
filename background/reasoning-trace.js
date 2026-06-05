@@ -8,10 +8,13 @@ const MAX_TRACE_ENTRIES = 1000; // Per-run limit
 const STORAGE_KEY_PREFIX = 'reasoning_trace_';
 
 // In-memory cache for active run
-const _traceCache = new Map(); // runId → trace array
+const _traceCache = new Map(); // runId → trace object
 // Pending write timeouts for debouncing storage writes
 const _pendingWrites = new Map(); // runId → timeout ID
 const WRITE_DELAY_MS = 500; // Batch writes within this window
+
+// Current active run ID (set by initReasoningTrace)
+let _currentRunId = null;
 
 function _storageKey(runId) {
   return STORAGE_KEY_PREFIX + String(runId).replace(/[^a-z0-9_-]/gi, '_');
@@ -19,22 +22,17 @@ function _storageKey(runId) {
 
 /**
  * Persist a trace to storage (debounced)
- * @param {string} runId - The run identifier
  */
 async function _persistTrace(runId) {
-  const timeout = _pendingWrites.get(runId);
-  if (timeout) {
-    clearTimeout(timeout);
-  }
+  const existing = _pendingWrites.get(runId);
+  if (existing) clearTimeout(existing);
 
   _pendingWrites.set(runId, setTimeout(async () => {
     _pendingWrites.delete(runId);
     const trace = _traceCache.get(runId);
     if (!trace) return;
-
     try {
-      const key = _storageKey(runId);
-      await chrome.storage.local.set({ [key]: trace });
+      await chrome.storage.local.set({ [_storageKey(runId)]: trace });
     } catch (e) {
       console.error('[Sentinel] Failed to persist reasoning trace:', getErrorMessage(e));
     }
@@ -42,202 +40,176 @@ async function _persistTrace(runId) {
 }
 
 /**
- * Initialize a new reasoning trace for a run
- * @param {string} runId - The run identifier
- * @param {object} metadata - Initial metadata { goal, model, timestamp }
+ * Initialize a new reasoning trace for the current run.
+ * @param {object} metadata - Optional { goal, model, timestamp }
  */
-export async function initReasoningTrace(runId, metadata = {}) {
+export async function initReasoningTrace(metadata = {}) {
+  _currentRunId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const trace = {
-    runId,
+    runId: _currentRunId,
     startTime: metadata.timestamp || Date.now(),
     goal: metadata.goal || '',
     model: metadata.model || '',
     entries: []
   };
-  _traceCache.set(runId, trace);
-
-  // Persist initial trace immediately
+  _traceCache.set(_currentRunId, trace);
   try {
-    const key = _storageKey(runId);
-    await chrome.storage.local.set({ [key]: trace });
+    await chrome.storage.local.set({ [_storageKey(_currentRunId)]: trace });
   } catch (e) {
     console.error('[Sentinel] Failed to initialize reasoning trace:', getErrorMessage(e));
   }
 }
 
 /**
- * Capture a reasoning step in the agent's decision-making process
- * @param {string} runId - The run identifier
- * @param {object} entry - The reasoning entry { step, phase, decision, factors, confidence }
+ * Capture a reasoning step in the agent's decision-making process.
+ * @param {string} phase - The decision phase (e.g. 'plan_generation', 'action_decision')
+ * @param {string} direction - 'input' or 'output'
+ * @param {object} data - Additional context data
  */
-export async function captureReasoningStep(runId, entry) {
-  const trace = _traceCache.get(runId);
+export async function captureReasoningStep(phase, direction, data = {}) {
+  if (!_currentRunId) return;
+  const trace = _traceCache.get(_currentRunId);
   if (!trace) {
-    console.warn('[Sentinel] No reasoning trace found for run:', runId);
+    console.warn('[Sentinel] No active reasoning trace');
     return;
   }
 
-  const enrichedEntry = {
+  trace.entries.push({
     timestamp: Date.now(),
-    step: entry.step || 0,
-    phase: entry.phase || 'unknown', // e.g., 'observe', 'plan', 'execute', 'verify'
-    decision: entry.decision || '',
-    factors: entry.factors || [], // Array of factors considered
-    confidence: entry.confidence || 0.5,
-    alternatives: entry.alternatives || [], // Alternative decisions considered
-    context: entry.context || {} // Additional context
-  };
-
-  trace.entries.push(enrichedEntry);
+    step: trace.entries.length,
+    phase: phase || 'unknown',
+    direction: direction || 'unknown',
+    data: data || {}
+  });
 
   // Cap entries to prevent unbounded growth
   if (trace.entries.length > MAX_TRACE_ENTRIES) {
     trace.entries = trace.entries.slice(-MAX_TRACE_ENTRIES);
   }
 
-  // Debounced write to storage - batches multiple rapid calls
-  await _persistTrace(runId);
+  await _persistTrace(_currentRunId);
 }
 
 /**
- * Retrieve the full reasoning trace for a run
+ * Retrieve the full reasoning trace for a specific run.
  * @param {string} runId - The run identifier
- * @returns {Promise<object|null>} The reasoning trace object or null
+ * @returns {Promise<object|null>}
  */
 export async function getReasoningTrace(runId) {
-  // Check cache first
-  if (_traceCache.has(runId)) {
-    return _traceCache.get(runId);
-  }
+  if (_traceCache.has(runId)) return _traceCache.get(runId);
 
-  // Load from storage
   try {
-    const key = _storageKey(runId);
-    const result = await chrome.storage.local.get([key]);
-    if (result[key]) {
-      _traceCache.set(runId, result[key]);
-      return result[key];
+    const result = await chrome.storage.local.get([_storageKey(runId)]);
+    const trace = result[_storageKey(runId)];
+    if (trace) {
+      _traceCache.set(runId, trace);
+      return trace;
     }
   } catch (e) {
     console.error('[Sentinel] Failed to load reasoning trace:', getErrorMessage(e));
   }
-
   return null;
 }
 
 /**
- * Get a summary of the reasoning trace for human review
- * @param {string} runId - The run identifier
- * @returns {Promise<string>} Human-readable summary
+ * Get a summary of the current run's reasoning trace.
+ * @param {string} [runId] - Run ID; defaults to the current run
+ * @returns {Promise<{totalSteps: number, goal: string, model: string, phases: object, summary: string}>}
  */
 export async function getReasoningSummary(runId) {
-  const trace = await getReasoningTrace(runId);
-  if (!trace) {
-    return 'No reasoning trace found for this run.';
-  }
+  const id = runId || _currentRunId;
+  if (!id) return { totalSteps: 0, goal: '', model: '', phases: {}, summary: 'No active reasoning trace.' };
 
-  const parts = [];
-  parts.push(`# Reasoning Trace Summary\n`);
-  parts.push(`**Run ID:** ${trace.runId}\n`);
-  parts.push(`**Goal:** ${trace.goal}\n`);
-  parts.push(`**Model:** ${trace.model}\n`);
-  parts.push(`**Total Decisions:** ${trace.entries.length}\n\n`);
+  const trace = _traceCache.get(id) || await getReasoningTrace(id);
+  if (!trace) return { totalSteps: 0, goal: '', model: '', phases: {}, summary: 'No reasoning trace found.' };
 
   // Group by phase
-  const byPhase = {};
-  trace.entries.forEach(entry => {
-    if (!byPhase[entry.phase]) {
-      byPhase[entry.phase] = [];
-    }
-    byPhase[entry.phase].push(entry);
-  });
-
-  for (const [phase, entries] of Object.entries(byPhase)) {
-    parts.push(`## ${phase.toUpperCase()} (${entries.length} decisions)\n`);
-    entries.forEach(entry => {
-      parts.push(`### Step ${entry.step}\n`);
-      parts.push(`- **Decision:** ${entry.decision}\n`);
-      parts.push(`- **Confidence:** ${(entry.confidence * 100).toFixed(1)}%\n`);
-      parts.push(`- **Factors:** ${entry.factors.length} considered\n`);
-      if (entry.alternatives.length > 0) {
-        parts.push(`- **Alternatives:** ${entry.alternatives.length} considered\n`);
-      }
-      parts.push('\n');
-    });
+  const phases = {};
+  for (const entry of trace.entries) {
+    if (!phases[entry.phase]) phases[entry.phase] = { inputs: 0, outputs: 0 };
+    if (entry.direction === 'input') phases[entry.phase].inputs++;
+    else phases[entry.phase].outputs++;
   }
 
-  return parts.join('');
+  const summary = [
+    `Run: ${trace.runId}`,
+    `Goal: ${trace.goal || '(none)'}`,
+    `Total steps: ${trace.entries.length}`,
+    `Phases: ${Object.keys(phases).join(', ') || 'none'}`
+  ].join(' | ');
 
+  return {
+    totalSteps: trace.entries.length,
+    goal: trace.goal,
+    model: trace.model,
+    phases,
+    summary
+  };
 }
 
 /**
- * Convert reasoning trace to JSON format for export
- * @param {string} runId - The run identifier
+ * Convert reasoning trace to JSON format for export.
+ * @param {string} [runId] - Run ID; defaults to the current run
  * @returns {Promise<string>} JSON string
  */
 export async function reasoningTraceToJson(runId) {
-  const trace = await getReasoningTrace(runId);
-  if (!trace) {
-    return JSON.stringify({ error: 'No reasoning trace found' }, null, 2);
-  }
-
+  const id = runId || _currentRunId;
+  if (!id) return JSON.stringify({ error: 'No active reasoning trace' }, null, 2);
+  const trace = _traceCache.get(id) || await getReasoningTrace(id);
+  if (!trace) return JSON.stringify({ error: 'No reasoning trace found' }, null, 2);
   return JSON.stringify(trace, null, 2);
 }
 
 /**
- * Clear the reasoning trace for a run
- * @param {string} runId - The run identifier
+ * Clear the reasoning trace for the current run (or a specific run).
+ * @param {string} [runId] - Run ID; defaults to the current run
  */
 export async function clearReasoningTrace(runId) {
-  // Clear any pending write
-  const timeout = _pendingWrites.get(runId);
+  const id = runId || _currentRunId;
+  if (!id) return;
+
+  const timeout = _pendingWrites.get(id);
   if (timeout) {
     clearTimeout(timeout);
-    _pendingWrites.delete(runId);
+    _pendingWrites.delete(id);
   }
 
-  _traceCache.delete(runId);
+  _traceCache.delete(id);
+  if (id === _currentRunId) _currentRunId = null;
 
   try {
-    const key = _storageKey(runId);
-    await chrome.storage.local.remove(key);
+    await chrome.storage.local.remove(_storageKey(id));
   } catch (e) {
     console.error('[Sentinel] Failed to clear reasoning trace:', getErrorMessage(e));
   }
 }
 
 /**
- * Get high-confidence decisions from the trace
- * @param {string} runId - The run identifier
+ * Get high-confidence decisions from the current run's trace.
  * @param {number} minConfidence - Minimum confidence threshold (0-1)
- * @returns {Promise<Array>} Array of high-confidence decisions
+ * @returns {Promise<Array>}
  */
-export async function getHighConfidenceDecisions(runId, minConfidence = 0.8) {
-  const trace = await getReasoningTrace(runId);
-  if (!trace) {
-    return [];
-  }
-
-  return trace.entries.filter(entry => entry.confidence >= minConfidence);
+export async function getHighConfidenceDecisions(minConfidence = 0.8) {
+  if (!_currentRunId) return [];
+  const trace = _traceCache.get(_currentRunId);
+  if (!trace) return [];
+  return trace.entries.filter(e => (e.data?.confidence ?? 1) >= minConfidence);
 }
 
 /**
- * Get low-confidence decisions that may need review
- * @param {string} runId - The run identifier
+ * Get low-confidence decisions from the current run's trace.
  * @param {number} maxConfidence - Maximum confidence threshold (0-1)
- * @returns {Promise<Array>} Array of low-confidence decisions
+ * @returns {Promise<Array>}
  */
-export async function getLowConfidenceDecisions(runId, maxConfidence = 0.5) {
-  const trace = await getReasoningTrace(runId);
-  if (!trace) {
-    return [];
-  }
-
-  return trace.entries.filter(entry => entry.confidence <= maxConfidence);
+export async function getLowConfidenceDecisions(maxConfidence = 0.5) {
+  if (!_currentRunId) return [];
+  const trace = _traceCache.get(_currentRunId);
+  if (!trace) return [];
+  return trace.entries.filter(e => (e.data?.confidence ?? 1) <= maxConfidence);
 }
 
 /**
- * Flush any pending writes immediately (for shutdown/cleanup)
+ * Flush any pending writes immediately (for shutdown/cleanup).
  */
 export async function flushPendingWrites() {
   const promises = [];
@@ -246,28 +218,23 @@ export async function flushPendingWrites() {
     _pendingWrites.delete(runId);
     const trace = _traceCache.get(runId);
     if (!trace) continue;
-
     promises.push((async () => {
       try {
-        const key = _storageKey(runId);
-        await chrome.storage.local.set({ [key]: trace });
+        await chrome.storage.local.set({ [_storageKey(runId)]: trace });
       } catch (e) {
         console.error('[Sentinel] Failed to flush reasoning trace:', getErrorMessage(e));
       }
     })());
   }
-
   await Promise.all(promises);
 }
 
 /**
- * Clear the in-memory cache (for testing or cleanup)
+ * Reset all module state (for testing).
  */
 export function _resetReasoningTraceCache() {
-  // Clear all pending writes
-  for (const timeout of _pendingWrites.values()) {
-    clearTimeout(timeout);
-  }
+  for (const timeout of _pendingWrites.values()) clearTimeout(timeout);
   _pendingWrites.clear();
   _traceCache.clear();
+  _currentRunId = null;
 }

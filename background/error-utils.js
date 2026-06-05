@@ -13,7 +13,8 @@
 export function getErrorMessage(err) {
   if (typeof err === 'string') return err;
   if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
-  return String(err || '');
+  if (err === null || err === undefined) return '';
+  return String(err);
 }
 
 /**
