@@ -1,6 +1,6 @@
 # 🧠 Neuralis Brain Context (auto-loaded)
 
-Connected to the shared Neuralis v4 brain (5979 neurons / 18381 synapses).
+Connected to the shared Neuralis v4 brain (5990 neurons / 18390 synapses).
 You also have live brain tools: `brain_recall`, `brain_search`, `brain_think` (store a memory),
 `brain_context`, `brain_stats`. Use `brain_recall` whenever the user references a project,
 person, or past decision you are unsure about.
