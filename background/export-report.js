@@ -161,7 +161,7 @@ export function generateHtmlReport(auditLog, metadata) {
  */
 export function generateReplayReport(entries, meta) {
   const { goal = 'Unknown', runLogId = '', estimatedCostUsd = 0 } = meta || {};
-  const actionEntries = (entries || []).filter(e => e.kind === 'action');
+  const actionEntries = (entries || []).filter(e => e && e.kind === 'action');
   const startTs = entries?.[0]?.timestamp ? new Date(entries[0].timestamp).toLocaleString() : '';
   const costStr = estimatedCostUsd > 0 ? `~$${estimatedCostUsd.toFixed(estimatedCostUsd < 0.01 ? 4 : 3)}` : '';
 
