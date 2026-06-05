@@ -103,20 +103,21 @@ export function predictNextFailure(failureIntervals) {
       confidence: 0
     };
   }
-  
-  const avg = failureIntervals.reduce((a, b) => a + b, 0) / failureIntervals.length;
-  const variance = failureIntervals.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / failureIntervals.length;
+
+  const len = failureIntervals.length;
+  const avg = failureIntervals.reduce((a, b) => a + b, 0) / len;
+  const variance = failureIntervals.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / len;
   const stdDev = Math.sqrt(variance);
-  
+
   // 95% confidence interval
-  const margin = 1.96 * stdDev / Math.sqrt(failureIntervals.length);
-  
+  const margin = 1.96 * stdDev / Math.sqrt(len);
+
   return {
     predicted: Math.round(avg),
     lowerBound: Math.round(avg - margin),
     upperBound: Math.round(avg + margin),
-    confidence: Math.min(95, failureIntervals.length * 10), // More data = higher confidence
-    trend: failureIntervals.length > 2 ? detectTrend(failureIntervals) : 'stable'
+    confidence: Math.min(95, len * 10), // More data = higher confidence
+    trend: len > 2 ? detectTrend(failureIntervals) : 'stable'
   };
 }
 
@@ -127,15 +128,17 @@ export function predictNextFailure(failureIntervals) {
  */
 function detectTrend(data) {
   if (data.length < 3) return 'stable';
-  
+
   const firstHalf = data.slice(0, Math.floor(data.length / 2));
   const secondHalf = data.slice(Math.floor(data.length / 2));
-  
-  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-  
+
+  const firstLen = firstHalf.length;
+  const secondLen = secondHalf.length;
+  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstLen;
+  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondLen;
+
   const percentChange = ((secondAvg - firstAvg) / firstAvg) * 100;
-  
+
   if (percentChange > 10) return 'increasing';
   if (percentChange < -10) return 'decreasing';
   return 'stable';
@@ -164,12 +167,13 @@ export function analyzeFailurePatterns(failures) {
     
     // Calculate intervals
     const intervals = [];
-    for (let i = 1; i < timestamps.length; i++) {
+    const len = timestamps.length;
+    for (let i = 1; i < len; i++) {
       intervals.push(timestamps[i] - timestamps[i - 1]);
     }
-    
+
     patterns[type] = {
-      count: timestamps.length,
+      count: len,
       avgInterval: intervals.reduce((a, b) => a + b, 0) / intervals.length,
       prediction: predictNextFailure(intervals),
       lastOccurrence: timestamps[timestamps.length - 1]
@@ -262,22 +266,23 @@ export function monteCarloSimulation(params) {
     
     results.push(totalDuration);
   }
-  
+
   // Sort results for percentile analysis
   results.sort((a, b) => a - b);
-  
+
+  const len = results.length;
   return {
-    mean: results.reduce((a, b) => a + b, 0) / results.length,
-    median: results[Math.floor(results.length / 2)],
+    mean: results.reduce((a, b) => a + b, 0) / len,
+    median: results[Math.floor(len / 2)],
     percentiles: {
-      p50: results[Math.floor(results.length * 0.5)],
-      p80: results[Math.floor(results.length * 0.8)],
-      p90: results[Math.floor(results.length * 0.9)],
-      p95: results[Math.floor(results.length * 0.95)]
+      p50: results[Math.floor(len * 0.5)],
+      p80: results[Math.floor(len * 0.8)],
+      p90: results[Math.floor(len * 0.9)],
+      p95: results[Math.floor(len * 0.95)]
     },
     confidence: {
-      lower: results[Math.floor(results.length * 0.05)],
-      upper: results[Math.floor(results.length * 0.95)]
+      lower: results[Math.floor(len * 0.05)],
+      upper: results[Math.floor(len * 0.95)]
     },
     iterations
   };
@@ -520,7 +525,10 @@ function calculateNoveltyRisk(history) {
 
 function calculateInstabilityRisk(history) {
   // More failures = higher instability
-  const failures = history.filter(h => h.failed).length;
+  let failures = 0;
+  for (let i = 0; i < history.length; i++) {
+    if (history[i].failed) failures++;
+  }
   return Math.min(1, failures / history.length);
 }
 
