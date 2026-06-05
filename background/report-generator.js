@@ -10,6 +10,15 @@ import { ONE_SECOND_MS, MAX_REPORT_FINDING_LENGTH } from './constants.js';
 // Precompute action types to filter from step history for O(1) lookup
 const FILTERED_ACTION_TYPES = new Set(['read_page', 'scroll', 'wait_for_text', 'wait_for_element', 'wait_for_navigation']);
 
+// Precompile regex patterns for performance (hot path functions)
+const TASK_TYPE_BRIEFING_RE = /top \d|briefing|latest|recent|news|articles/i;
+const TASK_TYPE_COMPARISON_RE = /compar|vs\.|versus|better|which/i;
+const TASK_TYPE_EXTRACTION_RE = /extract|pull|scrape|list|inventory|export|gather/i;
+const TASK_TYPE_INVESTIGATION_RE = /investigat|analyz|audit|review|check|look into|diagnos|troubleshoot/i;
+const TASK_TYPE_CONFIGURATION_RE = /config|setup|install|deploy|create|add|enable|configure/i;
+const ACTION_FAILED_RE = /(not found|Error|failed|timed out)/i;
+const CODE_BLOCK_CLEAN_RE = /^```(?:markdown|md)?\s*\n?([\s\S]*?)\n?```$/s;
+
 // ========== Pure Helpers ==========
 
 /**
@@ -42,11 +51,11 @@ function _truncateMemoryValue(val, maxChars) {
  */
 function _detectTaskType(goal) {
   const goalLower = (goal || '').toLowerCase();
-  if (/top \d|briefing|latest|recent|news|articles/i.test(goalLower)) return 'briefing';
-  if (/compar|vs\.|versus|better|which/i.test(goalLower)) return 'comparison';
-  if (/extract|pull|scrape|list|inventory|export|gather/i.test(goalLower)) return 'extraction';
-  if (/investigat|analyz|audit|review|check|look into|diagnos|troubleshoot/i.test(goalLower)) return 'investigation';
-  if (/config|setup|install|deploy|create|add|enable|configure/i.test(goalLower)) return 'configuration';
+  if (TASK_TYPE_BRIEFING_RE.test(goalLower)) return 'briefing';
+  if (TASK_TYPE_COMPARISON_RE.test(goalLower)) return 'comparison';
+  if (TASK_TYPE_EXTRACTION_RE.test(goalLower)) return 'extraction';
+  if (TASK_TYPE_INVESTIGATION_RE.test(goalLower)) return 'investigation';
+  if (TASK_TYPE_CONFIGURATION_RE.test(goalLower)) return 'configuration';
   return 'general';
 }
 
@@ -70,7 +79,7 @@ function _countActionHistory(history) {
     const t = h.action.type || 'unknown';
     if (actionCounts[t] !== undefined) actionCounts[t]++;
     const result = String(h.result || '');
-    if (/(not found|Error|failed|timed out)/i.test(result)) {
+    if (ACTION_FAILED_RE.test(result)) {
       failedActions++;
     } else {
       successfulActions++;
@@ -377,7 +386,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       let cleaned = responseText.trim();
       if (cleaned.startsWith('```')) {
         // Remove opening and closing code blocks in single pass
-        cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?([\s\S]*?)\n?```$/s, '$1');
+        cleaned = cleaned.replace(CODE_BLOCK_CLEAN_RE, '$1');
       }
 
       return cleaned;
