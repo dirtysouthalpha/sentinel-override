@@ -29,6 +29,28 @@ const SONICWALL_PATH_RE = /\/ui\b|#\/dashboard|#\/firewall|#\/network|#\/securit
 const FORTINET_URL_RE = /fortinet|fortigate|fortimanager/;
 const FORTINET_TEXT_RE = /fortinet|fortigate/;
 
+// Precompiled regex patterns for plan parsing (performance optimization)
+const THINK_TAG_RE = /<think[\s\S]*?<\/think>/gi;
+const NEWLINE_RE = /\n/;
+const MARKDOWN_ASTERISK_RE = /^\*{1,2}|\*{1,2}$/g;
+const NUMBERED_STEP_RE = /^(?:\d+[.)]\s+|[Ss]tep\s+\d+[:.)\s]+)/;
+const BULLET_STEP_RE = /^[-*•→]\s+/;
+const ESCAPE_BACKSLASH_RE = /\\([^"\\/bfnrtu])/g;
+const ESCAPE_NEWLINE_RE = /\\n/g;
+const ESCAPE_CR_RE = /\\r/g;
+const ESCAPE_TAB_RE = /\\t/g;
+const ESCAPE_QUOTE_RE = /\\"/g;
+const CONTROL_CHARS_RE = /[\x00-\x1f]/gu;
+const WHITESPACE_REPLACE_RE = /\s+/g;
+const NEWLINE_REPLACE_RE = /\n/g;
+const BACKSLASH_REPLACE_RE = /\n/g;
+const NON_ALNUM_RE = /[^a-z0-9_-]/gi;
+const DOUBLE_QUOTE_REPLACE_RE = /"/g;
+const UNDERSCORE_REPLACE_RE = /_/g;
+const CAPITALIZE_RE = /\b\w/g;
+const HTML_ESCAPE_RE = /[&<>'"]/g;
+const TRAILING_SLASH_RE = /\/$/;
+
 // Precompiled regex patterns for salvaging finish/note from malformed LLM responses
 const FINISH_SALVAGE_REGEX = /"summary"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/m;
 const NOTE_SALVAGE_REGEX = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/m;
