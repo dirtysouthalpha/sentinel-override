@@ -41,7 +41,7 @@ describe('UAP Server', () => {
   let mockSender;
   let mockSendResponse;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockSender = {
       id: 'test-client-123',
       origin: 'https://example.com'
@@ -50,6 +50,9 @@ describe('UAP Server', () => {
 
     // Clear audit log before each test
     uapServer.auditLog = [];
+
+    // Initialize keypair for federation tests
+    await uapServer.generateKeyPair();
   });
 
   afterEach(async () => {

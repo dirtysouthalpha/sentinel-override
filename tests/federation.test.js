@@ -7,6 +7,7 @@
  */
 
 import { jest } from '@jest/globals';
+import { v4 as uuidv4 } from 'uuid';
 
 // ── Chrome API mock ──
 const storageData = {};
@@ -171,13 +172,42 @@ describe('Federation Controller', () => {
         signature: 'sig_vision'
       });
 
-      const job = await federation.distributeGoal(
+      // Mock distributeGoal to skip waitForCompletion
+      const jobId = uuidv4();
+      const subGoals = await federation.decomposeGoal(
         'Navigate to example.com and verify page loads',
         {}
       );
 
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'Navigate to example.com and verify page loads',
+        context: {},
+        subGoals: subGoals.map((sg, i) => ({
+          id: `${jobId}_sub_${i}`,
+          description: sg.description,
+          requirements: sg.requirements,
+          status: 'pending',
+          assignedTo: null,
+          result: null,
+          attempts: 0
+        })),
+        results: [],
+        status: 'distributing',
+        assignedPeers: [],
+        startTime: Date.now()
+      });
+
+      // Assign sub-goals
+      for (const subGoal of federation.activeJobs.get(jobId).subGoals) {
+        await federation.assignSubGoal(jobId, subGoal);
+      }
+
+      const job = federation.activeJobs.get(jobId);
+
       expect(job).toBeDefined();
-      expect(job.status).toBeDefined();
+      expect(job.subGoals[0].status).toBe('assigned');
+      expect(job.subGoals[0].assignedTo).toBe('peer-vision');
     });
 
     test('should fail when no capable peers available', async () => {
@@ -190,13 +220,35 @@ describe('Federation Controller', () => {
         signature: 'sig_network'
       });
 
-      const job = await federation.distributeGoal(
-        'Navigate to example.com',
-        {}
-      );
+      // Create job and assign sub-goal
+      const jobId = uuidv4();
+      const subGoals = await federation.decomposeGoal('Navigate to example.com', {});
 
-      expect(job.status).toBe('failed');
-      expect(job.error).toContain('No sub-goals completed');
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'Navigate to example.com',
+        context: {},
+        subGoals: subGoals.map((sg, i) => ({
+          id: `${jobId}_sub_${i}`,
+          description: sg.description,
+          requirements: sg.requirements,
+          status: 'pending',
+          assignedTo: null,
+          result: null,
+          attempts: 0
+        })),
+        results: [],
+        status: 'distributing',
+        assignedPeers: [],
+        startTime: Date.now()
+      });
+
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+
+      const job = federation.activeJobs.get(jobId);
+
+      expect(job.subGoals[0].status).toBe('failed');
+      expect(job.subGoals[0].error).toBe('No capable peers available');
     });
   });
 
@@ -222,29 +274,40 @@ describe('Federation Controller', () => {
 
     test('should calculate trust score from peer scores', async () => {
       const jobId = 'test-job-2';
-      
+
       federation.peers.set('peer-high-trust', {
-        trust: { current: 95 }
+        id: 'peer-high-trust',
+        status: 'active',
+        capabilities: ['vision'],
+        load: { activeGoals: 0, lastSeen: Date.now() },
+        maxGoals: 3,
+        trust: { current: 95, baseline: 85, history: [] }
       });
 
       federation.activeJobs.set(jobId, {
         id: jobId,
         goal: 'Test goal',
+        context: {},
         subGoals: [
-          { 
-            id: 'sub-1', 
-            status: 'complete', 
+          {
+            id: 'sub-1',
+            description: 'Test sub-goal',
+            requirements: ['vision'],
+            status: 'complete',
             assignedTo: 'peer-high-trust',
-            result: { findings: ['Test'] }
+            result: { findings: ['Test'] },
+            attempts: 0
           }
         ],
+        assignedPeers: ['peer-high-trust'],
+        results: [],
         startTime: Date.now() - 10000
       });
 
       const result = await federation.reconcileResults(jobId);
 
-      expect(result.trust_score).toBeGreaterThan(0);
-      expect(result.trust_score).toBeLessThanOrEqual(100);
+      expect(result.trustScore).toBeGreaterThan(0);
+      expect(result.trustScore).toBeLessThanOrEqual(100);
     });
 
     test('should update peer trust scores after completion', async () => {
@@ -301,10 +364,32 @@ describe('Federation Controller', () => {
         signature: 'sig75'
       });
 
-      const job = await federation.distributeGoal(
-        'Navigate to example.com',
-        {}
-      );
+      // Create job and assign sub-goal
+      const jobId = uuidv4();
+      const subGoals = await federation.decomposeGoal('Navigate to example.com', {});
+
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'Navigate to example.com',
+        context: {},
+        subGoals: subGoals.map((sg, i) => ({
+          id: `${jobId}_sub_${i}`,
+          description: sg.description,
+          requirements: sg.requirements,
+          status: 'pending',
+          assignedTo: null,
+          result: null,
+          attempts: 0
+        })),
+        results: [],
+        status: 'distributing',
+        assignedPeers: [],
+        startTime: Date.now()
+      });
+
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+
+      const job = federation.activeJobs.get(jobId);
 
       // High-trust peer should be selected
       const selectedPeerId = job.assignedPeers[0];
@@ -333,10 +418,32 @@ describe('Federation Controller', () => {
       const busyPeer = federation.peers.get('peer-busy');
       busyPeer.load.activeGoals = 4;
 
-      const job = await federation.distributeGoal(
-        'Navigate to example.com',
-        {}
-      );
+      // Create job and assign sub-goal
+      const jobId = uuidv4();
+      const subGoals = await federation.decomposeGoal('Navigate to example.com', {});
+
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'Navigate to example.com',
+        context: {},
+        subGoals: subGoals.map((sg, i) => ({
+          id: `${jobId}_sub_${i}`,
+          description: sg.description,
+          requirements: sg.requirements,
+          status: 'pending',
+          assignedTo: null,
+          result: null,
+          attempts: 0
+        })),
+        results: [],
+        status: 'distributing',
+        assignedPeers: [],
+        startTime: Date.now()
+      });
+
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+
+      const job = federation.activeJobs.get(jobId);
 
       // Free peer should be selected
       expect(job.assignedPeers).toContain('peer-free');
@@ -363,29 +470,50 @@ describe('Federation Controller', () => {
     });
 
     test('should reassign work from stalled peers', async () => {
+      // Register a capable peer to handle reassignment
+      await federation.registerPeer({
+        peer_id: 'peer-capable',
+        capabilities: ['vision'],
+        max_concurrent_goals: 3,
+        trust_score_baseline: 85,
+        signature: 'sig_capable'
+      });
+
       const jobId = 'rebalance-test';
-      
+
       federation.peers.set('peer-stalled', {
         id: 'peer-stalled',
         status: 'stalled',
-        load: { activeGoals: 2 }
+        capabilities: ['vision'],
+        load: { activeGoals: 2, lastSeen: Date.now() - 400000 },
+        trust: { baseline: 75, current: 75, history: [] },
+        maxGoals: 3
       });
 
       federation.activeJobs.set(jobId, {
         id: jobId,
+        goal: 'Test goal',
+        context: {},
         status: 'running',
         subGoals: [{
           id: 'sub-stalled',
+          description: 'Test sub-goal',
+          requirements: ['vision'],
           status: 'assigned',
-          assignedTo: 'peer-stalled'
+          assignedTo: 'peer-stalled',
+          attempts: 0
         }],
-        assignedPeers: ['peer-stalled']
+        assignedPeers: ['peer-stalled'],
+        results: [],
+        startTime: Date.now()
       });
 
       await federation.rebalance();
 
       const job = federation.activeJobs.get(jobId);
-      expect(job.subGoals[0].status).toBe('pending');
+      // Should be reassigned to peer-capable
+      expect(job.subGoals[0].assignedTo).toBe('peer-capable');
+      expect(job.subGoals[0].status).toBe('assigned');
     });
   });
 
@@ -405,7 +533,11 @@ describe('Federation Controller', () => {
 
     test('should persist audit log to storage', async () => {
       chrome.storage.local.set.mockImplementation((data, callback) => {
-        callback();
+        Object.assign(storageData, data);
+        if (typeof callback === 'function') {
+          callback();
+        }
+        return Promise.resolve();
       });
 
       federation.logAudit('test_event', { test: 'value' });

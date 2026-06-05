@@ -147,7 +147,7 @@ class UAPServer {
           break;
 
         case 'register_peer':
-          await this.handleRegisterPeer(id, payload, sendResponse);
+          await this.handleRegisterPeer(id, payload, sender, sendResponse);
           break;
 
         case 'ping':

@@ -114,8 +114,8 @@ class TaskQueue {
       
       request.onsuccess = () => {
         resolve(taskData.id);
-        // Try to process if we have capacity
-        this._tryProcessNext();
+        // Try to process if we have capacity (defer to next tick to ensure transaction commits)
+        setTimeout(() => this._tryProcessNext(), 0);
       };
       request.onerror = () => reject(request.error);
     });
