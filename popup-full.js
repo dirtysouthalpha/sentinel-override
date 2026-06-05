@@ -135,3 +135,44 @@ setTimeout(() => {
     console.log('[Sentinel/BOOT] sendBtn + goalInput present — UI should work');
   }
 }, 500);
+
+// ========== FALLBACK INPUT LISTENERS ==========
+// If chat.js IIFE failed to attach listeners, these catch it.
+// popup-full.js loads LAST, so all functions should be in global scope.
+(function attachFallbackListeners() {
+  const _goalInput = document.getElementById('goalInput');
+  const _sendBtn = document.getElementById('sendBtn');
+
+  if (_sendBtn) {
+    _sendBtn.addEventListener('click', () => {
+      console.log('[Sentinel/FALLBACK] sendBtn clicked');
+      if (typeof sendMessage === 'function') {
+        sendMessage();
+      } else {
+        console.error('[Sentinel/FALLBACK] sendMessage is NOT a function!');
+        alert('Sentinel Error: sendMessage function not found. Try reloading the extension.');
+      }
+    });
+    console.log('[Sentinel/FALLBACK] sendBtn click listener attached');
+  } else {
+    console.error('[Sentinel/FALLBACK] sendBtn NOT FOUND');
+  }
+
+  if (_goalInput) {
+    _goalInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        console.log('[Sentinel/FALLBACK] Enter key pressed');
+        if (typeof sendMessage === 'function') {
+          sendMessage();
+        } else {
+          console.error('[Sentinel/FALLBACK] sendMessage is NOT a function!');
+          alert('Sentinel Error: sendMessage function not found.');
+        }
+      }
+    });
+    console.log('[Sentinel/FALLBACK] goalInput keydown listener attached');
+  } else {
+    console.error('[Sentinel/FALLBACK] goalInput NOT FOUND');
+  }
+})();
