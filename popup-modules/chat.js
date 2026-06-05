@@ -1034,6 +1034,7 @@ if (injectContextInput) {
 }
 
 function sendMessage() {
+  console.log('[Sentinel] sendMessage() called');
   const state = getState();
   const _goalInput = document.getElementById('goalInput');
   const _sendBtn = document.getElementById('sendBtn');

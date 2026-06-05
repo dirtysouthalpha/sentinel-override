@@ -113,3 +113,31 @@ window.addEventListener('click', (e) => {
     document.getElementById('import-modal')?.classList.remove('show');
   }
 });
+
+// ========== Boot Diagnostic ==========
+// Runs after ALL scripts have loaded. Checks that critical listeners exist.
+setTimeout(() => {
+  const goalInput = document.getElementById('goalInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const errors = window.__sentinelErrors || [];
+  if (errors.length > 0) {
+    console.error('[Sentinel/BOOT] Errors during load:', errors);
+  }
+  // Verify elements exist
+  if (!goalInput) console.error('[Sentinel/BOOT] goalInput NOT FOUND in DOM');
+  if (!sendBtn) console.error('[Sentinel/BOOT] sendBtn NOT FOUND in DOM');
+  // Check if the provider is configured
+  chrome.storage.local.get(['active_provider_config'], (result) => {
+    const config = result.active_provider_config;
+    if (!config || !config.api_key) {
+      console.warn('[Sentinel/BOOT] No API key configured — agent will fail on send');
+      // Show a one-time hint
+      const _goalInput = document.getElementById('goalInput');
+      if (_goalInput && !_goalInput.value) {
+        _goalInput.placeholder = '⚠️ Configure an API key in Settings first ⚠️';
+      }
+    } else {
+      console.log('[Sentinel/BOOT] Provider configured:', config.provider || 'unknown');
+    }
+  });
+}, 500);

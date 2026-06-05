@@ -1000,6 +1000,35 @@
     </div>
   </div>
 
+  <!-- Global error catcher — MUST load before all other scripts -->
+  <script>
+    window.__sentinelErrors = [];
+    window.addEventListener('error', (e) => {
+      window.__sentinelErrors.push({
+        type: 'error',
+        message: e.message,
+        filename: e.filename,
+        lineno: e.lineno,
+        colno: e.colno
+      });
+      console.error('[Sentinel/BOOT]', e.message, e.filename + ':' + e.lineno);
+      // Show a red banner so the user can see what crashed
+      let banner = document.getElementById('__sentinel-boot-err');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = '__sentinel-boot-err';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#ff0040;color:#fff;padding:8px 12px;font-size:12px;font-family:monospace;white-space:pre-wrap;max-height:200px;overflow:auto;';
+        document.body.prepend(banner);
+      }
+      banner.textContent += '[ERROR] ' + e.filename.split('/').pop() + ':' + e.lineno + ' — ' + e.message + '\n';
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      window.__sentinelErrors.push({
+        type: 'unhandledrejection',
+        message: e.reason?.message || String(e.reason)
+      });
+    });
+  </script>
   <script src="popup-modules/popup-state.js"></script>
   <script src="marked.min.js"></script>
   <script src="popup-modules/helpers.js"></script>
