@@ -23,7 +23,7 @@ const attachBtn = document.getElementById('attachBtn');
 const fileInput = document.getElementById('file-input');
 const attachmentPreview = document.getElementById('attachmentPreview');
 const exportBtn = document.getElementById('exportBtn');
-const exportFormatSelect = document.getElementById('export-format');
+const chatExportFormatSelect = document.getElementById('export-format');
 const commandPalette = document.getElementById('commandPalette');
 const commandPaletteBackdrop = document.getElementById('commandPaletteBackdrop');
 const commandInput = document.getElementById('commandInput');
@@ -1648,7 +1648,7 @@ exportBtn.addEventListener('click', () => {
     return;
   }
 
-  const format = (exportFormatSelect && exportFormatSelect.value) || 'text';
+  const format = (chatExportFormatSelect && chatExportFormatSelect.value) || 'text';
   let content, filename, mimeType;
 
   if (format === 'markdown') {
