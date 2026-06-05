@@ -82,6 +82,11 @@ const DOMAIN_CLEAN_RE = /^https?:\/\/|\/.*$/gi;
 const DMARC_PREFIX_RE = /^_dmarc\./i;
 const DOMAINKEY_SUFFIX_RE = /\._domainkey.*$/i;
 
+// Precompile regex for goal URL extraction (performance optimization)
+const GOAL_URL_EXTRACT_RE = /https?:\/\/[^\s"'<>,]+/i;
+const GOAL_NAV_COMMAND_RE = /(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i;
+const GOAL_BARE_SITE_RE = /(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
+
 // Precompile regex for selector prefix
 const REF_SELECTOR_RE = /^ref_/;
 
@@ -3822,12 +3827,12 @@ async function runAgentLoop(goal, workingTabId) {
         let urlMatch = null;
         if (typeof _goalForUrlExtract === 'string') {
           urlMatch = _isExplicitNav
-            ? (_goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i) || _goalForUrlExtract.match(/(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i))
-            : _goalForUrlExtract.match(/https?:\/\/[^\s"'<>,]+/i);
+            ? (_goalForUrlExtract.match(GOAL_URL_EXTRACT_RE) || _goalForUrlExtract.match(GOAL_NAV_COMMAND_RE))
+            : _goalForUrlExtract.match(GOAL_URL_EXTRACT_RE);
         }
         // v3.66: Bare site name fallback for Step 1 auto-navigate
         if (!urlMatch && _isExplicitNav) {
-          const _step1Bare = _goalForUrlExtract.match(/(?:go to|navigate to|visit|open|check)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
+          const _step1Bare = _goalForUrlExtract.match(GOAL_BARE_SITE_RE);
           if (_step1Bare && typeof _step1Bare[1] === 'string') {
             const _step1Key = _step1Bare[1].trim().toLowerCase().replace(WHITESPACE_NORMALIZE_RE, '');
             if (BARE_SITE_MAP[_step1Key]) {
