@@ -1,0 +1,92 @@
+{
+  "manifest_version": 3,
+  "name": "Sentinel Override",
+  "version": "10.1.0",
+  "description": "Universal browser automation agent \u2014 investigates, configures, and collaborates via Universal Agent Protocol",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "tabGroups",
+    "sidePanel",
+    "storage",
+    "debugger",
+    "webNavigation",
+    "alarms",
+    "notifications",
+    "downloads",
+    "contextMenus"
+  ],
+  "action": {
+    "default_title": "Sentinel Override",
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png",
+    "256": "icon-256.png"
+  },
+  "background": {
+    "service_worker": "background/index.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/shadow-intercept.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/quick-assist.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "commands": {
+    "toggle-agent": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Space"
+      },
+      "description": "Toggle agent start/stop"
+    },
+    "pause-agent": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P"
+      },
+      "description": "Pause/resume running agent"
+    },
+    "turbo-mode": {
+      "description": "Set speed to turbo (fast, no human-like delays)"
+    },
+    "normal-mode": {
+      "description": "Set speed to normal (human-like delays)"
+    },
+    "stealth-mode": {
+      "description": "Set speed to stealth (slow, maximum human-like randomness)"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# Environment / secrets — never commit these
+.env
+.env.*
+*.env
+secrets.json
+settings.local.json
+*.key
+*.pem
+config.local.*
+storage-export.json
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Node / build
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+# Release artifacts (built locally, attached to GitHub release directly)
+sentinel-override-v*.zip
+
+# Internal scratch
+*.tmp
+*.bak
+coverage-stderr.txt
+coverage/
+test-output.txt
+*-output.txt
+scripts/analyze-functions.js
+scripts/check-coverage.js
+background/agent-engine.js.v*
