@@ -2143,7 +2143,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
       const _siteUrl = _intentText.match(NAVIGATE_SITE_RE);
       if (_siteUrl && _siteUrl[1]) {
-        const _mapped = SITE_DOMAIN_MAP[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
+        const _mapped = SITE_DOMAIN_MAP[_siteUrl[1].toLowerCase().replace(WHITESPACE_REPLACE_RE, '')];
         if (_mapped) {
           console.warn('[Sentinel/FALLBACK] Detected navigate to site from content:', _mapped);
           return { type: 'navigate', url: `https://${_mapped}` };
