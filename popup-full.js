@@ -143,13 +143,26 @@ setTimeout(() => {
   const _goalInput = document.getElementById('goalInput');
   const _sendBtn = document.getElementById('sendBtn');
 
+  console.log('[Sentinel/FALLBACK] Attaching fallback listeners...');
+  console.log('[Sentinel/FALLBACK] goalInput:', !!_goalInput, 'sendBtn:', !!_sendBtn);
+  console.log('[Sentinel/FALLBACK] sendMessage:', typeof sendMessage);
+  console.log('[Sentinel/FALLBACK] addMessage:', typeof addMessage);
+  console.log('[Sentinel/FALLBACK] showToast:', typeof showToast);
+
   if (_sendBtn) {
+    // Mousedown fires even if click is blocked by overlay
+    _sendBtn.addEventListener('mousedown', () => {
+      console.log('[Sentinel/FALLBACK] sendBtn mousedown — button IS receiving events');
+      _sendBtn.style.outline = '3px solid lime';
+      setTimeout(() => { _sendBtn.style.outline = ''; }, 500);
+    });
+
     _sendBtn.addEventListener('click', () => {
       console.log('[Sentinel/FALLBACK] sendBtn clicked');
       if (typeof sendMessage === 'function') {
         sendMessage();
       } else {
-        console.error('[Sentinel/FALLBACK] sendMessage is NOT a function!');
+        console.error('[Sentinel/FALLBACK] sendMessage is NOT a function! typeof:', typeof sendMessage);
         alert('Sentinel Error: sendMessage function not found. Try reloading the extension.');
       }
     });
