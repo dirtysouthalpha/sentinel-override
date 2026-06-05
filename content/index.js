@@ -22,9 +22,9 @@ if (!window.__sentinelContentTel) {
         message: String(message || '').substring(0, 500),
         payload: payload || null
       }).catch((e) => {
-        console.error('[_ctel] Unhandled rejection:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
+        console.error('[_ctel] Unhandled rejection:', getErrorMessage(e));
       });
-    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] Runtime error during shutdown:', getErrorMessage(e)); }
   };
   // Per-level shorthands so call sites stay terse.
   window.__sentinelContentTel.error = (c, m, p) => window.__sentinelContentTel(c, 'error', m, p);
@@ -40,8 +40,8 @@ var ctel = window.__sentinelContentTel;
 // when content/index.js is injected multiple times (e.g., on page navigation).
 if (window.__sentinelInitialized) {
   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
-    console.warn('[Sentinel] re-inject ready send failed:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
-  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    console.warn('[Sentinel] re-inject ready send failed:', getErrorMessage(e));
+  }); } catch (e) { console.warn('[Sentinel] re-inject ready signal:', getErrorMessage(e)); }
 } else {
   window.__sentinelInitialized = true;
 
@@ -65,6 +65,11 @@ if (window.__sentinelInitialized) {
     const err = chrome.runtime.lastError;
     if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
     return String(err || '');
+  }
+
+  function getErrorMessage(e) {
+    if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+    return String(e || '');
   }
 
   // Shorthand references to utility modules
@@ -110,13 +115,13 @@ if (window.__sentinelInitialized) {
     // Wait until body exists, then start observing.
     const startObserving = () => {
       if (document.body) {
-        try { insertionObserver.observe(document.body, { childList: true, subtree: true }); } catch (e) { console.warn('[Sentinel] insertion observer start:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        try { insertionObserver.observe(document.body, { childList: true, subtree: true }); } catch (e) { console.warn('[Sentinel] insertion observer start:', getErrorMessage(e)); }
       } else {
         setTimeout(startObserving, 50);
       }
     };
     startObserving();
-  } catch (e) { console.warn('[Sentinel] Observer unavailable:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+  } catch (e) { console.warn('[Sentinel] Observer unavailable:', getErrorMessage(e)); }
 
   function __sentinelHasPositiveModalSignal(el) {
     try {
@@ -132,7 +137,7 @@ if (window.__sentinelInitialized) {
       if (/\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/.test(text)) return true;
       // "Continue anyway" / "I understand" popup signals
       if (/\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i.test(text)) return true;
-    } catch (e) { console.warn('[Sentinel] modal signal check:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] modal signal check:', getErrorMessage(e)); }
     return false;
   }
 
@@ -153,7 +158,7 @@ if (window.__sentinelInitialized) {
         __sentinelDismissalCount = 0;
         __sentinelLastDismissRoute = _route;
       }
-    } catch (e) { console.warn('[Sentinel] route change reset:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] route change reset:', getErrorMessage(e)); }
 
     if (__sentinelDismissalCount >= SENTINEL_MAX_DISMISSALS) {
       return { dismissed: [], count: 0, capped: true };
@@ -219,7 +224,7 @@ if (window.__sentinelInitialized) {
             dismissed.push((typeof btn.textContent === 'string' ? btn.textContent.trim().substring(0, 40) : '') || sel);
           }
         }
-      } catch (e) { console.warn('[Sentinel] Invalid selector:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] Invalid selector:', getErrorMessage(e)); }
     }
 
     // Text-based Continue/Dismiss button detection — catches buttons that don't
@@ -330,7 +335,7 @@ if (window.__sentinelInitialized) {
           const backdrop = document.querySelector('[class*="backdrop" i], [class*="scrim" i]');
           if (backdrop) backdrop.style.display = 'none';
         }
-      } catch (e) { console.warn('[Sentinel] Overlay error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] Overlay error:', getErrorMessage(e)); }
     }
 
     return { dismissed, count: dismissed.length };
@@ -364,7 +369,7 @@ if (window.__sentinelInitialized) {
         try {
           const lbl = document.querySelector(`label[for="${CSS.escape(String(el.id))}"]`);
           if (lbl) parts.push((lbl.innerText || lbl.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] label lookup by id:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] label lookup by id:', getErrorMessage(e)); }
       }
       // Walk up to 3 ancestors and collect any nearby label-ish text. Many
       // SPA forms render the label as a sibling div with class containing
@@ -381,11 +386,11 @@ if (window.__sentinelInitialized) {
           // Also previous sibling text — e.g. "Pre-shared Key" rendered as a <span>
           const prev = p.previousElementSibling;
           if (prev) parts.push((prev.innerText || prev.textContent || '').substring(0, 100));
-        } catch (e) { console.warn('[Sentinel] ancestor label walk:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] ancestor label walk:', getErrorMessage(e)); }
         p = p.parentElement;
         depth++;
       }
-    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] field sensitivity ctx:', getErrorMessage(e)); }
     return parts.join(' ').toLowerCase();
   }
 
@@ -429,7 +434,7 @@ if (window.__sentinelInitialized) {
                 if (iframeResult.elements && Array.isArray(iframeResult.elements)) {
                   interactiveElements.push(...iframeResult.elements);
                 }
-              } catch (e) { console.warn('[Sentinel] Iframe scan error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+              } catch (e) { console.warn('[Sentinel] Iframe scan error:', getErrorMessage(e)); }
             }
             // If we found elements, stop retrying
             if (interactiveElements.length >= 5) break;
@@ -469,7 +474,7 @@ if (window.__sentinelInitialized) {
               const skip = ['nav', 'header', 'footer', 'aside', '[role="navigation"]', '[role="banner"]',
                 '.cookie-notice', '.cookie-banner', '#cookie', '.ad', '.advertisement', '[aria-hidden="true"]',
                 'script', 'style', 'noscript', 'svg'];
-              skip.forEach(s => { try { const elements = clone.querySelectorAll(s); if (typeof elements.forEach === 'function') { elements.forEach(el => el.remove()); } } catch(e) { console.warn('[Sentinel] skip selector remove:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); } });
+              skip.forEach(s => { try { const elements = clone.querySelectorAll(s); if (typeof elements.forEach === 'function') { elements.forEach(el => el.remove()); } } catch(e) { console.warn('[Sentinel] skip selector remove:', getErrorMessage(e)); } });
               content = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
             }
 
@@ -502,7 +507,7 @@ if (window.__sentinelInitialized) {
             await new Promise(r => setTimeout(r, 1000));
             const bodyText = (document.body && document.body.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
             if (bodyText.length > content.length) content = bodyText;
-          } catch (e) { console.warn('[Sentinel] Page navigation error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] Page navigation error:', getErrorMessage(e)); }
         }
 
         return { content: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
@@ -666,13 +671,13 @@ if (window.__sentinelInitialized) {
           try {
             const u = new URL(window.location.href);
             tid = u.searchParams.get('tid') || null;
-          } catch (e) { console.warn('[Sentinel] tid URL parse:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] tid URL parse:', getErrorMessage(e)); }
 
           try {
             const bodyText = (document.body && document.body.innerText) || '';
             const m = bodyText.match(/[a-z0-9-]+\.onmicrosoft\.com/i);
             if (m) onmicrosoft = m[0];
-          } catch (e) { console.warn('[Sentinel] onmicrosoft scan:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] onmicrosoft scan:', getErrorMessage(e)); }
 
           // Common chip selectors across admin.microsoft.com / entra.microsoft.com / portal.azure.com
           const chipSelectors = [
@@ -690,7 +695,7 @@ if (window.__sentinelInitialized) {
                 const t = (el.innerText || el.textContent || '').trim();
                 if (t && t.length < 120) { chipText = t; break; }
               }
-            } catch (e) { console.warn('[Sentinel] tenant chip lookup:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] tenant chip lookup:', getErrorMessage(e)); }
           }
 
           return {
@@ -721,7 +726,7 @@ if (window.__sentinelInitialized) {
           // mid-click — that's fine, the pulse will draw on top).
           if (window.__sentinelCursor && window.__sentinelCursor.moveTo) {
             // Fire-and-forget: don't block the click on the full travel time.
-            try { window.__sentinelCursor.moveTo(x, y); } catch (e) { console.warn('[Sentinel] cursor moveTo:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            try { window.__sentinelCursor.moveTo(x, y); } catch (e) { console.warn('[Sentinel] cursor moveTo:', getErrorMessage(e)); }
           }
 
           // Highlight whatever's at (x, y). Use elementFromPoint with a tiny
@@ -733,18 +738,18 @@ if (window.__sentinelInitialized) {
               window.__sentinelUtils.highlight.highlightElement(highlighted);
               // Auto-clear after 1.5s so the visual doesn't linger forever.
               setTimeout(() => {
-                try { window.__sentinelUtils.highlight.removeHighlight(highlighted); } catch (e) { console.warn('[Sentinel] highlight auto-clear:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+                try { window.__sentinelUtils.highlight.removeHighlight(highlighted); } catch (e) { console.warn('[Sentinel] highlight auto-clear:', getErrorMessage(e)); }
               }, 1500);
             }
-          } catch (e) { console.warn('[Sentinel] cdp highlight from point:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] cdp highlight from point:', getErrorMessage(e)); }
 
           // Banner + pulse + cursor press
           if (window.__sentinelOverlay) {
-            try { window.__sentinelOverlay.showActionBanner('click', desc); } catch (e) { console.warn('[Sentinel] action banner show:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-            try { window.__sentinelOverlay.showClickIndicator(x, y); } catch (e) { console.warn('[Sentinel] click indicator show:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            try { window.__sentinelOverlay.showActionBanner('click', desc); } catch (e) { console.warn('[Sentinel] action banner show:', getErrorMessage(e)); }
+            try { window.__sentinelOverlay.showClickIndicator(x, y); } catch (e) { console.warn('[Sentinel] click indicator show:', getErrorMessage(e)); }
           }
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
-            try { window.__sentinelCursor.press(); } catch (e) { console.warn('[Sentinel] cursor press:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            try { window.__sentinelCursor.press(); } catch (e) { console.warn('[Sentinel] cursor press:', getErrorMessage(e)); }
           }
 
           return { ok: true };
@@ -804,10 +809,10 @@ if (window.__sentinelInitialized) {
         // (5.0) Log sensitive field detection for audit but never block — IT techs have full credential access.
         const __sensitiveMatch = __sentinelCheckSensitiveField(el);
         if (__sensitiveMatch) {
-          try { ctel && ctel.info && ctel.info('page', `Focus: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { ctel && ctel.info && ctel.info('page', `Focus: sensitive field detected (matched "${__sensitiveMatch}") — proceeding per IT-tech authorization`, { match: __sensitiveMatch, url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] sensitive field log:', getErrorMessage(e)); }
         }
         try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch { try { el.scrollIntoView(); } catch (e2) { console.warn('[Sentinel] scrollIntoView fallback failed:', ((e2 && typeof e2.message === 'string') ? e2.message : String(e2))); } }
-        try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        try { el.focus({ preventScroll: false }); } catch (e) { console.warn('[Sentinel] focus element:', getErrorMessage(e)); }
         // Dispatch explicit FocusEvent for frameworks (Formik, React Hook Form) that use listeners
         try { el.dispatchEvent(new FocusEvent('focus', { bubbles: true, composed: true })); } catch { /* non-fatal */ }
         // Clear existing value so CDP insertText replaces rather than appends,
@@ -822,7 +827,7 @@ if (window.__sentinelInitialized) {
           } else if (el.isContentEditable) {
             el.textContent = '';
           }
-        } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] Non-fatal error:', getErrorMessage(e)); }
         return { focused: true };
       }
 
@@ -901,14 +906,14 @@ if (window.__sentinelInitialized) {
       const label = escapeHtml(description || actionType);
       overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
       overlay.style.opacity = '1';
-    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', getErrorMessage(e)); }
   }
 
   function hideActionBanner() {
     try {
       const overlay = document.getElementById(SENTINEL_OVERLAY_ID);
       if (overlay) overlay.style.opacity = '0';
-    } catch (e) { console.warn('[Sentinel] hide action banner:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    } catch (e) { console.warn('[Sentinel] hide action banner:', getErrorMessage(e)); }
   }
 
   function showClickIndicator(x, y) {
@@ -920,8 +925,8 @@ if (window.__sentinelInitialized) {
       indicator.style.left = `${x}px`;
       indicator.style.top = `${y}px`;
       (document.body || document.documentElement).appendChild(indicator);
-      setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); } }, 700);
-    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+      setTimeout(() => { try { if (indicator.parentNode) indicator.remove(); } catch(e) { console.warn('[Sentinel] click indicator cleanup failed:', getErrorMessage(e)); } }, 700);
+    } catch (e) { console.warn('[Sentinel] Extension context invalidated:', getErrorMessage(e)); }
   }
 
   // Make overlay functions available for the execute_command handler
@@ -1166,20 +1171,20 @@ if (window.__sentinelInitialized) {
       // brittle nth-of-type selector chain, which breaks on SPA re-renders.
       try {
         console.warn(`[Sentinel Override] ${cmd.ref} stale, attempting semantic fallback`);
-      } catch (e) { console.warn('[Sentinel] stale ref log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] stale ref log:', getErrorMessage(e)); }
       // 1. aria-label match (most reliable stable identifier)
       if (cmd.ariaLabel) {
         try {
           const byAria = targetDoc.querySelector(`[aria-label="${(cmd.ariaLabel || '').replace(/"/g, '\\"')}"]`);
           if (byAria) return { el: byAria, viaRef: false, staleRef: true };
-        } catch (e) { console.warn('[Sentinel] aria-label fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] aria-label fallback:', getErrorMessage(e)); }
       }
       // 2. id match
       if (cmd.elementId) {
         try {
           const byId = targetDoc.getElementById(cmd.elementId);
           if (byId) return { el: byId, viaRef: false, staleRef: true };
-        } catch (e) { console.warn('[Sentinel] id fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] id fallback:', getErrorMessage(e)); }
       }
       // 3. visible text + tag match (e.g. a button that always says "Save")
       if (cmd.elementText && cmd.tag) {
@@ -1189,7 +1194,7 @@ if (window.__sentinelInitialized) {
           const byText = [...targetDoc.querySelectorAll(tag)]
             .find(el => (el.innerText || el.textContent || '').trim() === needle);
           if (byText) return { el: byText, viaRef: false, staleRef: true };
-        } catch (e) { console.warn('[Sentinel] text+tag fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] text+tag fallback:', getErrorMessage(e)); }
       }
       // 4. XPath text search — find any visible element containing the text
       if (cmd.elementText) {
@@ -1201,7 +1206,7 @@ if (window.__sentinelInitialized) {
             targetDoc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null
           ).singleNodeValue;
           if (byXPath) return { el: byXPath, viaRef: false, staleRef: true };
-        } catch (e) { console.warn('[Sentinel] XPath fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] XPath fallback:', getErrorMessage(e)); }
       }
       // 5. aria-label partial / case-insensitive match (label may have changed slightly)
       if (cmd.elementText) {
@@ -1213,7 +1218,7 @@ if (window.__sentinelInitialized) {
               return { el: c, viaRef: false, staleRef: true };
             }
           }
-        } catch (e) { console.warn('[Sentinel] aria partial fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] aria partial fallback:', getErrorMessage(e)); }
       }
       // 6. data-testid / data-id partial match
       if (cmd.elementText) {
@@ -1221,7 +1226,7 @@ if (window.__sentinelInitialized) {
           const needle = String(cmd.elementText).trim().substring(0, 30).toLowerCase().replace(/\s+/g, '-');
           const byTestId = targetDoc.querySelector(`[data-testid*="${needle}" i], [data-id*="${needle}" i]`);
           if (byTestId) return { el: byTestId, viaRef: false, staleRef: true };
-        } catch (e) { console.warn('[Sentinel] testid fallback:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] testid fallback:', getErrorMessage(e)); }
       }
       // 7. nth-of-type selector as last resort
       if (cmd.selector) {
@@ -1343,7 +1348,7 @@ if (window.__sentinelInitialized) {
               staleRef: !!resolved.staleRef,
               url: location.href.substring(0, 200)
             });
-          } catch (e) { console.warn('[Sentinel] click not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] click not found tel:', getErrorMessage(e)); }
           return `Element not found: ${describeTarget(cmd)}`;
         }
 
@@ -1360,7 +1365,7 @@ if (window.__sentinelInitialized) {
                 tag: (el.tagName || '').toLowerCase(),
                 url: location.href.substring(0, 200)
               });
-            } catch (e) { console.warn('[Sentinel] click rejected tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] click rejected tel:', getErrorMessage(e)); }
             return `Cannot click ${describeTarget(cmd)}: ${reason}`;
           }
         }
@@ -1385,21 +1390,21 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveToElement:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveToElement:', getErrorMessage(e)); }
 
         // Get element center for click indicator
         try {
           const rect = el.getBoundingClientRect();
           if (!rect || !rect.width || !rect.height) throw new Error('Unable to get element bounding rect');
           if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(rect.left + rect.width / 2, rect.top + rect.height / 2);
-        } catch (e) { console.warn('[Sentinel] click indicator rect:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] click indicator rect:', getErrorMessage(e)); }
 
         // (G3) Cursor press animation, fired at the same moment as the pulse.
         try {
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
             window.__sentinelCursor.press();
           }
-        } catch (e) { console.warn('[Sentinel] cursor press click:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor press click:', getErrorMessage(e)); }
 
         // Short settle pause — the cursor.moveToElement above already provided
         // the visible "operator looking" travel time, so this is just a brief
@@ -1430,7 +1435,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(rcEl);
           }
-        } catch (e) { console.warn('[Sentinel] cursor right_click:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor right_click:', getErrorMessage(e)); }
         var rcRect = rcEl.getBoundingClientRect();
         if (!rcRect || !rcRect.width || !rcRect.height) return 'Error: unable to get bounding rect for right_click';
         var rcX = Math.round(rcRect.left + rcRect.width / 2);
@@ -1457,7 +1462,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(dcEl);
           }
-        } catch (e) { console.warn('[Sentinel] cursor double_click:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor double_click:', getErrorMessage(e)); }
         if (!targetDoc.defaultView) return 'Error: no window context for double_click dispatch';
         var dcView = targetDoc.defaultView;
         var dcOpts = { bubbles: true, cancelable: true, composed: true, view: dcView };
@@ -1488,7 +1493,7 @@ if (window.__sentinelInitialized) {
           if (typeof cmd.dpr === 'number' && !Number.isNaN(cmd.dpr) && Math.abs(cmd.dpr - liveDpr) > 0.01) {
             console.warn(`[sentinel] click_at dpr mismatch: cmd.dpr=${cmd.dpr} live=${liveDpr} (still treating x,y as CSS pixels)`);
           }
-        } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] Non-fatal error:', getErrorMessage(e)); }
 
         // (#11) Defensive viewport clamp. If coordinates land outside the
         // visible viewport, refuse rather than silently clicking on nothing.
@@ -1520,14 +1525,14 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveTo) {
             await window.__sentinelCursor.moveTo(x, y);
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveTo click_at:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveTo click_at:', getErrorMessage(e)); }
 
         if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(x, y);
         try {
           if (window.__sentinelCursor && window.__sentinelCursor.press) {
             window.__sentinelCursor.press();
           }
-        } catch (e) { console.warn('[Sentinel] cursor press click_at:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor press click_at:', getErrorMessage(e)); }
 
         // Short settle (cursor travel already provided the visible pause)
         await humanDelay(60, 140);
@@ -1570,7 +1575,7 @@ if (window.__sentinelInitialized) {
 
         // mousedown + dragstart on source
         dragEl.dispatchEvent(mkMouse('mousedown', srcX, srcY));
-        try { dragEl.dispatchEvent(mkDrag('dragstart', srcX, srcY)); } catch (e) { console.warn('[Sentinel] DragEvent unavailable:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        try { dragEl.dispatchEvent(mkDrag('dragstart', srcX, srcY)); } catch (e) { console.warn('[Sentinel] DragEvent unavailable:', getErrorMessage(e)); }
 
         // intermediate mousemove steps for smooth drag appearance
         var steps = 6;
@@ -1584,7 +1589,7 @@ if (window.__sentinelInitialized) {
 
         // dragenter + drop + dragend on target
         try { dropEl.dispatchEvent(mkDrag('dragenter', dstX, dstY)); } catch (_dragEnterErr) { /* Non-fatal: dragenter failed */ }
-        try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch (e) { console.warn('[Sentinel] Drop event error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        try { dropEl.dispatchEvent(mkDrag('drop', dstX, dstY)); } catch (e) { console.warn('[Sentinel] Drop event error:', getErrorMessage(e)); }
         dragEl.dispatchEvent(mkMouse('mouseup', dstX, dstY));
         try { dragEl.dispatchEvent(mkDrag('dragend', dstX, dstY)); } catch (_dragEndErr) { /* Non-fatal: dragend failed */ }
 
@@ -1607,7 +1612,7 @@ if (window.__sentinelInitialized) {
               textLen: (cmd.text || '').length,
               url: location.href.substring(0, 200)
             });
-          } catch (e) { console.warn('[Sentinel] type not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] type not found tel:', getErrorMessage(e)); }
           return `Element not found: ${describeTarget(cmd)}`;
         }
 
@@ -1623,7 +1628,7 @@ if (window.__sentinelInitialized) {
               id: (el.id || '').substring(0, 60),
               url: location.href.substring(0, 200)
             });
-          } catch (e) { console.warn('[Sentinel] sensitive field tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] sensitive field tel:', getErrorMessage(e)); }
         }
 
         // (#20) Reject disabled targets up front.
@@ -1638,7 +1643,7 @@ if (window.__sentinelInitialized) {
                 tag: (el.tagName || '').toLowerCase(),
                 url: location.href.substring(0, 200)
               });
-            } catch (e) { console.warn('[Sentinel] type rejected tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] type rejected tel:', getErrorMessage(e)); }
             return `Cannot type into ${describeTarget(cmd)}: ${reason}`;
           }
         }
@@ -1658,7 +1663,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveTo type:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveTo type:', getErrorMessage(e)); }
 
         el.focus();
         const text = cmd.text || '';
@@ -1684,8 +1689,8 @@ if (window.__sentinelInitialized) {
           el.textContent = '';
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
           // Use execCommand for broadest compatibility with SPA frameworks
-          try { targetDoc.execCommand('selectAll', false, null); } catch (e) { console.warn('[Sentinel] execCommand selectAll:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          try { targetDoc.execCommand('delete', false, null); } catch (e) { console.warn('[Sentinel] execCommand delete:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { targetDoc.execCommand('selectAll', false, null); } catch (e) { console.warn('[Sentinel] execCommand selectAll:', getErrorMessage(e)); }
+          try { targetDoc.execCommand('delete', false, null); } catch (e) { console.warn('[Sentinel] execCommand delete:', getErrorMessage(e)); }
           const textLen = text.length;
           for (let i = 0; i < textLen; i++) {
             const char = text[i];
@@ -1699,7 +1704,7 @@ if (window.__sentinelInitialized) {
             // Insert the character. Frameworks that intercept beforeinput may
             // already have updated content, but we still call execCommand for
             // editors that don't.
-            try { targetDoc.execCommand('insertText', false, char); } catch (e) { console.warn('[Sentinel] execCommand insertText:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            try { targetDoc.execCommand('insertText', false, char); } catch (e) { console.warn('[Sentinel] execCommand insertText:', getErrorMessage(e)); }
             el.dispatchEvent(new InputEvent('input', {
               inputType: 'insertText', data: char,
               bubbles: true, cancelable: true, composed: true
@@ -1922,13 +1927,13 @@ if (window.__sentinelInitialized) {
               if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
                 await window.__sentinelCursor.moveToElement(checkEl);
               }
-            } catch (e) { console.warn('[Sentinel] cursor moveTo check:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] cursor moveTo check:', getErrorMessage(e)); }
             checkEl.focus();
             try {
               if (window.__sentinelCursor && window.__sentinelCursor.press) {
                 window.__sentinelCursor.press();
               }
-            } catch (e) { console.warn('[Sentinel] cursor press check:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] cursor press check:', getErrorMessage(e)); }
             await humanDelay(80, 180);
             checkEl.click();
             hl.removeHighlight(checkEl);
@@ -1996,7 +2001,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveTo hover:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveTo hover:', getErrorMessage(e)); }
 
         // (#21) Full pointer + mouse hover sequence so Radix / Headless UI /
         // Tailwind UI menus react. Use PointerEvent where available.
@@ -2149,7 +2154,7 @@ if (window.__sentinelInitialized) {
 
         try {
           console.warn('[Sentinel Override] execute_js running with full page privileges:', code.slice(0, 200));
-        } catch (e) { console.warn('[Sentinel] exec_js warn log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] exec_js warn log:', getErrorMessage(e)); }
 
         // (#26) Honor cmd.timeout: default 8000ms, max 30000ms; clamp.
         // Hotfix 2026-05-06: bumped default from 3000 -> 8000. The 3s
@@ -2199,12 +2204,12 @@ if (window.__sentinelInitialized) {
               }
             } catch (err) { console.warn('[Sentinel] CSP violation handler failed:', ((err && typeof err.message === 'string') ? err.message : String(err))); }
           };
-          try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener add:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { document.addEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener add:', getErrorMessage(e)); }
 
           const execResult = await new Promise((resolve) => {
             const timeout = setTimeout(() => {
               window.removeEventListener('message', handler);
-              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove timeout:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove timeout:', getErrorMessage(e)); }
               // (3.21.1) Distinguish CSP block from a true timeout. If a CSP
               // violation fired in this window, the script never executed.
               if (__cspBlocked) {
@@ -2218,7 +2223,7 @@ if (window.__sentinelInitialized) {
               if (event.source !== window || !event.data || event.data.__sentinelEventId !== eventId) return;
               clearTimeout(timeout);
               window.removeEventListener('message', handler);
-              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove handler:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+              try { scriptEl.remove(); } catch (e) { console.warn('[Sentinel] script remove handler:', getErrorMessage(e)); }
               resolve(event.data);
             };
 
@@ -2331,7 +2336,7 @@ if (window.__sentinelInitialized) {
           });
 
           // (3.21.1) Clean up CSP listener regardless of which path we returned through.
-          try { document.removeEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener remove:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { document.removeEventListener('securitypolicyviolation', __cspListener); } catch (e) { console.warn('[Sentinel] CSP listener remove:', getErrorMessage(e)); }
 
           if (execResult.__cspBlocked) {
             // Clear, actionable error that the agent-engine's recovery skills
@@ -2349,7 +2354,7 @@ if (window.__sentinelInitialized) {
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
-            } catch (e) { console.warn('[Sentinel] exec_js timeout tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] exec_js timeout tel:', getErrorMessage(e)); }
             return `Code execution timed out (${execTimeout}ms)`;
           }
           if (execResult.__error) {
@@ -2360,12 +2365,12 @@ if (window.__sentinelInitialized) {
                 codeLen: code.length,
                 url: location.href.substring(0, 200)
               });
-            } catch (e) { console.warn('[Sentinel] exec_js error tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] exec_js error tel:', getErrorMessage(e)); }
             return `Execution error: ${execResult.__error}`;
           }
           return `JS Result: ${execResult.__value || ''}`;
         } catch (err) {
-          try { ctel.error('page', 'execute_js outer failure', { error: ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          try { ctel.error('page', 'execute_js outer failure', { error: ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', getErrorMessage(e)); }
           return `JS Error: ${((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}`;
         }
       }
@@ -2385,7 +2390,7 @@ if (window.__sentinelInitialized) {
               staleRef: !!resolvedEx.staleRef,
               url: location.href.substring(0, 200)
             });
-          } catch (e) { console.warn('[Sentinel] extract not found tel:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+          } catch (e) { console.warn('[Sentinel] extract not found tel:', getErrorMessage(e)); }
           return `Element not found: ${describeTarget(cmd)}`;
         }
         let value;
@@ -2423,14 +2428,14 @@ if (window.__sentinelInitialized) {
           } else if (cmd.selector) {
             try {
               console.warn(`[Sentinel Override] ${cmd.ref} stale, falling back to selector`);
-            } catch (e) { console.warn('[Sentinel] extract_list stale log:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+            } catch (e) { console.warn('[Sentinel] extract_list stale log:', getErrorMessage(e)); }
             try {
               containers = [...targetDoc.querySelectorAll(cmd.selector)];
               // (3.8.0) Auto-fall-through to shadow.queryDeep on empty results.
               if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
                 try {
                   containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-                } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+                } catch (e) { console.warn('[Sentinel] Non-fatal error:', getErrorMessage(e)); }
               }
             } catch {
               return `Element not found: ${describeTarget(cmd)}`;
@@ -2447,7 +2452,7 @@ if (window.__sentinelInitialized) {
             if (containers.length === 0 && window.__sentinelUtils && window.__sentinelUtils.shadow && window.__sentinelUtils.shadow.queryDeep) {
               try {
                 containers = window.__sentinelUtils.shadow.queryDeep(targetDoc, cmd.selector) || [];
-              } catch (e) { console.warn('[Sentinel] Non-fatal error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+              } catch (e) { console.warn('[Sentinel] Non-fatal error:', getErrorMessage(e)); }
             }
           } catch {
             return `Element not found: ${cmd.selector}`;
@@ -2488,7 +2493,7 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el);
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveTo dropdown:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveTo dropdown:', getErrorMessage(e)); }
         if (dd) {
           const options = await dd.openDropdown(targetDoc, el);
           if (!options || options.length === 0) {
@@ -2510,7 +2515,7 @@ if (window.__sentinelInitialized) {
         if (!ov) return 'Overlay utilities not available';
         // Try Escape globally first — handles enterprise dialogs that trap focus
         var escO = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true, composed: true };
-        try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        try { (document.activeElement || document.body).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (e) { console.warn('[Sentinel] ESC dispatch error:', getErrorMessage(e)); }
         try { (document.body || document.documentElement).dispatchEvent(new KeyboardEvent('keydown', escO)); } catch (_escDispatchErr) { /* Non-fatal: ESC dispatch to body failed */ }
         await new Promise(r => setTimeout(r, 200));
         var detectedOverlay = ov.detectOverlay ? ov.detectOverlay(document) : null;
@@ -2543,13 +2548,13 @@ if (window.__sentinelInitialized) {
           if (window.__sentinelCursor && window.__sentinelCursor.moveToElement) {
             await window.__sentinelCursor.moveToElement(el, { duration: 250 });
           }
-        } catch (e) { console.warn('[Sentinel] cursor moveTo scroll_to:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] cursor moveTo scroll_to:', getErrorMessage(e)); }
 
         try {
           const r = el.getBoundingClientRect();
           if (!r || !r.width || !r.height) { console.warn('[Sentinel] scroll_to indicator: null or zero rect'); }
           else if (window.__sentinelOverlay) window.__sentinelOverlay.showClickIndicator(r.left + r.width / 2, r.top + r.height / 2);
-        } catch (e) { console.warn('[Sentinel] scroll_to indicator:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+        } catch (e) { console.warn('[Sentinel] scroll_to indicator:', getErrorMessage(e)); }
         setTimeout(() => hl.removeHighlight(el), 1500);
         const note = resolvedScroll.staleRef ? ' (selector fallback after stale ref)' : '';
         return `Scrolled to ${describeTarget(cmd)}${note}`;
@@ -2584,8 +2589,8 @@ if (window.__sentinelInitialized) {
 
   function safeSendMessage(msg) {
     try { chrome.runtime.sendMessage(msg).catch((e) => {
-      console.warn('[Sentinel] safe send failed:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
-    }); } catch (e) { console.warn('[Sentinel] safe send msg:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+      console.warn('[Sentinel] safe send failed:', getErrorMessage(e));
+    }); } catch (e) { console.warn('[Sentinel] safe send msg:', getErrorMessage(e)); }
   }
 
   // SPA observer at module scope for cleanup access
@@ -2671,7 +2676,7 @@ if (window.__sentinelInitialized) {
   setupSPAObservers();
 
   try { chrome.runtime.sendMessage({ action: 'content_script_ready' }).catch((e) => {
-    console.warn('[Sentinel] init ready send failed:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)));
-  }); } catch (e) { console.warn('[Sentinel] init ready signal:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
+    console.warn('[Sentinel] init ready send failed:', getErrorMessage(e));
+  }); } catch (e) { console.warn('[Sentinel] init ready signal:', getErrorMessage(e)); }
 }
 // (3.26.0) End-of-file marker — sync flush. (v3.36.3 dedupe applied)
