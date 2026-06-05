@@ -1121,9 +1121,7 @@ export async function generatePlan(goal, settings, context = {}) {
             if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
-            if (s2end === -1) {
-              console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', getErrorMessage(parseErr));
-            }
+            console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', getErrorMessage(parseErr));
           }
           s2from = s2end + 1;
         } else { break; }
