@@ -57,6 +57,13 @@ const SCREENCONNECT_URL_RE = /screenconnect|connectwisecontrol/;
 const SCREENCONNECT_TEXT_RE = /screenconnect/;
 const GENERIC_NETWORK_RE = /firewall|router|switch|access point|management ui|admin panel|web ui/;
 
+// Precompiled regex patterns for intent parsing (performance optimization)
+const FORECAST_QUERY_RE = /(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i;
+const FOR_ABOUT_QUERY_RE = /(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i;
+const NAVIGATE_URL_RE = /navigate\s+(?:to\s+)?(?:the\s+)?(?:url\s+)?["']?(https?:\/\/[^\s"'\])\]]+)/i;
+const NAVIGATE_SITE_RE = /(?:go|navigate)\s+(?:to\s+)?(?:the\s+)?(amazon|reddit|youtube|google|twitter|github|wikipedia|hackernews|hacker\s+news|cnn|bbc|nytimes|weather\.gov|stackoverflow|facebook|instagram|linkedin)[\s.,)]/i;
+const ARTICLE_GOAL_RE = /\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i;
+
 // Site name to domain mapping - avoid recreating on every call
 const SITE_DOMAIN_MAP = {
   amazon: 'amazon.com',
@@ -211,7 +218,7 @@ export function getMultiArticleDirective(goal) {
   if (!goal || typeof goal !== 'string') return '';
   if (!MULTI_ARTICLE_PATTERN.test(goal)) return '';
   // Try to extract N if present
-  const m = goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i);
+  const m = goal.match(ARTICLE_GOAL_RE);
   const parsedN = m ? parseInt(m[1], 10) : 0;
   const n = (Number.isNaN(parsedN) || parsedN < 0) ? 0 : parsedN;
   const nLabel = (n > 0) ? n : 'N';
@@ -2052,10 +2059,10 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         else if (/reddit/i.test(_goal)) _site = 'reddit';
         else if (/twitter\.com|x\.com/i.test(_goal)) _site = 'twitter';
         // Extract query from goal text
-        const _qm = _goal.match(/(?:forecast|weather|search|find|look\s*up|about)\s+(?:for\s+)?["']?([^"',]+?)["']?\s*(?:\s+(?:and|then|,|\.|in\s+a|summar|$))/i);
+        const _qm = _goal.match(FORECAST_QUERY_RE);
         if (_qm && _qm[1]) _query = _qm[1].trim();
         else {
-          const _fm = _goal.match(/(?:for|about)\s+(.+?)(?:\s+(?:and|then|,|\.|$))/i);
+          const _fm = _goal.match(FOR_ABOUT_QUERY_RE);
           if (_fm && _fm[1]) _query = _fm[1].trim();
         }
         if (_query) {
@@ -2064,7 +2071,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         }
       }
       // Detect explicit navigate URL in content
-      const _navUrl = _intentText.match(/navigate\s+(?:to\s+)?(?:the\s+)?(?:url\s+)?["']?(https?:\/\/[^\s"'\])\]]+)/i);
+      const _navUrl = _intentText.match(NAVIGATE_URL_RE);
       if (_navUrl && _navUrl[1]) {
         console.warn('[Sentinel/FALLBACK] Detected navigate intent from content — url:', _navUrl[1]);
         return { type: 'navigate', url: _navUrl[1] };
@@ -2075,7 +2082,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         return { type: 'navigate_back' };
       }
       // v3.63: Detect navigate to named site from content ("go to Amazon", "navigate to Reddit")
-      const _siteUrl = _intentText.match(/(?:go|navigate)\s+(?:to\s+)?(?:the\s+)?(amazon|reddit|youtube|google|twitter|github|wikipedia|hackernews|hacker\s+news|cnn|bbc|nytimes|weather\.gov|stackoverflow|facebook|instagram|linkedin)[\s.,)]/i);
+      const _siteUrl = _intentText.match(NAVIGATE_SITE_RE);
       if (_siteUrl && _siteUrl[1]) {
         const _mapped = SITE_DOMAIN_MAP[_siteUrl[1].toLowerCase().replace(/\s+/g, '')];
         if (_mapped) {
