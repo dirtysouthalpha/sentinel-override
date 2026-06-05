@@ -53,8 +53,8 @@ setTimeout(() => {
         __showBootBanner('[SW] NOT REACHABLE: ' + (chrome.runtime.lastError.message || 'unknown'), '#ff0040');
         return;
       }
-      if (resp && resp.pong) {
-        console.log('[Sentinel/BOOT] SW alive, agentRunning:', resp.agentRunning);
+      if (resp && (resp.pong || resp.data?.pong)) {
+        console.log('[Sentinel/BOOT] SW alive, agentRunning:', resp.agentRunning || resp.data?.agentRunning);
       } else {
         __showBootBanner('[SW] Unexpected response: ' + JSON.stringify(resp), '#ff8800');
       }
@@ -63,13 +63,36 @@ setTimeout(() => {
     __showBootBanner('[SW] Ping threw: ' + e.message, '#ff0040');
   }
 
-  // Check if provider has API key
-  chrome.storage.local.get(['active_provider_config'], (result) => {
-    const config = result.active_provider_config;
-    if (!config || !config.api_key) {
-      __showBootBanner('[CONFIG] No API key — open Settings to configure a provider', '#ffaa00');
+  // Check if provider has API key (correct storage keys: active_provider + providers)
+  chrome.storage.local.get(['active_provider', 'providers', 'api_key'], (result) => {
+    const activeId = result.active_provider;
+    const providers = result.providers;
+    const legacyKey = result.api_key;
+    let hasKey = false;
+    if (activeId && providers && providers[activeId] && providers[activeId].api_key) {
+      hasKey = true;
+      console.log('[Sentinel/BOOT] Provider:', activeId, 'model:', providers[activeId].model);
+    } else if (legacyKey) {
+      hasKey = true;
+      console.log('[Sentinel/BOOT] Legacy provider key found');
+    }
+
+    // Dump what we actually found in storage for debugging
+    const debugInfo = {
+      active_provider: activeId || '(empty)',
+      providers: providers ? Object.keys(providers) : '(empty)',
+      legacy_api_key: legacyKey ? '(has key)' : '(empty)',
+      activeConfig: (activeId && providers && providers[activeId]) ?
+        { api_key: providers[activeId].api_key ? '(has key)' : '(NO KEY)', endpoint: providers[activeId].endpoint, model: providers[activeId].model } : '(none)'
+    };
+    console.log('[Sentinel/BOOT] Storage state:', JSON.stringify(debugInfo, null, 2));
+
+    if (!hasKey) {
+      __showBootBanner('[CONFIG] No API key found — active_provider=' + (activeId || 'null') + ' providers=' + (providers ? Object.keys(providers).join(',') : 'null'), '#ffaa00');
       const gi = document.getElementById('goalInput');
       if (gi) gi.placeholder = '⚠️ Set up API key in Settings first ⚠️';
+    } else {
+      __showBootBanner('[OK] Provider: ' + (activeId || 'legacy') + ' — ready', '#00aa44');
     }
   });
 }, 600);
