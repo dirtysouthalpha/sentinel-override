@@ -47,11 +47,18 @@ globalThis.chrome = {
 };
 
 // ── Mock ES module dependencies ──
+// Use proper factory function for mocking to avoid read-only property issues
 const templateManagerMock = {
   resolveTemplateGoal: jest.fn(async (templateId, context) => ({
     goal: 'Test goal from template',
     steps: ['Step 1', 'Step 2'],
-  }))
+  })),
+  getTemplate: jest.fn(async (id) => ({ id, goal: 'Test goal' })),
+  listTemplates: jest.fn(async () => []),
+  saveTemplate: jest.fn(async (data) => data),
+  updateTemplate: jest.fn(async (id, updates) => ({ id, ...updates })),
+  deleteTemplate: jest.fn(async () => {}),
+  clearTemplateCache: jest.fn()
 };
 
 const agentEngineMock = {
@@ -62,9 +69,20 @@ const tabManagerMock = {
   getTabInfo: jest.fn(async () => ({ url: 'https://example.com', title: 'Test' }))
 };
 
-jest.unstable_mockModule('../background/template-manager.js', () => templateManagerMock);
-jest.unstable_mockModule('../background/agent-engine.js', () => agentEngineMock);
-jest.unstable_mockModule('../background/tab-manager.js', () => tabManagerMock);
+jest.unstable_mockModule('../background/template-manager.js', () => ({
+  __esModule: true,
+  ...templateManagerMock
+}));
+
+jest.unstable_mockModule('../background/agent-engine.js', () => ({
+  __esModule: true,
+  ...agentEngineMock
+}));
+
+jest.unstable_mockModule('../background/tab-manager.js', () => ({
+  __esModule: true,
+  ...tabManagerMock
+}));
 
 import {
   createSchedule,

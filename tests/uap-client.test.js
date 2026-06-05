@@ -31,9 +31,11 @@ class MockWebSocket {
     this.sentMessages.push(JSON.parse(data));
   }
 
-  close() {
+  close(code, reason) {
     this.readyState = WebSocket.CLOSED;
-    if (this.onclose) this.onclose();
+    if (this.onclose) {
+      this.onclose({ code: code || 1000, reason: reason || '' });
+    }
   }
 
   simulateMessage(message) {

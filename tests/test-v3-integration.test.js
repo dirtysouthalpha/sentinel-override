@@ -281,6 +281,10 @@ global.indexedDB = {
   }
 };
 
+// Make indexedDB available globally without the 'global.' prefix
+globalThis.indexedDB = global.indexedDB;
+globalThis.IDBKeyRange = global.IDBKeyRange;
+
 describe('v3.0 Circuit Breaker', () => {
   let CircuitBreaker, CircuitState, CircuitBreakerRegistry;
   beforeAll(async () => {

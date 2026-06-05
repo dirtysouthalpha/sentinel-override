@@ -10,9 +10,11 @@ globalThis.chrome = {
 };
 
 // ── Mock ES module dependencies ──
+// Use proper factory function for mocking to avoid read-only property issues
 const platformsMock = {
   getPlatformProfile: jest.fn(() => ({ id: 'test', label: 'Test Platform' })),
-  findMismatchHints: jest.fn(() => [])
+  findMismatchHints: jest.fn(() => []),
+  listAllProfiles: jest.fn(() => [])
 };
 
 const providerRegistryMock = {
@@ -24,8 +26,15 @@ const providerRegistryMock = {
   }))
 };
 
-jest.unstable_mockModule('../background/platforms/index.js', () => platformsMock);
-jest.unstable_mockModule('../background/provider-registry.js', () => providerRegistryMock);
+jest.unstable_mockModule('../background/platforms/index.js', () => ({
+  __esModule: true,
+  ...platformsMock
+}));
+
+jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  __esModule: true,
+  ...providerRegistryMock
+}));
 
 // Mock fetch globally
 global.fetch = jest.fn(() => Promise.resolve({
