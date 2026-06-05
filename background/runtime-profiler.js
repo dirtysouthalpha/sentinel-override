@@ -98,13 +98,15 @@ function generateProfilingSummary() {
   
   // Memory statistics
   const memoryUsage = samples.map(s => s.memory.usagePercent);
-  const avgMemory = memoryUsage.reduce((a, b) => a + b, 0) / memoryUsage.length;
+  const memLen = memoryUsage.length;
+  const avgMemory = memoryUsage.reduce((a, b) => a + b, 0) / memLen;
   const maxMemory = Math.max(...memoryUsage);
   const minMemory = Math.min(...memoryUsage);
-  
+
   // Timing statistics
   const intervals = samples.map(s => s.timing.sinceLastSample).filter(t => t > 0);
-  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const intLen = intervals.length;
+  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intLen;
   
   // Agent activity
   const agentActivity = samples[samples.length - 1]?.agent || {};
@@ -146,15 +148,17 @@ function detectTrend(values) {
 
 function detectPerformanceTrend(samples) {
   if (samples.length < 5) return 'unknown';
-  
+
   // Check if intervals are increasing (slowing down)
   const intervals = samples.slice(-10).map(s => s.timing.sinceLastSample);
   const firstHalf = intervals.slice(0, Math.floor(intervals.length / 2));
   const secondHalf = intervals.slice(Math.floor(intervals.length / 2));
-  
-  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-  
+
+  const firstLen = firstHalf.length;
+  const secondLen = secondHalf.length;
+  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstLen;
+  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondLen;
+
   if (secondAvg > firstAvg * 1.2) return 'degrading';
   if (secondAvg < firstAvg * 0.8) return 'improving';
   return 'stable';
@@ -322,8 +326,9 @@ function calculateOverallComplexity(state) {
     calculateHistoryComplexity(state.history) / 5,
     calculateMemoryComplexity(state.memory) / 20
   ];
-  
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+  const len = scores.length;
+  const avg = scores.reduce((a, b) => a + b, 0) / len;
   return Math.min(100, avg * 20); // Scale to 0-100
 }
 
@@ -595,9 +600,10 @@ function evaluateCanaryHealth(sample) {
   }
   
   const baseline = canaryState.samples.slice(0, baselineSize);
-  const avgBaselineError = baseline.reduce((sum, s) => sum + s.errorRate, 0) / baseline.length;
-  const avgBaselineTime = baseline.reduce((sum, s) => sum + s.avgStepTime, 0) / baseline.length;
-  const avgBaselineMemory = baseline.reduce((sum, s) => sum + s.memoryUsage, 0) / baseline.length;
+  const baseLen = baseline.length;
+  const avgBaselineError = baseline.reduce((sum, s) => sum + s.errorRate, 0) / baseLen;
+  const avgBaselineTime = baseline.reduce((sum, s) => sum + s.avgStepTime, 0) / baseLen;
+  const avgBaselineMemory = baseline.reduce((sum, s) => sum + s.memoryUsage, 0) / baseLen;
   
   const reasons = [];
   let shouldRollback = false;
@@ -705,9 +711,10 @@ export function runGeneticAlgorithm(params) {
       individual: ind,
       fitness: fitnessFunction(ind)
     }));
-    
+    const fitnessScoresLen = fitnessScores.length;
+
     // Track best
-    const genBest = fitnessScores.reduce((best, current) => 
+    const genBest = fitnessScores.reduce((best, current) =>
       current.fitness > best.fitness ? current : best);
     
     if (genBest.fitness > bestFitness) {
@@ -739,7 +746,7 @@ export function runGeneticAlgorithm(params) {
     history.push({
       generation: gen,
       bestFitness: genBest.fitness,
-      avgFitness: fitnessScores.reduce((sum, s) => sum + s.fitness, 0) / fitnessScores.length,
+      avgFitness: fitnessScores.reduce((sum, s) => sum + s.fitness, 0) / fitnessScoresLen,
       bestIndividual: genBest.individual
     });
   }

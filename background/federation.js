@@ -491,7 +491,8 @@ class FederationController {
     });
 
     // Average trust score weighted by completion rate
-    const avgTrust = peerScores.reduce((a, b) => a + b, 0) / peerScores.length;
+    const peerScoresLen = peerScores.length;
+    const avgTrust = peerScores.reduce((a, b) => a + b, 0) / peerScoresLen;
     const completionRate = results.length / job.subGoals.length;
 
     return Math.round(avgTrust * completionRate);

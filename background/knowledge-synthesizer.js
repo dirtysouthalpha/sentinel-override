@@ -292,11 +292,12 @@ async function crossTypeSynthesis(synthesized) {
       result.conflicts.push(...conflicts);
 
       // Create cross-type synthesis
+      const groupLen = group.length;
       result.synthesized.push({
         type: 'cross_type',
-        content: `Combined knowledge from ${group.length} sources`,
+        content: `Combined knowledge from ${groupLen} sources`,
         sources: group.flatMap(g => g.sources || []),
-        confidence: group.reduce((sum, g) => sum + (g.confidence || 0.5), 0) / group.length,
+        confidence: group.reduce((sum, g) => sum + (g.confidence || 0.5), 0) / groupLen,
         involvedTypes: group.map(g => g.type)
       });
     }
