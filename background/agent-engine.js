@@ -3921,11 +3921,14 @@ async function runAgentLoop(goal, workingTabId) {
       const _nonMutating = NON_MUTATING_ACTIONS_RE.test(_prevType);
       const _obsUrl = (tabInfo && tabInfo.url) || '';
 
+      // Cache repeated condition for observation skip logic (perf)
+      const _cacheCondition = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation;
+
       // Compute a lightweight DOM content hash via the content script to detect
       // SPA content changes that don't alter the URL. The hash is a stable
       // fingerprint based on visible text length + interactive element count.
       let _currentDomHash = 0;
-      if (_nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation) {
+      if (_cacheCondition) {
         try {
           const _hashResult = await sendMessageWithRetry(tab, {
             action: 'execute_command',
@@ -3953,13 +3956,13 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       const _observedHashBefore = _lastObservedDomHash;
-      const _skipObserve = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
+      const _skipObserve = _cacheCondition && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
       if (_skipObserve) {
         observation = _cachedObservation;
         pageContent = _cachedPageContent;
         activityDone(stepCount, 'observe', '(cached — page unchanged)', null);
       } else {
-        if (_nonMutating && _lastObservedUrl === _obsUrl && _currentDomHash !== 0 && _currentDomHash !== _lastObservedDomHash) {
+        if (_cacheCondition && _currentDomHash !== 0 && _currentDomHash !== _lastObservedDomHash) {
           // SPA content change detected (URL same, DOM hash different)
           sendSilentUpdate('DOM changed (SPA) — re-observing...', stepCount);
         }
