@@ -3911,7 +3911,8 @@ async function runAgentLoop(goal, workingTabId) {
       // AND the URL hasn't changed AND the DOM content hash matches (catches SPA
       // content changes without URL changes). On slow portals this halves step latency.
       let observation, pageContent;
-      const _prevAction = history.length ? history[history.length - 1] : null;
+      const histLen = history.length;
+      const _prevAction = histLen ? history[histLen - 1] : null;
       const _prevType = _prevAction && _prevAction.action ? _prevAction.action.type : '';
       const _nonMutating = NON_MUTATING_ACTIONS_RE.test(_prevType);
       const _obsUrl = (tabInfo && tabInfo.url) || '';
