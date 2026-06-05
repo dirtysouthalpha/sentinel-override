@@ -4052,12 +4052,12 @@ async function runAgentLoop(goal, workingTabId) {
               try {
                 const parsed = JSON.parse(val.replace('JS Result: ', ''));
                 val = (parsed && parsed.value !== undefined) ? parsed.value : val;
-              } catch (_e) { /* JSON parse failed - use raw value */ }
+              } catch (_e) { console.warn('[Sentinel] DOM hash JSON parse failed:', getErrorMessage(_e)); }
             }
             const parsed = typeof val === 'number' ? val : parseInt(String(val), 10);
             _currentDomHash = (typeof parsed === 'number' && !Number.isNaN(parsed)) ? parsed : 0;
           }
-        } catch (_) { /* hash probe failed — assume cache miss */ }
+        } catch (_) { console.warn('[Sentinel] DOM hash probe failed, assuming cache miss'); }
       }
 
       const _observedHashBefore = _lastObservedDomHash;
@@ -4857,7 +4857,7 @@ async function runAgentLoop(goal, workingTabId) {
             try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
               // Try extracting from code block
               const _m = _vRaw.match(CODE_BLOCK_REGEX);
-              if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) {}
+              if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) { console.warn('[Sentinel] Vision code block parse failed:', getErrorMessage(_e2)); }
             }
 
             if (_vParsed && _vParsed.action) {
@@ -7237,9 +7237,9 @@ return { ok: true, value: el.value };
   try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch(e) {
     console.warn('[Sentinel] Failed to clear agent state from session storage:', getErrorMessage(e));
     // Try to force-clear individual keys
-    try { await chrome.storage.session.remove(['agentRunning']); } catch (_clearErr) {}
-    try { await chrome.storage.session.remove(['agentGoal']); } catch (_clearErr) {}
-    try { await chrome.storage.session.remove(['agentStartTime']); } catch (_clearErr) {}
+    try { await chrome.storage.session.remove(['agentRunning']); } catch (_clearErr) { console.warn('[Sentinel] Failed to clear agentRunning:', getErrorMessage(_clearErr)); }
+    try { await chrome.storage.session.remove(['agentGoal']); } catch (_clearErr) { console.warn('[Sentinel] Failed to clear agentGoal:', getErrorMessage(_clearErr)); }
+    try { await chrome.storage.session.remove(['agentStartTime']); } catch (_clearErr) { console.warn('[Sentinel] Failed to clear agentStartTime:', getErrorMessage(_clearErr)); }
   }
 
   if (finished) {

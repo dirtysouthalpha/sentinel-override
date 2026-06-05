@@ -340,7 +340,9 @@ function extractStatements(text) {
  */
 function areContradictoryStatements(stmt1, stmt2) {
   // Check same subject
-  if (stmt1.subject.toLowerCase() !== stmt2.subject.toLowerCase()) {
+  const subject1 = stmt1.subject.toLowerCase();
+  const subject2 = stmt2.subject.toLowerCase();
+  if (subject1 !== subject2) {
     return false;
   }
 

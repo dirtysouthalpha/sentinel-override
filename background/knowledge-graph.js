@@ -238,9 +238,10 @@ class KnowledgeGraph {
         if (node.id === otherNode.id) continue;
 
         // Check for same type and label similarity
-        if (node.type === otherNode.type && 
-            node.label.toLowerCase() === otherNode.label.toLowerCase()) {
-          
+        const label1 = node.label.toLowerCase();
+        const label2 = otherNode.label.toLowerCase();
+        if (node.type === otherNode.type && label1 === label2) {
+
           // Check for conflicting properties
           for (const [key, value] of Object.entries(node.properties)) {
             const otherValue = otherNode.properties[key];

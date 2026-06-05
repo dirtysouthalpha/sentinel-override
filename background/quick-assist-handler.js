@@ -61,7 +61,7 @@ export async function handleQuickAssist(prompt) {
 
     if (!response.ok) {
       let errorText = '';
-      try { errorText = await response.text(); } catch (_) {}
+      try { errorText = await response.text(); } catch (_) { errorText = '(unable to read error response)'; }
       throw new Error(`API error ${response.status}: ${errorText.substring(0, 200)}`);
     }
 
