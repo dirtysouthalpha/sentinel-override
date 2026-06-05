@@ -79,9 +79,9 @@ export function takeProfilingSample() {
     },
     // Agent state
     agent: {
-      stepCount: window.__sentinelStepCount || 0,
-      apiCallCount: window.__sentinelApiCallCount || 0,
-      failures: window.__sentinelFailures || 0
+      stepCount: (typeof window !== 'undefined' && window.__sentinelStepCount) || 0,
+      apiCallCount: (typeof window !== 'undefined' && window.__sentinelApiCallCount) || 0,
+      failures: (typeof window !== 'undefined' && window.__sentinelFailures) || 0
     }
   };
 
