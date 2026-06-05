@@ -754,7 +754,7 @@ if (window.__sentinelInitialized) {
 
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+          return { ok: false, error: getErrorMessage(e) };
         }
       }
 
@@ -776,7 +776,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+          return { ok: false, error: getErrorMessage(e) };
         }
       }
 
@@ -793,7 +793,7 @@ if (window.__sentinelInitialized) {
           }
           return { ok: true };
         } catch (e) {
-          return { ok: false, error: (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e) };
+          return { ok: false, error: getErrorMessage(e) };
         }
       }
 
@@ -1014,7 +1014,7 @@ if (window.__sentinelInitialized) {
       const progress = position !== undefined ? ` (${position}/${total})` : '';
       overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${preview}"</span>${progress}`;
       overlay.style.opacity = '1';
-    } catch (e) { console.warn('[Sentinel] typing banner show:', (typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e)); }
+    } catch (e) { console.warn('[Sentinel] typing banner show:', getErrorMessage(e)); }
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -2370,8 +2370,8 @@ if (window.__sentinelInitialized) {
           }
           return `JS Result: ${execResult.__value || ''}`;
         } catch (err) {
-          try { ctel.error('page', 'execute_js outer failure', { error: ((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', getErrorMessage(e)); }
-          return `JS Error: ${((typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err))}`;
+          try { ctel.error('page', 'execute_js outer failure', { error: (getErrorMessage(err)), url: location.href.substring(0, 200) }); } catch (e) { console.warn('[Sentinel] exec_js outer tel:', getErrorMessage(e)); }
+          return `JS Error: ${(getErrorMessage(err))}`;
         }
       }
 
