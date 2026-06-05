@@ -487,7 +487,7 @@ export function analyzePredictively(data) {
   // Predict next run duration (optimized to avoid intermediate array)
   const durations = [];
   for (const r of runHistory) {
-    if (r.duration != null) {
+    if (r && typeof r === 'object' && r.duration != null) {
       durations.push(r.duration);
     }
   }
@@ -527,18 +527,24 @@ function calculateComplexityRisk(metrics) {
 
 function calculateNoveltyRisk(history) {
   // More unique URLs/actions = higher novelty
-  const uniqueUrls = new Set(history.map(h => h.url)).size;
+  // Defensive: history entries may be strings or objects without .url
+  const uniqueUrls = new Set(
+    (Array.isArray(history) ? history : [])
+      .map(h => (h && typeof h === 'object' && h.url) || '')
+      .filter(Boolean)
+  ).size;
   return Math.min(1, uniqueUrls / 20); // Normalize to 0-1
 }
 
 function calculateInstabilityRisk(history) {
   // More failures = higher instability
+  const safeHistory = Array.isArray(history) ? history : [];
   let failures = 0;
-  const histLen = history.length;
+  const histLen = safeHistory.length;
   for (let i = 0; i < histLen; i++) {
-    if (history[i].failed) failures++;
+    if (safeHistory[i] && typeof safeHistory[i] === 'object' && safeHistory[i].failed) failures++;
   }
-  return Math.min(1, failures / histLen);
+  return histLen > 0 ? Math.min(1, failures / histLen) : 0;
 }
 
 function calculateDependencyRisk(metrics) {
