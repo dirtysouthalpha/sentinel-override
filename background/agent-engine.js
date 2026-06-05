@@ -164,7 +164,11 @@ async function _visionObserve(tab, _currentUrl) {
       const tag = el.tag || 'div';
       // Template literal is more efficient than += concatenation in loop
       const hrefLen = el.href ? el.href.length : 0;
-      const attrs = `${el.type ? ` type=${el.type}` : ''}${el.role ? ` role=${el.role}` : ''}${el.ariaLabel ? ` aria-label=${JSON.stringify((el.ariaLabel || '').substring(0, 40))}` : ''}${el.placeholder ? ` placeholder=${JSON.stringify((el.placeholder || '').substring(0, 40))}` : ''}${el.href && hrefLen > 5 && hrefLen < 100 ? ` href=${JSON.stringify(el.href.substring(0, 80))}` : ''}`;
+      // Cache substring and JSON.stringify results for performance
+      const ariaLabel = el.ariaLabel ? (el.ariaLabel || '').substring(0, 40) : '';
+      const placeholder = el.placeholder ? (el.placeholder || '').substring(0, 40) : '';
+      const href = el.href && hrefLen > 5 && hrefLen < 100 ? el.href.substring(0, 80) : '';
+      const attrs = `${el.type ? ` type=${el.type}` : ''}${el.role ? ` role=${el.role}` : ''}${ariaLabel ? ` aria-label=${JSON.stringify(ariaLabel)}` : ''}${placeholder ? ` placeholder=${JSON.stringify(placeholder)}` : ''}${href ? ` href=${JSON.stringify(href)}` : ''}`;
       const text = el.text ? `>${(el.text || '').substring(0, 60)}` : '/>';
       const closing = el.text ? `</${tag}>` : '';
       elementParts.push(`[${el.index}]<${tag}${attrs}${text}${closing}\n`);
@@ -6921,7 +6925,11 @@ return { ok: true, value: el.value };
             },
             result: (() => {
               const r = result;
-              return typeof r === 'string' ? r.substring(0, 500) : JSON.stringify(r || '').substring(0, 500);
+              if (typeof r === 'string') {
+                return r.substring(0, 500);
+              }
+              const jsonStr = JSON.stringify(r || '');
+              return jsonStr.substring(0, 500);
             })(),
             failed: !!actionFailed,
             reasoning: (() => {
