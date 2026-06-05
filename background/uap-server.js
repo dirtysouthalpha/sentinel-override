@@ -10,6 +10,9 @@
 
 import { v4 as uuidv4 } from 'uuid';
 
+// Precompile regex for tenant validation (performance optimization)
+const ONMICROSOFT_TENANT_RE = /^[a-z0-9.-]+\.onmicrosoft\.com$/;
+
 /**
  * UAP Server class
  * Handles WebSocket connections, goal execution, and result streaming
@@ -515,7 +518,7 @@ class UAPServer {
     };
 
     // Tenant validation (for M365 work)
-    if (validated.tenant && !validated.tenant.match(/^[a-z0-9.-]+\.onmicrosoft\.com$/)) {
+    if (validated.tenant && !validated.tenant.match(ONMICROSOFT_TENANT_RE)) {
       console.warn('[UAP] Invalid tenant format:', validated.tenant);
       validated.tenant = null;
     }
