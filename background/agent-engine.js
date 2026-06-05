@@ -1547,21 +1547,18 @@ async function _cdpObservePage(tabId) {
 
   // SPEED: Skip ready check if previous observe found page was loaded
   if (_pageWasReady) {
-    console.log('[Sentinel/CDP] Skipping page ready check — previous observe confirmed loaded');
+    // Skip page ready check - previous observe confirmed loaded
   } else try {
     const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 2000 });
-    console.log('[Sentinel/CDP] Page ready check:', JSON.stringify(readyState && readyState.value));
     if (readyState && readyState.ok && readyState.value) {
       const r = readyState.value;
       // If page has no body and no children, wait a moment and try again
       if (!r.hasBody && r.childCount === 0) {
-        console.log('[Sentinel/CDP] Page has no body — waiting 2s for DOM...');
         try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
         await sleep(TWO_SECONDS_MS);
       }
       // If title is empty and URL is still about:blank or loading, wait
       if (!r.title && (r.url === 'about:blank' || r.url === '')) {
-        console.log('[Sentinel/CDP] Page still loading — waiting 2s...');
         try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
         await sleep(TWO_SECONDS_MS);
       }
@@ -1643,14 +1640,10 @@ async function _cdpObservePage(tabId) {
   const _cacheTTL = _inBatchMode ? BATCH_MODE_CACHE_TTL_MS : API_CACHE_TTL_MS;
   if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
-    console.log(`[Sentinel/CDP] Observation CACHE HIT #${_observeCacheHits} — reusing last result for`, currentUrl);
     return _cachedObservation;
   }
-  console.log('[Sentinel/CDP] _cdpObservePage: sending to tab', tabId, 'code length:', code.length);
   const result = await cdpExecuteJs(tabId, code, { timeout: THREE_SECONDS_MS });
-  console.log('[Sentinel/CDP] _cdpObservePage result:', JSON.stringify(result).substring(0, 300));
   if (result?.ok && result?.value) {
-    console.log('[Sentinel/CDP] _cdpObservePage: got', (result.value.elements || []).length, 'elements,', (result.value.text || '').length, 'chars text,', (result.value.overlays || []).length, 'overlays');
     _pageWasReady = true; // Mark page as ready for next step
     return result.value;
   }
@@ -1681,7 +1674,6 @@ async function _cdpDismissOverlays(tabId, overlays) {
         dismissBtn = buttons[0];
       }
       if (dismissBtn && dismissBtn.x && dismissBtn.y) {
-        console.log('[Sentinel/CDP] Phase1 clicking:', dismissBtn.text, 'at', dismissBtn.x, dismissBtn.y);
         const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
         if (r && r.ok) totalRemoved++;
         await new Promise(r => setTimeout(r, SIX_HUNDRED_MS));
@@ -1750,27 +1742,22 @@ async function _cdpDismissOverlays(tabId, overlays) {
 
   // SPEED: Skip nuke entirely when no overlays detected AND last nuke was clean
   if (!overlays.length && _lastNukeClean) {
-    console.log('[Sentinel/CDP] Skipping nuke — no overlays and last nuke was clean');
+    // Skip nuke - no overlays and last nuke was clean
   } else try {
-    console.log(`[Sentinel/CDP] Phase2: sending surgical nuke (${nukeCode.length} chars) to tab`, tabId);
     const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: FIVE_SECONDS_MS });
-    console.log('[Sentinel/CDP] Phase2 raw result:', JSON.stringify(nukeResult));
     if (nukeResult && nukeResult.ok) {
       const removed = (nukeResult.value || 0);
-      console.log('[Sentinel/CDP] Phase2 surgical removal:', removed, 'elements affected');
       totalRemoved += removed;
       _lastNukeClean = (removed === 0); // Track for skip optimization
       // (v3.59) Post-nuke integrity check: verify page still has content
       if ((nukeResult.value || 0) > 0) {
         const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: THREE_SECONDS_MS });
-        console.log('[Sentinel/CDP] Post-nuke integrity:', JSON.stringify(integrityCheck && integrityCheck.value));
         if (integrityCheck && integrityCheck.ok && integrityCheck.value) {
           if (!integrityCheck.value.hasBody || !integrityCheck.value.title) {
             console.warn('[Sentinel/CDP] Nuke destroyed page content — reloading via CDP...');
             try {
               await chrome.debugger.sendCommand({ tabId: tabId }, 'Page.reload', { ignoreCache: true });
               await new Promise(r => setTimeout(r, TWO_SECONDS_MS));
-              console.warn('[Sentinel/CDP] Page reloaded after integrity failure');
             } catch(reloadErr) {
               console.warn('[Sentinel/CDP] Reload failed:', getErrorMessage(reloadErr));
             }
@@ -1791,7 +1778,6 @@ async function _cdpDismissOverlays(tabId, overlays) {
     await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
   } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', getErrorMessage(e)); }
 
-  console.log('[Sentinel/CDP] Overlay dismissal complete. Total removed:', totalRemoved);
   return totalRemoved;
 }
 
@@ -2885,8 +2871,6 @@ async function _universalCdpFallback(tab, cmd, opts) {
 
 
 async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount = 0) {
-  console.log('[Sentinel/CAPTCHA] Detected:', captchaInfo.type, 'url:', currentUrl);
-  
   // Strategy 1: Try to click CAPTCHA checkbox/button via CDP
   try {
     const clickCode = `
@@ -2897,7 +2881,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
         const cb = rcDoc && rcDoc.querySelector('.recaptcha-checkbox');
         if (cb) { cb.click(); return 'recaptcha_clicked'; }
       }
-      // hCaptcha checkbox  
+      // hCaptcha checkbox
       const hcFrame = document.querySelector('iframe[src*="hcaptcha"]');
       if (hcFrame) {
         const hcDoc = hcFrame.contentDocument || hcFrame.contentWindow.document;
@@ -2918,7 +2902,6 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
     const result = await cdpExecuteJs(tab.id, clickCode, { timeout: THREE_SECONDS_MS });
     const clickedWhat = (result && result.ok) ? result.value : null;
     if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
-      console.log('[Sentinel/CAPTCHA] Auto-solved:', clickedWhat);
       sendSilentUpdate(`🤖 CAPTCHA auto-solved (${clickedWhat})`, stepCount);
       try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
       await sleep(TWO_SECONDS_MS); // wait for page to process
@@ -2938,7 +2921,6 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
       const searchMatch = goal.match(SEARCH_SIMPLE_RE);
       if (searchMatch && info.searchPath && searchMatch[1]) {
         const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
-        console.log('[Sentinel/CAPTCHA] Navigating around CAPTCHA to:', searchUrl);
         sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
         try {
           await chrome.tabs.update(tab.id, { url: searchUrl });
@@ -2950,7 +2932,6 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
         return 'bypassed';
       }
       // No search query - just go to homepage
-      console.log('[Sentinel/CAPTCHA] Navigating to homepage:', info.altUrl);
       sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
       try {
         await chrome.tabs.update(tab.id, { url: info.altUrl });
@@ -2965,7 +2946,6 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
   
   // Strategy 3: Go back and try again
   try {
-    console.log('[Sentinel/CAPTCHA] Going back to previous page');
     sendSilentUpdate('⬅️ CAPTCHA detected, going back', stepCount);
     await chrome.tabs.goBack(tab.id);
     try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
