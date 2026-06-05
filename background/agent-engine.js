@@ -4965,10 +4965,11 @@ async function runAgentLoop(goal, workingTabId) {
             }
             // Store action in knowledge graph
             try {
-              await addKnowledgeNode('action', command.type, {
-                stepCount,
-                goal: goal.substring(0, 100),
-                url: currentUrl
+              addKnowledgeNode(`action_${stepCount}`, {
+                type: command.type,
+                label: command.type,
+                properties: { stepCount, goal: goal.substring(0, 100), url: currentUrl },
+                source: 'agent'
               });
             } catch (e) {
               console.warn('[Sentinel] Failed to store action in knowledge graph:', getErrorMessage(e));
