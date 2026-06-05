@@ -7,6 +7,15 @@ import { getErrorMessage } from './error-utils.js';
 const STORAGE_KEY = 'novelty_history';
 const MAX_HISTORY = 5000;
 
+// Precompile regex patterns for performance optimization
+const WHITESPACE_SPLIT_RE = /\s+/;
+const NON_ALPHA_RE = /[^a-z]/g;
+const DIGIT_RE = /\d+/g;
+const QUOTED_STRING_RE = /"[^"]*"/g;
+const ELEMENT_TYPE_RE = /\b(button|input|link|text|element|field)\b/g;
+const URL_RE = /https?:\/\/[^\s]+/g;
+const ACTION_RE = /\b(click|type|navigate|scroll|extract|wait)\b/g;
+
 /**
  * Analyze information for novelty
  * @param {string} runId - Run identifier
@@ -106,12 +115,12 @@ async function checkContentSimilarity(content, history) {
   }
 
   // Simple word overlap similarity
-  const contentWords = new Set(content.toLowerCase().split(/\s+/));
+  const contentWords = new Set(content.toLowerCase().split(WHITESPACE_SPLIT_RE));
   let maxSimilarity = 0;
 
   for (const entry of history) {
     const entryContent = (entry.content || '').toLowerCase();
-    const entryWords = new Set(entryContent.split(/\s+/));
+    const entryWords = new Set(entryContent.split(WHITESPACE_SPLIT_RE));
 
     // Calculate Jaccard similarity
     const intersection = new Set([...contentWords].filter(x => entryWords.has(x)));
@@ -170,22 +179,22 @@ async function checkPatternUniqueness(type, content, history) {
 function extractPattern(content) {
   // Replace specific values with placeholders
   let pattern = content.toLowerCase();
-  
+
   // Replace numbers
-  pattern = pattern.replace(/\d+/g, '[NUM]');
-  
+  pattern = pattern.replace(DIGIT_RE, '[NUM]');
+
   // Replace quoted strings
-  pattern = pattern.replace(/"[^"]*"/g, '[STR]');
-  
+  pattern = pattern.replace(QUOTED_STRING_RE, '[STR]');
+
   // Replace specific elements
-  pattern = pattern.replace(/\b(button|input|link|text|element|field)\b/g, '[ELEMENT]');
-  
+  pattern = pattern.replace(ELEMENT_TYPE_RE, '[ELEMENT]');
+
   // Replace URLs
-  pattern = pattern.replace(/https?:\/\/[^\s]+/g, '[URL]');
-  
+  pattern = pattern.replace(URL_RE, '[URL]');
+
   // Replace specific actions
-  pattern = pattern.replace(/\b(click|type|navigate|scroll|extract|wait)\b/g, '[ACTION]');
-  
+  pattern = pattern.replace(ACTION_RE, '[ACTION]');
+
   return pattern;
 }
 
@@ -282,9 +291,9 @@ function extractConcepts(content) {
   // Simple noun/verb extraction (common words to skip)
   const skipWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'could', 'may', 'might', 'can', 'to', 'from', 'in', 'on', 'at', 'by', 'with', 'for', 'of', 'and', 'or', 'but', 'if', 'then', 'when', 'while', 'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'he', 'she', 'him', 'her', 'his', 'hers', 'you', 'your', 'we', 'us', 'our', 'i', 'me', 'my', 'mine']);
 
-  const words = content.toLowerCase().split(/\s+/);
+  const words = content.toLowerCase().split(WHITESPACE_SPLIT_RE);
   for (const word of words) {
-    const cleanWord = word.replace(/[^a-z]/g, '');
+    const cleanWord = word.replace(NON_ALPHA_RE, '');
     if (cleanWord.length >= 3 && !skipWords.has(cleanWord)) {
       concepts.add(cleanWord);
     }
