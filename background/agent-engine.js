@@ -478,7 +478,7 @@ export async function restoreFromCheckpoint() {
     if (cp.tabContextUrls && typeof cp.tabContextUrls === 'object') {
       for (const [tabIdStr, url] of Object.entries(cp.tabContextUrls)) {
         const tabId = parseInt(tabIdStr, 10);
-        if (typeof tabId !== 'number' || isNaN(tabId) || tabId <= 0) {
+        if (typeof tabId !== 'number' || Number.isNaN(tabId) || tabId <= 0) {
           console.warn('[Sentinel] Invalid tabId in checkpoint:', tabIdStr);
           continue;
         }
