@@ -2741,7 +2741,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         var body=(document.body&&document.body.innerText)||"";
         var _s=${JSON.stringify(searchFor)};
         if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});
-        if(_s&&body.toLowerCase().indexOf(_s.toLowerCase())>=0)return JSON.stringify({ok:true,result:"found case-insensitive"});
+        if(_s){var _bl=body.toLowerCase(),_sl=_s.toLowerCase();if(_bl.indexOf(_sl)>=0)return JSON.stringify({ok:true,result:"found case-insensitive"})}
         // Also try finding by selector
         var _el=document.querySelector(${JSON.stringify(cmd.selector || '')});
         if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});
@@ -2766,7 +2766,7 @@ async function _universalCdpFallback(tab, cmd, opts) {
         var body=(document.body&&document.body.innerText)||"";
         var _c=${JSON.stringify(cmd.text || cmd.value || '')};
         if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});
-        if(_c&&body.toLowerCase().indexOf(_c.toLowerCase())>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"});
+        if(_c){var _bl=body.toLowerCase(),_cl=_c.toLowerCase();if(_bl.indexOf(_cl)>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"})}
         return JSON.stringify({ok:false,error:"verification failed"})
       })()`;
       break;
