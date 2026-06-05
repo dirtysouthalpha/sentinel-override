@@ -1378,8 +1378,9 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
 
   // Check 1: All recent actions are the same type with the same failure result
   if (recent.length >= CONFIG.stallConfig.similarityWindow) {
-    const firstResult = recent[0] ? recent[0].result : undefined;
-    const allSameType = recent[0] && recent[0].action && recent.every(h => h.action && h.action.type === recent[0].action.type);
+    const first = recent[0];
+    const firstResult = first ? first.result : undefined;
+    const allSameType = first && first.action && recent.every(h => h.action && h.action.type === first.action.type);
     const allSameResult = recent.every(h => h.result === firstResult);
     const allFailed = recent.every(h => {
       const r = typeof h.result === 'string' ? h.result : '';
@@ -1387,7 +1388,7 @@ function detectStall(history, consecutiveFailures, _currentStrategies) {
     });
 
     if (allSameType && allSameResult && allFailed) {
-      const actionType = recent[0].action.type || 'unknown';
+      const actionType = first.action.type || 'unknown';
       const resultStr = typeof firstResult === 'string' ? firstResult : '';
       return {
         stalled: true,
@@ -7366,7 +7367,8 @@ async function saveLearnedPattern(goal, history, success) {
       success,
       timestamp: Date.now()
     });
-    if (patterns.length > CONFIG.maxLearnedPatterns) patterns.splice(0, patterns.length - CONFIG.maxLearnedPatterns);
+    const maxPatterns = CONFIG.maxLearnedPatterns;
+    if (patterns.length > maxPatterns) patterns.splice(0, patterns.length - maxPatterns);
     await chrome.storage.local.set({ learned_patterns: patterns });
   } catch (e) { console.warn('Failed to save pattern:', getErrorMessage(e)); }
 }
