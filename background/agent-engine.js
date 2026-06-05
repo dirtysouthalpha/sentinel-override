@@ -32,6 +32,9 @@ const ELEMENT_TAG_A_RE = /^a$/i;
 const ELEMENT_TAG_HEADING_RE = /^h[1-3]$/i;
 const ELEMENT_ERROR_TEXT_RE = /error|invalid|failed/i;
 
+// Precompile regex for JavaScript string escaping (performance optimization)
+const JS_ESCAPE_RE = /[\\'"\n\r\t]/g;
+
 // Priority element types for O(1) lookup in element sorting
 const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']);
 
@@ -7389,7 +7392,7 @@ async function enforceRateLimit() {
 function escapeJsString(str, quote = '"') {
   if (typeof str !== 'string') return '';
   const quoteChar = quote === '"' ? '"' : "'";
-  return str.replace(/[\\'"\n\r\t]/g, (char) => {
+  return str.replace(JS_ESCAPE_RE, (char) => {
     switch (char) {
       case '\\': return '\\\\';
       case quoteChar: return '\\' + quoteChar;

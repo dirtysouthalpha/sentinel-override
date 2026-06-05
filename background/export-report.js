@@ -231,6 +231,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 </html>`;
 }
 
+// Precompiled regex for HTML escaping (performance optimization)
+const HTML_ESCAPE_RE = /[&<>'"]/g;
+
 /**
  * Escape HTML special characters to prevent XSS in generated reports.
  * @param {string} str - Raw string to escape.
@@ -238,7 +241,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
  */
 function escapeHtml(str) {
   const s = (str == null) ? '' : String(str);
-  return s.replace(/[&<>'"]/g, (char) => {
+  return s.replace(HTML_ESCAPE_RE, (char) => {
     switch (char) {
       case '&': return '&amp;';
       case '<': return '&lt;';
