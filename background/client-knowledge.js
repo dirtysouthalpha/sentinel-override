@@ -43,6 +43,9 @@ const DEFAULT_STATE = {
   clients: {}
 };
 
+// Regex cache for URL pattern matching to avoid repeated RegExp compilation
+const _urlPatternCache = new Map();
+
 // ========== Storage helpers ==========
 
 async function _read() {
@@ -280,11 +283,17 @@ function _urlMatches(pattern, url) {
     const _patternLower = pattern.toLowerCase(); // Cache to avoid repeated toLowerCase calls
     const _urlLower = url.toLowerCase(); // Cache to avoid repeated toLowerCase calls
     if (!pattern.includes('*')) return _urlLower.includes(_patternLower);
-    const re = new RegExp(
-      `^${_patternLower
-        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*/g, '.*')}$`
-    );
+
+    // Use cached regex if available, otherwise create and cache it
+    let re = _urlPatternCache.get(_patternLower);
+    if (!re) {
+      re = new RegExp(
+        `^${_patternLower
+          .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')}$`
+      );
+      _urlPatternCache.set(_patternLower, re);
+    }
     return re.test(_urlLower);
   } catch (e) {
     console.error('[Sentinel/client-knowledge] _matchesPattern failed:', getErrorMessage(e));
