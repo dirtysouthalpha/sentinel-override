@@ -7,6 +7,9 @@ import { getErrorMessage } from './error-utils.js';
 const STORAGE_KEY = 'synthesized_knowledge';
 const MAX_SYNTHESIS_ENTRIES = 1000;
 
+// Precompile regex for performance optimization
+const WHITESPACE_SPLIT_RE = /\s+/;
+
 /**
  * Synthesize knowledge from multiple sources
  * @param {string} runId - Run identifier
@@ -183,8 +186,8 @@ function areItemsSimilar(item1, item2) {
   const content2 = (item2.content || '').toLowerCase();
 
   // Simple word overlap check
-  const words1 = new Set(content1.split(/\s+/));
-  const words2 = new Set(content2.split(/\s+/));
+  const words1 = new Set(content1.split(WHITESPACE_SPLIT_RE));
+  const words2 = new Set(content2.split(WHITESPACE_SPLIT_RE));
 
   const intersection = new Set([...words1].filter(x => words2.has(x)));
   const union = new Set([...words1, ...words2]);
