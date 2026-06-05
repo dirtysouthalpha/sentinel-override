@@ -377,8 +377,8 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       let data;
       try {
         data = await response.json();
-      } catch {
-        throw new Error('Report LLM returned invalid JSON');
+      } catch (e) {
+        throw new Error(`Report LLM returned invalid JSON: ${getErrorMessage(e)}`);
       }
       if (!data) throw new Error('Report LLM returned null response body');
       const responseText = provider.parseResponse(data) || '';
@@ -396,7 +396,7 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
       const isNonRetryable = errMsg === 'No active provider configured'
         || errMsg === 'API key not configured'
         || errMsg.startsWith('Failed to build report request')
-        || errMsg === 'Report LLM returned invalid JSON';
+        || errMsg.startsWith('Report LLM returned invalid JSON');
       if (isNonRetryable) break;
       if (attempt < MAX_ATTEMPTS) {
         console.warn('[Sentinel/report] Attempt', attempt, 'failed:', errMsg, 'retrying...');
