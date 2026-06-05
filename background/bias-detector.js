@@ -313,7 +313,7 @@ export async function getBiasStatistics() {
 
   for (const entry of log) {
     // Count by severity
-    stats.bySeverity[getSeverityLabel(entry.severity)]++;
+    stats.bySeverity[getSeverityLabel(entry.severity).toLowerCase()]++;
 
     // Count by bias type
     for (const bias of entry.biases) {
