@@ -1686,7 +1686,8 @@ if (window.__sentinelInitialized) {
           // Use execCommand for broadest compatibility with SPA frameworks
           try { targetDoc.execCommand('selectAll', false, null); } catch (e) { console.warn('[Sentinel] execCommand selectAll:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
           try { targetDoc.execCommand('delete', false, null); } catch (e) { console.warn('[Sentinel] execCommand delete:', ((typeof e === 'object' && e !== null && typeof e.message === 'string') ? e.message : String(e))); }
-          for (let i = 0; i < text.length; i++) {
+          const textLen = text.length;
+          for (let i = 0; i < textLen; i++) {
             const char = text[i];
             el.dispatchEvent(__sentinelKeyEventForChar('keydown', char));
             el.dispatchEvent(__sentinelKeyEventForChar('keypress', char));
@@ -1726,7 +1727,8 @@ if (window.__sentinelInitialized) {
 
           nativeSetter.call(el, '');
           el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-          for (let i = 0; i < text.length; i++) {
+          const textLen = text.length;
+          for (let i = 0; i < textLen; i++) {
             const char = text[i];
             // keydown + keypress let suggestion popups (Google, GitHub, Linear) react.
             el.dispatchEvent(__sentinelKeyEventForChar('keydown', char));
