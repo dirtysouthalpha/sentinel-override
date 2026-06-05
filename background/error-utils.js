@@ -17,39 +17,6 @@ export function getErrorMessage(err) {
 }
 
 /**
- * Format an error for logging with optional prefix.
- *
- * @param {*} err - The error value
- * @param {string} [prefix] - Optional prefix for the error message
- * @returns {string} Formatted error message
- */
-export function formatError(err, prefix) {
-  const msg = getErrorMessage(err);
-  return prefix ? `${prefix}: ${msg}` : msg;
-}
-
-/**
- * Check if chrome.runtime.lastError has a value.
- * This replaces the repeated pattern:
- *   typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError
- *
- * @returns {boolean} True if chrome.runtime.lastError has a value
- */
-export function hasLastError() {
-  return typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && chrome.runtime.lastError;
-}
-
-/**
- * Get chrome.runtime.lastError message safely.
- *
- * @returns {string} The lastError message or empty string if no error
- */
-export function getLastErrorMessage() {
-  if (!hasLastError()) return '';
-  return getErrorMessage(chrome.runtime.lastError);
-}
-
-/**
  * Sleep for a specified number of milliseconds.
  * Used for adding delays in async operations (e.g., retry logic, polling).
  *
