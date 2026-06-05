@@ -173,7 +173,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       try {
         const lc = ariaHealMatch[1].toLowerCase();
         const candidates = doc.querySelectorAll('[aria-label]');
-        for (var _hi = 0; _hi < candidates.length; _hi++) {
+        for (var _hi = 0, _candLen = candidates.length; _hi < _candLen; _hi++) {
           if ((candidates[_hi].getAttribute('aria-label') || '').toLowerCase() === lc) return candidates[_hi];
         }
       } catch (_) { /* non-fatal */ }
@@ -202,7 +202,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (_textHint) {
         var _lc = _textHint.trim().toLowerCase();
         var _interactives = doc.querySelectorAll('button, a, [role="button"], input[type="submit"], input[type="button"], [role="link"]');
-        for (var _ii = 0; _ii < _interactives.length; _ii++) {
+        for (var _ii = 0, _intLen = _interactives.length; _ii < _intLen; _ii++) {
           var _el = _interactives[_ii];
           var _elText = (_el.innerText || _el.textContent || _el.value || _el.getAttribute('aria-label') || '').trim().toLowerCase();
           if (_elText === _lc || _elText.includes(_lc)) return _el;
@@ -242,7 +242,7 @@ window.__sentinelUtils.dom = window.__sentinelUtils.dom || {};
       if (_labelHint) {
         var _ph = _labelHint[1].trim().toLowerCase();
         var _inputs = doc.querySelectorAll('input, textarea');
-        for (var _pi = 0; _pi < _inputs.length; _pi++) {
+        for (var _pi = 0, _inputsLen = _inputs.length; _pi < _inputsLen; _pi++) {
           if ((_inputs[_pi].getAttribute('placeholder') || '').trim().toLowerCase() === _ph) return _inputs[_pi];
         }
       }

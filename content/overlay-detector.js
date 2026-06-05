@@ -39,14 +39,14 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
 
     // 1. ARIA modal
     const ariaModals = doc.querySelectorAll('[aria-modal="true"]');
-    for (let i = 0; i < ariaModals.length; i++) {
+    for (let i = 0, ariaLen = ariaModals.length; i < ariaLen; i++) {
       if (dom && dom.isVisible(ariaModals[i])) return ariaModals[i];
     }
 
     // Also search in shadow DOM
     if (shadow && shadow.queryDeep) {
       const shadowModals = shadow.queryDeep(doc, '[aria-modal="true"]');
-      for (let i = 0; i < shadowModals.length; i++) {
+      for (let i = 0, shadowModalLen = shadowModals.length; i < shadowModalLen; i++) {
         if (dom && dom.isVisible(shadowModals[i])) return shadowModals[i];
       }
     }
@@ -54,21 +54,21 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     // 2. Role dialog / alertdialog
     const dialogSelectors = '[role="dialog"], [role="alertdialog"]';
     const dialogs = doc.querySelectorAll(dialogSelectors);
-    for (let i = 0; i < dialogs.length; i++) {
+    for (let i = 0, dialogLen = dialogs.length; i < dialogLen; i++) {
       if (dom && dom.isVisible(dialogs[i])) return dialogs[i];
     }
 
     // Shadow DOM dialogs
     if (shadow && shadow.queryDeep) {
       const shadowDialogs = shadow.queryDeep(doc, dialogSelectors);
-      for (let i = 0; i < shadowDialogs.length; i++) {
+      for (let i = 0, shadowDialogLen = shadowDialogs.length; i < shadowDialogLen; i++) {
         if (dom && dom.isVisible(shadowDialogs[i])) return shadowDialogs[i];
       }
     }
 
     // 3. High z-index fixed/absolute overlays
     const candidates = doc.querySelectorAll('div, section');
-    for (let i = 0; i < candidates.length; i++) {
+    for (let i = 0, candLen = candidates.length; i < candLen; i++) {
       const el = candidates[i];
       try {
         const view = doc.defaultView;
@@ -91,10 +91,10 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     }
 
     // 4. Cookie banners
-    for (let i = 0; i < COOKIE_SELECTORS.length; i++) {
+    for (let i = 0, cookieSelLen = COOKIE_SELECTORS.length; i < cookieSelLen; i++) {
       try {
         const cookieEls = doc.querySelectorAll(COOKIE_SELECTORS[i]);
-        for (let j = 0; j < cookieEls.length; j++) {
+        for (let j = 0, cookieLen = cookieEls.length; j < cookieLen; j++) {
           if (dom && dom.isVisible(cookieEls[j])) return cookieEls[j];
         }
       } catch {
@@ -105,9 +105,9 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
     // Cookie banners in shadow DOM
     if (shadow && shadow.queryDeep) {
       const cookieShadowSels = ['.cookie-banner', '#onetrust-banner', '#cookie-notice', '.consent-popup'];
-      for (let i = 0; i < cookieShadowSels.length; i++) {
+      for (let i = 0, shadowSelLen = cookieShadowSels.length; i < shadowSelLen; i++) {
         const shadowCookies = shadow.queryDeep(doc, cookieShadowSels[i]);
-        for (let j = 0; j < shadowCookies.length; j++) {
+        for (let j = 0, shadowCookieLen = shadowCookies.length; j < shadowCookieLen; j++) {
           if (dom && dom.isVisible(shadowCookies[j])) return shadowCookies[j];
         }
       }
@@ -148,10 +148,10 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       '[aria-label="Close this dialog" i]'
     ];
 
-    for (let i = 0; i < closeSelectors.length; i++) {
+    for (let i = 0, closeSelLen = closeSelectors.length; i < closeSelLen; i++) {
       try {
         const closeBtns = overlay.querySelectorAll(closeSelectors[i]);
-        for (let j = 0; j < closeBtns.length; j++) {
+        for (let j = 0, closeBtnLen = closeBtns.length; j < closeBtnLen; j++) {
           if (!dom || !dom.isVisible(closeBtns[j])) continue;
           closeBtns[j].click();
           closeBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
@@ -175,10 +175,10 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       'a[class*="accept" i]', 'a[id*="accept" i]'
     ];
 
-    for (let i = 0; i < acceptSelectors.length; i++) {
+    for (let i = 0, acceptSelLen = acceptSelectors.length; i < acceptSelLen; i++) {
       try {
         const acceptBtns = overlay.querySelectorAll(acceptSelectors[i]);
-        for (let j = 0; j < acceptBtns.length; j++) {
+        for (let j = 0, acceptBtnLen = acceptBtns.length; j < acceptBtnLen; j++) {
           if (!dom || !dom.isVisible(acceptBtns[j])) continue;
           acceptBtns[j].click();
           acceptBtns[j].dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, composed: true }));
@@ -195,7 +195,7 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
 
     // 3. Text match: buttons/links with dismiss text
     const clickableEls = overlay.querySelectorAll('button, a, [role="button"]');
-    for (let i = 0; i < clickableEls.length; i++) {
+    for (let i = 0, clickableLen = clickableEls.length; i < clickableLen; i++) {
       const el = clickableEls[i];
       if (!dom || !dom.isVisible(el)) continue;
       const text = (el.innerText || el.textContent || '').trim();
