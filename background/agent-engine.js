@@ -7320,13 +7320,15 @@ return { ok: true, value: el.value };
   
   // v10.0: Run novelty detection on completed actions
   try {
-    const noveltyResults = analyzeForNovelty(history, {
-      goal: _lastGoal,
-      stepCount: history.length,
-      apiCallCount
-    });
-    storeNoveltyResult(noveltyResults);
-    console.log('[Sentinel] Novelty detection complete:', noveltyResults.summary);
+    const noveltyData = {
+      type: 'run_summary',
+      content: JSON.stringify(history.slice(-10)), // last 10 steps for novelty check
+      context: { goal: _lastGoal, stepCount: history.length, apiCallCount }
+    };
+    const runId = agentReport?.runId || 'current';
+    const noveltyResults = await analyzeForNovelty(runId, noveltyData);
+    await storeNoveltyResult(runId, noveltyData, noveltyResults);
+    console.log('[Sentinel] Novelty detection complete:', noveltyResults.isNovel ? 'novel' : 'familiar');
   } catch (e) {
     console.warn('[Sentinel] Novelty detection failed:', getErrorMessage(e));
   }
