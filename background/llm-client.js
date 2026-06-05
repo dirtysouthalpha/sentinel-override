@@ -2357,10 +2357,13 @@ export async function getRelevantPatterns(goal) {
     if (!goal || typeof goal !== 'string') return [];
     const stored = await chrome.storage.local.get(['learned_patterns']).catch(() => ({ learned_patterns: [] }));
     const patterns = stored.learned_patterns || [];
-    const goalWords = goal.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    // Cache goal processing to avoid repeated toLowerCase and split calls
+    const goalLower = goal.toLowerCase();
+    const goalWords = goalLower.split(/\s+/).filter(w => w.length > 3);
     const scored = patterns
       .filter(p => p.success)
       .map(p => {
+        // Cache goal processing to avoid repeated toLowerCase calls
         const pGoalLower = p.goal && typeof p.goal === 'string' ? p.goal.toLowerCase() : '';
         return {
           pattern: p,
