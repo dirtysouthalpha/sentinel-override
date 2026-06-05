@@ -185,10 +185,11 @@ class AgentRegistry {
    * Get registry statistics
    */
   getRegistryStats() {
+    const statusValues = Array.from(this.agentStatus.values());
     return {
       totalAgents: this.agents.size,
-      activeAgents: Array.from(this.agentStatus.values()).filter(s => s === 'active').length,
-      idleAgents: Array.from(this.agentStatus.values()).filter(s => s === 'idle').length,
+      activeAgents: statusValues.filter(s => s === 'active').length,
+      idleAgents: statusValues.filter(s => s === 'idle').length,
       agentsByType: Object.fromEntries(
         Array.from(this.agentTypes.entries()).map(([type, ids]) => [type, ids.length])
       )
