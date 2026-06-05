@@ -5,6 +5,19 @@
 import { getErrorMessage } from './error-utils.js';
 import { TWELVE_SECONDS_MS } from './constants.js';
 
+/**
+ * Extract error message from API error object.
+ * Handles nested error objects with 'message' properties.
+ * @param {*} error - The error value from an API response
+ * @returns {string|null} The error message or null if not found
+ */
+function getApiErrorMessage(error) {
+  if (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return null;
+}
+
 // ========== Provider Definitions ==========
 // Each provider defines how to build headers, request bodies, parse responses,
 // and handle vision (base64 image) content for its specific API format.
@@ -241,7 +254,7 @@ export const PROVIDERS = {
         throw new Error(`🔑 Authentication failed: ${msg} (code ${code}). Check your API key in extension settings.`);
       }
       if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
-        const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+        const errMsg = getApiErrorMessage(data.error)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
         if (typeof errMsg === 'string') {
@@ -337,7 +350,7 @@ export const PROVIDERS = {
     parseToolUseResponse(data) {
       // Detect auth/API errors from providers that return HTTP 200 with error payloads
       if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
-        const errMsg = (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+        const errMsg = getApiErrorMessage(data.error)
           || (typeof data.msg === 'string' ? data.msg : null)
           || (typeof data.message === 'string' ? data.message : null);
         if (typeof errMsg === 'string') {
@@ -410,7 +423,7 @@ export const PROVIDERS = {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
       if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.msg === 'string' ? data.msg : null)
-          || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || getApiErrorMessage(data.error)
           || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
@@ -468,7 +481,7 @@ export const PROVIDERS = {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
       if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
         const errMsg = (typeof data.msg === 'string' ? data.msg : null)
-          || (typeof data.error === 'object' && data.error !== null && 'message' in data.error && typeof data.error.message === 'string' ? data.error.message : null)
+          || getApiErrorMessage(data.error)
           || (typeof data.message === 'string' ? data.message : null);
         if (errMsg) {
           throw new Error(`🔑 Authentication failed: ${errMsg}`);
