@@ -51,9 +51,10 @@ export function analyzeForContradictions(text) {
 function findDirectNegationContradictions(text) {
   const contradictions = [];
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentencesLen = sentences.length;
 
-  for (let i = 0; i < sentences.length; i++) {
-    for (let j = i + 1; j < sentences.length; j++) {
+  for (let i = 0; i < sentencesLen; i++) {
+    for (let j = i + 1; j < sentencesLen; j++) {
       const sent1 = sentences[i].trim().toLowerCase();
       const sent2 = sentences[j].trim().toLowerCase();
 
@@ -128,16 +129,17 @@ function findTemporalContradictions(text) {
  */
 function findQuantifierContradictions(text) {
   const contradictions = [];
-  
+
   const quantifiers = {
     universal: ['all', 'every', 'each', 'any', 'always', 'never', 'none'],
     existential: ['some', 'most', 'many', 'few', 'several', 'often', 'sometimes', 'rarely']
   };
 
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentencesLen = sentences.length;
 
-  for (let i = 0; i < sentences.length; i++) {
-    for (let j = i + 1; j < sentences.length; j++) {
+  for (let i = 0; i < sentencesLen; i++) {
+    for (let j = i + 1; j < sentencesLen; j++) {
       const sent1 = sentences[i].trim().toLowerCase();
       const sent2 = sentences[j].trim().toLowerCase();
 
