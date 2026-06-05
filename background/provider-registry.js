@@ -518,6 +518,15 @@ export const PROVIDERS = {
   }
 };
 
+// Inherit shared functions from openai to reduce duplication
+// zai uses the same buildBody, buildVisionContent, convertToolsToOpenAIFormat, and buildBodyWithTools
+Object.assign(PROVIDERS.zai, {
+  buildBody: PROVIDERS.openai.buildBody,
+  buildVisionContent: PROVIDERS.openai.buildVisionContent,
+  convertToolsToOpenAIFormat: PROVIDERS.openai.convertToolsToOpenAIFormat,
+  buildBodyWithTools: PROVIDERS.openai.buildBodyWithTools
+});
+
 // ========== Vision Capability Registry ==========
 // Per-provider/model vision (image input) support. Used by getModelSupportsVision()
 // to give a deterministic answer for known models, with regex fallback for
