@@ -29,7 +29,11 @@ export function setPageLoadConfig(config) {
  * @returns {Promise<void>}
  */
 export async function waitForPageLoad(tabId) {
-  const tab = await new Promise(resolve => { chrome.tabs.get(tabId, (i) => { resolve((typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) ? null : i); }); });
+  const tab = await new Promise(resolve => {
+    chrome.tabs.get(tabId, (i) => {
+      resolve((chrome.runtime.lastError && typeof chrome.runtime.lastError === 'object') ? null : i);
+    });
+  });
   if (!tab || tab.status === 'complete') return;
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
@@ -295,8 +299,10 @@ const NETWORK_BUFFER_MAX = 200;
  */
 function pushConsoleEntry(tabId, entry) {
   let buf = consoleBuffers.get(tabId);
-  if (!buf) { buf = []; consoleBuffers.set(tabId, buf); }
-  if (!Array.isArray(buf)) { buf = []; consoleBuffers.set(tabId, buf); }
+  if (!buf) {
+    buf = [];
+    consoleBuffers.set(tabId, buf);
+  }
   buf.push(entry);
   const toRemove = buf.length - CONSOLE_BUFFER_MAX;
   if (toRemove > 0) buf.splice(0, toRemove);
