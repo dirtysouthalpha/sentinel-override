@@ -314,14 +314,15 @@ async function crossTypeSynthesis(synthesized) {
 function groupBySemanticSimilarity(items) {
   const groups = [];
   const assigned = new Set();
+  const itemsLen = items.length;
 
-  for (let i = 0; i < items.length; i++) {
+  for (let i = 0; i < itemsLen; i++) {
     if (assigned.has(i)) continue;
 
     const group = [items[i]];
     assigned.add(i);
 
-    for (let j = i + 1; j < items.length; j++) {
+    for (let j = i + 1; j < itemsLen; j++) {
       if (assigned.has(j)) continue;
 
       if (areSemanticallySimilar(items[i], items[j])) {
@@ -370,10 +371,11 @@ function areSemanticallySimilar(item1, item2) {
  */
 function detectCrossTypeConflicts(group) {
   const conflicts = [];
+  const groupLen = group.length;
 
   // Check for contradictory statements across types
-  for (let i = 0; i < group.length; i++) {
-    for (let j = i + 1; j < group.length; j++) {
+  for (let i = 0; i < groupLen; i++) {
+    for (let j = i + 1; j < groupLen; j++) {
       if (areContradictory(group[i], group[j])) {
         conflicts.push({
           type: 'cross_type',

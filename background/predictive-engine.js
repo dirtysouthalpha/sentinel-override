@@ -526,10 +526,11 @@ function calculateNoveltyRisk(history) {
 function calculateInstabilityRisk(history) {
   // More failures = higher instability
   let failures = 0;
-  for (let i = 0; i < history.length; i++) {
+  const histLen = history.length;
+  for (let i = 0; i < histLen; i++) {
     if (history[i].failed) failures++;
   }
-  return Math.min(1, failures / history.length);
+  return Math.min(1, failures / histLen);
 }
 
 function calculateDependencyRisk(metrics) {

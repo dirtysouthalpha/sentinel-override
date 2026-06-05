@@ -193,8 +193,9 @@ function findNumericalContradictions(text) {
   }
 
   // Compare numbers with same units
-  for (let i = 0; i < matches.length; i++) {
-    for (let j = i + 1; j < matches.length; j++) {
+  const matchesLen = matches.length;
+  for (let i = 0; i < matchesLen; i++) {
+    for (let j = i + 1; j < matchesLen; j++) {
       if (matches[i].unit === matches[j].unit && matches[i].number !== matches[j].number) {
         contradictions.push({
           type: 'numerical',
@@ -233,8 +234,9 @@ function findConditionalContradictions(text) {
   }
 
   // Compare conditionals with same condition but different consequences
-  for (let i = 0; i < conditionals.length; i++) {
-    for (let j = i + 1; j < conditionals.length; j++) {
+  const conditionalsLen = conditionals.length;
+  for (let i = 0; i < conditionalsLen; i++) {
+    for (let j = i + 1; j < conditionalsLen; j++) {
       const cond1 = conditionals[i].condition.toLowerCase();
       const cond2 = conditionals[j].condition.toLowerCase();
       const cons1 = conditionals[i].consequence.toLowerCase();
