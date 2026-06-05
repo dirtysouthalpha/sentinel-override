@@ -402,7 +402,7 @@ class FederationController {
         duration: Date.now() - job.startTime,
         totalSubGoals: job.subGoals.length,
         completedSubGoals: successfulResults.length,
-        failedSubGoals: job.subGoals.filter(sg => sg.status === 'failed').length
+        failedSubGoals: job.subGoals.reduce((count, sg) => count + (sg.status === 'failed' ? 1 : 0), 0)
       }
     };
 
