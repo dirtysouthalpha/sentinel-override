@@ -186,10 +186,16 @@ class AgentRegistry {
    */
   getRegistryStats() {
     const statusValues = Array.from(this.agentStatus.values());
+    let activeCount = 0;
+    let idleCount = 0;
+    for (let i = 0, len = statusValues.length; i < len; i++) {
+      if (statusValues[i] === 'active') activeCount++;
+      else if (statusValues[i] === 'idle') idleCount++;
+    }
     return {
       totalAgents: this.agents.size,
-      activeAgents: statusValues.filter(s => s === 'active').length,
-      idleAgents: statusValues.filter(s => s === 'idle').length,
+      activeAgents: activeCount,
+      idleAgents: idleCount,
       agentsByType: Object.fromEntries(
         Array.from(this.agentTypes.entries()).map(([type, ids]) => [type, ids.length])
       )
