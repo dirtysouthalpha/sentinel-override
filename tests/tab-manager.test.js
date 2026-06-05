@@ -549,7 +549,8 @@ describe('takeScreenshot', () => {
 
 function getDebugEventListener() {
   // Find the most recently added debugger.onEvent listener
-  for (let i = listeners.debuggerOnEvent.length - 1; i >= 0; i--) {
+  const len = listeners.debuggerOnEvent.length;
+  for (let i = len - 1; i >= 0; i--) {
     if (typeof listeners.debuggerOnEvent[i] === 'function') {
       return listeners.debuggerOnEvent[i];
     }

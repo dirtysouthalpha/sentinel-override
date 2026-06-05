@@ -864,7 +864,8 @@ export function attemptHealing(issue) {
     healingState.activeHealings.delete(healingId);
   } else {
     // Try next strategies
-    for (let i = 1; i < healing.strategies.length; i++) {
+    const strategiesLen = healing.strategies.length;
+    for (let i = 1; i < strategiesLen; i++) {
       healing.attempts++;
       const nextResult = tryHealingStrategy(healing, healing.strategies[i]);
       if (nextResult.success) {
