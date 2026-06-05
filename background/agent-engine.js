@@ -3448,13 +3448,14 @@ async function _initRunState(goal) {
   }
   // v10.0: Initialize intelligence systems for each new run
   try {
-    await initReasoningTrace();
-    await initKnowledgeGraph();
-    // Clear previous run's detection logs
-    clearBiasLog();
-    clearContradictionLog();
-    clearNoveltyHistory();
-    clearSynthesis();
+    await Promise.all([
+      initReasoningTrace(),
+      initKnowledgeGraph(),
+      clearBiasLog(),
+      clearContradictionLog(),
+      clearNoveltyHistory(),
+      clearSynthesis()
+    ]);
     console.log('[Sentinel] Intelligence systems initialized');
   } catch (e) {
     console.warn('[Sentinel] Intelligence systems initialization failed:', getErrorMessage(e));
@@ -7348,16 +7349,24 @@ return { ok: true, value: el.value };
   }
   // v10.0: Generate compliance report
   try {
+    const [biasDetections, contradictionDetections, noveltyDetections, synthesisStats, reasoningTrace] =
+      await Promise.all([
+        getBiasStatistics(),
+        getContradictionStatistics(),
+        getNoveltyStatistics(),
+        getSynthesisStatistics(),
+        getReasoningSummary()
+      ]);
     const complianceReport = {
       timestamp: new Date().toISOString(),
       goal: _lastGoal,
       duration: Date.now() - (agentReport?.startTime || Date.now()),
       apiCalls: apiCallCount,
-      biasDetections: await getBiasStatistics(),
-      contradictionDetections: await getContradictionStatistics(),
-      noveltyDetections: await getNoveltyStatistics(),
-      synthesisStats: await getSynthesisStatistics(),
-      reasoningTrace: await getReasoningSummary()
+      biasDetections,
+      contradictionDetections,
+      noveltyDetections,
+      synthesisStats,
+      reasoningTrace
     };
     // Append compliance report to audit log
     await appendAuditEntry(agentReport?.runId || 'unknown', 'compliance_report', {

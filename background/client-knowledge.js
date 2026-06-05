@@ -245,7 +245,7 @@ export async function updateEntry(clientId, entryId, updates) {
   const state = await _read();
   const c = state.clients[clientId];
   if (!c) return { ok: false, error: 'Client not found' };
-  const e = c.entries.find(x => x.id === entryId);
+  const e = (c.entries || []).find(x => x.id === entryId);
   if (!e) return { ok: false, error: 'Entry not found' };
   if (typeof updates.wisdom === 'string') e.wisdom = updates.wisdom.trim().substring(0, 1000);
   if (/^(global|url)$/.test(updates.scope)) e.scope = updates.scope;
@@ -348,7 +348,7 @@ export async function markRunCompleted(clientId, usedEntryIds) {
   c.lastUsedAt = new Date().toISOString();
   const ids = new Set(Array.isArray(usedEntryIds) ? usedEntryIds : []);
   if (ids.size > 0) {
-    for (const e of c.entries) {
+    for (const e of (c.entries || [])) {
       if (ids.has(e.id)) e.useCount = (e.useCount || 0) + 1;
     }
   }
