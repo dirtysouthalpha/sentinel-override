@@ -98,6 +98,25 @@ const MEMORY_VAR_RE = /::(\w+)::/g;
 // Precompile regex for step list prefix
 const STEP_PREFIX_RE = /^(\d+[.)]|-|\*)\s+/;
 
+// Helper function to check if object is empty without creating intermediate array
+const isEmptyObject = (obj) => {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) return false;
+  }
+  return true;
+};
+
+// Helper function to get object length without creating intermediate array
+const getObjectLength = (obj) => {
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return 0;
+  let count = 0;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) count++;
+  }
+  return count;
+};
+
 // Precompile regex for PII redaction (error logging)
 const PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
 const PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -1363,7 +1382,7 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
       else if (PORTAL_SENTINELONE_RE.test(url)) portalsSeen.add('SentinelOne');
       else if (PORTAL_VIRUSTOTAL_RE.test(url)) portalsSeen.add('VirusTotal');
     }
-    const memCount = Object.keys(agentMemory).length;
+    const memCount = getObjectLength(agentMemory);
     const lastAction = histLen ? history[histLen - 1] : null;
     const lines = [
       `📊 PROGRESS UPDATE — step ${stepCount}`,
@@ -2315,7 +2334,7 @@ function _countSummaryClaims(summary) {
 function _countEvidenceSources(agentMemory, history) {
   let count = 0;
   try {
-    count += Object.keys(agentMemory || {}).length;
+    count += getObjectLength(agentMemory || {});
     if (Array.isArray(history)) {
       // Count notes in a single pass
       const noteCount = history.reduce((acc, h) => acc + (h && h.action && h.action.type === 'note' ? 1 : 0), 0);
@@ -4381,7 +4400,7 @@ async function runAgentLoop(goal, workingTabId) {
       }
 
       // Cache memory count for reuse in this section (perf: multiple uses below)
-      const memCount = Object.keys(agentMemory).length;
+      const memCount = getObjectLength(agentMemory);
 
       //    Also check for execute_js-heavy patterns in recent window (model escaping consecutive check)
       if (_histLen >= 3 && !loopDirective) {
@@ -6298,7 +6317,7 @@ async function runAgentLoop(goal, workingTabId) {
             try {
               const parsed = JSON.parse(jsValue);
               // Reject parsed-but-empty objects/arrays
-              const isEmptyObj = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && !Object.keys(parsed).length;
+              const isEmptyObj = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && isEmptyObject(parsed);
               const isEmptyArr = Array.isArray(parsed) && !parsed.length;
               if (parsed === null || isEmptyObj || isEmptyArr) {
                 actionFailed = true;
@@ -6334,7 +6353,7 @@ async function runAgentLoop(goal, workingTabId) {
               // execute_js fell back to body_text / visible_text.
               try {
                 const _isArr = Array.isArray(savedValue);
-                const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? Object.keys(savedValue).length : null));
+                const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? getObjectLength(savedValue) : null));
                 tel.info('memory', `Wrote "${savedKey}" (execute_js, strategy=${ladder.strategy || 'original'})`, { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
               } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', getErrorMessage(e)); }
               const preview = String(jsValue).substring(0, 100);
