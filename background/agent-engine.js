@@ -4637,7 +4637,10 @@ async function runAgentLoop(goal, workingTabId) {
           const visionResult = await _visionObserve(tab, currentUrl);
           if (visionResult.elements.length) {
             _visionElements = visionResult.elements;
-            _visionElementMap = new Map(visionResult.elements.map(e => [e.index, e]));
+            _visionElementMap = new Map();
+            for (const e of visionResult.elements) {
+              _visionElementMap.set(e.index, e);
+            }
             _visionElementTree = visionResult.elementTree;
             _visionMode = true;
             if (visionResult.pageText && visionResult.pageText.length > pageText.length) {
