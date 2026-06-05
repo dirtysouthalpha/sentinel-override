@@ -57,6 +57,23 @@ const NOTE_SALVAGE_REGEX = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/m;
 const CISCO_URL_RE = /cisco|\/asdm|\/fmc|meraki|\.ise\./;
 const CISCO_TEXT_RE = /cisco asa|firepower|meraki|cisco ise/;
 const PALOALTO_URL_RE = /paloalto|panorama|\/php\/rest\/pan/;
+
+// Precompiled regex patterns for vision support detection (performance optimization)
+const GPT_3_5_RE = /^gpt-3\.5/i;
+const CLAUDE_3_HAIKU_TEXT_RE = /^claude-3-haiku-text/i;
+const CLAUDE_2_RE = /^claude-2(\b|-)/i;
+const CLAUDE_INSTANT_RE = /^claude-instant/i;
+const TEXT_ONLY_RE = /-text-only$/i;
+const CLAUDE_OPUS_SONNET_RE = /\bclaude-(opus|sonnet|haiku|3|4|5)\b/i;
+const GPT_4_RE = /\bgpt-(4o|4\.1|4-vision|5|o\d)\b/i;
+const GEMINI_RE = /\bgemini\b/i;
+const GPT_VISION_RE = /\bgpt-4(?:\.\d+)?[ -]vision/i;
+const CLAUDE_VISION_RE = /\bclaude-3(?:\.\d+)?[ -]vision/i;
+const QWEN_VL_RE = /\bqwen[\w.-]*-vl\b/i;
+const LLAVA_RE = /\bllava\b/i;
+const VISION_RE = /vision/i;
+const VL_DASH_RE = /-vl-/i;
+const VL_END_RE = /-vl$/i;
 const PALOALTO_TEXT_RE = /palo alto|pan-os|panorama/;
 const SENTINELONE_URL_RE = /sentinelone\.net|\.sentinelone\.com|s1\.com/;
 const SENTINELONE_TEXT_RE = /sentinelone|singularity/;
@@ -117,23 +134,41 @@ const VALID_JSON_ESCAPE_CHARS = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't'
 // route to checklist-deliverable + one-portal-execution mode instead of
 // trying to cover everything in a single run and inevitably running out.
 
+// Precompile regex patterns for performance optimization
+const ENTRA_MP_RE = new RegExp('\\bentra(\\.microsoft|\\s+id)?\\b|\\bazure\\s+ad\\b|\\bsign.?in\\s+logs?\\b|\\baudit\\s+logs?\\b', 'i');
+const EXCHANGE_MP_RE = new RegExp('\\bexchange(\\s+online)?\\b|\\bmailbox(\\s+audit)?\\b|\\bmessage\\s+trace\\b|\\binbox\\s+rules?\\b|\\btransport\\s+rules?\\b|\\bmail\\s+flow\\b', 'i');
+const PURVIEW_MP_RE = new RegExp('\\bpurview\\b|\\bunified\\s+audit\\s+log\\b|\\bcompliance\\s+(center|search)\\b|\\bedisco\\b|\\bcontent\\s+search\\b', 'i');
+const ONEDRIVE_MP_RE = new RegExp('\\bonedrive\\b|\\bone.?drive\\b', 'i');
+const SHAREPOINT_MP_RE = new RegExp('\\bsharepoint\\b|\\bsharing\\s+externally\\b', 'i');
+const TEAMS_MP_RE = new RegExp('\\bteams(\\s+admin|\\s+chat|\\s+meeting|\\s+call)?\\b', 'i');
+const INTUNE_MP_RE = new RegExp('\\bintune\\b|\\bmdm\\b|\\bmem\\b', 'i');
+const DEFENDER_MP_RE = new RegExp('\\bdefender(\\s+for\\s+endpoint|\\s+for\\s+identity|\\s+for\\s+cloud)?\\b|\\bmde\\b|\\bdevice\\s+timeline\\b', 'i');
+const M365_ADMIN_MP_RE = new RegExp('\\badmin\\.microsoft\\b|\\bm365\\s+admin\\b|\\boffice\\s+365\\s+admin\\b', 'i');
+const AZURE_PORTAL_MP_RE = new RegExp('\\bportal\\.azure\\b|\\bazure\\s+portal\\b', 'i');
+const SENTINELONE_MP_RE = new RegExp('\\bsentinelone\\b|\\bsingularity\\b|\\bs1\\s+console\\b|\\bdeep\\s+visibility\\b', 'i');
+const CONNECTWISE_MP_RE = new RegExp('\\bconnectwise\\b|\\bcw\\.manage\\b|\\bcw\\s+manage\\b', 'i');
+const NINJAONE_MP_RE = new RegExp('\\bninjaone\\b|\\bninja\\s+rmm\\b', 'i');
+const DATTO_MP_RE = new RegExp('\\bdatto\\b|\\bautotask\\b', 'i');
+const ITGLUE_MP_RE = new RegExp('\\bit\\s*glue\\b', 'i');
+const HUNTRESS_MP_RE = new RegExp('\\bhuntress\\b', 'i');
+
 const MULTI_PORTAL_DETECTORS = [
-  { key: 'entra',          re: /\bentra(\.microsoft|\s+id)?\b|\bazure\s+ad\b|\bsign.?in\s+logs?\b|\baudit\s+logs?\b/i },
-  { key: 'exchange',       re: /\bexchange(\s+online)?\b|\bmailbox(\s+audit)?\b|\bmessage\s+trace\b|\binbox\s+rules?\b|\btransport\s+rules?\b|\bmail\s+flow\b/i },
-  { key: 'purview',        re: /\bpurview\b|\bunified\s+audit\s+log\b|\bcompliance\s+(center|search)\b|\bedisco\b|\bcontent\s+search\b/i },
-  { key: 'onedrive',       re: /\bonedrive\b|\bone.?drive\b/i },
-  { key: 'sharepoint',     re: /\bsharepoint\b|\bsharing\s+externally\b/i },
-  { key: 'teams',          re: /\bteams(\s+admin|\s+chat|\s+meeting|\s+call)?\b/i },
-  { key: 'intune',         re: /\bintune\b|\bmdm\b|\bmem\b/i },
-  { key: 'defender',       re: /\bdefender(\s+for\s+endpoint|\s+for\s+identity|\s+for\s+cloud)?\b|\bmde\b|\bdevice\s+timeline\b/i },
-  { key: 'm365_admin',     re: /\badmin\.microsoft\b|\bm365\s+admin\b|\boffice\s+365\s+admin\b/i },
-  { key: 'azure_portal',   re: /\bportal\.azure\b|\bazure\s+portal\b/i },
-  { key: 'sentinelone',    re: /\bsentinelone\b|\bsingularity\b|\bs1\s+console\b|\bdeep\s+visibility\b/i },
-  { key: 'connectwise',    re: /\bconnectwise\b|\bcw\.manage\b|\bcw\s+manage\b/i },
-  { key: 'ninjaone',       re: /\bninjaone\b|\bninja\s+rmm\b/i },
-  { key: 'datto',          re: /\bdatto\b|\bautotask\b/i },
-  { key: 'itglue',         re: /\bit\s*glue\b/i },
-  { key: 'huntress',       re: /\bhuntress\b/i }
+  { key: 'entra',          re: ENTRA_MP_RE },
+  { key: 'exchange',       re: EXCHANGE_MP_RE },
+  { key: 'purview',        re: PURVIEW_MP_RE },
+  { key: 'onedrive',       re: ONEDRIVE_MP_RE },
+  { key: 'sharepoint',     re: SHAREPOINT_MP_RE },
+  { key: 'teams',          re: TEAMS_MP_RE },
+  { key: 'intune',         re: INTUNE_MP_RE },
+  { key: 'defender',       re: DEFENDER_MP_RE },
+  { key: 'm365_admin',     re: M365_ADMIN_MP_RE },
+  { key: 'azure_portal',   re: AZURE_PORTAL_MP_RE },
+  { key: 'sentinelone',    re: SENTINELONE_MP_RE },
+  { key: 'connectwise',    re: CONNECTWISE_MP_RE },
+  { key: 'ninjaone',       re: NINJAONE_MP_RE },
+  { key: 'datto',          re: DATTO_MP_RE },
+  { key: 'itglue',         re: ITGLUE_MP_RE },
+  { key: 'huntress',       re: HUNTRESS_MP_RE }
 ];
 
 /**
@@ -889,12 +924,13 @@ export function supportsVision(model, providerHint) {
   const m = String(model).toLowerCase();
 
   // (a) Hard deny list -- confirmed text-only variants.
+  // Precompiled for performance
   const denyList = [
-    /^gpt-3\.5/i,
-    /^claude-3-haiku-text/i,
-    /^claude-2(\b|-)/i,
-    /^claude-instant/i,
-    /-text-only$/i
+    GPT_3_5_RE,
+    CLAUDE_3_HAIKU_TEXT_RE,
+    CLAUDE_2_RE,
+    CLAUDE_INSTANT_RE,
+    TEXT_ONLY_RE
   ];
   if (denyList.some(re => re.test(m))) return false;
 
@@ -910,15 +946,16 @@ export function supportsVision(model, providerHint) {
   if (registryAnswer === false) return false;
 
   // (c) Fallback positive matcher for unknown models.
+  // Precompiled for performance
   const visionPatterns = [
-    /\bclaude-(opus|sonnet|haiku|3|4|5)\b/i,
-    /\bgpt-(4o|4\.1|4-vision|5|o\d)\b/i,
-    /\bgemini\b/i,
-    /\bqwen[\w.-]*-vl\b/i,
-    /\bllava\b/i,
-    /vision/i,
-    /-vl-/i,
-    /-vl$/i
+    CLAUDE_OPUS_SONNET_RE,
+    GPT_4_RE,
+    GEMINI_RE,
+    QWEN_VL_RE,
+    LLAVA_RE,
+    VISION_RE,
+    VL_DASH_RE,
+    VL_END_RE
   ];
   return visionPatterns.some(re => re.test(m));
 }
