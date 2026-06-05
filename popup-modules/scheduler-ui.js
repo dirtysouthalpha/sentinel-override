@@ -17,6 +17,11 @@ function _getLastErrorMessage() {
   return String(err || '');
 }
 
+function getErrorMessage(e) {
+  if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+  return String(e || '');
+}
+
 // ========== Module-level State ==========
 let refreshIntervalId = null;
 let templatesCache = [];
@@ -295,7 +300,7 @@ function populateTemplateDropdown(preselectId) {
 
   chrome.runtime.sendMessage({ action: 'template_list' }, (response) => {
     if (_hasLastError() || !response) {
-      console.warn('[Sentinel/scheduler-ui] Template list fetch failed in populateTemplateDropdown:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'No response'));
+      console.warn('[Sentinel/scheduler-ui] Template list fetch failed in populateTemplateDropdown:', _getLastErrorMessage() || 'No response');
       dropdown.innerHTML = '<option value="">Error loading templates</option>';
       return;
     }
@@ -530,7 +535,7 @@ async function handleSaveSchedule() {
     loadAndRenderSchedules();
     showToast('Schedule created', 'success');
   } catch (err) {
-    showToast(`Error creating schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
+    showToast(`Error creating schedule: ${getErrorMessage(err)}`, 'error');
   }
 }
 
@@ -555,7 +560,7 @@ async function handleToggleSchedule(scheduleId, enabled) {
     loadAndRenderSchedules();
     showToast(enabled ? 'Schedule enabled' : 'Schedule disabled', 'success');
   } catch (err) {
-    showToast(`Error toggling schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
+    showToast(`Error toggling schedule: ${getErrorMessage(err)}`, 'error');
   }
 }
 
@@ -584,7 +589,7 @@ async function handleDeleteSchedule(scheduleId, name) {
     loadAndRenderSchedules();
     showToast('Schedule deleted', 'success');
   } catch (err) {
-    showToast(`Error deleting schedule: ${(typeof err === 'object' && err !== null && typeof err.message === 'string') ? err.message : String(err)}`, 'error');
+    showToast(`Error deleting schedule: ${getErrorMessage(err)}`, 'error');
   }
 }
 
