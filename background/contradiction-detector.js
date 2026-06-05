@@ -275,14 +275,16 @@ function findConditionalContradictions(text) {
  * @returns {object} Contradiction comparison results
  */
 export function compareResponsesForContradictions(response1, response2) {
-  const analysis1 = analyzeForContradictions(response1);
-  const analysis2 = analyzeForContradictions(response2);
+  const r1 = typeof response1 === 'string' ? response1 : '';
+  const r2 = typeof response2 === 'string' ? response2 : '';
+  const analysis1 = analyzeForContradictions(r1);
+  const analysis2 = analyzeForContradictions(r2);
 
   const crossContradictions = [];
 
   // Compare direct statements between responses
-  const statements1 = extractStatements(response1);
-  const statements2 = extractStatements(response2);
+  const statements1 = extractStatements(r1);
+  const statements2 = extractStatements(r2);
 
   for (const stmt1 of statements1) {
     for (const stmt2 of statements2) {

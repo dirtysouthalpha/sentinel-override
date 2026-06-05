@@ -27,7 +27,7 @@ async function _persistTrace(runId) {
   const existing = _pendingWrites.get(runId);
   if (existing) clearTimeout(existing);
 
-  _pendingWrites.set(runId, setTimeout(async () => {
+  const timer = setTimeout(async () => {
     _pendingWrites.delete(runId);
     const trace = _traceCache.get(runId);
     if (!trace) return;
@@ -36,7 +36,10 @@ async function _persistTrace(runId) {
     } catch (e) {
       console.error('[Sentinel] Failed to persist reasoning trace:', getErrorMessage(e));
     }
-  }, WRITE_DELAY_MS));
+  }, WRITE_DELAY_MS);
+  // Allow the Node.js process (and Jest workers) to exit without waiting for pending writes
+  if (typeof timer === 'object' && timer !== null && typeof timer.unref === 'function') timer.unref();
+  _pendingWrites.set(runId, timer);
 }
 
 /**
