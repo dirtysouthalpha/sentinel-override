@@ -1035,6 +1035,7 @@ if (injectContextInput) {
 
 function sendMessage() {
   console.log('[Sentinel] sendMessage() called');
+  if (typeof showToast === 'function') showToast('Sending...', 'info');
   const state = getState();
   const _goalInput = document.getElementById('goalInput');
   const _sendBtn = document.getElementById('sendBtn');
@@ -1045,11 +1046,16 @@ function sendMessage() {
 
   if (!_goalInput) {
     console.error('[Sentinel] sendMessage: goalInput not found');
+    if (typeof showToast === 'function') showToast('ERROR: goalInput not found', 'error');
     return;
   }
 
   const goal = _goalInput.value.trim();
-  if (!goal) return;
+  if (!goal) {
+    console.log('[Sentinel] sendMessage: empty goal, ignoring');
+    return;
+  }
+  console.log('[Sentinel] sendMessage: goal length=' + goal.length);
 
   // Disable UI immediately to prevent double-send
   addMessage(goal, 'user');
@@ -1094,19 +1100,26 @@ The user wants you to continue or adjust the previous task. Look at the current 
     // MV3 service workers can be inactive when the popup opens, causing
     // sendMessage to silently fail. The ping ensures the SW is alive.
     const _sendGoal = () => {
+      console.log('[Sentinel] _sendGoal: sending run_agent_loop, goal length=' + fullGoal.length);
       chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
+        console.log('[Sentinel] run_agent_loop response:', JSON.stringify(response));
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+          console.error('[Sentinel] run_agent_loop lastError:', getErrorMessage(chrome.runtime.lastError));
           removeTypingIndicator();
           addMessage(`Error: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
           resetUI();
           return;
         }
         if (response && !response.ok) {
+          console.error('[Sentinel] run_agent_loop error:', response.error);
           removeTypingIndicator();
           addMessage(`Error: ${response.error || 'Unknown error'}`, 'assistant');
           resetUI();
         }
         // If response is ok, the agent is running — agent_finished will reset UI
+        if (response && response.ok) {
+          console.log('[Sentinel] Agent started successfully');
+        }
       });
     };
 
@@ -1114,7 +1127,9 @@ The user wants you to continue or adjust the previous task. Look at the current 
     chrome.runtime.sendMessage({ action: 'ping' }, (pingResp) => {
       // Consume any lastError from the ping so it doesn't poison the next call
       void chrome.runtime.lastError;
-      if (pingResp && pingResp.pong) {
+      const pong = pingResp && (pingResp.pong || pingResp.data?.pong);
+      console.log('[Sentinel] SW ping response:', pong ? 'alive' : 'dead', JSON.stringify(pingResp));
+      if (pong) {
         _sendGoal();
       } else {
         // SW wasn't responding — try anyway after a short delay
