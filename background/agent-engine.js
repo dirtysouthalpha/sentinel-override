@@ -1056,7 +1056,7 @@ function _detectGoalModeDirective(goal) {
   const text = goal.substring(0, 6000);
 
   // Tier 1: Explicit "Mode: APPROVAL" / "Mode: AUTONOMOUS" / "Mode: YOLO"
-  const tier1 = text.match(/\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i);
+  const tier1 = text.match(MODE_TIER1_RE);
   if (tier1) {
     const w = tier1[1] ? tier1[1].toUpperCase() : '';
     return {
@@ -1068,7 +1068,7 @@ function _detectGoalModeDirective(goal) {
   }
 
   // Tier 2: "<word> mode" phrasing
-  const tier2 = text.match(/\b(approval|autonomous|yolo)\s+mode\b/i);
+  const tier2 = text.match(MODE_TIER2_RE);
   if (tier2) {
     const w = tier2[1] ? tier2[1].toUpperCase() : '';
     return {
@@ -1775,6 +1775,30 @@ const COMMIT_TARGET_RE = /\b(apply|applied|save|saved|commit|committed|deploy|de
 const CONFIG_PLATFORM_RE = /(sonicwall|sonicos|fortinet|fortigate|cisco|paloalto|pan-os|panorama|admin\.microsoft|admin\.exchange|entra\.microsoft|portal\.azure|connectwise|ninjaone|ninja\.io|ninjarmm|datto|autotask|itglue|it-glue|huntress|screenconnect)/i;
 const MULTI_PORTAL_RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/gi;
 
+// Precompiled regex patterns for goal parsing
+const MODE_TIER1_RE = /\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i;
+const MODE_TIER2_RE = /\b(approval|autonomous|yolo)\s+mode\b/i;
+const TICKET_ID_RE = /(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i;
+const HASH_TICKET_RE = /#(\d{3,8})/;
+const SEARCH_QUERY_RE = /(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i;
+const SEARCH_SIMPLE_RE = /(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i;
+const FIELD_LIST_RE = /(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i;
+const URL_NAV_RE = /(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i;
+const URL_ANY_RE = /(https?:\/\/[^\s]+)/i;
+const BARE_SITE_RE = /(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
+const SEARCH_LONG_RE = /(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i;
+const ABOUT_RE = /(?:about|on|regarding)\s+([^,.\n]{10,60})/i;
+const COUNT_RE = /(?:top\s+)?(\d+)/;
+const ARTICLE_RE = /\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i;
+const ARTICLE_KEY_RE = /article[_\s]?\d/i;
+
+// Precompiled regex patterns for summary analysis
+const SUMMARY_NUMBERED_RE = /^\s*(?:#+\s*)?\d+[.)]\s/gm;
+const SUMMARY_TABLE_RE = /^\|[^\n]+\|\s*$/gm;
+const SUMMARY_BULLETS_RE = /^\s*[-*]\s/gm;
+const SUMMARY_SRC_RE = /\[src:[a-z0-9_-]+\]/gi;
+const SUMMARY_UNVERIFIED_RE = /\[unverified\]/gi;
+
 function isConfigChangeGoal(goal, currentUrl) {
   const text = String(goal || '');
   const url  = String(currentUrl || '');
@@ -2234,11 +2258,11 @@ const _UNVERIFIED_CAVEATS = /\b(headline only|not read in this run|not actually 
 function _countSummaryClaims(summary) {
   if (!summary || typeof summary !== 'string') return 0;
   // Numbered list entries: "1. ", "2. ", etc., or "1) ", "## 1." style.
-  const numbered = (summary.match(/^\s*(?:#+\s*)?\d+[.)]\s/gm) || []).length;
+  const numbered = (summary.match(SUMMARY_NUMBERED_RE) || []).length;
   // Markdown table rows (excluding header + separator)
-  const tableRows = Math.max(0, (summary.match(/^\|[^\n]+\|\s*$/gm) || []).length - 2);
+  const tableRows = Math.max(0, (summary.match(SUMMARY_TABLE_RE) || []).length - 2);
   // Top-level bullets
-  const bullets = (summary.match(/^\s*[-*]\s/gm) || []).length;
+  const bullets = (summary.match(SUMMARY_BULLETS_RE) || []).length;
   // Use the densest grouping signal as the claim count.
   return Math.max(numbered, tableRows, bullets);
 }
@@ -2277,8 +2301,8 @@ function _countSpecificClaims(summary) {
 }
 function _countSourceTags(summary) {
   if (!summary) return 0;
-  const matches = summary.match(/\[src:[a-z0-9_-]+\]/gi) || [];
-  const unverified = summary.match(/\[unverified\]/gi) || [];
+  const matches = summary.match(SUMMARY_SRC_RE) || [];
+  const unverified = summary.match(SUMMARY_UNVERIFIED_RE) || [];
   return matches.length + unverified.length;
 }
 
@@ -2580,7 +2604,7 @@ function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _histo
   var urlLower = typeof url === 'string' ? url.toLowerCase() : '';
   for (const [site, siteUrl] of Object.entries(siteUrls)) {
     if (goalLower.includes(site) && !urlLower.includes(site)) {
-      var qm = goal.match(/(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i);
+      var qm = goal.match(SEARCH_QUERY_RE);
       if (qm && qm[1]) {
         strategies.push(`Navigate directly to https://www.${siteUrl}${encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : '')}`);
       }
@@ -2853,7 +2877,7 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
   for (const [key, info] of Object.entries(CAPTCHA_HOST_MAP)) {
     if (host.includes(key) && goal) {
       // Try to extract search query from goal and go directly to search results
-      const searchMatch = goal.match(/(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i);
+      const searchMatch = goal.match(SEARCH_SIMPLE_RE);
       if (searchMatch && info.searchPath && searchMatch[1]) {
         const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
         console.log('[Sentinel/CAPTCHA] Navigating around CAPTCHA to:', searchUrl);
@@ -3127,7 +3151,7 @@ function _checkPreFinishCompleteness(goal, agentMemory, history) {
 
   // Patterns we care about: "extract X" / "give me X" / "find X" + commas
   // For each: the CVE ID, CVSS v3 base score, affected FortiOS versions, ...
-  const fieldListMatch = goal.match(/(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i);
+  const fieldListMatch = goal.match(FIELD_LIST_RE);
   if (!fieldListMatch || !fieldListMatch[1]) return null;
 
   const fieldList = fieldListMatch[1];
@@ -3226,12 +3250,12 @@ function generateHeuristicPlan(goal, currentUrl) {
     || /\b(summarize?|brief|report)\b.*\b(all|each|every)\b/i.test(g);
 
   // Extract target URL from goal
-  const urlMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i)
-    || goal.match(/(https?:\/\/[^\s]+)/);
+  const urlMatch = goal.match(URL_NAV_RE)
+    || goal.match(URL_ANY_RE);
   // v3.63: Also match bare site names ("go to Amazon", "go to Reddit")
   let _urlMatch = urlMatch;
   if (!_urlMatch) {
-    const _bareMatch = goal.match(/(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i);
+    const _bareMatch = goal.match(BARE_SITE_RE);
     if (_bareMatch && _bareMatch[1]) {
       const _siteKey = _bareMatch[1].trim().toLowerCase().replace(/\s+/g, '');
       if (BARE_SITE_MAP[_siteKey]) {
@@ -3254,12 +3278,12 @@ function generateHeuristicPlan(goal, currentUrl) {
   const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
 
   // Extract search query from goal
-  const searchMatch = goal.match(/(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i)
-    || goal.match(/(?:about|on|regarding)\s+([^,.\n]{10,60})/i);
+  const searchMatch = goal.match(SEARCH_LONG_RE)
+    || goal.match(ABOUT_RE);
   const searchQuery = searchMatch && searchMatch[1] && typeof searchMatch[1] === 'string' ? searchMatch[1].trim() : null;
 
   // Extract count
-  const countMatch = goal.match(/(?:top\s+)?(\d+)/);
+  const countMatch = goal.match(COUNT_RE);
   const count = countMatch && countMatch[1] ? (parseInt(countMatch[1], 10) || 10) : 10;
 
   if (isMultiPage) {
@@ -5016,12 +5040,12 @@ async function runAgentLoop(goal, workingTabId) {
         // (3.50.0) Multi-article completion guard: don't let the agent finish
         // with just link lists — it must actually OPEN and READ the articles.
         try {
-          const _articleGoal = (typeof goal === 'string') ? goal.match(/\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i) : null;
+          const _articleGoal = (typeof goal === 'string') ? goal.match(ARTICLE_RE) : null;
           if (_articleGoal && !command.force) {
             const _targetN = _articleGoal[1] ? (parseInt(_articleGoal[1], 10) || 10) : 10;
             const _openTabs = history.reduce((acc, h) => acc + (h.action && h.action.type === 'open_tab' ? 1 : 0), 0);
             const _summaryKeys = memKeys.filter(k =>
-              k.includes('summary') || k.includes('_summary') || k.match(/article[_\s]?\d/i)
+              k.includes('summary') || k.includes('_summary') || ARTICLE_KEY_RE.test(k)
             );
             // Block: haven't opened ANY article tabs AND no summaries written
             if (_openTabs === 0 && !_summaryKeys.length && noteCount === 0) {
