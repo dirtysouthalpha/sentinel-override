@@ -6,6 +6,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
 window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
 
 (function() {
+  function getErrorMessage(e) {
+    if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+    return String(e || '');
+  }
+
   const dd = window.__sentinelUtils.dropdown;
   const dom = window.__sentinelUtils.dom || {};
   const wait = window.__sentinelUtils.wait || {};
@@ -92,14 +97,14 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         try {
           const controlled = doc.getElementById(controlsId);
           if (controlled) addAllFromContainer(controlled);
-        } catch (e) { console.warn('[Sentinel] aria-controls lookup:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+        } catch (e) { console.warn('[Sentinel] aria-controls lookup:', getErrorMessage(e)); }
       }
       const ownsId = triggerEl.getAttribute('aria-owns');
       if (ownsId) {
         try {
           const owned = doc.getElementById(ownsId);
           if (owned) addAllFromContainer(owned);
-        } catch (e) { console.warn('[Sentinel] aria-owns lookup:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+        } catch (e) { console.warn('[Sentinel] aria-owns lookup:', getErrorMessage(e)); }
       }
 
       // 1b. If we got nothing yet, climb the DOM looking for a parent that contains
@@ -119,7 +124,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
             cursor = cursor.parentElement;
             depth++;
           }
-        } catch (e) { console.warn('[Sentinel] parent container climb:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+        } catch (e) { console.warn('[Sentinel] parent container climb:', getErrorMessage(e)); }
       }
     }
 
@@ -386,7 +391,7 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
     let className = '';
     try {
       className = (typeof el.className === 'string') ? el.className : (el.className && el.className.baseVal) || '';
-    } catch (e) { console.warn('[Sentinel] className access:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { console.warn('[Sentinel] className access:', getErrorMessage(e)); }
     className = className.toLowerCase();
     if (/dropdown|combobox|select|picker/.test(className)) {
       return true;
