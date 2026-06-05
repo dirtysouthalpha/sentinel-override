@@ -36,11 +36,11 @@ class KnowledgeGraph {
         this.adjacencyList = new Map();
         
         // Reconstruct adjacency lists
-        for (const [nodeId, node] of this.nodes) {
+        for (const [nodeId, _node] of this.nodes) {
           this.adjacencyList.set(nodeId, new Set());
         }
-        
-        for (const [edgeId, edge] of this.edges) {
+
+        for (const [_edgeId, edge] of this.edges) {
           const neighbors = this.adjacencyList.get(edge.source);
           if (neighbors) {
             neighbors.add(edge.target);
@@ -231,7 +231,6 @@ class KnowledgeGraph {
    */
   findContradictions() {
     const contradictions = [];
-    const nodePairs = new Map();
 
     // Find nodes with similar properties but conflicting values
     for (const node of this.nodes.values()) {

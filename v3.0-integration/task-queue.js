@@ -1,9 +1,13 @@
 /**
  * Task Queue - JavaScript implementation of v3.0 task queue
  * Manages background task processing with IndexedDB persistence
- * 
+ *
  * Based on Python v3.0 implementation with Chrome extension adaptations
+ *
+ * NOTE: Uses browser APIs: indexedDB, IDBKeyRange (available in Chrome extensions)
  */
+
+/* globals indexedDB, IDBKeyRange */
 
 // Task priorities
 const TaskPriority = {

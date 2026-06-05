@@ -1,12 +1,14 @@
 /**
  * v4.0 Multi-Agent System - Agent Registry
- * 
+ *
  * Manages agent lifecycle, registration, and coordination for multi-agent orchestration.
  * Part of v10.0 upgrade - Phase 2 implementation.
- * 
+ *
  * @module agent-registry
  * @version 10.0.0
  */
+
+/* globals module */
 
 class AgentRegistry {
   constructor() {

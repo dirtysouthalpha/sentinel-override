@@ -1,13 +1,15 @@
 /**
  * v4.0 Multi-Agent System - Workflow Engine
- * 
+ *
  * Orchestrates complex multi-step tasks across multiple agents.
  * Handles task decomposition, dependency management, and agent coordination.
  * Part of v10.0 upgrade - Phase 2 implementation.
- * 
+ *
  * @module workflow-engine
  * @version 10.0.0
  */
+
+/* globals module */
 
 class WorkflowEngine {
   constructor(agentRegistry) {

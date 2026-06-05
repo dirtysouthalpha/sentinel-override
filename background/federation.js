@@ -195,7 +195,7 @@ class FederationController {
   /**
    * Decompose goal into sub-goals
    */
-  async decomposeGoal(goal, context) {
+  async decomposeGoal(goal, _context) {
     // Simple decomposition based on goal keywords
     const subGoals = [];
     const goalLower = goal.toLowerCase();

@@ -9,6 +9,12 @@
 // Defined at module top so every handler below has access. Fire-and-forget;
 // never blocks the agent or throws.
 
+// Helper function for error message extraction (defined early for use in telemetry)
+function getErrorMessage(e) {
+  if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+  return String(e || '');
+}
+
 // (3.26.0) Content-script telemetry emit helper. Bound to window so it
 // survives the re-injection guard (re-injection skips the else-branch but
 // the helper is defined unconditionally above it).
@@ -65,11 +71,6 @@ if (window.__sentinelInitialized) {
     const err = chrome.runtime.lastError;
     if (typeof err === 'object' && err !== null && typeof err.message === 'string') return err.message;
     return String(err || '');
-  }
-
-  function getErrorMessage(e) {
-    if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
-    return String(e || '');
   }
 
   // Shorthand references to utility modules

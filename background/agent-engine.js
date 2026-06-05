@@ -66,10 +66,6 @@ const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 // Precompile regex for email removal (URL extraction)
 const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
 
-// Precompile regex for URL extraction
-const URL_EXTRACT_RE = /https?:\/\/[^\s"'<>,]+/i;
-const NAVIGATE_URL_EXTRACT_RE = /(?:go to|visit|navigate to|open|browse to|start at|begin at|check)\s+(?:the\s+)?(?:site\s+)?([^\s]+?\.(?:com|org|net|io|gov|edu|co|us|uk|de|fr|cn|jp|ru|br|in|ca|au|me|tv|info|biz|dev|app|ai|xyz))/i;
-
 // Precompile regex for hostname cleaning
 const WWW_PREFIX_RE = /^www\./;
 const TRAILING_SLASH_RE = /\/$/;
@@ -251,7 +247,7 @@ import { getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab,
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
 import { rewriteGoalForPlatform } from './adaptive-prompts.js';
 import { appendAuditEntry, getAuditLog, auditLogToCsv } from './audit-log.js';
-import { runRecoverySkills } from './skills/index.js';
+import { runRecoverySkills, getSkillStats } from './skills/index.js';
 import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side
 // effects, no chrome.* deps. We aggregate the run's metrics here at the end
@@ -850,7 +846,7 @@ export async function startAgent(goal, sender) {
     const tabs = await new Promise(resolve => {
       chrome.tabs.query({active: true, currentWindow: true}, (t) => {
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-          console.error('[startAgent] tabs.query failed:', getLastErrorMessage() || String(chrome.runtime.lastError));
+          console.error('[startAgent] tabs.query failed:', chrome.runtime.lastError.message || String(chrome.runtime.lastError));
           resolve([]);
         } else {
           resolve(t || []);
@@ -1834,8 +1830,6 @@ const MULTI_PORTAL_RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|int
 // Precompiled regex patterns for goal parsing
 const MODE_TIER1_RE = /\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i;
 const MODE_TIER2_RE = /\b(approval|autonomous|yolo)\s+mode\b/i;
-const TICKET_ID_RE = /(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i;
-const HASH_TICKET_RE = /#(\d{3,8})/;
 const SEARCH_QUERY_RE = /(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i;
 const SEARCH_SIMPLE_RE = /(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i;
 const FIELD_LIST_RE = /(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i;
@@ -3754,7 +3748,7 @@ async function runAgentLoop(goal, workingTabId) {
         const allTabs = await new Promise(resolve => {
           chrome.tabs.query({}, (t) => {
             if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-              console.error('[Agent recovery] tabs.query failed:', getLastErrorMessage() || String(chrome.runtime.lastError));
+              console.error('[Agent recovery] tabs.query failed:', chrome.runtime.lastError.message || String(chrome.runtime.lastError));
               resolve([]);
             } else {
               resolve(t || []);
@@ -6616,14 +6610,14 @@ return { ok: true, value: el.value };
                       text: ch,
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) rej(getLastErrorMessage() || String(chrome.runtime.lastError)); else res(r); });
+                    }, (r) => { if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) rej(chrome.runtime.lastError.message || String(chrome.runtime.lastError)); else res(r); });
                   });
                   await new Promise((res, rej) => {
                     chrome.debugger.sendCommand({ tabId: typeof tab === 'object' && tab !== null ? tab.id : tab }, 'Input.dispatchKeyEvent', {
                       type: 'keyUp',
                       key: ch,
                       code: 'Key' + ch.toUpperCase()
-                    }, (r) => { if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) rej(getLastErrorMessage() || String(chrome.runtime.lastError)); else res(r); });
+                    }, (r) => { if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) rej(chrome.runtime.lastError.message || String(chrome.runtime.lastError)); else res(r); });
                   });
                 } catch (_keyErr) {
                   // Fallback: set value directly via CDP JS
@@ -6737,7 +6731,7 @@ return { ok: true, value: el.value };
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
               if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-                console.error('[New tab detection] tabs.query failed:', getLastErrorMessage() || String(chrome.runtime.lastError));
+                console.error('[New tab detection] tabs.query failed:', chrome.runtime.lastError.message || String(chrome.runtime.lastError));
                 resolve([]);
               } else {
                 resolve(t || []);
@@ -7100,7 +7094,7 @@ return { ok: true, value: el.value };
           const allTabs = await new Promise(resolve => {
             chrome.tabs.query({}, (t) => {
               if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-                console.error('[Tab recovery] tabs.query failed:', getLastErrorMessage() || String(chrome.runtime.lastError));
+                console.error('[Tab recovery] tabs.query failed:', chrome.runtime.lastError.message || String(chrome.runtime.lastError));
                 resolve([]);
               } else {
                 resolve(t || []);

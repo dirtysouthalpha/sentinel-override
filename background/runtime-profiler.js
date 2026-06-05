@@ -348,7 +348,7 @@ function assessCoupling(state) {
   };
 }
 
-function analyzeDependencies(state) {
+function analyzeDependencies(_state) {
   // This would analyze actual module imports/dependencies
   // For now, return placeholder
   return {
@@ -379,7 +379,7 @@ function getCouplingRecommendation(deps) {
  * @param {object} state - System state
  * @returns {object} Cohesion analysis
  */
-function assessCohesion(state) {
+function assessCohesion(_state) {
   // Analyze how closely related module responsibilities are
   return {
     score: 70, // Placeholder

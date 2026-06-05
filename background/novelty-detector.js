@@ -334,7 +334,7 @@ async function checkBehavioralNovelty(data, history) {
   let comboSeen = false;
 
   for (const entry of typeHistory) {
-    const entryCombo = `${entry.target || ''}:${entryAction}`;
+    const entryCombo = `${entry.target || ''}:${entry.action}`;
     if (entryCombo === targetActionCombo) {
       comboSeen = true;
       break;

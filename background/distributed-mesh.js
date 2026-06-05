@@ -1,13 +1,15 @@
 /**
  * v5.0 Distributed Intelligence Mesh
- * 
+ *
  * Multi-node coordination, state synchronization, and distributed consensus.
  * Enables multiple Sentinel Override instances to work together.
  * Part of v10.0 upgrade - Phase 3 implementation.
- * 
+ *
  * @module distributed-mesh
  * @version 10.0.0
  */
+
+/* globals module */
 
 class DistributedMesh {
   constructor(config = {}) {
@@ -79,9 +81,9 @@ class DistributedMesh {
 
   /**
    * Discover nodes in mesh
-   * @param {string} address 
+   * @param {string} address
    */
-  async discoverNodes(address) {
+  async discoverNodes(_address) {
     // Placeholder for node discovery
     // In reality, this would use mDNS, DHT, or service discovery
     return [];
@@ -303,7 +305,7 @@ class DistributedMesh {
    */
   getTotalSupply(resource) {
     let total = 0;
-    for (const [key, data] of this.resourceMarket.entries()) {
+    for (const [_key, data] of this.resourceMarket.entries()) {
       if (data.resource === resource) {
         total += data.amount;
       }
@@ -313,9 +315,9 @@ class DistributedMesh {
 
   /**
    * Get total demand for resource
-   * @param {string} resource 
+   * @param {string} resource
    */
-  getTotalDemand(resource) {
+  getTotalDemand(_resource) {
     // Placeholder - would track actual demand
     return 1.0;
   }

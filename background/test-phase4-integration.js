@@ -9,32 +9,32 @@ import {
   clearReasoningTrace 
 } from './reasoning-trace.js';
 
-import { 
-  analyzeForBias, 
-  analyzeActionForBias, 
-  shouldTriggerBiasWarning, 
-  generateBiasReport, 
-  logBiasDetection, 
-  getBiasStatistics, 
-  clearBiasLog 
+import {
+  _analyzeForBias,
+  analyzeActionForBias,
+  _shouldTriggerBiasWarning,
+  _generateBiasReport,
+  _logBiasDetection,
+  getBiasStatistics,
+  clearBiasLog
 } from './bias-detector.js';
 
-import { 
-  initKnowledgeGraph, 
-  addKnowledgeNode, 
-  updateKnowledgeNode, 
-  addKnowledgeEdge, 
-  findKnowledgeContradictions, 
-  getKnowledgeGraphStats, 
-  persistKnowledgeGraph 
+import {
+  initKnowledgeGraph,
+  addKnowledgeNode,
+  _updateKnowledgeNode,
+  addKnowledgeEdge,
+  _findKnowledgeContradictions,
+  getKnowledgeGraphStats,
+  _persistKnowledgeGraph
 } from './knowledge-graph.js';
 
-import { 
-  analyzeForContradictions, 
-  compareResponsesForContradictions, 
-  logContradictionDetection, 
-  getContradictionStatistics, 
-  clearContradictionLog 
+import {
+  analyzeForContradictions,
+  _compareResponsesForContradictions,
+  _logContradictionDetection,
+  getContradictionStatistics,
+  clearContradictionLog
 } from './contradiction-detector.js';
 
 import { 
@@ -44,11 +44,11 @@ import {
   clearNoveltyHistory 
 } from './novelty-detector.js';
 
-import { 
-  synthesizeKnowledge, 
-  getSynthesis, 
-  getSynthesisStatistics, 
-  clearSynthesis 
+import {
+  synthesizeKnowledge,
+  _getSynthesis,
+  getSynthesisStatistics,
+  clearSynthesis
 } from './knowledge-synthesizer.js';
 
 console.log('=== Phase 4 Intelligence Systems Integration Test ===\n');

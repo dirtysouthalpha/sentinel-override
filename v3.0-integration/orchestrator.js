@@ -6,11 +6,11 @@
  * with the existing v4.0.2 JavaScript Chrome extension architecture.
  */
 
-import { CircuitBreaker, CircuitBreakerRegistry, CircuitState } from './circuit-breaker.js';
-import { TaskQueue, TaskPriority, TaskState } from './task-queue.js';
+import { CircuitBreakerRegistry } from './circuit-breaker.js';
+import { TaskQueue } from './task-queue.js';
 import { StateManager, HistoryManager } from './state-manager.js';
-import { LoadMonitor, LoadState, PerformanceTracker } from './load-monitor.js';
-import { EventBus, EventTypes, globalEventBus } from './event-bus.js';
+import { LoadMonitor, PerformanceTracker } from './load-monitor.js';
+import { EventTypes, globalEventBus } from './event-bus.js';
 
 /**
  * v3.0 Runtime Orchestrator - Main integration coordinator
@@ -155,7 +155,7 @@ class V3RuntimeOrchestrator {
    */
   _registerDefaultTaskProcessors() {
     // Health check processor
-    this.taskQueue.registerProcessor('health_check', async (payload) => {
+    this.taskQueue.registerProcessor('health_check', async (_payload) => {
       return await this.performHealthCheck();
     });
 
@@ -165,7 +165,7 @@ class V3RuntimeOrchestrator {
     });
 
     // Memory cleanup processor
-    this.taskQueue.registerProcessor('memory_cleanup', async (payload) => {
+    this.taskQueue.registerProcessor('memory_cleanup', async (_payload) => {
       return await this.performMemoryCleanup();
     });
   }
@@ -185,7 +185,7 @@ class V3RuntimeOrchestrator {
     });
 
     // Subscribe to load events
-    this.eventBus.on(EventTypes.LOAD_CRITICAL, (data) => {
+    this.eventBus.on(EventTypes.LOAD_CRITICAL, (_data) => {
       console.error('[V3Orchestrator] Critical load detected, activating emergency measures');
     });
   }
