@@ -3576,7 +3576,7 @@ async function _generateInitialPlan(goal, workingTabId) {
     firstStep: plan?.[0] || 'none'
   });
   // Analyze plan for potential bias
-  const planBiasAnalysis = analyzeForBias(plan?.join('\n') || '', 'plan', goal);
+  const planBiasAnalysis = analyzeForBias(plan?.join('\n') || '');
   if (planBiasAnalysis.hasBias && shouldTriggerBiasWarning(planBiasAnalysis)) {
     console.warn('[Sentinel] Plan bias detected:', planBiasAnalysis);
     logBiasDetection(planBiasAnalysis, 'plan_generation');
@@ -4932,9 +4932,13 @@ async function runAgentLoop(goal, workingTabId) {
         });
         // v10.0: Check prompt history for contradictions before LLM call
         if (promptHistory.length > 1) {
-          const contradictionCheck = analyzeForContradictions(promptHistory, 'action_selection');
+          const historyText = promptHistory
+            .map(h => (h && typeof h === 'object' ? String(h.result || '') : ''))
+            .filter(Boolean)
+            .join('\n');
+          const contradictionCheck = analyzeForContradictions(historyText);
           if (contradictionCheck.hasContradictions) {
-            logContradictionDetection(contradictionCheck, 'prompt_history', stepCount);
+            logContradictionDetection(contradictionCheck, stepCount);
             console.warn('[Sentinel] Contradictions detected in prompt history:', contradictionCheck);
           }
         }
@@ -4954,10 +4958,10 @@ async function runAgentLoop(goal, workingTabId) {
           });
           // Analyze action decision for potential bias
           if (command && command.type) {
-            const actionBiasAnalysis = analyzeActionForBias(command, goal);
+            const actionBiasAnalysis = analyzeActionForBias(command);
             if (actionBiasAnalysis.hasBias && shouldTriggerBiasWarning(actionBiasAnalysis)) {
               console.warn('[Sentinel] Action bias detected:', actionBiasAnalysis);
-              logBiasDetection(actionBiasAnalysis, 'action_decision', stepCount);
+              logBiasDetection(actionBiasAnalysis, stepCount);
             }
             // Store action in knowledge graph
             try {
