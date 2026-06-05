@@ -15,6 +15,9 @@ function getErrorMessage(e) {
   return String(e || '');
 }
 
+// Precompile regex for Microsoft 365 tenant detection (performance optimization)
+const ONMICROSOFT_TENANT_RE = /[a-z0-9-]+\.onmicrosoft\.com/i;
+
 // (3.26.0) Content-script telemetry emit helper. Bound to window so it
 // survives the re-injection guard (re-injection skips the else-branch but
 // the helper is defined unconditionally above it).
@@ -676,7 +679,7 @@ if (window.__sentinelInitialized) {
 
           try {
             const bodyText = (document.body && document.body.innerText) || '';
-            const m = bodyText.match(/[a-z0-9-]+\.onmicrosoft\.com/i);
+            const m = bodyText.match(ONMICROSOFT_TENANT_RE);
             if (m) onmicrosoft = m[0];
           } catch (e) { console.warn('[Sentinel] onmicrosoft scan:', getErrorMessage(e)); }
 
