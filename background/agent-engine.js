@@ -3072,7 +3072,16 @@ function _isUnproductiveJsResult(raw) {
     const p = JSON.parse(trim);
     if (p === null) return true;
     if (Array.isArray(p) && !p.length) return true;
-    if (typeof p === 'object' && !Object.keys(p).length) return true;
+    if (typeof p === 'object') {
+      let hasOwnProp = false;
+      for (let key in p) {
+        if (Object.prototype.hasOwnProperty.call(p, key)) {
+          hasOwnProp = true;
+          break;
+        }
+      }
+      if (!hasOwnProp) return true;
+    }
   } catch (_) { /* not JSON, that's fine */ }
 
   return false;
