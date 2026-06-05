@@ -4,6 +4,11 @@
 
 import { getErrorMessage } from './error-utils.js';
 
+// Precompile regex for sentence splitting (performance optimization)
+const SENTENCE_SPLIT_RE = /[.!?]+/;
+const IS_PATTERN_RE = /(?:is|are|was|were)\s+([a-z][^,.]*)/i;
+const NOT_PATTERN_RE = /(?:is|are|was|were)\s+not\s+([a-z][^,.]*)/i;
+
 /**
  * Analyzes text for logical contradictions
  * @param {string} text - Text to analyze
@@ -50,7 +55,7 @@ export function analyzeForContradictions(text) {
  */
 function findDirectNegationContradictions(text) {
   const contradictions = [];
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
   const sentencesLen = sentences.length;
 
   for (let i = 0; i < sentencesLen; i++) {
@@ -59,11 +64,8 @@ function findDirectNegationContradictions(text) {
       const sent2 = sentences[j].trim().toLowerCase();
 
       // Check for "is X" vs "is not X" pattern
-      const isPattern1 = /(?:is|are|was|were)\s+([a-z][^,.]*)/i;
-      const notPattern1 = /(?:is|are|was|were)\s+not\s+([a-z][^,.]*)/i;
-
-      const match1 = sent1.match(isPattern1);
-      const match2 = sent2.match(notPattern1);
+      const match1 = sent1.match(IS_PATTERN_RE);
+      const match2 = sent2.match(NOT_PATTERN_RE);
 
       if (match1 && match2) {
         const term1 = match1[1].trim().toLowerCase();
@@ -97,7 +99,7 @@ function findTemporalContradictions(text) {
     { before: ['already', 'previously', 'formerly'], after: ['not yet', 'still not', 'never'] }
   ];
 
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
 
   for (const markerGroup of temporalMarkers) {
     for (const sentence of sentences) {
@@ -135,7 +137,7 @@ function findQuantifierContradictions(text) {
     existential: ['some', 'most', 'many', 'few', 'several', 'often', 'sometimes', 'rarely']
   };
 
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
   const sentencesLen = sentences.length;
 
   for (let i = 0; i < sentencesLen; i++) {
@@ -310,7 +312,7 @@ export function compareResponsesForContradictions(response1, response2) {
  */
 function extractStatements(text) {
   const statements = [];
-  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
   
   for (const sentence of sentences) {
     // Extract subject-verb-object triples

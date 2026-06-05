@@ -58,6 +58,7 @@ const NEWLINE_SPLIT_RE = /\n+/;
 const SINGLE_NEWLINE_SPLIT_RE = /\n/;
 const WHITESPACE_NORMALIZE_RE = /\s+/g;
 const WHITESPACE_SPLIT_RE = /\s+/;
+const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 
 // Precompile regex for email removal (URL extraction)
 const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -1961,7 +1962,7 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
 
   // Action Taken: take the first 2 sentences from the summary (or up to 240 chars).
   const summaryStr = typeof summary === 'string' ? summary : '';
-  let actionTaken = summaryStr.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ').trim();
+  let actionTaken = summaryStr.split(SENTENCE_SPLIT_RE).slice(0, 2).join(' ').trim();
   if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
   if (actionTaken.length > 240) actionTaken = `${actionTaken.slice(0, 237)}...`;
 
@@ -2040,7 +2041,7 @@ function formatTicketKickoff(summary, goal, tech, options) {
   // Resolution path: derive from the summary's last 1-3 sentences (treat them
   // as recommended next steps). If empty, leave numbered placeholders so the
   // tech can fill in.
-  const sentences = (summary || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+  const sentences = (summary || '').split(SENTENCE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
   const tail = sentences.slice(-3);
   const pathLines = tail.length
     ? tail.map((s, i) => `${i + 1}. ${s.replace(WHITESPACE_NORMALIZE_RE, ' ').slice(0, 240)}`)
@@ -2076,7 +2077,7 @@ function formatWaitingOnClient(summary, goal, tech, options) {
   const _opts = options || {}; // reserved for future template options
   const ticketNum = extractTicketNumber(goal);
   const stamp = _ticketStamp();
-  const firstSentence = ((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
+  const firstSentence = ((summary || '').split(SENTENCE_SPLIT_RE)[0] || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
   const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
 
   const lines = [
@@ -2170,7 +2171,7 @@ function formatItGlueKb(summary, goal, tech, options) {
     `- ${(title || 'Untitled')}`,
     '',
     '**Issue:**',
-    `- ${((summary || '').split(/(?<=[.!?])\s+/)[0] || '').slice(0, 240)}`,
+    `- ${((summary || '').split(SENTENCE_SPLIT_RE)[0] || '').slice(0, 240)}`,
     '',
     '**Environment:**',
     `- ${envBits.join('; ')}`,
@@ -2203,7 +2204,7 @@ function formatClientEmail(summary, goal, tech, options) {
   const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
   const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
   const briefIssue = ((goal || '').split(SINGLE_NEWLINE_SPLIT_RE)[0] || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
-  const oneLine = ((summary || '').split(/(?<=[.!?])\s+/)[0] || 'The issue has been investigated and addressed.').slice(0, 240);
+  const oneLine = ((summary || '').split(SENTENCE_SPLIT_RE)[0] || 'The issue has been investigated and addressed.').slice(0, 240);
 
   const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
 
