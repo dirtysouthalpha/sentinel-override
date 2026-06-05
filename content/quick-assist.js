@@ -735,7 +735,7 @@ ${selectedText}`;
   // Check if Quick Assist is enabled
   try {
     chrome.storage.local.get(['quickAssist'], function(result) {
-      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/quick-assist] init failed:', (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string') ? chrome.runtime.lastError.message : String(chrome.runtime.lastError)); return; }
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { const _err = typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError); console.warn('[Sentinel/quick-assist] init failed:', _err); return; }
       enabled = result.quickAssist !== false; // default ON
     });
   } catch (_e) {
