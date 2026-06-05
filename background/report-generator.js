@@ -376,7 +376,8 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
 
       let cleaned = responseText.trim();
       if (cleaned.startsWith('```')) {
-        cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+        // Remove opening and closing code blocks in single pass
+        cleaned = cleaned.replace(/^```(?:markdown|md)?\s*\n?([\s\S]*?)\n?```$/s, '$1');
       }
 
       return cleaned;

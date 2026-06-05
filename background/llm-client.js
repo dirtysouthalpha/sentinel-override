@@ -1114,7 +1114,8 @@ export async function generatePlan(goal, settings, context = {}) {
       // Numbered: "1. Step", "1) Step", "Step 1: Step"
       const numberedLines = lines.filter(l => /^\d+[.)]\s+.{8,}/.test(l) || /^[Ss]tep\s+\d+[:.)\s]+.{8,}/.test(l));
       if (numberedLines.length >= 2) {
-        const steps = numberedLines.map(l => l.replace(/^\d+[.)]\s+/, '').replace(/^[Ss]tep\s+\d+[:.)\s]+/, '').trim()).filter(s => s.length >= 8);
+        // Single replace with alternation is more efficient than chained replaces
+        const steps = numberedLines.map(l => l.replace(/^(?:\d+[.)]\s+|[Ss]tep\s+\d+[:.)\s]+)/, '').trim()).filter(s => s.length >= 8);
         if (steps.length >= 2) {
           console.warn(`Plan generation: extracted ${steps.length} numbered steps from prose`);
           return steps;
