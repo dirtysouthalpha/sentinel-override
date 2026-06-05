@@ -1041,7 +1041,7 @@ export function isValidUrl(url) {
   try {
     const parsed = new URL(url);
     return VALID_PROTOCOLS.has(parsed.protocol);
-  } catch (e) {
+  } catch (_e) {
     // Invalid URL format
     return false;
   }
