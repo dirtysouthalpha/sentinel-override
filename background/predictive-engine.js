@@ -480,7 +480,9 @@ export function generateOptimizedPlan(tasks) {
  * @returns {object} Predictive insights
  */
 export function analyzePredictively(data) {
-  const { runHistory, failureHistory, performanceMetrics } = data;
+  const runHistory = data.runHistory || data.history || [];
+  const failureHistory = data.failureHistory || data.failures || [];
+  const performanceMetrics = data.performanceMetrics || data;
 
   // Predict next run duration (optimized to avoid intermediate array)
   const durations = [];

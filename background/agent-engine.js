@@ -7274,18 +7274,18 @@ return { ok: true, value: el.value };
     // Run predictive analysis on this run
     const predictiveData = {
       goal: _lastGoal,
-      duration: Date.now() - agentReport.startTime,
+      duration: Date.now() - (agentReport?.startTime || Date.now()),
       stepCount: stepCount,
       apiCalls: apiCallCount,
       history: history,
       failures: failedSteps,
       stagnation: _pageStagnation
     };
-    const predictiveInsights = PredictiveEngine.analyzePredictively(predictiveData);
+    const predictiveInsights = PredictiveEngine.analyze(predictiveData);
     console.log('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);
-    
+
     // Generate mutation proposals for optimization
-    if (predictiveInsights.riskScore > 50) {
+    if ((predictiveInsights.riskAssessment?.score || 0) > 50) {
       const currentState = {
         profiling: profilingSummary,
         predictive: predictiveInsights,
@@ -7302,7 +7302,7 @@ return { ok: true, value: el.value };
     }
     
     // Store Phase 5 results in audit log
-    await appendAuditEntry(agentReport.runId, 'phase5_intelligence', {
+    await appendAuditEntry(agentReport?.runId || 'unknown', 'phase5_intelligence', {
       message: 'Phase 5 Predictive & Profiling Analysis',
       profiling: profilingSummary,
       predictive: predictiveInsights,
@@ -7344,7 +7344,7 @@ return { ok: true, value: el.value };
     const complianceReport = {
       timestamp: new Date().toISOString(),
       goal: _lastGoal,
-      duration: Date.now() - agentReport.startTime,
+      duration: Date.now() - (agentReport?.startTime || Date.now()),
       apiCalls: apiCallCount,
       biasDetections: await getBiasStatistics(),
       contradictionDetections: await getContradictionStatistics(),
@@ -7353,7 +7353,7 @@ return { ok: true, value: el.value };
       reasoningTrace: await getReasoningSummary()
     };
     // Append compliance report to audit log
-    await appendAuditEntry(agentReport.runId, 'compliance_report', {
+    await appendAuditEntry(agentReport?.runId || 'unknown', 'compliance_report', {
       message: 'V10.0 Intelligence Compliance Report',
       report: complianceReport
     });
