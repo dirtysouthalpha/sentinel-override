@@ -23,6 +23,9 @@
 // The score is the sum of component contributions. Each component handles
 // missing/edge data (zero steps, zero plan, etc.) with documented fallbacks.
 
+// Precompile regex for performance optimization
+const GOOD_BAND_RE = /^(high|good)$/;
+
 /**
  * Compute a trust score from agent-run metrics.
  *
@@ -203,7 +206,7 @@ function round(n, digits = 0) {
  */
 export function suggestRetryActions(scoreResult) {
   if (!scoreResult || typeof scoreResult.score !== 'number') return [];
-  if (/^(high|good)$/.test(scoreResult.band)) return [];
+  if (GOOD_BAND_RE.test(scoreResult.band)) return [];
 
   const bd = scoreResult.breakdown || {};
   const suggestions = [];
