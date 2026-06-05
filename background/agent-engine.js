@@ -58,7 +58,6 @@ const TICKET_NUMBER_RE2 = /#(\d{3,8})/;
 
 // Precompile regex for string operations (performance optimization)
 const NEWLINE_SPLIT_RE = /\n+/;
-const SINGLE_NEWLINE_SPLIT_RE = /\n/;
 const WHITESPACE_NORMALIZE_RE = /\s+/g;
 const WHITESPACE_SPLIT_RE = /\s+/;
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
