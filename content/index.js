@@ -1744,8 +1744,8 @@ if (window.__sentinelInitialized) {
             el.dispatchEvent(__sentinelKeyEventForChar('keyup', char));
 
             // Update typing banner every 10 chars for visual feedback
-            if (i % 10 === 0 || i === text.length - 1) showTypingBanner(text, i + 1, text.length);
-            await typingDelay(i, text.length);
+            if (i % 10 === 0 || i === textLen - 1) showTypingBanner(text, i + 1, textLen);
+            await typingDelay(i, textLen);
           }
           // Final change event after the full string is typed.
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
