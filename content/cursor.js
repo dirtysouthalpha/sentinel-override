@@ -28,6 +28,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   const HIDE_AFTER_MS = 12000;
   const DEFAULT_TRAVEL_MS = 380;
 
+  function getErrorMessage(e) {
+    if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+    return String(e || '');
+  }
+
   let lastX = -1;
   let lastY = -1;
   let hideTimer = null;
@@ -102,7 +107,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       // (3.8.1) Element might exist but be detached (React reconciliation).
       // If it's not currently in the document, drop it and rebuild.
       if (c && !c.isConnected) {
-        try { c.remove(); } catch (e) { console.warn('[Sentinel] cursor remove detached:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        try { c.remove(); } catch (e) { console.warn('[Sentinel] cursor remove detached:', getErrorMessage(e)); }
         c = null;
       }
       if (c) return c;
@@ -134,7 +139,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         try { root.appendChild(c); }
         catch {
           // Fallback: try body
-          try { (document.body || document).appendChild(c); } catch (e2) { console.warn('[Sentinel] cursor element append fallback failed:', (typeof e2 === 'object' && e2 !== null && 'message' in e2 && typeof e2.message === 'string' ? e2.message : String(e2))); }
+          try { (document.body || document).appendChild(c); } catch (e2) { console.warn('[Sentinel] cursor element append fallback failed:', getErrorMessage(e2)); }
         }
       };
 
@@ -163,7 +168,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         // Re-create on next animation frame so we don't fight an ongoing
         // reconciliation pass.
         requestAnimationFrame(() => {
-          try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor recreate on mutation:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+          try { ensureCursor(); } catch (e) { console.warn('[Sentinel] cursor recreate on mutation:', getErrorMessage(e)); }
         });
       });
       const target = document.documentElement || document.body;
@@ -180,7 +185,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       try {
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
-      } catch (e) { console.warn('[Sentinel] cursor auto-hide dim:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] cursor auto-hide dim:', getErrorMessage(e)); }
     }, HIDE_AFTER_MS);
   }
 
@@ -273,9 +278,9 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         if (!c) return;
         c.classList.add('pressing');
         setTimeout(() => {
-          try { c.classList.remove('pressing'); } catch (e) { console.warn('[Sentinel] cursor press cleanup:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+          try { c.classList.remove('pressing'); } catch (e) { console.warn('[Sentinel] cursor press cleanup:', getErrorMessage(e)); }
         }, 240);
-      } catch (e) { console.warn('[Sentinel] cursor press:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] cursor press:', getErrorMessage(e)); }
     },
 
     /**
@@ -288,7 +293,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = ensureCursor();
         if (c) c.classList.remove('dimmed');
         scheduleAutoHide();
-      } catch (e) { console.warn('[Sentinel] cursor show:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] cursor show:', getErrorMessage(e)); }
     },
 
     /**
@@ -301,7 +306,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const c = document.getElementById(CURSOR_ID);
         if (c) c.classList.add('dimmed');
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      } catch (e) { console.warn('[Sentinel] cursor hide:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+      } catch (e) { console.warn('[Sentinel] cursor hide:', getErrorMessage(e)); }
     },
 
     /**
@@ -313,7 +318,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
     setKeepVisible(on) {
       keepVisibleMode = !!on;
       if (on) {
-        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', getErrorMessage(e)); }
       }
     },
 
@@ -329,7 +334,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
         const _ = c.style;
         return { x: lastX, y: lastY };
       } catch (e) {
-        console.warn('[Sentinel] cursor.getPosition error:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)));
+        console.warn('[Sentinel] cursor.getPosition error:', getErrorMessage(e));
         return { x: -1, y: -1 };
       }
     }
@@ -340,5 +345,5 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   // (3.8.1) Make the cursor visible immediately on script load.
   try {
     ensureCursor();
-  } catch (e) { console.warn('[Sentinel/CURSOR] Init failed:', (typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e))); }
+  } catch (e) { console.warn('[Sentinel/CURSOR] Init failed:', getErrorMessage(e)); }
 })();
