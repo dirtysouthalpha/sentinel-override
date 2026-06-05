@@ -3637,8 +3637,9 @@ chrome.runtime.onMessage.addListener((message) => {
                   if (Array.isArray(sug.applyKeys) && sug.applyKeys.length && Array.isArray(sug.applyValues)) {
                     const updates = {};
                     const applyKeysLen = sug.applyKeys.length;
+                    const applyValuesLen = sug.applyValues.length;
                     for (let i = 0; i < applyKeysLen; i++) {
-                      if (i < sug.applyValues.length) updates[sug.applyKeys[i]] = sug.applyValues[i];
+                      if (i < applyValuesLen) updates[sug.applyKeys[i]] = sug.applyValues[i];
                     }
                     await chrome.storage.local.set(updates);
                   }
