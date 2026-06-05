@@ -6,6 +6,11 @@ window.__sentinelUtils = window.__sentinelUtils || {};
 window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
 
 (function() {
+  function getErrorMessage(e) {
+    if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
+    return String(e || '');
+  }
+
   const fm = window.__sentinelUtils.frame;
   const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
 
@@ -27,7 +32,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (error) {
-      console.error('Error selecting iframes:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error selecting iframes:', getErrorMessage(error));
       return { elements, iframeCount: 0, crossOriginCount: 0 };
     }
 
@@ -66,7 +71,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
           frameUrl: src,
           frameId: null
         });
-        console.error(`Error scanning iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+        console.error(`Error scanning iframe ${index}:`, getErrorMessage(error));
       }
       });
     }
@@ -96,7 +101,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (error) {
-      console.error('Error selecting iframes:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error selecting iframes:', getErrorMessage(error));
       return null;
     }
 
@@ -117,7 +122,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       }
     } catch (error) {
       // Cross-origin
-      console.error(`Error accessing iframe ${frameIndex} content:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error(`Error accessing iframe ${frameIndex} content:`, getErrorMessage(error));
     }
 
     // Cross-origin iframe
@@ -144,7 +149,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     try {
       iframes = doc.querySelectorAll('iframe');
     } catch (error) {
-      console.error('Error selecting iframes:', typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+      console.error('Error selecting iframes:', getErrorMessage(error));
       return info;
     }
 
@@ -158,14 +163,14 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
             sameOrigin = true;
           }
         } catch (error) {
-          console.error(`Error checking origin for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+          console.error(`Error checking origin for iframe ${index}:`, getErrorMessage(error));
         }
 
         let rect;
         try {
         rect = iframe.getBoundingClientRect();
       } catch (error) {
-        console.error(`Error getting dimensions for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+        console.error(`Error getting dimensions for iframe ${index}:`, getErrorMessage(error));
         rect = { width: 0, height: 0 };
       }
 
@@ -173,7 +178,7 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
       try {
         visible = dom && dom.isVisible(iframe);
       } catch (error) {
-        console.error(`Error checking visibility for iframe ${index}:`, typeof error === 'object' && error !== null && typeof error.message === 'string' ? error.message : String(error));
+        console.error(`Error checking visibility for iframe ${index}:`, getErrorMessage(error));
       }
 
       info.push({
