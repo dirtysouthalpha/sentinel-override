@@ -121,7 +121,7 @@ export async function enumerateFrames(tabId) {
  * @returns {Promise<number|null>} The Chrome frameId, or null if not found.
  */
 export async function resolveFrameForSelector(tabId, frameIndex) {
-  if (tabId === null || tabId === undefined || frameIndex === null || frameIndex === undefined || frameIndex < 0) return null;
+  if (tabId == null || frameIndex == null || frameIndex < 0) return null;
 
   try {
     const cached = frameIdsByTab.get(tabId);
@@ -163,7 +163,7 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
  */
 export async function executeInFrame(tabId, frameId, command) {
   // Note: frameId === 0 is the main frame and is a valid value, so check for nullish only.
-  if (tabId === null || tabId === undefined || frameId === null || frameId === undefined) {
+  if (tabId == null || frameId == null) {
     return { ok: false, error: 'Missing tabId or frameId' };
   }
   if (!command || !command.type) {
