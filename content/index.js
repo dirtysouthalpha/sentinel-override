@@ -1705,7 +1705,7 @@ if (window.__sentinelInitialized) {
               bubbles: true, cancelable: true, composed: true
             }));
             el.dispatchEvent(__sentinelKeyEventForChar('keyup', char));
-            await typingDelay(i, text.length);
+            await typingDelay(i, textLen);
           }
           el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
           el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
