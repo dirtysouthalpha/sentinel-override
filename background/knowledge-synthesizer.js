@@ -210,7 +210,7 @@ function mergeCluster(cluster) {
   // Combine content (simple concatenation for now)
   const combinedContent = cluster.items
     .map(item => item.content || '')
-    .filter(c => c.trim().length > 0)
+    .filter(c => c.trim())
     .join('; ');
 
   // Calculate average confidence

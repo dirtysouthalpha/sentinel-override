@@ -160,8 +160,9 @@ class KnowledgeGraph {
     const visited = new Set();
     const queue = [{ nodeId: nodeId, depth: 0 }];
 
-    while (queue.length > 0) {
-      const { nodeId: currentId, depth } = queue.shift();
+    let queueIndex = 0;
+    while (queueIndex < queue.length) {
+      const { nodeId: currentId, depth } = queue[queueIndex++];
 
       if (depth >= maxDepth || visited.has(currentId)) {
         continue;

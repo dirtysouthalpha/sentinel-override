@@ -390,8 +390,9 @@ export function generateOptimizedPlan(tasks) {
   const executionOrder = [];
   const levels = new Map(); // Track which level each task belongs to
   
-  while (queue.length > 0) {
-    const id = queue.shift();
+  let queueIndex = 0;
+  while (queueIndex < queue.length) {
+    const id = queue[queueIndex++];
     executionOrder.push(id);
 
     const level = taskMap.get(id)?.dependencies?.length || 0;

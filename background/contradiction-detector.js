@@ -55,7 +55,7 @@ export function analyzeForContradictions(text) {
  */
 function findDirectNegationContradictions(text) {
   const contradictions = [];
-  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim());
   const sentencesLen = sentences.length;
 
   for (let i = 0; i < sentencesLen; i++) {
@@ -99,7 +99,7 @@ function findTemporalContradictions(text) {
     { before: ['already', 'previously', 'formerly'], after: ['not yet', 'still not', 'never'] }
   ];
 
-  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim());
 
   for (const markerGroup of temporalMarkers) {
     for (const sentence of sentences) {
@@ -137,7 +137,7 @@ function findQuantifierContradictions(text) {
     existential: ['some', 'most', 'many', 'few', 'several', 'often', 'sometimes', 'rarely']
   };
 
-  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim());
   const sentencesLen = sentences.length;
 
   for (let i = 0; i < sentencesLen; i++) {
@@ -312,7 +312,7 @@ export function compareResponsesForContradictions(response1, response2) {
  */
 function extractStatements(text) {
   const statements = [];
-  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim().length > 0);
+  const sentences = text.split(SENTENCE_SPLIT_RE).filter(s => s.trim());
   
   for (const sentence of sentences) {
     // Extract subject-verb-object triples
