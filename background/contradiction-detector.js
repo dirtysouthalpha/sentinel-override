@@ -150,7 +150,7 @@ function findQuantifierContradictions(text) {
         for (const exis of quantifiers.existential) {
           if (sent1.includes(uni) && sent2.includes(exis)) {
             // Try to extract the subject
-            const subjectPattern = /\b([a-z]+)\s+(?:is|are|was|were)\s+(?:${uni}|${exis})/i;
+            const subjectPattern = new RegExp(`\\b([a-z]+)\\s+(?:is|are|was|were)\\s+(?:${uni}|${exis})`, 'i');
             const match1 = sent1.match(subjectPattern);
             const match2 = sent2.match(subjectPattern);
 

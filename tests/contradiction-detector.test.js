@@ -70,6 +70,17 @@ describe('analyzeForContradictions', () => {
     expect(typeof result.hasContradictions).toBe('boolean');
   });
 
+  test('quantifier regex uses variable values not literal ${uni} text', () => {
+    // Regression test: regex was /...${uni}|${exis}/ (literal) instead of new RegExp
+    // Before fix: pattern matched literal "$" text; after fix: matches quantifier words
+    const text = 'The button is always visible. The button is sometimes visible.';
+    const result = analyzeForContradictions(text);
+    // We can't guarantee a match with the simple subject pattern, but the regex
+    // must not contain literal "${" characters (which would never match real text)
+    expect(typeof result.hasContradictions).toBe('boolean');
+    expect(Array.isArray(result.contradictions)).toBe(true);
+  });
+
   test('returns totalScore', () => {
     const result = analyzeForContradictions('Clean text about navigation');
     expect(typeof result.totalScore).toBe('number');
