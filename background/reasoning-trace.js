@@ -112,11 +112,12 @@ export async function getReasoningSummary(runId) {
     return 'No reasoning trace found for this run.';
   }
 
-  let summary = `# Reasoning Trace Summary\n`;
-  summary += `**Run ID:** ${trace.runId}\n`;
-  summary += `**Goal:** ${trace.goal}\n`;
-  summary += `**Model:** ${trace.model}\n`;
-  summary += `**Total Decisions:** ${trace.entries.length}\n\n`;
+  const parts = [];
+  parts.push(`# Reasoning Trace Summary\n`);
+  parts.push(`**Run ID:** ${trace.runId}\n`);
+  parts.push(`**Goal:** ${trace.goal}\n`);
+  parts.push(`**Model:** ${trace.model}\n`);
+  parts.push(`**Total Decisions:** ${trace.entries.length}\n\n`);
 
   // Group by phase
   const byPhase = {};
@@ -128,20 +129,21 @@ export async function getReasoningSummary(runId) {
   });
 
   for (const [phase, entries] of Object.entries(byPhase)) {
-    summary += `## ${phase.toUpperCase()} (${entries.length} decisions)\n`;
+    parts.push(`## ${phase.toUpperCase()} (${entries.length} decisions)\n`);
     entries.forEach(entry => {
-      summary += `### Step ${entry.step}\n`;
-      summary += `- **Decision:** ${entry.decision}\n`;
-      summary += `- **Confidence:** ${(entry.confidence * 100).toFixed(1)}%\n`;
-      summary += `- **Factors:** ${entry.factors.length} considered\n`;
+      parts.push(`### Step ${entry.step}\n`);
+      parts.push(`- **Decision:** ${entry.decision}\n`);
+      parts.push(`- **Confidence:** ${(entry.confidence * 100).toFixed(1)}%\n`);
+      parts.push(`- **Factors:** ${entry.factors.length} considered\n`);
       if (entry.alternatives.length > 0) {
-        summary += `- **Alternatives:** ${entry.alternatives.length} considered\n`;
+        parts.push(`- **Alternatives:** ${entry.alternatives.length} considered\n`);
       }
-      summary += '\n';
+      parts.push('\n');
     });
   }
 
-  return summary;
+  return parts.join('');
+
 }
 
 /**

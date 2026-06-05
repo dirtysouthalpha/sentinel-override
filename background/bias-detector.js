@@ -206,18 +206,19 @@ export function generateBiasReport(biasAnalysis) {
     return 'No biases detected.';
   }
 
-  let report = '## Bias Detection Report\n\n';
-  report += `**Severity Level:** ${getSeverityLabel(biasAnalysis.severity)}\n`;
-  report += `**Biases Detected:** ${biasAnalysis.totalBiasScore}\n\n`;
+  const parts = [];
+  parts.push('## Bias Detection Report\n\n');
+  parts.push(`**Severity Level:** ${getSeverityLabel(biasAnalysis.severity)}\n`);
+  parts.push(`**Biases Detected:** ${biasAnalysis.totalBiasScore}\n\n`);
 
   for (const bias of biasAnalysis.biases) {
-    report += `### ${bias.type}\n`;
-    report += `- **Pattern:** ${bias.pattern}\n`;
-    report += `- **Severity:** ${getSeverityLabel(bias.severity)}\n`;
-    report += `- **Matches:** ${bias.matches.join(', ')}\n\n`;
+    parts.push(`### ${bias.type}\n`);
+    parts.push(`- **Pattern:** ${bias.pattern}\n`);
+    parts.push(`- **Severity:** ${getSeverityLabel(bias.severity)}\n`);
+    parts.push(`- **Matches:** ${bias.matches.join(', ')}\n\n`);
   }
 
-  return report;
+  return parts.join('');
 }
 
 /**

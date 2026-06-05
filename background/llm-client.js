@@ -1418,7 +1418,10 @@ function _buildTabCtx() {
   const allContexts = getAllTabContexts();
   const activeId = getActiveTabId();
   if (!allContexts.length) return '';
-  let tabCtxSection = `\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`;
+
+  const parts = [];
+  parts.push(`\nMANAGED TABS (${allContexts.length}/${TAB_LIMIT} tab limit):\n`);
+
   for (const ctx of allContexts) {
     const isActive = ctx.tabId === activeId;
     const marker = isActive ? '[ACTIVE] ' : '';
@@ -1430,15 +1433,17 @@ function _buildTabCtx() {
           return Number.isNaN(d.getTime()) ? 'Invalid timestamp' : d.toLocaleTimeString();
         })()})`
       : 'No snapshot yet.';
-    tabCtxSection += `- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`;
+    parts.push(`- ${marker}"${ctx.label}" (${ctx.url}): ${snapSummary}\n`);
   }
-  tabCtxSection += `\nTab rules:\n`;
-  tabCtxSection += `- Use "open_tab" to open a new URL in a background tab (max ${TAB_LIMIT} tabs total)\n`;
-  tabCtxSection += `- Use "switch_tab" with a label to operate on a different tab\n`;
-  tabCtxSection += `- Use "close_tab" with a label to close a tab you no longer need\n`;
-  tabCtxSection += `- Extract data from a tab BEFORE opening new tabs that might push it past the ${TAB_LIMIT}-tab limit\n`;
-  tabCtxSection += `- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`;
-  return tabCtxSection;
+
+  parts.push(`\nTab rules:\n`);
+  parts.push(`- Use "open_tab" to open a new URL in a background tab (max ${TAB_LIMIT} tabs total)\n`);
+  parts.push(`- Use "switch_tab" with a label to operate on a different tab\n`);
+  parts.push(`- Use "close_tab" with a label to close a tab you no longer need\n`);
+  parts.push(`- Extract data from a tab BEFORE opening new tabs that might push it past the ${TAB_LIMIT}-tab limit\n`);
+  parts.push(`- Reference data from other tabs in your reasoning -- you can see their last-known content above\n`);
+
+  return parts.join('');
 }
 
 // Strip screenshot payloads from history entries beyond the most-recent step,
