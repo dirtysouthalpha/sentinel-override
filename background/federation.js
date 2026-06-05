@@ -9,6 +9,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { getErrorMessage } from './error-utils.js';
 
 /**
  * Federation Controller
@@ -39,7 +40,7 @@ class FederationController {
       await this.loadConfig();
       
       if (!this.config.enabled) {
-        console.log('[Federation] Disabled in config');
+        console.warn('[Federation] Disabled in config');
         return;
       }
 
@@ -49,9 +50,9 @@ class FederationController {
       // Start rebalance loop
       this.startRebalanceLoop();
 
-      console.log('[Federation] Initialized');
+      console.warn('[Federation] Initialized');
     } catch (error) {
-      console.error('[Federation] Init failed:', error);
+      console.error('[Federation] Init failed:', getErrorMessage(error));
       throw error;
     }
   }
@@ -79,7 +80,7 @@ class FederationController {
       publicKey: 'fed_' + uuidv4(),
       secretKey: 'fed_sec_' + uuidv4()
     };
-    console.log('[Federation] Keypair generated');
+    console.warn('[Federation] Keypair generated');
   }
 
   /**
@@ -115,7 +116,7 @@ class FederationController {
       status: 'active'
     });
 
-    console.log('[Federation] Peer registered:', peer_id);
+    console.warn('[Federation] Peer registered:', peer_id);
     this.logAudit('peer_registered', { peer_id, capabilities });
 
     return {
@@ -140,7 +141,7 @@ class FederationController {
     }
 
     this.peers.delete(peerId);
-    console.log('[Federation] Peer unregistered:', peerId);
+    console.warn('[Federation] Peer unregistered:', peerId);
     this.logAudit('peer_unregistered', { peer_id: peerId });
 
     return true;
@@ -284,7 +285,7 @@ class FederationController {
       job.assignedPeers.push(selectedPeer.peerId);
     }
 
-    console.log('[Federation] Assigned', subGoal.id, 'to', selectedPeer.peerId);
+    console.warn('[Federation] Assigned', subGoal.id, 'to', selectedPeer.peerId);
 
     // Send goal to peer (via UAP server or direct message)
     await this.sendGoalToPeer(selectedPeer.peerId, subGoal);
@@ -320,7 +321,7 @@ class FederationController {
   async sendGoalToPeer(peerId, subGoal) {
     // Implementation depends on transport mechanism
     // Could use WebSocket, HTTP, or chrome.runtime messaging
-    console.log('[Federation] Sending goal to peer:', peerId, subGoal.description);
+    console.warn('[Federation] Sending goal to peer:', peerId, subGoal.description);
     
     // Placeholder - would send actual message via UAP server
     this.logAudit('goal_sent_to_peer', { peer_id: peerId, sub_goal_id: subGoal.id });
@@ -539,7 +540,7 @@ class FederationController {
         jobId: job.id
       });
 
-      console.log(`[Federation] Updated trust for ${result.peerId}: ${peer.trust.current} (${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
+      console.warn(`[Federation] Updated trust for ${result.peerId}: ${peer.trust.current} (${scoreDelta > 0 ? '+' : ''}${scoreDelta})`);
     }
   }
 
@@ -564,7 +565,7 @@ class FederationController {
    * Rebalance work across peers
    */
   rebalance() {
-    console.log('[Federation] Rebalancing...');
+    console.warn('[Federation] Rebalancing...');
 
     // Check for stalled peers
     const now = Date.now();
@@ -655,7 +656,7 @@ class FederationController {
     this.peers.clear();
     this.activeJobs.clear();
 
-    console.log('[Federation] Shut down');
+    console.warn('[Federation] Shut down');
   }
 }
 
@@ -666,13 +667,13 @@ export const federation = new FederationController();
 if (typeof chrome !== 'undefined' && chrome.runtime) {
   chrome.runtime.onStartup.addListener(() => {
     federation.init().catch(error => {
-      console.error('[Federation] Failed to start:', error);
+      console.error('[Federation] Failed to start:', getErrorMessage(error));
     });
   });
 
   chrome.runtime.onInstalled.addListener(() => {
     federation.init().catch(error => {
-      console.error('[Federation] Failed to start:', error);
+      console.error('[Federation] Failed to start:', getErrorMessage(error));
     });
   });
 }
