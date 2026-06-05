@@ -4,55 +4,55 @@
 
 import { getErrorMessage } from './error-utils.js';
 
-// Bias patterns to detect
+// Bias patterns to detect - precompiled with 'gi' flags for reuse
 const BIAS_PATTERNS = {
   // Confirmation bias: favoring information that confirms preexisting beliefs
   confirmationBias: [
-    /as expected/i,
-    /as i thought/i,
-    /just as i suspected/i,
-    /confirms my belief/i,
-    /told you so/i
+    /as expected/gi,
+    /as i thought/gi,
+    /just as i suspected/gi,
+    /confirms my belief/gi,
+    /told you so/gi
   ],
-  
+
   // Anchoring bias: relying too heavily on first piece of information
   anchoringBias: [
-    /initial.*indicated/i,
-    /first.*suggested/i,
-    /originally.*thought/i,
-    /starting point/i
+    /initial.*indicated/gi,
+    /first.*suggested/gi,
+    /originally.*thought/gi,
+    /starting point/gi
   ],
-  
+
   // Availability heuristic: overestimating importance of readily available information
   availabilityHeuristic: [
-    /recent.*suggests/i,
-    /lately.*seen/i,
-    /common.*encounter/i,
-    /often.*find/i
+    /recent.*suggests/gi,
+    /lately.*seen/gi,
+    /common.*encounter/gi,
+    /often.*find/gi
   ],
-  
+
   // Selection bias: choosing data that supports a conclusion
   selectionBias: [
-    /ignoring.*evidence/i,
-    /disregarding.*data/i,
-    /only.*considering/i,
-    /selectively.*looking/i
+    /ignoring.*evidence/gi,
+    /disregarding.*data/gi,
+    /only.*considering/gi,
+    /selectively.*looking/gi
   ],
-  
+
   // Stereotyping: making assumptions about groups
   stereotyping: [
-    /typical.*for/i,
-    /usually.*these/i,
-    /characteristic.*of/i,
-    /standard.*for.*type/i
+    /typical.*for/gi,
+    /usually.*these/gi,
+    /characteristic.*of/gi,
+    /standard.*for.*type/gi
   ],
-  
+
   // Hindsight bias: seeing past events as predictable
   hindsightBias: [
-    /should have.*known/i,
-    /obvious.*in.*retrospect/i,
-    /clear.*now.*that/i,
-    /with.*benefit.*of.*hindsight/i
+    /should have.*known/gi,
+    /obvious.*in.*retrospect/gi,
+    /clear.*now.*that/gi,
+    /with.*benefit.*of.*hindsight/gi
   ]
 };
 
@@ -112,8 +112,8 @@ export function analyzeForBias(text) {
  * @returns {number} Severity level (0-3)
  */
 function calculateBiasSeverity(biasType, text, pattern) {
-  // Count occurrences of the bias pattern
-  const matches = text.match(new RegExp(pattern.source, 'gi'));
+  // Count occurrences of the bias pattern - pattern is precompiled with 'gi' flags
+  const matches = text.match(pattern);
   const occurrenceCount = matches ? matches.length : 0;
 
   // Calculate based on frequency and bias type
