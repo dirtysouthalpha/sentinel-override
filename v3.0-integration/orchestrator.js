@@ -307,7 +307,7 @@ class V3RuntimeOrchestrator {
 
     // Overall health
     const componentHealth = Object.values(health.components);
-    const degradedCount = componentHealth.filter(c => c.status === 'degraded').length;
+    const degradedCount = componentHealth.reduce((count, c) => count + (c.status === 'degraded' ? 1 : 0), 0);
     
     if (degradedCount > 0) {
       health.status = degradedCount > 2 ? 'unhealthy' : 'degraded';
