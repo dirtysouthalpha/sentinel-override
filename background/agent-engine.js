@@ -131,6 +131,9 @@ const TICKET_KICKOFF_RE = /kickoff|new ticket|just opened|investigate this ticke
 // Precompile regex for overlay dismissal (hot path in CDP observe)
 const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
 
+// Precompile regex for history failure detection (hot path in history summarization)
+const HISTORY_FAILURE_RE = /error|fail|not found|blocked|timed out/i;
+
 // Precompile regex for plan step analysis
 const PLAN_PARTIAL_RE = /step limit|extraction.*fail|not yet|incomplete|manually search/i;
 
@@ -1304,7 +1307,7 @@ function summarizeHistoryBatch(batch) {
       notes.push(typeof text === 'string' ? text.substring(0, 200) : String(text).substring(0, 200));
     }
     const r = (h && typeof h.result === 'string') ? h.result : '';
-    if (/error|fail|not found|blocked|timed out/i.test(r)) failures.push(`${t}: ${r.substring(0, 120)}`);
+    if (HISTORY_FAILURE_RE.test(r)) failures.push(`${t}: ${r.substring(0, 120)}`);
   }
   const summaryParts = [];
   summaryParts.push(`Action counts: ${Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(', ')}`);

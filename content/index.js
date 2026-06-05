@@ -18,6 +18,17 @@ function getErrorMessage(e) {
 // Precompile regex for Microsoft 365 tenant detection (performance optimization)
 const ONMICROSOFT_TENANT_RE = /[a-z0-9-]+\.onmicrosoft\.com/i;
 
+// Precompile regex for modal/overlay detection (hot path in dismissOverlays)
+const DIALOG_ROLE_RE = /^(dialog|alertdialog)$/;
+const MODAL_TEXT_RE = /\b(modal|dialog|sign in|subscribe)\b/;
+const ADBLOCK_TEXT_RE = /\b(ad.?block|adblocker|ad.?blocker|whitelist|white.?list|turn.?off.?ad|disable.?ad|remove.?ad|blocker.?detect|using.?an?.ad)\b/;
+const PAYWALL_TEXT_RE = /\b(paywall|premium|subscription|required|register.?to.?read|subscribe.?to.?continue|sign.?up.?to.?continue)\b/;
+const CONSENT_TEXT_RE = /\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/;
+const DISMISS_TEXT_RE = /\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i;
+
+// Precompile regex for UI component skip pattern (hot path in dismissOverlays)
+const UI_COMPONENT_SKIP_RE = /compose|drawer|figma|sheet|panel/i;
+
 // (3.26.0) Content-script telemetry emit helper. Bound to window so it
 // survives the re-injection guard (re-injection skips the else-branch but
 // the helper is defined unconditionally above it).
@@ -130,17 +141,17 @@ if (window.__sentinelInitialized) {
   function __sentinelHasPositiveModalSignal(el) {
     try {
       const role = el && el.getAttribute ? el.getAttribute('role') : null;
-      if (/^(dialog|alertdialog)$/.test(role)) return true;
+      if (DIALOG_ROLE_RE.test(role)) return true;
       if (el && el.getAttribute && el.getAttribute('aria-modal') === 'true') return true;
       const text = (el.innerText || el.textContent || '').toLowerCase().slice(0, 500);
       // Core modal signals
-      if (/\b(modal|dialog|sign in|subscribe)\b/.test(text)) return true;
+      if (MODAL_TEXT_RE.test(text)) return true;
       // Ad-blocker / paywall / consent signals
-      if (/\b(ad.?block|adblocker|ad.?blocker|whitelist|white.?list|turn.?off.?ad|disable.?ad|remove.?ad|blocker.?detect|using.?an?.ad)\b/.test(text)) return true;
-      if (/\b(paywall|premium|subscription|required|register.?to.?read|subscribe.?to.?continue|sign.?up.?to.?continue)\b/.test(text)) return true;
-      if (/\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/.test(text)) return true;
+      if (ADBLOCK_TEXT_RE.test(text)) return true;
+      if (PAYWALL_TEXT_RE.test(text)) return true;
+      if (CONSENT_TEXT_RE.test(text)) return true;
       // "Continue anyway" / "I understand" popup signals
-      if (/\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i.test(text)) return true;
+      if (DISMISS_TEXT_RE.test(text)) return true;
     } catch (e) { console.warn('[Sentinel] modal signal check:', getErrorMessage(e)); }
     return false;
   }
@@ -301,7 +312,7 @@ if (window.__sentinelInitialized) {
         const cls = typeof el.className === 'string' ? el.className : '';
         if (cls.includes('sentinel')) continue;
         // Also skip elements with known composer/drawer class markers early
-        if (/compose|drawer|figma|sheet|panel/i.test(cls + (el.id || ''))) continue;
+        if (UI_COMPONENT_SKIP_RE.test(cls + (el.id || ''))) continue;
 
         // Now do expensive computed style check
         const style = window.getComputedStyle(el);
