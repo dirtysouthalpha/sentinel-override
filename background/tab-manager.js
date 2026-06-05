@@ -1035,7 +1035,16 @@ const VALID_PROTOCOLS = new Set(['http:', 'https:']);
  * @returns {boolean} True if the URL parses and uses http: or https: protocol.
  */
 export function isValidUrl(url) {
-  try { const p = new URL(url); return VALID_PROTOCOLS.has(p.protocol); } catch { return false; }
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  try {
+    const parsed = new URL(url);
+    return VALID_PROTOCOLS.has(parsed.protocol);
+  } catch (e) {
+    // Invalid URL format
+    return false;
+  }
 }
 
 // ========== Tab Info ==========

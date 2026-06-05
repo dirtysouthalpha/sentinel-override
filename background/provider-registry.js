@@ -265,7 +265,7 @@ export const PROVIDERS = {
       if (data.choices[0]?.message) {
         // Valid choice exists
       } else {
-        throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+        throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}. Expected choices[0].message but got: ${JSON.stringify(data.choices)}`);
       }
       const msg = data.choices[0].message;
       const content = msg.content || '';
@@ -273,7 +273,7 @@ export const PROVIDERS = {
         // Some APIs (OpenRouter, Z.ai) return null content for tool calls or empty responses
         const reasoning = msg.reasoning_content || msg.reasoning;
         if (reasoning) return reasoning;
-        throw new Error(`API returned null content: ${JSON.stringify(data).slice(0, 500)}`);
+        throw new Error(`API returned null content: ${JSON.stringify(data).slice(0, 500)}. Message content was empty or null for choices[0].message.content`);
       }
       return content;
     },
@@ -434,7 +434,9 @@ export const PROVIDERS = {
         }
         throw new Error(`API returned no valid response: ${JSON.stringify(data).slice(0, 500)}`);
       }
-      if (!data.choices.length || !data.choices[0] || !data.choices[0].message) throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}`);
+      if (!data.choices.length || !data.choices[0] || !data.choices[0].message) {
+        throw new Error(`API returned malformed choice: ${JSON.stringify(data).slice(0, 500)}. Expected data.choices[0].message but choices array has ${data.choices.length} items`);
+      }
       const msg = data.choices[0].message;
       const content = msg.content || '';
       if (!content) {
