@@ -985,7 +985,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     observabilityListenersInstalled.delete(tabId);
     try { await chrome.debugger.detach({ tabId }); } catch(e) { console.warn('[Sentinel/tab-manager] Debugger detach failed in error path:', getErrorMessage(e)); }
     try {
-      const screenshot_data_url = await new Promise((resolve, reject) => {
+      const screenshotDataUrl = await new Promise((resolve, reject) => {
         chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: CONFIG.screenshotQuality }, (dataUrl) => {
           if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
             const err = typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : String(chrome.runtime.lastError);
@@ -997,7 +997,7 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
           }
         });
       });
-      const _parts = typeof screenshot_data_url === 'string' && screenshot_data_url ? screenshot_data_url.split(',') : [];
+      const _parts = typeof screenshotDataUrl === 'string' && screenshotDataUrl ? screenshotDataUrl.split(',') : [];
       if (!Array.isArray(_parts) || _parts.length < 2 || !_parts[1] || !_parts[1].length) throw new Error('captureVisibleTab returned invalid data URL');
       base64Image = _parts[1];
     } catch {

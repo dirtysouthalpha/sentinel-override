@@ -1557,8 +1557,8 @@ function _sanitizeHistory(history, isRunbook, CONFIG) {
  * @param {number} params.historyWindowSize - Number of history entries included.
  * @param {boolean} params.isRunbook - Whether the run is in runbook/investigation mode.
  * @param {Array}  params.sanitizedHistory - History array with screenshots stripped.
- * @param {Object|null} params.last_action - The most recent action object, or null.
- * @param {*}           params.last_result - The most recent action result, or null.
+ * @param {Object|null} params.lastAction - The most recent action object, or null.
+ * @param {*}           params.lastResult - The most recent action result, or null.
  * @param {string} params.planCtx - Rendered plan context string.
  * @param {string} params.strategyCtx - Strategy-shift directive string.
  * @param {string} params.finishCtx - Navigation-fatigue / finish-now directive string.
@@ -1579,7 +1579,7 @@ function _buildAgentPrompt(params) {
     goal, currentUrl, stepCount, pageContent,
     trimmedElements, totalElementCount,
     historyWindowSize, isRunbook, sanitizedHistory,
-    last_action, last_result,
+    lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
     patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
@@ -1657,7 +1657,7 @@ ${agentState && agentState.visionMode && agentState.visionElementTree ? `\nINDEX
 RECENT HISTORY (last ${historyWindowSize} steps${isRunbook ? ' -- extended for runbook context' : ''}, screenshots from prior steps stripped):
 ${JSON.stringify(sanitizedHistory)}
 
-${last_action && last_result && String(last_result).includes('not found') ? 'CRITICAL: Last action FAILED. You MUST pick a selector from the AVAILABLE INTERACTIVE ELEMENTS list.' : ''}
+${lastAction && lastResult && String(lastResult).includes('not found') ? 'CRITICAL: Last action FAILED. You MUST pick a selector from the AVAILABLE INTERACTIVE ELEMENTS list.' : ''}
 
 RULES:
 1. **READ BEFORE YOU ACT** -- Always "read_page" or "extract" BEFORE navigating. You CANNOT extract data from a page you already left!
@@ -1819,8 +1819,8 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
 
   const hasHistory = Array.isArray(history) && history.length;
   const lastEntry = hasHistory ? history[history.length - 1] : null;
-  const last_action = lastEntry ? lastEntry.action : null;
-  const last_result = lastEntry ? lastEntry.result : null;
+  const lastAction = lastEntry ? lastEntry.action : null;
+  const lastResult = lastEntry ? lastEntry.result : null;
 
   // Runbook detection
   const isRunbook = RUNBOOK_COMPREHENSIVE_RE.test(goal);
@@ -1919,7 +1919,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     goal, currentUrl, stepCount, pageContent,
     trimmedElements, totalElementCount,
     historyWindowSize, isRunbook, sanitizedHistory,
-    last_action, last_result,
+    lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
     patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
