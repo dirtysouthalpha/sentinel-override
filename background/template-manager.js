@@ -263,6 +263,10 @@ export async function resolveTemplateGoal(templateId, paramValues) {
     throw new Error(`Template not found: ${templateId}`);
   }
 
+  if (!template.goal || typeof template.goal !== 'string') {
+    throw new Error(`Template ${templateId} has no goal`);
+  }
+
   const values = paramValues || {};
 
   const resolvedGoal = template.goal.replace(PARAM_REGEX, (_, key) => {
