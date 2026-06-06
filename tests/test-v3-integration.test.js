@@ -548,6 +548,64 @@ describe('v3.0 Task Queue', () => {
       expect(stats).toHaveProperty('completed');
       expect(stats).toHaveProperty('failed');
     });
+
+    test('rejects enqueue when queue is full', async () => {
+      const smallQueue = new TaskQueue({ dbName: 'SmallQueue', maxQueueSize: 1 });
+      await smallQueue.init();
+      smallQueue.registerProcessor('overflow', async () => 'done');
+
+      await smallQueue.enqueue({ type: 'overflow', payload: {} });
+      // Second enqueue should be rejected
+      await expect(smallQueue.enqueue({ type: 'overflow', payload: {} }))
+        .rejects.toThrow('Task queue is full');
+
+      // Drain any pending setTimeout(0) from smallQueue so they don't leak into the next test
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    test('fires onTaskComplete callback after successful task', async () => {
+      const completedIds = [];
+      taskQueue.onTaskComplete = (id, result) => completedIds.push(id);
+      taskQueue.registerProcessor('callback_test', async () => 'done');
+
+      const taskId = await taskQueue.enqueue({ type: 'callback_test', payload: {} });
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(completedIds).toContain(taskId);
+      taskQueue.onTaskComplete = null;
+    });
+
+    test('fires onTaskFailed callback after exhausting retries', async () => {
+      const failedIds = [];
+      taskQueue.onTaskFailed = (id) => failedIds.push(id);
+      taskQueue.registerProcessor('fail_test', async () => { throw new Error('always fails'); });
+
+      const taskId = await taskQueue.enqueue({
+        type: 'fail_test',
+        payload: {},
+        maxAttempts: 2,
+      });
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      expect(failedIds).toContain(taskId);
+      taskQueue.onTaskFailed = null;
+    });
+
+    test('purge resolves without error after completing tasks', async () => {
+      taskQueue.registerProcessor('purge_test', async () => 'done');
+      await taskQueue.enqueue({ type: 'purge_test', payload: {} });
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Backdate completedAt so the task falls within the purge window
+      idbStores.tasks.forEach(t => {
+        if (t.state === 'completed') {
+          t.completedAt = Date.now() - 9999999;
+        }
+      });
+
+      // purge() returns undefined (void) — just verify it doesn't throw
+      await expect(taskQueue.purge(1000)).resolves.toBeUndefined();
+    });
   });
 });
 
