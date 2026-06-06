@@ -22,7 +22,7 @@ jest.unstable_mockModule('../background/platforms/index.js', () => ({
   findMismatchHints: jest.fn(() => []),
 }));
 
-import { rewriteGoalForPlatform } from '../background/adaptive-prompts.js';
+let rewriteGoalForPlatform;
 
 let storageData = {};
 globalThis.chrome = {
@@ -68,7 +68,8 @@ let getPlatformProfile, findMismatchHints, getActiveProvider;
 async function getMockedModules() {
   const { getPlatformProfile: gpp, findMismatchHints: fmh } = await import('../background/platforms/index.js');
   const { getActiveProvider: gap } = await import('../background/provider-registry.js');
-  return { getPlatformProfile: gpp, findMismatchHints: fmh, getActiveProvider: gap };
+  const { rewriteGoalForPlatform: rwgfp } = await import('../background/adaptive-prompts.js');
+  return { getPlatformProfile: gpp, findMismatchHints: fmh, getActiveProvider: gap, rewriteGoalForPlatform: rwgfp };
 }
 
 function mockProviderWithApiKey() {
@@ -96,11 +97,12 @@ beforeEach(async () => {
   getPlatformProfile = mocks.getPlatformProfile;
   findMismatchHints = mocks.findMismatchHints;
   getActiveProvider = mocks.getActiveProvider;
+  rewriteGoalForPlatform = mocks.rewriteGoalForPlatform;
 });
 
 // ========== Early return paths ==========
 
-describe.skip('rewriteGoalForPlatform — early returns', () => {
+describe('rewriteGoalForPlatform — early returns', () => {
   test('returns adapted=false for goal too short', async () => {
     const result = await rewriteGoalForPlatform('short', 'https://example.com');
     expect(result.adapted).toBe(false);
@@ -181,7 +183,7 @@ describe.skip('rewriteGoalForPlatform — early returns', () => {
 
 // ========== API call paths (testing extractJsonObject via fetch mock) ==========
 
-describe.skip('rewriteGoalForPlatform — API call paths', () => {
+describe('rewriteGoalForPlatform — API call paths', () => {
   test('successful adaptation returns adapted=true with adapted goal', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
     getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
@@ -438,7 +440,7 @@ describe.skip('rewriteGoalForPlatform — API call paths', () => {
 
 // ========== Prompt construction (verified via fetch call args) ==========
 
-describe.skip('rewriteGoalForPlatform — prompt construction', () => {
+describe('rewriteGoalForPlatform — prompt construction', () => {
   test('sends system and user content to API', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
     getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
@@ -729,7 +731,7 @@ describe.skip('rewriteGoalForPlatform — prompt construction', () => {
 
 // ========== Expansion modes ==========
 
-describe.skip('rewriteGoalForPlatform — expansion modes', () => {
+describe('rewriteGoalForPlatform — expansion modes', () => {
   test('light expansion mode is included in system prompt', async () => {
     getPlatformProfile.mockReturnValueOnce(BASE_PROFILE);
     getActiveProvider.mockResolvedValueOnce(mockProviderWithApiKey());
@@ -828,7 +830,7 @@ describe.skip('rewriteGoalForPlatform — expansion modes', () => {
 
 // ========== Anthropic provider path ==========
 
-describe.skip('rewriteGoalForPlatform — anthropic provider', () => {
+describe('rewriteGoalForPlatform — anthropic provider', () => {
   function mockAnthropicProvider() {
     return {
       id: 'anthropic',
@@ -920,7 +922,7 @@ describe.skip('rewriteGoalForPlatform — anthropic provider', () => {
 
 // ========== Edge cases ==========
 
-describe.skip('rewriteGoalForPlatform — edge cases', () => {
+describe('rewriteGoalForPlatform — edge cases', () => {
   test('handles URL with null currentUrl', async () => {
     getPlatformProfile.mockReturnValueOnce(null);
 
@@ -1046,7 +1048,7 @@ describe.skip('rewriteGoalForPlatform — edge cases', () => {
 
 // ========== Edge case: malformed profile data ==========
 
-describe.skip('rewriteGoalForPlatform — malformed profile data', () => {
+describe('rewriteGoalForPlatform — malformed profile data', () => {
   test('handles malformed waitStrings gracefully', async () => {
     const malformedProfile = {
       ...BASE_PROFILE,
@@ -1268,7 +1270,7 @@ describe.skip('rewriteGoalForPlatform — malformed profile data', () => {
 
   // ========== Profile parsing error handling (catch blocks) ==========
 
-  describe.skip('rewriteGoalForPlatform — profile parsing error handling', () => {
+  describe('rewriteGoalForPlatform — profile parsing error handling', () => {
     test('handles waitStrings Object.entries throw (line 55)', async () => {
       // Create an object that throws when Object.entries is called
       const throwingObject = {};
