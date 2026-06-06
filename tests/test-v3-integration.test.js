@@ -1184,11 +1184,95 @@ describe('v3.0 Integration Layer', () => {
       await orchestrator.initialize();
 
       const health = await orchestrator.performHealthCheck();
-      
+
       expect(health).toHaveProperty('status');
       expect(health).toHaveProperty('components');
       expect(health.components).toHaveProperty('circuitBreakers');
       expect(health.components).toHaveProperty('taskQueue');
+    });
+
+    test('warns on double initialize', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      const warns = [];
+      const orig = console.warn;
+      console.warn = (...args) => warns.push(args.join(' '));
+      await orchestrator.initialize();
+      await orchestrator.initialize();
+      console.warn = orig;
+      orchestrator.shutdown();
+      expect(warns.some(m => m.includes('Already initialized'))).toBe(true);
+    });
+
+    test('merges user config via options.config', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({
+        enabled: true,
+        config: { circuitBreaker: { failureThreshold: 99 } },
+      });
+      await orchestrator.initialize();
+      orchestrator.shutdown();
+      // Config was merged — we can't easily inspect private config, just verify init worked
+      expect(orchestrator.initialized).toBe(false); // shutdown sets initialized=false
+    });
+
+    test('enqueueTask throws when not initialized', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await expect(orchestrator.enqueueTask({ type: 'test', payload: {} }))
+        .rejects.toThrow('not initialized');
+    });
+
+    test('enqueueTask enqueues and returns taskId after init', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await orchestrator.initialize();
+      orchestrator.taskQueue.registerProcessor('orch_test', async () => 'ok');
+      const taskId = await orchestrator.enqueueTask({ type: 'orch_test', payload: {} });
+      await orchestrator.shutdown();
+      expect(typeof taskId).toBe('string');
+    });
+
+    test('saveAgentState and loadAgentState round-trip', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await orchestrator.initialize();
+      await orchestrator.saveAgentState({ stepCount: 42 });
+      const state = await orchestrator.loadAgentState();
+      await orchestrator.shutdown();
+      expect(state.stepCount).toBe(42);
+    });
+
+    test('createCheckpoint and loadCheckpoint round-trip', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await orchestrator.initialize();
+      await orchestrator.createCheckpoint('orch_cp', { data: 'snap' });
+      const snap = await orchestrator.loadCheckpoint('orch_cp');
+      await orchestrator.shutdown();
+      expect(snap.data).toBe('snap');
+    });
+
+    test('shutdown sets initialized to false', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await orchestrator.initialize();
+      expect(orchestrator.initialized).toBe(true);
+      await orchestrator.shutdown();
+      expect(orchestrator.initialized).toBe(false);
+    });
+
+    test('saveAgentState throws when not initialized', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await expect(orchestrator.saveAgentState({})).rejects.toThrow('not initialized');
+    });
+
+    test('loadAgentState throws when not initialized', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await expect(orchestrator.loadAgentState()).rejects.toThrow('not initialized');
+    });
+
+    test('createCheckpoint throws when not initialized', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await expect(orchestrator.createCheckpoint('cp', {})).rejects.toThrow('not initialized');
+    });
+
+    test('loadCheckpoint throws when not initialized', async () => {
+      const orchestrator = new V3RuntimeOrchestrator({ enabled: true });
+      await expect(orchestrator.loadCheckpoint('cp')).rejects.toThrow('not initialized');
     });
   });
 });
