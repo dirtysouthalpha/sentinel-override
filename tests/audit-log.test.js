@@ -33,6 +33,7 @@ const {
   appendAuditEntry,
   getAuditLog,
   clearAuditLog,
+  evictAuditCache,
   _resetAuditCacheForTesting,
 } = await import('../background/audit-log.js');
 
@@ -307,5 +308,30 @@ describe('clearAuditLog', () => {
       'toString failed'
     );
     consoleSpy.mockRestore();
+  });
+});
+
+// ========== evictAuditCache ==========
+
+describe('evictAuditCache', () => {
+  test('no-ops when runId is falsy', () => {
+    expect(() => evictAuditCache(null)).not.toThrow();
+    expect(() => evictAuditCache(undefined)).not.toThrow();
+    expect(() => evictAuditCache('')).not.toThrow();
+  });
+
+  test('forces next getAuditLog to re-read storage after eviction', async () => {
+    // Populate cache via getAuditLog
+    storageData['audit_run1'] = [{ ts: 1, step: 1, type: 'x', target: '', outcome: '' }];
+    await getAuditLog('run1');
+    // Mutate storage directly (simulating a cross-process write)
+    storageData['audit_run1'] = [
+      { ts: 1, step: 1, type: 'x', target: '', outcome: '' },
+      { ts: 2, step: 2, type: 'y', target: '', outcome: '' },
+    ];
+    // Without eviction the cache would return stale data; evict first
+    evictAuditCache('run1');
+    const log = await getAuditLog('run1');
+    expect(log).toHaveLength(2);
   });
 });
