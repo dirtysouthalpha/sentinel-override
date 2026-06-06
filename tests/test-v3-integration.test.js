@@ -674,6 +674,114 @@ describe('v3.0 State Manager', () => {
       await stateManager.clearState();
       expect(await stateManager.hasState()).toBe(false);
     });
+
+    test('getStateMetadata returns version/timestamp/compressed/age', async () => {
+      await stateManager.saveState({ x: 1 });
+      const meta = await stateManager.getStateMetadata();
+      expect(meta).not.toBeNull();
+      expect(meta).toHaveProperty('version');
+      expect(meta).toHaveProperty('timestamp');
+      expect(typeof meta.age).toBe('number');
+    });
+
+    test('getStateMetadata returns null when no state exists', async () => {
+      const fresh = new StateManager({ stateKey: 'nonexistent_key_xyz' });
+      const meta = await fresh.getStateMetadata();
+      expect(meta).toBeNull();
+    });
+
+    test('loadState returns null when no state exists', async () => {
+      const fresh = new StateManager({ stateKey: 'empty_key_xyz' });
+      expect(await fresh.loadState()).toBeNull();
+    });
+
+    test('loadCheckpoint returns null for missing checkpoint', async () => {
+      const result = await stateManager.loadCheckpoint('nonexistent_cp');
+      expect(result).toBeNull();
+    });
+
+    test('deleteCheckpoint removes checkpoint and updates index', async () => {
+      await stateManager.createCheckpoint('del_cp', { data: 'to_delete' });
+      const deleted = await stateManager.deleteCheckpoint('del_cp');
+      expect(deleted).toBe(true);
+      const loaded = await stateManager.loadCheckpoint('del_cp');
+      expect(loaded).toBeNull();
+    });
+
+    test('_enforceHistoryLimit prunes oldest checkpoints when over limit', async () => {
+      const sm = new StateManager({ stateKey: 'limit_test', maxHistorySize: 2 });
+      await sm.createCheckpoint('cp_a', { a: 1 });
+      await sm.createCheckpoint('cp_b', { b: 2 });
+      await sm.createCheckpoint('cp_c', { c: 3 }); // triggers limit enforcement
+      const checkpoints = await sm.listCheckpoints();
+      expect(checkpoints.length).toBeLessThanOrEqual(2);
+    });
+
+    test('loadState warns on version mismatch', async () => {
+      const v1 = new StateManager({ stateKey: 'ver_test', version: '1.0' });
+      await v1.saveState({ data: 'old' });
+      const warnSpy = [];
+      const orig = console.warn;
+      console.warn = (...args) => warnSpy.push(args.join(' '));
+      const v2 = new StateManager({ stateKey: 'ver_test', version: '2.0' });
+      await v2.loadState();
+      console.warn = orig;
+      expect(warnSpy.some(m => m.includes('mismatch'))).toBe(true);
+    });
+  });
+
+  describe('HistoryManager', () => {
+    let HistoryManager;
+
+    beforeAll(async () => {
+      const module = await import('../v3.0-integration/state-manager.js');
+      HistoryManager = module.HistoryManager;
+    });
+
+    test('addEntry appends to history', () => {
+      const hm = new HistoryManager();
+      const hist = [];
+      hm.addEntry(hist, { action: 'click' });
+      expect(hist.length).toBe(1);
+      expect(hist[0].action).toBe('click');
+    });
+
+    test('addEntry adds timestamp if missing', () => {
+      const hm = new HistoryManager();
+      const hist = [];
+      hm.addEntry(hist, { action: 'nav' });
+      expect(typeof hist[0].timestamp).toBe('number');
+    });
+
+    test('addEntry triggers summarization when threshold exceeded', () => {
+      const hm = new HistoryManager({ summarizeThreshold: 3, summarizeBatchSize: 2 });
+      const hist = [];
+      for (let i = 0; i < 4; i++) {
+        hm.addEntry(hist, { action: 'step', timestamp: Date.now() + i });
+      }
+      // After summarization, history has 1 summary + remaining entries
+      expect(hist.some(e => e.type === 'summary')).toBe(true);
+    });
+
+    test('addEntry caps history at maxHistorySize', () => {
+      const hm = new HistoryManager({ maxHistorySize: 5, summarizeThreshold: 1000 });
+      const hist = [];
+      for (let i = 0; i < 10; i++) {
+        hm.addEntry(hist, { action: 'a' });
+      }
+      expect(hist.length).toBe(5);
+    });
+
+    test('getRecent returns last N entries', () => {
+      const hm = new HistoryManager();
+      const hist = [];
+      for (let i = 0; i < 5; i++) {
+        hm.addEntry(hist, { action: `step${i}` });
+      }
+      const recent = hm.getRecent(hist, 3);
+      expect(recent.length).toBe(3);
+      expect(recent[2].action).toBe('step4');
+    });
   });
 });
 
