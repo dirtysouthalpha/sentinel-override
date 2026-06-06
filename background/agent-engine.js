@@ -7342,7 +7342,7 @@ return { ok: true, value: el.value };
       reasoningTrace: await getReasoningSummary(),
       biasStats: await getBiasStatistics(),
       contradictionStats: await getContradictionStatistics(),
-      noveltyStats: await getNoveltyStatistics()
+      noveltyStats: await getNoveltyStatistics(runLogId || 'current')
     });
     console.log('[Sentinel] Knowledge synthesis generated:', synthesis.summary);
   } catch (e) {
@@ -7354,7 +7354,7 @@ return { ok: true, value: el.value };
       await Promise.all([
         getBiasStatistics(),
         getContradictionStatistics(),
-        getNoveltyStatistics(),
+        getNoveltyStatistics(runLogId || 'current'),
         getSynthesisStatistics(),
         getReasoningSummary()
       ]);

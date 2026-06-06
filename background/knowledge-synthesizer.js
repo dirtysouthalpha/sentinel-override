@@ -520,12 +520,12 @@ export async function getSynthesisStatistics() {
   };
 
   for (const entry of entries) {
-    stats.totalSynthesized += entry.synthesized.length;
-    stats.totalConflicts += entry.conflicts.length;
-    stats.totalGaps += entry.gaps.length;
+    stats.totalSynthesized += (entry.synthesized || []).length;
+    stats.totalConflicts += (entry.conflicts || []).length;
+    stats.totalGaps += (entry.gaps || []).length;
 
     // Count by type
-    for (const item of entry.synthesized) {
+    for (const item of (entry.synthesized || [])) {
       stats.byType[item.type] = (stats.byType[item.type] || 0) + 1;
     }
   }
