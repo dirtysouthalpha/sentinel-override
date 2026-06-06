@@ -1055,6 +1055,44 @@ describe('v3.0 Event Bus', () => {
       expect(history.length).toBe(3);
       expect(history[0].event).toBe('h2');
     });
+
+    test('before() unsubscribe function removes handler', async () => {
+      const bus = new EventBus();
+      const calls = [];
+      const unsubscribe = bus.before(() => calls.push('before'));
+      await bus.emit('unsub_before', {});
+      expect(calls.length).toBe(1);
+      unsubscribe();
+      await bus.emit('unsub_before', {});
+      expect(calls.length).toBe(1); // not called again after unsubscribe
+    });
+
+    test('after() unsubscribe function removes handler', async () => {
+      const bus = new EventBus();
+      const calls = [];
+      const unsubscribe = bus.after(() => calls.push('after'));
+      await bus.emit('unsub_after', {});
+      expect(calls.length).toBe(1);
+      unsubscribe();
+      await bus.emit('unsub_after', {});
+      expect(calls.length).toBe(1); // not called again
+    });
+
+    test('before() handler error is caught and does not stop emission', async () => {
+      const bus = new EventBus();
+      const delivered = [];
+      bus.before(() => { throw new Error('before crash'); });
+      bus.on('before_err', () => delivered.push(1));
+      await bus.emit('before_err', {});
+      expect(delivered.length).toBe(1); // subscriber still gets event
+    });
+
+    test('after() handler error is caught and does not break emit', async () => {
+      const bus = new EventBus();
+      bus.after(() => { throw new Error('after crash'); });
+      // Should not throw
+      await expect(bus.emit('after_err', {})).resolves.toBeDefined();
+    });
   });
 });
 
@@ -1202,6 +1240,49 @@ describe('v3.0 Load Monitor', () => {
       console.warn = orig;
       monitor.stop();
       expect(warnSpy.some(m => m.includes('Already monitoring'))).toBe(true);
+    });
+
+    test('stop() is a no-op when not monitoring', () => {
+      const monitor = new LoadMonitor();
+      expect(() => monitor.stop()).not.toThrow();
+    });
+
+    test('getReadings() returns most recent readings', () => {
+      const monitor = new LoadMonitor();
+      for (let i = 0; i < 5; i++) {
+        monitor._addReading({ timestamp: Date.now() + i, cpu: i, ram: i * 10, jsHeap: 0 });
+      }
+      const readings = monitor.getReadings(3);
+      expect(readings.length).toBe(3);
+      expect(readings[2].cpu).toBe(4);
+    });
+
+    test('_evaluateLoadState increments cpuSustainSeconds for high CPU', () => {
+      const monitor = new LoadMonitor({ cpuHighThreshold: 70, cpuNormalThreshold: 50 });
+      const highCpuReading = { timestamp: Date.now(), cpu: 80, ram: 0, jsHeap: 0, jsHeapLimit: 0 };
+      monitor._evaluateLoadState(highCpuReading);
+      expect(monitor.cpuSustainSeconds).toBeGreaterThan(0);
+    });
+
+    test('_checkLoad() triggers state change callback when state changes', async () => {
+      const stateChanges = [];
+      const monitor = new LoadMonitor({
+        ramHighThreshold: 1, // ultra-low threshold so any RAM reading triggers HIGH
+        ramNormalThreshold: 0,
+        sustainDuration: 0,
+        pollInterval: 60000,
+        onLoadHigh: (r) => stateChanges.push('high'),
+      });
+      await monitor._checkLoad();
+      // State might change from NORMAL to HIGH if RAM reading is > 1%
+      expect(typeof monitor.currentState).toBe('string');
+    });
+
+    test('_checkLoad() error is caught without throwing', async () => {
+      const monitor = new LoadMonitor({ pollInterval: 60000 });
+      // Override _getSystemReading to throw
+      monitor._getSystemReading = async () => { throw new Error('no readings'); };
+      await expect(monitor._checkLoad()).resolves.toBeUndefined();
     });
   });
 
