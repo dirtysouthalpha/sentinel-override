@@ -852,6 +852,195 @@ describe('v3.0 Event Bus', () => {
   });
 });
 
+describe('v3.0 Load Monitor', () => {
+  let LoadMonitor, LoadState, PerformanceTracker;
+
+  beforeAll(async () => {
+    const module = await import('../v3.0-integration/load-monitor.js');
+    LoadMonitor = module.LoadMonitor;
+    LoadState = module.LoadState;
+    PerformanceTracker = module.PerformanceTracker;
+  });
+
+  describe('LoadMonitor state machine', () => {
+    test('starts in NORMAL state', () => {
+      const monitor = new LoadMonitor();
+      expect(monitor.getCurrentState().state).toBe(LoadState.NORMAL);
+    });
+
+    test('transitions to HIGH after sustained RAM usage', () => {
+      // pollInterval: 1000ms, sustainDuration: 3000ms → need 3 consecutive high readings
+      const monitor = new LoadMonitor({
+        ramHighThreshold: 80,
+        ramNormalThreshold: 75,
+        sustainDuration: 3000,
+        pollInterval: 1000,
+      });
+      const highReading = { timestamp: Date.now(), cpu: 0, ram: 85, jsHeap: 0, jsHeapLimit: 0 };
+      let newState;
+      for (let i = 0; i < 3; i++) {
+        newState = monitor._evaluateLoadState(highReading);
+      }
+      expect(newState).toBe(LoadState.HIGH);
+    });
+
+    test('transitions to CRITICAL when RAM > 90 after sustained usage', () => {
+      const monitor = new LoadMonitor({
+        ramHighThreshold: 80,
+        ramNormalThreshold: 75,
+        sustainDuration: 3000,
+        pollInterval: 1000,
+      });
+      const critReading = { timestamp: Date.now(), cpu: 0, ram: 95, jsHeap: 0, jsHeapLimit: 0 };
+      let newState;
+      for (let i = 0; i < 3; i++) {
+        newState = monitor._evaluateLoadState(critReading);
+      }
+      expect(newState).toBe(LoadState.CRITICAL);
+    });
+
+    test('transitions back to NORMAL from HIGH when load drops', () => {
+      const monitor = new LoadMonitor({
+        ramHighThreshold: 80, ramNormalThreshold: 75, sustainDuration: 0, pollInterval: 1000,
+      });
+      monitor.currentState = LoadState.HIGH;
+      const lowReading = { timestamp: Date.now(), cpu: 0, ram: 50, jsHeap: 0, jsHeapLimit: 0 };
+      const newState = monitor._evaluateLoadState(lowReading);
+      expect(newState).toBe(LoadState.NORMAL);
+    });
+
+    test('fires onLoadHigh callback on HIGH state transition', () => {
+      const readings = [];
+      const monitor = new LoadMonitor({
+        ramHighThreshold: 80, ramNormalThreshold: 75, sustainDuration: 0, pollInterval: 1000,
+        onLoadHigh: (r) => readings.push(r),
+      });
+      const highReading = { timestamp: Date.now(), cpu: 0, ram: 85, jsHeap: 0, jsHeapLimit: 0 };
+      monitor._handleStateChange(LoadState.HIGH, highReading);
+      expect(readings).toHaveLength(1);
+    });
+
+    test('fires onLoadCritical callback on CRITICAL transition', () => {
+      const readings = [];
+      const monitor = new LoadMonitor({ onLoadCritical: (r) => readings.push(r) });
+      monitor._handleStateChange(LoadState.CRITICAL, { ram: 95 });
+      expect(readings).toHaveLength(1);
+    });
+
+    test('fires onLoadNormal callback when returning to NORMAL', () => {
+      const readings = [];
+      const monitor = new LoadMonitor({ onLoadNormal: (r) => readings.push(r) });
+      monitor._handleStateChange(LoadState.NORMAL, { ram: 50 });
+      expect(readings).toHaveLength(1);
+    });
+
+    test('isThrottled returns true for HIGH and CRITICAL', () => {
+      const monitor = new LoadMonitor();
+      monitor.currentState = LoadState.HIGH;
+      expect(monitor.isThrottled()).toBe(true);
+      monitor.currentState = LoadState.CRITICAL;
+      expect(monitor.isThrottled()).toBe(true);
+      monitor.currentState = LoadState.NORMAL;
+      expect(monitor.isThrottled()).toBe(false);
+    });
+
+    test('getThrottlingRecommendation returns correct severity', () => {
+      const monitor = new LoadMonitor();
+      expect(monitor.getThrottlingRecommendation().severity).toBe('normal');
+      monitor.currentState = LoadState.HIGH;
+      expect(monitor.getThrottlingRecommendation().severity).toBe('high');
+      monitor.currentState = LoadState.CRITICAL;
+      expect(monitor.getThrottlingRecommendation().severity).toBe('critical');
+    });
+
+    test('getAverageUsage returns zeros when no readings', () => {
+      const monitor = new LoadMonitor();
+      expect(monitor.getAverageUsage()).toEqual({ cpu: 0, ram: 0, jsHeap: 0 });
+    });
+
+    test('getAverageUsage calculates averages from readings', () => {
+      const monitor = new LoadMonitor();
+      monitor._addReading({ timestamp: Date.now(), cpu: 20, ram: 40, jsHeap: 100 });
+      monitor._addReading({ timestamp: Date.now(), cpu: 40, ram: 60, jsHeap: 200 });
+      const avg = monitor.getAverageUsage();
+      expect(avg.cpu).toBe(30);
+      expect(avg.ram).toBe(50);
+    });
+
+    test('_addReading shifts oldest when maxReadings exceeded', () => {
+      const monitor = new LoadMonitor();
+      monitor.maxReadings = 3;
+      for (let i = 0; i < 4; i++) {
+        monitor._addReading({ timestamp: Date.now() + i, cpu: i, ram: i, jsHeap: 0 });
+      }
+      expect(monitor.readings.length).toBe(3);
+      expect(monitor.readings[0].cpu).toBe(1); // first reading evicted
+    });
+
+    test('reset clears state and readings', () => {
+      const monitor = new LoadMonitor();
+      monitor.currentState = LoadState.HIGH;
+      monitor._addReading({ timestamp: Date.now(), cpu: 90, ram: 90, jsHeap: 0 });
+      monitor.reset();
+      expect(monitor.currentState).toBe(LoadState.NORMAL);
+      expect(monitor.readings.length).toBe(0);
+    });
+
+    test('start warns when already monitoring', async () => {
+      const monitor = new LoadMonitor({ pollInterval: 10000 });
+      const warnSpy = [];
+      const orig = console.warn;
+      console.warn = (...args) => warnSpy.push(args.join(' '));
+      await monitor.start();
+      await monitor.start(); // second call — should warn
+      console.warn = orig;
+      monitor.stop();
+      expect(warnSpy.some(m => m.includes('Already monitoring'))).toBe(true);
+    });
+  });
+
+  describe('PerformanceTracker', () => {
+    test('tracks operation metrics', () => {
+      const tracker = new PerformanceTracker();
+      tracker.track('op1', 100);
+      tracker.track('op1', 200);
+      const m = tracker.getMetrics('op1');
+      expect(m.count).toBe(2);
+      expect(m.averageTime).toBe(150);
+      expect(m.minTime).toBe(100);
+      expect(m.maxTime).toBe(200);
+    });
+
+    test('getMetrics returns null for unknown operation', () => {
+      const tracker = new PerformanceTracker();
+      expect(tracker.getMetrics('unknown')).toBeNull();
+    });
+
+    test('getAllMetrics returns all tracked operations', () => {
+      const tracker = new PerformanceTracker();
+      tracker.track('a', 50);
+      tracker.track('b', 100);
+      expect(tracker.getAllMetrics().length).toBe(2);
+    });
+
+    test('getSlowOperations filters by threshold', () => {
+      const tracker = new PerformanceTracker();
+      tracker.track('fast', 10);
+      tracker.track('slow', 2000);
+      const slow = tracker.getSlowOperations(1000);
+      expect(slow.map(s => s.operation)).toContain('slow');
+      expect(slow.map(s => s.operation)).not.toContain('fast');
+    });
+
+    test('reset clears all metrics', () => {
+      const tracker = new PerformanceTracker();
+      tracker.track('op', 100);
+      tracker.reset();
+      expect(tracker.getAllMetrics().length).toBe(0);
+    });
+  });
+});
+
 describe('v3.0 Integration Layer', () => {
   describe('V3 Runtime Orchestrator', () => {
     let V3RuntimeOrchestrator;
