@@ -550,4 +550,61 @@ describe('UAP Server', () => {
       );
     });
   });
+
+  describe('broadcastToClient', () => {
+    test('does not throw when sendMessage resolves', () => {
+      chrome.runtime.sendMessage = jest.fn().mockResolvedValue(undefined);
+      expect(() => uapServer.broadcastToClient('c1', { type: 'ping' })).not.toThrow();
+    });
+
+    test('catch handler suppresses sendMessage rejection', async () => {
+      chrome.runtime.sendMessage = jest.fn().mockRejectedValue(new Error('channel closed'));
+      expect(() => uapServer.broadcastToClient('c1', { type: 'ping' })).not.toThrow();
+      // Let the promise settle without unhandled rejection
+      await new Promise(r => setTimeout(r, 20));
+    });
+  });
+
+  describe('sendWebhook', () => {
+    test('calls fetch with POST method and JSON body', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({ ok: true });
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = mockFetch;
+
+      await uapServer.sendWebhook('https://example.com/hook', { event: 'done' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/hook',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+      );
+
+      globalThis.fetch = origFetch;
+    });
+
+    test('catch handler suppresses fetch rejection', async () => {
+      const mockFetch = jest.fn().mockRejectedValue(new Error('network error'));
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = mockFetch;
+
+      await expect(uapServer.sendWebhook('https://example.com/hook', {})).resolves.toBeUndefined();
+
+      globalThis.fetch = origFetch;
+    });
+  });
+
+  describe('getStats', () => {
+    test('returns server statistics with expected shape', () => {
+      const stats = uapServer.getStats();
+      expect(stats).toHaveProperty('activeRuns');
+      expect(stats).toHaveProperty('connectedClients');
+      expect(stats).toHaveProperty('federationPeers');
+      expect(stats).toHaveProperty('auditLogEntries');
+      expect(stats).toHaveProperty('uptime');
+      expect(typeof stats.uptime).toBe('number');
+      expect(stats.uptime).toBeGreaterThanOrEqual(0);
+    });
+  });
 });

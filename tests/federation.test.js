@@ -590,4 +590,177 @@ describe('Federation Controller', () => {
       expect(allPeers.every(p => p.id && p.trust !== undefined)).toBe(true);
     });
   });
+
+  describe('buildSummary', () => {
+    test('returns fallback when no results have summaries', () => {
+      const result = federation.buildSummary('test goal', []);
+      expect(result).toBe('Completed goal: test goal');
+    });
+
+    test('returns single summary when exactly one result has a summary', () => {
+      const result = federation.buildSummary('test goal', [{ summary: 'Done the thing' }]);
+      expect(result).toBe('Done the thing');
+    });
+
+    test('combines multiple summaries with multi-peer prefix', () => {
+      const result = federation.buildSummary('test goal', [
+        { summary: 'Summary A' },
+        { summary: 'Summary B' }
+      ]);
+      expect(result).toContain('Multi-peer execution complete');
+      expect(result).toContain('Summary A');
+      expect(result).toContain('Summary B');
+    });
+
+    test('skips results without a summary field', () => {
+      const result = federation.buildSummary('test goal', [
+        { findings: ['x'] },
+        { summary: 'Only one' }
+      ]);
+      expect(result).toBe('Only one');
+    });
+  });
+
+  describe('aggregateEvidence', () => {
+    test('accumulates array evidence by spreading each item', () => {
+      const results = [{ peerId: 'p1', evidence: { items: ['a', 'b', 'c'] } }];
+      const ev = federation.aggregateEvidence(results);
+      expect(ev.items).toEqual(['a', 'b', 'c']);
+    });
+
+    test('wraps non-array evidence values in an array', () => {
+      const results = [{ peerId: 'p1', evidence: { data: 'scalar' } }];
+      const ev = federation.aggregateEvidence(results);
+      expect(ev.data).toEqual(['scalar']);
+    });
+
+    test('merges evidence from multiple results under the same key', () => {
+      const results = [
+        { peerId: 'p1', evidence: { logs: ['entry1'] } },
+        { peerId: 'p2', evidence: { logs: ['entry2'] } }
+      ];
+      const ev = federation.aggregateEvidence(results);
+      expect(ev.logs).toContain('entry1');
+      expect(ev.logs).toContain('entry2');
+    });
+
+    test('ignores results with no evidence', () => {
+      const results = [{ peerId: 'p1', findings: ['x'] }];
+      const ev = federation.aggregateEvidence(results);
+      expect(Object.keys(ev).length).toBe(0);
+    });
+  });
+
+  describe('aggregateFindings — deduplication', () => {
+    test('deduplicates identical findings across peers', () => {
+      const finding = { type: 'alert', severity: 'high' };
+      const results = [
+        { peerId: 'p1', findings: [finding] },
+        { peerId: 'p2', findings: [finding] }
+      ];
+      const aggregated = federation.aggregateFindings(results);
+      expect(aggregated.length).toBe(1);
+    });
+
+    test('includes unique findings from each peer', () => {
+      const results = [
+        { peerId: 'p1', findings: [{ type: 'a' }] },
+        { peerId: 'p2', findings: [{ type: 'b' }] }
+      ];
+      const aggregated = federation.aggregateFindings(results);
+      expect(aggregated.length).toBe(2);
+    });
+  });
+
+  describe('decomposeGoal — all users branch', () => {
+    test('decomposes "list users" goal into extract + analyze sub-goals', async () => {
+      const subGoals = await federation.decomposeGoal('list users in the admin portal', {});
+      expect(subGoals.length).toBe(2);
+      const descriptions = subGoals.map(sg => sg.description.toLowerCase());
+      expect(descriptions.some(d => d.includes('extract') || d.includes('user'))).toBe(true);
+    });
+
+    test('decomposes "all users" goal into two sub-goals', async () => {
+      const subGoals = await federation.decomposeGoal('get all users from entra', {});
+      expect(subGoals.length).toBe(2);
+    });
+  });
+
+  describe('calculateJobTrustScore', () => {
+    test('returns 0 when results array is empty', () => {
+      const job = { subGoals: [{ id: 's1' }] };
+      expect(federation.calculateJobTrustScore(job, [])).toBe(0);
+    });
+
+    test('averages peer trust weighted by completion rate', () => {
+      federation.peers.set('p-calc', {
+        id: 'p-calc',
+        trust: { current: 80 }
+      });
+      const job = { subGoals: [{ id: 's1' }, { id: 's2' }] };
+      const results = [{ peerId: 'p-calc', subGoalId: 's1' }];
+      const score = federation.calculateJobTrustScore(job, results);
+      // 80 trust * 0.5 completion = 40
+      expect(score).toBe(40);
+    });
+  });
+
+  describe('unregisterPeer — unknown peer', () => {
+    test('returns false for unknown peer', () => {
+      expect(federation.unregisterPeer('peer-does-not-exist-xyz')).toBe(false);
+    });
+  });
+
+  describe('reassignSubGoal — edge cases', () => {
+    test('is no-op for unknown jobId', async () => {
+      await expect(federation.reassignSubGoal('no-such-job', 'peer-1')).resolves.toBeUndefined();
+    });
+
+    test('marks sub-goal failed after 3 attempts', async () => {
+      const jobId = 'reassign-max-test';
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'test',
+        context: {},
+        subGoals: [{
+          id: 'sub-max',
+          description: 'needs reassign',
+          requirements: ['vision'],
+          status: 'assigned',
+          assignedTo: 'peer-gone',
+          attempts: 3
+        }],
+        assignedPeers: ['peer-gone'],
+        results: [],
+        startTime: Date.now()
+      });
+      await federation.reassignSubGoal(jobId, 'peer-gone');
+      const job = federation.activeJobs.get(jobId);
+      expect(job.subGoals[0].status).toBe('failed');
+      expect(job.subGoals[0].error).toContain('Max assignment attempts');
+    });
+  });
+
+  describe('reconcileResults — no successes', () => {
+    test('returns failed status when all sub-goals failed', async () => {
+      const jobId = 'all-failed-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId,
+        goal: 'test',
+        subGoals: [
+          { id: 'sub-1', status: 'failed', error: 'no peers' },
+          { id: 'sub-2', status: 'failed', error: 'timeout' }
+        ],
+        startTime: Date.now()
+      });
+      const result = await federation.reconcileResults(jobId);
+      expect(result.status).toBe('failed');
+      expect(result.error).toContain('No sub-goals');
+    });
+
+    test('returns null for unknown jobId', async () => {
+      const result = await federation.reconcileResults('no-such-job');
+      expect(result).toBeNull();
+    });
+  });
 });
