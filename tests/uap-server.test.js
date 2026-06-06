@@ -36,6 +36,8 @@ globalThis.chrome = {
   runtime: {
     lastError: null,
     onMessageExternal: { addListener: () => {} },
+    onStartup: { addListener: () => {} },
+    onInstalled: { addListener: () => {} },
     sendMessage: jest.fn().mockResolvedValue(undefined),
   },
 };
@@ -460,6 +462,92 @@ describe('UAP Server', () => {
     test('broadcastStep is a no-op for missing run', () => {
       // Should not throw
       expect(() => uapServer.broadcastStep('nonexistent-run', { step: 1 })).not.toThrow();
+    });
+
+    test('handleMessage catch block returns internal_error on exception', async () => {
+      // Pass a message that causes handleMessage to throw (malformed message)
+      await uapServer.handleMessage(null, mockSender, mockSendResponse);
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'internal_error' })
+      );
+    });
+  });
+
+  describe('Authentication', () => {
+    test('authenticate returns true for valid_token', () => {
+      expect(uapServer.authenticate('client1', 'valid_token')).toBe(true);
+    });
+
+    test('authenticate returns false for null token', () => {
+      expect(uapServer.authenticate('client1', null)).toBe(false);
+    });
+
+    test('authenticate returns false for malformed JWT (not 3 parts)', () => {
+      expect(uapServer.authenticate('client1', 'bad.token')).toBe(false);
+    });
+
+    test('authenticate returns false for JWT with expired exp', () => {
+      // Create a JWT-like token with exp in the past
+      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 3600 }));
+      const token = `${header}.${payload}.fakeSignature`;
+      expect(uapServer.authenticate('client1', token)).toBe(false);
+    });
+
+    test('authenticate returns true for JWT with future exp', () => {
+      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
+      const token = `${header}.${payload}.fakeSignature`;
+      expect(uapServer.authenticate('client1', token)).toBe(true);
+    });
+  });
+
+  describe('isRecoverable', () => {
+    test('returns true for NetworkError', () => {
+      const err = new Error('connection dropped');
+      err.name = 'NetworkError';
+      expect(uapServer.isRecoverable(err)).toBe(true);
+    });
+
+    test('returns false for regular Error', () => {
+      const err = new Error('something bad');
+      expect(uapServer.isRecoverable(err)).toBe(false);
+    });
+
+    test('returns true for TimeoutError', () => {
+      const err = new Error('timed out');
+      err.name = 'TimeoutError';
+      expect(uapServer.isRecoverable(err)).toBe(true);
+    });
+  });
+
+  describe('Audit log management', () => {
+    test('logAudit trims to 5000 when exceeds 10000 entries', () => {
+      uapServer.auditLog = Array(10001).fill({ event_type: 'test', client_id: 'x', timestamp: new Date().toISOString() });
+      uapServer.logAudit('overflow_test', 'c1', {});
+      expect(uapServer.auditLog.length).toBeLessThanOrEqual(5001);
+    });
+  });
+
+  describe('Rate limiting — exceeded path', () => {
+    test('goal_request returns rate_limit_exceeded when limit hit', async () => {
+      const clientId = mockSender.id;
+      // Fill the rate limit window
+      uapServer.rateLimits.set(clientId, {
+        requests: Array(200).fill(Date.now()),
+        count: 200
+      });
+
+      const message = {
+        type: 'goal_request',
+        id: 'rl-test-1',
+        payload: { goal: 'Navigate to example.com and verify page loads', context: {}, authToken: 'valid_token' }
+      };
+
+      await uapServer.handleMessage(message, mockSender, mockSendResponse);
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'rate_limit_exceeded' })
+      );
     });
   });
 });
