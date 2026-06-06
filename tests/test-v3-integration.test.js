@@ -747,8 +747,107 @@ describe('v3.0 Event Bus', () => {
       });
 
       await scopedBus.emit('action', { type: 'click' });
-      
+
       expect(received).toEqual({ type: 'click' });
+    });
+
+    test('off() removes regular and once subscribers', async () => {
+      const bus = new EventBus();
+      let regularCalled = false;
+      let onceCalled = false;
+      const regFn = () => { regularCalled = true; };
+      const onceFn = () => { onceCalled = true; };
+
+      bus.on('evt', regFn);
+      bus.once('evt', onceFn);
+      bus.off('evt', regFn);
+      bus.off('evt', onceFn);
+
+      await bus.emit('evt', {});
+      expect(regularCalled).toBe(false);
+      expect(onceCalled).toBe(false);
+    });
+
+    test('before() and after() middleware fire during emit', async () => {
+      const bus = new EventBus();
+      const log = [];
+
+      bus.before(() => { log.push('before'); });
+      bus.after(() => { log.push('after'); });
+      bus.on('mw_test', () => { log.push('handler'); });
+
+      await bus.emit('mw_test', {});
+      expect(log).toEqual(['before', 'handler', 'after']);
+    });
+
+    test('subscriber error increments stats.failed', async () => {
+      const bus = new EventBus();
+      bus.on('fail_evt', () => { throw new Error('subscriber boom'); });
+
+      await bus.emit('fail_evt', {});
+      expect(bus.getStats().failed).toBe(1);
+    });
+
+    test('subscriber with context uses call()', async () => {
+      const bus = new EventBus();
+      const ctx = { value: 42 };
+      let thisValue;
+      bus.on('ctx_evt', function() { thisValue = this.value; }, { context: ctx });
+      await bus.emit('ctx_evt', {});
+      expect(thisValue).toBe(42);
+    });
+
+    test('subscriberCount returns total of regular + once', () => {
+      const bus = new EventBus();
+      bus.on('c_evt', () => {});
+      bus.on('c_evt', () => {});
+      bus.once('c_evt', () => {});
+      expect(bus.subscriberCount('c_evt')).toBe(3);
+      expect(bus.subscriberCount('no_evt')).toBe(0);
+    });
+
+    test('clear() removes all subscribers', async () => {
+      const bus = new EventBus();
+      let called = false;
+      bus.on('cl_evt', () => { called = true; });
+      bus.clear();
+      await bus.emit('cl_evt', {});
+      expect(called).toBe(false);
+    });
+
+    test('clearEvent() removes subscribers for one event only', async () => {
+      const bus = new EventBus();
+      let aCount = 0, bCount = 0;
+      bus.on('evt_a', () => { aCount++; });
+      bus.on('evt_b', () => { bCount++; });
+      bus.clearEvent('evt_a');
+      await bus.emit('evt_a', {});
+      await bus.emit('evt_b', {});
+      expect(aCount).toBe(0);
+      expect(bCount).toBe(1);
+    });
+
+    test('disable() prevents emit and on(); enable() restores', async () => {
+      const bus = new EventBus();
+      let called = false;
+      bus.on('en_evt', () => { called = true; });
+      bus.disable();
+      await bus.emit('en_evt', {});
+      expect(called).toBe(false);
+      bus.enable();
+      await bus.emit('en_evt', {});
+      expect(called).toBe(true);
+    });
+
+    test('history shifts when maxHistory exceeded', async () => {
+      const bus = new EventBus({ maxHistory: 3 });
+      await bus.emit('h1', {});
+      await bus.emit('h2', {});
+      await bus.emit('h3', {});
+      await bus.emit('h4', {});
+      const history = bus.getHistory(10);
+      expect(history.length).toBe(3);
+      expect(history[0].event).toBe('h2');
     });
   });
 });
