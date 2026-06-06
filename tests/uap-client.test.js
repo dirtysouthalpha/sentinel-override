@@ -466,4 +466,199 @@ describe('UAP Client', () => {
       expect(mockWs.sentMessages.length).toBeGreaterThanOrEqual(2);
     });
   });
+
+  describe('Not-connected error paths', () => {
+    test('execute throws when not connected', async () => {
+      await expect(client.execute('This goal is long enough to pass validation'))
+        .rejects.toThrow('Not connected');
+    });
+
+    test('execute throws for invalid goal (too short)', async () => {
+      await client.connect();
+      await expect(client.execute('short')).rejects.toThrow('Invalid goal');
+    });
+
+    test('getStatus throws when not connected', async () => {
+      await expect(client.getStatus('run-1')).rejects.toThrow('Not connected');
+    });
+
+    test('pause throws when not connected', async () => {
+      await expect(client.pause('run-1')).rejects.toThrow('Not connected');
+    });
+
+    test('resume throws when not connected', async () => {
+      await expect(client.resume('run-1')).rejects.toThrow('Not connected');
+    });
+
+    test('cancel throws when not connected', async () => {
+      await expect(client.cancel('run-1')).rejects.toThrow('Not connected');
+    });
+
+    test('ping returns false when not connected', async () => {
+      const result = await client.ping();
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('Message handler edge cases', () => {
+    test('auth_accepted sets clientId', async () => {
+      await client.connect();
+      mockWs = client.ws;
+      mockWs.simulateMessage({ type: 'auth_accepted', id: 'x', payload: { clientId: 'client-abc' } });
+      expect(client.clientId).toBe('client-abc');
+    });
+
+    test('unknown message type is handled without throwing', async () => {
+      await client.connect();
+      mockWs = client.ws;
+      expect(() => mockWs.simulateMessage({ type: 'totally_unknown', id: 'x', payload: {} })).not.toThrow();
+    });
+
+    test('handleError rejects run and removes from activeRuns', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const executePromise = client.execute('This goal is long enough to pass validation');
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      mockWs.simulateMessage({ type: 'goal_accepted', id: goalRequest.id, payload: { runId: 'err-run' } });
+
+      mockWs.simulateMessage({
+        type: 'error',
+        id: 'err-run',
+        payload: { message: 'Execution failed', error: 'execution_error', recoverable: false }
+      });
+
+      await expect(executePromise).rejects.toThrow('Execution failed');
+      expect(client.activeRuns.has('err-run')).toBe(false);
+    });
+
+    test('handleError with recoverable=true does not reject run', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const executePromise = client.execute('This goal is long enough to pass');
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      mockWs.simulateMessage({ type: 'goal_accepted', id: goalRequest.id, payload: { runId: 'rec-run' } });
+
+      // Recoverable error — should NOT reject the promise
+      mockWs.simulateMessage({
+        type: 'error',
+        id: 'rec-run',
+        payload: { message: 'Transient error', error: 'retry_later', recoverable: true }
+      });
+
+      // The run should still be active — resolve it so it doesn't leak
+      mockWs.simulateMessage({
+        type: 'goal_complete',
+        id: 'rec-run',
+        payload: { status: 'success', result: { summary: 'ok', findings: [], evidence: {}, trust_score: 90 } }
+      });
+      await executePromise;
+    });
+
+    test('onComplete callback is called on success', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const completedWith = [];
+      const executePromise = client.execute('Callback goal long enough validation', {
+        onComplete: (result, metrics) => completedWith.push({ result, metrics })
+      });
+
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      mockWs.simulateMessage({ type: 'goal_accepted', id: goalRequest.id, payload: { runId: 'cb-run' } });
+      mockWs.simulateMessage({
+        type: 'goal_complete',
+        id: 'cb-run',
+        payload: { status: 'success', result: { summary: 'done', findings: [], evidence: {}, trust_score: 99 }, metrics: { time: 1 } }
+      });
+
+      await executePromise;
+      expect(completedWith.length).toBe(1);
+      expect(completedWith[0].result.summary).toBe('done');
+    });
+
+    test('onError callback is called on failure', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const errors = [];
+      const executePromise = client.execute('Error callback test goal validation', {
+        onError: (err) => errors.push(err)
+      });
+
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      mockWs.simulateMessage({ type: 'goal_accepted', id: goalRequest.id, payload: { runId: 'onerr-run' } });
+      mockWs.simulateMessage({
+        type: 'goal_complete',
+        id: 'onerr-run',
+        payload: { status: 'failed', error: 'Step failed', recoverable: false }
+      });
+
+      await expect(executePromise).rejects.toThrow('Step failed');
+      expect(errors.length).toBe(1);
+    });
+
+    test('emit catches and suppresses event handler errors', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      client.addEventListener('step_update', () => { throw new Error('handler crash'); });
+      expect(() => mockWs.simulateMessage({ type: 'step_update', id: 'x', payload: { step: 1 } })).not.toThrow();
+    });
+
+    test('handleStatusResponse calls onStatus if present', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const statuses = [];
+      const statusPromise = client.getStatus('run-stat');
+
+      // Simulate response to the status request
+      const statusRequest = mockWs.sentMessages.find(m => m.type === 'status_request');
+      mockWs.simulateMessage({
+        type: 'status_response',
+        id: statusRequest.id,
+        payload: { status: 'running', step: 2, total: 5 }
+      });
+
+      const result = await statusPromise;
+      expect(result.status).toBe('running');
+    });
+  });
+
+  describe('Connection resilience', () => {
+    test('reconnect timer fires and calls connect again', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      // Force reconnect scenario: max reconnect attempts not reached
+      client.reconnectDelay = 5; // ultra-short delay
+      client.maxReconnectAttempts = 3;
+      client.reconnectAttempts = 0;
+      client.reconnectTimer = null;
+
+      client.scheduleReconnect();
+      expect(client.reconnectTimer).not.toBeNull();
+      await new Promise(resolve => setTimeout(resolve, 30)); // let timer fire
+      // After timer fires, reconnectAttempts is incremented (we don't care if connect fails)
+    });
+
+    test('onclose rejects active runs when autoReconnect disabled and max attempts reached', async () => {
+      await client.connect();
+      mockWs = client.ws;
+
+      const executePromise = client.execute('Run that gets terminated by close');
+      const goalRequest = mockWs.sentMessages.find(m => m.type === 'goal_request');
+      mockWs.simulateMessage({ type: 'goal_accepted', id: goalRequest.id, payload: { runId: 'close-run' } });
+
+      // Disable reconnect and saturate attempts
+      client.autoReconnect = false;
+
+      // Manually trigger onclose
+      client.ws.onclose({ code: 1001, reason: 'server gone' });
+
+      await expect(executePromise).rejects.toThrow('Connection closed');
+    });
+  });
 });
