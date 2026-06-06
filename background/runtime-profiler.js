@@ -525,9 +525,9 @@ export function proposeMutations(currentState) {
  */
 export function rankMutations(proposals) {
   const allMutations = [
-    ...proposals.safe.map(m => ({ ...m, category: 'safe', score: 90 })),
-    ...proposals.moderate.map(m => ({ ...m, category: 'moderate', score: 70 })),
-    ...proposals.experimental.map(m => ({ ...m, category: 'experimental', score: 50 }))
+    ...(proposals?.safe || []).map(m => ({ ...m, category: 'safe', score: 90 })),
+    ...(proposals?.moderate || []).map(m => ({ ...m, category: 'moderate', score: 70 })),
+    ...(proposals?.experimental || []).map(m => ({ ...m, category: 'experimental', score: 50 }))
   ];
   
   // Sort by score (descending)

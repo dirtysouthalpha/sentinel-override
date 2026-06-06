@@ -13,6 +13,10 @@ import {
   attemptHealing,
   getHealingHistory,
   getActiveHealings,
+  startCanaryDeployment,
+  monitorCanary,
+  stopCanaryDeployment,
+  runGeneticAlgorithm,
   RuntimeProfiler
 } from '../background/runtime-profiler.js';
 
@@ -267,6 +271,127 @@ describe('getHealingHistory and getActiveHealings', () => {
 
   test('getActiveHealings returns array', () => {
     expect(Array.isArray(getActiveHealings())).toBe(true);
+  });
+});
+
+describe('rankMutations — null safety', () => {
+  test('returns empty array when proposals is undefined', () => {
+    const result = rankMutations(undefined);
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array when categories are missing', () => {
+    const result = rankMutations({});
+    expect(result).toEqual([]);
+  });
+
+  test('handles partial proposals with only safe mutations', () => {
+    const result = rankMutations({ safe: [{ type: 'x' }] });
+    expect(result).toHaveLength(1);
+    expect(result[0].category).toBe('safe');
+  });
+});
+
+describe('startCanaryDeployment', () => {
+  afterEach(() => {
+    stopCanaryDeployment(false); // clean up state
+  });
+
+  test('returns started status with mutation info', () => {
+    const mutation = { type: 'reduce_timeout', value: 3000 };
+    const result = startCanaryDeployment(mutation);
+    expect(result.status).toBe('started');
+    expect(result.mutation).toBe(mutation);
+    expect(typeof result.startTime).toBe('number');
+  });
+});
+
+describe('monitorCanary', () => {
+  afterEach(() => {
+    stopCanaryDeployment(false);
+  });
+
+  test('returns inactive when no canary is running', () => {
+    stopCanaryDeployment(false);
+    const result = monitorCanary({ failures: 0, stepCount: 10, totalTime: 100, memoryUsage: 50 });
+    expect(result.status).toBe('inactive');
+  });
+
+  test('returns active status after canary started', () => {
+    startCanaryDeployment({ type: 'test_mutation' });
+    const metrics = { failures: 1, stepCount: 10, totalTime: 1000, memoryUsage: 60 };
+    const result = monitorCanary(metrics);
+    expect(['active', 'rolled_back']).toContain(result.status);
+    expect(typeof result.totalSamples).toBe('number');
+  });
+
+  test('triggers rollback when error rate spikes after baseline', () => {
+    startCanaryDeployment({ type: 'risky_mutation' });
+    const goodMetrics = { failures: 1, stepCount: 100, totalTime: 1000, memoryUsage: 50 };
+    // Build a baseline (5+ samples)
+    for (let i = 0; i < 6; i++) {
+      monitorCanary(goodMetrics);
+    }
+    // Now spike the error rate far above baseline
+    const badMetrics = { failures: 90, stepCount: 100, totalTime: 1000, memoryUsage: 50 };
+    const result = monitorCanary(badMetrics);
+    expect(result.status).toBe('rolled_back');
+  });
+});
+
+describe('stopCanaryDeployment', () => {
+  test('returns not_active when no canary running', () => {
+    stopCanaryDeployment(false);
+    const result = stopCanaryDeployment();
+    expect(result.status).toBe('not_active');
+  });
+
+  test('returns success summary when stopping active canary', () => {
+    startCanaryDeployment({ type: 'stop_test' });
+    const result = stopCanaryDeployment(true);
+    expect(result.status).toBe('success');
+    expect(result.mutation).toEqual({ type: 'stop_test' });
+  });
+
+  test('returns cancelled summary when stopping with failure', () => {
+    startCanaryDeployment({ type: 'cancel_test' });
+    const result = stopCanaryDeployment(false);
+    expect(result.status).toBe('cancelled');
+  });
+});
+
+describe('runGeneticAlgorithm', () => {
+  test('returns best individual after optimization', () => {
+    const result = runGeneticAlgorithm({
+      populationSize: 5,
+      generations: 3,
+      mutationRate: 0.1,
+      crossoverRate: 0.7,
+      fitnessFunction: (ind) => -(ind.x ** 2 + ind.y ** 2), // minimize distance from origin
+      geneSpace: {
+        x: { min: -10, max: 10 },
+        y: { min: -10, max: 10 }
+      }
+    });
+    expect(result.bestIndividual).toHaveProperty('x');
+    expect(result.bestIndividual).toHaveProperty('y');
+    expect(typeof result.bestFitness).toBe('number');
+    expect(result.history).toHaveLength(3);
+  });
+
+  test('uses provided initial population', () => {
+    const initial = [{ x: 0, y: 0 }, { x: 1, y: 1 }, { x: -1, y: -1 }];
+    const result = runGeneticAlgorithm({
+      populationSize: 3,
+      generations: 2,
+      mutationRate: 0,
+      crossoverRate: 0,
+      fitnessFunction: (ind) => -Math.abs(ind.x) - Math.abs(ind.y),
+      geneSpace: { x: { min: -5, max: 5 }, y: { min: -5, max: 5 } },
+      initialPopulation: initial,
+    });
+    expect(result.bestIndividual).toBeDefined();
+    expect(result.history).toHaveLength(2);
   });
 });
 
