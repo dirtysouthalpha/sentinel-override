@@ -266,6 +266,8 @@ describe('UAP Server', () => {
         federationPeers: expect.any(Number),
         auditLogEntries: expect.any(Number)
       });
+      expect(typeof stats.uptime).toBe('number');
+      expect(stats.uptime).toBeGreaterThanOrEqual(0);
     });
   });
 

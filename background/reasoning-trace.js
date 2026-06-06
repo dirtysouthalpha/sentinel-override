@@ -126,9 +126,10 @@ export async function getReasoningSummary(runId) {
   const trace = _traceCache.get(id) || await getReasoningTrace(id);
   if (!trace) return { totalSteps: 0, goal: '', model: '', phases: {}, summary: 'No reasoning trace found.' };
 
+  const entries = trace.entries || [];
   // Group by phase
   const phases = {};
-  for (const entry of trace.entries) {
+  for (const entry of entries) {
     if (!phases[entry.phase]) phases[entry.phase] = { inputs: 0, outputs: 0 };
     if (entry.direction === 'input') phases[entry.phase].inputs++;
     else phases[entry.phase].outputs++;
@@ -137,12 +138,12 @@ export async function getReasoningSummary(runId) {
   const summary = [
     `Run: ${trace.runId}`,
     `Goal: ${trace.goal || '(none)'}`,
-    `Total steps: ${trace.entries.length}`,
+    `Total steps: ${entries.length}`,
     `Phases: ${Object.keys(phases).join(', ') || 'none'}`
   ].join(' | ');
 
   return {
-    totalSteps: trace.entries.length,
+    totalSteps: entries.length,
     goal: trace.goal,
     model: trace.model,
     phases,
