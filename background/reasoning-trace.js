@@ -10,7 +10,7 @@ const STORAGE_KEY_PREFIX = 'reasoning_trace_';
 // In-memory cache for active run
 const _traceCache = new Map(); // runId → trace object
 // Pending write timeouts for debouncing storage writes
-const _pendingWrites = new Map(); // runId → timeout ID
+const _pendingWrites = new Map(); // runId → timerId
 const WRITE_DELAY_MS = 500; // Batch writes within this window
 
 // Current active run ID (set by initReasoningTrace)
@@ -27,7 +27,14 @@ async function _persistTrace(runId) {
   const existing = _pendingWrites.get(runId);
   if (existing) clearTimeout(existing);
 
-  const timer = setTimeout(async () => {
+  // Capture the timerId for closure
+  let timerId;
+  const callback = async () => {
+    // Check if this timer was cancelled by verifying it's still in _pendingWrites
+    // This handles Jest fake timers where clearTimeout doesn't prevent execution
+    if (_pendingWrites.get(runId) !== timerId) {
+      return; // Timer was cancelled or replaced
+    }
     _pendingWrites.delete(runId);
     const trace = _traceCache.get(runId);
     if (!trace) return;
@@ -36,23 +43,35 @@ async function _persistTrace(runId) {
     } catch (e) {
       console.error('[Sentinel] Failed to persist reasoning trace:', getErrorMessage(e));
     }
-  }, WRITE_DELAY_MS);
+  };
+
+  timerId = setTimeout(callback, WRITE_DELAY_MS);
   // Allow the Node.js process (and Jest workers) to exit without waiting for pending writes
-  if (typeof timer === 'object' && timer !== null && typeof timer.unref === 'function') timer.unref();
-  _pendingWrites.set(runId, timer);
+  if (typeof timerId === 'object' && timerId !== null && typeof timerId.unref === 'function') timerId.unref();
+  _pendingWrites.set(runId, timerId);
 }
 
 /**
  * Initialize a new reasoning trace for the current run.
- * @param {object} metadata - Optional { goal, model, timestamp }
+ * @param {object|string} metadata - Optional { goal, model, timestamp } OR legacy runId string
+ * @param {string} [goal] - Optional goal string (for backward compatibility)
+ * @param {string} [model] - Optional model string (for backward compatibility)
  */
-export async function initReasoningTrace(metadata = {}) {
+export async function initReasoningTrace(metadata = {}, goal = '', model = '') {
+  // Handle backward compatibility with initReasoningTrace(runId, goal, model)
+  if (typeof metadata === 'string') {
+    // First param is runId (ignored, we generate our own), second is goal, third is model
+    goal = arguments[1] || '';
+    model = arguments[2] || '';
+    metadata = {};
+  }
+
   _currentRunId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const trace = {
     runId: _currentRunId,
     startTime: metadata.timestamp || Date.now(),
-    goal: metadata.goal || '',
-    model: metadata.model || '',
+    goal: metadata.goal || goal,
+    model: metadata.model || model,
     entries: []
   };
   _traceCache.set(_currentRunId, trace);
@@ -172,20 +191,19 @@ export async function clearReasoningTrace(runId) {
   const id = runId || _currentRunId;
   if (!id) return;
 
-  const timeout = _pendingWrites.get(id);
-  if (timeout) {
-    clearTimeout(timeout);
-    _pendingWrites.delete(id);
+  const timerId = _pendingWrites.get(id);
+  if (timerId) {
+    clearTimeout(timerId);
+    _pendingWrites.delete(id); // Delete immediately to mark timer as cancelled
   }
 
   _traceCache.delete(id);
   if (id === _currentRunId) _currentRunId = null;
 
-  try {
-    await chrome.storage.local.remove(_storageKey(id));
-  } catch (e) {
+  // Don't await the storage removal - do it fire-and-forget style
+  chrome.storage.local.remove(_storageKey(id)).catch(e => {
     console.error('[Sentinel] Failed to clear reasoning trace:', getErrorMessage(e));
-  }
+  });
 }
 
 /**
@@ -217,8 +235,8 @@ export async function getLowConfidenceDecisions(maxConfidence = 0.5) {
  */
 export async function flushPendingWrites() {
   const promises = [];
-  for (const [runId, timeout] of _pendingWrites) {
-    clearTimeout(timeout);
+  for (const [runId, timerId] of _pendingWrites) {
+    clearTimeout(timerId);
     _pendingWrites.delete(runId);
     const trace = _traceCache.get(runId);
     if (!trace) continue;
@@ -237,7 +255,7 @@ export async function flushPendingWrites() {
  * Reset all module state (for testing).
  */
 export function _resetReasoningTraceCache() {
-  for (const timeout of _pendingWrites.values()) clearTimeout(timeout);
+  for (const timerId of _pendingWrites.values()) clearTimeout(timerId);
   _pendingWrites.clear();
   _traceCache.clear();
   _currentRunId = null;

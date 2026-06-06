@@ -458,6 +458,32 @@ class UAPServer {
   }
 
   /**
+   * Check if a JWT token is valid and not expired
+   * @param {string} token - JWT token to validate
+   * @returns {boolean} true if valid and not expired
+   */
+  isValidJWT(token) {
+    if (!token || typeof token !== 'string') return false;
+
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false; // Not a JWT
+
+      // Decode payload (base64url)
+      const payload = JSON.parse(atob(parts[1]));
+
+      // Check exp field exists and is in the future
+      if (!payload.exp || typeof payload.exp !== 'number') return false;
+
+      const now = Date.now() / 1000;
+      return payload.exp > now;
+    } catch (e) {
+      // Invalid base64, JSON, or other parsing error
+      return false;
+    }
+  }
+
+  /**
    * Authenticate client
    */
   authenticate(clientId, authToken) {
@@ -570,6 +596,7 @@ class UAPServer {
     const entry = {
       timestamp: new Date().toISOString(),
       event_type: eventType,
+      event: eventType, // Include both for backward compatibility
       client_id: clientId,
       ...data
     };
@@ -595,31 +622,40 @@ class UAPServer {
   setupCleanup() {
     // Clean up old audit logs every hour
     setInterval(() => {
-      const hourAgo = Date.now() - 3600000;
-      
-      // Clean old rate limit entries
-      for (const [clientId, limit] of this.rateLimits.entries()) {
-        limit.requests = limit.requests.filter(time => time > hourAgo);
-        if (limit.requests.length === 0) {
-          this.rateLimits.delete(clientId);
-        }
-      }
-
-      // Clean old completed runs
-      for (const [runId, run] of this.activeRuns.entries()) {
-        if (run.endTime && Date.now() - run.endTime > 86400000) {
-          this.activeRuns.delete(runId);
-        }
-      }
-
-      // Clean inactive peers
-      for (const [peerId, peer] of this.peerTrust.entries()) {
-        if (Date.now() - peer.lastSeen > 3600000) {
-          this.peerTrust.delete(peerId);
-        }
-      }
-
+      this._performCleanup();
     }, 3600000); // Every hour
+  }
+
+  /**
+   * Perform cleanup of old entries (called by interval or manually for testing)
+   */
+  _performCleanup() {
+    const now = Date.now();
+    const hourAgo = now - 3600000;
+    const dayAgo = now - 86400000;
+
+    // Clean old rate limit entries
+    for (const [clientId, limit] of this.rateLimits.entries()) {
+      limit.requests = limit.requests.filter(time => time > hourAgo);
+      this.rateLimits.set(clientId, limit);
+      if (limit.requests.length === 0) {
+        this.rateLimits.delete(clientId);
+      }
+    }
+
+    // Clean old completed runs
+    for (const [runId, run] of this.activeRuns.entries()) {
+      if (run.endTime && now - run.endTime > 86400000) {
+        this.activeRuns.delete(runId);
+      }
+    }
+
+    // Clean inactive peers
+    for (const [peerId, peer] of this.peerTrust.entries()) {
+      if (now - peer.lastSeen > 3600000) {
+        this.peerTrust.delete(peerId);
+      }
+    }
   }
 
   /**
