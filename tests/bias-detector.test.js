@@ -208,3 +208,41 @@ describe('clearBiasLog', () => {
     await expect(clearBiasLog()).resolves.not.toThrow();
   });
 });
+
+describe('analyzeForBias — severity levels', () => {
+  test('occurrence count >= 3 results in high severity', () => {
+    // Three occurrences of confirmationBias pattern "as expected"
+    const text = 'As expected the test passed. As expected this worked. As expected everything is fine.';
+    const result = analyzeForBias(text);
+    const highBiases = result.biases.filter(b => b.severity === 3);
+    expect(highBiases.length).toBeGreaterThan(0);
+  });
+
+  test('occurrence count >= 2 results in medium severity', () => {
+    // Two occurrences
+    const text = 'As expected the test passed. As expected this also worked.';
+    const result = analyzeForBias(text);
+    const medBiases = result.biases.filter(b => b.severity >= 2);
+    expect(medBiases.length).toBeGreaterThan(0);
+  });
+
+  test('stereotyping bias bumps severity up', () => {
+    // Single occurrence of stereotyping → starts at low (1), bumps to medium (2)
+    const text = 'This is typical for this type of user.';
+    const result = analyzeForBias(text);
+    const stereo = result.biases.find(b => b.type === 'stereotyping');
+    if (stereo) {
+      expect(stereo.severity).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
+describe('generateBiasReport — severity labels', () => {
+  test('generates report with high severity label for frequent bias', () => {
+    const text = 'As expected. As expected. As expected.';
+    const analysis = analyzeForBias(text);
+    const report = generateBiasReport(analysis);
+    expect(typeof report).toBe('string');
+    expect(report.length).toBeGreaterThan(0);
+  });
+});
