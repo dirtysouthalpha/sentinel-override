@@ -336,20 +336,93 @@ describe('v3.0 Circuit Breaker', () => {
 
     test('should reset to CLOSED after timeout', async () => {
       const breaker = new CircuitBreaker({ name: 'test', failureThreshold: 1, resetTimeout: 100 });
-      
+
       // Trip the breaker
       try {
         await breaker.execute(async () => { throw new Error('Trip'); });
       } catch (e) {}
-      
+
       expect(breaker.getState().state).toBe(CircuitState.OPEN);
-      
+
       // Wait for timeout
       await new Promise(resolve => setTimeout(resolve, 150));
-      
+
       // Should transition to HALF_OPEN then CLOSED on success
       const result = await breaker.execute(async () => 'recovered');
       expect(result).toBe('recovered');
+    });
+
+    test('closes from HALF_OPEN after 2 successes', async () => {
+      const onResetCalls = [];
+      const onStateChangeCalls = [];
+      const breaker = new CircuitBreaker({
+        name: 'test-close',
+        failureThreshold: 1,
+        resetTimeout: 50,
+        onReset: (name) => onResetCalls.push(name),
+        onStateChange: (name, state) => onStateChangeCalls.push([name, state]),
+      });
+
+      // Trip to OPEN
+      try { await breaker.execute(async () => { throw new Error('trip'); }); } catch (e) {}
+      expect(breaker.getState().state).toBe(CircuitState.OPEN);
+
+      // Wait for timeout
+      await new Promise(r => setTimeout(r, 80));
+
+      // First success → stays HALF_OPEN (successCount = 1)
+      await breaker.execute(async () => 'ok');
+      expect(breaker.getState().state).toBe(CircuitState.HALF_OPEN);
+
+      // Second success → transitions to CLOSED (successCount = 2)
+      await breaker.execute(async () => 'ok2');
+      expect(breaker.getState().state).toBe(CircuitState.CLOSED);
+      expect(onResetCalls).toContain('test-close');
+    });
+
+    test('returns to OPEN when operation fails in HALF_OPEN', async () => {
+      const breaker = new CircuitBreaker({ name: 'test-reopen', failureThreshold: 1, resetTimeout: 50 });
+
+      // Trip to OPEN
+      try { await breaker.execute(async () => { throw new Error('trip'); }); } catch (e) {}
+      await new Promise(r => setTimeout(r, 80));
+
+      // First execute transitions to HALF_OPEN; now fail
+      try { await breaker.execute(async () => { throw new Error('fail in half-open'); }); } catch (e) {}
+      expect(breaker.getState().state).toBe(CircuitState.OPEN);
+    });
+
+    test('manual reset transitions to CLOSED from any state', () => {
+      const onStateChangeCalls = [];
+      const breaker = new CircuitBreaker({
+        name: 'test-reset',
+        failureThreshold: 1,
+        resetTimeout: 9999,
+        onStateChange: (name, state) => onStateChangeCalls.push([name, state]),
+      });
+
+      // Trip to OPEN
+      breaker._onFailure();
+      expect(breaker.getState().state).toBe(CircuitState.OPEN);
+
+      // Manual reset
+      breaker.reset();
+      expect(breaker.getState().state).toBe(CircuitState.CLOSED);
+      expect(breaker.getState().failureCount).toBe(0);
+      expect(onStateChangeCalls).toContainEqual(['test-reset', CircuitState.CLOSED]);
+    });
+
+    test('onStateChange callback fires on trip', async () => {
+      const onStateChangeCalls = [];
+      const breaker = new CircuitBreaker({
+        name: 'cb-test',
+        failureThreshold: 1,
+        resetTimeout: 9999,
+        onStateChange: (name, state) => onStateChangeCalls.push([name, state]),
+      });
+
+      try { await breaker.execute(async () => { throw new Error('trip'); }); } catch (e) {}
+      expect(onStateChangeCalls).toContainEqual(['cb-test', CircuitState.OPEN]);
     });
   });
 
