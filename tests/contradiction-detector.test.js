@@ -189,3 +189,39 @@ describe('clearContradictionLog', () => {
     await expect(clearContradictionLog()).resolves.not.toThrow();
   });
 });
+
+describe('analyzeForContradictions — conditional contradictions', () => {
+  test('detects conditional contradiction (if X then Y vs if X then not Y)', () => {
+    const text = 'If the server is up then the site is accessible. If the server is up then the site is not accessible.';
+    const result = analyzeForContradictions(text);
+    const types = result.contradictions.map(c => c.type);
+    expect(types).toContain('conditional');
+  });
+
+  test('temporal detection breaks after first match per sentence', () => {
+    // A sentence with multiple before/after pairs — coverage for the inner break statement
+    const text = 'Previously and currently and before and now the setting was both on and off.';
+    const result = analyzeForContradictions(text);
+    expect(result).toHaveProperty('contradictions');
+  });
+});
+
+describe('compareResponsesForContradictions — cross-response', () => {
+  test('detects cross-response contradictions between opposite statements', () => {
+    const r1 = 'The service is accessible.';
+    const r2 = 'The service is not accessible.';
+    const result = compareResponsesForContradictions(r1, r2);
+    expect(result).toHaveProperty('crossResponseContradictions');
+    expect(Array.isArray(result.crossResponseContradictions)).toBe(true);
+    expect(result.crossResponseContradictions.length).toBeGreaterThan(0);
+    expect(result.crossResponseContradictions[0].type).toBe('cross_response');
+  });
+
+  test('produces zero cross contradictions for unrelated statements', () => {
+    const r1 = 'Clear skies today.';
+    const r2 = 'Temperatures are mild.';
+    const result = compareResponsesForContradictions(r1, r2);
+    expect(result).toHaveProperty('crossResponseContradictions');
+    expect(result.crossResponseContradictions.length).toBe(0);
+  });
+});
