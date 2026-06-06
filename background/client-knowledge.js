@@ -227,6 +227,7 @@ export async function addEntry(clientId, { scope, urlPattern, wisdom, tags }) {
     capturedAt: new Date().toISOString(),
     useCount: 0
   };
+  if (!Array.isArray(c.entries)) c.entries = [];
   c.entries.push(entry);
   const written = await _write(state);
   if (!written) return { ok: false, error: 'Storage write failed' };
@@ -266,9 +267,10 @@ export async function deleteEntry(clientId, entryId) {
   const state = await _read();
   const c = state.clients[clientId];
   if (!c) return { ok: false, error: 'Client not found' };
-  const before = c.entries.length;
-  c.entries = c.entries.filter(x => x.id !== entryId);
-  if (c.entries.length === before) return { ok: false, error: 'Entry not found' };
+  const entries = c.entries || [];
+  const filtered = entries.filter(x => x.id !== entryId);
+  if (filtered.length === entries.length) return { ok: false, error: 'Entry not found' };
+  c.entries = filtered;
   const written = await _write(state);
   if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true };
@@ -312,7 +314,7 @@ export async function getRelevantEntries(clientId, currentUrl) {
   const c = state.clients[clientId];
   if (!c) return [];
   const url = (currentUrl || '').toLowerCase();
-  return c.entries.filter(e => {
+  return (c.entries || []).filter(e => {
     if (e.scope === 'global') return true;
     if (e.scope === 'url' && e.urlPattern) return _urlMatches(e.urlPattern, url);
     return false;
