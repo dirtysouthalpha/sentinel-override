@@ -33,6 +33,11 @@ globalThis.chrome = {
       }),
     },
   },
+  runtime: {
+    lastError: null,
+    onMessageExternal: { addListener: () => {} },
+    sendMessage: jest.fn().mockResolvedValue(undefined),
+  },
 };
 
 import { uapServer } from '../background/uap-server.js';
@@ -314,6 +319,147 @@ describe('UAP Server', () => {
           error: 'invalid_signature'
         })
       );
+    });
+  });
+
+  describe('Status / Cancel / Pause / Resume requests', () => {
+    let runId;
+
+    beforeEach(() => {
+      // Directly inject a run to avoid triggering fire-and-forget executeGoal
+      runId = 'test-run-' + Date.now();
+      uapServer.activeRuns.set(runId, {
+        clientId: mockSender.id,
+        goal: 'test goal',
+        context: {},
+        startTime: Date.now(),
+        status: 'running',
+        endTime: null,
+        result: null,
+      });
+    });
+
+    afterEach(() => {
+      uapServer.activeRuns.delete(runId);
+    });
+
+    test('status_request returns run status', async () => {
+      await uapServer.handleMessage(
+        { type: 'status_request', id: 'stat-1', payload: { runId } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'status_response', id: 'stat-1' })
+      );
+    });
+
+    test('status_request returns error for unknown runId', async () => {
+      await uapServer.handleMessage(
+        { type: 'status_request', id: 'stat-2', payload: { runId: 'no-such-run' } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'run_not_found' })
+      );
+    });
+
+    test('cancel_request marks run as cancelled', async () => {
+      await uapServer.handleMessage(
+        { type: 'cancel_request', id: 'cancel-1', payload: { runId } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'cancel_accepted', runId })
+      );
+      expect(uapServer.activeRuns.get(runId).status).toBe('cancelled');
+    });
+
+    test('cancel_request returns error for unknown runId', async () => {
+      await uapServer.handleMessage(
+        { type: 'cancel_request', id: 'cancel-2', payload: { runId: 'ghost' } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'run_not_found' })
+      );
+    });
+
+    test('pause_request marks run as paused', async () => {
+      await uapServer.handleMessage(
+        { type: 'pause_request', id: 'pause-1', payload: { runId } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'pause_accepted', runId })
+      );
+      expect(uapServer.activeRuns.get(runId).status).toBe('paused');
+    });
+
+    test('pause_request returns error for unknown runId', async () => {
+      await uapServer.handleMessage(
+        { type: 'pause_request', id: 'pause-2', payload: { runId: 'ghost' } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'run_not_found' })
+      );
+    });
+
+    test('resume_request marks run as running', async () => {
+      uapServer.activeRuns.get(runId).status = 'paused';
+      await uapServer.handleMessage(
+        { type: 'resume_request', id: 'resume-1', payload: { runId } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'resume_accepted', runId })
+      );
+      expect(uapServer.activeRuns.get(runId).status).toBe('running');
+    });
+
+    test('resume_request returns error for unknown runId', async () => {
+      await uapServer.handleMessage(
+        { type: 'resume_request', id: 'resume-2', payload: { runId: 'ghost' } },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'run_not_found' })
+      );
+    });
+  });
+
+  describe('Edge cases', () => {
+    test('unknown message type returns error', async () => {
+      await uapServer.handleMessage(
+        { type: 'unsupported_type', id: 'edge-1', payload: {} },
+        mockSender,
+        mockSendResponse
+      );
+      expect(mockSendResponse).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error', error: 'unknown_message_type' })
+      );
+    });
+
+    test('broadcastStep emits step_update for active run', () => {
+      const clientId = 'bc-client';
+      uapServer.activeRuns.set('bc-run', { clientId, status: 'running' });
+      chrome.runtime.sendMessage.mockClear();
+      uapServer.broadcastStep('bc-run', { step: 1, total: 5, action: 'click', target: '#btn' });
+      expect(chrome.runtime.sendMessage).toHaveBeenCalled();
+      uapServer.activeRuns.delete('bc-run');
+    });
+
+    test('broadcastStep is a no-op for missing run', () => {
+      // Should not throw
+      expect(() => uapServer.broadcastStep('nonexistent-run', { step: 1 })).not.toThrow();
     });
   });
 });
