@@ -986,3 +986,90 @@ describe('executeScheduledTask — getTabInfo returns null on error', () => {
     expect(tabContext.registerInitialTab).toHaveBeenCalledWith(42, '');
   });
 });
+
+// ============================================================
+// 22. Empty goal path (lines 536-538)
+//     When resolveTemplateGoal returns an empty string, executeScheduledTask
+//     should log an error and call _handleTaskFailure.
+// ============================================================
+
+describe('executeScheduledTask — empty resolved goal (lines 536-538)', () => {
+  test('stores failure when resolveTemplateGoal returns empty string', async () => {
+    const templateManager = await import('../background/template-manager.js');
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const schedule = await createSchedule({
+      name: 'Empty Goal Schedule',
+      templateId: 'some-template',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    resetChromeMocks();
+    templateManager.resolveTemplateGoal.mockResolvedValue('');
+
+    await executeScheduledTask('schedule-' + schedule.id);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('empty goal')
+    );
+
+    const schedules = storageData['sentinel_schedules'] || {};
+    expect(schedules[schedule.id].lastRunStatus).toBe('failure');
+
+    errorSpy.mockRestore();
+  });
+
+  test('stores failure when resolveTemplateGoal returns null', async () => {
+    const templateManager = await import('../background/template-manager.js');
+
+    const schedule = await createSchedule({
+      name: 'Null Goal Schedule',
+      templateId: 'null-template',
+      type: 'once',
+      runAt: Date.now() + 3600000,
+    });
+    resetChromeMocks();
+    templateManager.resolveTemplateGoal.mockResolvedValue(null);
+
+    await executeScheduledTask('schedule-' + schedule.id);
+
+    const schedules = storageData['sentinel_schedules'] || {};
+    expect(schedules[schedule.id].lastRunStatus).toBe('failure');
+  });
+});
+
+// ============================================================
+// 23. tabs.query lastError path (lines 637-639)
+//     When chrome.runtime.lastError is set in the tabs.query callback,
+//     the function resolves with [] and falls through to tab creation.
+// ============================================================
+
+describe('executeScheduledTask — tabs.query lastError (lines 637-639)', () => {
+  test('falls back to creating new tab when tabs.query fires lastError', async () => {
+    const schedule = await makeSchedule();
+    resetChromeMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      chrome.runtime.lastError = { message: 'Tabs query failed' };
+      if (cb) cb([]);
+      delete chrome.runtime.lastError;
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockResolvedValue({ id: 77 });
+
+    const agentEngine = await import('../background/agent-engine.js');
+    agentEngine.startAgent.mockResolvedValue(undefined);
+
+    // tab creation has a 500ms delay — fire completion after 700ms to clear it
+    const execPromise = executeScheduledTask('schedule-' + schedule.id);
+    await new Promise(r => setTimeout(r, 700));
+    for (const listener of _msgListeners) {
+      listener({ action: 'agent_loop_complete', report: 'lastError fallback done' });
+    }
+    await execPromise;
+
+    expect(chrome.tabs.create).toHaveBeenCalledWith({ url: 'about:blank' });
+    const schedules = storageData['sentinel_schedules'] || {};
+    expect(schedules[schedule.id].lastRunStatus).toBe('success');
+  }, 10000);
+});
