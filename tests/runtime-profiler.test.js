@@ -50,6 +50,17 @@ describe('startProfiling and stopProfiling', () => {
     expect(summary).toHaveProperty('recommendations');
   });
 
+  test('stopProfiling with 6+ samples covers detectTrend and detectPerformanceTrend', () => {
+    startProfiling();
+    for (let i = 0; i < 6; i++) {
+      takeProfilingSample();
+    }
+    const summary = stopProfiling();
+    expect(summary.sampleCount).toBe(6);
+    expect(summary).toHaveProperty('memory');
+    expect(Array.isArray(summary.recommendations)).toBe(true);
+  });
+
   test('profiling is disabled after stop', () => {
     startProfiling();
     stopProfiling();

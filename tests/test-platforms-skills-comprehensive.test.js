@@ -204,6 +204,12 @@ describe('findMismatchHints', () => {
     const profile = { mismatchHints: [{ pattern: null, onbox: 'A', nsm: 'B' }] };
     expect(findMismatchHints(profile, 'test')).toEqual([]);
   });
+
+  test('catch block suppresses throwing pattern.test()', () => {
+    const throwingPattern = { test: () => { throw new Error('regex engine error'); } };
+    const profile = { mismatchHints: [{ pattern: throwingPattern, onbox: 'A', nsm: 'B' }] };
+    expect(findMismatchHints(profile, 'test goal')).toEqual([]);
+  });
 });
 
 // ============================================================
