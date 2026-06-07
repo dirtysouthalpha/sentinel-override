@@ -1130,10 +1130,12 @@ The user wants you to continue or adjust the previous task. Look at the current 
     // sendMessage to silently fail. The ping ensures the SW is alive.
     const _sendGoal = () => {
       console.log('[Sentinel] _sendGoal: sending run_agent_loop, goal length=' + fullGoal.length);
+      __chatDiag('[send] → run_agent_loop sent (len=' + fullGoal.length + ')', '#0066cc'); // TEMP DIAGNOSTIC
       chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
         console.log('[Sentinel] run_agent_loop response:', JSON.stringify(response));
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
           console.error('[Sentinel] run_agent_loop lastError:', getErrorMessage(chrome.runtime.lastError));
+          __chatDiag('[send] ✗ run_agent_loop lastError: ' + getErrorMessage(chrome.runtime.lastError), '#ff0040'); // TEMP DIAGNOSTIC
           removeTypingIndicator();
           addMessage(`Error: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
           resetUI();
@@ -1141,6 +1143,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
         }
         if (response && !response.ok) {
           console.error('[Sentinel] run_agent_loop error:', response.error);
+          __chatDiag('[send] ✗ agent error: ' + (response.error || 'unknown'), '#ff0040'); // TEMP DIAGNOSTIC
           removeTypingIndicator();
           addMessage(`Error: ${response.error || 'Unknown error'}`, 'assistant');
           resetUI();
@@ -1148,6 +1151,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
         // If response is ok, the agent is running — agent_finished will reset UI
         if (response && response.ok) {
           console.log('[Sentinel] Agent started successfully');
+          __chatDiag('[send] ✓ agent started — response ok', '#00aa44'); // TEMP DIAGNOSTIC
         }
       });
     };
@@ -1158,6 +1162,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
       void chrome.runtime.lastError;
       const pong = pingResp && (pingResp.pong || pingResp.data?.pong);
       console.log('[Sentinel] SW ping response:', pong ? 'alive' : 'dead', JSON.stringify(pingResp));
+      __chatDiag('[send] SW ping: ' + (pong ? 'alive' : 'DEAD') + (chrome.runtime.lastError ? ' err=' + getErrorMessage(chrome.runtime.lastError) : ''), pong ? '#0066cc' : '#ff8800'); // TEMP DIAGNOSTIC
       if (pong) {
         _sendGoal();
       } else {
