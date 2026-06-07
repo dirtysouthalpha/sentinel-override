@@ -1,5 +1,21 @@
 // popup-modules/chat.js
 console.log('[Sentinel] chat.js loading...');
+// TEMP DIAGNOSTIC (remove once the "Enter does nothing" report is resolved):
+// write directly into the boot banner so the user can see chat.js load + send
+// activity WITHOUT opening devtools. __showBootBanner is defined in
+// boot-catcher.js, which loads first.
+function __chatDiag(text, color) {
+  try {
+    if (typeof window !== 'undefined' && typeof window.__showBootBanner === 'function') {
+      window.__showBootBanner(text, color || '#0066cc');
+      return;
+    }
+    // Fallback: write to the banner element directly if the helper isn't present.
+    const b = document.getElementById('__sentinel-boot-err');
+    if (b) b.textContent += text + '\n';
+  } catch (_e) { /* never let diagnostics break the popup */ }
+}
+__chatDiag('[chat.js] loaded ✓');
 // Chat UI: goal input, message rendering, action cards, typing indicator, file attachments,
 // voice input, command palette, search, export, report card/modal, background message handler.
 // Depends on: ui-common.js (sanitizeHtml, isValidUrl, showToast, marked config).
@@ -910,12 +926,18 @@ function hideStatus() {
 // goal and returns — no double-send. Any throw is surfaced to the user as a
 // toast instead of failing silently ("nothing happens, no errors").
 function _safeSendMessage(origin) {
+  __chatDiag(`[send] handler fired (${origin}) ✓`, '#00aa44'); // TEMP DIAGNOSTIC
   try {
     console.log(`[Sentinel] (delegated:${origin}) → sendMessage()`);
+    if (typeof sendMessage !== 'function') {
+      __chatDiag('[send] ERROR: sendMessage is not a function', '#ff0040'); // TEMP DIAGNOSTIC
+      return;
+    }
     sendMessage();
   } catch (err) {
     const m = (typeof getErrorMessage === 'function') ? getErrorMessage(err) : String(err);
     console.error('[Sentinel] sendMessage threw:', m, err);
+    __chatDiag('[send] sendMessage threw: ' + m, '#ff0040'); // TEMP DIAGNOSTIC
     if (typeof showToast === 'function') showToast(`Send failed: ${m}`, 'error');
   }
 }
@@ -934,6 +956,7 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
     _safeSendMessage('click');
   });
   console.log('[Sentinel] delegated send handlers attached');
+  __chatDiag('[send] delegated handlers attached ✓'); // TEMP DIAGNOSTIC
 }
 
 // Input listeners (auto-resize, example-prompt buttons, Enter key, send button)
@@ -965,7 +988,7 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
         }
       });
     }
-  }, 300); // small delay to let initial load settle
+  }, 1000); // delay increased to let all DOMContentLoaded listeners settle
 })();
 
 function setAgentActive(isActive) {
@@ -1003,6 +1026,12 @@ if (injectContextInput) {
 
 function sendMessage() {
   console.log('[Sentinel] sendMessage() called');
+
+  if (typeof showToast !== 'function') {
+    console.error('[Sentinel] showToast not available — initialization incomplete');
+    alert('Extension not fully loaded. Please close and reopen the popup.');
+    return;
+  }
   if (typeof showToast === 'function') showToast('Sending...', 'info');
   const state = getState();
   const _goalInput = document.getElementById('goalInput');
