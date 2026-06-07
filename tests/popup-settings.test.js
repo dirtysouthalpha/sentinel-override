@@ -429,3 +429,36 @@ describe('settings.js — persistProviderConfig', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('settings.js — provider save status indicator', () => {
+  test('persist marks saved, then editing the key marks unsaved', async () => {
+    const sb = createSandbox();
+    sb.Promise = Promise;
+    sb.chrome.storage.local.set = (data, cb) => { if (cb) cb(); };
+    sb.getState = () => ({ providerConfigs: { openai: {} }, activeProviderId: 'openai' });
+    loadModule(sb);
+
+    const keyEl = sb._elCache['set-provider-key'];
+    const statusEl = sb.document.getElementById('providerSaveStatus');
+    keyEl.value = 'sk-abc';
+
+    await sb.persistProviderConfig('https://api.openai.com', 'sk-abc', 'gpt-4o');
+    expect(statusEl.style.display).toBe('block');
+    expect(statusEl.textContent.toLowerCase()).toContain('saved');
+
+    // Editing the key so it no longer matches the persisted value flips to unsaved.
+    keyEl.value = 'sk-abc-CHANGED';
+    sb.refreshProviderSaveStatus();
+    expect(statusEl.textContent).toContain('Unsaved');
+  });
+
+  test('indicator stays hidden when no key is entered', () => {
+    const sb = createSandbox();
+    loadModule(sb);
+    const keyEl = sb._elCache['set-provider-key'];
+    const statusEl = sb.document.getElementById('providerSaveStatus');
+    keyEl.value = '';
+    sb.setProviderSaveStatus('saved');
+    expect(statusEl.style.display).toBe('none');
+  });
+});

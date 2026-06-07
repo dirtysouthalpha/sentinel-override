@@ -353,6 +353,10 @@
         <!-- Test connection -->
         <button type="button" id="testConnectionBtn" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:13px;">🔌 Test Connection</button>
 
+        <!-- Persisted-state indicator: reflects whether the current API key is
+             actually saved to storage (set by persistProviderConfig / updateProviderSaveStatus). -->
+        <div id="providerSaveStatus" role="status" aria-live="polite" style="display:none;font-size:11px;margin-top:6px;font-weight:600;"></div>
+
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:8px;line-height:1.4;">
           Pick a provider above → endpoint auto-fills → paste API key → click <strong>Detect Models</strong> to list available models, or type a model ID manually. Local providers (Ollama, LM Studio, KoboldCpp) need no key.
         </div>

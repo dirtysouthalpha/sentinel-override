@@ -723,6 +723,10 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   }
 
   switchProviderCard(state.activeProviderId);
+  // Seed the saved-key tracker from storage so the inline indicator reflects
+  // the real persisted state the moment the modal opens.
+  _lastSavedProviderKey = (state.providerConfigs[state.activeProviderId] || {}).api_key || '';
+  refreshProviderSaveStatus();
   // Sync the catalog dropdown to the active provider
   const catalogSel = document.getElementById('providerCatalogSelect');
   if (catalogSel) {
@@ -753,6 +757,38 @@ if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => {
   if (settingsModal) settingsModal.classList.remove('show');
 });
 
+// Tracks the API key currently persisted in storage for the active provider,
+// so the inline status indicator can tell "saved" from "unsaved edits".
+let _lastSavedProviderKey = null;
+
+// Update the inline "API key saved / unsaved" indicator under Test Connection.
+// kind: 'saved' | 'unsaved' | 'hidden'. When no key is entered, stays hidden.
+function setProviderSaveStatus(kind) {
+  const el = document.getElementById('providerSaveStatus');
+  if (!el) return;
+  const key = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  if (kind === 'hidden' || !key) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.style.display = 'block';
+  if (kind === 'saved') {
+    el.textContent = '✓ API key saved';
+    el.style.color = 'var(--success-color, #00aa44)';
+  } else {
+    el.textContent = '● Unsaved changes — click Save Settings';
+    el.style.color = 'var(--warning-color, #ffaa00)';
+  }
+}
+
+// Recompute the indicator by comparing the form key to the last persisted key.
+function refreshProviderSaveStatus() {
+  const key = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  if (!key) { setProviderSaveStatus('hidden'); return; }
+  setProviderSaveStatus(key === _lastSavedProviderKey ? 'saved' : 'unsaved');
+}
+
 // Persist the current provider form values to chrome.storage.local under the
 // active provider, in the exact shape getActiveProvider() / boot-catcher read.
 // Shared by "Save Settings" and a successful "Test Connection" so that a config
@@ -780,6 +816,9 @@ function persistProviderConfig(endpoint, apiKey, model) {
         resolve(null);
         return;
       }
+      // Reflect the freshly persisted key in the inline status indicator.
+      _lastSavedProviderKey = apiKey;
+      try { setProviderSaveStatus('saved'); } catch (_e) { /* non-fatal */ }
       resolve(activeProviderId);
     });
   });
@@ -1097,6 +1136,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   }
 });
 
+// Editing any provider field means the in-memory form no longer matches what's
+// persisted — flip the indicator to "unsaved" so the user knows to Save/Test.
+[setProviderKey, setProviderModel, setProviderEndpoint].forEach((field) => {
+  if (field && typeof field.addEventListener === 'function') {
+    field.addEventListener('input', () => { try { refreshProviderSaveStatus(); } catch (_e) { /* non-fatal */ } });
+  }
+});
+
 // ========== Provider Catalog Auto-Detect (3.10.0) ==========
 // Loads the 16-provider catalog from the background, populates the dropdown,
 // auto-fills the endpoint on selection, and provides a Detect Models button
@@ -1161,6 +1208,11 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (keyInput) {
       keyInput.value = savedConfig.api_key || '';
     }
+
+    // The active provider just changed — re-baseline the saved-key tracker to
+    // this provider's persisted key so the indicator reflects its real state.
+    _lastSavedProviderKey = savedConfig.api_key || '';
+    refreshProviderSaveStatus();
 
     // Reset detected models dropdown
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
@@ -1242,6 +1294,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
+      try { refreshProviderSaveStatus(); } catch (_e) { /* non-fatal */ }
       try { showToast(`Model set to ${value}`, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     }
   });
