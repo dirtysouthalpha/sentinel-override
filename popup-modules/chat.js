@@ -1076,13 +1076,32 @@ function sendMessage() {
 
   // Carry over the last goal if the new message seems like a follow-up
   let fullGoal = goal;
-  chrome.storage.local.get(['last_agent_goal', 'agent_history'], (stored) => {
+  chrome.storage.local.get(['last_agent_goal', 'agent_history', 'active_provider', 'providers', 'api_key'], (stored) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
       removeTypingIndicator();
       addMessage(`Error reading stored goal: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
       resetUI();
       return;
     }
+
+    // Pre-flight: bail early with clear, visible feedback if no API key is
+    // configured. Without this the agent half-starts and only surfaces a buried
+    // "API call failed: API key not configured" note several steps in, which
+    // reads to the user as "nothing happened / no API even though I set one".
+    const _activeId = stored.active_provider;
+    const _providers = stored.providers;
+    const _hasProviderKey = !!(_activeId && _providers && _providers[_activeId] && _providers[_activeId].api_key);
+    const _hasLegacyKey = !!stored.api_key;
+    if (!_hasProviderKey && !_hasLegacyKey) {
+      removeTypingIndicator();
+      addMessage('No API key configured. Open Settings, enter your provider API key, and click "Test Connection" (which now saves it) or "Save Settings" before sending a goal.', 'assistant');
+      if (typeof showToast === 'function') showToast('Set up an API key in Settings first', 'error');
+      // Restore the goal the user typed so they don't lose it, and re-enable UI.
+      if (_goalInput) _goalInput.value = goal;
+      resetUI();
+      return;
+    }
+
     const lastGoal = stored.last_agent_goal || '';
     const history = stored.agent_history || [];
     // If the message is short and looks like a follow-up (not a URL or specific instruction), prepend context
@@ -1467,6 +1486,15 @@ function updateAttachmentPreview() {
 // ========== Voice Input (tab-based) ==========
 // eslint-disable-next-line no-unused-vars -- Function is called from popup-full.js
 function setupVoiceInput() {
+  // Guard: the mic button must exist before we wire click/message handlers.
+  // voiceBtn is captured at module load; if the popup markup ever ships without
+  // #voiceBtn this would otherwise throw uncaught inside DOMContentLoaded and
+  // abort the rest of popup init. Fail loud-but-safe instead.
+  if (!voiceBtn) {
+    console.warn('[Sentinel/chat] setupVoiceInput: #voiceBtn not found — voice input disabled');
+    return;
+  }
+
   // Remove previous listeners if exists (prevent duplicates on popup reopen)
   if (_voiceMessageListener) {
     try {

@@ -393,3 +393,72 @@ describe('settings.js — settingsModal null guard', () => {
     await expect(clickHandler()).resolves.toBeUndefined();
   });
 });
+
+describe('settings.js — persistProviderConfig', () => {
+  test('writes the active provider key in the shape getActiveProvider reads', async () => {
+    const sb = createSandbox();
+    sb.Promise = Promise; // real Promise so the helper resolves
+    let written = null;
+    sb.chrome.storage.local.set = (data, cb) => { written = data; if (cb) cb(); };
+    sb.getState = () => ({ providerConfigs: { openai: {} }, activeProviderId: 'zai' });
+
+    loadModule(sb);
+    expect(typeof sb.persistProviderConfig).toBe('function');
+
+    const result = await sb.persistProviderConfig('https://api.z.ai/x', 'sk-test-123', 'glm-5');
+    expect(result).toBe('zai');
+    expect(written.active_provider).toBe('zai');
+    expect(written.providers.zai.api_key).toBe('sk-test-123');
+    expect(written.providers.zai.model).toBe('glm-5');
+    expect(written.providers.zai.endpoint).toBe('https://api.z.ai/x');
+  });
+
+  test('resolves null when storage.set reports an error', async () => {
+    const sb = createSandbox();
+    sb.Promise = Promise;
+    sb.getErrorMessage = (e) => String(e && e.message || e);
+    sb.chrome.storage.local.set = (data, cb) => {
+      sb.chrome.runtime.lastError = { message: 'quota' };
+      if (cb) cb();
+      sb.chrome.runtime.lastError = null;
+    };
+    sb.getState = () => ({ providerConfigs: {}, activeProviderId: 'openai' });
+
+    loadModule(sb);
+    const result = await sb.persistProviderConfig('https://api.openai.com', 'sk-x', 'gpt-4o');
+    expect(result).toBeNull();
+  });
+});
+
+describe('settings.js — provider save status indicator', () => {
+  test('persist marks saved, then editing the key marks unsaved', async () => {
+    const sb = createSandbox();
+    sb.Promise = Promise;
+    sb.chrome.storage.local.set = (data, cb) => { if (cb) cb(); };
+    sb.getState = () => ({ providerConfigs: { openai: {} }, activeProviderId: 'openai' });
+    loadModule(sb);
+
+    const keyEl = sb._elCache['set-provider-key'];
+    const statusEl = sb.document.getElementById('providerSaveStatus');
+    keyEl.value = 'sk-abc';
+
+    await sb.persistProviderConfig('https://api.openai.com', 'sk-abc', 'gpt-4o');
+    expect(statusEl.style.display).toBe('block');
+    expect(statusEl.textContent.toLowerCase()).toContain('saved');
+
+    // Editing the key so it no longer matches the persisted value flips to unsaved.
+    keyEl.value = 'sk-abc-CHANGED';
+    sb.refreshProviderSaveStatus();
+    expect(statusEl.textContent).toContain('Unsaved');
+  });
+
+  test('indicator stays hidden when no key is entered', () => {
+    const sb = createSandbox();
+    loadModule(sb);
+    const keyEl = sb._elCache['set-provider-key'];
+    const statusEl = sb.document.getElementById('providerSaveStatus');
+    keyEl.value = '';
+    sb.setProviderSaveStatus('saved');
+    expect(statusEl.style.display).toBe('none');
+  });
+});

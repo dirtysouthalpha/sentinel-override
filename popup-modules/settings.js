@@ -723,6 +723,10 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   }
 
   switchProviderCard(state.activeProviderId);
+  // Seed the saved-key tracker from storage so the inline indicator reflects
+  // the real persisted state the moment the modal opens.
+  _lastSavedProviderKey = (state.providerConfigs[state.activeProviderId] || {}).api_key || '';
+  refreshProviderSaveStatus();
   // Sync the catalog dropdown to the active provider
   const catalogSel = document.getElementById('providerCatalogSelect');
   if (catalogSel) {
@@ -753,8 +757,74 @@ if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => {
   if (settingsModal) settingsModal.classList.remove('show');
 });
 
-if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
-  const state = getState();
+// Tracks the API key currently persisted in storage for the active provider,
+// so the inline status indicator can tell "saved" from "unsaved edits".
+let _lastSavedProviderKey = null;
+
+// Update the inline "API key saved / unsaved" indicator under Test Connection.
+// kind: 'saved' | 'unsaved' | 'hidden'. When no key is entered, stays hidden.
+function setProviderSaveStatus(kind) {
+  const el = document.getElementById('providerSaveStatus');
+  if (!el) return;
+  const key = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  if (kind === 'hidden' || !key) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
+  el.style.display = 'block';
+  if (kind === 'saved') {
+    el.textContent = '✓ API key saved';
+    el.style.color = 'var(--success-color, #00aa44)';
+  } else {
+    el.textContent = '● Unsaved changes — click Save Settings';
+    el.style.color = 'var(--warning-color, #ffaa00)';
+  }
+}
+
+// Recompute the indicator by comparing the form key to the last persisted key.
+function refreshProviderSaveStatus() {
+  const key = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
+  if (!key) { setProviderSaveStatus('hidden'); return; }
+  setProviderSaveStatus(key === _lastSavedProviderKey ? 'saved' : 'unsaved');
+}
+
+// Persist the current provider form values to chrome.storage.local under the
+// active provider, in the exact shape getActiveProvider() / boot-catcher read.
+// Shared by "Save Settings" and a successful "Test Connection" so that a config
+// the user just verified is never silently lost when they close the modal
+// without clicking Save — the root cause of "tested fine but says no API key".
+// Returns a Promise resolving to the activeProviderId on success, or null on failure.
+function persistProviderConfig(endpoint, apiKey, model) {
+  return new Promise((resolve) => {
+    const state = getState();
+    const activeProviderId = state.activeProviderId || 'openai';
+    state.providerConfigs = state.providerConfigs || {};
+    state.providerConfigs[activeProviderId] = {
+      api_key: apiKey,
+      model: model,
+      endpoint: endpoint,
+      max_tokens: 8000,
+      temperature: 0.3
+    };
+    chrome.storage.local.set({
+      active_provider: activeProviderId,
+      providers: state.providerConfigs
+    }, () => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.error('[Sentinel/settings] persistProviderConfig failed:', getErrorMessage(chrome.runtime.lastError));
+        resolve(null);
+        return;
+      }
+      // Reflect the freshly persisted key in the inline status indicator.
+      _lastSavedProviderKey = apiKey;
+      try { setProviderSaveStatus('saved'); } catch (_e) { /* non-fatal */ }
+      resolve(activeProviderId);
+    });
+  });
+}
+
+if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', async () => {
   const endpoint = setProviderEndpoint && setProviderEndpoint.value ? setProviderEndpoint.value.trim() : '';
   const apiKey = setProviderKey && setProviderKey.value ? setProviderKey.value.trim() : '';
   const model = setProviderModel && setProviderModel.value ? setProviderModel.value.trim() : '';
@@ -772,24 +842,20 @@ if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', () => {
     return;
   }
 
-  // Save to per-provider structure
-  const activeProviderId = state.activeProviderId || 'openai';
-  state.providerConfigs[activeProviderId] = {
-    api_key: apiKey,
-    model: model,
-    endpoint: endpoint,
-    max_tokens: 8000,
-    temperature: 0.3
-  };
+  // Save provider config via the shared helper (single source of truth for the
+  // storage shape) plus the non-provider preferences.
+  const activeProviderId = await persistProviderConfig(endpoint, apiKey, model);
+  if (!activeProviderId) {
+    showToast('Failed to save settings', 'error');
+    return;
+  }
 
   chrome.storage.local.set({
-    active_provider: activeProviderId,
-    providers: state.providerConfigs,
     export_format: format,
     agent_context: agentContext
   }, () => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-      console.error('[Sentinel/settings] Failed to save settings:', getErrorMessage(chrome.runtime.lastError));
+      console.error('[Sentinel/settings] Failed to save preferences:', getErrorMessage(chrome.runtime.lastError));
       showToast('Failed to save settings', 'error');
       return;
     }
@@ -1051,7 +1117,13 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     clearTimeout(timer);
 
     if (resp.ok) {
-      showToast(`Connection OK (${resp.status})`, 'success');
+      // Persist the verified config immediately. Previously Test only validated
+      // form values and saved nothing, so a user who tested OK then closed the
+      // modal without clicking "Save Settings" had no key in storage — the agent
+      // then failed at runtime with "API key not configured" ("no API"). Saving
+      // here makes "Connection OK" mean the config is actually usable.
+      const savedId = await persistProviderConfig(endpoint, apiKey, model);
+      showToast(savedId ? `Connection OK (${resp.status}) — saved` : `Connection OK (${resp.status}) — but save failed`, savedId ? 'success' : 'error');
     } else {
       const errText = (await resp.text()).slice(0, 200);
       showToast(`Connection failed: ${resp.status} ${errText}`, 'error');
@@ -1061,6 +1133,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   } finally {
     testConnectionBtn.textContent = prevText;
     testConnectionBtn.disabled = false;
+  }
+});
+
+// Editing any provider field means the in-memory form no longer matches what's
+// persisted — flip the indicator to "unsaved" so the user knows to Save/Test.
+[setProviderKey, setProviderModel, setProviderEndpoint].forEach((field) => {
+  if (field && typeof field.addEventListener === 'function') {
+    field.addEventListener('input', () => { try { refreshProviderSaveStatus(); } catch (_e) { /* non-fatal */ } });
   }
 });
 
@@ -1128,6 +1208,11 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     if (keyInput) {
       keyInput.value = savedConfig.api_key || '';
     }
+
+    // The active provider just changed — re-baseline the saved-key tracker to
+    // this provider's persisted key so the indicator reflects its real state.
+    _lastSavedProviderKey = savedConfig.api_key || '';
+    refreshProviderSaveStatus();
 
     // Reset detected models dropdown
     modelsSel.innerHTML = '<option value="">(click Detect Models to populate)</option>';
@@ -1209,6 +1294,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const modelInput = document.getElementById('set-provider-model');
     if (modelInput) {
       modelInput.value = value;
+      try { refreshProviderSaveStatus(); } catch (_e) { /* non-fatal */ }
       try { showToast(`Model set to ${value}`, 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
     }
   });
