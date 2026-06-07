@@ -1486,6 +1486,15 @@ function updateAttachmentPreview() {
 // ========== Voice Input (tab-based) ==========
 // eslint-disable-next-line no-unused-vars -- Function is called from popup-full.js
 function setupVoiceInput() {
+  // Guard: the mic button must exist before we wire click/message handlers.
+  // voiceBtn is captured at module load; if the popup markup ever ships without
+  // #voiceBtn this would otherwise throw uncaught inside DOMContentLoaded and
+  // abort the rest of popup init. Fail loud-but-safe instead.
+  if (!voiceBtn) {
+    console.warn('[Sentinel/chat] setupVoiceInput: #voiceBtn not found — voice input disabled');
+    return;
+  }
+
   // Remove previous listeners if exists (prevent duplicates on popup reopen)
   if (_voiceMessageListener) {
     try {

@@ -1173,7 +1173,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const strs = _normalizeSteps(parsed.steps);
         if (strs.length) return strs;
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', getErrorMessage(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 1 failed:', getErrorMessage(e)); }
 
     // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
     // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
@@ -1216,7 +1216,7 @@ export async function generatePlan(goal, settings, context = {}) {
           s2from = s2end + 1;
         } else { break; }
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', getErrorMessage(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', getErrorMessage(e)); }
 
     // Strategy 3: find first { and last } and try that substring; also try bare array.
     // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
@@ -1245,7 +1245,7 @@ export async function generatePlan(goal, settings, context = {}) {
         const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
         if (Array.isArray(parsed) && parsed.length) { const r = _normalizeSteps(parsed); if (r.length) return r; }
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 4 failed:', getErrorMessage(e)); }
+    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', getErrorMessage(e)); }
 
     // Strategy 4: extract numbered or bulleted steps from prose.
     // Uses contentNoThink so think-block text isn't mistaken for real plan steps.
