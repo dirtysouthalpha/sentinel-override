@@ -1034,7 +1034,20 @@ function sendMessage() {
   }
   if (typeof showToast === 'function') showToast('Sending...', 'info');
   const state = getState();
-  const _goalInput = document.getElementById('goalInput');
+  // Robust goal-field resolution. getElementById returns only the FIRST
+  // #goalInput; if a duplicate ever exists in the live DOM, that first one may
+  // be empty/hidden while the user typed into another. Prefer the focused field
+  // (what the user actually typed into), then any #goalInput that has text.
+  const _goalInputs = Array.prototype.slice.call(document.querySelectorAll('#goalInput'));
+  let _goalInput = document.getElementById('goalInput');
+  const _activeEl = document.activeElement;
+  if (_activeEl && _activeEl.id === 'goalInput' && typeof _activeEl.value === 'string') {
+    _goalInput = _activeEl;
+  } else {
+    const _withText = _goalInputs.find(el => el && typeof el.value === 'string' && el.value.trim());
+    if (_withText) _goalInput = _withText;
+  }
+  __chatDiag('[send] #goalInput count=' + _goalInputs.length + ' val="' + (_goalInput && _goalInput.value ? _goalInput.value.slice(0, 24) : '') + '"', '#aa00aa'); // TEMP DIAGNOSTIC
   const _sendBtn = document.getElementById('sendBtn');
   const _stopBtn = document.getElementById('stopBtn');
   const _pauseBtn = document.getElementById('pauseBtn');
