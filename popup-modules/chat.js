@@ -899,79 +899,47 @@ function hideStatus() {
 }
 
 // ========== Input Area ==========
-(function() {
-  function attachInputListeners() {
-    console.log('[Sentinel] Attaching input listeners...');
-    const _goalInput = document.getElementById('goalInput'); // Re-query to ensure element exists
-    if (_goalInput) {
-      _goalInput.addEventListener('input', () => {
-        _goalInput.style.height = 'auto';
-        _goalInput.style.height = `${Math.min(_goalInput.scrollHeight, 100)}px`;
-        updateMarkdownPreview();
-      });
-      console.log('[Sentinel] goalInput input listener attached');
-    } else {
-      console.error('[Sentinel] goalInput not found - input listener not attached');
-    }
 
-    // (3.12.0) Example-prompt buttons in welcome state — click to populate input
-    document.querySelectorAll('.example-prompt-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const prompt = btn.dataset.prompt || (typeof btn.textContent === 'string' ? btn.textContent.trim() : '');
-        const _goalInput = document.getElementById('goalInput'); // Re-query to ensure element exists
-        if (_goalInput) {
-          _goalInput.value = prompt;
-          _goalInput.style.height = 'auto';
-          _goalInput.style.height = `${Math.min(_goalInput.scrollHeight, 100)}px`;
-          _goalInput.focus();
-          // Position cursor at first [bracket] placeholder if present, so the
-          // user can immediately fill in their value.
-          const bracketMatch = prompt.match(/\[([^\]]+)\]/);
-          if (bracketMatch && bracketMatch[0]) {
-            const start = prompt.indexOf(bracketMatch[0]);
-            _goalInput.setSelectionRange(start, start + bracketMatch[0].length);
-          }
-          updateMarkdownPreview();
-        }
-      });
-    });
-
-    const _goalInputKeydown = document.getElementById('goalInput'); // Re-query to ensure element exists
-    if (_goalInputKeydown) {
-      _goalInputKeydown.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          console.log('[Sentinel] Enter key pressed, calling sendMessage()');
-          sendMessage();
-        }
-      });
-      console.log('[Sentinel] goalInput keydown listener attached');
-    } else {
-      console.error('[Sentinel] goalInput not found - keydown listener not attached');
-    }
-
-    // ========== Send Message ==========
-    const _sendBtn = document.getElementById('sendBtn'); // Re-query to ensure element exists
-    if (_sendBtn) {
-      _sendBtn.addEventListener('click', () => {
-        console.log('[Sentinel] Send button clicked, calling sendMessage()');
-        sendMessage();
-      });
-      console.log('[Sentinel] sendBtn click listener attached');
-    } else {
-      console.error('[Sentinel] sendBtn not found - event listener not attached');
-    }
+// Bulletproof send: document-level delegated handlers so the send path works
+// even if the direct per-element listeners never attach (DOM timing, a missing
+// element halting init, or the input/button being re-rendered after wiring).
+// Delegation is attached to `document`, which always exists, in the bubble
+// phase — Enter from #goalInput and clicks on #sendBtn (or the SVG inside it)
+// both reach it. sendMessage() clears the input on entry, so when both a direct
+// and the delegated handler fire for one keystroke the second sees an empty
+// goal and returns — no double-send. Any throw is surfaced to the user as a
+// toast instead of failing silently ("nothing happens, no errors").
+function _safeSendMessage(origin) {
+  try {
+    console.log(`[Sentinel] (delegated:${origin}) → sendMessage()`);
+    sendMessage();
+  } catch (err) {
+    const m = (typeof getErrorMessage === 'function') ? getErrorMessage(err) : String(err);
+    console.error('[Sentinel] sendMessage threw:', m, err);
+    if (typeof showToast === 'function') showToast(`Send failed: ${m}`, 'error');
   }
+}
+if (typeof document !== 'undefined' && document.addEventListener && !window.__sentinelSendDelegated) {
+  window.__sentinelSendDelegated = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.shiftKey) return;
+    const ae = document.activeElement;
+    if (!ae || ae.id !== 'goalInput') return;
+    e.preventDefault();
+    _safeSendMessage('enter');
+  });
+  document.addEventListener('click', (e) => {
+    const btn = e.target && e.target.closest && e.target.closest('#sendBtn');
+    if (!btn) return;
+    _safeSendMessage('click');
+  });
+  console.log('[Sentinel] delegated send handlers attached');
+}
 
-  // Wait for DOM to be ready before attaching listeners
-  if (document.readyState === 'loading') {
-    console.log('[Sentinel] DOM still loading, waiting for DOMContentLoaded');
-    document.addEventListener('DOMContentLoaded', attachInputListeners);
-  } else {
-    console.log('[Sentinel] DOM ready, attaching listeners immediately');
-    attachInputListeners();
-  }
-})();
+// Input listeners (auto-resize, example-prompt buttons, Enter key, send button)
+// are now consolidated into popup-full.js DOMContentLoaded to eliminate the
+// race condition that occurred when this IIFE ran before DOM elements existed.
+// Document-level delegated handlers above handle the send path as a safety net.
 
 // ========== Safety: ensure UI is never stuck disabled on popup open ==========
 // If the previous session crashed mid-run, the agent_finished message was never
@@ -1276,7 +1244,7 @@ document.addEventListener('keydown', (e) => {
     _pauseBtn.click();
   }
 });
-newChatBtn.addEventListener('click', () => {
+newChatBtn && newChatBtn.addEventListener('click', () => {
   if (confirm('Start a new chat? This will clear the current conversation. (The current chat will be archived to Recent Chats.)')) {
     const _goalInput = document.getElementById('goalInput');
     // (3.24.0) Archive the current chat to Recent Chats BEFORE clearing so
@@ -1309,7 +1277,7 @@ newChatBtn.addEventListener('click', () => {
 });
 
 // ========== Message Search ==========
-searchInput.addEventListener('input', (e) => {
+searchInput && searchInput.addEventListener('input', (e) => {
   const state = getState();
   state.currentSearchQuery = (e.target && typeof e.target.value === 'string' ? e.target.value : '').toLowerCase();
   state.currentSearchIndex = 0;
@@ -1357,7 +1325,7 @@ function clearSearchHighlights() {
 }
 
 // ========== Markdown Preview ==========
-previewBtn.addEventListener('click', () => {
+previewBtn && previewBtn.addEventListener('click', () => {
   markdownPreview.classList.toggle('show');
   previewBtn.classList.toggle('active');
 });
@@ -1442,11 +1410,11 @@ function updateMarkdownPreview() {
 }
 
 // ========== File Attachment ==========
-attachBtn.addEventListener('click', () => {
+attachBtn && attachBtn.addEventListener('click', () => {
   fileInput.click();
 });
 
-fileInput.addEventListener('change', (e) => {
+fileInput && fileInput.addEventListener('change', (e) => {
   const state = getState();
   if (e.target && e.target.files) {
     state.selectedAttachments = [...e.target.files];
@@ -1685,7 +1653,7 @@ function setupVoiceInput() {
 // here too would register a duplicate chrome.runtime.onMessage listener.
 
 // ========== Conversation Export ==========
-exportBtn.addEventListener('click', () => {
+exportBtn && exportBtn.addEventListener('click', () => {
   const state = getState();
   if (!state.conversationHistory || !Array.isArray(state.conversationHistory) || state.conversationHistory.length === 0) {
     showToast('No messages to export', 'error');
@@ -1731,8 +1699,8 @@ exportBtn.addEventListener('click', () => {
 });
 
 // ========== Command Palette ==========
-commandPaletteBtn.addEventListener('click', openCommandPalette);
-commandPaletteBackdrop.addEventListener('click', closeCommandPalette);
+commandPaletteBtn && commandPaletteBtn.addEventListener('click', openCommandPalette);
+commandPaletteBackdrop && commandPaletteBackdrop.addEventListener('click', closeCommandPalette);
 
 function openCommandPalette() {
   commandPalette.classList.add('show');
@@ -1747,8 +1715,8 @@ function closeCommandPalette() {
   commandInput.value = '';
 }
 
-commandInput.addEventListener('input', filterCommands);
-commandInput.addEventListener('keydown', (e) => {
+commandInput && commandInput.addEventListener('input', filterCommands);
+commandInput && commandInput.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeCommandPalette();
   if (e.key === 'Enter') executeSelectedCommand();
   if (e.key === 'ArrowDown') moveCommandSelection(1);
@@ -2115,17 +2083,17 @@ function closeReportModal() {
 }
 
 // Report modal close button
-closeReportBtn.addEventListener('click', closeReportModal);
+closeReportBtn && closeReportBtn.addEventListener('click', closeReportModal);
 
 // Close report modal on backdrop click
-reportModal.addEventListener('click', (e) => {
+reportModal && reportModal.addEventListener('click', (e) => {
   if (e.target === reportModal) {
     closeReportModal();
   }
 });
 
 // Export: Copy as Markdown
-copyReportMdBtn.addEventListener('click', () => {
+copyReportMdBtn && copyReportMdBtn.addEventListener('click', () => {
   const state = getState();
   if (!state.currentReportMarkdown) {
     showToast('No report to copy', 'error');
@@ -2139,7 +2107,7 @@ copyReportMdBtn.addEventListener('click', () => {
 });
 
 // Export: Download as .md (with YAML frontmatter via collaboration module)
-downloadReportBtn.addEventListener('click', () => {
+downloadReportBtn && downloadReportBtn.addEventListener('click', () => {
   const state = getState();
   if (!state.currentReportMarkdown) {
     showToast('No report to download', 'error');
@@ -2219,7 +2187,7 @@ if (exportReplayBtn) {
 }
 
 // Export: Copy as Plain Text
-copyReportTextBtn.addEventListener('click', () => {
+copyReportTextBtn && copyReportTextBtn.addEventListener('click', () => {
   const state = getState();
   if (!state.currentReportMarkdown) {
     showToast('No report to copy', 'error');
