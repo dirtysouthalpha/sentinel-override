@@ -967,7 +967,23 @@ function _buildPlanPrompt(goal, context) {
     ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal && typeof p === 'object' ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && typeof s === 'object' && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
-  return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED numbered execution plan.
+  return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED hierarchical execution plan formatted as structured phases with sub-tasks.
+
+OUTPUT FORMAT:
+{
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Phase 1 – Setup",
+      "steps": ["step 1", "step 2"]
+    },
+    {
+      "phase": 2,
+      "title": "Phase 2 – Discovery",
+      "steps": ["step 1", "step 2"]
+    }
+  ]
+}
 
 DECOMPOSITION RULES — follow these exactly:
 1. Break every task into EXPLICIT, atomic browser actions. NEVER combine multiple actions into one step.
@@ -980,30 +996,84 @@ DECOMPOSITION RULES — follow these exactly:
 8. ALWAYS include data extraction steps (extract, execute_js with key, or note) — never just navigate and read without saving
 9. ALWAYS include verification after saves/commits (wait for success message, then use a verify action to confirm the value persisted)
 10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change, followed by a verify action
-11. Maximum 15 steps — be thorough but not redundant
+11. Phases must be numbered sequentially starting at 1. Phase titles are short descriptive strings.
+12. If the goal naturally splits into independent sub-goals, create separate phases for each sub-goal.
+13. Maximum overall steps still limited to 100, but phases may contain multiple steps.
 
 ${urlContext}${platformContext}${patternContext}${getMultiPortalDirective(goal) || ''}${getMultiArticleDirective(goal) || ''}
 <GOAL>
 ${goal}
 </GOAL>
 
-Return ONLY a JSON object: { "plan": ["step 1...", "step 2...", ...] }
+Return ONLY a JSON object: { "phases": [...] }
 
-Example GOOD plan for a complex MSP task:
-Goal: "Block port 3389 from WAN to LAN on the SonicWall at 192.168.1.1"
-{ "plan": ["Navigate to https://192.168.1.1", "Type the username into the login field", "Type the password into the password field", "Click the Login button and wait for dashboard", "Click Policy or Firewall in the left navigation menu", "Click Access Rules or IPv4 Rules", "Wait for the rules table to load", "Click Add Rule or the + button to create a new rule", "Set the Source Zone dropdown to WAN", "Set the Destination Zone dropdown to LAN", "Set the Service dropdown to RDP (port 3389) or type 3389", "Set the Action to Deny or Drop", "Type a descriptive name in the Comment/Name field", "Click Save or Apply", "Wait for the success confirmation banner", "Finish with confirmation that the RDP block rule was created"] }
+Example GOOD phased plan for a complex MSP task:
+{
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Initialize",
+      "steps": ["Navigate to https://192.168.1.1"]
+    },
+    {
+      "phase": 2,
+      "title": "Authenticate",
+      "steps": ["Type the username into the login field", "Type the password into the password field", "Click the Login button and wait for dashboard"]
+    },
+    {
+      "phase": 3,
+      "title": "Navigate to Rules",
+      "steps": ["Click Policy or Firewall in the left navigation menu", "Click Access Rules or IPv4 Rules", "Wait for the rules table to load"]
+    },
+    {
+      "phase": 4,
+      "title": "Create Block Rule",
+      "steps": ["Click Add Rule or the + button to create a new rule", "Set the Source Zone dropdown to WAN", "Set the Destination Zone dropdown to LAN", "Set the Service dropdown to RDP (port 3389) or type 3389", "Set the Action to Deny or Drop", "Type a descriptive name in the Comment/Name field", "Click Save or Apply", "Wait for the success confirmation banner"]
+    },
+    {
+      "phase": 5,
+      "title": "Verify",
+      "steps": ["Finish with confirmation that the RDP block rule was created"]
+    }
+  ]
+}
 
-Example GOOD plan for a multi-page research task:
-Goal: "Go to cnn.com and give me a briefing on the top 10 articles"
-{ "plan": ["Navigate to cnn.com", "Read the homepage content to identify top stories", "Use execute_js with key 'headlines' to extract the top 10 headline titles, links, and descriptions", "For each article that needs more detail, open it in a new tab using open_tab with label", "Switch to each article tab, read the page, and note a brief summary", "Close article tabs when done", "Finish with a numbered briefing of all 10 articles with headlines and key takeaways"] }
-
-Example GOOD plan for a firewall investigation:
-Goal: "Check the SonicWall at 10.0.0.1 for why traffic from 192.168.5.20 is being blocked"
-{ "plan": ["Navigate to the SonicWall management URL", "Login with the provided credentials", "Click Log in the left navigation menu", "Click View under Log to open the log viewer", "Wait for log entries to load", "Set the Category filter to Firewall if available", "Set the Source IP filter to 192.168.5.20", "Click Apply or Filter to apply the filters", "Wait for filtered results to appear", "Read and extract the blocked connection log entries", "Note the rule IDs, zones, and action (deny/drop) for each blocked connection", "Navigate to the matching firewall rules to understand why traffic is blocked", "Finish with a summary of which rules are blocking the traffic and why"] }
+Example GOOD phased plan for a multi-page research task:
+{
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Source",
+      "steps": ["Navigate to cnn.com", "Read the homepage content to identify top stories"]
+    },
+    {
+      "phase": 2,
+      "title": "Extract Links",
+      "steps": ["Use execute_js with key 'headlines' to extract the top 10 headline titles, links, and descriptions"]
+    },
+    {
+      "phase": 3,
+      "title": "Detail Pages",
+      "steps": ["For each article that needs more detail, open it in a new tab using open_tab with label", "Switch to each article tab, read the page, and note a brief summary", "Close article tabs when done"]
+    },
+    {
+      "phase": 4,
+      "title": "Summarize",
+      "steps": ["Finish with a numbered briefing of all 10 articles with headlines and key takeaways"]
+    }
+  ]
+}
 
 Example BAD plan (too vague):
-Goal: "Check the SonicWall firewall for blocked connections"
-{ "plan": ["Go to the website", "Find the information", "Get the data"] }`;
+{
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Phase 1",
+      "steps": ["Go to the website", "Find the information", "Get the data"]
+    }
+  ]
+}`;
 }
 
 /**
@@ -1088,6 +1158,16 @@ export async function generatePlan(goal, settings, context = {}) {
         const strs = _normalizeSteps(parsed.plan);
         if (strs.length) return strs;
       }
+      // New phased format: { "phases": [{ phase: 1, title: "...", steps: [...] }] }
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.phases) && parsed.phases.length) {
+        const flatSteps = [];
+        for (const phase of parsed.phases) {
+          if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
+            flatSteps.push(...phase.steps);
+          }
+        }
+        if (flatSteps.length) return _normalizeSteps(flatSteps);
+      }
       // Some models return { "steps": [...] } instead of { "plan": [...] }
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length) {
         const strs = _normalizeSteps(parsed.steps);
@@ -1119,6 +1199,16 @@ export async function generatePlan(goal, settings, context = {}) {
             const parsed = JSON.parse(contentNoThink.substring(s2start, s2end + 1));
             if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
             if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
+            // New phased format
+            if (Array.isArray(parsed.phases) && parsed.phases.length) {
+              const flatSteps = [];
+              for (const phase of parsed.phases) {
+                if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
+                  flatSteps.push(...phase.steps);
+                }
+              }
+              if (flatSteps.length) return _normalizeSteps(flatSteps);
+            }
           } catch (parseErr) {
             /* Not valid JSON at this position - keep scanning for next { */
             console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', getErrorMessage(parseErr));
@@ -1137,6 +1227,16 @@ export async function generatePlan(goal, settings, context = {}) {
         const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
         if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
         if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
+        // New phased format
+        if (Array.isArray(parsed.phases) && parsed.phases.length) {
+          const flatSteps = [];
+          for (const phase of parsed.phases) {
+            if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
+              flatSteps.push(...phase.steps);
+            }
+          }
+          if (flatSteps.length) return _normalizeSteps(flatSteps);
+        }
       }
       // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
       const arrStart = contentNoThink.indexOf('[');
