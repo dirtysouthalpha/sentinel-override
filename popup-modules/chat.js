@@ -3,6 +3,49 @@
 // voice input, command palette, search, export, report card/modal, background message handler.
 // Depends on: ui-common.js (sanitizeHtml, isValidUrl, showToast, marked config).
 // Depends on: settings.js (toggleTheme).
+
+// ========== User-Friendly Error Messages ==========
+// Translates raw API/runtime errors into actionable messages the user can act on.
+function friendlyError(raw) {
+  if (!raw || typeof raw !== 'string') return 'Something went wrong. Try again or check Settings.';
+  const lower = raw.toLowerCase();
+
+  // API key / auth
+  if (lower.includes('api key') || lower.includes('api_key') || lower.includes('authentication') || lower.includes('unauthorized') || lower.includes('401'))
+    return '🔑 API key issue — open Settings and verify your key is correct.';
+  if (lower.includes('forbidden') || lower.includes('403'))
+    return '🚫 Access denied — your API key doesn\'t have permission for this model. Check your plan in Settings.';
+
+  // Network
+  if (lower.includes('failed to fetch') || lower.includes('networkerror') || lower.includes('net::'))
+    return '🌐 Network error — check your internet connection and try again.';
+  if (lower.includes('timed out') || lower.includes('timeout') || lower.includes('aborted'))
+    return '⏱️ Request timed out — the API took too long to respond. Try again or switch to a faster model.';
+
+  // Rate limits
+  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('too many'))
+    return '⚡ Rate limited — too many requests. Wait a moment and try again.';
+
+  // Server errors
+  if (lower.includes('502') || lower.includes('bad gateway'))
+    return '🔧 API server error (502) — the provider is having issues. Try again in a minute.';
+  if (lower.includes('503') || lower.includes('service unavailable'))
+    return '🔧 API unavailable (503) — the provider is temporarily down. Try again shortly.';
+
+  // Content / model errors
+  if (lower.includes('400') && lower.includes('vision'))
+    return '👁️ Vision request rejected — try a text-only model or check if screenshots are supported.';
+  if (lower.includes('context_length_exceeded') || lower.includes('too many tokens') || lower.includes('max_tokens'))
+    return '📏 Request too large — the page content exceeded the model\'s context limit. Try a simpler goal.';
+
+  // Port / extension
+  if (lower.includes('disconnected port') || lower.includes('message port closed'))
+    return '🔌 Extension connection lost — reload the page and try again.';
+
+  // Fallback
+  if (raw.length > 200) return raw.slice(0, 200) + '… — check Settings or try again.';
+  return raw;
+}
 // ========== DOM Elements ==========
 const chatContainer = document.getElementById('chat-container');
 const stopBtn = document.getElementById('stopBtn');
@@ -1164,7 +1207,7 @@ function sendMessage() {
   chrome.storage.local.get(['last_agent_goal', 'agent_history', 'active_provider', 'providers', 'api_key'], (stored) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
       removeTypingIndicator();
-      addMessage(`Error reading stored goal: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
+      addMessage(friendlyError(getErrorMessage(chrome.runtime.lastError)), 'assistant');
       resetUI();
       return;
     }
@@ -1212,7 +1255,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
           console.error('[Sentinel] run_agent_loop lastError:', getErrorMessage(chrome.runtime.lastError));
           // Agent runtime error — already logged
           removeTypingIndicator();
-          addMessage(`Error: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
+          addMessage(friendlyError(getErrorMessage(chrome.runtime.lastError)), 'assistant');
           resetUI();
           return;
         }
@@ -1220,7 +1263,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
           console.error('[Sentinel] run_agent_loop error:', response.error);
           // Agent returned error — already logged
           removeTypingIndicator();
-          addMessage(`Error: ${response.error || 'Unknown error'}`, 'assistant');
+          addMessage(friendlyError(response.error || 'Unknown error'), 'assistant');
           resetUI();
         }
         // If response is ok, the agent is running — agent_finished will reset UI
@@ -1273,9 +1316,9 @@ if (stopBtn) {
   stopBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'stop_agent_loop' }, (response) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !response) {
-        addMessage(`Error stopping agent: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
+        addMessage(friendlyError(getErrorMessage(chrome.runtime.lastError)), 'assistant');
       } else if (response && !response.ok) {
-        addMessage(`Error stopping agent: ${response.error || 'Unknown error'}`, 'assistant');
+        addMessage(`⚠️ ${friendlyError(response.error || 'Unknown error')}`, 'assistant');
       } else {
         addMessage('Agent stopped by user.', 'assistant');
       }
@@ -1329,11 +1372,11 @@ if (undoBtn) {
     undoBtn.disabled = true;
     chrome.runtime.sendMessage({ action: 'undo_action' }, (resp) => {
       if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && !resp) {
-        addMessage(`Undo failed: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
+        addMessage(friendlyError(getErrorMessage(chrome.runtime.lastError)), 'assistant');
         return;
       }
       if (resp && !resp.ok) {
-        addMessage(`Undo failed: ${resp.error || 'Unknown error'}`, 'assistant');
+        addMessage(friendlyError(resp.error || 'Undo not available'), 'assistant');
       } else if (resp && resp.data && !resp.data.success) {
         addMessage(`Nothing to undo: ${resp.data.reason || ''}`, 'assistant');
       } else if (resp && resp.data && resp.data.success) {

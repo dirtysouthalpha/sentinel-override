@@ -1123,13 +1123,16 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       // then failed at runtime with "API key not configured" ("no API"). Saving
       // here makes "Connection OK" mean the config is actually usable.
       const savedId = await persistProviderConfig(endpoint, apiKey, model);
-      showToast(savedId ? `Connection OK (${resp.status}) — saved` : `Connection OK (${resp.status}) — but save failed`, savedId ? 'success' : 'error');
+      showToast(savedId ? '✓ Connection OK — settings saved' : '✓ Connection OK — but save failed', savedId ? 'success' : 'error');
     } else {
       const errText = (await resp.text()).slice(0, 200);
-      showToast(`Connection failed: ${resp.status} ${errText}`, 'error');
+      const hint = resp.status === 401 ? 'Check your API key.' : resp.status === 403 ? 'Your plan may not include this model.' : resp.status >= 500 ? 'The API server is having issues.' : '';
+      showToast(`Connection failed (${resp.status}): ${hint || errText}`, 'error');
     }
   } catch (err) {
-    showToast(`Connection error: ${String(err)}`, 'error');
+    const msg = String(err);
+    if (msg.includes('Failed to fetch')) showToast('Network error — check your internet connection.', 'error');
+    else showToast(`Connection error: ${msg.slice(0, 120)}`, 'error');
   } finally {
     testConnectionBtn.textContent = prevText;
     testConnectionBtn.disabled = false;
@@ -1252,8 +1255,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       const data = (resp && resp.data) ? resp.data : resp;
       if (!data || !data.ok) {
         const msg = (data && data.error) || 'Unknown error';
-        try { showToast(`Detect failed: ${msg}`, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
-        modelsSel.innerHTML = '<option value="">(detection failed - see toast)</option>';
+        const hint = msg.includes('401') ? 'Check your API key.' : msg.includes('fetch') ? 'Network error — check your connection.' : msg;
+        try { showToast(`Model detection failed: ${hint}`, 'error'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+        modelsSel.innerHTML = '<option value="">(detection failed — enter model manually)</option>';
         return;
       }
       const models = data.models || [];
