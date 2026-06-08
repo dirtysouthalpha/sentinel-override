@@ -217,7 +217,9 @@ export function sendActionMessage(command, stepNumber, observation) {
       code: enrichedCode,
       targetText: resolvedText,
       reasoning: (typeof command.__reasoning === 'string' && command.__reasoning)
-        ? command.__reasoning.substring(0, 600) : undefined
+        ? command.__reasoning.substring(0, 600) : undefined,
+      confidence: (typeof command.__confidence === 'number')
+        ? command.__confidence : undefined
     }
   }).catch((e) => {
     console.error('[sendActionMessage] Unhandled rejection:', e);

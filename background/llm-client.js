@@ -1528,6 +1528,75 @@ export function isSimpleStep(agentState, stepCount, history) {
   return true;
 }
 
+// ========== Multi-Provider Model Routing ==========
+// Routes steps to cheap/light models for simple tasks and powerful/heavy
+// models for complex ones. Reduces cost on observation-heavy runs while
+// keeping accuracy high on action-critical steps.
+
+/**
+ * Select the model tier for a step based on its complexity context.
+ * Returns 'light', 'default', or 'heavy', or null to use the default model.
+ * @param {Object} stepContext - { type, selector, hasScreenshot, stepNumber, totalSteps, previousFailures }
+ * @returns {string|null} Tier identifier or null for default.
+ */
+export function selectModelForStep(stepContext) {
+  if (!stepContext) return null; // use default
+
+  const type = stepContext.type || '';
+
+  // Simple observation/reading tasks — use cheap model
+  const simpleTypes = ['read_page', 'extract', 'extract_list', 'read_network_requests', 'read_console_messages', 'scroll', 'wait'];
+  if (simpleTypes.includes(type)) return 'light';
+
+  // Complex reasoning tasks — use powerful model
+  const complexTypes = ['click', 'type', 'execute_js', 'navigate', 'form_fill'];
+  if (complexTypes.includes(type)) {
+    // If previous failures, upgrade model
+    if (stepContext.previousFailures > 1) return 'heavy';
+    return 'default';
+  }
+
+  // Screenshot analysis always uses heavy model
+  if (stepContext.hasScreenshot) return 'heavy';
+
+  // Final steps use heavy model for accuracy
+  if (stepContext.stepNumber && stepContext.totalSteps &&
+      stepContext.stepNumber >= stepContext.totalSteps - 1) return 'heavy';
+
+  return null; // use default
+}
+
+// Cost tracker for multi-provider routing — accumulates per-tier call counts
+// and rough cost estimates across the run lifetime.
+const _costTracker = {
+  totalCalls: 0,
+  byTier: { light: 0, default: 0, heavy: 0 },
+  estimatedCost: 0
+};
+
+/**
+ * Record a model usage event for cost tracking.
+ * @param {string} tier - 'light', 'default', or 'heavy'
+ * @param {number} inputTokens - Input token count for this call.
+ * @param {number} outputTokens - Output token count for this call.
+ */
+export function recordModelUsage(tier, inputTokens, outputTokens) {
+  _costTracker.totalCalls++;
+  if (_costTracker.byTier[tier] !== undefined) _costTracker.byTier[tier]++;
+  else _costTracker.byTier.default++;
+  // Rough cost estimates per tier
+  const costs = { light: 0.000001, default: 0.000003, heavy: 0.00001 };
+  _costTracker.estimatedCost += (costs[tier] || costs.default) * ((inputTokens || 0) + (outputTokens || 0));
+}
+
+/**
+ * Get a snapshot of the cost tracker state.
+ * @returns {Object} { totalCalls, byTier, estimatedCost }
+ */
+export function getCostTracker() {
+  return { ..._costTracker, byTier: { ..._costTracker.byTier }, estimatedCost: _costTracker.estimatedCost.toFixed(4) };
+}
+
 // ========== LLM Prompt Context Builders ==========
 
 // Build the strategy-shift injection when the agent has failed consecutively.
@@ -1782,7 +1851,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
+${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.zoomAnnotation ? agentState.zoomAnnotation : ''}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? `Budget: ${agentState.budgetHint}\n` : ''}<GOAL>
 ${goal}
@@ -1794,8 +1863,8 @@ ${pageContent}
 </UNTRUSTED_PAGE_CONTENT>
 
 AVAILABLE INTERACTIVE ELEMENTS (use ONLY these selectors -- ${trimmedElements.length} of ${totalElementCount} shown, prioritized by type):
-${JSON.stringify(trimmedElements)}
-${agentState && agentState.visionMode && agentState.visionElementTree ? `\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n${agentState.visionElementTree}` : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows green numbered boxes [1], [2], etc. on interactive elements. Each element in AVAILABLE INTERACTIVE ELEMENTS has a selector like "[data-sentinel-index=\\"N\\"]" — use THAT selector in your click/type/select commands. Example: { "type": "click", "selector": "[data-sentinel-index=\\"5\\"]" } to click element [5]. The element tree and screenshot labels match these indexes.\n' : ''}
+${(() => { try { return trimmedElements.map(el => { const base = { selector: el.selector, ref: el.ref || undefined, text: el.text || '', tag: el.type || el.tag || '', role: el.role || '', ariaLabel: el.ariaLabel || '' }; if (el._visual) base.visual = el._visual; return base; }); } catch(_e) { return trimmedElements; } })().map(el => { const parts = [el.ref ? `[${el.ref}]` : el.selector]; if (el.tag) parts.push(`<${el.tag}>`); if (el.role) parts.push(`role=${el.role}`); if (el.text) parts.push(`"${el.text.substring(0, 50)}"`); if (el.ariaLabel && el.ariaLabel !== el.text) parts.push(`aria="${el.ariaLabel.substring(0, 30)}"`); if (el.visual) parts.push(`[${el.visual}]`); return parts.join(' '); }).join('\n')}
+${agentState && agentState.visionMode && agentState.visionElementTree ? `\nINDEXED ELEMENT TREE (screenshot shows [N] labels matching these):\n${agentState.visionElementTree}` : ''}${agentState && agentState.visionMode ? '\nV4 VISION MODE ACTIVE: The screenshot shows green numbered boxes [1], [2], etc. on interactive elements. Each element in AVAILABLE INTERACTIVE ELEMENTS has a selector like "[data-sentinel-index=\\"N\\"]" — use THAT selector in your click/type/select commands. Example: { "type": "click", "selector": "[data-sentinel-index=\\"5\\"]" } to click element [5]. The element tree and screenshot labels match these indexes.\n' : ''}VISUAL ELEMENT MATCHING: When a screenshot is attached, elements include a [visual] tag describing their appearance (size, role, etc.). You can also use "description" instead of "selector" to target elements by their visible text: { "type": "click", "description": "submit" } will match the first element whose text, aria-label, placeholder, or title contains "submit".
 
 RECENT HISTORY (last ${historyWindowSize} steps${isRunbook ? ' -- extended for runbook context' : ''}, screenshots from prior steps stripped):
 ${JSON.stringify(sanitizedHistory)}
@@ -1839,8 +1908,8 @@ RULES:
    - Skip the "Raw extracted data" section — synthesize everything into readable prose
 
 Actions:
-- { "type": "click", "selector": "FROM_LIST" }
-- { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }
+- { "type": "click", "selector": "FROM_LIST" }  -- also accepts "description": "visible text" to click by visual description instead of selector
+- { "type": "type", "selector": "FROM_LIST", "text": "TEXT" }  -- also accepts "description": "visible text" to target by visual description
 - { "type": "navigate", "url": "URL" }
 - { "type": "smart_navigate", "site": "google|weather.gov|wikipedia|youtube|amazon|reddit|twitter", "query": "SEARCH QUERY" }  — auto-constructs direct URL for the site search/forecast page. ALWAYS prefer over clicking through menus.
 - { "type": "batch", "actions": [ACTION1, ACTION2, ...] }  — execute multiple actions in sequence WITHOUT re-observing. Use for: type+Enter, scroll+extract, click+wait+read, navigate+wait+read. Max 5 actions per batch.
@@ -1957,9 +2026,22 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
   // (9.2) Route simple steps to fast model if configured
   const _useSimple = isSimpleStep(agentState, stepCount, history) && providerConfig.fastModel;
-  const model = _useSimple ? providerConfig.fastModel : providerConfig.model;
+  // Multi-provider model routing: check stepContext for complexity-based tier selection
+  const _stepTier = selectModelForStep(agentState.stepContext || null);
+  let model;
+  if (_stepTier === 'light' && providerConfig.fastModel) {
+    model = providerConfig.fastModel;
+  } else if (_stepTier === 'heavy' && providerConfig.heavyModel) {
+    model = providerConfig.heavyModel;
+  } else if (_useSimple) {
+    model = providerConfig.fastModel;
+  } else {
+    model = providerConfig.model;
+  }
   agentState.model = model; // needed by _buildAgentPrompt → supportsVision
+  const _resolvedTier = _stepTier || (_useSimple ? 'light' : 'default');
   if (_useSimple) agentState.fastModelCallCount = (agentState.fastModelCallCount || 0) + 1;
+  agentState._lastModelTier = _resolvedTier; // track tier for cost recording after response
 
   const hasHistory = Array.isArray(history) && history.length;
   const lastEntry = hasHistory ? history[history.length - 1] : null;
@@ -2182,6 +2264,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _out;
     // (9.2) Update running cost estimate
     agentState.estimatedCostUsd = estimateCostUsd(agentState.totalInputTokens, agentState.totalOutputTokens, model);
+    // Multi-provider cost tracking by tier
+    recordModelUsage(agentState._lastModelTier || 'default', _in, _out);
   }
   if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
   if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;

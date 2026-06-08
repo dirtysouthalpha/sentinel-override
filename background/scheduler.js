@@ -609,6 +609,16 @@ export async function executeScheduledTask(alarmName) {
 
   sendNotification(schedule, finalResult);
   setBadge(finalResult.status);
+  // Direct desktop notification — always fires (not gated by sound setting)
+  try {
+    chrome.notifications.create('scheduled-' + scheduleId + '-' + Date.now(), {
+      type: 'basic',
+      iconUrl: 'icon-128.png',
+      title: 'Scheduled Run Complete',
+      message: `"${schedule.name || scheduleId}" finished · Check results in extension popup`,
+      priority: 2
+    });
+  } catch (_e) {}
   tel.info('scheduler', `Scheduled task ${schedule.name} completed`, { status: finalResult.status });
 }
 

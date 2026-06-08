@@ -2,7 +2,7 @@
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns } from './llm-client.js';
+import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns, selectModelForStep, getCostTracker } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
@@ -347,6 +347,7 @@ const _correctionQueue = new Map(); // tabId -> correction text
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
+let _learnedPatterns = null;   // (Phase 5) Runtime pattern tracking: { key: { uses, successes, lastUsed } }
 // Phase 5: Advanced Intelligence State
 let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
 let profilingEnabled = false;            // Runtime profiling enabled
@@ -354,6 +355,67 @@ let mutationProposals = [];              // Proposed mutations for review
 let _activeCanaryDeployment = null;       // Active canary deployment status (reserved for future)
 let selfHealingEnabled = false;          // Self-healing system enabled
 let healingHistory = [];                 // Self-healing attempt history
+
+// ========== Run Replay Recording ==========
+// Lightweight in-memory run recorder that captures every step for instant
+// HTML replay export. Lives alongside the forensic runLogBuffer but is
+// optimised for quick human-readable HTML generation rather than storage.
+const _runRecording = {
+  steps: [],
+  startTime: null,
+  goal: '',
+  tabId: null
+};
+
+function startRunRecording(tabId, goal) {
+  _runRecording.startTime = Date.now();
+  _runRecording.goal = goal || '';
+  _runRecording.tabId = tabId;
+  _runRecording.steps = [];
+}
+
+function recordStep(stepData) {
+  _runRecording.steps.push({
+    ...stepData,
+    timestamp: Date.now()
+  });
+}
+
+function generateRunReplay() {
+  const duration = Date.now() - (_runRecording.startTime || Date.now());
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Sentinel Override Run Replay</title>
+<style>
+body{font-family:system-ui;background:#0a0a1a;color:#ccc;margin:0;padding:20px;}
+.header{border-bottom:1px solid #333;padding-bottom:12px;margin-bottom:20px;}
+.goal{font-size:16px;color:#fff;margin:8px 0;}
+.meta{font-size:12px;color:#666;}
+.step{background:#111;border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid #333;}
+.step.click{border-left-color:#4caf50;} .step.type{border-left-color:#2196f3;}
+.step.navigate{border-left-color:#ff9800;} .step.error{border-left-color:#f44336;}
+.step.extract{border-left-color:#ab47bc;} .step.finish{border-left-color:#26c6da;}
+.step-header{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px;}
+.step-action{font-size:13px;color:#ccc;} .step-result{font-size:12px;color:#999;margin-top:4px;}
+.screenshot{max-width:100%;border-radius:4px;margin-top:8px;border:1px solid #333;}
+.stats{display:flex;gap:20px;margin-top:16px;font-size:12px;color:#666;}
+</style></head><body>
+<div class="header">
+<h1>Sentinel Override Run Replay</h1>
+<div class="goal">Goal: ${_runRecording.goal || 'N/A'}</div>
+<div class="meta">${_runRecording.startTime ? new Date(_runRecording.startTime).toLocaleString() : 'N/A'} &middot; ${Math.round(duration/1000)}s &middot; ${_runRecording.steps.length} steps</div>
+</div>
+<div class="stats">
+<div>Total Steps: ${_runRecording.steps.length}</div>
+<div>Duration: ${Math.round(duration/1000)}s</div>
+</div>
+${_runRecording.steps.map((s,i) => {
+  const screenshotHtml = s.screenshot ? '<img class="screenshot" src="data:image/jpeg;base64,' + s.screenshot + '" alt="Step ' + (i+1) + '" />' : '';
+  return '<div class="step ' + (s.actionType || '') + '"><div class="step-header"><span>Step ' + (i+1) + '</span><span>' + (s.actionType || 'unknown') + '</span><span>' + new Date(s.timestamp).toLocaleTimeString() + '</span></div><div class="step-action">' + (s.action || 'No action recorded') + '</div>' + (s.result ? '<div class="step-result">' + s.result + '</div>' : '') + screenshotHtml + '</div>';
+}).join('')}
+</body></html>`;
+  return html;
+}
+
 // Expose agentRunning for index.js
 export { agentRunning };
 
@@ -647,6 +709,42 @@ async function captureStepScreenshot(tabId) {
   } catch (e) { return null; }
 }
 
+// ========== Zoom & Inspect — Region-of-Interest Markup ==========
+// When the LLM specifies a zoom/inspect region (dense UI where detail matters),
+// this appends region coordinates to the screenshot prompt so the model knows
+// which viewport area to focus on. Service-worker compatible — no canvas needed.
+let _zoomRegion = null; // { x, y, width, height } in viewport coordinates
+
+/**
+ * Set the current zoom/inspect region for the next LLM call.
+ * @param {Object|null} region - { x, y, width, height } in viewport coords, or null to clear.
+ */
+export function setZoomRegion(region) {
+  _zoomRegion = region || null;
+}
+
+/**
+ * Get the current zoom region (for status display).
+ * @returns {Object|null}
+ */
+export function getZoomRegion() {
+  return _zoomRegion;
+}
+
+/**
+ * Format zoom region as a text annotation for the LLM prompt.
+ * Appended to the user content alongside the screenshot so the model
+ * knows which area of the dense UI to focus on.
+ * @param {Object|null} region - { x, y, width, height } in viewport coords.
+ * @returns {string} Annotation text, or empty string if no region set.
+ */
+function formatZoomRegion(region) {
+  if (!region || typeof region !== 'object') return '';
+  const { x, y, width, height } = region;
+  if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return '';
+  return `\n[ZOOM REGION] Focus on viewport area: x=${Math.round(x)}, y=${Math.round(y)}, width=${Math.round(width)}, height=${Math.round(height)}. The relevant content is in this region — pay extra attention to detail here.`;
+}
+
 // ========== Configuration ==========
 const CONFIG = {
   minDelayBetweenCalls: 500,
@@ -689,6 +787,22 @@ function emitAgentStatus(tabId, status, detail) {
       timestamp: Date.now()
     }).catch(() => {});
   } catch (_) { /* non-fatal */ }
+}
+
+// ========== Learned Patterns Dashboard (Phase 5) ==========
+// Emits the top-20 learned patterns to the popup for the patterns dashboard.
+// Called after each step completes and on run finish.
+function emitLearnedPatterns(tabId) {
+  try {
+    const patterns = Object.entries(_learnedPatterns || {}).map(([key, data]) => ({
+      pattern: key,
+      uses: data.uses,
+      successes: data.successes,
+      rate: data.uses > 0 ? Math.round(data.successes / data.uses * 100) : 0,
+      lastUsed: data.lastUsed
+    })).sort((a, b) => b.uses - a.uses).slice(0, 20);
+    chrome.runtime.sendMessage({ type: 'learned_patterns', tabId, patterns }).catch(() => {});
+  } catch (_e) {}
 }
 
 // ========== History Helpers ==========
@@ -735,6 +849,33 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
   };
 }
 
+// ========== Desktop Notification on Run Completion ==========
+// Fires a chrome notification when a manual (non-scheduled) agent run finishes.
+
+/**
+ * Send a desktop notification when an agent run completes.
+ * @param {string} goal - The run goal text
+ * @param {boolean} success - Whether the run completed successfully
+ * @param {number} stepCount - Total steps executed
+ * @param {number} duration - Run duration in ms
+ */
+function notifyRunComplete(goal, success, stepCount, duration) {
+  try {
+    const truncatedGoal = (goal || 'Task').substring(0, 50);
+    const status = success ? 'Completed successfully' : 'Failed';
+    const body = `${status} · ${stepCount} steps · ${Math.round((duration || 0) / 1000)}s`;
+    chrome.notifications.create('run-complete-' + Date.now(), {
+      type: 'basic',
+      iconUrl: 'icon-128.png',
+      title: 'Sentinel Override: ' + truncatedGoal,
+      message: body,
+      priority: 2
+    });
+  } catch (_e) {
+    // notifications API may not be available
+  }
+}
+
 // ========== State Reset ==========
 
 /**
@@ -766,6 +907,7 @@ export function resetAgentState() {
   _historyDirty = false;
   undoStack.length = 0;
   _verificationFailures = 0; // (Phase 8.2) reset post-action verification counter
+  _learnedPatterns = null; // (Phase 5) reset learned patterns for new run
   _stepScreenshots.clear(); // (9.3) reset replay screenshot ring buffer
   // Reset CDP observe-path optimization flags so a new run always gets a fresh
   // page ready check and overlay nuke on its first observation.
@@ -778,6 +920,7 @@ export function resetAgentState() {
   _activeCanaryDeployment = null;
   selfHealingEnabled = false;
   healingHistory = [];
+  _zoomRegion = null; // reset zoom/inspect region between runs
   resetAllContexts();
 }
 
@@ -988,6 +1131,19 @@ export async function startAgent(goal, sender) {
       // (9.1) Broadcast which facts are being injected so popup can show them
       try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (_previewErr) {
         /* Non-fatal: client knowledge preview send failed */
+      }
+      // Emit knowledge_context so popup can show a persistent visibility bar
+      if (relevantEntries.length > 0) {
+        try {
+          chrome.runtime.sendMessage({
+            type: 'knowledge_context',
+            tabId: startTabId,
+            clientName: activeClient.displayName || '',
+            factCount: relevantEntries.length,
+            facts: relevantEntries.map(f => typeof f.wisdom === 'string' ? f.wisdom.substring(0, 100) : String(f.wisdom || '').substring(0, 100)),
+            timestamp: Date.now()
+          }).catch(() => {});
+        } catch (_kcErr) {}
       }
     } else {
       activeClientId = null;
@@ -1922,6 +2078,64 @@ function _findElementBbox(elements, selector, text) {
       (text && el.text && el.text.toLowerCase().includes(text.toLowerCase()))
     )) {
       return el.bbox;
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Visual Element Matching — enhances elements with visual descriptions
+// and allows the LLM to specify actions by visual description.
+// When vision/screenshot is available, elements get a _visual tag
+// describing their visual properties (size, role, visibility).
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Enhance element descriptions with visual properties when available.
+ * Adds a _visual string to each element describing its visual characteristics.
+ * @param {Array} elements - Array of observed element objects.
+ * @returns {Array} The same array with _visual properties added where applicable.
+ */
+function enhanceWithVisualProperties(elements) {
+  if (!elements || !Array.isArray(elements)) return elements;
+  for (const el of elements) {
+    const visual = [];
+    if (el.bbox) {
+      const w = el.bbox.w || el.bbox.width;
+      const h = el.bbox.h || el.bbox.height;
+      if (w && h) {
+        if (w > 200 && h > 40) visual.push('large');
+        else if (w < 50 || h < 20) visual.push('small');
+      }
+    }
+    if (el.role) visual.push('role:' + el.role);
+    if (el.tag) visual.push('tag:' + el.tag);
+    if (el.type && el.type !== el.tag) visual.push('type:' + el.type);
+    if (el.isClickable) visual.push('clickable');
+    if (el.isInput) visual.push('input');
+    if (el.visible === false) visual.push('hidden');
+    if (visual.length > 0) el._visual = visual.join(', ');
+  }
+  return elements;
+}
+
+/**
+ * Find an element by natural language description.
+ * Searches element text, ariaLabel, placeholder, and title for matches.
+ * @param {Array} elements - Array of observed element objects.
+ * @param {string} description - Natural language description to match against.
+ * @returns {Object|null} The matched element, or null.
+ */
+function _findElementByDescription(elements, description) {
+  if (!elements || !description) return null;
+  const desc = description.toLowerCase();
+  for (const el of elements) {
+    const text = (el.text || el.textContent || '').toLowerCase();
+    const ariaLabel = (el.ariaLabel || el['aria-label'] || '').toLowerCase();
+    const placeholder = (el.placeholder || '').toLowerCase();
+    const title = (el.title || '').toLowerCase();
+    if (text.includes(desc) || ariaLabel.includes(desc) || placeholder.includes(desc) || title.includes(desc)) {
+      return el;
     }
   }
   return null;
@@ -3724,10 +3938,47 @@ async function _generateInitialPlan(goal, workingTabId) {
   return plan;
 }
 
+// ========== Confidence Scoring ==========
+// Scores each action 0-100 so the popup can display how sure the agent is
+// about a given step. Pure function — no side effects.
+
+function scoreActionConfidence(command, pageContext) {
+  if (!command) return 0;
+  let score = 50; // baseline
+  const type = command.type || '';
+
+  // High-confidence actions
+  if (type === 'note' || type === 'finish') return 95;
+  if (type === 'navigate' || type === 'open_tab') { score = 80; }
+
+  // Selector-based scoring
+  if (command.selector) {
+    score += 10; // has explicit selector
+    if (command.selector.startsWith('#')) score += 10; // ID selector = very specific
+    else if (command.selector.includes('[aria-')) score += 8; // ARIA = good
+    else if (command.selector.startsWith('//')) score -= 5; // XPath = fragile
+  }
+
+  // Text-based matching
+  if (command.text || command.value) score += 5; // has text to match
+
+  // Check if selector exists in observed elements
+  if (pageContext && pageContext.elements && command.selector) {
+    const found = pageContext.elements.some(el =>
+      el.selector === command.selector || el.id === command.selector
+    );
+    if (found) score += 15;
+    else score -= 20; // selector not found on page
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
   console.log('[Sentinel] Agent starting loop for goal:', goal);
   _lastGoal = goal || '';
+  startRunRecording(workingTabId, goal);
   let finished = false;
   // (3.15.1) `history` is module-level — clear in-place so the array reference
   // stays valid for any captured closures (trimHistory/persistHistory helpers).
@@ -3736,6 +3987,7 @@ async function runAgentLoop(goal, workingTabId) {
   let reportData = null;  // Snapshot for async report generation
   agentPlan = null;
   currentPlanStep = 0;
+  const _loopStartTime = Date.now();
 
   goal = await _initRunState(goal);
 
@@ -4460,6 +4712,8 @@ async function runAgentLoop(goal, workingTabId) {
           ...e,
           text: e.text && e.text.length > 80 ? e.text.substring(0, 77) + '...' : e.text
         }));
+      // Enhance elements with visual descriptions for LLM prompt
+      enhanceWithVisualProperties(trimmedElements);
 
       // (3.14.1) Sign-in wall detection. Fires when we hit a login page on a
       // known auth host with a password (or username) input — BEFORE the LLM
@@ -4840,9 +5094,15 @@ async function runAgentLoop(goal, workingTabId) {
               type: e.tag || 'div',
               index: e.index,
               rect: e.rect,
+              bbox: e.rect, // normalized bbox for visual property extraction
               isClickable: e.isClickable,
-              isInput: e.isInput
+              isInput: e.isInput,
+              tag: e.tag || 'div',
+              role: e.role || '',
+              ariaLabel: e.ariaLabel || ''
             }));
+            // Enhance vision elements with visual descriptions
+            enhanceWithVisualProperties(trimmedElements);
             allElements = [...trimmedElements]; // reassign (not mutate) so cached observation.elements stays intact
             console.log(`[Sentinel/v4] Vision: ${_visionElements.length} indexed elements`);
           }
@@ -4850,8 +5110,18 @@ async function runAgentLoop(goal, workingTabId) {
           console.warn('[Sentinel/v4] Vision observe failed:', e);
         }
       }
+      // Build step context for multi-provider model routing
+      const _stepContext = {
+        type: '', // unknown at this point — LLM hasn't decided yet
+        selector: '',
+        hasScreenshot: !!base64Image,
+        stepNumber: stepCount,
+        totalSteps: agentPlan ? agentPlan.length : 0,
+        previousFailures: consecutiveFailures || 0
+      };
 
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive };
+      const _zoomAnnotation = formatZoomRegion(_zoomRegion);
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -4960,6 +5230,7 @@ async function runAgentLoop(goal, workingTabId) {
           '</output_format>'
         ].join('\n');
 
+        const _zoomAnnotation = formatZoomRegion(_zoomRegion);
         const _visionUserContent = [
           `Goal: ${goal}`,
           `URL: ${currentUrl}`,
@@ -4970,9 +5241,12 @@ async function runAgentLoop(goal, workingTabId) {
           '',
           'History:',
           _visionHistory || '(first step)',
+          _zoomAnnotation,
           '',
           'What is your next action?'
         ].join('\n');
+        // Clear zoom region after consuming it (one-shot)
+        _zoomRegion = null;
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -5187,6 +5461,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Non-fatal but could affect next action execution
           }
           base64Image = null; // release screenshot memory after LLM call
+          _zoomRegion = null; // clear zoom region after consuming it
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
           // module-level var must still be updated or the final log shows 0.
@@ -5233,6 +5508,30 @@ async function runAgentLoop(goal, workingTabId) {
       }
       if (typeof command.value === 'string') {
         command.value = command.value.replace(MEMORY_VAR_RE, (_, key) => agentMemory[key] || `::${key}::`);
+      }
+
+      // Visual element matching — resolve description-based targeting.
+      // If the LLM specifies a "description" field without a selector/ref,
+      // match it against observed elements by text/aria/placeholder/title.
+      if (command.description && !command.selector && !command.ref) {
+        const _matched = _findElementByDescription(allElements, command.description);
+        if (_matched) {
+          command.selector = _matched.selector || _matched.id;
+          command.ref = _matched.ref || null;
+          command._matchedByVisual = true;
+          try {
+            tel.info('visual', `Visual match: "${command.description}" -> ${command.selector || command.ref}`, { description: command.description, selector: command.selector, ref: command.ref });
+          } catch (_e) { /* non-fatal */ }
+        } else {
+          // No match — tell the LLM so it can adjust
+          const _noMatchMsg = `BLOCKED: No element found matching description "${command.description}". Try using a selector or ref from the AVAILABLE INTERACTIVE ELEMENTS list instead.`;
+          historyPush({ step: stepCount, action: command, result: _noMatchMsg });
+          await persistHistory();
+          sendSilentUpdate(`No visual match for "${command.description}"`, stepCount);
+          await sleep(ONE_SECOND_MS);
+          continue;
+        }
+        delete command.description; // consumed
       }
 
       // (#10) Sanity-check ref ids the LLM returns. A ref that doesn't appear
@@ -5999,7 +6298,10 @@ async function runAgentLoop(goal, workingTabId) {
       // Capture pre-action screenshot for live preview
       const _beforeScreenshot = await captureStepScreenshot(tab);
 
-      // Show action card
+      // Compute confidence score for this action
+      const _confidence = scoreActionConfidence(command, observation);
+      // Show action card (confidence is forwarded via command.__confidence)
+      command.__confidence = _confidence;
       sendActionMessage(command, stepCount, observation);
       // (3.16.0) Begin the dispatch activity item — gives the user a "Now
       // doing: <X>" indicator that finalizes when the action completes.
@@ -7212,7 +7514,8 @@ return { ok: true, value: el.value };
           action: command.type,
           beforeScreenshot: _beforeScreenshot || undefined,
           afterScreenshot: _afterScreenshot || undefined,
-          failed: !!actionFailed
+          failed: !!actionFailed,
+          confidence: _confidence
         }).catch(() => {});
       } catch (_e) { /* non-fatal */ }
 
@@ -7272,6 +7575,17 @@ return { ok: true, value: el.value };
       }
       historyPush({ step: stepCount, action: command, result });
 
+      // (Phase 5) Track learned patterns for dashboard
+      if (command && command.type) {
+        const _patternKey = command.type + ':' + (command.selector || '').substring(0, 50);
+        if (!_learnedPatterns) _learnedPatterns = {};
+        if (!_learnedPatterns[_patternKey]) _learnedPatterns[_patternKey] = { uses: 0, successes: 0, lastUsed: 0 };
+        _learnedPatterns[_patternKey].uses++;
+        if (!actionFailed) _learnedPatterns[_patternKey].successes++;
+        _learnedPatterns[_patternKey].lastUsed = Date.now();
+      }
+      emitLearnedPatterns(tab);
+
       // (3.40.0) Audit log: append a structured entry for MSP compliance.
       try {
         appendAuditEntry(runLogId, {
@@ -7284,6 +7598,17 @@ return { ok: true, value: el.value };
       } catch (_e) {
         // Audit log append failed non-fatally
       }
+
+      // Run replay recording: capture every step for instant HTML export.
+      try {
+        recordStep({
+          actionType: command.type || 'unknown',
+          action: _describeTarget(command) || command.type || 'unknown',
+          result: typeof result === 'string' ? result.substring(0, 300) : (actionFailed ? 'failed' : 'ok'),
+          screenshot: _stepScreenshots.get(stepCount) || undefined,
+          failed: !!actionFailed
+        });
+      } catch (_e) { /* never crash the loop on replay recording */ }
 
       // (3.12.0) Vision-based action verification flag. After every modifying
       // action that didn't fail outright, mark the next observation cycle to
@@ -7664,6 +7989,11 @@ return { ok: true, value: el.value };
   } catch (_) { /* non-fatal */ }
   // Phase 8.2: Emit final status narration for popup status bar
   emitAgentStatus(workingTabId, 'complete', `Agent finished — ${stepCount} steps, ${apiCallCount} API calls`);
+  // (Phase 5) Final learned patterns emission on run finish
+  emitLearnedPatterns(workingTabId);
+  // Desktop notification on run completion
+  const _runDuration = Date.now() - _loopStartTime;
+  notifyRunComplete(_lastGoal, !!finished, stepCount, _runDuration);
 
   // Signal completion via messaging (replaces polling for scheduler)
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
@@ -7742,6 +8072,7 @@ function escapeJsString(str, quote = '"') {
 function _describeTarget(cmd) {
   if (!cmd) return '(no target)';
   // Prefer human-readable labels over raw CSS selectors for approval card readability
+  if (cmd.description) return `"${String(cmd.description).slice(0, 80)}"`;
   if (cmd.ariaLabel) return `"${String(cmd.ariaLabel).slice(0, 80)}"`;
   if (cmd.elementText) return `"${String(cmd.elementText).slice(0, 80)}"`;
   if (cmd.label) return `"${String(cmd.label).slice(0, 80)}"`;
@@ -7754,12 +8085,12 @@ function describeAction(command) {
   switch (command.type) {
     case 'navigate_back':    return 'Navigate back';
     case 'navigate_forward': return 'Navigate forward';
-    case 'click':        return `Click: ${_describeTarget(command)}`;
+    case 'click':        return `Click: ${_describeTarget(command)}${command._matchedByVisual ? ' [visual match]' : ''}`;
     case 'right_click':  return `Right-click: ${_describeTarget(command)}`;
     case 'double_click': return `Double-click: ${_describeTarget(command)}`;
     case 'drag_and_drop':return `Drag ${_describeTarget({ ref: command.source_ref, selector: command.source_selector, label: command.source_label })} → ${_describeTarget({ ref: command.target_ref, selector: command.target_selector, label: command.target_label })}`;
     case 'click_at':    return `Click at: ${_describeTarget(command)}`;
-    case 'type':        return `Type into ${_describeTarget(command)}: '${(command.text || '').toString().slice(0, 80)}'`;
+    case 'type':        return `Type into ${_describeTarget(command)}: '${(command.text || '').toString().slice(0, 80)}'${command._matchedByVisual ? ' [visual match]' : ''}`;
     case 'navigate':    return `Navigate to ${command.url || '(no url)'}`;
     case 'scroll':      return `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
     case 'scroll_to':   return `Scroll to ${_describeTarget(command)}`;
@@ -7938,4 +8269,8 @@ export {
   _cdpObservePage,
   clickAtCoordinates,
   _findElementBbox,
+  enhanceWithVisualProperties,
+  _findElementByDescription,
+  scoreActionConfidence,
+  generateRunReplay,
 };

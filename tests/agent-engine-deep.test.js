@@ -82,6 +82,8 @@ jest.unstable_mockModule('../background/llm-client.js', () => ({
   supportsVision: mockSupportsVision,
   getPlatformContext: mockGetPlatformContext,
   getRelevantPatterns: mockGetRelevantPatterns,
+  selectModelForStep: jest.fn(() => null),
+  getCostTracker: jest.fn(() => ({ totalCalls: 0, byTier: { light: 0, default: 0, heavy: 0 }, estimatedCost: '0.0000' })),
 }));
 
 jest.unstable_mockModule('../background/platforms/index.js', () => ({

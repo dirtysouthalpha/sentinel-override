@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
 import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
@@ -915,6 +915,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       } catch (_) { logData = null; }
       if (!logData || !logData.entries) throw new Error('Run log data not found');
       const html = generateReplayReport(logData.entries, { goal: logData.goal, runLogId: runId, estimatedCostUsd: estimatedCostUsd || 0 });
+      return { html };
+    }
+
+    // Run replay export: generates HTML from in-memory step recording.
+    case 'export_replay': {
+      const html = generateRunReplay();
       return { html };
     }
 

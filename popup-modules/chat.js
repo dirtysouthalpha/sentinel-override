@@ -334,12 +334,6 @@ function ensureMiniShotPanel() {
   return wrap;
 }
 
-function updateMiniShot(base64Image) {
-  if (!base64Image) return;
-  const panel = ensureMiniShotPanel();
-  const img = panel.querySelector('#mini-shot-img');
-  if (img) img.src = `data:image/jpeg;base64,${base64Image}`;
-}
 
 function hideMiniShot() {
   if (__miniShotPanelEl) __miniShotPanelEl.style.display = 'none';
@@ -366,6 +360,73 @@ function showCrosshair(x, y, viewportW, viewportH) {
   svg.style.display = 'block';
   // Auto-hide after 3 seconds
   setTimeout(() => { if (svg) svg.style.display = 'none'; }, 3000);
+}
+
+// ========== Zoom & Inspect — Click-to-Zoom Overlay ==========
+// Clicking on the mini screenshot opens a full-screen zoom overlay at 2x,
+// centered on the clicked point. Click again to dismiss. The zoom transform
+// origin is set to the click position so the region of interest fills the
+// viewport. A zoom hint badge appears on the thumbnail to indicate clickability.
+
+let __zoomOverlayEl = null;
+let __zoomHintAdded = false;
+
+function _addZoomHintToMiniShot(panel) {
+  if (__zoomHintAdded) return;
+  __zoomHintAdded = true;
+  const hint = document.createElement('div');
+  hint.style.cssText = 'position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;pointer-events:none;z-index:1;';
+  hint.textContent = '🔍 Click to zoom';
+  const imgWrap = panel.querySelector('.mini-shot-img-wrap');
+  if (imgWrap) {
+    imgWrap.style.cursor = 'zoom-in';
+    imgWrap.appendChild(hint);
+  }
+}
+
+function _openZoomOverlay(imgSrc, clickXPct, clickYPct) {
+  if (__zoomOverlayEl) __zoomOverlayEl.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'zoom-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+  const zoomedImg = document.createElement('img');
+  zoomedImg.src = imgSrc;
+  zoomedImg.style.cssText = 'max-width:95%;max-height:95%;object-fit:contain;transform:scale(2);transform-origin:' + clickXPct + '% ' + clickYPct + '%;transition:transform 0.2s ease;';
+  zoomedImg.draggable = false;
+  overlay.appendChild(zoomedImg);
+  // Close on click
+  overlay.addEventListener('click', () => { overlay.remove(); __zoomOverlayEl = null; });
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { overlay.remove(); __zoomOverlayEl = null; document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+  document.body.appendChild(overlay);
+  __zoomOverlayEl = overlay;
+}
+
+function updateMiniShot(base64Image) {
+  if (!base64Image) return;
+  const panel = ensureMiniShotPanel();
+  const img = panel.querySelector('#mini-shot-img');
+  if (img) img.src = `data:image/jpeg;base64,${base64Image}`;
+  // Wire zoom-on-click and hint badge
+  _wireMiniShotZoom(panel);
+  _addZoomHintToMiniShot(panel);
+}
+
+function _wireMiniShotZoom(panel) {
+  const img = panel.querySelector('#mini-shot-img');
+  if (!img || img._zoomWired) return;
+  img._zoomWired = true;
+  img.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const rect = img.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const clickXPct = ((e.clientX - rect.left) / rect.width * 100).toFixed(1);
+    const clickYPct = ((e.clientY - rect.top) / rect.height * 100).toFixed(1);
+    _openZoomOverlay(img.src, clickXPct, clickYPct);
+  });
 }
 
 // ========== Approval Mode ==========
@@ -1775,6 +1836,40 @@ exportBtn && exportBtn.addEventListener('click', () => {
 
   showToast(`Exported as ${format.toUpperCase()}`, 'success');
 });
+
+// ========== Export Replay (Chat Header) ==========
+// Adds a toolbar button that exports the in-memory run recording as a
+// self-contained HTML replay file. Different from the report-modal
+// "Export Replay" — this is always available in the toolbar, not just
+// after a run finishes.
+(function initExportReplayBtn() {
+  const toolbar = document.querySelector('.toolbar');
+  if (!toolbar) return;
+  const replayBtn = document.createElement('button');
+  replayBtn.className = 'toolbar-icon-btn';
+  replayBtn.id = 'chatExportReplayBtn';
+  replayBtn.title = 'Export run replay as HTML';
+  replayBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+  replayBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'export_replay' }, (response) => {
+      if (response && response.html) {
+        const blob = new Blob([response.html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'sentinel-run-' + new Date().toISOString().slice(0, 10) + '.html';
+        if (document.body) document.body.appendChild(a);
+        a.click();
+        if (document.body) document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Run replay exported', 'success');
+      } else {
+        showToast('No replay data — run the agent first', 'error');
+      }
+    });
+  });
+  toolbar.appendChild(replayBtn);
+})();
 
 // ========== Command Palette ==========
 commandPaletteBtn && commandPaletteBtn.addEventListener('click', openCommandPalette);
@@ -3541,6 +3636,35 @@ chrome.runtime.onMessage.addListener((message) => {
       __lastClickCoords = null;
     }
   }
+  // Knowledge context bar — persistent bar above chat showing injected client facts
+  if (message.type === 'knowledge_context' && message.factCount > 0) {
+    try {
+      let knowledgeBar = document.getElementById('knowledge-context-bar');
+      if (!knowledgeBar) {
+        knowledgeBar = document.createElement('div');
+        knowledgeBar.id = 'knowledge-context-bar';
+        knowledgeBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;cursor:pointer;';
+        knowledgeBar.title = 'Click to see facts';
+        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        if (chatArea) chatArea.parentNode.insertBefore(knowledgeBar, chatArea);
+        knowledgeBar.addEventListener('click', () => {
+          const details = document.getElementById('knowledge-details');
+          if (details) details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        });
+      }
+      knowledgeBar.innerHTML = '<span style="color:#5bc0de;">&#9432;</span><span>Using ' + message.factCount + ' facts' + (message.clientName ? ' for ' + message.clientName : '') + '</span>';
+      // Add expandable details
+      let details = document.getElementById('knowledge-details');
+      if (!details) {
+        details = document.createElement('div');
+        details.id = 'knowledge-details';
+        details.style.cssText = 'padding:6px 10px;font-size:11px;color:#666;display:none;border-bottom:1px solid rgba(255,255,255,0.06);';
+        knowledgeBar.parentNode.insertBefore(details, knowledgeBar.nextSibling);
+      }
+      details.innerHTML = (message.facts || []).map(f => '<div style="padding:1px 0;">• ' + f + '</div>').join('');
+    } catch (_kcErr) { /* non-fatal */ }
+  }
+
   // (9.1) Client knowledge visibility — show which facts are being injected
   if (message.action === 'client_knowledge_preview') {
     try {
@@ -3703,6 +3827,24 @@ chrome.runtime.onMessage.addListener((message) => {
             section.appendChild(body);
             const stream = card.querySelector('.activity-stream');
             if (stream) card.insertBefore(section, stream); else card.appendChild(section);
+          }
+        } catch (_) { /* non-fatal */ }
+      }
+      // Confidence bar — show how sure the agent is about this step
+      if (typeof p.confidence === 'number') {
+        try {
+          const state = __activityState.get(p.stepNumber);
+          const card = state ? state.card : null;
+          if (card && !card.querySelector('.confidence-bar')) {
+            const pct = p.confidence;
+            const color = pct > 80 ? '#4caf50' : pct > 50 ? '#ff9800' : '#f44336';
+            const bar = document.createElement('div');
+            bar.className = 'confidence-bar';
+            bar.style.cssText = 'margin:4px 0 2px 0;height:3px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden;';
+            bar.innerHTML = '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:2px;"></div>';
+            bar.title = 'Confidence: ' + pct + '%';
+            const stream = card.querySelector('.activity-stream');
+            if (stream) card.insertBefore(bar, stream); else card.appendChild(bar);
           }
         } catch (_) { /* non-fatal */ }
       }
@@ -4050,5 +4192,24 @@ chrome.runtime.onMessage.addListener((message) => {
   }
   if (message.action === 'run_log_available') {
     try { showRunLogExportButton(message.runLogId, message.entryCount); } catch (e) { console.error('[Sentinel] showRunLogExportButton error:', getErrorMessage(e)); }
+  }
+  // (Phase 5) Learned Patterns Dashboard — show action patterns and success rates
+  if (message.type === 'learned_patterns' && message.patterns && message.patterns.length > 0) {
+    try {
+      let patternsPanel = document.getElementById('patterns-panel');
+      if (!patternsPanel) {
+        patternsPanel = document.createElement('div');
+        patternsPanel.id = 'patterns-panel';
+        patternsPanel.style.cssText = 'padding:8px 12px;margin:4px 8px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.06);font-size:11px;';
+        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        if (chatArea) chatArea.parentNode.insertBefore(patternsPanel, chatArea);
+      }
+      const header = '<div style="color:#888;margin-bottom:4px;">Learned Patterns (' + message.patterns.length + ')</div>';
+      const rows = message.patterns.slice(0, 5).map(function(p) {
+        const color = p.rate >= 90 ? '#4caf50' : p.rate >= 70 ? '#ff9800' : '#f44336';
+        return '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#777;"><span>' + p.pattern + '</span><span style="color:' + color + '">' + p.rate + '% (' + p.uses + ')</span></div>';
+      }).join('');
+      patternsPanel.innerHTML = header + rows;
+    } catch (e) { console.warn('[Sentinel] Patterns panel render error:', e); }
   }
 });
