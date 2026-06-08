@@ -1,5 +1,28 @@
 # Changelog
 
+## v15.0.0 — 2026-06-08 (Enterprise & Platform Release)
+
+Extends the v10-v13 foundation with enterprise audit/export, webhook integrations, REST API, plugin ecosystem, and web dashboard.
+
+### v14 — Enterprise Features
+- **Audit Export** (`background/audit-export.js`) — SOC2-compliant tamper-evident audit trail export with hash chain verification, JSON + CSV output formats, integrity verification API
+- **Webhook Manager** (`background/webhook-manager.js`) — configurable webhook delivery to external services (Teams, Slack, PagerDuty, custom), event filtering, retry logic with exponential backoff, delivery log
+- Tests: `tests/audit-export.test.js` (8 tests), full hash chain + tampering verification coverage
+
+### v15 — Platform Features
+- **REST API Server** (`background/api-server.js`) — local REST API for controlling the extension from external tools, routes: status, runs, queue, patterns, playbooks, webhooks, health
+- **Plugin Registry** (`background/plugin-registry.js`) — community-contributed platform profiles, playbooks, and action packs from remote registry, install/uninstall/toggle lifecycle
+- **Web Dashboard** (`web/dashboard.html` + `web/dashboard.js`) — standalone dashboard for monitoring runs, queue status, and patterns via the REST API
+
+### Fixes
+- `tests/agent-learning.test.js` — fixed missing `jest` import from `@jest/globals` (was using `jest.unstable_mockModule` without importing the global)
+
+### Stats
+- 156 test suites, 8,468 tests passing
+- 9 new files, ~850 lines added
+
+---
+
 ## v10.3.0 — 2026-06-08 (Full-Visibility Release — all IMPROVEMENT-PLAN features delivered)
 
 Major feature release delivering all 19 planned features from the IMPROVEMENT-PLAN across 5 priority tiers.

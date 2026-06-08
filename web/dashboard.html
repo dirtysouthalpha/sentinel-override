@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentinel Override — Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0a0a1a; --surface: #111128; --border: rgba(255,255,255,0.08);
+      --text: #ccc; --text-dim: #666; --accent: #4a9eff;
+      --green: #4caf50; --red: #f44336; --orange: #ff9800;
+    }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .header { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .version { font-size: 12px; color: var(--text-dim); }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card h2 { font-size: 14px; color: var(--text-dim); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card .value { font-size: 32px; font-weight: 700; }
+    .card .sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+    .status-dot.green { background: var(--green); }
+    .status-dot.red { background: var(--red); }
+    .status-dot.orange { background: var(--orange); }
+
+    .section { margin-bottom: 32px; }
+    .section h2 { font-size: 16px; margin-bottom: 16px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    th { color: var(--text-dim); font-weight: 500; }
+    td { color: var(--text); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .badge.green { background: rgba(76,175,80,0.2); color: var(--green); }
+    .badge.red { background: rgba(244,67,54,0.2); color: var(--red); }
+    .badge.orange { background: rgba(255,152,0,0.2); color: var(--orange); }
+
+    .btn { padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; font-size: 13px; }
+    .btn:hover { background: rgba(255,255,255,0.05); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .empty { text-align: center; padding: 40px; color: var(--text-dim); }
+
+    #goal-form { display: flex; gap: 8px; margin-bottom: 24px; }
+    #goal-input { flex: 1; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+    #goal-input:focus { outline: none; border-color: var(--accent); }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+      .header { padding: 16px; }
+      .container { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>Sentinel Override</h1>
+      <div class="version">v15.0.0 — Dashboard</div>
+    </div>
+    <div>
+      <span class="status-dot green"></span>
+      <span id="connection-status">Connected</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Goal Input -->
+    <form id="goal-form">
+      <input type="text" id="goal-input" placeholder="Enter a goal for the agent..." />
+      <button type="submit" class="btn primary">Run</button>
+    </form>
+
+    <!-- Stats Cards -->
+    <div class="grid">
+      <div class="card">
+        <h2>Total Runs</h2>
+        <div class="value" id="stat-runs">—</div>
+        <div class="sub">lifetime</div>
+      </div>
+      <div class="card">
+        <h2>Active Runs</h2>
+        <div class="value" id="stat-active">0</div>
+        <div class="sub">concurrent</div>
+      </div>
+      <div class="card">
+        <h2>API Health</h2>
+        <div class="value" id="stat-health">—</div>
+        <div class="sub" id="stat-health-sub">checking...</div>
+      </div>
+      <div class="card">
+        <h2>Est. Cost</h2>
+        <div class="value" id="stat-cost">$0.00</div>
+        <div class="sub">this session</div>
+      </div>
+    </div>
+
+    <!-- Recent Runs -->
+    <div class="section">
+      <h2>Recent Runs</h2>
+      <table>
+        <thead>
+          <tr><th>Goal</th><th>Status</th><th>Steps</th><th>Duration</th><th>Time</th></tr>
+        </thead>
+        <tbody id="runs-table">
+          <tr><td colspan="5" class="empty">No runs yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Playbooks -->
+    <div class="section">
+      <h2>Learned Playbooks</h2>
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>Trigger</th><th>Runs</th><th>Success Rate</th><th>Last Used</th></tr>
+        </thead>
+        <tbody id="playbooks-table">
+          <tr><td colspan="5" class="empty">No playbooks learned yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
