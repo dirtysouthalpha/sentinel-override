@@ -3393,3 +3393,66 @@ body {
 .modal-content h2 select {
   cursor: auto;
 }
+
+/* ========== Phase 8.2: Agent Live Status Bar ========== */
+@keyframes senPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+#agent-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  background: var(--bg-tertiary, #111418);
+  border: 1px solid var(--border-color, #3b494b);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #b9cacb);
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.3s ease, max-height 0.3s ease;
+}
+
+#agent-status-bar.visible {
+  opacity: 1;
+  max-height: 40px;
+}
+
+#agent-status-bar .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary, #849495);
+  flex-shrink: 0;
+}
+
+#agent-status-bar .status-dot.status-thinking,
+#agent-status-bar .status-dot.status-executing {
+  background: var(--cyan, #00F0FF);
+  animation: senPulse 1.2s ease-in-out infinite;
+}
+
+#agent-status-bar .status-dot.status-verifying {
+  background: var(--amber, #FBBC00);
+  animation: senPulse 1.8s ease-in-out infinite;
+}
+
+#agent-status-bar .status-dot.status-complete {
+  background: var(--lime, #95E400);
+  animation: none;
+}
+
+#agent-status-bar .status-dot.status-error {
+  background: #ff4444;
+  animation: none;
+}
+
+#agent-status-bar .status-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

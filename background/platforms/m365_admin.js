@@ -40,7 +40,7 @@ export const m365Admin = {
         'portal.azure.com', 'login.microsoftonline.com'
       ];
       if (host && Array.isArray(m365Hosts) && m365Hosts.some(h => host === h || host.endsWith('.' + h))) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     return _M365_GOAL_RE.test(String(goal || ''));
   },
 

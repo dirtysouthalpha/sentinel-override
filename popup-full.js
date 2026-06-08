@@ -117,7 +117,7 @@ window.addEventListener('click', (e) => {
 // ========== Boot Diagnostic ==========
 // Runs after ALL scripts have loaded. Checks that critical listeners exist.
 // (Provider config check is handled by boot-catcher.js with correct storage keys)
-setTimeout(() => {
+const _bootTimer = setTimeout(() => {
   const goalInput = document.getElementById('goalInput');
   const sendBtn = document.getElementById('sendBtn');
   const errors = window.__sentinelErrors || [];
@@ -131,34 +131,33 @@ setTimeout(() => {
   // Nuclear fallback: if chat.js listeners failed to attach, attach them here
   if (sendBtn && goalInput) {
     const listeners = typeof getEventListeners === 'function' ? getEventListeners(sendBtn) : null;
-    // We can't check listeners in production, so just log readiness
-    console.log('[Sentinel/BOOT] sendBtn + goalInput present — UI should work');
+    // We can't check listeners in production, so only log when something is wrong
+    if (errors.length > 0 || !goalInput || !sendBtn) {
+      console.log('[Sentinel/BOOT] sendBtn + goalInput present — UI should work');
+    }
   }
 }, 500);
+window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true });
 
 // ========== FALLBACK INPUT LISTENERS ==========
 // If chat.js IIFE failed to attach listeners, these catch it.
 // popup-full.js loads LAST, so all functions should be in global scope.
 (function attachFallbackListeners() {
+  const _DEBUG = false;
   const _goalInput = document.getElementById('goalInput');
   const _sendBtn = document.getElementById('sendBtn');
 
-  console.log('[Sentinel/FALLBACK] Attaching fallback listeners...');
-  console.log('[Sentinel/FALLBACK] goalInput:', !!_goalInput, 'sendBtn:', !!_sendBtn);
-  console.log('[Sentinel/FALLBACK] sendMessage:', typeof sendMessage);
-  console.log('[Sentinel/FALLBACK] addMessage:', typeof addMessage);
-  console.log('[Sentinel/FALLBACK] showToast:', typeof showToast);
+  if (_DEBUG) {
+    console.log('[Sentinel/FALLBACK] Attaching fallback listeners...');
+    console.log('[Sentinel/FALLBACK] goalInput:', !!_goalInput, 'sendBtn:', !!_sendBtn);
+    console.log('[Sentinel/FALLBACK] sendMessage:', typeof sendMessage);
+    console.log('[Sentinel/FALLBACK] addMessage:', typeof addMessage);
+    console.log('[Sentinel/FALLBACK] showToast:', typeof showToast);
+  }
 
   if (_sendBtn) {
-    // Mousedown fires even if click is blocked by overlay
-    _sendBtn.addEventListener('mousedown', () => {
-      console.log('[Sentinel/FALLBACK] sendBtn mousedown — button IS receiving events');
-      _sendBtn.style.outline = '3px solid lime';
-      setTimeout(() => { _sendBtn.style.outline = ''; }, 500);
-    });
-
     _sendBtn.addEventListener('click', () => {
-      console.log('[Sentinel/FALLBACK] sendBtn clicked');
+      if (_DEBUG) { console.log('[Sentinel/FALLBACK] sendBtn clicked'); }
       if (typeof sendMessage === 'function') {
         sendMessage();
       } else {
@@ -166,7 +165,7 @@ setTimeout(() => {
         alert('Sentinel Error: sendMessage function not found. Try reloading the extension.');
       }
     });
-    console.log('[Sentinel/FALLBACK] sendBtn click listener attached');
+    if (_DEBUG) { console.log('[Sentinel/FALLBACK] sendBtn click listener attached'); }
   } else {
     console.error('[Sentinel/FALLBACK] sendBtn NOT FOUND');
   }
@@ -175,7 +174,7 @@ setTimeout(() => {
     _goalInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        console.log('[Sentinel/FALLBACK] Enter key pressed');
+        if (_DEBUG) { console.log('[Sentinel/FALLBACK] Enter key pressed'); }
         if (typeof sendMessage === 'function') {
           sendMessage();
         } else {
@@ -184,7 +183,7 @@ setTimeout(() => {
         }
       }
     });
-    console.log('[Sentinel/FALLBACK] goalInput keydown listener attached');
+    if (_DEBUG) { console.log('[Sentinel/FALLBACK] goalInput keydown listener attached'); }
   } else {
     console.error('[Sentinel/FALLBACK] goalInput NOT FOUND');
   }

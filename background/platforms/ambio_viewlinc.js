@@ -37,7 +37,7 @@ export const ambioViewlinc = {
         // Common internal viewLinc deployments — IP-based + DNS-based.
         if (_VIEWLINC_HOST_RE.test(host)) return true;
         if (_VIEWLINC_IP_RE.test(host)) return true;  // user's specific server
-      } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+      } catch (e) { /* fall through */ }
     }
     const g = String(goal || '').toLowerCase();
     if (_VIEWLINC_GOAL_RE.test(g)) return true;

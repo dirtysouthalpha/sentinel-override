@@ -644,6 +644,23 @@ const CONFIG = {
   },
 };
 
+// ========== Live Status Narration (Phase 8.2) ==========
+// Emits structured status messages to the popup for real-time narration.
+// Uses `type: 'agent_status'` (distinct from the existing `action: 'agent_status'`
+// from message-protocol.js) so the popup can render a dedicated status bar
+// with tab-scoped context alongside the legacy ticker.
+function emitAgentStatus(tabId, status, detail) {
+  try {
+    chrome.runtime.sendMessage({
+      type: 'agent_status',
+      tabId: tabId || 0,
+      status: status || 'idle',
+      detail: detail || '',
+      timestamp: Date.now()
+    }).catch(() => {});
+  } catch (_) { /* non-fatal */ }
+}
+
 // ========== History Helpers ==========
 // Deduplicated from ~47 inline occurrences across the agent loop.
 function historyPush(entry) {
@@ -1019,6 +1036,7 @@ export async function startAgent(goal, sender) {
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
   runAgentLoop(finalGoal, startTabId).catch(err => {
     console.error('[Sentinel] runAgentLoop crashed unexpectedly:', getErrorMessage(err));
+    emitAgentStatus(startTabId, 'error', `Agent crashed: ${getErrorMessage(err)}`);
     agentRunning = false;
     chrome.runtime.sendMessage({
       action: 'agent_finished',
@@ -4614,6 +4632,7 @@ async function runAgentLoop(goal, workingTabId) {
       }, FIVE_SECONDS_MS);
 
       sendAgentStatus('thinking', 'Analyzing context, deciding next action...');
+      emitAgentStatus(workingTabId, 'thinking', `LLM call #${apiCallCount + 1} — analyzing context`);
       sendSilentUpdate(`Consulting AI -- call #${apiCallCount + 1}`, stepCount);
       tel.info('llm', `LLM call #${apiCallCount + 1} starting`, { stepCount, elementsCount: trimmedElements.length, pageTextLen: pageText.length, historyEntries: _histLen, hasScreenshot: !!base64Image });
       command = null;
@@ -5160,6 +5179,7 @@ async function runAgentLoop(goal, workingTabId) {
           const _gateUrl  = (typeof currentUrl === 'string') ? currentUrl : '';
           if (isConfigChangeGoal(_gateGoal, _gateUrl)) {
             sendAgentStatus('verifying', 'Checking if configuration change was committed...');
+            emitAgentStatus(workingTabId, 'verifying', 'Checking if configuration change was committed');
             if (!hasRecentCommitClick(history)) {
               const blockMsg = 'BLOCKED: configuration change detected but no Save/Apply/Commit click in recent history. Find and click the Apply/Save/Commit/Deploy button before finishing.';
               historyPush({ step: stepCount, action: command, result: blockMsg });
@@ -5761,6 +5781,7 @@ async function runAgentLoop(goal, workingTabId) {
 
 
       sendAgentStatus('executing', describeAction(command));
+      emitAgentStatus(workingTabId, 'executing', describeAction(command));
       // (3.50.0) Update the in-page action HUD so the user can see what's happening
       try {
         chrome.tabs.sendMessage(tab, {
@@ -7391,6 +7412,9 @@ return { ok: true, value: el.value };
       await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
     }
   } catch (_) { /* non-fatal */ }
+  // Phase 8.2: Emit final status narration for popup status bar
+  emitAgentStatus(workingTabId, 'complete', `Agent finished — ${stepCount} steps, ${apiCallCount} API calls`);
+
   // Signal completion via messaging (replaces polling for scheduler)
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
     console.error('[agentReport] Unhandled rejection:', e);

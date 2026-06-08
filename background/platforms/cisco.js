@@ -27,7 +27,7 @@ export const cisco = {
       if (_MERAKI_HOST_RE.test(host)) return true;
       if (_CISCO_PATH_RE.test(path)) return true;
       if (_ISE_HOST_RE.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     const t = String(goal || '').toLowerCase();
     return _CISCO_GOAL_RE.test(t);
   },

@@ -28,7 +28,7 @@ export const itglue = {
       const host = new URL(url).host.toLowerCase();
       if (_ITGLUE_HOST_RE.test(host)) return true;
       if (_ITGLUE_PARTNER_HOST_RE.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     return _ITGLUE_GOAL_RE.test(String(goal || ''));
   },
 

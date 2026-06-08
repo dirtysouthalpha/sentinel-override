@@ -26,7 +26,7 @@ export const huntress = {
       const host = (new URL(url)).host.toLowerCase();
       if (_HUNTRESS_HOST_RE.test(host)) return true;
     } catch (e) {
-      console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+      // URL parse failed — fall through to goal regex
     }
     return _HUNTRESS_GOAL_RE.test(String(goal || ''));
   },

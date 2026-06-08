@@ -28,7 +28,7 @@ export const dattoRmm = {
       if (_DATTO_HOST_RE.test(host)) return true;
       if (_DATTO_SITE_RE.test(host) && _RMM_PATH_RE.test(u.pathname)) return true;
       if (_AUTOTASK_HOST_RE.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     return _DATTO_GOAL_RE.test(String(goal || ''));
   },
 

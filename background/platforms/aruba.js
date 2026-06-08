@@ -37,7 +37,7 @@ export const aruba = {
       if (_ARUBA_PORTAL_RE.test(host)) return true;
       // Aruba Instant / on-IP — IP-based hosts with characteristic paths
       if (_ARUBA_PATH_RE.test(path) && _IP_ADDRESS_RE3.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     return _ARUBA_GOAL_RE.test(String(goal || ''));
   },
 

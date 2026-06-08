@@ -29,7 +29,7 @@ export const fortigate = {
       const path = u.pathname.toLowerCase();
       if (_FORTI_HOST_RE.test(host)) return true;
       if (_FORTI_PATH_RE.test(path) && _IP_ADDRESS_RE.test(host)) return true;
-    } catch (e) { console.warn('[Sentinel] URL parse failed:', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e)); }
+    } catch (e) { /* fall through */ }
     return _FORTI_GOAL_RE.test(String(goal || ''));
   },
 

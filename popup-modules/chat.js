@@ -3449,6 +3449,32 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_status') {
     _showStatusTicker(message.state, message.text, message.timestamp);
   }
+  // Phase 8.2: Live status bar for structured agent_status messages (type-based)
+  if (message.type === 'agent_status') {
+    try {
+      const bar = document.getElementById('agent-status-bar') || (() => {
+        const el = document.createElement('div');
+        el.id = 'agent-status-bar';
+        el.innerHTML = '<span class="status-dot"></span><span class="status-label"></span>';
+        const chatEl = chatContainer;
+        if (chatEl && chatEl.firstChild) {
+          chatEl.insertBefore(el, chatEl.firstChild);
+        } else if (chatEl) {
+          chatEl.appendChild(el);
+        }
+        return el;
+      })();
+      const label = bar.querySelector('.status-label');
+      const dot = bar.querySelector('.status-dot');
+      if (label) label.textContent = message.detail || message.status || '';
+      if (dot) dot.className = `status-dot status-${message.status || 'idle'}`;
+      bar.classList.toggle('visible', true);
+      // Auto-hide after completion or idle after a delay
+      if (message.status === 'complete' || message.status === 'error') {
+        setTimeout(() => { bar.classList.toggle('visible', false); }, 4000);
+      }
+    } catch (_) { /* non-fatal */ }
+  }
   // (6.0) API health heartbeat
   if (message.action === 'heartbeat_update') {
     _updateHeartbeat(message.durationMs || 0);
