@@ -1,21 +1,4 @@
 // popup-modules/chat.js
-console.log('[Sentinel] chat.js loading...');
-// TEMP DIAGNOSTIC (remove once the "Enter does nothing" report is resolved):
-// write directly into the boot banner so the user can see chat.js load + send
-// activity WITHOUT opening devtools. __showBootBanner is defined in
-// boot-catcher.js, which loads first.
-function __chatDiag(text, color) {
-  try {
-    if (typeof window !== 'undefined' && typeof window.__showBootBanner === 'function') {
-      window.__showBootBanner(text, color || '#0066cc');
-      return;
-    }
-    // Fallback: write to the banner element directly if the helper isn't present.
-    const b = document.getElementById('__sentinel-boot-err');
-    if (b) b.textContent += text + '\n';
-  } catch (_e) { /* never let diagnostics break the popup */ }
-}
-__chatDiag('[chat.js] loaded ✓');
 // Chat UI: goal input, message rendering, action cards, typing indicator, file attachments,
 // voice input, command palette, search, export, report card/modal, background message handler.
 // Depends on: ui-common.js (sanitizeHtml, isValidUrl, showToast, marked config).
@@ -987,18 +970,18 @@ function hideStatus() {
 // goal and returns — no double-send. Any throw is surfaced to the user as a
 // toast instead of failing silently ("nothing happens, no errors").
 function _safeSendMessage(origin) {
-  __chatDiag(`[send] handler fired (${origin}) ✓`, '#00aa44'); // TEMP DIAGNOSTIC
+  // send handler entry
   try {
     console.log(`[Sentinel] (delegated:${origin}) → sendMessage()`);
     if (typeof sendMessage !== 'function') {
-      __chatDiag('[send] ERROR: sendMessage is not a function', '#ff0040'); // TEMP DIAGNOSTIC
+      console.error('[Sentinel] sendMessage is not a function');
       return;
     }
     sendMessage();
   } catch (err) {
     const m = (typeof getErrorMessage === 'function') ? getErrorMessage(err) : String(err);
     console.error('[Sentinel] sendMessage threw:', m, err);
-    __chatDiag('[send] sendMessage threw: ' + m, '#ff0040'); // TEMP DIAGNOSTIC
+    // sendMessage threw — already logged above
     if (typeof showToast === 'function') showToast(`Send failed: ${m}`, 'error');
   }
 }
@@ -1017,7 +1000,7 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
     _safeSendMessage('click');
   });
   console.log('[Sentinel] delegated send handlers attached');
-  __chatDiag('[send] delegated handlers attached ✓'); // TEMP DIAGNOSTIC
+  // delegated send handlers attached
 }
 
 // Input listeners (auto-resize, example-prompt buttons, Enter key, send button)
@@ -1111,7 +1094,7 @@ function sendMessage() {
     const _withText = _goalInputs.find(el => el && typeof el.value === 'string' && el.value.trim());
     if (_withText) _goalInput = _withText;
   }
-  __chatDiag('[send] #goalInput count=' + _goalInputs.length + ' val="' + (_goalInput && _goalInput.value ? _goalInput.value.slice(0, 24) : '') + '"', '#aa00aa'); // TEMP DIAGNOSTIC
+  // goal input resolved
   const _sendBtn = document.getElementById('sendBtn');
   const _stopBtn = document.getElementById('stopBtn');
   const _pauseBtn = document.getElementById('pauseBtn');
@@ -1222,12 +1205,12 @@ The user wants you to continue or adjust the previous task. Look at the current 
     // sendMessage to silently fail. The ping ensures the SW is alive.
     const _sendGoal = () => {
       console.log('[Sentinel] _sendGoal: sending run_agent_loop, goal length=' + fullGoal.length);
-      __chatDiag('[send] → run_agent_loop sent (len=' + fullGoal.length + ')', '#0066cc'); // TEMP DIAGNOSTIC
+      // Sending goal to agent
       chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
         console.log('[Sentinel] run_agent_loop response:', JSON.stringify(response));
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
           console.error('[Sentinel] run_agent_loop lastError:', getErrorMessage(chrome.runtime.lastError));
-          __chatDiag('[send] ✗ run_agent_loop lastError: ' + getErrorMessage(chrome.runtime.lastError), '#ff0040'); // TEMP DIAGNOSTIC
+          // Agent runtime error — already logged
           removeTypingIndicator();
           addMessage(`Error: ${getErrorMessage(chrome.runtime.lastError)}`, 'assistant');
           resetUI();
@@ -1235,7 +1218,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
         }
         if (response && !response.ok) {
           console.error('[Sentinel] run_agent_loop error:', response.error);
-          __chatDiag('[send] ✗ agent error: ' + (response.error || 'unknown'), '#ff0040'); // TEMP DIAGNOSTIC
+          // Agent returned error — already logged
           removeTypingIndicator();
           addMessage(`Error: ${response.error || 'Unknown error'}`, 'assistant');
           resetUI();
@@ -1243,7 +1226,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
         // If response is ok, the agent is running — agent_finished will reset UI
         if (response && response.ok) {
           console.log('[Sentinel] Agent started successfully');
-          __chatDiag('[send] ✓ agent started — response ok', '#00aa44'); // TEMP DIAGNOSTIC
+          // Agent started successfully
         }
       });
     };
@@ -1254,7 +1237,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
       void chrome.runtime.lastError;
       const pong = pingResp && (pingResp.pong || pingResp.data?.pong);
       console.log('[Sentinel] SW ping response:', pong ? 'alive' : 'dead', JSON.stringify(pingResp));
-      __chatDiag('[send] SW ping: ' + (pong ? 'alive' : 'DEAD') + (chrome.runtime.lastError ? ' err=' + getErrorMessage(chrome.runtime.lastError) : ''), pong ? '#0066cc' : '#ff8800'); // TEMP DIAGNOSTIC
+      // SW ping result already logged
       if (pong) {
         _sendGoal();
       } else {
