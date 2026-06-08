@@ -15,7 +15,7 @@
    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║██║  ██║██║██████╔╝███████╗
     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝
 
-                v4.0.0 — Vision-First AI Browser Operator
+                v10.3.0 — Full-Visibility AI Browser Operator
 ```
 
 ### Professional AI Browser Automation for IT Pros & MSPs
@@ -24,17 +24,17 @@ A self-healing, vision-powered browser agent built for the work technicians actu
 multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see,
 click, read, think, and produce defensible reports.
 
-![Version](https://img.shields.io/badge/version-4.0.0-orange)
+![Version](https://img.shields.io/badge/version-10.3.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
 ![Providers](https://img.shields.io/badge/providers-16+-success)
 ![Themes](https://img.shields.io/badge/themes-14-9cf)
-![Tests](https://img.shields.io/badge/tests-5%2C517%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-8%2C488%20passing-brightgreen)
 ![Platforms](https://img.shields.io/badge/platform%20profiles-19-ff69b4)
 
 <p>
-  <a href="#-whats-new-in-v40">What's New</a> •
+  <a href="#-whats-new-in-v103">What's New</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-providers">Providers</a> •
   <a href="#-msp-features">MSP Features</a> •
@@ -54,27 +54,58 @@ click, read, think, and produce defensible reports.
 
 ---
 
-## ⚡ What's New in v4.0
+## ⚡ What's New in v10.3
 
-### Vision-First Architecture
+### Phase 5 — P0: Live Observability
 
-The agent no longer guesses at CSS selectors. It **sees** the page.
+The agent now **narrates what it sees** in real time. Every observation produces a human-readable status line — not just internal state, but a plain-English description of the page, the form fields detected, the buttons available, and the login state. You always know what the agent is looking at.
 
-Every observation renders a screenshot with **Set-of-Mark overlays** — numbered orange badges on every interactive element. The LLM picks the element index it wants. The agent resolves it back to the live DOM, validates the coordinates, and fires the click. No fragile XPath. No brittle attribute matching. If the UI shifts between screenshot and click, the live-rect refresh catches it.
+**API Health Heartbeat** — a colored indicator (green/yellow/red) in the side panel tracks provider endpoint health in real time. Latency spikes, rate limits, and outages surface immediately — no silent failures.
 
-```
-  Screenshot → SoM overlay (numbered elements) → LLM picks index
-  → resolve index → validate live rect → click with mouseMoved chain
-  → JS fallback if synthetic events fail → verify + continue
-```
+**Reasoning Cards** — every LLM thinking step renders as a collapsible card in the chat stream. Expand to see the full chain-of-thought; collapse to keep the view clean. Full transparency into why the agent chose its next action.
 
-**v4.1 click reliability** — every click uses the full `mouseMoved → mousePressed → mouseReleased` CDP chain before falling back to JS. Overlay barriers auto-dismiss with a text-match verification pass.
+### Phase 5 — P1: Reliability & Fallbacks
 
-**v4.2 rect refresh** — coordinates are re-queried at click time, not screenshot time. Solves the "element moved between observe and act" race on animated M365 pages.
+**Screenshot Capture + Preview** — every observation captures a live viewport screenshot displayed in a collapsible preview panel. See exactly what the agent saw at each step. No guesswork.
 
-### GPU Grind
+**Post-Action Verification** — after every click, type, or navigation, the agent automatically re-reads the page to confirm the action took effect. If the verification check fails, the agent retries with adjusted selectors. Self-correcting execution.
 
-The entire codebase was run through a **Qwen3-8B local GPU grind** — 80+ files, 15 batch passes — for defensive null guards, tighter error surfaces, and consistent code style. Then a second human pass caught and fixed every logic bug the GPU introduced. The result: 5,517 passing tests across 107 suites, zero regressions.
+**Coordinate-Based Fallback** — when all selector strategies fail (dynamic classes, shadow DOM, iframe sandboxes), the agent falls back to CDP `Input.dispatchMouseEvent` with raw (x,y) coordinates extracted from the last SoM screenshot. Clicks land even on the most hostile SPA layouts.
+
+### Phase 6–7 — P2: User Control & Transparency
+
+**Plan Preview** — before execution starts, the agent renders a step-by-step plan of what it intends to do. Review it, approve it, or edit the goal to redirect. No more blind launches.
+
+**Page State Narration** — the agent describes the current page in structured terms: form fields present, buttons available, login/logout state detected, modal dialogs blocking. Critical for M365 admin work where page state determines what's possible.
+
+**Natural Language Correction** — mid-run adjustments in plain English. Type "click the second tab instead" or "skip this step" while the agent is running. No pause-and-restart — the agent incorporates the correction on the next loop.
+
+### Phase 7–8 — P3: Intelligence & Analytics
+
+**Confidence Scoring** — every action gets a 0–100 confidence score based on selector match quality, element visibility, page stability, and historical success rate. Low-confidence actions surface a warning banner before execution.
+
+**Learned Patterns Dashboard** — tracks success rates for action types across domains. See which selectors work, which sites need CDP fallback, and where the agent self-heals most often. Data-driven reliability insights.
+
+**Client Knowledge Visibility** — the fact count for the current client displays in the sidebar. See how many accumulated wisdom entries are being injected into the system prompt before each run.
+
+**Multi-Provider Strategy** — configure light, default, and heavy model tiers with automatic routing. Simple tasks go to the fast/cheap model; complex reasoning escalates to the heavy model. Cost tracking shows spend per run, per tier.
+
+### Phase 6–8 — P4: Visual & Reporting
+
+**Visual Element Matching** — describe elements by visual appearance ("the blue button in the top-right") instead of selector syntax. The agent matches descriptions to SoM screenshot regions.
+
+**Zoom & Inspect** — click-to-zoom on any screenshot in the run history. Full-resolution inspection of the page state at each step.
+
+**Run Replay & Sharing** — export any completed run as a self-contained HTML report with step-by-step screenshots, actions, and results. Share with teammates, attach to tickets, archive for compliance.
+
+**Desktop Notifications** — native OS notifications for run completion, MFA challenges, errors, and key milestones. Minimize the side panel and still stay informed.
+
+### Stability & Test Coverage
+
+- **153 test suites, 8,488 tests passing** — zero regressions
+- **Timer leak fix** — eliminated a memory leak in the action loop that caused slowdown on long runs
+- **17 platform detector noise fixes** — cleaner platform detection across M365, SonicWall, and Fortinet portals
+- **600+ commits and counting**
 
 ### What else is new
 
@@ -85,6 +116,23 @@ The entire codebase was run through a **Qwen3-8B local GPU grind** — 80+ files
 | Index-based actions — no selector required | v4.0 |
 | Speed modes: Turbo / Normal / Stealth | v4.0 |
 | Keyboard shortcuts (Ctrl+Shift+Space / P) | v4.0 |
+| Live Status Narration | v10.3 |
+| API Health Heartbeat | v10.3 |
+| Reasoning Cards (collapsible thinking) | v10.3 |
+| Screenshot Capture + Preview | v10.3 |
+| Post-Action Verification + auto-retry | v10.3 |
+| Coordinate-Based Fallback (CDP clicking) | v10.3 |
+| Plan Preview (pre-execution step list) | v10.3 |
+| Page State Narration | v10.3 |
+| Natural Language Correction (mid-run) | v10.3 |
+| Confidence Scoring (0–100 per action) | v10.3 |
+| Learned Patterns Dashboard | v10.3 |
+| Client Knowledge Visibility | v10.3 |
+| Multi-Provider Strategy (light/default/heavy) | v10.3 |
+| Visual Element Matching | v10.3 |
+| Zoom & Inspect (click-to-zoom screenshots) | v10.3 |
+| Run Replay & Sharing (HTML export) | v10.3 |
+| Desktop Notifications | v10.3 |
 | Adaptive Prompts (platform-aware goal rewriting) | v3.15 |
 | Client Knowledge (per-client persistent memory) | v3.12 |
 | Quick Assist inline panel | v3.46 |
@@ -103,6 +151,12 @@ The entire codebase was run through a **Qwen3-8B local GPU grind** — 80+ files
 |---|---|---|
 | **Bring your own LLM** | 16 providers + custom endpoint | Anthropic only |
 | **Vision-first SoM architecture** | ✅ Numbered overlays, index-based actions | ✅ Computer Use |
+| **Live Status Narration** | ✅ Agent narrates what it sees in real time | ❌ |
+| **API Health Monitor** | ✅ Colored heartbeat indicator | ❌ |
+| **Confidence Scoring** | ✅ 0–100 per action | ❌ |
+| **Run Replay** | ✅ Export HTML reports with screenshots | ❌ |
+| **Plan Preview** | ✅ See steps before execution | ❌ |
+| **Mid-run Corrections** | ✅ Natural language adjustments during run | ❌ |
 | **Tenant lockdown** for M365 admin work | ✅ Hard-block, cross-client guard | ❌ |
 | **Sensitive-field protection** by label proximity | ✅ PSK, API keys, recovery codes, SSN | Limited (password-only) |
 | **MFA challenge auto-pause** | ✅ 12 patterns + resume banner | ❌ |
@@ -524,8 +578,8 @@ sentinel-override/
 ├── popup.html                      # Side-panel entry
 ├── popup.css                       # 14 themes + custom CSS hooks
 ├── popup-full.js                   # Bootstrap
-├── manifest.json                   # MV3 manifest, v4.0.0
-└── tests/                          # 107 suites, 5,517 passing tests
+├── manifest.json                   # MV3 manifest, v10.3.0
+└── tests/                          # 153 suites, 8,488 passing tests
 ```
 
 ---
@@ -548,8 +602,8 @@ sentinel-override/
 ## 🧪 Tests
 
 ```
-Test Suites: 107 passed
-Tests:       5,517 passed (5,615 total, 98 skipped)
+Test Suites: 153 passed
+Tests:       8,488 passed (8,529 total, 41 skipped)
 Time:        ~22 seconds
 ```
 
@@ -592,6 +646,6 @@ If this saves you a billable hour, consider [buying me a coffee](https://buymeac
 
 Built with ⚡ by [Dirtysouthalpha](https://github.com/dirtysouthalpha) — **for the techs in the trenches**
 
-*596 commits and counting.*
+*600+ commits and counting.*
 
 </div>

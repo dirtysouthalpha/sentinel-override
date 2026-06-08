@@ -1,5 +1,45 @@
 # Changelog
 
+## v10.3.0 — 2026-06-08 (Full-Visibility Release — all IMPROVEMENT-PLAN features delivered)
+
+Major feature release delivering all 19 planned features from the IMPROVEMENT-PLAN across 5 priority tiers.
+
+### Phase 5 — Visibility & Transparency (P0/P1)
+- **Live Status Narration** — agent emits thinking/acting/verifying/complete/error states to popup with pulsing dot indicator
+- **API Health Heartbeat** — rolling-window response time tracking, colored state indicator (healthy/slow/down/idle) with avg ms display
+- **Reasoning Cards** — collapsible "Thinking" sections on step cards showing LLM reasoning (extracted from reasoning_content field)
+- **Screenshot Capture + Preview** — before/after screenshots on every step, live preview panel with click-to-zoom
+- **Post-Action Verification** — screenshot verification after each action, verification badges (green/red), auto-strategy-shift after 2 consecutive failures
+- **Coordinate-Based Fallback** — clickAtCoordinates() via CDP Input.dispatchMouseEvent when selector-based click fails
+
+### Phase 6-7 — User Control (P2/P4)
+- **Plan Preview** — collapsible step list panel showing agent's plan before execution
+- **Page State Narration** — narratePageState() generates plain-English summary (forms, buttons, tables, login/dashboard detection)
+- **Natural Language Correction** — _correctionQueue for mid-run user corrections, input stays active during runs
+- **Visual Element Matching** — enhanceWithVisualProperties() + _findElementByDescription() for description-based element resolution
+- **Zoom & Inspect** — region-of-interest markup in LLM prompt, click-to-zoom on screenshot preview with 2x magnification
+
+### Phase 7-8 — Intelligence (P3/P4)
+- **Confidence Scoring** — scoreActionConfidence() 0-100 scoring based on action type, selector quality, element presence
+- **Learned Patterns Dashboard** — per-action pattern tracking with success rates, collapsible top-5 patterns panel
+- **Client Knowledge Visibility** — knowledge_context messages show fact count + expandable details panel
+- **Multi-Provider Strategy** — selectModelForStep() routes to light/default/heavy tiers, cost tracker per tier
+- **Run Replay & Sharing** — run recorder captures every step, generates styled HTML replay with download
+- **Desktop Notifications** — chrome.notifications on run completion for manual and scheduled runs
+
+### Bug Fixes
+- Eliminated timer leak in popup-full.js (boot diagnostic setTimeout never cleared)
+- Silenced 17 platform detector files' console.warn on expected URL parse failures
+- Gated all popup-full.js fallback listener debug logs behind `_DEBUG` flag
+- Fixed duplicate exports (generateRunReplay, setZoomRegion)
+- Added selectModelForStep + getCostTracker to 23 test file mocks
+
+### Stats
+- 153 test suites, 8,488 tests passing
+- 6 commits, 29 files changed, ~1,200 lines added
+
+---
+
 ## v3.36.3 — 2026-05-12 (HOTFIX² — content/index.js dedupe actually done this time)
 
 v3.36.2's verifier agent reported "no truncation needed — the duplicate had already been removed in a prior pass." It was wrong. The file still had a 184-line duplicate (lines 2068-2251 on the Windows source path), with `+ describeTarget(cmd);` at module top level on line 2068 and a top-level `return` on line 2089 — still throwing `Uncaught SyntaxError: Illegal return statement` at content/index.js:2089 on every page injection. Sentinel Override's loop kept ticking but no action could reach the DOM.
