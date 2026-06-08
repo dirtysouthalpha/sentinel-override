@@ -187,34 +187,6 @@ const ACTION_FAILED_TIMEOUT_RE = /^(Error|BLOCKED:|JS Error)|timed out| not foun
 // Precompile regex for page-mutating action detection (hot path in observation loop)
 const PAGE_MUTATING_ACTIONS_RE = /^(click|click_at|type|press_key|select|check|check_all)$/;
 
-// Bare site name mapping for heuristic plan generation ("go to Amazon" -> "amazon.com")
-const BARE_SITE_MAP = {
-  amazon: 'amazon.com',
-  reddit: 'reddit.com',
-  youtube: 'youtube.com',
-  twitter: 'twitter.com',
-  x: 'x.com',
-  github: 'github.com',
-  wikipedia: 'wikipedia.org',
-  hackernews: 'news.ycombinator.com',
-  'hacker news': 'news.ycombinator.com',
-  hn: 'news.ycombinator.com',
-  google: 'google.com',
-  facebook: 'facebook.com',
-  instagram: 'instagram.com',
-  linkedin: 'linkedin.com',
-  netflix: 'netflix.com',
-  yahoo: 'yahoo.com',
-  bing: 'bing.com',
-  duckduckgo: 'duckduckgo.com',
-  stackoverflow: 'stackoverflow.com',
-  'stack overflow': 'stackoverflow.com',
-  cnn: 'cnn.com',
-  bbc: 'bbc.com',
-  nytimes: 'nytimes.com',
-  espn: 'espn.com',
-  weather: 'weather.gov'
-};
 
 // ═══════════════════════════════════════════════════════════════
 // v4.0 Vision Observe — discovers elements, draws SoM, returns indexed list
@@ -284,7 +256,7 @@ import { getActiveProvider, migrateLegacySettings } from './provider-registry.js
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
 import { getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount } from './tab-context.js';
 import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
-import { rewriteGoalForPlatform } from './adaptive-prompts.js';
+import { generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP } from './agent-planning.js';
 import { appendAuditEntry, getAuditLog, auditLogToCsv } from './audit-log.js';
 import { runRecoverySkills, getSkillStats } from './skills/index.js';
 import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
@@ -304,6 +276,7 @@ import { synthesizeKnowledge, getSynthesisStatistics, clearSynthesis } from './k
 import { PredictiveEngine } from './predictive-engine.js';
 import { RuntimeProfiler } from './runtime-profiler.js';
 import { getErrorMessage, sleep } from './error-utils.js';
+import { _tenantsMatch, detectMfaInText, detectSignInWall, evaluateHallucinationRisk, _countSummaryClaims, _countSpecificClaims, _countSourceTags } from './agent-security.js';
 // ========== Agent State ==========
 let agentRunning = false;
 let apiCallCount = 0;
@@ -347,6 +320,7 @@ const _correctionQueue = new Map(); // tabId -> correction text
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
+import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
 let _learnedPatterns = null;   // (Phase 5) Runtime pattern tracking: { key: { uses, successes, lastUsed } }
 // Phase 5: Advanced Intelligence State
 let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
@@ -356,65 +330,6 @@ let _activeCanaryDeployment = null;       // Active canary deployment status (re
 let selfHealingEnabled = false;          // Self-healing system enabled
 let healingHistory = [];                 // Self-healing attempt history
 
-// ========== Run Replay Recording ==========
-// Lightweight in-memory run recorder that captures every step for instant
-// HTML replay export. Lives alongside the forensic runLogBuffer but is
-// optimised for quick human-readable HTML generation rather than storage.
-const _runRecording = {
-  steps: [],
-  startTime: null,
-  goal: '',
-  tabId: null
-};
-
-function startRunRecording(tabId, goal) {
-  _runRecording.startTime = Date.now();
-  _runRecording.goal = goal || '';
-  _runRecording.tabId = tabId;
-  _runRecording.steps = [];
-}
-
-function recordStep(stepData) {
-  _runRecording.steps.push({
-    ...stepData,
-    timestamp: Date.now()
-  });
-}
-
-function generateRunReplay() {
-  const duration = Date.now() - (_runRecording.startTime || Date.now());
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Sentinel Override Run Replay</title>
-<style>
-body{font-family:system-ui;background:#0a0a1a;color:#ccc;margin:0;padding:20px;}
-.header{border-bottom:1px solid #333;padding-bottom:12px;margin-bottom:20px;}
-.goal{font-size:16px;color:#fff;margin:8px 0;}
-.meta{font-size:12px;color:#666;}
-.step{background:#111;border-radius:8px;padding:12px;margin:8px 0;border-left:3px solid #333;}
-.step.click{border-left-color:#4caf50;} .step.type{border-left-color:#2196f3;}
-.step.navigate{border-left-color:#ff9800;} .step.error{border-left-color:#f44336;}
-.step.extract{border-left-color:#ab47bc;} .step.finish{border-left-color:#26c6da;}
-.step-header{display:flex;justify-content:space-between;font-size:12px;color:#888;margin-bottom:4px;}
-.step-action{font-size:13px;color:#ccc;} .step-result{font-size:12px;color:#999;margin-top:4px;}
-.screenshot{max-width:100%;border-radius:4px;margin-top:8px;border:1px solid #333;}
-.stats{display:flex;gap:20px;margin-top:16px;font-size:12px;color:#666;}
-</style></head><body>
-<div class="header">
-<h1>Sentinel Override Run Replay</h1>
-<div class="goal">Goal: ${_runRecording.goal || 'N/A'}</div>
-<div class="meta">${_runRecording.startTime ? new Date(_runRecording.startTime).toLocaleString() : 'N/A'} &middot; ${Math.round(duration/1000)}s &middot; ${_runRecording.steps.length} steps</div>
-</div>
-<div class="stats">
-<div>Total Steps: ${_runRecording.steps.length}</div>
-<div>Duration: ${Math.round(duration/1000)}s</div>
-</div>
-${_runRecording.steps.map((s,i) => {
-  const screenshotHtml = s.screenshot ? '<img class="screenshot" src="data:image/jpeg;base64,' + s.screenshot + '" alt="Step ' + (i+1) + '" />' : '';
-  return '<div class="step ' + (s.actionType || '') + '"><div class="step-header"><span>Step ' + (i+1) + '</span><span>' + (s.actionType || 'unknown') + '</span><span>' + new Date(s.timestamp).toLocaleTimeString() + '</span></div><div class="step-action">' + (s.action || 'No action recorded') + '</div>' + (s.result ? '<div class="step-result">' + s.result + '</div>' : '') + screenshotHtml + '</div>';
-}).join('')}
-</body></html>`;
-  return html;
-}
 
 // Expose agentRunning for index.js
 export { agentRunning };
@@ -789,22 +704,6 @@ function emitAgentStatus(tabId, status, detail) {
   } catch (_) { /* non-fatal */ }
 }
 
-// ========== Learned Patterns Dashboard (Phase 5) ==========
-// Emits the top-20 learned patterns to the popup for the patterns dashboard.
-// Called after each step completes and on run finish.
-function emitLearnedPatterns(tabId) {
-  try {
-    const patterns = Object.entries(_learnedPatterns || {}).map(([key, data]) => ({
-      pattern: key,
-      uses: data.uses,
-      successes: data.successes,
-      rate: data.uses > 0 ? Math.round(data.successes / data.uses * 100) : 0,
-      lastUsed: data.lastUsed
-    })).sort((a, b) => b.uses - a.uses).slice(0, 20);
-    chrome.runtime.sendMessage({ type: 'learned_patterns', tabId, patterns }).catch(() => {});
-  } catch (_e) {}
-}
-
 // ========== History Helpers ==========
 // Deduplicated from ~47 inline occurrences across the agent loop.
 function historyPush(entry) {
@@ -847,33 +746,6 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
     apiCallCount,
     tabContexts: tabCtxData
   };
-}
-
-// ========== Desktop Notification on Run Completion ==========
-// Fires a chrome notification when a manual (non-scheduled) agent run finishes.
-
-/**
- * Send a desktop notification when an agent run completes.
- * @param {string} goal - The run goal text
- * @param {boolean} success - Whether the run completed successfully
- * @param {number} stepCount - Total steps executed
- * @param {number} duration - Run duration in ms
- */
-function notifyRunComplete(goal, success, stepCount, duration) {
-  try {
-    const truncatedGoal = (goal || 'Task').substring(0, 50);
-    const status = success ? 'Completed successfully' : 'Failed';
-    const body = `${status} · ${stepCount} steps · ${Math.round((duration || 0) / 1000)}s`;
-    chrome.notifications.create('run-complete-' + Date.now(), {
-      type: 'basic',
-      iconUrl: 'icon-128.png',
-      title: 'Sentinel Override: ' + truncatedGoal,
-      message: body,
-      priority: 2
-    });
-  } catch (_e) {
-    // notifications API may not be available
-  }
 }
 
 // ========== State Reset ==========
@@ -1218,7 +1090,7 @@ export async function startAgent(goal, sender) {
     }
   }
 
-  const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId);
+  const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
 
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
@@ -1245,113 +1117,6 @@ export async function startAgent(goal, sender) {
   return 'Agent started in background';
 }
 
-// (3.15.0) Run the adaptive-prompts platform-rewrite pass before agent execution.
-// Reads user settings, calls rewriteGoalForPlatform, handles the approval flow
-// (if mode === 'approval'), and returns the final goal string to use for the run.
-// Falls back to the original goal on any error.
-async function _applyAdaptivePrompts(goal, tabInfo, startTabId) {
-  try {
-    const apSettings = await chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode', 'technicianInfo']);
-    const apMode = (apSettings.adaptivePromptsMode || 'auto').toString();
-    if (apMode === 'off') return goal;
-    const result = await rewriteGoalForPlatform(
-      goal,
-      tabInfo?.url || '',
-      apSettings.technicianInfo || null,
-      apSettings.adaptiveExpansionMode || 'light'
-    );
-    if (!result || !result.adapted) return goal;
-    // Log the adaptation to the forensic run log
-    try {
-      if (runLogId) {
-        runLogBuffer.push({
-          step: 0,
-          timestamp: new Date().toISOString(),
-          kind: 'adaptive_prompt_applied',
-          platform: result.platform ? result.platform.id : '',
-          mismatchCount: (result.mismatchHints || []).length,
-          durationMs: result.durationMs,
-          originalLength: (result.originalGoal || '').length,
-          adaptedLength: (result.adaptedGoal || '').length
-        });
-        chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch((e) => {
-          console.error('[_applyAdaptivePrompts] Unhandled rejection:', getErrorMessage(e));
-        });
-      }
-    } catch (_) { /* non-fatal */ }
-    if (apMode === 'approval') {
-      const decision = await _waitForAdaptedGoalDecision(result, startTabId);
-      if (decision.useOriginal) return goal;
-      if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) return decision.editedGoal;
-      // approved, timeout, or unknown → use adapted
-      return result.adaptedGoal;
-    }
-    // Auto mode: swap silently but broadcast the card for the popup diff view
-    try {
-      chrome.runtime.sendMessage({
-        action: 'adapted_goal_available',
-        mode: 'auto',
-        platform: result.platform,
-        summary: result.summary,
-        mismatchHints: result.mismatchHints,
-        originalGoal: result.originalGoal,
-        adaptedGoal: result.adaptedGoal
-      }).catch((e) => {
-        console.error('[_applyAdaptivePrompts] Unhandled rejection:', getErrorMessage(e));
-      });
-    } catch (_e) { /* non-fatal */ }
-    return result.adaptedGoal;
-  } catch (e) {
-    console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', getErrorMessage(e));
-    return goal;
-  }
-}
-
-// (3.15.0) Approval flow for Adaptive Prompts. Broadcasts the rewritten goal
-// to the popup, waits for the user's decision via adapted_goal_response, and
-// keeps the SW alive during the wait.
-async function _waitForAdaptedGoalDecision(rewriteResult, _startTabId) {
-  const requestId = crypto.randomUUID();
-  const kaName = `adaptive_prompt_${requestId}`;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-  return new Promise((resolve) => {
-    const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-      resolve(payload);
-    };
-    chrome.runtime.sendMessage({
-      action: 'adapted_goal_available',
-      mode: 'approval',
-      requestId,
-      platform: rewriteResult.platform,
-      summary: rewriteResult.summary,
-      mismatchHints: rewriteResult.mismatchHints,
-      originalGoal: rewriteResult.originalGoal,
-      adaptedGoal: rewriteResult.adaptedGoal
-    }).catch((e) => {
-      console.error('[finish] Unhandled rejection:', e);
-    });
-    const listener = (message) => {
-      if (message && message.action === 'adapted_goal_response' && message.requestId === requestId) {
-        chrome.runtime.onMessage.removeListener(listener);
-        clearTimeout(timeoutId);
-        finish({
-          approved: !!message.approved,
-          useOriginal: !!message.useOriginal,
-          edited: !!message.edited,
-          editedGoal: message.editedGoal
-        });
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-    // Cap at 5 minutes — if the user walks away, proceed with adapted goal
-    // rather than blocking the run forever.
-    const timeoutId = setTimeout(() => {
-      chrome.runtime.onMessage.removeListener(listener);
-      finish({ approved: true, useOriginal: false, edited: false, reason: 'approval_timeout_default_adapted' });
-    }, FIVE_MINUTES_MS);
-  });
-}
 
 // (3.15.2) Goal mode-directive detection. MSP technicians often write "Mode:
 // APPROVAL" or "agent pauses for technician approval before each click" in the
@@ -2199,12 +1964,6 @@ const COUNT_RE = /(?:top\s+)?(\d+)/;
 const ARTICLE_RE = /\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i;
 const ARTICLE_KEY_RE = /article[_\s]?\d/i;
 
-// Precompiled regex patterns for summary analysis
-const SUMMARY_NUMBERED_RE = /^\s*(?:#+\s*)?\d+[.)]\s/gm;
-const SUMMARY_TABLE_RE = /^\|[^\n]+\|\s*$/gm;
-const SUMMARY_BULLETS_RE = /^\s*[-*]\s/gm;
-const SUMMARY_SRC_RE = /\[src:[a-z0-9_-]+\]/gi;
-const SUMMARY_UNVERIFIED_RE = /\[unverified\]/gi;
 
 function isConfigChangeGoal(goal, currentUrl) {
   const text = String(goal || '');
@@ -2643,234 +2402,6 @@ const OTHER_ACTIONS = new Set(['execute_js', 'scroll', 'dismiss_overlay']);
 function _hostnameOf(url) {
   try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return ''; }
 }
-
-function _tenantsMatch(detected, expected) {
-  if (!expected || (typeof expected === 'string' && !expected.trim())) return true;  // no expected = no lock
-  if (!detected) return false;  // we have an expectation but nothing detected yet → block
-  const exp = typeof expected === 'string' ? expected.trim().toLowerCase() : '';
-  const signals = [detected.chipText || '', detected.onmicrosoft || '', detected.tid || ''].map(s => String(s).toLowerCase());
-  return signals.some(s => s && (s.includes(exp) || exp.includes(s)));
-}
-
-
-// ========== Hallucination Hard-Stop (3.9.1) ==========
-// Counts distinct "claim items" in a finish summary vs the actual evidence
-// sources the agent collected (memory keys + note actions). When the claim
-// density wildly outstrips evidence AND there are no "headline only / not
-// read in this run" caveats, blocks the finish and forces the LLM to either
-// trim the summary or tag unverified items explicitly.
-
-const _UNVERIFIED_CAVEATS = /\b(headline only|not read in this run|not actually read|not yet read|could not (?:read|extract|verify)|unverified|extraction failed|skipped reading|did not read|not visited|not opened|listed by headline|based on headline)\b/i;
-
-function _countSummaryClaims(summary) {
-  if (!summary || typeof summary !== 'string') return 0;
-  // Numbered list entries: "1. ", "2. ", etc., or "1) ", "## 1." style.
-  const numbered = (summary.match(SUMMARY_NUMBERED_RE) || []).length;
-  // Markdown table rows (excluding header + separator)
-  const tableRows = Math.max(0, (summary.match(SUMMARY_TABLE_RE) || []).length - 2);
-  // Top-level bullets
-  const bullets = (summary.match(SUMMARY_BULLETS_RE) || []).length;
-  // Use the densest grouping signal as the claim count.
-  return Math.max(numbered, tableRows, bullets);
-}
-
-function _countEvidenceSources(agentMemory, history) {
-  let count = 0;
-  try {
-    count += getObjectLength(agentMemory || {});
-    if (Array.isArray(history)) {
-      // Count notes in a single pass
-      const noteCount = history.reduce((acc, h) => acc + (h && h.action && h.action.type === 'note' ? 1 : 0), 0);
-      count += noteCount;
-    }
-  } catch (_e) {
-    // Context data read failed non-fatally
-  }
-  return count;
-}
-
-// (3.10.0) Patterns for "specific claims" that should be tagged with [src:*].
-const _SPECIFIC_CLAIM_RES = [
-  /\b\d[\d,]{3,}\b/g,                       // 1,234 / 110,000 / 271000
-  /\b\d+(?:\.\d+)?%/g,                       // 47% / 15.5%
-  /\$\s?\d[\d,]*(?:\.\d+)?\s?(?:[KMB]|million|billion|thousand)?\b/gi, // $5M / $12,345
-  /\b\d{4}-\d{2}-\d{2}\b/g,                 // ISO dates
-  /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,\s*\d{4})?\b/g
-];
-function _countSpecificClaims(summary) {
-  if (!summary) return 0;
-  let total = 0;
-  for (const re of _SPECIFIC_CLAIM_RES) {
-    const matches = summary.match(re);
-    if (matches) total += matches.length;
-  }
-  return total;
-}
-function _countSourceTags(summary) {
-  if (!summary) return 0;
-  const matches = summary.match(SUMMARY_SRC_RE) || [];
-  const unverified = summary.match(SUMMARY_UNVERIFIED_RE) || [];
-  return matches.length + unverified.length;
-}
-
-function evaluateHallucinationRisk(summary, agentMemory, history) {
-  const claims = _countSummaryClaims(summary);
-  const evidence = _countEvidenceSources(agentMemory, history);
-  const hasCaveats = _UNVERIFIED_CAVEATS.test(summary || '');
-  const specificClaims = _countSpecificClaims(summary);
-  const sourceTags = _countSourceTags(summary);
-
-  // 3+ claims with 0 evidence is a clear fabrication.
-  if (claims >= 3 && evidence === 0) {
-    return { risky: true, reason: `Summary lists ${claims} items but no data was extracted to memory or recorded as notes.` };
-  }
-  // claims > 2x evidence with no caveats is suspicious.
-  if (claims >= 4 && evidence > 0 && claims > evidence * 2 && !hasCaveats) {
-    return { risky: true, reason: `Summary lists ${claims} items but only ${evidence} evidence sources (memory keys + notes) and no "headline only / not read" caveats.` };
-  }
-  // (3.10.0) Lots of specific numeric/date claims with no [src:*] tags
-  if (specificClaims >= 5 && sourceTags === 0) {
-    return { risky: true, reason: `Summary contains ${specificClaims} specific claims (numbers, dates, statistics) but no [src:memory_key] citations. Per the SOURCE-CITED OUTPUTS rule, every specific claim must be tagged.` };
-  }
-  // Specific claims wildly outnumber tags
-  if (specificClaims >= 8 && sourceTags > 0 && specificClaims > sourceTags * 3) {
-    return { risky: true, reason: `Summary has ${specificClaims} specific claims but only ${sourceTags} source tags. Tag each specific claim with [src:memory_key] or move it to a Caveats section as [unverified].` };
-  }
-  return { risky: false, claims, evidence, hasCaveats, specificClaims, sourceTags };
-}
-
-// ========== MFA Challenge Detection (3.7.0) ==========
-// Many M365 / Entra / firewall login flows fire a step-up auth prompt
-// (verification code, push notification, authenticator app). Without this
-// detection the agent loops uselessly on the auth page until step-limit.
-// We scan freshly read pageText for a panel of known MFA cues; on match,
-// pause the agent, fire a desktop notification, and post a chat banner with
-// a Resume button. The user resolves the challenge in the page, then clicks
-// Resume.
-
-// (3.12.0) Confidence-based MFA detection. The previous flat regex array
-// false-positived on retail/checkout pages (coupon code fields, security
-// product descriptions, news articles mentioning two-factor). Real MFA
-// pages have stacked evidence: auth-provider URL + step-up language +
-// short-input field. Match scheme:
-//   1. Tier-1 cue alone (specific to MFA flows) -> fire
-//   2. Auth-provider URL + ANY tier-2 cue -> fire
-//   3. 2+ tier-2 cues on same page -> fire
-//   4. Otherwise -> no fire
-// Domain exclusion list short-circuits known non-MFA contexts.
-
-const MFA_TIER1_PATTERNS = [
-  /approve\s+(?:the\s+|this\s+)?sign.?in\s+request/i,
-  /we'?ve\s+sent\s+(?:a\s+|an\s+)?(?:verification\s+)?code\s+to/i,
-  /open\s+your\s+authenticator\s+app/i,
-  /tap\s+the\s+number\s+you\s+see/i,         // Microsoft number-matching MFA
-  /\bduo\s+(?:push|prompt|mobile)\b/i,
-  /\bpush\s+(?:notification|approval)\s+sent\b/i,
-  /enter\s+the\s+(?:verification\s+|security\s+)?code\s+(?:from|sent\s+to)/i,
-  /\bwaiting\s+for\s+approval\b/i,
-  /security\s+key\s+(?:plugged\s+in|connected|inserted)/i
-];
-
-const MFA_TIER2_PATTERNS = [
-  /verify\s+your\s+identity/i,
-  /two.?factor\s+(?:authentication|verification)/i,
-  /multi.?factor\s+authentication/i,
-  /authenticator\s+app/i,
-  /one.?time\s+(?:passcode|password|code)/i,
-  /\bOTP\b/,
-  /6.?digit\s+(?:code|number|verification)/i,
-  /check\s+your\s+phone/i,
-  /enter\s+(?:the\s+)?verification\s+code/i,
-  /verification\s+code\s+(?:was\s+)?sent/i
-];
-
-const MFA_AUTH_URL_PATTERNS = [
-  /login\.microsoftonline\.com/i,
-  /login\.live\.com/i,
-  /accounts\.google\.com/i,
-  /login\.okta\.com/i,
-  /\.okta\.com\/(?:signin|verify|mfa)/i,
-  /\.duosecurity\.com/i,
-  /sts\.[a-z0-9.-]+\.(com|net|org)/i,
-  /\/(?:mfa|2fa|otp|challenge|verify|signin|sign-in)(?:[/?#]|$)/i,
-  /auth\.[a-z0-9.-]+\.(com|net|org)/i
-];
-
-// Pages that should NEVER fire MFA, even with weak text cues. Stops
-// shopping / news / social sites from tripping the detector.
-const MFA_EXCLUDE_DOMAINS = [
-  /amazon\.[a-z.]+\/(?:s|gp|dp|product|cart|checkout)/i,
-  /ebay\.[a-z.]+\/(?:itm|sch|str)/i,
-  /walmart\.com\/(?:ip|search|cart)/i,
-  /target\.com\/(?:p|s|c)/i,
-  /bestbuy\.com\/(?:site|cart)/i,
-  /apple\.com\/shop/i,
-  /bhphotovideo\.com\/c/i,
-  /newegg\.com\/p/i,
-  /github\.com\/[^/]+\/[^/]+(?:\/|$)/i,    // GitHub repos
-  /\/blog\//i,
-  /\/news\//i,
-  /\/article\//i,
-  /\/(?:product|products|shop|store|cart|checkout)\//i,
-  /(?:youtube|youtu\.be|twitter|x\.com|reddit|linkedin|facebook|instagram|tiktok)\.com/i
-];
-
-function detectMfaInText(text, currentUrl) {
-  if (!text || typeof text !== 'string') return null;
-  const url = (currentUrl || '').toLowerCase();
-
-  // Hard exclude known non-MFA contexts -- protects against shopping /
-  // news / social pages with random "verify" or "two-factor" text.
-  for (const re of MFA_EXCLUDE_DOMAINS) {
-    if (re.test(url)) return null;
-  }
-
-  const sample = text.substring(0, TEXT_SAMPLE_LENGTH);
-
-  // Tier 1: any single match fires.
-  for (const re of MFA_TIER1_PATTERNS) {
-    const m = sample.match(re);
-    if (m) return m[0];
-  }
-
-  const isAuthUrl = MFA_AUTH_URL_PATTERNS.some(re => re.test(url));
-
-  // Tier 2: collect matches, decide based on count + URL.
-  const tier2Hits = [];
-  for (const re of MFA_TIER2_PATTERNS) {
-    const m = sample.match(re);
-    if (m) tier2Hits.push(m[0]);
-  }
-
-  // Auth URL + any tier-2 cue -> fire.
-  if (isAuthUrl && tier2Hits.length) return tier2Hits[0];
-
-  // Multiple tier-2 cues on same page -> fire (covers MFA flows on
-  // less-common auth domains).
-  if (tier2Hits.length >= 2) return tier2Hits[0];
-
-  return null;
-}
-
-// ========== Sign-In Wall Detection (3.14.1) ==========
-// Detects authentication walls (username/password forms) BEFORE the LLM tries
-// to drive past them. Different from MFA detection: MFA fires AFTER credentials
-// have been entered. Sign-in wall fires when we hit the login page at all and
-// have no way to enter the user's password (the runtime password-field block in
-// content/index.js already prevents auto-fill).
-//
-// Trigger requires BOTH signals to be true:
-//   1. URL matches a known auth host
-//   2. Page has at least one visible password input in the observation
-// This guards against false positives on post-auth redirect pages that
-// briefly pass through login.microsoftonline.com without showing a form.
-
-const SIGN_IN_WALL_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|accounts\.google\.com|accounts\.youtube\.com|login\.okta\.com|[^.]+\.okta\.com|[^.]+\.oktapreview\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|github\.com\/login|gitlab\.com\/users\/sign_in|bitbucket\.org\/account\/signin|login\.salesforce\.com|[^.]+\.my\.salesforce\.com|signin\.intuit\.com|login\.duosecurity\.com|connect\.secureauth\.com|adfs\..+|sts\..+)/i;
-
-const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|email)|use\s+your\s+microsoft\s+account|stay\s+signed\s+in)\b/i;
-
-// Returns { matched: true, host, evidence } when a sign-in wall is detected,
-// or null. Evidence describes WHY we matched (URL + password-field selector
 
 
 // ========== CAPTCHA / Bot Detection (v3.65) ==========
@@ -3324,49 +2855,6 @@ async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount 
 
 
 
-// or text cue) so the banner can show useful context.
-function detectSignInWall(allElements, currentUrl, pageText) {
-  if (!currentUrl) return null;
-  let host;
-  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return null; }
-  if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
-
-  // Signal 1: a password input is present in the observed elements
-  let pwField = null;
-  if (Array.isArray(allElements)) {
-    pwField = allElements.find(e => {
-      if (!e) return false;
-      if (e.type === 'password') return true;
-      const sel = String(e.selector || '').toLowerCase();
-      if (/passw(or)?d|passwordinput/i.test(sel)) return true;
-      return false;
-    });
-  }
-  if (pwField) {
-    return { matched: true, host, evidence: `password input on ${host}`, selector: pwField.selector || '' };
-  }
-
-  // Signal 2 (fallback): page text contains sign-in cues AND we're on a known auth host
-  // This catches the brief username-only first step before the password field renders
-  // (Microsoft's two-step sign-in: email page → password page).
-  if (pageText && SIGN_IN_WALL_TEXT_RE.test(pageText)) {
-    // Require a username/email input to be present so we don't trip on
-    // post-auth redirect screens that say "Stay signed in?" without a form.
-    if (Array.isArray(allElements)) {
-      const emailField = allElements.find(e => {
-        if (!e) return false;
-        if (e.type === 'email') return true;
-        const sel = String(e.selector || '').toLowerCase();
-        return /(email|username|loginfmt|user_?id|user_?name|signin)/i.test(sel);
-      });
-      if (emailField) {
-        return { matched: true, host, evidence: `email/username input on ${host}`, selector: emailField.selector || '' };
-      }
-    }
-  }
-
-  return null;
-}
 
 // ========== v3.13.0 Auto-Recovery Helpers ==========
 // Engine-side reliability layer. The LLM is good at "what's the next step";
@@ -3645,101 +3133,6 @@ function _detectActionTypeLoop(history, _agentMemory) {
   return { isLoop: false };
 }
 
-// ========== Heuristic Plan Generator ==========
-// Fallback when LLM-based plan generation fails. Analyzes the goal text
-// to produce a basic step-by-step plan without any API calls.
-
-function generateHeuristicPlan(goal, currentUrl) {
-  if (!goal) return null;
-  const g = goal.toLowerCase();
-  const currentHost = (() => { try { return new URL(currentUrl).hostname; } catch (_urlErr) { return ''; } })();
-
-  // Detect multi-page research patterns
-  const isMultiPage = MULTI_PAGE_GOAL_RE.test(g)
-    || /\b(open|visit|browse|check)\b.*\b(each|and|then)\b/i.test(g)
-    || /\b(summarize?|brief|report)\b.*\b(all|each|every)\b/i.test(g);
-
-  // Extract target URL from goal
-  const urlMatch = goal.match(URL_NAV_RE)
-    || goal.match(URL_ANY_RE);
-  // v3.63: Also match bare site names ("go to Amazon", "go to Reddit")
-  let _urlMatch = urlMatch;
-  if (!_urlMatch) {
-    const _bareMatch = goal.match(BARE_SITE_RE);
-    if (_bareMatch && _bareMatch[1]) {
-      const _siteKey = _bareMatch[1].trim().toLowerCase().replace(WHITESPACE_NORMALIZE_RE, '');
-      if (BARE_SITE_MAP[_siteKey]) {
-        _urlMatch = [`go to ${_bareMatch[1]}`, `https://${BARE_SITE_MAP[_siteKey]}`];
-      } else {
-        // Try partial match
-        for (const [k, v] of Object.entries(BARE_SITE_MAP)) {
-          if (_siteKey.includes(k) || k.includes(_siteKey)) {
-            _urlMatch = [`go to ${_bareMatch[1]}`, `https://${v}`];
-            break;
-          }
-        }
-      }
-    }
-  }
-  const urlMatchFinal = _urlMatch;
-  const targetUrl = urlMatchFinal && urlMatchFinal[1] ? urlMatchFinal[1] : null;
-  const targetHost = targetUrl ? (() => { try { return new URL(targetUrl).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { return ''; } })() : '';
-  const _normHost = currentHost.replace(WWW_PREFIX_RE, '');
-  const alreadyThere = targetHost && (_normHost === targetHost || _normHost.endsWith('.' + targetHost));
-
-  // Extract search query from goal
-  const searchMatch = goal.match(SEARCH_LONG_RE)
-    || goal.match(ABOUT_RE);
-  const searchQuery = searchMatch && searchMatch[1] && typeof searchMatch[1] === 'string' ? searchMatch[1].trim() : null;
-
-  // Extract count
-  const countMatch = goal.match(COUNT_RE);
-  const count = countMatch && countMatch[1] ? (parseInt(countMatch[1], 10) || 10) : 10;
-
-  if (isMultiPage) {
-    const steps = [];
-    if (targetUrl && !alreadyThere) {
-      steps.push(`Navigate to ${targetUrl}`);
-    } else if (searchQuery) {
-      steps.push(`Search Google for "${searchQuery}"`);
-    }
-    steps.push(`Use execute_js with key "links" to extract article/result links from the page`);
-    steps.push(`Review extracted links and identify the ${count} most relevant ones`);
-    for (let i = 1; i <= Math.min(count, 10); i++) {
-      steps.push(`Open article ${i} in a new tab, read it, and note a brief summary`);
-    }
-    steps.push(`Close all article tabs`);
-    steps.push(`Finish with a combined summary of all ${count} items`);
-    return steps;
-  }
-
-  if (targetUrl && !alreadyThere) {
-    return [
-      `Navigate to ${targetUrl}`,
-      'Read the page content',
-      'Extract key information using execute_js with key "data"',
-      'Finish with a summary of findings'
-    ];
-  }
-
-  if (searchQuery) {
-    return [
-      `Search Google for "${searchQuery}"`,
-      'Read search results and extract top links',
-      'Visit the most relevant result',
-      'Read and extract key information',
-      'Finish with a summary'
-    ];
-  }
-
-  // Generic fallback
-  return [
-    'Read the current page',
-    'Extract key information',
-    'If needed, navigate to find more data',
-    'Finish with a summary'
-  ];
-}
 
 // ========== Run Setup Helpers ==========
 
@@ -3887,103 +3280,6 @@ function narratePageState(pageContext) {
   return parts.length > 0 ? parts.join(' · ') : 'Page loaded.';
 }
 
-// Generate the initial execution plan before the agent loop starts.
-// In quick mode, skips planning and returns null. Otherwise tries LLM planning
-// first and falls back to a heuristic plan if the LLM call fails.
-async function _generateInitialPlan(goal, workingTabId) {
-  if (_runSettings.quickMode) {
-    sendSilentUpdate('⚡ Quick Mode — executing directly');
-    return null;
-  }
-  sendSilentUpdate('Planning task...');
-  sendAgentStatus('planning', 'Generating task plan...');
-  const planProviderConfig = await getActiveProvider();
-  if (!planProviderConfig) {
-    sendSilentUpdate('No provider configured — cannot generate plan');
-    return null;
-  }
-  const planSettings = {
-    api_endpoint: planProviderConfig.endpoint,
-    api_key: planProviderConfig.apiKey,
-    model: planProviderConfig.model
-  };
-  const currentTabInfo = await getTabContext(workingTabId);
-  const platformCtx = getPlatformContext(currentTabInfo?.url || '', goal);
-  const patterns = await getRelevantPatterns(goal);
-  // v10.0: Capture reasoning for plan generation
-  await captureReasoningStep('plan_generation', 'input', {
-    goal,
-    url: currentTabInfo?.url || '',
-    title: currentTabInfo?.title || '',
-    platformContext: platformCtx,
-    patterns: patterns.length
-  });
-  let plan = await generatePlan(goal, planSettings, {
-    currentUrl: currentTabInfo?.url || '',
-    pageTitle: currentTabInfo?.title || '',
-    platformContext: platformCtx,
-    relevantPatterns: patterns
-  });
-  // v10.0: Capture plan result and check for bias
-  await captureReasoningStep('plan_generation', 'output', {
-    planSteps: plan?.length || 0,
-    firstStep: plan?.[0] || 'none'
-  });
-  // Analyze plan for potential bias
-  const planBiasAnalysis = analyzeForBias(plan?.join('\n') || '');
-  if (planBiasAnalysis.hasBias && shouldTriggerBiasWarning(planBiasAnalysis)) {
-    console.warn('[Sentinel] Plan bias detected:', planBiasAnalysis);
-    logBiasDetection(planBiasAnalysis, 'plan_generation');
-  }
-  if (plan) {
-    sendSilentUpdate(`📋 Plan ready (${plan.length} steps): ${plan[0] || ''}`);
-    return plan;
-  }
-  // Fallback: heuristic plan from goal analysis
-  plan = generateHeuristicPlan(goal, currentTabInfo?.url || '');
-  if (plan) {
-    sendSilentUpdate(`📋 Basic plan (${plan.length} steps): ${plan[0] || ''}`);
-  } else {
-    sendSilentUpdate('Running in direct mode');
-  }
-  return plan;
-}
-
-// ========== Confidence Scoring ==========
-// Scores each action 0-100 so the popup can display how sure the agent is
-// about a given step. Pure function — no side effects.
-
-function scoreActionConfidence(command, pageContext) {
-  if (!command) return 0;
-  let score = 50; // baseline
-  const type = command.type || '';
-
-  // High-confidence actions
-  if (type === 'note' || type === 'finish') return 95;
-  if (type === 'navigate' || type === 'open_tab') { score = 80; }
-
-  // Selector-based scoring
-  if (command.selector) {
-    score += 10; // has explicit selector
-    if (command.selector.startsWith('#')) score += 10; // ID selector = very specific
-    else if (command.selector.includes('[aria-')) score += 8; // ARIA = good
-    else if (command.selector.startsWith('//')) score -= 5; // XPath = fragile
-  }
-
-  // Text-based matching
-  if (command.text || command.value) score += 5; // has text to match
-
-  // Check if selector exists in observed elements
-  if (pageContext && pageContext.elements && command.selector) {
-    const found = pageContext.elements.some(el =>
-      el.selector === command.selector || el.id === command.selector
-    );
-    if (found) score += 15;
-    else score -= 20; // selector not found on page
-  }
-
-  return Math.max(0, Math.min(100, score));
-}
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
@@ -4014,7 +3310,7 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastObservedDomHash = 0;
 
   try {
-    agentPlan = await _generateInitialPlan(goal, workingTabId);
+    agentPlan = await _generateInitialPlan(goal, workingTabId, _runSettings);
   } catch (e) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', getErrorMessage(e));
     agentPlan = null;
@@ -7599,7 +6895,7 @@ return { ok: true, value: el.value };
         if (!actionFailed) _learnedPatterns[_patternKey].successes++;
         _learnedPatterns[_patternKey].lastUsed = Date.now();
       }
-      emitLearnedPatterns(tab);
+      emitLearnedPatterns(tab, _learnedPatterns);
 
       // (3.40.0) Audit log: append a structured entry for MSP compliance.
       try {
@@ -8005,7 +7301,7 @@ return { ok: true, value: el.value };
   // Phase 8.2: Emit final status narration for popup status bar
   emitAgentStatus(workingTabId, 'complete', `Agent finished — ${stepCount} steps, ${apiCallCount} API calls`);
   // (Phase 5) Final learned patterns emission on run finish
-  emitLearnedPatterns(workingTabId);
+  emitLearnedPatterns(workingTabId, _learnedPatterns);
   // Desktop notification on run completion
   const _runDuration = Date.now() - _loopStartTime;
   notifyRunComplete(_lastGoal, !!finished, stepCount, _runDuration);
@@ -8016,39 +7312,6 @@ return { ok: true, value: el.value };
   });
 }
 
-// ========== Self-Learning ==========
-async function saveLearnedPattern(goal, history, success) {
-  try {
-    const stored = await chrome.storage.local.get(['learned_patterns']);
-    const patterns = stored.learned_patterns || [];
-    // Scrub PII before persisting — IPs, emails, ticket numbers, and quoted
-    // strings (often client names) are replaced with safe placeholders so
-    // chrome.storage.local doesn't accumulate identifiable client data.
-    const _scrubPii = (str) => String(str)
-      .replace(PII_IP_RE, '[REDACTED:ip]')
-      .replace(PII_EMAIL_RE, '[REDACTED:email]')
-      .replace(PII_TICKET_RE, '[REDACTED:ticket]')
-      .replace(PII_CLIENT_STRING_RE, '"[REDACTED:client]"')
-      .replace(PII_CLIENT_SINGLE_RE, "'[REDACTED:client]'");
-    const steps = [];
-    for (const h of history) {
-      if (h.action) {
-        steps.push({ type: h.action.type, selector: h.action.selector });
-      }
-    }
-    patterns.push({
-      goal: _scrubPii(goal.substring(0, 100)),
-      steps,
-      success,
-      timestamp: Date.now()
-    });
-    const maxPatterns = CONFIG.maxLearnedPatterns;
-    if (patterns.length > maxPatterns) patterns.splice(0, patterns.length - maxPatterns);
-    await chrome.storage.local.set({ learned_patterns: patterns });
-  } catch (e) { console.warn('Failed to save pattern:', getErrorMessage(e)); }
-}
-
-// ========== Utilities ==========
 async function enforceRateLimit() {
   const delay = _runSettings.quickMode ? 200 : CONFIG.minDelayBetweenCalls;
   const delayNeeded = Math.max(0, delay - (Date.now() - lastApiCallTime));
