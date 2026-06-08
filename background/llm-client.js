@@ -1405,9 +1405,11 @@ const SENTINEL_TOOLS = [
  * @returns {Promise<Object>} Parsed LLM response object.
  */
 export async function callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount, CONFIG, agentState) {
+  console.log('[Sentinel/LLM] callLLMWithRetry called. model=' + (agentState && agentState.model ? agentState.model : 'default') + ' messages=' + (history ? history.length : 0));
   try {
     return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
   } catch (err) {
+    console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
     const msg = (typeof err.message === 'string' ? err.message : String(err));
     const isRetryable = (msg.includes('429') || msg.includes('502') || msg.includes('503') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
@@ -2019,9 +2021,15 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   _rateLimiter.check();
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
-  if (!providerConfig) throw new Error('No active provider configured. Set one in extension settings.');
+  if (!providerConfig) {
+    console.error('[Sentinel/LLM] No active provider configured!');
+    return { type: 'finish', summary: 'Error: No provider configured. Open Settings and configure a provider.' };
+  }
   const { endpoint, apiKey } = providerConfig;
-  if (!apiKey) throw new Error('API key not configured. Set it in extension settings.');
+  if (!apiKey) {
+    console.error('[Sentinel/LLM] No API key configured! Provider:', providerConfig.providerId || endpoint || 'unknown');
+    throw new Error('No API key configured. Open Settings and configure a provider.');
+  }
   const provider = resolveProvider(endpoint);
   if (!provider) throw new Error(`Unknown provider for endpoint: ${endpoint}`);
   // (9.2) Route simple steps to fast model if configured
@@ -2188,9 +2196,11 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   } catch (err) {
     clearTimeout(fetchTimeout);
     _apiHealth.record(_apiStart, false);
+    console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
     throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
   }
   clearTimeout(fetchTimeout);
+  console.log('[Sentinel/LLM] Response received. status=' + (response ? response.status : 'null'));
   let _apiHealthRecorded = false;
   try {
   if (!response.ok) {
@@ -2221,6 +2231,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         _fbResp = await fetch(endpoint, { method: 'POST', headers: requestHeaders, body: _fbBody, signal: _fbCtrl.signal });
       } catch (err) {
         clearTimeout(_fbTimeout);
+        console.error('[Sentinel/LLM] Vision fallback API call failed:', getErrorMessage(err));
         throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
       }
       clearTimeout(_fbTimeout);

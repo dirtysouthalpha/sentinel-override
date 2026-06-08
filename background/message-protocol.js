@@ -82,7 +82,12 @@ export function wrapMessageHandler(asyncHandler) {
   return (request, sender, sendResponse) => {
     asyncHandler(request, sender)
       .then(data => sendResponse({ ok: true, data }))
-      .catch(err => sendResponse({ ok: false, error: (err && typeof err.message === 'string') ? err.message : String(err) }));
+      .catch(err => {
+        // v10.3.1: Log every unhandled message-handler error to SW console
+        const msg = (err && typeof err.message === 'string') ? err.message : String(err);
+        console.error(`[Sentinel/SW] Message handler error (action=${request && request.action}):`, msg, err);
+        sendResponse({ ok: false, error: msg });
+      });
     return true; // keep message channel open
   };
 }

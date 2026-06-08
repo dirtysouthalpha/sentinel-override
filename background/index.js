@@ -46,6 +46,13 @@ import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitor
 import { startRecording, stopRecording, isRecording, loadMacros } from './macro-recorder.js';
 import { generateHtmlReport, generateReplayReport } from './export-report.js';
 
+// v10.3.1: Startup diagnostics
+console.log('[Sentinel/SW] Service worker starting...');
+console.log('[Sentinel/SW] All imports resolved successfully');
+
+// Service worker health heartbeat — confirms the SW event loop is alive
+chrome.alarms.create('sw_heartbeat', { periodInMinutes: 0.5 });
+
 // ========== One-time migration ==========
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(['api_endpoint', 'model'], (result) => {
@@ -190,8 +197,13 @@ try {
 // for cross-origin iframe routing.
 addFrameRouterListeners();
 
-// Schedule alarm listener
+// Schedule alarm listener + SW heartbeat
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  // v10.3.1: Heartbeat diagnostic
+  if (alarm.name === 'sw_heartbeat') {
+    console.log('[Sentinel/SW] Heartbeat — service worker alive');
+    return;
+  }
   if (alarm.name.startsWith('schedule-')) {
     const scheduleId = alarm.name.replace('schedule-', '');
     try {
@@ -397,8 +409,10 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
           historyLength: result.historyLength,
           memoryKeys: result.memoryKeys
         });
+        console.log('[Sentinel/SW] resume_from_checkpoint — starting agent...');
         return await startAgent(result.goal, sender);
       } catch (e) {
+        console.error('[Sentinel/SW] resume_from_checkpoint error:', e);
         return { ok: false, error: getErrorMessage(e) };
       }
     }
@@ -524,7 +538,16 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     }
 
     case 'run_agent_loop': {
-      return await startAgent(request.goal, sender);
+      // v10.3.1: Explicit error catch for startAgent — surfaces LLM/config errors
+      try {
+        console.log('[Sentinel/SW] run_agent_loop received — starting agent...');
+        const result = await startAgent(request.goal, sender);
+        console.log('[Sentinel/SW] startAgent returned successfully');
+        return result;
+      } catch (agentErr) {
+        console.error('[Sentinel/SW] startAgent threw:', agentErr);
+        throw agentErr; // re-throw so wrapMessageHandler sends error response
+      }
     }
 
     case 'stop_agent_loop': {
@@ -672,7 +695,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       if (!request.templateId) throw new Error('Template ID required');
       if (agentRunning) throw new Error('Agent already running');
       const goal = await resolveTemplateGoal(request.templateId, request.params || {});
-      return await startAgent(goal, sender);
+      try {
+        return await startAgent(goal, sender);
+      } catch (agentErr) {
+        console.error('[Sentinel/SW] template_run startAgent threw:', agentErr);
+        throw agentErr;
+      }
     }
 
     // ========== Client Knowledge (3.12.0+ -- 3.12.3 unwrap fix) ==========
@@ -832,7 +860,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         context_menu_summarize: () => 'Summarize the current page content concisely.',
       };
       const goal = goalMap[request.action](request.params || {});
-      return await startAgent(goal, sender);
+      try {
+        return await startAgent(goal, sender);
+      } catch (agentErr) {
+        console.error(`[Sentinel/SW] context_menu startAgent (${request.action}) threw:`, agentErr);
+        throw agentErr;
+      }
     }
 
     case 'context_menu_monitor_changes': {

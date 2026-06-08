@@ -1223,13 +1223,24 @@ export async function startAgent(goal, sender) {
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
   runAgentLoop(finalGoal, startTabId).catch(err => {
-    console.error('[Sentinel] runAgentLoop crashed unexpectedly:', getErrorMessage(err));
+    console.error('[Sentinel/Loop] runAgentLoop crashed unexpectedly:', err);
+    console.error('[Sentinel/Loop] Stack:', err && err.stack ? err.stack : '[no stack]');
     emitAgentStatus(startTabId, 'error', `Agent crashed: ${getErrorMessage(err)}`);
     agentRunning = false;
     chrome.runtime.sendMessage({
       action: 'agent_finished',
-      summary: `Agent crashed unexpectedly: ${getErrorMessage(err)}`
+      summary: `Agent crashed: ${getErrorMessage(err)}`,
+      error: true,
+      errorStack: err && err.stack ? err.stack.substring(0, 500) : undefined
     }).catch(() => {});
+    try {
+      chrome.notifications.create('sentinel-agent-crash', {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: 'Sentinel Agent Crashed',
+        message: `Agent error: ${getErrorMessage(err)}`.substring(0, 200)
+      });
+    } catch (_notifErr) { /* notifications API may be unavailable */ }
   });
   return 'Agent started in background';
 }
@@ -3977,6 +3988,7 @@ function scoreActionConfidence(command, pageContext) {
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
   console.log('[Sentinel] Agent starting loop for goal:', goal);
+  console.log('[Sentinel/Loop] Agent loop entered. goal="' + (goal||'').substring(0,60) + '" tabId=' + workingTabId);
   _lastGoal = goal || '';
   startRunRecording(workingTabId, goal);
   let finished = false;
@@ -4007,6 +4019,7 @@ async function runAgentLoop(goal, workingTabId) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', getErrorMessage(e));
     agentPlan = null;
   }
+  console.log('[Sentinel/Loop] Plan generated. Steps: ' + (agentPlan ? agentPlan.length : 'none'));
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_e) {
     // Plan preview send failed non-fatally
   }
@@ -5409,6 +5422,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }
         try {
+          console.log('[Sentinel/Loop] Calling LLM for step ' + (stepCount+1) + '...');
           command = await callLLMWithRetry(
             trimmedElements, allElements.length, pageText, base64Image,
             goal, promptHistory, stepCount, currentUrl,
@@ -5416,6 +5430,7 @@ async function runAgentLoop(goal, workingTabId) {
             CONFIG,
             agentState
           );
+          console.log('[Sentinel/Loop] LLM responded. Type: ' + (command ? command.type : 'null'));
           // v10.0: Capture reasoning result and analyze for bias
           await captureReasoningStep('action_decision', 'output', {
             commandType: command?.type || 'none',
@@ -7731,7 +7746,7 @@ return { ok: true, value: el.value };
       await sleep(baseDelay * speedMultiplier);
 
     } catch (err) {
-      console.error('[Sentinel] Agent loop error:', getErrorMessage(err), (typeof err.stack === 'string' ? err.stack : '[no stack]'));
+      console.error('[Sentinel/Loop] Step error:', getErrorMessage(err), err.stack ? err.stack.substring(0, 200) : '');
       sendSilentUpdate(`Loop error: ${getErrorMessage(err)}`, stepCount);
       consecutiveFailures++;
       // Don't kill the loop on tab-closed errors — try to recover instead
