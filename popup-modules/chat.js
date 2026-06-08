@@ -834,17 +834,104 @@ function updateActionCardResult(stepNumber, resultText, isError) {
 }
 
 // ========== Chat History ==========
+
+/**
+ * Render a message bubble into the chat container WITHOUT touching
+ * conversationHistory or storage. Used by loadChatHistory() to replay
+ * stored messages without doubling the state.
+ */
+function _renderMessageBubble(textStr, role) {
+  if (!chatContainer) return;
+
+  const messageGroup = document.createElement('div');
+  messageGroup.className = 'message-group';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = `message-wrapper ${role === 'user' ? 'user-wrapper' : 'assistant-wrapper'}`;
+
+  const msg = document.createElement('div');
+  msg.className = `message ${role === 'user' ? 'user-msg' : 'assistant-msg'}`;
+
+  if (role === 'user') {
+    msg.textContent = textStr;
+  } else {
+    try {
+      msg.innerHTML = sanitizeHtml(marked.parse(textStr));
+      addCodeCopyButtons(msg);
+    } catch (err) {
+      msg.textContent = textStr;
+      console.warn('Markdown parse failed, showing raw text:', err);
+    }
+  }
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'message-copy-btn';
+  copyBtn.title = 'Copy message';
+  copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+  copyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(textStr).then(() => {
+      copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    }).catch((e) => { console.warn('[Sentinel/chat] Copy failed:', getErrorMessage(e)); });
+  });
+
+  wrapper.appendChild(msg);
+  wrapper.appendChild(copyBtn);
+  messageGroup.appendChild(wrapper);
+  chatContainer.appendChild(messageGroup);
+}
+
+// Deduplicate conversation history by removing consecutive duplicate turns.
+// This repairs data corrupted by the previous loadChatHistory bug that
+// doubled the array on every popup open.
+function _dedupHistory(history) {
+  if (!Array.isArray(history) || history.length === 0) return history;
+  const deduped = [history[0]];
+  for (let i = 1; i < history.length; i++) {
+    const prev = history[i - 1];
+    const curr = history[i];
+    if (curr && prev && curr.text === prev.text && curr.role === prev.role) {
+      continue; // skip duplicate
+    }
+    deduped.push(curr);
+  }
+  return deduped;
+}
+
+const CHAT_HISTORY_MAX = 200; // cap to prevent runaway growth
+
 // eslint-disable-next-line no-unused-vars
 function loadChatHistory() {
   const state = getState();
   chrome.storage.local.get(['chat_history'], (result) => {
     if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.error('[Sentinel/chat] loadChatHistory failed:', getErrorMessage(chrome.runtime.lastError)); return; }
     if (Array.isArray(result.chat_history) && result.chat_history.length) {
-      state.conversationHistory = result.chat_history;
+      // Repair corrupted history (dedup + cap)
+      let history = _dedupHistory(result.chat_history);
+      if (history.length > CHAT_HISTORY_MAX) {
+        console.warn(`[Sentinel/chat] chat_history had ${history.length} entries, trimming to ${CHAT_HISTORY_MAX}`);
+        history = history.slice(-CHAT_HISTORY_MAX);
+      }
+      // Persist the cleaned-up version if it changed
+      if (history.length !== result.chat_history.length) {
+        chrome.storage.local.set({ chat_history: history }).catch((e) => {
+          console.error('[Sentinel/chat] failed to persist deduped history:', getErrorMessage(e));
+        });
+      }
+      // Set state ONCE — do NOT call addMessage (which would push + save again)
+      state.conversationHistory = history;
       if (chatContainer) chatContainer.innerHTML = '';
-      state.conversationHistory.forEach(turn => {
-        addMessage(turn.text, turn.role);
+      history.forEach(turn => {
+        if (turn && typeof turn.text === 'string') {
+          _renderMessageBubble(turn.text, turn.role || 'assistant');
+        }
       });
+      chatContainer.scrollTop = chatContainer.scrollHeight;
       hideStatus();
     }
   });
