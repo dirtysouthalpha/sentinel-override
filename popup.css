@@ -3456,3 +3456,66 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ================================================================
+   PRODUCTION POLISH — subtle transitions for premium feel
+   ================================================================ */
+
+/* Active-agent status pulse — subtle cyan glow when the agent is thinking */
+.status-indicator {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Typing indicator entrance — smoother than fadeIn for the dots */
+#typing-indicator {
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Agent status bar — smooth transitions between states */
+#agent-status-bar {
+  transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+/* Active tab strip — fade in/out when agent starts/stops */
+.active-tab-strip {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Toast notifications — slide-in from right */
+.toast {
+  animation: toastSlideIn 0.3s ease-out;
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Empty state panels — centered with subtle styling */
+.template-empty,
+.schedule-empty {
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  padding: 32px 16px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+/* Chat input focus glow — visual feedback when typing */
+#goalInput:focus {
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 0 1px var(--accent-a30), 0 0 12px var(--accent-a10) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Approval card entrance — draws attention for action-required UI */
+#approvalCardContainer .approval-card {
+  animation: fadeIn 0.3s ease-out;
+  border-left: 3px solid var(--amber);
+}
+
+/* Report card glow — success state */
+.report-card-success {
+  border-left: 3px solid var(--lime);
+}
