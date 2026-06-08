@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
 import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
@@ -563,6 +563,15 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
       const note = typeof request.note === 'string' ? request.note.trim() : '';
       if (!note) return { ok: false, error: 'Empty note' };
       injectContext(note);
+      return { ok: true };
+    }
+
+    case 'agent_correction': {
+      if (!agentRunning) return { ok: false, error: 'No agent running' };
+      const correction = typeof request.correction === 'string' ? request.correction.trim() : '';
+      if (!correction) return { ok: false, error: 'Empty correction' };
+      const tabId = request.tabId || (sender.tab && sender.tab.id) || 0;
+      applyCorrection(tabId, correction);
       return { ok: true };
     }
 

@@ -340,8 +340,13 @@ let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section 
 let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this run; useCount bumps at run end
 let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
 let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
+// Mid-run user corrections (e.g., "click the second one instead"). Distinct from
+// context injections — corrections are higher-priority, consume on next step only,
+// and trigger a status update so the user sees the agent adjusting.
+const _correctionQueue = new Map(); // tabId -> correction text
 let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained before consulting LLM
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
+let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 // Phase 5: Advanced Intelligence State
 let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
 let profilingEnabled = false;            // Runtime profiling enabled
@@ -356,6 +361,13 @@ export { agentRunning };
 export function injectContext(note) {
   if (typeof note === 'string' && note.trim()) {
     _pendingContextInjections.push(note.trim());
+  }
+}
+
+/** Enqueue a mid-run user correction (e.g., "click the second one instead"). */
+export function applyCorrection(tabId, correction) {
+  if (typeof correction === 'string' && correction.trim()) {
+    _correctionQueue.set(tabId, correction.trim());
   }
 }
 
@@ -617,6 +629,24 @@ function activityUpdate(stepNumber, key, label) {
   try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Agent activity send failed:', getErrorMessage(e)); }
 }
 
+// ========== Step Screenshot Capture ==========
+// Lightweight screenshot helper for before/after action capture.
+// Uses chrome.tabs.captureVisibleTab for quick JPEG captures without
+// the full takeScreenshot pipeline (no cache, no CDP, no DPR metadata).
+async function captureStepScreenshot(tabId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const windowId = tab.windowId;
+    const dataUrl = await new Promise((resolve, reject) => {
+      chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 60 }, (result) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else resolve(result);
+      });
+    });
+    return dataUrl; // base64 data URL
+  } catch (e) { return null; }
+}
+
 // ========== Configuration ==========
 const CONFIG = {
   minDelayBetweenCalls: 500,
@@ -731,9 +761,11 @@ export function resetAgentState() {
   failedSteps = 0;
   consecutiveFailureMax = 0;
   _pendingContextInjections.length = 0;
+  _correctionQueue.clear();
   _pendingCommandQueue.length = 0;
   _historyDirty = false;
   undoStack.length = 0;
+  _verificationFailures = 0; // (Phase 8.2) reset post-action verification counter
   _stepScreenshots.clear(); // (9.3) reset replay screenshot ring buffer
   // Reset CDP observe-path optimization flags so a new run always gets a fresh
   // page ready check and overlay nuke on its first observation.
@@ -1840,6 +1872,60 @@ let _pageWasReady = false; // Skip ready check if previous observe succeeded
 let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
 let _observeCacheHits = 0;
 
+
+// ═══════════════════════════════════════════════════════════════
+// Coordinate-based click fallback — uses CDP Input.dispatchMouseEvent
+// to click at exact viewport coordinates when selector matching fails.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Click at exact viewport coordinates using CDP Input.dispatchMouseEvent.
+ * Attaches the debugger, dispatches mousePressed + mouseReleased, then detaches.
+ * Returns true on success, false on any failure.
+ * @param {number} tabId - Chrome tab ID to click in.
+ * @param {number} x - X coordinate in CSS pixels.
+ * @param {number} y - Y coordinate in CSS pixels.
+ * @returns {Promise<boolean>}
+ */
+async function clickAtCoordinates(tabId, x, y) {
+  try {
+    const target = { tabId };
+    await chrome.debugger.attach(target, '1.3');
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+      type: 'mousePressed', x, y, button: 'left', clickCount: 1
+    });
+    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x, y, button: 'left', clickCount: 1
+    });
+    await chrome.debugger.detach(target);
+    return true;
+  } catch (e) {
+    try { await chrome.debugger.detach({ tabId }); } catch (_) {}
+    return false;
+  }
+}
+
+/**
+ * Find an element's bbox from observed page data by matching selector or text.
+ * Searches the elements array from observe_page / _cdpObservePage for an element
+ * whose selector, id, or text content matches the given criteria.
+ * @param {Array} elements - Array of observed element objects with bbox, text, selector, etc.
+ * @param {string} [selector] - CSS selector or ref to match.
+ * @param {string} [text] - Text content to match (case-insensitive substring).
+ * @returns {{ x: number, y: number, width: number, height: number } | null}
+ */
+function _findElementBbox(elements, selector, text) {
+  if (!elements || !Array.isArray(elements)) return null;
+  for (const el of elements) {
+    if (el.bbox && (
+      (selector && (el.selector === selector || el.id === selector)) ||
+      (text && el.text && el.text.toLowerCase().includes(text.toLowerCase()))
+    )) {
+      return el.bbox;
+    }
+  }
+  return null;
+}
 
 
 /**
@@ -3553,6 +3639,29 @@ function _buildPageNarration(url, title, observation, pageContent) {
   }
 }
 
+// Page state narration helper — generates a plain-English summary of page context.
+// Takes a pageContext object with optional title, url, forms, buttons, links,
+// inputs, tables, and bodyText fields. Returns a human-readable narration string.
+function narratePageState(pageContext) {
+  if (!pageContext) return 'Page state unknown.';
+  const parts = [];
+  if (pageContext.title) parts.push('Page: ' + pageContext.title);
+  if (pageContext.url) {
+    try { parts.push('on ' + new URL(pageContext.url).hostname); } catch(_e) {}
+  }
+  if (pageContext.forms && pageContext.forms.length > 0) parts.push(pageContext.forms.length + ' form(s) visible');
+  if (pageContext.buttons && pageContext.buttons.length > 0) parts.push(pageContext.buttons.length + ' button(s)');
+  if (pageContext.links && pageContext.links.length > 0) parts.push(pageContext.links.length + ' link(s)');
+  if (pageContext.inputs && pageContext.inputs.length > 0) parts.push(pageContext.inputs.length + ' input field(s)');
+  if (pageContext.tables && pageContext.tables.length > 0) parts.push(pageContext.tables.length + ' table(s)');
+  // Check for specific platform indicators
+  const text = (pageContext.bodyText || '').toLowerCase();
+  if (text.includes('login') || text.includes('sign in')) parts.push('login page detected');
+  if (text.includes('dashboard')) parts.push('dashboard detected');
+  if (text.includes('error') || text.includes('404') || text.includes('403')) parts.push('error page detected');
+  return parts.length > 0 ? parts.join(' · ') : 'Page loaded.';
+}
+
 // Generate the initial execution plan before the agent loop starts.
 // In quick mode, skips planning and returns null. Otherwise tries LLM planning
 // first and falls back to a heuristic plan if the LLM call fails.
@@ -3649,6 +3758,16 @@ async function runAgentLoop(goal, workingTabId) {
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_e) {
     // Plan preview send failed non-fatally
   }
+  // Send plan to popup for preview
+  try {
+    chrome.runtime.sendMessage({
+      type: 'agent_plan',
+      tabId: workingTabId,
+      plan: (agentPlan || []).map((step, i) => ({ index: i, text: String(step).substring(0, 200) })),
+      totalSteps: (agentPlan || []).length,
+      timestamp: Date.now()
+    }).catch(() => {});
+  } catch (_e) {}
 
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
@@ -3694,6 +3813,24 @@ async function runAgentLoop(goal, workingTabId) {
           historyPush({ role: 'user', content: `📌 Technician note (mid-run): ${n}` });
           sendSilentUpdate(`📌 Context injected: ${n}`, stepCount);
         }
+      }
+
+      // Check for mid-run user correction (e.g., "click the second one instead")
+      const _correctionTabId = getActiveTabId();
+      const _correction = _correctionQueue.get(_correctionTabId);
+      if (_correction) {
+        _correctionQueue.delete(_correctionTabId);
+        historyPush({ role: 'user', content: 'USER CORRECTION: ' + _correction + '. Adjust your next action accordingly.' });
+        try {
+          chrome.runtime.sendMessage({
+            type: 'agent_status',
+            tabId: _correctionTabId,
+            status: 'thinking',
+            detail: 'Adjusting plan: ' + _correction,
+            timestamp: Date.now()
+          }).catch(() => {});
+        } catch(_e) {}
+        sendSilentUpdate(`🔄 User correction: ${_correction}`, stepCount);
       }
 
       _lastLoopUrl = _lastObservedUrl;
@@ -4158,6 +4295,37 @@ async function runAgentLoop(goal, workingTabId) {
             if (narration) sendAgentStatus('observing', narration);
           } catch (_e) {
             // Page narration failed non-fatally
+          }
+          // Page state narration via narratePageState helper
+          try {
+            const _els = (observation && observation.elements) || [];
+            const _forms = _els.filter(e => ELEMENT_TAG_FORM_RE.test(e.tag || ''));
+            const _buttons = _els.filter(e => ELEMENT_TAG_BUTTON_RE.test(e.tag || '') || e.role === 'button');
+            const _links = _els.filter(e => ELEMENT_TAG_A_RE.test(e.tag || ''));
+            const _inputs = _els.filter(e => ELEMENT_TAG_INPUT_RE.test(e.tag || ''));
+            const _tables = _els.filter(e => /^table$/i.test(e.tag || ''));
+            const _pageCtx = {
+              title: (tabInfo && tabInfo.title) || '',
+              url: (tabInfo && tabInfo.url) || '',
+              forms: _forms,
+              buttons: _buttons,
+              links: _links,
+              inputs: _inputs,
+              tables: _tables,
+              bodyText: (pageContent && pageContent.content) || ''
+            };
+            const _narration = narratePageState(_pageCtx);
+            try {
+              chrome.runtime.sendMessage({
+                type: 'agent_status',
+                tabId: tab,
+                status: 'thinking',
+                detail: 'I see: ' + _narration,
+                timestamp: Date.now()
+              }).catch(() => {});
+            } catch(_e) {}
+          } catch (_ne) {
+            // narratePageState emission failed non-fatally
           }
         } catch (err) {
           const errMsg = getErrorMessage(err);
@@ -5828,6 +5996,9 @@ async function runAgentLoop(goal, workingTabId) {
         if (approval.approved) command.approvalGranted = true;
       }
 
+      // Capture pre-action screenshot for live preview
+      const _beforeScreenshot = await captureStepScreenshot(tab);
+
       // Show action card
       sendActionMessage(command, stepCount, observation);
       // (3.16.0) Begin the dispatch activity item — gives the user a "Now
@@ -6759,6 +6930,26 @@ return { ok: true, value: el.value };
         } catch (_) { /* bbox fallback is always non-fatal */ }
       }
 
+      // Coordinate fallback for failed selector clicks — uses observed page element
+      // bboxes to locate the target by text/aria-label when selector matching fails,
+      // then clicks via CDP Input.dispatchMouseEvent at the element's center.
+      if (actionFailed && command.type === 'click') {
+        const _bbox = _findElementBbox(observation && observation.elements, command.selector || command.ref, command.text);
+        if (_bbox) {
+          // bbox from observe_page uses {x, y, w, h}; compute center
+          const _cx = Math.round((_bbox.x || 0) + (_bbox.w || _bbox.width || 0) / 2);
+          const _cy = Math.round((_bbox.y || 0) + (_bbox.h || _bbox.height || 0) / 2);
+          const _coordResult = await clickAtCoordinates(tab, _cx, _cy);
+          if (_coordResult) {
+            result = `Coordinate fallback click at (${_cx}, ${_cy})`;
+            actionFailed = false;
+            sendSilentUpdate(`Selector not found → coordinate fallback click at (${_cx}, ${_cy})`, stepCount);
+            sendActionMessage({ ...command, type: 'click_at', x: _cx, y: _cy, _coordFallback: true }, stepCount, observation);
+            try { chrome.runtime.sendMessage({ type: 'agent_status', tabId: tab, status: 'acting', detail: 'Coordinate fallback click at (' + _cx + ',' + _cy + ')' }).catch(() => {}); } catch(_e) {}
+          }
+        }
+      }
+
       // (v3.67) UNIVERSAL CDP fallback — when content script is dead and a specific
       // CDP handler didn't fire, convert the failed action to execute_js via CDP.
       // Covers: select, check, check_all, scroll_to, wait_for_element, hover, wait_for_text
@@ -7012,6 +7203,62 @@ return { ok: true, value: el.value };
       }
 
       sendActionResult(stepCount, result, actionFailed);
+      // Capture post-action screenshot and broadcast agent_step with before/after
+      const _afterScreenshot = await captureStepScreenshot(tab);
+      try {
+        chrome.runtime.sendMessage({
+          type: 'agent_step',
+          stepNumber: stepCount,
+          action: command.type,
+          beforeScreenshot: _beforeScreenshot || undefined,
+          afterScreenshot: _afterScreenshot || undefined,
+          failed: !!actionFailed
+        }).catch(() => {});
+      } catch (_e) { /* non-fatal */ }
+
+      // ── Post-Action Verification (Phase 8.2) ──
+      // After each action, check the post-action screenshot for evidence of success.
+      // Track consecutive verification failures; after 2, inject a strategy-shift hint.
+      // Emit verification status to popup for badge rendering.
+      let _verificationStatus = 'unknown';
+      try {
+        if (_afterScreenshot && command && command.type !== 'finish' && command.type !== 'note') {
+          // Use the post-action screenshot as evidence for the next LLM prompt cycle.
+          // Store it so the observation phase can include it as context.
+          _stepScreenshots.set(stepCount, _afterScreenshot);
+
+          if (actionFailed) {
+            _verificationFailures++;
+            _verificationStatus = 'failed';
+            // After 2 consecutive verification failures, inject a strategy-shift note
+            if (_verificationFailures >= 2) {
+              const _shiftNote = `SYSTEM: ${_verificationFailures} consecutive verification failures. Consider: using a different selector, trying execute_js, scrolling to reveal the element, or navigating to a different page section. The last action did NOT produce the expected result.`;
+              historyPush({
+                step: stepCount,
+                action: { type: 'note', text: _shiftNote },
+                result: `Verification strategy shift after ${_verificationFailures} failures`
+              });
+              _verificationFailures = 0; // Reset after injecting shift
+            }
+          } else {
+            _verificationFailures = 0; // Reset on success
+            _verificationStatus = 'verified';
+          }
+
+          // Emit verification status to popup for badge rendering
+          chrome.runtime.sendMessage({
+            action: 'agent_verification',
+            stepNumber: stepCount,
+            verification: {
+              status: _verificationStatus,
+              failures: _verificationFailures
+            }
+          }).catch(() => {});
+        }
+      } catch (_ve) {
+        // Verification emit is non-fatal
+        console.warn('[Sentinel] Post-action verification failed:', getErrorMessage(_ve));
+      }
       // (3.16.0) Finalize the dispatch activity item with the outcome.
       try {
         const _resPreview = typeof result === 'string' ? result.substring(0, 160) : '';
@@ -7689,4 +7936,6 @@ export {
   recoverFromCaptcha,
   _cdpDismissOverlays,
   _cdpObservePage,
+  clickAtCoordinates,
+  _findElementBbox,
 };

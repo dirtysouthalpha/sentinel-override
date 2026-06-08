@@ -993,13 +993,16 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
 
 function setAgentActive(isActive) {
   if (!activeIndicator) return;
+  const _goalInput = document.getElementById('goalInput');
   if (isActive) {
     activeIndicator.classList.add('active');
     if (injectContextBar) injectContextBar.style.display = 'flex';
+    if (_goalInput) _goalInput.placeholder = 'Type a correction or instruction...';
   } else {
     activeIndicator.classList.remove('active');
     if (injectContextBar) injectContextBar.style.display = 'none';
     if (injectContextInput) injectContextInput.value = '';
+    if (_goalInput) _goalInput.placeholder = 'What should I do?';
   }
 }
 
@@ -1066,17 +1069,45 @@ function sendMessage() {
     return;
   }
   console.log('[Sentinel] sendMessage: goal length=' + goal.length);
+  // If agent is already running, send text as a mid-run correction instead of a new goal.
+  const _isAgentRunning = activeIndicator && activeIndicator.classList.contains('active');
+  if (_isAgentRunning) {
+    console.log('[Sentinel] Agent running — sending as correction:', goal);
+    const _correctionTabId = __atsStripState.tabId || null;
+    chrome.runtime.sendMessage({
+      action: 'agent_correction',
+      correction: goal,
+      tabId: _correctionTabId
+    }, (resp) => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.warn('[Sentinel] Correction send failed:', getErrorMessage(chrome.runtime.lastError));
+        if (typeof showToast === 'function') showToast('Correction failed to send', 'error');
+        return;
+      }
+      if (resp && resp.ok) {
+        if (typeof showToast === 'function') showToast('Correction applied', 'info');
+      } else {
+        if (typeof showToast === 'function') showToast(resp?.error || 'Correction rejected', 'error');
+      }
+    });
+    // Add to chat as user correction message
+    addMessage(goal, 'user');
+    _goalInput.value = '';
+    _goalInput.style.height = 'auto';
+    _goalInput.placeholder = 'Type a correction or instruction...';
+    return;
+  }
 
-  // Disable UI immediately to prevent double-send
+  // Disable send button to prevent starting a new run, but keep input enabled
+  // so the user can type mid-run corrections.
   addMessage(goal, 'user');
   _goalInput.value = '';
   _goalInput.style.height = 'auto';
   if (_sendBtn) _sendBtn.disabled = true;
-  _goalInput.disabled = true;
   if (_stopBtn) _stopBtn.style.display = 'flex';
   if (_pauseBtn) { _pauseBtn.style.display = 'flex'; _pauseBtn.dataset.paused = 'false'; _pauseBtn.innerHTML = PAUSE_ICON; _pauseBtn.title = 'Pause agent'; }
   if (_undoBtn) { _undoBtn.style.display = 'flex'; _undoBtn.disabled = true; }
-  _goalInput.placeholder = 'Waiting for response...';
+  _goalInput.placeholder = 'Type a correction or instruction...';
   state.selectedAttachments = [];
   if (_attachmentPreview) _attachmentPreview.style.display = 'none';
 
@@ -3585,6 +3616,45 @@ chrome.runtime.onMessage.addListener((message) => {
       }
     } catch (_) { /* non-fatal */ }
   }
+  // Plan preview panel — rendered from agent_plan message type
+  if (message.type === 'agent_plan') {
+    let planPanel = document.getElementById('plan-preview-panel');
+    if (planPanel) planPanel.remove();
+
+    planPanel = document.createElement('div');
+    planPanel.id = 'plan-preview-panel';
+    planPanel.style.cssText = 'padding:10px 12px;margin:6px 8px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.08);';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:13px;font-weight:600;color:#ccc;margin-bottom:8px;display:flex;justify-content:space-between;';
+    header.innerHTML = '<span>Plan: ' + message.totalSteps + ' steps</span><span style="font-size:11px;color:#666;cursor:pointer;" id="plan-toggle">Collapse</span>';
+    planPanel.appendChild(header);
+
+    const stepsList = document.createElement('div');
+    stepsList.id = 'plan-steps-list';
+    stepsList.style.cssText = 'font-size:12px;';
+
+    message.plan.forEach((step) => {
+      const stepDiv = document.createElement('div');
+      stepDiv.style.cssText = 'padding:4px 8px;margin:2px 0;border-radius:4px;color:#999;display:flex;gap:8px;';
+      stepDiv.innerHTML = '<span style="color:#555;min-width:20px;">' + (step.index + 1) + '.</span><span>' + step.text + '</span>';
+      stepsList.appendChild(stepDiv);
+    });
+
+    planPanel.appendChild(stepsList);
+
+    // Insert after status bars, before chat messages
+    const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+    if (chatArea) chatArea.parentNode.insertBefore(planPanel, chatArea);
+
+    // Toggle collapse
+    document.getElementById('plan-toggle').addEventListener('click', () => {
+      const list = document.getElementById('plan-steps-list');
+      const toggle = document.getElementById('plan-toggle');
+      if (list.style.display === 'none') { list.style.display = 'block'; toggle.textContent = 'Collapse'; }
+      else { list.style.display = 'none'; toggle.textContent = 'Expand'; }
+    });
+  }
   // (6.0) New step starting — create activity stream card
   if (message.action === 'agent_step_start') {
     if (message.stepNumber && message.stepNumber >= 1) _ensureActivityStream(message.stepNumber);
@@ -3642,6 +3712,47 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_action_result') {
     updateActionCardResult(message.stepNumber, message.result, message.isError);
   }
+  // (Phase 8.2) Post-action verification badge — green "Verified" or red "Failed — retrying"
+  if (message.action === 'agent_verification' && message.verification) {
+    const card = document.getElementById(`agent-action-${message.stepNumber}`);
+    if (card) {
+      const inner = card.querySelector('.agent-action-inner');
+      if (inner) {
+        const existingBadge = inner.querySelector('.verification-badge');
+        if (existingBadge) existingBadge.remove();
+
+        const badge = document.createElement('span');
+        badge.className = 'verification-badge';
+        const v = message.verification;
+        if (v.status === 'verified') {
+          badge.style.cssText = 'display:inline-flex;align-items:center;gap:3px;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(34,197,94,0.15);color:#22c55e;';
+          badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Verified';
+        } else if (v.status === 'failed') {
+          badge.style.cssText = 'display:inline-flex;align-items:center;gap:3px;margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;background:rgba(239,68,68,0.15);color:#ef4444;';
+          badge.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Failed — retrying';
+        }
+        if (badge.innerHTML) inner.appendChild(badge);
+      }
+    }
+  }
+  // Screenshot live preview panel — shows what the agent sees after each action
+  if (message.type === 'agent_step' && message.afterScreenshot) {
+    let previewPanel = document.getElementById('screenshot-preview');
+    if (!previewPanel) {
+      previewPanel = document.createElement('div');
+      previewPanel.id = 'screenshot-preview';
+      previewPanel.style.cssText = 'position:relative;width:100%;max-height:200px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;';
+      previewPanel.title = 'Click to expand';
+      const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+      if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
+      previewPanel.addEventListener('click', () => {
+        const isExpanded = previewPanel.style.maxHeight === '500px';
+        previewPanel.style.maxHeight = isExpanded ? '200px' : '500px';
+      });
+    }
+    previewPanel.innerHTML = '<img src="' + message.afterScreenshot + '" style="width:100%;display:block;" alt="Agent view" />';
+    previewPanel.style.display = '';
+  }
   if (message.action === 'tab_state_update') {
     renderTabBar(message.tabs || []);
   }
@@ -3673,6 +3784,8 @@ chrome.runtime.onMessage.addListener((message) => {
     renderTabBar([]);
     hideActiveTabStrip();
     hideMiniShot();
+    const _previewPanel = document.getElementById('screenshot-preview');
+    if (_previewPanel) _previewPanel.style.display = 'none';
     try { clearActivityState(); } catch { /* activity state may not be initialized */ }
     try {
       const summary = String(message.summary || 'Done');
