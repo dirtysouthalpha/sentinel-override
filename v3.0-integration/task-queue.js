@@ -38,7 +38,8 @@ class TaskQueue {
     this.processing = new Set(); // Currently processing task IDs
     this.db = null;
     this.processors = new Map(); // Task type -> processor function
-    
+    this._drainTimer = null;     // Debounce rapid enqueues into a single drain
+
     // Event callbacks
     this.onTaskComplete = options.onTaskComplete || null;
     this.onTaskFailed = options.onTaskFailed || null;
@@ -119,7 +120,7 @@ class TaskQueue {
       request.onsuccess = () => {
         resolve(taskData.id);
         // Try to process if we have capacity (defer to next tick to ensure transaction commits)
-        setTimeout(() => this._tryProcessNext(), 0);
+        this._scheduleDrain();
       };
       request.onerror = () => reject(request.error);
     });
@@ -171,6 +172,19 @@ class TaskQueue {
         }
       }
     }
+  }
+
+  /**
+   * Schedule a debounced drain — batches rapid enqueues into one processing pass.
+   * Without this, the first enqueue's setTimeout(0) fires before later tasks
+   * are written to IDB, so priority ordering breaks under rapid enqueue bursts.
+   */
+  _scheduleDrain() {
+    if (this._drainTimer) return; // Already scheduled — batch
+    this._drainTimer = setTimeout(() => {
+      this._drainTimer = null;
+      this._tryProcessNext();
+    }, 1);
   }
 
   /**
