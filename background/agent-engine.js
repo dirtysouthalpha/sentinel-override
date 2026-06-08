@@ -4912,8 +4912,11 @@ async function runAgentLoop(goal, workingTabId) {
                 default:
                   command = { type: 'note', text: `Vision: unknown action ${_va.type}`, _visionAction: true };
               }
-              // Store thinking/evaluation for logging
-              if (_vParsed.thinking) sendSilentUpdate(`[Vision] ${_vParsed.thinking}`, stepCount);
+              // Store thinking/evaluation for logging and reasoning cards
+              if (_vParsed.thinking) {
+                sendSilentUpdate(`[Vision] ${_vParsed.thinking}`, stepCount);
+                if (command && typeof command === 'object') command.__reasoning = _vParsed.thinking.substring(0, 600);
+              }
               console.log('[Sentinel/v4] Vision decided:', _va.type, 'index:', _va.index || 'N/A');
             } else {
               // Fallback: couldn't parse structured output, try the legacy LLM path

@@ -106,6 +106,51 @@ const SITE_DOMAIN_MAP = {
 // Valid JSON escape characters - avoid recreating on every call
 const VALID_JSON_ESCAPE_CHARS = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
 
+// API Health Heartbeat - tracks LLM API responsiveness
+const _apiHealth = {
+  lastResponseTime: null,
+  avgResponseTime: null,
+  totalCalls: 0,
+  failures: 0,
+  _times: [],    // rolling window of last 10 response times
+  _lastPing: null,
+
+  record(startTime, ok) {
+    const elapsed = Date.now() - startTime;
+    this._times.push(elapsed);
+    if (this._times.length > 10) this._times.shift();
+    this.totalCalls++;
+    if (!ok) this.failures++;
+    this.lastResponseTime = elapsed;
+    this.avgResponseTime = Math.round(this._times.reduce((a, b) => a + b, 0) / this._times.length);
+    this._lastPing = Date.now();
+    // Emit health status to popup
+    try {
+      const status = this.getStatus();
+      chrome.runtime.sendMessage({ type: 'api_health', ...status }).catch(() => {});
+    } catch (_e) { /* popup not open */ }
+  },
+
+  getStatus() {
+    const now = Date.now();
+    const stale = this._lastPing && (now - this._lastPing > 60000);
+    let state = 'unknown';
+    if (stale || !this._lastPing) state = 'idle';
+    else if (this.avgResponseTime && this.avgResponseTime < 5000) state = 'healthy';
+    else if (this.avgResponseTime && this.avgResponseTime < 15000) state = 'slow';
+    else if (this.failures > 3) state = 'down';
+    else if (this._lastPing) state = 'healthy';
+    return {
+      state,
+      avgMs: this.avgResponseTime,
+      lastMs: this.lastResponseTime,
+      totalCalls: this.totalCalls,
+      failures: this.failures,
+      timestamp: now
+    };
+  }
+};
+
 // ========== Multi-Portal Investigation Analyzer (3.8.1) ==========
 // Detects when a goal mentions 2+ M365/security admin centers (Entra,
 // Exchange, Purview, OneDrive, SharePoint, Teams, Intune, Defender, Compliance,
@@ -1901,6 +1946,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
 async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   if (!agentState) throw new Error('agentState is required');
   if (!CONFIG) throw new Error('CONFIG is required');
+  const _apiStart = Date.now();
   _rateLimiter.check();
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
@@ -2059,10 +2105,12 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     });
   } catch (err) {
     clearTimeout(fetchTimeout);
+    _apiHealth.record(_apiStart, false);
     throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
   }
   clearTimeout(fetchTimeout);
-
+  let _apiHealthRecorded = false;
+  try {
   if (!response.ok) {
     let errorData;
     try { errorData = await response.text(); } catch (_readErr) { errorData = 'unable to read error body'; }
@@ -2137,7 +2185,27 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   }
   if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
   if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;
+  // API Health: record successful response
+  _apiHealthRecorded = true; _apiHealth.record(_apiStart, true);
 
+
+  // Extract reasoning_content from models that return it (GLM, DeepSeek, etc.)
+  // This is the model's chain-of-thought, separate from the action text.
+  // parseLLMResponse captures text-before-JSON reasoning; this captures the
+  // API-level reasoning field. We merge both so the popup reasoning cards
+  // show the most complete picture.
+  const _apiReasoning = (typeof data.choices?.[0]?.message?.reasoning_content === 'string')
+    ? data.choices[0].message.reasoning_content.trim().substring(0, 600)
+    : '';
+  function _attachReasoning(cmd) {
+    if (!_apiReasoning || !cmd || typeof cmd !== 'object') return cmd;
+    if (cmd.__reasoning) {
+      cmd.__reasoning = (_apiReasoning + '\n' + cmd.__reasoning).substring(0, 600);
+    } else {
+      cmd.__reasoning = _apiReasoning;
+    }
+    return cmd;
+  }
   // Parse response — tool use path for providers that support it
   if (provider.supportsToolUse) {
     // Anthropic: check stop_reason === 'tool_use'
@@ -2164,7 +2232,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // Try text-JSON parsing as a safety net
     try {
       const responseText = provider.parseResponse(data);
-      if (responseText) return parseLLMResponse(responseText);
+      if (responseText) return _attachReasoning(parseLLMResponse(responseText));
     } catch (e) {
       console.warn('[Sentinel/llm] parseResponse fallback failed:', getErrorMessage(e));
     }
@@ -2175,7 +2243,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       if (tc && tc.function && tc.function.name) {
         try {
           const input = JSON.parse(tc.function.arguments || '{}');
-          return { type: tc.function.name, ...input };
+          return _attachReasoning({ type: tc.function.name, ...input });
         } catch (e) { console.warn('[Sentinel/llm] tool_calls JSON parse failed:', getErrorMessage(e)); }
       }
     }
@@ -2243,7 +2311,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
   }
   if (!responseText) return { type: 'note', text: 'Empty LLM response — will retry on next step.' };
-  return parseLLMResponse(responseText);
+  return _attachReasoning(parseLLMResponse(responseText));
+  } catch(_apiErr) { if (!_apiHealthRecorded) _apiHealth.record(_apiStart, false); throw _apiErr; }
 }
 
 // ========== Response Parsing ==========
@@ -2516,4 +2585,7 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
     throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error('Quick Assist request timed out after 30s') : err;
   }
 }
+
+// API Health — exported for external queries (e.g. background service worker status endpoint)
+export function getApiHealth() { return _apiHealth.getStatus(); }
 

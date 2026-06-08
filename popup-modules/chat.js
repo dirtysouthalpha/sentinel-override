@@ -3475,6 +3475,23 @@ chrome.runtime.onMessage.addListener((message) => {
       }
     } catch (_) { /* non-fatal */ }
   }
+  // API Health Heartbeat — live indicator for LLM API responsiveness
+  if (message.type === 'api_health') {
+    let healthBar = document.getElementById('api-health-bar');
+    if (!healthBar) {
+      healthBar = document.createElement('div');
+      healthBar.id = 'api-health-bar';
+      healthBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:5px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;';
+      const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+      if (chatArea) chatArea.parentNode.insertBefore(healthBar, chatArea);
+    }
+    const colors = { healthy: '#4caf50', slow: '#ff9800', down: '#f44336', idle: '#666', unknown: '#666' };
+    const labels = { healthy: 'API: responding', slow: 'API: slow', down: 'API: down', idle: 'API: idle', unknown: 'API: ?' };
+    const dot = colors[message.state] || '#666';
+    const label = labels[message.state] || 'API: ?';
+    const avg = message.avgMs ? `${message.avgMs}ms avg` : '';
+    healthBar.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';"></span><span>' + label + '</span>' + (avg ? '<span style="margin-left:4px;color:#555;">' + avg + '</span>' : '');
+  }
   // (6.0) API health heartbeat
   if (message.action === 'heartbeat_update') {
     _updateHeartbeat(message.durationMs || 0);
