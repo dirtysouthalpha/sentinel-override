@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 // Sentinel Override — Build Script
-// Creates a clean .zip for Chrome Web Store sideload.
+// Creates a production-ready .zip for Chrome Web Store.
+// Strips console.log/console.warn from JS files (keeps console.error for runtime diagnostics).
+// Removes TEMP/HACK/DEBUG comments and dead diagnostic code.
 /* global process */
 
-import { createWriteStream, readdirSync, existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { createWriteStream, readdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
+import { join, resolve, extname } from 'path';
 import { createRequire } from 'module';
-import { mkdir } from 'fs/promises';
+import { mkdir, mkdtemp } from 'fs/promises';
+import { tmpdir } from 'os';
 
 const require = createRequire(import.meta.url);
 const archiver = require('archiver');
 
-const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/\/$/, ''));
+import { fileURLToPath } from 'url';
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const ROOT = resolve(__dirname, '..');
 const DIST = join(ROOT, 'dist');
 
 // Determine version from manifest.json
@@ -41,7 +46,7 @@ const includeFiles = [
 ];
 
 // Patterns to exclude within included dirs
-const excludeDirs = new Set(['tests', 'node_modules', 'coverage', 'docs', '.git', 'dist', '__pycache__']);
+const excludeDirs = new Set(['tests', 'node_modules', 'coverage', 'docs', '.git', 'dist', '__pycache__', 'web']);
 const excludeSuffixes = ['.test.js', '.spec.js', '.map'];
 
 function shouldExclude(relPath) {
@@ -70,6 +75,32 @@ function collectFiles(dir, base) {
   return results;
 }
 
+// ========== Production Transform ==========
+// Strips debug noise from JS files for production builds:
+//   - Removes console.log() and console.warn() calls (keeps console.error)
+//   - Removes lines that are only TEMP DIAGNOSTIC comments
+//   - Collapses multiple blank lines left by removals
+//
+// This is intentionally regex-based — no AST dependency needed for a Chrome extension.
+
+const CONSOLE_LOG_RE = /^\s*console\.log\([^;]*\);?\s*$/gm;
+const CONSOLE_WARN_RE = /^\s*console\.warn\([^;]*\);?\s*$/gm;
+const TEMP_DIAG_COMMENT_RE = /^\s*\/\/\s*(TEMP|HACK|DEBUG|DIAGNOSTIC)[^\n]*$/gim;
+const MULTI_BLANK_RE = /\n{3,}/g;
+
+function transformJs(source) {
+  let out = source;
+  // Strip console.log lines (whole-line only — won't break inline usage)
+  out = out.replace(CONSOLE_LOG_RE, '');
+  // Strip console.warn lines
+  out = out.replace(CONSOLE_WARN_RE, '');
+  // Strip TEMP/HACK/DEBUG comment lines
+  out = out.replace(TEMP_DIAG_COMMENT_RE, '');
+  // Collapse excessive blank lines from removals
+  out = out.replace(MULTI_BLANK_RE, '\n\n');
+  return out;
+}
+
 async function build() {
   console.log(`\n📦 Building Sentinel Override v${version}...`);
 
@@ -92,6 +123,33 @@ async function build() {
 
   console.log(`   Found ${files.length} files to package`);
 
+  // Create temp dir for transformed JS files
+  const tmpDir = await mkdtemp(join(tmpdir(), 'sentinel-build-'));
+  let transformedCount = 0;
+  let savedBytes = 0;
+
+  // Transform JS files and replace fullPath with temp copy
+  const processedFiles = files.map(f => {
+    if (extname(f.relPath) === '.js') {
+      const source = readFileSync(f.fullPath, 'utf-8');
+      const transformed = transformJs(source);
+      const diff = source.length - transformed.length;
+      if (diff > 0) {
+        const tmpPath = join(tmpDir, f.relPath.replace(/[/\\]/g, '_'));
+        writeFileSync(tmpPath, transformed, 'utf-8');
+        transformedCount++;
+        savedBytes += diff;
+        return { ...f, fullPath: tmpPath };
+      }
+    }
+    return f;
+  });
+
+  if (transformedCount > 0) {
+    const saved = savedBytes > 1024 ? `${(savedBytes / 1024).toFixed(1)} KB` : `${savedBytes} B`;
+    console.log(`   🧹 Stripped debug from ${transformedCount} JS files (saved ${saved})`);
+  }
+
   // Create dist directory
   if (!existsSync(DIST)) {
     await mkdir(DIST, { recursive: true });
@@ -106,15 +164,19 @@ async function build() {
       const size = bytes > 1024 * 1024
         ? `${(bytes / (1024 * 1024)).toFixed(2)} MB`
         : `${(bytes / 1024).toFixed(1)} KB`;
-      console.log(`   ✅ ${zipName} created (${size}, ${files.length} files)`);
+      console.log(`   ✅ ${zipName} created (${size}, ${processedFiles.length} files)`);
       console.log(`   Path: ${zipPath}\n`);
+
+      // Cleanup temp dir
+      try { const { rmSync } = require('fs'); rmSync(tmpDir, { recursive: true, force: true }); } catch (_e) { /* non-fatal */ }
+
       resolve();
     });
 
     archive.on('error', reject);
     archive.pipe(output);
 
-    for (const file of files) {
+    for (const file of processedFiles) {
       archive.file(file.fullPath, { name: file.relPath });
     }
 
