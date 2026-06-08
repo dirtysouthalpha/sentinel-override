@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js",
+    "test": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --forceExit",
     "test:coverage": "node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint .",
     "build": "node scripts/build.js"
