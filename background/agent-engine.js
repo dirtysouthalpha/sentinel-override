@@ -379,6 +379,7 @@ try {
 // are all persisted and restored when the SW restarts after an interruption.
 let _lastCheckpoint = null;
 let _lastGoal = '';
+let _runStartTime = 0;
 
 function buildCheckpoint(stepCount) {
   return {
@@ -967,7 +968,7 @@ export async function startAgent(goal, sender) {
   }
 
   agentRunning = true;
-  const _runStartTime = Date.now();
+  _runStartTime = Date.now();
   // Persist running state so SW restarts can detect an interrupted run
   try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: _runStartTime }); } catch(_sessionErr) {
     /* Non-fatal: session storage set failed */
