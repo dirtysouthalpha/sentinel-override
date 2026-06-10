@@ -545,8 +545,11 @@
         </div>
       </details>
 
-      <div class="modal-actions">
+      <div class="modal-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
         <button id="saveSettingsBtn" class="modal-btn btn-save" style="flex:1;">Save Settings</button>
+        <button id="exportSettingsBtn" class="modal-btn" style="flex:0.5; background:var(--bg-tertiary); color:var(--text-primary); font-size:12px;">Export</button>
+        <button id="importSettingsBtn" class="modal-btn" style="flex:0.5; background:var(--bg-tertiary); color:var(--text-primary); font-size:12px;">Import</button>
+        <input type="file" id="importSettingsFile" accept=".json" style="display:none;">
       </div>
     </div>
   </div>

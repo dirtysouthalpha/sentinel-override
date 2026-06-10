@@ -1443,6 +1443,77 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     }
   }
   if (document.readyState === 'loading') {
+  // ========== Export / Import Settings (SET-04) ==========
+  const SETTINGS_EXPORT_VERSION = 1;
+  const EXPORT_KEYS = [
+    'active_provider', 'providers', 'export_format', 'agent_context',
+    'quickAssist', 'useTrustedInput', 'sentinelSoundEnabled',
+    'adaptivePromptsMode', 'adaptiveExpansionMode', 'telemetryLevel',
+    'telemetryPersist', 'telemetryRedact', 'telemetrySkillAdapt',
+    'quickMode', 'show_api_health_bar', 'ticketMode', 'ticketFormat',
+    'technicianInfo', 'expectedTenant'
+  ];
+
+  function doExportSettings() {
+    chrome.storage.local.get(EXPORT_KEYS, (data) => {
+      if (chrome.runtime.lastError) {
+        showToast('Export failed', 'error');
+        return;
+      }
+      data._version = SETTINGS_EXPORT_VERSION;
+      data._exportedAt = new Date().toISOString();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sentinel-settings-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Settings exported', 'success');
+    });
+  }
+
+  function doImportSettings(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!data._version || data._version > SETTINGS_EXPORT_VERSION) {
+          showToast('Incompatible settings file', 'error');
+          return;
+        }
+        const toWrite = {};
+        for (const key of EXPORT_KEYS) {
+          if (key in data) toWrite[key] = data[key];
+        }
+        chrome.storage.local.set(toWrite, () => {
+          if (chrome.runtime.lastError) {
+            showToast('Import failed', 'error');
+            return;
+          }
+          showToast('Settings imported — reloading', 'success');
+          setTimeout(() => location.reload(), 800);
+        });
+      } catch (_e) {
+        showToast('Invalid JSON file', 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  const exportBtn = document.getElementById('exportSettingsBtn');
+  if (exportBtn) exportBtn.addEventListener('click', doExportSettings);
+
+  const importBtn = document.getElementById('importSettingsBtn');
+  const importFile = document.getElementById('importSettingsFile');
+  if (importBtn && importFile) {
+    importBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', () => {
+      if (importFile.files.length) doImportSettings(importFile.files[0]);
+    });
+  }
+
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();

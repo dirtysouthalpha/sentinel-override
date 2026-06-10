@@ -5,15 +5,19 @@
 // ========== Configuration ==========
 const BRIDGE_URL = 'ws://localhost:8001/extension-bridge';
 const AUTH_TOKEN = 'sentinel-prime-bridge-2025';
-const RECONNECT_BASE_MS = 1000;  // Start with 1s, exponential backoff to 30s
+const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_INTERVAL_MS = 30000;
+const MAX_MESSAGE_SIZE = 1048576;
+const VALID_MSG_TYPES = new Set(['auth', 'auth_challenge', 'task', 'query', 'cancel', 'status']);
 
 let ws = null;
 let reconnectDelay = RECONNECT_BASE_MS;
 let heartbeatTimer = null;
 let isConnecting = false;
-let enabled = true;  // Can be toggled via settings
+let enabled = true;
+let authenticated = false;
+let challengeNonce = null;
 
 // ========== Connection Management ==========
 
@@ -26,6 +30,7 @@ export function startBridge() {
 export function stopBridge() {
   console.log('[WS-BRIDGE] Stopping...');
   enabled = false;
+  authenticated = false;
   if (ws) {
     ws.close();
     ws = null;
@@ -53,17 +58,15 @@ function connect() {
     console.log('[WS-BRIDGE] Connected to bridge server');
     isConnecting = false;
     reconnectDelay = RECONNECT_BASE_MS;
+    authenticated = false;
 
-    // Send auth message
     ws.send(JSON.stringify({
       type: 'auth',
       token: AUTH_TOKEN
     }));
 
-    // Start heartbeat
     heartbeatTimer = setInterval(() => {
       if (ws && ws.readyState === WebSocket.OPEN) {
-        // Send a ping-like status message
         sendStatus();
       }
     }, HEARTBEAT_INTERVAL_MS);
@@ -71,7 +74,15 @@ function connect() {
 
   ws.onmessage = async (event) => {
     try {
+      if (typeof event.data === 'string' && event.data.length > MAX_MESSAGE_SIZE) {
+        console.warn('[WS-BRIDGE] Oversized message dropped');
+        return;
+      }
       const message = JSON.parse(event.data);
+      if (!validateMessage(message)) {
+        console.warn('[WS-BRIDGE] Invalid message structure dropped');
+        return;
+      }
       await handleMessage(message);
     } catch (e) {
       console.error('[WS-BRIDGE] Error handling message:', e);
@@ -81,6 +92,7 @@ function connect() {
   ws.onclose = () => {
     console.log('[WS-BRIDGE] Disconnected');
     isConnecting = false;
+    authenticated = false;
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
@@ -89,18 +101,25 @@ function connect() {
     scheduleReconnect();
   };
 
-  ws.onerror = (e) => {
+  ws.onerror = () => {
     console.warn('[WS-BRIDGE] Connection error');
-    // onclose will fire after this
   };
+}
+
+function validateMessage(msg) {
+  if (!msg || typeof msg !== 'object') return false;
+  if (!VALID_MSG_TYPES.has(msg.type)) return false;
+  return true;
 }
 
 function scheduleReconnect() {
   if (!enabled) return;
-  console.log(`[WS-BRIDGE] Reconnecting in ${reconnectDelay / 1000}s...`);
+  const jitter = Math.random() * 0.3 * reconnectDelay;
+  const delay = reconnectDelay + jitter;
+  console.log(`[WS-BRIDGE] Reconnecting in ${(delay / 1000).toFixed(1)}s...`);
   setTimeout(() => {
     if (enabled) connect();
-  }, reconnectDelay);
+  }, delay);
   reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
 }
 
@@ -114,8 +133,8 @@ async function handleMessage(message) {
 
   switch (msgType) {
     case 'auth':
-      // Auth response from server
       if (message.success) {
+        authenticated = true;
         console.log('[WS-BRIDGE] Authenticated successfully');
         sendStatus();
       } else {
@@ -123,21 +142,40 @@ async function handleMessage(message) {
       }
       break;
 
+    case 'auth_challenge':
+      challengeNonce = message.nonce;
+      const response = computeChallengeResponse(challengeNonce);
+      ws.send(JSON.stringify({ type: 'auth_challenge_response', response }));
+      break;
+
     case 'task':
+      if (!authenticated) { sendResponse(requestId, { type: 'error', message: 'Not authenticated' }); return; }
       await handleTask(message.goal, requestId);
       break;
 
     case 'query':
+      if (!authenticated) { sendResponse(requestId, { type: 'error', message: 'Not authenticated' }); return; }
       await handleQuery(message.message, requestId);
       break;
 
     case 'cancel':
+      if (!authenticated) { sendResponse(requestId, { type: 'error', message: 'Not authenticated' }); return; }
       await handleCancel(requestId);
       break;
 
     default:
       console.warn(`[WS-BRIDGE] Unknown message type: ${msgType}`);
   }
+}
+
+function computeChallengeResponse(nonce) {
+  const enc = new TextEncoder();
+  const data = enc.encode(AUTH_TOKEN + ':' + nonce);
+  const hash = crypto.subtle.digestSync ? crypto.subtle.digestSync('SHA-256', data) : null;
+  if (hash) {
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return btoa(AUTH_TOKEN + ':' + nonce);
 }
 
 async function handleTask(goal, requestId) {
