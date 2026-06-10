@@ -27,7 +27,8 @@
     { id: 'fix',         label: 'Troubleshoot',prompt: 'Given the following error/message, suggest troubleshooting steps for an IT technician:' },
     { id: 'playbook',    label: 'Playbook',    prompt: 'Based on the following, create a step-by-step IT runbook/playbook for an MSP technician:' },
     { id: 'extract',     label: 'Extract',     prompt: 'Extract all structured data (IPs, email addresses, dates, ticket numbers, hostnames, URLs) from:' },
-    { id: 'rewrite',     label: 'Rewrite',     prompt: 'Rewrite the following in a professional tone suitable for client communication:' }
+    { id: 'rewrite',     label: 'Rewrite',     prompt: 'Rewrite the following in a professional tone suitable for client communication:' },
+    { id: 'security',    label: 'Security',    prompt: 'Analyze the following for security implications: identify risks, exposed credentials, misconfigurations, and remediation steps for an IT security context:' }
   ];
 
   // ===== CSS =====

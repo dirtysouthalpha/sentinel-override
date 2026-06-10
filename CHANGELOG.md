@@ -1,5 +1,32 @@
 # Changelog
 
+## v19.0.0 — 2026-06-10 (Foundation Hardening + Test Coverage + Plugin System)
+
+### v16.0 — Foundation Hardening + Plugin Power
+- **Plugin System** (PLG-01-06): Full plugin registry with install/uninstall/toggle/conflict detection + settings UI
+- **Settings Persistence** (SET-01-05): Export/import JSON, schema versioning, single write path
+- **WebSocket Bridge** (WSB-01-05): Auth gate, challenge-response, jitter, message validation, size limits
+- **Platform Profiles** (PLT-01-04): Schema validation + 8 smoke tests for all 18 profiles
+- **Error Recovery** (ERR-01-04): AgentError class, error cards in chat, auto-retry with backoff
+- **Repo Hygiene** (HYG-01-05): 26 stale files removed, -6,187 lines
+
+### v17.0 — Codebase Health + Developer Velocity
+- **Build improvements**: lib/ directory in build, npm scripts (test:quick, lint:fix, check)
+- **Content script hardening**: Top-level error boundary reporting uncaught errors
+- **Dead code audit**: federation.js unused (preserved for future), runtime-profiler active
+
+### v18.0 — Test Surge
+- 89 tests across 9 suites (was 0 new test suites)
+- WS bridge validation + challenge-response tests
+- Tab manager URL validation tests
+
+### v19.0 — Coverage Expansion
+- Provider registry pure function tests (18 tests)
+- Scheduler pure function tests (5 tests)
+- Error-utils tests (10 tests)
+- Quick Assist: added Security Analysis action
+- **Running total: 122 tests across 14 suites**
+
 ## v15.0.0-audit — 2026-06-10 (Production Security Audit & Dead Code Removal)
 
 ### Security Fixes
