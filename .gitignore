@@ -36,3 +36,39 @@ test-output.txt
 scripts/analyze-functions.js
 scripts/check-coverage.js
 background/agent-engine.js.v*
+
+# GSD planning artifacts (generated during code reviews, not source code)
+.planning/
+
+# Debug/temp scripts and status files
+AUTO_*.ps1
+AUTO_*.bat
+AUTO_*.vbs
+CLICK_*.vbs
+FIND_*.ps1
+FORCE_*.ps1
+INSTALL_*.ps1
+NUCLEAR_*.ps1
+RELOAD_*.ps1
+RUN_*.ps1
+FLUSH_*.bat
+test_loop_*.txt
+test-summary.txt
+*_test.html
+test-*.cjs
+debug-*.html
+diagnose*.html
+emergency-*.ps1
+emergency-*.html
+auto-*.js
+auto-*.ps1
+minimal-test/
+minimal-working-extension/
+
+# Session/debug markdown that shouldn't be tracked
+MUST_RELOAD_EXTENSION.md
+SESSION-ANALYSIS.md
+TEST-REVIEW*.md
+review-batch*.md
+*_STATUS*.txt
+*_INSTRUCTIONS.txt

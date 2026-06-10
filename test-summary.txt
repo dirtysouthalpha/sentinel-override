@@ -1,4 +1,0 @@
-
-> sentinel-override@3.49.0 test
-> node --experimental-vm-modules --no-warnings ./node_modules/jest/bin/jest.js
-
