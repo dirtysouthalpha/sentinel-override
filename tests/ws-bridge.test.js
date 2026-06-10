@@ -1,7 +1,10 @@
 ﻿// tests/ws-bridge.test.js
 // Tests for ws-bridge.js pure functions (COV-02).
 
-import { validateMessage, computeChallengeResponse } from '../background/ws-bridge.js';
+import { validateMessage, computeChallengeResponse, setAuthTokenForTest } from '../background/ws-bridge.js';
+
+// Set a known token so challenge-response tests are deterministic
+setAuthTokenForTest('test-token-for-unit-tests');
 
 describe('validateMessage', () => {
   test('rejects null', () => {

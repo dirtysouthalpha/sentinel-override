@@ -4,7 +4,6 @@
 
 // ========== Configuration ==========
 const BRIDGE_URL = 'ws://localhost:8001/extension-bridge';
-const AUTH_TOKEN = 'sentinel-prime-bridge-2025';
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const HEARTBEAT_INTERVAL_MS = 30000;
@@ -19,11 +18,41 @@ let enabled = true;
 let authenticated = false;
 let challengeNonce = null;
 
+// Auth token loaded from chrome.storage.local — never hardcoded.
+// Generated once on install, persisted, and read at connect time.
+let authToken = null;
+
+function generateToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function ensureAuthToken() {
+  if (authToken) return authToken;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['ws_bridge_token'], (result) => {
+      if (result.ws_bridge_token) {
+        authToken = result.ws_bridge_token;
+        resolve(authToken);
+      } else {
+        const token = generateToken();
+        chrome.storage.local.set({ ws_bridge_token: token }, () => {
+          authToken = token;
+          console.log('[WS-BRIDGE] Generated new bridge auth token');
+          resolve(authToken);
+        });
+      }
+    });
+  });
+}
+
 // ========== Connection Management ==========
 
-export function startBridge() {
+export async function startBridge() {
   if (!enabled) return;
   console.log('[WS-BRIDGE] Starting WebSocket bridge client...');
+  await ensureAuthToken();
   connect();
 }
 
@@ -62,7 +91,7 @@ function connect() {
 
     ws.send(JSON.stringify({
       type: 'auth',
-      token: AUTH_TOKEN
+      token: authToken
     }));
 
     heartbeatTimer = setInterval(() => {
@@ -170,12 +199,12 @@ async function handleMessage(message) {
 
 function computeChallengeResponse(nonce) {
   const enc = new TextEncoder();
-  const data = enc.encode(AUTH_TOKEN + ':' + nonce);
+  const data = enc.encode(authToken + ':' + nonce);
   const hash = crypto.subtle.digestSync ? crypto.subtle.digestSync('SHA-256', data) : null;
   if (hash) {
     return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
-  return btoa(AUTH_TOKEN + ':' + nonce);
+  return btoa(authToken + ':' + nonce);
 }
 
 async function handleTask(goal, requestId) {
@@ -293,7 +322,9 @@ function sendStatus() {
 
 // ========== Test exports ==========
 // Pure functions exported for unit testing.
+// Tests must set authToken before calling computeChallengeResponse.
 export { validateMessage, computeChallengeResponse };
+export function setAuthTokenForTest(token) { authToken = token; }
 
 // ========== Auto-start ==========
 // Start the bridge connection when this module loads
