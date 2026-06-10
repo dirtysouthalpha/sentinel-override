@@ -260,6 +260,8 @@ import { generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _wa
 import { appendAuditEntry, getAuditLog, auditLogToCsv } from './audit-log.js';
 import { runRecoverySkills, getSkillStats } from './skills/index.js';
 import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.js';
+// (Phase 6) UAP bridge — broadcasts agent lifecycle events to external UAP server
+import { broadcast as uapBroadcast, setRunId as uapSetRunId } from './uap-bridge.js';
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side
 // effects, no chrome.* deps. We aggregate the run's metrics here at the end
 // of the loop and stamp the result onto both the report card and the
@@ -977,6 +979,8 @@ export async function startAgent(goal, sender) {
   }
   resetAgentState();
   tel.info('lifecycle', 'Agent started', { goal: (goal || '').substring(0, 200), startTabId });
+  // (Phase 6) UAP bridge: notify external server of agent start
+  try { uapBroadcast('agent.started', { goal }); } catch (_uapErr) { /* UAP bridge unavailable */ }
 
   // Load speed mode from settings
   try {
@@ -1043,6 +1047,8 @@ export async function startAgent(goal, sender) {
       tenant: null,
       url: tabInfo?.url || ''
     }];
+    // (Phase 6) UAP bridge: correlate events with this run
+    try { uapSetRunId(runLogId); } catch (_uapErr) { /* UAP bridge unavailable */ }
     // (3.14.0) Track this run in the index so the popup can list it later
     // even if the user dismisses the post-run banner.
     try {
@@ -1102,6 +1108,8 @@ export async function startAgent(goal, sender) {
     console.error('[Sentinel/Loop] Stack:', err && err.stack ? err.stack : '[no stack]');
     emitAgentStatus(startTabId, 'error', `Agent crashed: ${getErrorMessage(err)}`);
     agentRunning = false;
+    // (Phase 6) UAP bridge: notify external server of crash
+    try { uapBroadcast('agent.error', { error: getErrorMessage(err) }); } catch (_uapErr) { /* UAP bridge unavailable */ }
     chrome.runtime.sendMessage({
       action: 'agent_finished',
       summary: `Agent crashed: ${getErrorMessage(err)}`,
@@ -7313,6 +7321,8 @@ return { ok: true, value: el.value };
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
     console.error('[agentReport] Unhandled rejection:', e);
   });
+  // (Phase 6) UAP bridge: notify external server of completion
+  try { uapBroadcast('agent.completed', { stepCount, apiCallCount, finished: !!finished }); } catch (_uapErr) { /* UAP bridge unavailable */ }
 }
 
 async function enforceRateLimit() {
