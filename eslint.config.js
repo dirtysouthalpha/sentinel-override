@@ -98,7 +98,7 @@ export default [
       'dist/**',
       'tests/**',
       'coverage/**',
-      'marked.min.js',
+      'lib/marked.min.js',
       'scripts/**',
       '.claude/**',
     ],
