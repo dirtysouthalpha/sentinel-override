@@ -37,8 +37,9 @@ scripts/analyze-functions.js
 scripts/check-coverage.js
 background/agent-engine.js.v*
 
-# GSD planning artifacts (generated during code reviews, not source code)
-.planning/
+# GSD planning artifacts — .planning/ is tracked for project coordination
+# Individual phase review files are generated during execution but the core
+# planning docs (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md) are source of truth
 
 # Debug/temp scripts and status files
 AUTO_*.ps1
