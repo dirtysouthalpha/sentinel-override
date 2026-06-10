@@ -1,6 +1,6 @@
 # Sentinel Override — AI Planning & Visual Feedback
 **Date:** 2026-05-08
-**Brandon — short answer to your two requirements**
+**Short answer to the two requirements**
 
 ---
 

@@ -1,6 +1,6 @@
 # Sentinel Override — MSP Task Playbooks
 **Date:** 2026-05-08
-**Audience:** Brandon (Acme IT)
+**Audience:** Technician (Acme IT)
 **Goal:** Match or beat Claude in Chrome for the four real workflows that get pushed to the agent: **SonicWall VPN tunnels**, **M365 permission edits**, **Exchange mail trace**, **AD/Entra sign-in auditing**.
 
 This document walks through each task family — what the current build does, where it breaks, and the specific code-level fixes that close the gap. The fixes at the end are *cross-cutting*: each one unlocks multiple task families.
@@ -114,7 +114,7 @@ The actual work spans four different admin centers. Most-common flows:
   - Resume button in the popup unblocks the loop.
 
 #### 2.3 Tenant context is non-existent — high cross-client risk
-- A tech might run "add Brandon to Domain Admins" and the goal goes to whatever tenant is currently signed in, with no check that it's the correct client tenant.
+- A tech might run "add a user to Domain Admins" and the goal goes to whatever tenant is currently signed in, with no check that it's the correct client tenant.
 - **Fix:** Add a per-run "tenant lock" field. Either:
   - Auto-detect tenant from `https://*.onmicrosoft.com` references in the page, OR from the top-right tenant picker text.
   - At plan time, the LLM is told: "Confirm tenant matches `<expected>` before any modifying action. If mismatch, finish with 'Wrong tenant — switch to <expected> first'."

@@ -15,7 +15,7 @@
    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║██║  ██║██║██████╔╝███████╗
     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝
 
-                v15.0.0 — Full-Visibility AI Browser Operator
+                v19.0.0 — Full-Visibility AI Browser Operator
 ```
 
 ### Professional AI Browser Automation for IT Pros & MSPs
@@ -24,17 +24,17 @@ A self-healing, vision-powered browser agent built for the work technicians actu
 multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see,
 click, read, think, and produce defensible reports.
 
-![Version](https://img.shields.io/badge/version-15.0.0-orange)
+![Version](https://img.shields.io/badge/version-19.0.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
 ![Providers](https://img.shields.io/badge/providers-16+-success)
 ![Themes](https://img.shields.io/badge/themes-14-9cf)
-![Tests](https://img.shields.io/badge/tests-8%2C468%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-8%2C313%20passing-brightgreen)
 ![Platforms](https://img.shields.io/badge/platform%20profiles-19-ff69b4)
 
 <p>
-  <a href="#-whats-new-in-v103">What's New</a> •
+  <a href="#-whats-new-in-v190">What's New</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-providers">Providers</a> •
   <a href="#-msp-features">MSP Features</a> •
@@ -54,9 +54,27 @@ click, read, think, and produce defensible reports.
 
 ---
 
-## ⚡ What's New in v15.0
+## ⚡ What's New in v19.0
 
-### Phase 5 — P0: Live Observability
+### v16–v17 — Foundation & Developer Velocity
+
+- **Plugin system** — install, uninstall, toggle, and conflict-detect plugins via manifest URL. Plugin registry UI in settings modal.
+- **Settings export/import** — JSON-based config backup with versioned schema. One-click export, file-picker import.
+- **WebSocket bridge hardening** — challenge-response auth (SHA-256), 1MB message limit, type whitelist, exponential backoff reconnect with jitter.
+- **Error recovery system** — `AgentError` with 15 error codes, auto-retry with exponential backoff (2s/4s/8s, 3 attempts), error cards in chat with collapsible details and retry button.
+- **Platform profile smoke tests** — 8 tests covering all 19 profiles.
+- **42 new agent tests** — planning (7), security (16), reporting (10), recovery (5).
+
+### v18–v19 — Test Coverage & Security Hardening
+
+- **8,313 tests passing, 0 failures** across 164 suites.
+- **No hardcoded secrets** — WS bridge auth token generated randomly on install, stored in `chrome.storage.local`.
+- **No external network dependencies** — Inter and Space Grotesk fonts bundled locally (no Google Fonts CDN).
+- **Tightened CSP** — `style-src 'self'` only, no external font/style origins.
+- **PII-free codebase** — no personal information in source, tests, or docs.
+- **Production build** — 125 files, 1.66 MB zip, debug-stripped, ready for Chrome Web Store.
+
+### Previous Highlights
 
 The agent now **narrates what it sees** in real time. Every observation produces a human-readable status line — not just internal state, but a plain-English description of the page, the form fields detected, the buttons available, and the login state. You always know what the agent is looking at.
 
@@ -102,10 +120,10 @@ The agent now **narrates what it sees** in real time. Every observation produces
 
 ### Stability & Test Coverage
 
-- **153 test suites, 8,468 tests passing** — zero regressions
-- **Timer leak fix** — eliminated a memory leak in the action loop that caused slowdown on long runs
-- **17 platform detector noise fixes** — cleaner platform detection across M365, SonicWall, and Fortinet portals
-- **600+ commits and counting**
+- **164 test suites, 8,313 tests passing** — zero failures
+- **No hardcoded secrets, no external CDN dependencies**
+- **19 platform profiles with smoke test coverage**
+- **700+ commits and counting**
 
 ### What else is new
 
@@ -517,6 +535,9 @@ sentinel-override/
 │   ├── scheduler.js                # chrome.alarms scheduling
 │   ├── template-manager.js         # Template CRUD
 │   ├── collaboration.js            # Import/export
+│   ├── plugin-registry.js          # Plugin install/uninstall/toggle/conflict detection
+│   ├── agent-errors.js             # AgentError class, 15 error codes, helpers
+│   ├── agent-recovery.js           # Auto-retry with exponential backoff
 │   ├── report-generator.js         # Final-report rendering
 │   ├── export-report.js            # JSON/CSV export
 │   ├── context-menu.js             # Right-click context menu
@@ -578,8 +599,9 @@ sentinel-override/
 ├── popup.html                      # Side-panel entry
 ├── popup.css                       # 14 themes + custom CSS hooks
 ├── popup-full.js                   # Bootstrap
-├── manifest.json                   # MV3 manifest, v15.0.0
-└── tests/                          # 153 suites, 8,488 passing tests
+├── manifest.json                   # MV3 manifest, v19.0.0
+├── fonts/                          # Bundled Inter + Space Grotesk (no CDN)
+└── tests/                          # 164 suites, 8,313 passing tests
 ```
 
 ---
@@ -587,6 +609,8 @@ sentinel-override/
 ## 🔐 Security & Safety
 
 - API keys stored in `chrome.storage.local` — never sent anywhere except your configured endpoint
+- **No hardcoded secrets in source code** — all auth tokens generated at runtime and stored locally
+- **No external CDN dependencies** — fonts bundled locally, no network requests on popup open
 - `execute_js` runs in MAIN world via CDP `Runtime.evaluate` (bypasses page CSP) with approval-mode gating
 - Approval mode defaults **ON** for new installs
 - Auto-approve timeout **rejects** after 60 seconds — never silent approval
@@ -596,15 +620,16 @@ sentinel-override/
 - Goal text scrubbed of IPs/emails/ticket numbers before persistence to learned patterns
 - Per-tab side panel visibility — panel hides on unrelated tabs during a run
 - **No telemetry, no third-party analytics, no data exfiltration paths**
+- Content Security Policy: `script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'` — no external script or style origins
 
 ---
 
 ## 🧪 Tests
 
 ```
-Test Suites: 153 passed
-Tests:       8,488 passed (8,529 total, 41 skipped)
-Time:        ~22 seconds
+Test Suites: 164 passed
+Tests:       8,313 passed (8,466 total, 153 skipped)
+Time:        ~25 seconds
 ```
 
 Coverage spans: agent engine, LLM client, all 16 provider adapters, tab manager, frame router, all content scripts, shadow DOM piercing, dropdown utils, special inputs, scheduler, template manager, collaboration, popup modules, adaptive prompts, trust score, macro recorder, page monitor, audit log, client knowledge, Quick Assist, and platform profiles.
@@ -646,6 +671,6 @@ If this saves you a billable hour, consider [buying me a coffee](https://buymeac
 
 Built with ⚡ by [Dirtysouthalpha](https://github.com/dirtysouthalpha) — **for the techs in the trenches**
 
-*600+ commits and counting.*
+*700+ commits and counting.*
 
 </div>

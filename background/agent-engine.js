@@ -40,8 +40,8 @@ const PRIORITY_ELEMENT_TYPES = new Set(['button', 'input', 'select', 'textarea']
 
 // Precompile regex for approval mode detection (Tier 3: pause phrases)
 const APPROVAL_PAUSE_AGENT_RE = /\b(?:agent|sentinel)\s+(?:pauses?|must\s+pause|should\s+pause|will\s+pause)\s+(?:for|before|on|to\s+wait|until)/i;
-const APPROVAL_PAUSE_GENERIC_RE = /\b(?:PAUSE|pause)\s+(?:and\s+)?wait\s+for\s+(?:technician|user|operator|human|brandon)\s+approval/i;
-const APPROVAL_WAIT_BEFORE_RE = /\bwait\s+for\s+(?:technician|user|operator|brandon)\s+approval\s+(?:before|prior\s+to)\s+(?:each|every|any)/i;
+const APPROVAL_PAUSE_GENERIC_RE = /\b(?:PAUSE|pause)\s+(?:and\s+)?wait\s+for\s+(?:technician|user|operator|human|owner)\s+approval/i;
+const APPROVAL_WAIT_BEFORE_RE = /\bwait\s+for\s+(?:technician|user|operator|owner)\s+approval\s+(?:before|prior\s+to)\s+(?:each|every|any)/i;
 
 // Precompile regex for approval mode detection (Tier 4: autonomous phrases)
 const AUTONOMOUS_MODE_RE = /\b(?:no\s+approvals?\s+required|execute\s+all\s+steps?\s+(?:autonomously|without\s+pausing)|do\s+not\s+pause)\b/i;
@@ -2020,7 +2020,7 @@ function hasPostCommitVerification(history) {
 }
 
 // ========== Ticket FINAL_NOTES Auto-Formatter (3.8.0) ==========
-// Post-processes the agent's finish summary into Brandon's preferred ticket
+// Post-processes the agent's finish summary into the preferred ticket
 // FINAL_NOTES format when the goal is recognized as a ticket investigation.
 // The format (per user prefs):
 //   Action Taken: [1-2 sentences]

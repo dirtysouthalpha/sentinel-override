@@ -148,7 +148,7 @@ The verifier agent ran `wc -l` and `node --check` against the Linux mount path `
 
 ### Fix
 
-Direct Edit on the Windows source `C:\Users\brandon.goolsby\Downloads\sentinel-override-3.13.0\content\index.js`:
+Direct Edit on `sentinel-override-3.13.0/content/index.js`:
 - `old_string`: the entire 184-line duplicate (line 2067's EOF marker + all duplicated case blocks + setupSPAObservers + sendMessage + second EOF marker).
 - `new_string`: just the single EOF marker.
 
@@ -829,7 +829,7 @@ If `_redactEvent()` throws for any reason (malformed payload, circular reference
 ### Why these patterns specifically
 
 Every regex was selected based on real values that have appeared in telemetry during v3.13 → v3.27 testing:
-- Brandon's Z.AI / GLM API keys (covered by the generic 20-char tail patterns).
+- Z.AI / GLM API keys (covered by the generic 20-char tail patterns).
 - Microsoft tenant bearer tokens captured during `read_network_requests` on Entra portals.
 - OAuth `?code=` values in M365 sign-in redirects.
 - SentinelOne JWTs in execute_js CSP-block error messages.
@@ -1178,7 +1178,7 @@ Settings modal opens fully within the side panel (no more cut-off right side). T
 
 ## v3.22.0 — 2026-05-12 (MSP platform profiles — M365, FortiGate, IT Glue, Aruba, SonicWall on-box)
 
-The platform-profile system shipped in v3.18.0 (SonicWall NSM only). v3.22.0 fills out the five platforms Brandon's MSP runs daily: M365 admin surfaces, FortiGate / FortiManager, IT Glue, Aruba (Central + Instant + OS-CX), and SonicWall on-box web admin.
+The platform-profile system shipped in v3.18.0 (SonicWall NSM only). v3.22.0 fills out the five platforms the MSP runs daily: M365 admin surfaces, FortiGate / FortiManager, IT Glue, Aruba (Central + Instant + OS-CX), and SonicWall on-box web admin.
 
 Each profile injects ~15-30 `knownSelectors` + per-surface `pageTypes` + `waitStrings` into the agent's runtime system prompt whenever the agent lands on a matching URL. Reduces observe-and-flail loops; gives the LLM "try these first" hints before falling back to runtime DOM scanning.
 

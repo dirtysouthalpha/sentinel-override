@@ -9,6 +9,15 @@ settings.local.json
 config.local.*
 storage-export.json
 
+# Claude Code local config (contains project-specific instructions, not for public repo)
+CLAUDE.md
+
+# Dev/CI scripts not needed in repo
+grind-loop.sh
+local-2070-grind.sh
+override-perfect-grind.sh
+release.ps1
+
 # Editor / OS
 .vscode/
 .idea/
