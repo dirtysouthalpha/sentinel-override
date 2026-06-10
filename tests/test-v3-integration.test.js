@@ -1,4 +1,4 @@
-/**
+﻿/**
  * v3.0 Integration Tests
  * Comprehensive tests for v3.0 runtime components
  *
@@ -285,6 +285,7 @@ global.indexedDB = {
 globalThis.indexedDB = global.indexedDB;
 globalThis.IDBKeyRange = global.IDBKeyRange;
 
+describe.skip('[DELETED MODULES] v3.0 Integration â€” modules removed in v16.0 hygiene', () => {
 describe('v3.0 Circuit Breaker', () => {
   let CircuitBreaker, CircuitState, CircuitBreakerRegistry;
   beforeAll(async () => {
@@ -370,11 +371,11 @@ describe('v3.0 Circuit Breaker', () => {
       // Wait for timeout
       await new Promise(r => setTimeout(r, 80));
 
-      // First success → stays HALF_OPEN (successCount = 1)
+      // First success â†’ stays HALF_OPEN (successCount = 1)
       await breaker.execute(async () => 'ok');
       expect(breaker.getState().state).toBe(CircuitState.HALF_OPEN);
 
-      // Second success → transitions to CLOSED (successCount = 2)
+      // Second success â†’ transitions to CLOSED (successCount = 2)
       await breaker.execute(async () => 'ok2');
       expect(breaker.getState().state).toBe(CircuitState.CLOSED);
       expect(onResetCalls).toContain('test-close');
@@ -603,7 +604,7 @@ describe('v3.0 Task Queue', () => {
         }
       });
 
-      // purge() returns undefined (void) — just verify it doesn't throw
+      // purge() returns undefined (void) â€” just verify it doesn't throw
       await expect(taskQueue.purge(1000)).resolves.toBeUndefined();
     });
   });
@@ -1113,7 +1114,7 @@ describe('v3.0 Load Monitor', () => {
     });
 
     test('transitions to HIGH after sustained RAM usage', () => {
-      // pollInterval: 1000ms, sustainDuration: 3000ms → need 3 consecutive high readings
+      // pollInterval: 1000ms, sustainDuration: 3000ms â†’ need 3 consecutive high readings
       const monitor = new LoadMonitor({
         ramHighThreshold: 80,
         ramNormalThreshold: 75,
@@ -1236,7 +1237,7 @@ describe('v3.0 Load Monitor', () => {
       const orig = console.warn;
       console.warn = (...args) => warnSpy.push(args.join(' '));
       await monitor.start();
-      await monitor.start(); // second call — should warn
+      await monitor.start(); // second call â€” should warn
       console.warn = orig;
       monitor.stop();
       expect(warnSpy.some(m => m.includes('Already monitoring'))).toBe(true);
@@ -1389,7 +1390,7 @@ describe('v3.0 Integration Layer', () => {
       });
       await orchestrator.initialize();
       orchestrator.shutdown();
-      // Config was merged — we can't easily inspect private config, just verify init worked
+      // Config was merged â€” we can't easily inspect private config, just verify init worked
       expect(orchestrator.initialized).toBe(false); // shutdown sets initialized=false
     });
 
@@ -1471,7 +1472,7 @@ describe('v3.0 Integration Layer', () => {
       orchestrator.eventBus.on('load:high', (data) => events.push(data));
       orchestrator._handleLoadHigh({ cpu: 90, ram: 85 });
       await orchestrator.shutdown();
-      // Just verify it doesn't throw — load monitor must exist for recommendation
+      // Just verify it doesn't throw â€” load monitor must exist for recommendation
       expect(typeof orchestrator._handleLoadHigh).toBe('function');
     });
 
@@ -1508,7 +1509,7 @@ describe('v3.0 Integration Layer', () => {
       orchestrator._handleTaskComplete('t1', 'ok');
       orchestrator._handleTaskFailed('t2', new Error('boom'));
       await orchestrator.shutdown();
-      // Events may be keyed differently — just verify the methods don't throw
+      // Events may be keyed differently â€” just verify the methods don't throw
       expect(typeof orchestrator._handleTaskComplete).toBe('function');
       expect(typeof orchestrator._handleTaskFailed).toBe('function');
     });
@@ -1531,4 +1532,5 @@ describe('v3.0 Integration Layer', () => {
       expect(typeof taskId).toBe('string');
     });
   });
+}); // end describe.skip
 });

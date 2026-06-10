@@ -1,6 +1,10 @@
 /**
- * Federation Layer - Zero-Trust Multi-Agent Coordination
- * 
+ * @future Federation Layer - Zero-Trust Multi-Agent Coordination
+ *
+ * STATUS: Reserved for future multi-agent orchestration.
+ * Zero consumers as of v19.0.0. Do not delete — intended for
+ * peer-to-peer agent federation across SENTINEL PRIME nodes.
+ *
  * Enables multiple Sentinel Override agents to collaborate on goals
  * with zero-trust security, peer discovery, and result reconciliation.
  * 

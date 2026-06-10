@@ -1442,8 +1442,10 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
       });
     }
   }
-  if (document.readyState === 'loading') {
-  // ========== Export / Import Settings (SET-04) ==========
+})();
+
+// ========== Export / Import Settings (SET-04) ==========
+(function wireExportImportPlugins() {
   const SETTINGS_EXPORT_VERSION = 1;
   const EXPORT_KEYS = [
     'active_provider', 'providers', 'export_format', 'agent_context',
@@ -1589,10 +1591,4 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   }
 
   refreshPluginList();
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
 })();
