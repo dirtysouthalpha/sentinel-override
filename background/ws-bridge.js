@@ -291,6 +291,10 @@ function sendStatus() {
   }).catch(() => {});
 }
 
+// ========== Test exports ==========
+// Pure functions exported for unit testing.
+export { validateMessage, computeChallengeResponse };
+
 // ========== Auto-start ==========
 // Start the bridge connection when this module loads
 console.log('[WS-BRIDGE] Module loaded, will connect to bridge server');
