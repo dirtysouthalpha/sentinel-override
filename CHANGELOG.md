@@ -1,5 +1,29 @@
 # Changelog
 
+## v20.0.0 — 2026-06-10 (Production Release)
+
+### Security
+- **Removed hardcoded WS bridge auth token** — now generated randomly on first install and stored in chrome.storage.local
+- **Bundled Google Fonts locally** — no external CDN dependency on popup open (Inter + Space Grotesk, 10 TTF files)
+- **Tightened CSP** — removed fonts.googleapis.com and fonts.gstatic.com from content_security_policy
+- **PII sweep** — removed all personal information from source code, docs, and comments
+
+### Infrastructure
+- **Installed uuid dependency** — fixed 3 previously broken test suites (uap-server, federation, coverage)
+- **Moved archiver to devDependencies** — build-only dependency no longer in production deps
+- **Removed dev scripts from tracking** — grind scripts and release.ps1 excluded from repo
+
+### Documentation
+- **README.md** updated to v20.0.0 — new stats, architecture tree, security section
+- **PRIVACY.md** added — Chrome Web Store privacy policy
+- **CWS-LISTING.md** added — store listing copy, description, permission justifications
+- **CLAUDE.md** removed from tracking — project-specific config not for public repo
+
+### Test Results
+- **164/164 test suites passing, 0 failures**
+- **8,313 tests passing** (153 skipped — dead v3.0-integration module tests)
+- **Build**: 125 files, 1.66 MB zip
+
 ## v19.0.0 — 2026-06-10 (Foundation Hardening + Test Coverage + Plugin System)
 
 ### v16.0 — Foundation Hardening + Plugin Power

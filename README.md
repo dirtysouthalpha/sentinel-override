@@ -15,7 +15,7 @@
    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║██║  ██║██║██████╔╝███████╗
     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝
 
-                v19.0.0 — Full-Visibility AI Browser Operator
+                v20.0.0 — Full-Visibility AI Browser Operator
 ```
 
 ### Professional AI Browser Automation for IT Pros & MSPs
@@ -24,7 +24,7 @@ A self-healing, vision-powered browser agent built for the work technicians actu
 multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see,
 click, read, think, and produce defensible reports.
 
-![Version](https://img.shields.io/badge/version-19.0.0-orange)
+![Version](https://img.shields.io/badge/version-20.0.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
@@ -599,7 +599,7 @@ sentinel-override/
 ├── popup.html                      # Side-panel entry
 ├── popup.css                       # 14 themes + custom CSS hooks
 ├── popup-full.js                   # Bootstrap
-├── manifest.json                   # MV3 manifest, v19.0.0
+├── manifest.json                   # MV3 manifest, v20.0.0
 ├── fonts/                          # Bundled Inter + Space Grotesk (no CDN)
 └── tests/                          # 164 suites, 8,313 passing tests
 ```

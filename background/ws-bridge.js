@@ -1,4 +1,4 @@
-// Sentinel Override v3.57.0 — WebSocket Bridge Client
+// Sentinel Override v20.0.0 — WebSocket Bridge Client
 // Connects to SENTINEL PRIME bridge server for external orchestration.
 // Receives task/query/cancel commands and routes to the agent engine.
 
