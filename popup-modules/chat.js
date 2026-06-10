@@ -944,6 +944,63 @@ function saveChatHistory() {
   } catch (_e) { /* storage unavailable */ }
 }
 
+// ========== Error Card (ERR-02, ERR-03) ==========
+
+/**
+ * Render an AgentError as a styled card in the chat stream.
+ * Shows: error code, message, suggestion, and a Retry button if retryable.
+ * @param {object} errorData - AgentError.toJSON() payload
+ */
+function renderErrorCard(errorData) {
+  const welcome = chatContainer ? chatContainer.querySelector('.welcome-message') : null;
+  if (welcome) welcome.remove();
+
+  const card = document.createElement('div');
+  card.className = 'message-group agent-error-card';
+  card.dataset.errorCode = errorData.code || 'UNKNOWN';
+  card.dataset.retryable = errorData.retryable ? 'true' : 'false';
+  card.dataset.context = JSON.stringify(errorData.context || {});
+
+  const retryBtn = errorData.retryable
+    ? `<button class="error-retry-btn" style="margin-top:8px; padding:4px 12px; border:1px solid var(--error-color, #f44336); background:transparent; color:var(--error-color, #f44336); border-radius:4px; cursor:pointer; font-size:12px;">Retry</button>`
+    : '';
+
+  card.innerHTML = `
+    <div class="message assistant-msg" style="border-left:3px solid var(--error-color, #f44336); padding:10px 14px; background:rgba(244,67,54,0.08); border-radius:6px;">
+      <div style="font-weight:600; font-size:13px; color:var(--error-color, #f44336);">
+        ${escapeHtml(errorData.code || 'ERROR')}
+      </div>
+      <div style="font-size:12px; margin-top:4px;">${escapeHtml(errorData.message || 'Unknown error')}</div>
+      ${errorData.suggestion ? `<div style="font-size:11px; margin-top:6px; color:var(--text-secondary);">Suggestion: ${escapeHtml(errorData.suggestion)}</div>` : ''}
+      <details style="margin-top:6px; font-size:11px; color:var(--text-secondary);">
+        <summary style="cursor:pointer;">Technical details</summary>
+        <pre style="margin-top:4px; white-space:pre-wrap; font-size:10px;">${escapeHtml(JSON.stringify(errorData.context || {}, null, 2))}</pre>
+      </details>
+      ${retryBtn}
+    </div>
+  `;
+
+  const retryButton = card.querySelector('.error-retry-btn');
+  if (retryButton && errorData.retryable) {
+    retryButton.addEventListener('click', () => {
+      const ctx = errorData.context || {};
+      if (ctx.goal) {
+        const goalInput = document.getElementById('goalInput');
+        if (goalInput) goalInput.value = ctx.goal;
+        card.remove();
+        // Re-fire the goal through the normal send path
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) sendBtn.click();
+      } else {
+        showToast('No context available for retry', 'error');
+      }
+    });
+  }
+
+  if (chatContainer) chatContainer.appendChild(card);
+  if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
 // ========== Message Handling ==========
 function addMessage(text, role = 'assistant') {
   const state = getState();
@@ -4241,5 +4298,9 @@ chrome.runtime.onMessage.addListener((message) => {
       }).join('');
       patternsPanel.innerHTML = header + rows;
     } catch (e) { console.warn('[Sentinel] Patterns panel render error:', e); }
+  }
+  // ERR-02/03: Render AgentError as error card in chat
+  if (message.action === 'agent_error') {
+    try { renderErrorCard(message.error); } catch (e) { console.error('[Sentinel] renderErrorCard error:', e); }
   }
 });

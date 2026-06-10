@@ -45,6 +45,7 @@ import { handleMenuClick } from './context-menu.js';
 import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop } from './page-monitor.js';
 import { startRecording, stopRecording, isRecording, loadMacros } from './macro-recorder.js';
 import { generateHtmlReport, generateReplayReport } from './export-report.js';
+import * as pluginRegistry from './plugin-registry.js';
 
 // v10.3.1: Startup diagnostics
 console.log('[Sentinel/SW] Service worker starting...');
@@ -955,6 +956,36 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'export_replay': {
       const html = generateRunReplay();
       return { html };
+    }
+
+    // ========== Plugin System (PLG-06) ==========
+    case 'plugin_list': {
+      const plugins = await pluginRegistry.getInstalledPlugins();
+      return { ok: true, plugins };
+    }
+    case 'plugin_get_registry_url': {
+      const url = await pluginRegistry.getRegistryUrl();
+      return { ok: true, url };
+    }
+    case 'plugin_set_registry_url': {
+      await pluginRegistry.setRegistryUrl(request.url);
+      return { ok: true };
+    }
+    case 'plugin_install': {
+      try {
+        const id = await pluginRegistry.installPlugin(request.manifestUrl);
+        return { ok: true, pluginId: id };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+    case 'plugin_uninstall': {
+      await pluginRegistry.uninstallPlugin(request.pluginId);
+      return { ok: true };
+    }
+    case 'plugin_toggle': {
+      const active = await pluginRegistry.togglePlugin(request.pluginId);
+      return { ok: true, active };
     }
 
     default:

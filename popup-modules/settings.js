@@ -1513,6 +1513,83 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     });
   }
 
+  // ========== Plugin Management UI (PLG-06) ==========
+  const pluginList = document.getElementById('pluginList');
+  const pluginRegistryUrl = document.getElementById('pluginRegistryUrl');
+  const pluginManifestUrl = document.getElementById('pluginManifestUrl');
+  const installPluginBtn = document.getElementById('installPluginBtn');
+
+  function renderPluginList(plugins) {
+    if (!pluginList) return;
+    const entries = Object.entries(plugins);
+    if (!entries.length) {
+      pluginList.innerHTML = '<div style="color:var(--text-secondary); font-size:12px; padding:8px 0;">No plugins installed</div>';
+      return;
+    }
+    pluginList.innerHTML = entries.map(([id, p]) => `
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-color, #333);">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:12px; font-weight:600;">${sanitizeHtml(p.name || id)}</div>
+          <div style="font-size:11px; color:var(--text-secondary);">${sanitizeHtml(p.version || '?')} by ${sanitizeHtml(p.author || '?')}</div>
+        </div>
+        <button class="form-btn-sm plugin-toggle" data-id="${id}" style="font-size:10px; ${p.active ? 'background:var(--success-color, #4caf50);' : 'background:var(--bg-tertiary);'}">${p.active ? 'ON' : 'OFF'}</button>
+        <button class="form-btn-sm plugin-uninstall" data-id="${id}" style="font-size:10px; color:var(--error-color, #f44336);">Remove</button>
+      </div>
+    `).join('');
+
+    pluginList.querySelectorAll('.plugin-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'plugin_toggle', pluginId: btn.dataset.id }, (resp) => {
+          if (resp && resp.ok) refreshPluginList();
+        });
+      });
+    });
+    pluginList.querySelectorAll('.plugin-uninstall').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (confirm('Remove plugin ' + btn.dataset.id + '?')) {
+          chrome.runtime.sendMessage({ action: 'plugin_uninstall', pluginId: btn.dataset.id }, (resp) => {
+            if (resp && resp.ok) refreshPluginList();
+          });
+        }
+      });
+    });
+  }
+
+  function refreshPluginList() {
+    chrome.runtime.sendMessage({ action: 'plugin_list' }, (resp) => {
+      if (resp && resp.plugins) renderPluginList(resp.plugins);
+    });
+  }
+
+  if (pluginRegistryUrl) {
+    chrome.runtime.sendMessage({ action: 'plugin_get_registry_url' }, (resp) => {
+      if (resp && resp.url) pluginRegistryUrl.value = resp.url;
+    });
+    pluginRegistryUrl.addEventListener('change', () => {
+      chrome.runtime.sendMessage({ action: 'plugin_set_registry_url', url: pluginRegistryUrl.value.trim() });
+    });
+  }
+
+  if (installPluginBtn && pluginManifestUrl) {
+    installPluginBtn.addEventListener('click', () => {
+      const url = pluginManifestUrl.value.trim();
+      if (!url) { showToast('Enter a manifest URL', 'error'); return; }
+      installPluginBtn.disabled = true;
+      chrome.runtime.sendMessage({ action: 'plugin_install', manifestUrl: url }, (resp) => {
+        installPluginBtn.disabled = false;
+        if (resp && resp.ok) {
+          showToast('Plugin installed', 'success');
+          pluginManifestUrl.value = '';
+          refreshPluginList();
+        } else {
+          showToast(resp?.error || 'Install failed', 'error');
+        }
+      });
+    });
+  }
+
+  refreshPluginList();
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

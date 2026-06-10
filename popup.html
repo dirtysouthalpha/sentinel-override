@@ -545,6 +545,24 @@
         </div>
       </details>
 
+      <details style="margin-top:12px;">
+        <summary class="form-section-label" style="cursor:pointer;">Plugins</summary>
+        <div style="margin-top:8px;">
+          <div class="form-row">
+            <label class="form-section-label">Registry URL</label>
+            <input type="text" id="pluginRegistryUrl" class="form-input" placeholder="https://registry.sentinel.dev/plugins.json" style="width:100%; font-size:12px;">
+          </div>
+          <div class="form-row">
+            <label class="form-section-label">Install Plugin</label>
+            <div style="display:flex; gap:6px;">
+              <input type="text" id="pluginManifestUrl" class="form-input" placeholder="Manifest URL" style="flex:1; font-size:12px;">
+              <button id="installPluginBtn" class="form-btn-sm" style="font-size:11px;">Install</button>
+            </div>
+          </div>
+          <div id="pluginList" style="margin-top:8px;"></div>
+        </div>
+      </details>
+
       <div class="modal-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
         <button id="saveSettingsBtn" class="modal-btn btn-save" style="flex:1;">Save Settings</button>
         <button id="exportSettingsBtn" class="modal-btn" style="flex:0.5; background:var(--bg-tertiary); color:var(--text-primary); font-size:12px;">Export</button>
