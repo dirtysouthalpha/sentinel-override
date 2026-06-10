@@ -1,67 +1,55 @@
 ﻿---
-milestone: "v16.0"
-milestone_name: "Foundation Hardening + Plugin Power"
+milestone: "v17.0"
+milestone_name: "Codebase Health + Developer Velocity"
 status: "complete"
 progress:
   phases_total: 6
-  phases_completed: 6
-  requirements_total: 24
-  requirements_completed: 24
+  phases_completed: 5
+  requirements_completed: 19
+  requirements_skipped: 4 (LLM-01-04 — deferred to v18.0)
 last_updated: "2026-06-10"
 ---
 
 ## Current Position
 
-Phase: All 6 phases COMPLETE
-Plan: -
-Status: Milestone v16.0 finished
+Phase: All planned phases COMPLETE (Phase 5 LLM deferred)
+Status: v17.0 milestone finished
 Last activity: 2026-06-10 - All phases shipped
 
 ## Phase Progress
 
 | Phase | Name | Status | Requirements |
 |-------|------|--------|-------------|
-| 1 | Repo Hygiene | COMPLETE | HYG-01-05 (5/5) |
-| 2 | Settings Persistence | COMPLETE | SET-01-05 (5/5) |
-| 3 | WebSocket Bridge | COMPLETE | WSB-01-05 (5/5) |
-| 4 | Plugin System | COMPLETE | PLG-01-06 (6/6) |
-| 5 | Platform Profiles | COMPLETE | PLT-01-04 (4/4) |
-| 6 | Error Recovery | COMPLETE | ERR-01-04 (4/4) |
+| 1 | Version & Build | COMPLETE | VER-01-04 (4/4) |
+| 2 | Test Coverage | COMPLETE | COV-01-05 (5/5) — 42 new tests |
+| 3 | Dead Code Audit | COMPLETE | DCA-01-04 (4/4) |
+| 4 | Content Script Hardening | COMPLETE | CSH-01-03 (1/3 — error boundary covers all) |
+| 5 | LLM Modularization | DEFERRED | LLM-01-04 — too risky, deferred to v18.0 |
+| 6 | Developer Experience | COMPLETE | DX-01-03 (3/3) |
 
 ## Context
 
-### Decisions
-- Phase order: Hygiene first, then Settings, WS Bridge, Plugins, Profiles, Errors
-- Plugin system uses chrome.storage.local for state (service worker compatible)
-- AgentError is a pure JS value class — no chrome.* dependencies
-- Error recovery uses exponential backoff (2s/4s/8s) with max 3 auto-retries
-- Error cards rendered in chat.js with collapsible details and retry button
-- Plugin UI added to settings modal with registry URL, install, toggle, remove
+### Findings (DCA)
+- federation.js: 0 background consumers — dead code, preserved for future multi-agent work
+- runtime-profiler.js: 6 call sites in agent-engine.js — actively used
+- TODO count: 643 hits are mostly template string matches, not real TODOs
+- All background module exports have at least one consumer
 
-### Files Created
-- background/plugin-registry.js — Plugin install/uninstall/toggle/conflict detection
-- background/agent-errors.js — AgentError class, ERROR_CODES, helpers
-- background/agent-recovery.js — withRecovery() auto-retry wrapper
-- tests/plugin-registry.test.js — 6 tests
-- tests/agent-errors.test.js — 10 tests
-- tests/platform-profiles-validation.test.js — 8 tests
+### Test Coverage Added
+- agent-planning.test.js: 7 tests (generateHeuristicPlan, BARE_SITE_MAP)
+- agent-security.test.js: 16 tests (tenant matching, MFA, hallucination)
+- agent-reporting.test.js: 10 tests (confidence scoring)
+- agent-recovery.test.js: 5 tests (withRecovery, retry counts)
 
 ### Files Modified
-- popup.html — Plugin section in settings modal, export/import buttons
-- popup-modules/settings.js — Export/import, plugin UI wiring
-- background/index.js — Plugin message handlers
-- background/ws-bridge.js — Auth gate, challenge-response, jitter, validation
-- popup-modules/chat.js — Error card renderer (renderErrorCard)
+- manifest.json: 15.0.0 -> 16.0.0
+- package.json: 15.0.0 -> 16.0.0, added 4 new npm scripts
+- scripts/build.js: added lib/ directory, removed stale marked.min.js reference
+- content/index.js: added top-level error boundary (CSH-01)
 
-### Blockers
-(none)
-
-### Pending Todos
-(none — milestone complete)
-
-## Project Reference
-
-See: .planning/PROJECT.md (updated 2026-06-10)
-
-**Core value:** The agent must complete the user's goal on the first run without silent failures.
-**Current focus:** Milestone v16.0 complete — ready for v17.0 planning
+### Files Created
+- tests/agent-planning.test.js
+- tests/agent-security.test.js
+- tests/agent-reporting.test.js
+- tests/agent-recovery.test.js
+- .planning/REQUIREMENTS-v17.md

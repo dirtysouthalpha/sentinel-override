@@ -3,6 +3,38 @@
 // Verified 2026-05-06.
 // Handles DOM observation, element scanning, action execution, and dynamic tools.
 // Orchestrates utility modules loaded on window.__sentinelUtils.
+
+// (CSH-01) Top-level error boundary — reports uncaught content script errors
+// to the background service worker so they appear in telemetry/logs instead
+// of silently vanishing in the content script context.
+window.addEventListener('error', (event) => {
+  try {
+    chrome.runtime.sendMessage({
+      action: 'content_telemetry_event',
+      category: 'content',
+      level: 'error',
+      message: 'Uncaught error in content script',
+      payload: {
+        message: String(event.message || ''),
+        filename: String(event.filename || ''),
+        lineno: event.lineno || 0,
+        colno: event.colno || 0
+      }
+    }).catch(() => {});
+  } catch (_e) { /* truly non-fatal */ }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  try {
+    chrome.runtime.sendMessage({
+      action: 'content_telemetry_event',
+      category: 'content',
+      level: 'error',
+      message: 'Unhandled rejection in content script',
+      payload: { reason: String(event.reason || '') }
+    }).catch(() => {});
+  } catch (_e) {}
+});
 //
 // (3.26.0) Content-side telemetry helper — fires `content_telemetry_event`
 // messages to the background, which re-emits via tel.emit() (telemetry.js).

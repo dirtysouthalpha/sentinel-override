@@ -26,7 +26,7 @@ const zipName = `sentinel-override-v${version}.zip`;
 const zipPath = join(DIST, zipName);
 
 // Directories to include (recursively)
-const includeDirs = ['background', 'content', 'popup-modules'];
+const includeDirs = ['background', 'content', 'popup-modules', 'lib'];
 
 // Individual files to include
 const includeFiles = [
@@ -36,7 +36,6 @@ const includeFiles = [
   'popup.css',
   'report-view.html',
   'report-print.html',
-  'marked.min.js',
   'icon.svg',
   'icon-16.png',
   'icon-32.png',

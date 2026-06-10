@@ -56,17 +56,17 @@ export async function withRecovery(fn, context = {}, operationId = 'default') {
 
     if (error.retryable && attempts < MAX_AUTO_RETRIES) {
       const delay = RETRY_DELAYS_MS[Math.min(attempts - 1, RETRY_DELAYS_MS.length - 1)];
-      console.warn([AGENT-RECOVERY] Retryable error (attempt /), retrying in ms:, error.code, error.message);
+      console.warn('[AGENT-RECOVERY] Retryable error (attempt ' + attempts + '/' + MAX_AUTO_RETRIES + '), retrying in ' + delay + 'ms:', error.code, error.message);
       await sleep(delay);
       return withRecovery(fn, context, operationId);
     }
 
     // Max retries exceeded or non-retryable — emit error card
-    console.error([AGENT-RECOVERY] :, error.code, error.message);
+    console.error('[AGENT-RECOVERY] ' + (error.retryable ? 'Max retries exceeded' : 'Non-retryable error') + ':', error.code, error.message);
     const finalError = error.retryable
       ? new AgentError({
           code: ERROR_CODES.MAX_RETRIES_EXCEEDED,
-          message: Failed after  attempts: ,
+          message: 'Failed after ' + attempts + ' attempts: ' + error.message,
           suggestion: error.suggestion || 'Try again manually or adjust your goal.',
           retryable: true,
           context: { ...context, originalCode: error.code, attempts }
