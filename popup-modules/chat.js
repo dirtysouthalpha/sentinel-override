@@ -1150,8 +1150,11 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
     if ((_sendBtn && _sendBtn.disabled) || (_goalInput && _goalInput.disabled)) {
       chrome.runtime.sendMessage({ action: 'ping' }, (resp) => {
         void chrome.runtime.lastError; // consume any error
-        // If the SW responds and says no agent is running, reset UI
-        if (resp && resp.pong && resp.agentRunning !== true) {
+        // wrapMessageHandler wraps responses as { ok: true, data: {...} }
+        // so pong/agentRunning may be at resp.data, not resp directly
+        const _pong = resp && (resp.pong || (resp.data && resp.data.pong));
+        const _isRunning = resp && (resp.agentRunning === true || (resp.data && resp.data.agentRunning === true));
+        if (_pong && !_isRunning) {
           console.warn('[Sentinel] Safety reset: UI was stuck disabled but no agent running');
           resetUI();
         }
@@ -1650,7 +1653,7 @@ document.addEventListener('mousedown', (e) => {
   try { target.classList.remove('show'); } catch (e) { console.warn('[Sentinel] DOM detach error:', getErrorMessage(e)); }
 }, true);
 
-function updateMarkdownPreview() {
+function _updateMarkdownPreview() {
   const _goalInput = document.getElementById('goalInput');
   if (!_goalInput) return;
   const text = _goalInput.value;
@@ -2190,34 +2193,6 @@ function renderTabBar(tabs) {
 
 // ========== Report Card & Modal ==========
 
-/**
- * Adds a "Generating report..." indicator in the chat feed.
- */
-// eslint-disable-next-line no-unused-vars
-function addReportGeneratingIndicator() {
-  // Remove existing indicator if any
-  removeReportGeneratingIndicator();
-
-  const group = document.createElement('div');
-  group.className = 'message-group report-group';
-  group.id = 'report-generating';
-
-  const indicator = document.createElement('div');
-  indicator.className = 'report-generating-indicator';
-  indicator.innerHTML = '<span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span><span>Generating report...</span>';
-
-  group.appendChild(indicator);
-  chatContainer.appendChild(group);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-}
-
-/**
- * Removes the generating indicator from the chat feed.
- */
-function removeReportGeneratingIndicator() {
-  const existing = document.getElementById('report-generating');
-  if (existing) existing.remove();
-}
 
 /**
  * Adds an inline report card to the chat feed with summary preview
@@ -3141,7 +3116,7 @@ async function renderRunLogHistoryList() {
       return `${m}m ${s}s`;
     };
     const rowsHtml = list.map((entry) => {
-      const id = entry.runLogId || '';
+      const id = escapeHtml(entry.runLogId || '');
       const goalShort = (entry.goal || '(no goal)').replace(/</g, '&lt;').slice(0, 140);
       const statusChip = entry.completed
         ? '<span style="display:inline-block; padding:2px 6px; font-size:10px; border-radius:8px; background:rgba(0,255,100,0.12); color:#33cc66; border:1px solid #2a9d4a;">COMPLETE</span>'
@@ -3488,72 +3463,6 @@ async function toggleSourceChipExpansion(chip) {
 // Career-risk gate: forces an explicit "yes, intentional cross-tenant work"
 // click before dispatching. Forensic log captures the timestamped decision.
 
-// eslint-disable-next-line no-unused-vars
-function showTenantOverrideCard(payload) {
-  if (!payload) return;
-  const requestId = payload.requestId;
-  // Remove any prior card so we don't stack
-  const existing = document.getElementById('tenant-override-card');
-  if (existing) existing.remove();
-
-  const card = document.createElement('div');
-  card.id = 'tenant-override-card';
-  card.className = 'safety-banner';
-  card.style.cssText = 'border: 2px solid #C00000; background: rgba(192,0,0,0.12); margin: 8px 14px; padding: 14px 16px; border-radius: 8px;';
-  card.innerHTML = `
-    <div class="safety-banner-header" style="display:flex; align-items:center; gap:8px; font-weight:600; color:#C00000; margin-bottom:8px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-        <line x1="12" y1="9" x2="12" y2="13"></line>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>
-      <span>CROSS-TENANT ACTION BLOCKED</span>
-    </div>
-    <div style="font-size: 12px; line-height: 1.5; margin-bottom: 10px;">
-      The agent is about to <strong>${escapeHtml(payload.actionType || 'modify')}</strong> on <code style="background:rgba(0,0,0,0.18); padding:1px 4px; border-radius:3px;">${escapeHtml(payload.host || '')}</code> but the detected tenant doesn&#x2019;t match your expected tenant.
-    </div>
-    <div style="font-size:11px; line-height:1.5; padding:8px 10px; background:rgba(0,0,0,0.18); border-radius:4px; margin-bottom:10px; font-family:monospace;">
-      <div><span style="color:#888;">Expected:</span> <strong style="color:#6fcf80;">${escapeHtml(payload.expected || '')}</strong></div>
-      <div><span style="color:#888;">Detected:</span> <strong style="color:#FF8A8A;">${escapeHtml(payload.detected || '(none)')}</strong></div>
-      <div style="margin-top:4px; color:#bbb;">Action: ${escapeHtml(payload.actionDescription || payload.actionType || '')}</div>
-    </div>
-    <div style="font-size:11px; color:#FFB070; margin-bottom: 10px;">
-      ⚠ Modifying actions in the wrong tenant can affect the wrong client. This decision is logged with a timestamp to the forensic run log.
-    </div>
-    <div style="display:flex; gap:8px;">
-      <button id="tenantOverrideApproveBtn" style="flex:1; padding:9px 12px; border-radius:6px; border:1px solid #C00000; background:#C00000; color:white; cursor:pointer; font-size:12px; font-weight:600;">Yes — intentional cross-tenant work</button>
-      <button id="tenantOverrideRejectBtn" style="flex:1; padding:9px 12px; border-radius:6px; border:1px solid var(--border-color); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; font-size:12px;">Cancel — wrong tenant</button>
-    </div>
-  `;
-  chatContainer.appendChild(card);
-  chatContainer.scrollTop = chatContainer.scrollHeight;
-
-  const tenantOverrideApproveBtn = document.getElementById('tenantOverrideApproveBtn');
-  if (tenantOverrideApproveBtn) {
-    tenantOverrideApproveBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({
-        action: 'tenant_override_response',
-        requestId,
-        approved: true,
-        rejected: false
-      }).catch(() => {});
-      card.remove();
-    });
-  }
-  const tenantOverrideRejectBtn = document.getElementById('tenantOverrideRejectBtn');
-  if (tenantOverrideRejectBtn) {
-    tenantOverrideRejectBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({
-        action: 'tenant_override_response',
-        requestId,
-        approved: false,
-        rejected: true
-      }).catch(() => {});
-      card.remove();
-    });
-  }
-}
-
 
 
 // ========== Paste Ticket Modal ==========
@@ -3714,22 +3623,25 @@ chrome.runtime.onMessage.addListener((message) => {
       }
     } catch (_) { /* non-fatal */ }
   }
-  // API Health Heartbeat — live indicator for LLM API responsiveness
+  // API Health Heartbeat — live indicator for LLM API responsiveness (hidden by default; enable in Settings)
   if (message.type === 'api_health') {
-    let healthBar = document.getElementById('api-health-bar');
-    if (!healthBar) {
-      healthBar = document.createElement('div');
-      healthBar.id = 'api-health-bar';
-      healthBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:5px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;';
-      const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
-      if (chatArea) chatArea.parentNode.insertBefore(healthBar, chatArea);
-    }
-    const colors = { healthy: '#4caf50', slow: '#ff9800', down: '#f44336', idle: '#666', unknown: '#666' };
-    const labels = { healthy: 'API: responding', slow: 'API: slow', down: 'API: down', idle: 'API: idle', unknown: 'API: ?' };
-    const dot = colors[message.state] || '#666';
-    const label = labels[message.state] || 'API: ?';
-    const avg = message.avgMs ? `${message.avgMs}ms avg` : '';
-    healthBar.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';"></span><span>' + label + '</span>' + (avg ? '<span style="margin-left:4px;color:#555;">' + avg + '</span>' : '');
+    chrome.storage.local.get(['show_api_health_bar'], (result) => {
+      if (!result.show_api_health_bar) return; // OFF by default
+      let healthBar = document.getElementById('api-health-bar');
+      if (!healthBar) {
+        healthBar = document.createElement('div');
+        healthBar.id = 'api-health-bar';
+        healthBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:5px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;';
+        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        if (chatArea) chatArea.parentNode.insertBefore(healthBar, chatArea);
+      }
+      const colors = { healthy: '#4caf50', slow: '#ff9800', down: '#f44336', idle: '#666', unknown: '#666' };
+      const labels = { healthy: 'API: responding', slow: 'API: slow', down: 'API: down', idle: 'API: idle', unknown: 'API: ?' };
+      const dot = colors[message.state] || '#666';
+      const label = labels[message.state] || 'API: ?';
+      const avg = (typeof message.avgMs === 'number') ? `${message.avgMs}ms avg` : '';
+      healthBar.innerHTML = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';"></span><span>' + label + '</span>' + (avg ? '<span style="margin-left:4px;color:#555;">' + avg + '</span>' : '');
+    });
   }
   // (6.0) API health heartbeat
   if (message.action === 'heartbeat_update') {
@@ -3765,7 +3677,7 @@ chrome.runtime.onMessage.addListener((message) => {
           if (details) details.style.display = details.style.display === 'none' ? 'block' : 'none';
         });
       }
-      knowledgeBar.innerHTML = '<span style="color:#5bc0de;">&#9432;</span><span>Using ' + message.factCount + ' facts' + (message.clientName ? ' for ' + message.clientName : '') + '</span>';
+      knowledgeBar.innerHTML = '<span style="color:#5bc0de;">&#9432;</span><span>Using ' + message.factCount + ' facts' + (message.clientName ? ' for ' + escapeHtml(message.clientName || '') : '') + '</span>';
       // Add expandable details
       let details = document.getElementById('knowledge-details');
       if (!details) {
@@ -3774,7 +3686,7 @@ chrome.runtime.onMessage.addListener((message) => {
         details.style.cssText = 'padding:6px 10px;font-size:11px;color:#666;display:none;border-bottom:1px solid rgba(255,255,255,0.06);';
         knowledgeBar.parentNode.insertBefore(details, knowledgeBar.nextSibling);
       }
-      details.innerHTML = (message.facts || []).map(f => '<div style="padding:1px 0;">• ' + f + '</div>').join('');
+      details.innerHTML = (message.facts || []).map(f => '<div style="padding:1px 0;">• ' + escapeHtml(String(f)) + '</div>').join('');
     } catch (_kcErr) { /* non-fatal */ }
   }
 
@@ -3793,7 +3705,7 @@ chrome.runtime.onMessage.addListener((message) => {
           const header = document.createElement('div');
           header.style.cssText = 'display:flex; align-items:center; justify-content:space-between; cursor:pointer; user-select:none;';
           const _factsLen = facts.length; // Cache to avoid repeated property access
-          header.innerHTML = `<span style="font-weight:600; color:#4a9eff;">🧠 ${_factsLen} fact${_factsLen !== 1 ? 's' : ''} for ${message.clientName || 'client'}</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>`;
+          header.innerHTML = `<span style="font-weight:600; color:#4a9eff;">🧠 ${_factsLen} fact${_factsLen !== 1 ? 's' : ''} for ${escapeHtml(message.clientName || 'client')}</span><span class="ck-chevron" style="color:var(--text-secondary,#aaa);">▼</span>`;
           const list = document.createElement('div');
           list.style.cssText = 'margin-top:6px;';
           facts.forEach(f => {
@@ -3874,7 +3786,7 @@ chrome.runtime.onMessage.addListener((message) => {
     message.plan.forEach((step) => {
       const stepDiv = document.createElement('div');
       stepDiv.style.cssText = 'padding:4px 8px;margin:2px 0;border-radius:4px;color:#999;display:flex;gap:8px;';
-      stepDiv.innerHTML = '<span style="color:#555;min-width:20px;">' + (step.index + 1) + '.</span><span>' + step.text + '</span>';
+      stepDiv.innerHTML = '<span style="color:#555;min-width:20px;">' + (step.index + 1) + '.</span><span>' + escapeHtml(step.text) + '</span>';
       stepsList.appendChild(stepDiv);
     });
 
@@ -4005,7 +3917,12 @@ chrome.runtime.onMessage.addListener((message) => {
         previewPanel.style.maxHeight = isExpanded ? '200px' : '500px';
       });
     }
-    previewPanel.innerHTML = '<img src="' + message.afterScreenshot + '" style="width:100%;display:block;" alt="Agent view" />';
+    previewPanel.textContent = '';
+    const img = document.createElement('img');
+    img.src = message.afterScreenshot;
+    img.style.cssText = 'width:100%;display:block;';
+    img.alt = 'Agent view';
+    previewPanel.appendChild(img);
     previewPanel.style.display = '';
   }
   if (message.action === 'tab_state_update') {
@@ -4320,7 +4237,7 @@ chrome.runtime.onMessage.addListener((message) => {
       const header = '<div style="color:#888;margin-bottom:4px;">Learned Patterns (' + message.patterns.length + ')</div>';
       const rows = message.patterns.slice(0, 5).map(function(p) {
         const color = p.rate >= 90 ? '#4caf50' : p.rate >= 70 ? '#ff9800' : '#f44336';
-        return '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#777;"><span>' + p.pattern + '</span><span style="color:' + color + '">' + p.rate + '% (' + p.uses + ')</span></div>';
+        return '<div style="display:flex;justify-content:space-between;padding:2px 0;color:#777;"><span>' + escapeHtml(String(p.pattern)) + '</span><span style="color:' + color + '">' + escapeHtml(String(p.rate)) + '% (' + escapeHtml(String(p.uses)) + ')</span></div>';
       }).join('');
       patternsPanel.innerHTML = header + rows;
     } catch (e) { console.warn('[Sentinel] Patterns panel render error:', e); }
