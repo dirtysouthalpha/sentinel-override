@@ -25,7 +25,7 @@ export const huntress = {
     try {
       const host = (new URL(url)).host.toLowerCase();
       if (_HUNTRESS_HOST_RE.test(host)) return true;
-    } catch (e) {
+    } catch (_e) {
       // URL parse failed — fall through to goal regex
     }
     return _HUNTRESS_GOAL_RE.test(String(goal || ''));

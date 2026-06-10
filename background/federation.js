@@ -61,8 +61,13 @@ class FederationController {
    * Load configuration
    */
   async loadConfig() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get(['federationConfig'], (result) => {
+        if (chrome.runtime.lastError) {
+          console.error('[Federation] Failed to load config:', chrome.runtime.lastError.message);
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
         if (result.federationConfig) {
           this.config = { ...this.config, ...result.federationConfig };
         }
@@ -647,9 +652,17 @@ class FederationController {
 
     // Persist to storage
     chrome.storage.local.get(['federationAuditLog'], (result) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Federation] Failed to read audit log:', chrome.runtime.lastError.message);
+        return;
+      }
       const log = result.federationAuditLog || [];
       log.push(entry);
-      chrome.storage.local.set({ federationAuditLog: log.slice(-10000) });
+      chrome.storage.local.set({ federationAuditLog: log.slice(-10000) }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('[Federation] Failed to persist audit log:', chrome.runtime.lastError.message);
+        }
+      });
     });
   }
 

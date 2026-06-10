@@ -22,7 +22,7 @@ export const ninjarmm = {
       const host = u.hostname;
       if (_NINJA_HOST_RE.test(host)) return true;
       if (_NINJA_HOST_SHORT_RE.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _NINJA_GOAL_RE.test(String(goal || ''));
   },
 

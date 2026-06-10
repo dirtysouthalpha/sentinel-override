@@ -1,5 +1,53 @@
 # Changelog
 
+## v15.0.0-audit — 2026-06-10 (Production Security Audit & Dead Code Removal)
+
+### Security Fixes
+- **DOM XSS in chat.js** (4 locations) — Knowledge bar facts, client names, LLM plan steps, and knowledge preview cards now use `escapeHtml()` before innerHTML insertion. Previously, LLM-generated content could inject arbitrary HTML.
+- **DOM XSS in quick-assist.js** (2 locations) — Error messages from `chrome.runtime.lastError` and server responses now escaped before innerHTML.
+- **DOM XSS in special-inputs.js** — Rich text editor fallback now escapes HTML before inserting text with newline-to-br conversion.
+- **URL leak in console.log** — agent-engine.js CDP page check no longer stringifies full page data (including URLs) to console.
+
+### Memory Leak Fixes
+- **agent-engine.js** — `_dkimDomainKeyCache` and `_activityStartedAt` Maps now cleared in `resetAgentState()`, preventing unbounded growth across runs.
+- **llm-client.js** — `_platformContextCache` Map now evicts oldest entry when exceeding 50 keys, preventing unbounded growth across many URLs.
+- **content/index.js** — `insertionObserver` MutationObserver now disconnected on `beforeunload` alongside `domObserver`.
+- **content/index.js** — Stale `__sentinelActiveFrameDoc` references now detected and cleared when target iframe is removed from DOM.
+
+### Dead Code Removal
+- **Deleted orphaned files** — `background/api-server.js`, `background/webhook-manager.js`, `background/plugin-registry.js`, `popup-modules/diagnostic.js`, `lib/` directory (bridges/*, uap-client.js). These modules had no production imports and no test coverage.
+- **Deleted dead test** — `tests/uap-client.test.js` tested deleted `lib/uap-client.js`.
+- **Removed dead functions** — `addReportGeneratingIndicator()`, `removeReportGeneratingIndicator()`, `showTenantOverrideCard()` removed from `popup-modules/chat.js` (never called, had eslint-disable comments).
+
+### Bug Fixes
+- **federation.js** — `loadConfig()` and `writeAuditLog()` now check `chrome.runtime.lastError` instead of silently ignoring storage failures.
+- **Cost tracking** — `recordModelUsage()` now uses separate input/output token rates per tier instead of a single flat rate, giving more accurate cost estimates.
+
+### Stats
+- 155 test suites, 8,431 tests passing (0 failures)
+- 0 lint errors, 0 lint warnings
+- Build: 110-file zip (724.6 KB) — 4 files fewer than previous build
+
+
+## v15.0.0-polish — 2026-06-10 (UI Production Polish)
+
+### UI Polish
+- **Inline style extraction** — 70 inline `style` attributes replaced with 25+ CSS utility/component classes (`settings-card`, `details-panel`, `form-input`, `form-btn-sm`, `chip-btn`, `preset-btn`, `flex-between`, etc.) in `popup.html`. Inline style count reduced from 294 to 224 (24%).
+- **Dashboard theme alignment** — `web/dashboard.html` now uses the same color palette (`#050608`/`#0A0C10`/`#111418` surfaces, `#00F0FF` accent), same fonts (Space Grotesk + Inter via Google Fonts), chamfer clip-path buttons, angular geometry, and neon glow hover effects as the popup side panel.
+- **Body text bumped to 14px** — message text increased from 13px to 14px for better readability in the Chrome side panel's narrow viewport (~320-400px).
+- **Copy voice standardized** — placeholder text normalized to noun-phrase style throughout settings modal.
+
+### Code Quality
+- **6 ESLint `no-undef` errors fixed** — added `AbortSignal`, `getEventListeners`, `sendMessage`, `addMessage` to globals, restored `structuredClone`.
+- **62 ESLint unused-variable warnings fixed** — prefixed unused catch parameters, imports, and declarations with `_` across 18+ files. Used `import { x as _x }` alias pattern for unused imports in `agent-engine.js`.
+- **Task queue debounce fix** — `_scheduleDrain()` timer now resets on each enqueue, preventing premature drain before all writes complete.
+- **Version sync** — manifest.json, package.json, README.md, and webhook-manager.js all consistently show v15.0.0.
+
+### Stats
+- 156 test suites, 8,468 tests passing (0 failures)
+- 0 lint errors, 0 lint warnings
+- Build: 114-file zip (731 KB)
+
 ## v15.0.0 — 2026-06-08 (Enterprise & Platform Release)
 
 Extends the v10-v13 foundation with enterprise audit/export, webhook integrations, REST API, plugin ecosystem, and web dashboard.

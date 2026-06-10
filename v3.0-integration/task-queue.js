@@ -180,11 +180,13 @@ class TaskQueue {
    * are written to IDB, so priority ordering breaks under rapid enqueue bursts.
    */
   _scheduleDrain() {
-    if (this._drainTimer) return; // Already scheduled — batch
+    // Reset timer on each enqueue so drain fires after the LAST write,
+    // not the first. Prevents priority-ordering races with async IDB mocks.
+    if (this._drainTimer) clearTimeout(this._drainTimer);
     this._drainTimer = setTimeout(() => {
       this._drainTimer = null;
       this._tryProcessNext();
-    }, 1);
+    }, 5);
   }
 
   /**

@@ -37,7 +37,7 @@ export const sonicwallOnbox = {
       // Exclude /fmc (Cisco Firepower Management Center) and /asdm (Cisco ASA) paths
       // that also match the dashboard/system patterns on IP hosts.
       if (_IP_ADDRESS_RE2.test(host) && _DASHBOARD_PATH_RE.test(u.pathname) && !_CISCO_PATH_EXCLUDE_RE.test(u.pathname)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _SONICOS_GOAL_RE.test(String(goal || ''));
   },
 

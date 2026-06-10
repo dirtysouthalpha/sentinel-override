@@ -23,7 +23,7 @@ export const sonicwallNsm = {
       const host = new URL(url).host;
       if (_NSM_HOST_RE.test(host)) return true;
       if (_NSM_CLOUD_HOST_RE.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _NSM_GOAL_RE.test(String(goal || ''));
   },
 

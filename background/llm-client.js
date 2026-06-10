@@ -924,6 +924,10 @@ export function getPlatformContext(currentUrl, goal) {
   }
   const ctx = prose + selectorBlock;
   _platformContextCache.set(_cacheKey, { ctx, ts: Date.now() });
+  if (_platformContextCache.size > 50) {
+    const oldest = _platformContextCache.keys().next().value;
+    _platformContextCache.delete(oldest);
+  }
   return ctx;
 }
 
@@ -1586,9 +1590,11 @@ export function recordModelUsage(tier, inputTokens, outputTokens) {
   _costTracker.totalCalls++;
   if (_costTracker.byTier[tier] !== undefined) _costTracker.byTier[tier]++;
   else _costTracker.byTier.default++;
-  // Rough cost estimates per tier
-  const costs = { light: 0.000001, default: 0.000003, heavy: 0.00001 };
-  _costTracker.estimatedCost += (costs[tier] || costs.default) * ((inputTokens || 0) + (outputTokens || 0));
+  // Cost estimates per tier — [input rate, output rate] per token
+  // Output tokens typically 3-5x more expensive than input
+  const rates = { light: [0.15, 0.60], default: [3.00, 15.00], heavy: [15.00, 75.00] };
+  const [inRate, outRate] = rates[tier] || rates.default;
+  _costTracker.estimatedCost += (inRate * (inputTokens || 0) + outRate * (outputTokens || 0)) / 1_000_000;
 }
 
 /**

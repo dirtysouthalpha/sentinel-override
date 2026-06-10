@@ -23,7 +23,7 @@ export const paloalto = {
       if (/paloalto/i.test(u.hostname)) return true;
       if (/panorama/i.test(u.hostname)) return true;
       if (/\/php\/rest\/pan/i.test(u.href)) return true;
-    } catch (e) {
+    } catch (_e) {
       // URL parse failed — fall through to goal regex
     }
     const t = String(goal || '').toLowerCase();

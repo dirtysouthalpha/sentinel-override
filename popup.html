@@ -120,10 +120,10 @@
       <span class="header-brand">SENTINEL<span class="brand-underscore">_</span>OVERRIDE</span>
       <span id="modeBadge" class="mode-badge approval">APPROVAL</span>
       <span id="tenantChip" class="tenant-chip" style="display:none;" title="Detected Microsoft tenant (3.7.0)"></span>
-      <button id="clientChip" class="tenant-chip" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; background:transparent; border:1px solid var(--border-color, rgba(255,255,255,0.15)); color:var(--text-secondary, #aaa); font-size:11px; padding:2px 8px; border-radius:10px;" title="Active client for this run (3.12.0). Click to switch or manage.">
+      <button id="clientChip" class="chip-btn" title="Active client for this run (3.12.0). Click to switch or manage.">
         <span style="opacity:0.7;">CLIENT:</span> <span id="clientChipName">none</span>
       </button>
-      <button id="quickAssistHeaderBtn" class="tenant-chip" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; background:transparent; border:1px solid var(--border-color, rgba(255,255,255,0.15)); color:var(--text-secondary, #aaa); font-size:11px; padding:2px 8px; border-radius:10px; transition: all 0.2s;" title="Quick Assist — select text on any page for instant AI (3.46.0)">
+      <button id="quickAssistHeaderBtn" class="chip-btn" title="Quick Assist — select text on any page for instant AI (3.46.0)">
         <span style="font-size:13px;">⚡</span> <span id="quickAssistHeaderLabel">Quick Assist</span>
       </button>
       <span id="activeIndicator" class="active-indicator" title="Agent active"></span>
@@ -193,28 +193,29 @@
 
   <!-- Templates Panel -->
   <div id="templates-panel" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <div class="flex-between mb-4">
       <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0;">Templates & Runbooks</h2>
-      <div style="display:flex;gap:6px;">
+      <div class="flex-row">
         <button id="importTemplatesBtn" class="small-btn" title="Import templates from JSON file">Import</button>
         <button id="exportAllTemplatesBtn" class="small-btn" title="Export all templates as JSON">Export All</button>
-        <button id="createTemplateBtn" class="small-btn" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">+ New Template</button>
+        <button id="createTemplateBtn" class="small-btn btn-accent">+ New Template</button>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <input type="text" id="templateSearchInput" placeholder="Search templates..." style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;outline:none;">
-      <input type="text" id="templateTagFilter" placeholder="Filter by tag..." style="width:140px;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:13px;outline:none;">
+    <div class="flex-row gap-8" style="margin-bottom:8px;">
+      <input type="text" id="templateSearchInput" placeholder="Search templates..." class="form-input" style="flex:1;border-radius:8px;">
+      <input type="text" id="templateTagFilter" placeholder="Filter by tag..." class="form-input" style="width:140px;border-radius:8px;">
     </div>
     <div id="template-list"></div>
   </div>
 
   <!-- Schedules Panel -->
   <div id="schedules-panel" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <div class="flex-between mb-4">
       <h2 style="font-size:16px;font-weight:600;color:var(--text-primary);margin:0;">Schedules</h2>
-      <button id="createScheduleBtn" class="small-btn" style="background:var(--accent-primary);color:white;border-color:var(--accent-primary);">+ New Schedule</button>
+      <button id="createScheduleBtn" class="small-btn btn-accent">+ New Schedule</button>
     </div>
     <div id="schedule-list"></div>
+  </div>
   </div>
 
   <!-- Input Area -->
@@ -306,102 +307,99 @@
   <!-- Settings Modal -->
   <div id="settings-modal" class="modal">
     <div class="modal-content" style="max-width:580px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div class="flex-between" style="margin-bottom:16px;">
         <h2 style="margin:0;">Settings</h2>
         <button id="closeSettingsBtn" class="icon-btn" title="Close" style="background:transparent;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;">×</button>
       </div>
 
       <!-- ══════ PROVIDER SETUP ══════ -->
-      <div class="settings-section" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:14px;margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:600;color:var(--accent-primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Provider Setup</div>
+      <div class="settings-card">
+        <div class="settings-card-title">Provider Setup</div>
 
         <!-- Provider catalog dropdown (single source of truth) -->
-        <div class="modal-field" style="margin-bottom:10px;">
+        <div class="modal-field form-field" style="margin-bottom:10px;">
           <label>Select Provider</label>
-          <select id="providerCatalogSelect" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:13px;">
+          <select id="providerCatalogSelect" class="form-input">
             <option value="">— Pick a provider —</option>
           </select>
         </div>
 
         <!-- Provider config card -->
         <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:10px;">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div class="modal-field" style="grid-column:span 2;">
+          <div class="form-grid-2">
+            <div class="modal-field span-2">
               <label>API Endpoint</label>
-              <input type="text" id="set-provider-endpoint" placeholder="https://api.example.com/v1/..." style="width:100%;">
+              <input type="text" id="set-provider-endpoint" placeholder="https://api.example.com/v1/..." class="form-input">
             </div>
             <div class="modal-field">
               <label>API Key</label>
-              <input type="password" id="set-provider-key" placeholder="Your API key" style="width:100%;">
+              <input type="password" id="set-provider-key" placeholder="API key" class="form-input">
             </div>
             <div class="modal-field">
               <label>Model</label>
-              <input type="text" id="set-provider-model" placeholder="Model ID" style="width:100%;">
+              <input type="text" id="set-provider-model" placeholder="Model ID" class="form-input">
             </div>
           </div>
 
           <!-- Detect models row -->
-          <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+          <div class="flex-row" style="margin-top:8px;">
             <button type="button" id="detectModelsBtn" style="padding:6px 12px;border-radius:6px;border:1px solid var(--accent-primary);background:rgba(255,107,0,0.1);color:var(--accent-primary);cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap;">🔍 Detect Models</button>
-            <select id="detectedModelsSelect" disabled style="flex:1;padding:6px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:12px;">
+            <select id="detectedModelsSelect" disabled class="form-btn-sm" style="flex:1;">
               <option value="">(no models detected yet)</option>
             </select>
-            <button type="button" id="useDetectedModelBtn" disabled style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">Use</button>
+            <button type="button" id="useDetectedModelBtn" disabled class="form-btn-sm">Use</button>
           </div>
         </div>
 
         <!-- Test connection -->
-        <button type="button" id="testConnectionBtn" style="width:100%;padding:8px;border-radius:6px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:13px;">🔌 Test Connection</button>
+        <button type="button" id="testConnectionBtn" class="form-btn-sm" style="width:100%;padding:8px;font-size:13px;">🔌 Test Connection</button>
 
-        <!-- Persisted-state indicator: reflects whether the current API key is
-             actually saved to storage (set by persistProviderConfig / updateProviderSaveStatus). -->
+        <!-- Persisted-state indicator -->
         <div id="providerSaveStatus" role="status" aria-live="polite" style="display:none;font-size:11px;margin-top:6px;font-weight:600;"></div>
 
-        <div style="font-size:10px;color:var(--text-tertiary);margin-top:8px;line-height:1.4;">
+        <div class="text-subtle" style="margin-top:8px;">
           Pick a provider above → endpoint auto-fills → paste API key → click <strong>Detect Models</strong> to list available models, or type a model ID manually. Local providers (Ollama, LM Studio, KoboldCpp) need no key.
         </div>
       </div>
 
       <!-- ══════ QUICK PRESETS ══════ -->
-      <details style="margin-bottom:12px;border:1px solid var(--border-color);border-radius:8px;">
-        <summary style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);background:var(--bg-secondary);border-radius:8px;">
-          Quick Presets <span style="font-weight:400;color:var(--text-tertiary);">(click to expand)</span>
-        </summary>
-        <div style="padding:10px 14px;">
-          <div style="font-size:10px;font-weight:600;color:var(--text-tertiary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Free / Low Cost</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.3-70b-versatile" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">⚡ Groq (Llama 3.3 70B)</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" data-model="gemini-2.0-flash" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">🆓 Gemini 2.0 Flash</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.0-flash-exp:free" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">🆓 OpenRouter Free</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://llm.chutes.ai/v1/chat/completions" data-model="deepseek-ai/DeepSeek-V3" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">🆓 Chutes.ai</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="http://localhost:11434/v1/chat/completions" data-model="llama3.3" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">🖥️ Ollama Local</button>
+      <details class="details-panel">
+        <summary>Quick Presets <span>(click to expand)</span></summary>
+        <div class="details-panel-body">
+          <div class="preset-row-label">Free / Low Cost</div>
+          <div class="preset-row">
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.groq.com/openai/v1/chat/completions" data-model="llama-3.3-70b-versatile">⚡ Groq (Llama 3.3 70B)</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" data-model="gemini-2.0-flash">🆓 Gemini 2.0 Flash</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="google/gemini-2.0-flash-exp:free">🆓 OpenRouter Free</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://llm.chutes.ai/v1/chat/completions" data-model="deepseek-ai/DeepSeek-V3">🆓 Chutes.ai</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="http://localhost:11434/v1/chat/completions" data-model="llama3.3">🖥️ Ollama Local</button>
           </div>
 
-          <div style="font-size:10px;font-weight:600;color:var(--text-tertiary);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Best for Complex Runbooks</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
-            <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-haiku-4-5-20251001" style="padding:5px 10px;border-radius:5px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.06);color:var(--text-primary);cursor:pointer;font-size:11px;">🧠 Claude Haiku</button>
-            <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-sonnet-4-6" style="padding:5px 10px;border-radius:5px;border:1px solid var(--warning-color);background:rgba(251,188,0,0.06);color:var(--text-primary);cursor:pointer;font-size:11px;">🧠 Claude Sonnet</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-sonnet-4-6" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">🔀 OpenRouter Sonnet</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.mistral.ai/v1/chat/completions" data-model="mistral-large-latest" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">Mistral Large</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.deepseek.com/v1/chat/completions" data-model="deepseek-chat" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">DeepSeek V3</button>
-            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.venice.ai/api/v1/chat/completions" data-model="llama-3.3-70b" style="padding:5px 10px;border-radius:5px;border:1px solid var(--border-color);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:11px;">Venice.ai</button>
+          <div class="preset-row-label">Best for Complex Runbooks</div>
+          <div class="preset-row">
+            <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-haiku-4-5-20251001" style="border-color:var(--warning-color);background:rgba(251,188,0,0.06);">🧠 Claude Haiku</button>
+            <button type="button" class="preset-btn" data-provider="anthropic" data-endpoint="https://api.anthropic.com/v1/messages" data-model="claude-sonnet-4-6" style="border-color:var(--warning-color);background:rgba(251,188,0,0.06);">🧠 Claude Sonnet</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://openrouter.ai/api/v1/chat/completions" data-model="anthropic/claude-sonnet-4-6">🔀 OpenRouter Sonnet</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.mistral.ai/v1/chat/completions" data-model="mistral-large-latest">Mistral Large</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.deepseek.com/v1/chat/completions" data-model="deepseek-chat">DeepSeek V3</button>
+            <button type="button" class="preset-btn" data-provider="openai" data-endpoint="https://api.venice.ai/api/v1/chat/completions" data-model="llama-3.3-70b">Venice.ai</button>
           </div>
         </div>
       </details>
 
       <!-- ══════ AGENT BEHAVIOR ══════ -->
-      <div class="settings-section" style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:14px;margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:600;color:var(--accent-primary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Agent Behavior</div>
+      <div class="settings-card">
+        <div class="settings-card-title">Agent Behavior</div>
 
-        <div class="modal-field" style="margin-bottom:8px;">
-          <label>Context Memory <span style="font-weight:400;color:var(--text-tertiary);">(remembered across tabs)</span></label>
-          <textarea id="set-agent-context" rows="2" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:13px;resize:vertical;font-family:inherit;" placeholder="e.g. Working on React app at localhost:3000. Login: admin/admin"></textarea>
+        <div class="modal-field form-field">
+          <label>Context Memory <span class="label-muted">(remembered across tabs)</span></label>
+          <textarea id="set-agent-context" rows="2" class="form-input" style="resize:vertical;" placeholder="e.g. Working on React app at localhost:3000. Login: admin/admin"></textarea>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div class="form-grid-2 form-field">
           <div class="modal-field">
             <label>Export Format</label>
-            <select id="export-format" style="width:100%;">
+            <select id="export-format" class="form-input">
               <option value="markdown">Markdown (.md)</option>
               <option value="json">JSON (.json)</option>
               <option value="txt">Text (.txt)</option>
@@ -409,7 +407,7 @@
           </div>
           <div class="modal-field">
             <label>Adaptive Prompts</label>
-            <select id="adaptivePromptsModeSelect" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:12px;">
+            <select id="adaptivePromptsModeSelect" class="form-input" style="font-size:12px;">
               <option value="auto">Auto (silent rewrite)</option>
               <option value="approval">Approval (review diff)</option>
               <option value="off">Off</option>
@@ -434,22 +432,24 @@
             <div class="toggle-row-label"><span>🔒 Trusted Input</span></div>
             <label class="toggle-switch"><input type="checkbox" id="useTrustedInputToggle"><span class="toggle-slider"></span></label>
           </div>
+          <div class="toggle-row" style="margin:0;">
+            <div class="toggle-row-label"><span>📶 API Health Bar</span></div>
+            <label class="toggle-switch"><input type="checkbox" id="apiHealthBarToggle"><span class="toggle-slider"></span></label>
+          </div>
         </div>
       </div>
 
       <!-- ══════ TICKET MODE ══════ -->
-      <details style="margin-bottom:12px;border:1px solid var(--border-color);border-radius:8px;">
-        <summary style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);background:var(--bg-secondary);border-radius:8px;">
-          Ticket Mode (MSP Templates)
-        </summary>
-        <div style="padding:10px 14px;">
-          <div class="toggle-row" style="margin-bottom:8px;">
+      <details class="details-panel">
+        <summary>Ticket Mode (MSP Templates)</summary>
+        <div class="details-panel-body">
+          <div class="toggle-row form-field">
             <div class="toggle-row-label"><span>Enable Ticket Mode</span></div>
             <label class="toggle-switch"><input type="checkbox" id="ticketModeToggle"><span class="toggle-slider"></span></label>
           </div>
           <div id="ticketFormatRow" class="modal-field" style="display:none;">
             <label>Default Format</label>
-            <select id="ticketFormatSelect" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:13px;">
+            <select id="ticketFormatSelect" class="form-input">
               <option value="auto">Auto</option>
               <option value="TICKET_KICKOFF">Ticket Kickoff</option>
               <option value="FINAL_NOTES">Final Notes</option>
@@ -459,13 +459,13 @@
               <option value="CLIENT_EMAIL">Client Email</option>
             </select>
             <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-color);">
-              <label style="margin-bottom:6px;display:block;font-size:12px;">Technician Details</label>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-                <input type="text" id="techNameInput" placeholder="Name" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
-                <input type="text" id="techTitleInput" placeholder="Title" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
-                <input type="text" id="techCompanyInput" placeholder="Company" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
-                <input type="text" id="techPhoneInput" placeholder="Phone" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
-                <input type="text" id="techEmailInput" placeholder="Email" style="padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;grid-column:span 2;">
+              <label class="form-section-label">Technician Details</label>
+              <div class="form-grid-2" style="gap:6px;">
+                <input type="text" id="techNameInput" placeholder="Name" class="form-input-sm">
+                <input type="text" id="techTitleInput" placeholder="Title" class="form-input-sm">
+                <input type="text" id="techCompanyInput" placeholder="Company" class="form-input-sm">
+                <input type="text" id="techPhoneInput" placeholder="Phone" class="form-input-sm">
+                <input type="text" id="techEmailInput" placeholder="Email" class="form-input-sm" style="grid-column:span 2;">
               </div>
             </div>
           </div>
@@ -473,52 +473,50 @@
       </details>
 
       <!-- ══════ ADVANCED ══════ -->
-      <details style="margin-bottom:12px;border:1px solid var(--border-color);border-radius:8px;">
-        <summary style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);background:var(--bg-secondary);border-radius:8px;">
-          Advanced Settings
-        </summary>
-        <div style="padding:10px 14px;">
-          <div class="modal-field" style="margin-bottom:8px;">
+      <details class="details-panel">
+        <summary>Advanced Settings</summary>
+        <div class="details-panel-body">
+          <div class="modal-field form-field">
             <label>Expected Microsoft Tenant</label>
-            <input type="text" id="expectedTenantInput" placeholder="acme.onmicrosoft.com" style="width:100%;padding:8px 10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:13px;">
+            <input type="text" id="expectedTenantInput" placeholder="acme.onmicrosoft.com" class="form-input">
           </div>
 
           <div class="modal-field" style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;padding:10px;margin-bottom:8px;">
             <label style="display:block;margin-bottom:6px;">Telemetry</label>
-            <select id="telemetryLevelSelect" style="width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
+            <select id="telemetryLevelSelect" class="form-input-sm" style="width:100%;">
               <option value="quiet">Quiet (errors only)</option>
               <option value="normal">Normal</option>
               <option value="verbose">Verbose</option>
               <option value="debug">Debug</option>
             </select>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-              <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">
+              <label class="check-label">
                 <input type="checkbox" id="telemetryPersistToggle" style="width:14px;height:14px;"> Persist
               </label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">
+              <label class="check-label">
                 <input type="checkbox" id="telemetryRedactToggle" checked style="width:14px;height:14px;"> Redact
               </label>
-              <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;">
+              <label class="check-label">
                 <input type="checkbox" id="telemetrySkillAdaptToggle" checked style="width:14px;height:14px;"> Adaptive Skills
               </label>
             </div>
-            <div style="display:flex;gap:6px;margin-top:6px;">
-              <button id="skillStatsViewBtn" type="button" style="padding:4px 8px;font-size:10px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:3px;cursor:pointer;">Skill Stats</button>
-              <button id="skillStatsResetBtn" type="button" style="padding:4px 8px;font-size:10px;background:var(--bg-input);color:var(--text-secondary);border:1px solid var(--border-color);border-radius:3px;cursor:pointer;">Reset Stats</button>
+            <div class="flex-row" style="margin-top:6px;">
+              <button id="skillStatsViewBtn" type="button" class="btn-micro">Skill Stats</button>
+              <button id="skillStatsResetBtn" type="button" class="btn-micro">Reset Stats</button>
             </div>
           </div>
 
-          <div class="form-row" style="margin-bottom:8px;">
-            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Quick Assist</label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+          <div class="form-row form-field">
+            <label class="form-section-label">Quick Assist</label>
+            <label class="check-label-lg">
               <input type="checkbox" id="quickAssistToggle" style="width:16px;height:16px;">
               <span id="quickAssistLabel">Show floating panel on text selection</span>
             </label>
           </div>
 
-          <div class="form-row" style="margin-bottom:8px;">
-            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Expansion Mode</label>
-            <select id="adaptiveExpansionModeSelect" style="width:100%;padding:6px 8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:4px;color:var(--text-primary);font-size:12px;">
+          <div class="form-row form-field">
+            <label class="form-section-label">Expansion Mode</label>
+            <select id="adaptiveExpansionModeSelect" class="form-input-sm" style="width:100%;">
               <option value="light">Light (short goals only)</option>
               <option value="off">Off</option>
               <option value="full">Full (risky)</option>
@@ -528,23 +526,21 @@
       </details>
 
       <!-- ══════ DATA ══════ -->
-      <details style="margin-bottom:12px;border:1px solid var(--border-color);border-radius:8px;">
-        <summary style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);background:var(--bg-secondary);border-radius:8px;">
-          Data & Patterns
-        </summary>
-        <div style="padding:10px 14px;">
-          <div class="form-row" style="margin-bottom:8px;">
-            <label style="display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:12px;margin-bottom:4px;">
+      <details class="details-panel">
+        <summary>Data & Patterns</summary>
+        <div class="details-panel-body">
+          <div class="form-row form-field">
+            <label class="flex-between mb-4" style="font-weight:600;font-size:12px;">
               <span>Learned Patterns</span>
-              <button id="clearAllPatternsBtn" style="font-size:10px;padding:2px 6px;border-radius:3px;border:1px solid var(--error-color);background:transparent;color:var(--error-color);cursor:pointer;">Clear All</button>
+              <button id="clearAllPatternsBtn" class="btn-danger-sm">Clear All</button>
             </label>
             <div id="learnedPatternsList" style="max-height:140px;overflow-y:auto;font-size:11px;color:var(--text-secondary);border:1px solid var(--border-color);border-radius:4px;padding:6px;">
               <em>Loading…</em>
             </div>
           </div>
           <div class="form-row">
-            <label style="font-weight:600;font-size:12px;margin-bottom:4px;display:block;">Audit Log</label>
-            <button id="downloadAuditLogBtn" style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--border-color);background:transparent;color:var(--text-primary);cursor:pointer;">Download Audit Log CSV</button>
+            <label class="form-section-label">Audit Log</label>
+            <button id="downloadAuditLogBtn" class="form-btn-sm" style="font-size:11px;">Download Audit Log CSV</button>
           </div>
         </div>
       </details>

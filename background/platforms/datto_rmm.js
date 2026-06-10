@@ -28,7 +28,7 @@ export const dattoRmm = {
       if (_DATTO_HOST_RE.test(host)) return true;
       if (_DATTO_SITE_RE.test(host) && _RMM_PATH_RE.test(u.pathname)) return true;
       if (_AUTOTASK_HOST_RE.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _DATTO_GOAL_RE.test(String(goal || ''));
   },
 

@@ -6,6 +6,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
 window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {};
 
 (function() {
+  function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   const si = window.__sentinelUtils.specialInputs;
 
   // ========== Date Picker Detection ==========
@@ -228,7 +229,7 @@ window.__sentinelUtils.specialInputs = window.__sentinelUtils.specialInputs || {
 
     // Strategy 2: Direct innerHTML set
     try {
-      el.innerHTML = text.replace(/\n/g, '<br>');
+      el.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
       el.dispatchEvent(new Event('input', eventOpts));
       el.dispatchEvent(new Event('change', eventOpts));
       return { success: true, method: 'direct-innerHTML' };

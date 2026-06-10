@@ -114,8 +114,9 @@ if (window.__sentinelInitialized) {
   // Active iframe document for switch_to_frame / switch_to_parent_frame state.
   let __sentinelActiveFrameDoc = null;
 
+  let insertionObserver = null;
   try {
-    const insertionObserver = new MutationObserver((muts) => {
+    insertionObserver = new MutationObserver((muts) => {
       if (!Array.isArray(muts)) return;
       const now = Date.now();
       for (const m of muts) {
@@ -1284,8 +1285,22 @@ if (window.__sentinelInitialized) {
   async function executeCommand(cmd) {
     if (!cmd) return 'Invalid command: cmd is null';
     // Use active frame doc if switch_to_frame was called and no explicit frame: prefix
-    let targetDoc = (__sentinelActiveFrameDoc && !(cmd.selector && cmd.selector.startsWith('frame:')))
-      ? __sentinelActiveFrameDoc : document;
+    // Guard against stale reference (iframe removed from DOM)
+    let targetDoc = document;
+    if (__sentinelActiveFrameDoc && !(cmd.selector && cmd.selector.startsWith('frame:'))) {
+      try {
+        // Accessing parentNode on the documentElement checks if the document is still live.
+        // If the iframe was removed, this will throw or return null.
+        const docEl = __sentinelActiveFrameDoc.documentElement;
+        if (docEl && docEl.parentNode !== null) {
+          targetDoc = __sentinelActiveFrameDoc;
+        } else {
+          __sentinelActiveFrameDoc = null;
+        }
+      } catch (_e) {
+        __sentinelActiveFrameDoc = null;
+      }
+    }
     let selector = cmd.selector;
 
     // Check if command targets an iframe
@@ -2680,6 +2695,10 @@ if (window.__sentinelInitialized) {
       if (domObserver) {
         domObserver.disconnect();
         domObserver = null;
+      }
+      if (insertionObserver) {
+        insertionObserver.disconnect();
+        insertionObserver = null;
       }
       if (spaDebounce) {
         clearTimeout(spaDebounce);

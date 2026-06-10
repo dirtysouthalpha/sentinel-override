@@ -15,7 +15,7 @@
    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║██║  ██║██║██████╔╝███████╗
     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝
 
-                v10.3.0 — Full-Visibility AI Browser Operator
+                v15.0.0 — Full-Visibility AI Browser Operator
 ```
 
 ### Professional AI Browser Automation for IT Pros & MSPs
@@ -24,13 +24,13 @@ A self-healing, vision-powered browser agent built for the work technicians actu
 multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see,
 click, read, think, and produce defensible reports.
 
-![Version](https://img.shields.io/badge/version-10.3.0-orange)
+![Version](https://img.shields.io/badge/version-15.0.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
 ![Providers](https://img.shields.io/badge/providers-16+-success)
 ![Themes](https://img.shields.io/badge/themes-14-9cf)
-![Tests](https://img.shields.io/badge/tests-8%2C488%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-8%2C468%20passing-brightgreen)
 ![Platforms](https://img.shields.io/badge/platform%20profiles-19-ff69b4)
 
 <p>
@@ -54,7 +54,7 @@ click, read, think, and produce defensible reports.
 
 ---
 
-## ⚡ What's New in v10.3
+## ⚡ What's New in v15.0
 
 ### Phase 5 — P0: Live Observability
 
@@ -102,7 +102,7 @@ The agent now **narrates what it sees** in real time. Every observation produces
 
 ### Stability & Test Coverage
 
-- **153 test suites, 8,488 tests passing** — zero regressions
+- **153 test suites, 8,468 tests passing** — zero regressions
 - **Timer leak fix** — eliminated a memory leak in the action loop that caused slowdown on long runs
 - **17 platform detector noise fixes** — cleaner platform detection across M365, SonicWall, and Fortinet portals
 - **600+ commits and counting**
@@ -116,23 +116,23 @@ The agent now **narrates what it sees** in real time. Every observation produces
 | Index-based actions — no selector required | v4.0 |
 | Speed modes: Turbo / Normal / Stealth | v4.0 |
 | Keyboard shortcuts (Ctrl+Shift+Space / P) | v4.0 |
-| Live Status Narration | v10.3 |
-| API Health Heartbeat | v10.3 |
-| Reasoning Cards (collapsible thinking) | v10.3 |
-| Screenshot Capture + Preview | v10.3 |
-| Post-Action Verification + auto-retry | v10.3 |
-| Coordinate-Based Fallback (CDP clicking) | v10.3 |
-| Plan Preview (pre-execution step list) | v10.3 |
-| Page State Narration | v10.3 |
-| Natural Language Correction (mid-run) | v10.3 |
-| Confidence Scoring (0–100 per action) | v10.3 |
-| Learned Patterns Dashboard | v10.3 |
-| Client Knowledge Visibility | v10.3 |
-| Multi-Provider Strategy (light/default/heavy) | v10.3 |
-| Visual Element Matching | v10.3 |
-| Zoom & Inspect (click-to-zoom screenshots) | v10.3 |
-| Run Replay & Sharing (HTML export) | v10.3 |
-| Desktop Notifications | v10.3 |
+| Live Status Narration | v15.0 |
+| API Health Heartbeat | v15.0 |
+| Reasoning Cards (collapsible thinking) | v15.0 |
+| Screenshot Capture + Preview | v15.0 |
+| Post-Action Verification + auto-retry | v15.0 |
+| Coordinate-Based Fallback (CDP clicking) | v15.0 |
+| Plan Preview (pre-execution step list) | v15.0 |
+| Page State Narration | v15.0 |
+| Natural Language Correction (mid-run) | v15.0 |
+| Confidence Scoring (0–100 per action) | v15.0 |
+| Learned Patterns Dashboard | v15.0 |
+| Client Knowledge Visibility | v15.0 |
+| Multi-Provider Strategy (light/default/heavy) | v15.0 |
+| Visual Element Matching | v15.0 |
+| Zoom & Inspect (click-to-zoom screenshots) | v15.0 |
+| Run Replay & Sharing (HTML export) | v15.0 |
+| Desktop Notifications | v15.0 |
 | Adaptive Prompts (platform-aware goal rewriting) | v3.15 |
 | Client Knowledge (per-client persistent memory) | v3.12 |
 | Quick Assist inline panel | v3.46 |
@@ -578,7 +578,7 @@ sentinel-override/
 ├── popup.html                      # Side-panel entry
 ├── popup.css                       # 14 themes + custom CSS hooks
 ├── popup-full.js                   # Bootstrap
-├── manifest.json                   # MV3 manifest, v10.3.0
+├── manifest.json                   # MV3 manifest, v15.0.0
 └── tests/                          # 153 suites, 8,488 passing tests
 ```
 

@@ -1,7 +1,7 @@
 // Audit Export — v14 Enterprise
 // SOC2-compliant audit trail export with tamper-evident hashing.
 
-const AUDIT_EXPORT_KEY = 'sentinel_audit_exports';
+const _AUDIT_EXPORT_KEY = 'sentinel_audit_exports';
 
 /**
  * Generate a tamper-evident audit trail from run logs.
@@ -9,7 +9,7 @@ const AUDIT_EXPORT_KEY = 'sentinel_audit_exports';
  * @param {object} options - Export options
  * @returns {{ json: string, csv: string, hash: string, hashChain: string[] }}
  */
-export function generateAuditExport(runLog, options = {}) {
+export function generateAuditExport(runLog, _options = {}) {
   if (!runLog || !Array.isArray(runLog)) {
     return { json: '[]', csv: '', hash: '', hashChain: [] };
   }

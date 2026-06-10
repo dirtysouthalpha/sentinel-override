@@ -15,7 +15,7 @@ export const virustotal = {
     try {
       const host = new URL(url).host.toLowerCase();
       if (host.includes('virustotal.com')) return true;
-    } catch (e) {
+    } catch (_e) {
       // URL parse failed — fall through to goal regex
     }
     const t = String(goal || '').toLowerCase();

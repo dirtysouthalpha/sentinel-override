@@ -21,7 +21,7 @@ export const nvd = {
     try {
       const host = new URL(url).host.toLowerCase();
       if (_NVD_HOST_RE.test(host)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _NVD_GOAL_RE.test(String(goal || ''));
   },
 

@@ -477,7 +477,7 @@ class UAPServer {
 
       const now = Date.now() / 1000;
       return payload.exp > now;
-    } catch (e) {
+    } catch (_e) {
       // Invalid base64, JSON, or other parsing error
       return false;
     }
@@ -632,7 +632,7 @@ class UAPServer {
   _performCleanup() {
     const now = Date.now();
     const hourAgo = now - 3600000;
-    const dayAgo = now - 86400000;
+    const _dayAgo = now - 86400000;
 
     // Clean old rate limit entries
     for (const [clientId, limit] of this.rateLimits.entries()) {

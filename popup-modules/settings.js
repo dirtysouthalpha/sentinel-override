@@ -503,6 +503,28 @@ if (quickModeToggle) {
   });
 }
 
+// ========== API Health Bar ==========
+const apiHealthBarToggle = document.getElementById('apiHealthBarToggle');
+if (apiHealthBarToggle) {
+  chrome.storage.local.get(['show_api_health_bar'], (result) => {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read show_api_health_bar:', getErrorMessage(chrome.runtime.lastError)); return; }
+    apiHealthBarToggle.checked = !!result.show_api_health_bar; // default OFF
+  });
+  apiHealthBarToggle.addEventListener('change', () => {
+    const enabled = apiHealthBarToggle.checked;
+    chrome.storage.local.set({ show_api_health_bar: enabled }, () => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.error('[Sentinel/settings] Failed to save show_api_health_bar:', getErrorMessage(chrome.runtime.lastError));
+        showToast('Failed to save setting', 'error');
+        return;
+      }
+      const bar = document.getElementById('api-health-bar');
+      if (bar) bar.style.display = enabled ? 'flex' : 'none';
+      try { showToast(enabled ? 'API Health Bar ON' : 'API Health Bar OFF', 'success'); } catch (e) { console.warn('[Sentinel] showToast failed:', window.getErrorMessage ? window.getErrorMessage(e) : String(e)); }
+    });
+  });
+}
+
 // ========== Ticket Mode (3.14.0) ==========
 // Toggle wraps every finish summary into one of six MSP templates
 // (TICKET_KICKOFF / FINAL_NOTES / WAITING_ON_CLIENT / WAITING_ON_VENDOR /
@@ -732,7 +754,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', async () => {
   if (catalogSel) {
     // Try to match by endpoint first (most reliable), then by provider ID
     const activeConfig = state.providerConfigs[state.activeProviderId] || {};
-    const activeEndpoint = activeConfig.endpoint || '';
+    const _activeEndpoint = activeConfig.endpoint || '';
     let matched = false;
     if (catalogSel.options) {
       for (const opt of catalogSel.options) {
@@ -1225,9 +1247,9 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     // Auto-detect models if we have a key and a models URL
     if (savedConfig.api_key && provider.modelsUrl) {
       // Silently attempt model detection
-      try { showToast(`Endpoint set for ${provider.label}`, 'info'); } catch (e) { /* non-fatal */ }
+      try { showToast(`Endpoint set for ${provider.label}`, 'info'); } catch (_e) { /* non-fatal */ }
     } else {
-      try { showToast(`Endpoint set for ${provider.label}${provider.auth === 'none' ? ' (no key needed)' : ''}`, 'info'); } catch (e) { /* non-fatal */ }
+      try { showToast(`Endpoint set for ${provider.label}${provider.auth === 'none' ? ' (no key needed)' : ''}`, 'info'); } catch (_e) { /* non-fatal */ }
     }
   });
 

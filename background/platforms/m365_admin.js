@@ -40,7 +40,7 @@ export const m365Admin = {
         'portal.azure.com', 'login.microsoftonline.com'
       ];
       if (host && Array.isArray(m365Hosts) && m365Hosts.some(h => host === h || host.endsWith('.' + h))) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _M365_GOAL_RE.test(String(goal || ''));
   },
 

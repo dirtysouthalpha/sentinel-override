@@ -744,7 +744,7 @@ body {
   max-width: 88%;
   padding: 10px 14px;
   border-radius: var(--radius-none);
-  font-size: 13px;
+  font-size: 14px;
   font-family: var(--font-body);
   line-height: 1.6;
   word-wrap: break-word;
@@ -3518,4 +3518,262 @@ body {
 /* Report card glow — success state */
 .report-card-success {
   border-left: 3px solid var(--lime);
+}
+
+
+/* ================================================================
+   EXTRACTED INLINE STYLES — popup.html common patterns
+   ================================================================ */
+
+/* ── Settings Section Card ── */
+.settings-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+/* ── Settings Section Header ── */
+.settings-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+/* ── Collapsible Details Panel ── */
+.details-panel {
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.details-panel > summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+.details-panel > summary span {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+.details-panel-body {
+  padding: 10px 14px;
+}
+
+/* ── Form Field (label + input container) ── */
+.form-field {
+  margin-bottom: 8px;
+}
+.form-field:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Standard Form Input ── */
+.form-input {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+.form-input:focus {
+  border-color: var(--cyan);
+  box-shadow: var(--border-active-glow);
+}
+
+/* ── Small Form Input (compact fields) ── */
+.form-input-sm {
+  padding: 6px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* ── Small Action Button (form-level actions) ── */
+.form-btn-sm {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.form-btn-sm:hover {
+  background: var(--bg-elevated);
+  border-color: var(--cyan);
+}
+.form-btn-sm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Accent Button (primary action) ── */
+.btn-accent {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+/* ── Chip Button (header chips — tenant, client, quick assist) ── */
+.chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+.chip-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+/* ── Two-column form grid ── */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.form-grid-2 .span-2 {
+  grid-column: span 2;
+}
+
+/* ── Flex row: space-between ── */
+.flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.flex-between.mb-4 { margin-bottom: 4px; }
+.flex-between.mb-8 { margin-bottom: 8px; }
+
+/* ── Inline label muted ── */
+.label-muted {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+/* ── Preset grid (provider quick presets) ── */
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.preset-row-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Provider preset button ── */
+.preset-btn {
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.preset-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--cyan);
+}
+
+/* ── Checkbox label row ── */
+.check-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.check-label-lg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ── Form section label ── */
+.form-section-label {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* ── Inline flex row with gap ── */
+.flex-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.flex-row.gap-8 { gap: 8px; }
+.flex-row.gap-5 { gap: 5px; }
+
+/* ── Subtle text ── */
+.text-subtle {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+.text-subtle strong {
+  color: var(--text-secondary);
+}
+
+/* ── Danger button (destructive actions) ── */
+.btn-danger-sm {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--error-color);
+  background: transparent;
+  color: var(--error-color);
+  cursor: pointer;
+}
+.btn-danger-sm:hover {
+  background: var(--error-a08);
+}
+
+/* ── Small inline button (micro-actions) ── */
+.btn-micro {
+  padding: 4px 8px;
+  font-size: 10px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn-micro:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--cyan);
 }

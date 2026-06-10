@@ -23,7 +23,7 @@ export const screenconnect = {
       const host = u.hostname;
       if (_SC_HOST_RE.test(host)) return true;
       if (_SC_PATH_RE.test(u.href)) return true;
-    } catch (e) { /* fall through */ }
+    } catch (_e) { /* fall through */ }
     return _SC_GOAL_RE.test(String(goal || ''));
   },
 

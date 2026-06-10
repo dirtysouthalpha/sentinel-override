@@ -68,8 +68,8 @@ export function getPlatformProfile(currentUrl, goal) {
   for (const p of PROFILES) {
     try {
       if (p && typeof p.detect === 'function' && p.detect(currentUrl, goal)) return p;
-    } catch (e) {
-      console.warn('[Sentinel] Platform detect error (profile:', p && p.id, '):', typeof e === 'object' && e !== null && typeof e.message === 'string' ? e.message : String(e));
+    } catch (_e) {
+      console.warn('[Sentinel] Platform detect error (profile:', p && p.id, '):', typeof _e === 'object' && _e !== null && typeof _e.message === 'string' ? _e.message : String(_e));
       continue;
     }
   }

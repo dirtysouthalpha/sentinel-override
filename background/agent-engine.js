@@ -2,10 +2,10 @@
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import { callLLMWithRetry, generatePlan, getPlatformContext, getRelevantPatterns, selectModelForStep, getCostTracker } from './llm-client.js';
+import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, THIRTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n  var clickableTags = new Set(['a', 'button', 'summary']);\n  var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    // Determine interactivity\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; return __sentinel_discoverElements();";
@@ -131,11 +131,11 @@ const getFirstSentence = (str) => {
 };
 
 // Precompile regex for PII redaction (error logging)
-const PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
-const PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
-const PII_TICKET_RE = /(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi;
-const PII_CLIENT_STRING_RE = /"[^"]{2,60}"/g;
-const PII_CLIENT_SINGLE_RE = /'[^']{2,60}'/g;
+const _PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
+const _PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
+const _PII_TICKET_RE = /(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi;
+const _PII_CLIENT_STRING_RE = /"[^"]{2,60}"/g;
+const _PII_CLIENT_SINGLE_RE = /'[^']{2,60}'/g;
 const PORTAL_ONEDRIVE_RE = /onedrive|sharepoint/i;
 const PORTAL_TEAMS_RE = /teams/i;
 const PORTAL_INTUNE_RE = /intune|endpoint\.microsoft/i;
@@ -175,7 +175,7 @@ const INCOMPLETE_MARKER_RE = /\b(incomplete|step budget|could not access|unable 
 const TRIED_ACTION_RE = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
 
 // Precompile regex for multi-page goal detection
-const MULTI_PAGE_GOAL_RE = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i;
+const _MULTI_PAGE_GOAL_RE = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i;
 
 // Precompile regex for useless JavaScript result detection
 const USELESS_OBJECT_RE = /^\s*\[object\s+(?:Object|Promise|Array|Function|HTMLElement|HTMLCollection|NodeList|Window|Document|Map|Set)\]\s*$/i;
@@ -267,7 +267,7 @@ import { tel, startRun as telStartRun, endRun as telEndRun } from './telemetry.j
 import { computeTrustScore, suggestRetryActions } from './trust-score.js';
 // v10.0 Intelligence Systems Integration
 import { initReasoningTrace, captureReasoningStep, getReasoningSummary } from './reasoning-trace.js';
-import { analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics, clearBiasLog } from './bias-detector.js';
+import { analyzeForBias as _analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics, clearBiasLog } from './bias-detector.js';
 import { initKnowledgeGraph, addKnowledgeNode, persistKnowledgeGraph } from './knowledge-graph.js';
 import { analyzeForContradictions, logContradictionDetection, getContradictionStatistics, clearContradictionLog } from './contradiction-detector.js';
 import { analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics, clearNoveltyHistory } from './novelty-detector.js';
@@ -622,7 +622,7 @@ async function captureStepScreenshot(tabId) {
       });
     });
     return dataUrl; // base64 data URL
-  } catch (e) { return null; }
+  } catch (_e) { return null; }
 }
 
 // ========== Zoom & Inspect — Region-of-Interest Markup ==========
@@ -782,6 +782,8 @@ export function resetAgentState() {
   _verificationFailures = 0; // (Phase 8.2) reset post-action verification counter
   _learnedPatterns = null; // (Phase 5) reset learned patterns for new run
   _stepScreenshots.clear(); // (9.3) reset replay screenshot ring buffer
+  _dkimDomainKeyCache.clear(); // clear DKIM domain key cache between runs
+  _activityStartedAt.clear(); // clear activity start timestamps between runs
   // Reset CDP observe-path optimization flags so a new run always gets a fresh
   // page ready check and overlay nuke on its first observation.
   _pageWasReady = false;
@@ -1832,7 +1834,7 @@ async function clickAtCoordinates(tabId, x, y) {
     });
     await chrome.debugger.detach(target);
     return true;
-  } catch (e) {
+  } catch (_e) {
     try { await chrome.debugger.detach({ tabId }); } catch (_) {}
     return false;
   }
@@ -1956,12 +1958,12 @@ const MODE_TIER2_RE = /\b(approval|autonomous|yolo)\s+mode\b/i;
 const SEARCH_QUERY_RE = /(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i;
 const SEARCH_SIMPLE_RE = /(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i;
 const FIELD_LIST_RE = /(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i;
-const URL_NAV_RE = /(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i;
-const URL_ANY_RE = /(https?:\/\/[^\s]+)/i;
-const BARE_SITE_RE = /(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
-const SEARCH_LONG_RE = /(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i;
-const ABOUT_RE = /(?:about|on|regarding)\s+([^,.\n]{10,60})/i;
-const COUNT_RE = /(?:top\s+)?(\d+)/;
+const _URL_NAV_RE = /(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i;
+const _URL_ANY_RE = /(https?:\/\/[^\s]+)/i;
+const _BARE_SITE_RE = /(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
+const _SEARCH_LONG_RE = /(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i;
+const _ABOUT_RE = /(?:about|on|regarding)\s+([^,.\n]{10,60})/i;
+const _COUNT_RE = /(?:top\s+)?(\d+)/;
 const ARTICLE_RE = /\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i;
 const ARTICLE_KEY_RE = /article[_\s]?\d/i;
 
@@ -3672,7 +3674,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (consecutiveInjectionFailures === 2) {
             try {
               const pgCheck = await cdpExecuteJs(tab, 'return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};', { timeout: THREE_SECONDS_MS });
-              console.log('[Sentinel/CDP] Page check on first CDP activation:', JSON.stringify(pgCheck && pgCheck.value));
+              console.log('[Sentinel/CDP] Page check on first CDP activation: hasBody=%s children=%d', !!(pgCheck && pgCheck.value && pgCheck.value.hasBody), (pgCheck && pgCheck.value && pgCheck.value.children) || 0);
               if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
                 console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
                 await chrome.debugger.sendCommand({ tabId: tab }, 'Page.reload', { ignoreCache: true });

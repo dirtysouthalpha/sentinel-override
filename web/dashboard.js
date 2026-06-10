@@ -1,7 +1,7 @@
 // Sentinel Override Dashboard — v15
 // Connects to the extension's REST API via chrome.runtime.sendMessage
 
-const EXTENSION_ID = 'fignfifoniblkonapihmkfakmlgkbkcf'; // Will be dynamic in production
+const _EXTENSION_ID = 'fignfifoniblkonapihmkfakmlgkbkcf'; // Will be dynamic in production
 
 // API helper — sends requests through chrome.runtime.sendMessage
 async function api(method, path, body) {
@@ -43,7 +43,7 @@ const statRuns = document.getElementById('stat-runs');
 const statActive = document.getElementById('stat-active');
 const statHealth = document.getElementById('stat-health');
 const statHealthSub = document.getElementById('stat-health-sub');
-const statCost = document.getElementById('stat-cost');
+const _statCost = document.getElementById('stat-cost');
 const runsTable = document.getElementById('runs-table');
 const playbooksTable = document.getElementById('playbooks-table');
 const connectionStatus = document.getElementById('connection-status');
@@ -116,7 +116,7 @@ async function refresh() {
     } else {
       playbooksTable.innerHTML = '<tr><td colspan="5" class="empty">No playbooks learned yet</td></tr>';
     }
-  } catch (e) {
+  } catch (_e) {
     connectionStatus.textContent = 'Error';
   }
 }

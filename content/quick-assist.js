@@ -6,6 +6,7 @@
 
 (function sentinelQuickAssist() {
   'use strict';
+  function escapeHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   // Avoid double-injection in same frame
   if (window.__sentinelQuickAssistLoaded) return;
@@ -524,14 +525,14 @@ ${selectedText}`;
       function(response) {
         setButtonsLoading(false);
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
-          setResponseHTML(`<span class="qa-error">Error: ${typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error'}</span>`);
+          setResponseHTML(`<span class="qa-error">Error: ${escapeHtml(typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null && typeof chrome.runtime.lastError.message === 'string' ? chrome.runtime.lastError.message : 'Unknown error')}</span>`);
           return;
         }
         var text = response && response.data && response.data.text;
         if (text) {
           setResponse(text);
         } else if (response && response.ok === false) {
-          setResponseHTML(`<span class="qa-error">Error: ${response.error || 'Unknown error'}</span>`);
+          setResponseHTML(`<span class="qa-error">Error: ${escapeHtml(response.error || 'Unknown error')}</span>`);
         } else {
           setResponseHTML('<span class="qa-error">No response received.</span>');
         }

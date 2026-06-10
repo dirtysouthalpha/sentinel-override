@@ -130,7 +130,7 @@ const _bootTimer = setTimeout(() => {
 
   // Nuclear fallback: if chat.js listeners failed to attach, attach them here
   if (sendBtn && goalInput) {
-    const listeners = typeof getEventListeners === 'function' ? getEventListeners(sendBtn) : null;
+    const _listeners = typeof getEventListeners === 'function' ? getEventListeners(sendBtn) : null;
     // We can't check listeners in production, so only log when something is wrong
     if (errors.length > 0 || !goalInput || !sendBtn) {
       console.log('[Sentinel/BOOT] sendBtn + goalInput present — UI should work');

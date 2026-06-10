@@ -127,7 +127,7 @@ const WELCOME_MESSAGE_RE = /^\s*<div class="welcome-message"/i;
       // Clear and restore (sanitize stored HTML — could be tampered via storage)
       chatContainer.innerHTML = (typeof sanitizeHtml === 'function')
         ? sanitizeHtml(entry.htmlSnapshot || '')
-        : (entry.htmlSnapshot || '');
+        : '';
 
       // Sync conversationHistory
       const state = (typeof getState === 'function') ? getState() : null;

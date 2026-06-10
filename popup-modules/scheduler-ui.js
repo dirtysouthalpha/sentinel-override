@@ -161,9 +161,10 @@ function renderScheduleCard(schedule) {
   // Last run status badge
   let statusBadge = '';
   if (schedule.lastRunStatus) {
-    const statusClass = schedule.lastRunStatus;
+    const validStatuses = ['success','failed','running','pending','error','timeout','cancelled'];
+    const statusClass = validStatuses.includes(schedule.lastRunStatus) ? schedule.lastRunStatus : 'unknown';
     const status = schedule.lastRunStatus || '';
-    const statusLabel = status ? status.charAt(0).toUpperCase() + status.slice(1) : '?';
+    const statusLabel = escapeHtml(status ? status.charAt(0).toUpperCase() + status.slice(1) : '?');
     statusBadge = `<span class="schedule-status-badge ${statusClass}">${statusLabel}</span>`;
   }
 
@@ -174,7 +175,7 @@ function renderScheduleCard(schedule) {
     <div class="schedule-card-header">
       <div class="schedule-card-name">${escapeHtml(schedule.name)}</div>
       <label class="toggle-switch" style="flex-shrink:0;">
-        <input type="checkbox" data-action="toggle" data-id="${schedule.id}" ${toggleChecked}>
+        <input type="checkbox" data-action="toggle" data-id="${escapeHtml(schedule.id)}" ${toggleChecked}>
         <span class="toggle-slider"></span>
       </label>
     </div>
@@ -186,8 +187,8 @@ function renderScheduleCard(schedule) {
       ${statusBadge}
     </div>
     <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;">
-      <button class="small-btn" data-action="history" data-id="${schedule.id}" data-name="${escapeHtml(schedule.name)}">History</button>
-      <button class="small-btn" data-action="delete" data-id="${schedule.id}" data-name="${escapeHtml(schedule.name)}" style="color:var(--error-color);">Delete</button>
+      <button class="small-btn" data-action="history" data-id="${escapeHtml(schedule.id)}" data-name="${escapeHtml(schedule.name)}">History</button>
+      <button class="small-btn" data-action="delete" data-id="${escapeHtml(schedule.id)}" data-name="${escapeHtml(schedule.name)}" style="color:var(--error-color);">Delete</button>
     </div>
   `;
 }
@@ -623,8 +624,9 @@ async function showRunHistory(scheduleId, scheduleName) {
         const item = document.createElement('div');
         item.className = 'schedule-result-item';
 
-        const statusClass = result.status || 'pending';
-        const statusLabel = (result.status || 'pending').charAt(0).toUpperCase() + (result.status || 'pending').slice(1);
+        const validStatuses = ['success','failed','running','pending','error','timeout','cancelled'];
+        const statusClass = validStatuses.includes(result.status) ? result.status : 'pending';
+        const statusLabel = escapeHtml((result.status || 'pending').charAt(0).toUpperCase() + (result.status || 'pending').slice(1));
         const duration = formatDuration(result.startedAt, result.completedAt);
         const timestamp = result.completedAt
           ? new Date(result.completedAt).toLocaleString()
