@@ -1119,7 +1119,7 @@ describe('_waitForModeMismatchDecision', () => {
 // ══════════════════════════════════════════════════════════════════════
 // 13. activityStart / activityDone / activityFail / activityUpdate
 // ══════════════════════════════════════════════════════════════════════
-describe.skip('activity tracking helpers - mock setup issue with ESM unstable_mockModule', () => {
+describe('activity tracking helpers', () => {
   test('mock is a jest mock', () => {
     // Verify the mock is actually a Jest mock
     expect(jest.isMockFunction(mockSendAgentActivity)).toBe(true);
