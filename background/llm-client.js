@@ -2687,6 +2687,3 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   }
 }
 
-// API Health — exported for external queries (e.g. background service worker status endpoint)
-export function getApiHealth() { return _apiHealth.getStatus(); }
-

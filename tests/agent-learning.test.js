@@ -36,6 +36,16 @@ jest.unstable_mockModule('../background/agent-learning.js', () => {
         .filter(([, d]) => d.attempts >= 3 && (d.successes / d.attempts) < 0.3)
         .map(([key]) => key.substring(actionType.length + 1));
     }),
+    getEstimatedWaitTime: jest.fn((platform) => {
+      const patterns = _patterns[platform];
+      if (!patterns) return null;
+      const navigatePatterns = Object.entries(patterns)
+        .filter(([key]) => key.startsWith('navigate:'))
+        .map(([, data]) => data.avgDuration)
+        .filter(d => d > 0);
+      if (navigatePatterns.length === 0) return null;
+      return Math.round(navigatePatterns.reduce((a, b) => a + b, 0) / navigatePatterns.length);
+    }),
     findOneShotPlaybook: jest.fn(() => null),
     maybeGeneratePlaybook: jest.fn(() => null),
     getPlaybooks: jest.fn(() => []),
@@ -86,5 +96,25 @@ describe('agent-learning', () => {
 
   test('maybeGeneratePlaybook returns null when no steps', () => {
     expect(learning.maybeGeneratePlaybook('goal', 'platform', [])).toBeNull();
+  });
+
+  test('getPlaybooks returns empty array by default', () => {
+    expect(learning.getPlaybooks()).toEqual([]);
+  });
+
+  test('getEstimatedWaitTime returns null for unknown platform', () => {
+    expect(learning.getEstimatedWaitTime('unknown_platform')).toBeNull();
+  });
+
+  test('getEstimatedWaitTime returns null when no navigate patterns recorded', () => {
+    learning.recordActionOutcome('cisco_asa', 'click', '#apply', true, 200);
+    expect(learning.getEstimatedWaitTime('cisco_asa')).toBeNull();
+  });
+
+  test('getEstimatedWaitTime returns average duration of navigate actions', () => {
+    learning.recordActionOutcome('fortinet', 'navigate', 'https://example.com', true, 400);
+    learning.recordActionOutcome('fortinet', 'navigate', 'https://other.com', true, 600);
+    const result = learning.getEstimatedWaitTime('fortinet');
+    expect(result).toBe(500);
   });
 });
