@@ -620,6 +620,7 @@ export async function executeScheduledTask(alarmName) {
     });
   } catch (_e) {}
   tel.info('scheduler', `Scheduled task ${schedule.name} completed`, { status: finalResult.status });
+  _fireAgentCompleteCallbacks();
 }
 
 // ========== Execution Helpers ==========
