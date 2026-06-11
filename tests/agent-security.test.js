@@ -4,6 +4,7 @@
 import {
   _tenantsMatch,
   detectMfaInText,
+  detectSignInWall,
   evaluateHallucinationRisk,
   _countSummaryClaims,
   _countSpecificClaims,
@@ -107,5 +108,89 @@ describe('_countSourceTags', () => {
 
   test('counts unverified tags', () => {
     expect(_countSourceTags('Claim [unverified] and [unverified]')).toBe(2);
+  });
+});
+
+describe('detectSignInWall', () => {
+  test('returns null for null currentUrl', () => {
+    expect(detectSignInWall([], null, '')).toBeNull();
+    expect(detectSignInWall([], undefined, '')).toBeNull();
+  });
+
+  test('returns null for malformed URL', () => {
+    expect(detectSignInWall([], 'not-a-valid-url', '')).toBeNull();
+  });
+
+  test('returns null for non-auth host', () => {
+    expect(detectSignInWall([], 'https://example.com/login', 'sign in')).toBeNull();
+  });
+
+  test('matches on auth host with password-type element', () => {
+    const elements = [{ type: 'password', selector: '#passwd' }];
+    const result = detectSignInWall(elements, 'https://login.microsoftonline.com/common/oauth2', '');
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+    expect(result.host).toBe('login.microsoftonline.com');
+    expect(result.evidence).toMatch(/password input/);
+    expect(result.selector).toBe('#passwd');
+  });
+
+  test('matches on auth host with password-pattern selector', () => {
+    const elements = [{ type: 'text', selector: '#passwordInput' }];
+    const result = detectSignInWall(elements, 'https://accounts.google.com/signin/v2', '');
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+    expect(result.evidence).toMatch(/password input/);
+  });
+
+  test('matches via pageText sign-in cue + email-type element', () => {
+    const elements = [{ type: 'email', selector: '#email' }];
+    const result = detectSignInWall(elements, 'https://login.live.com/oauth20_authorize', 'Enter your email', );
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+    expect(result.evidence).toMatch(/email\/username input/);
+    expect(result.selector).toBe('#email');
+  });
+
+  test('matches via pageText sign-in cue + username-selector element', () => {
+    const elements = [{ type: 'text', selector: '#loginfmt' }];
+    const result = detectSignInWall(elements, 'https://login.microsoftonline.com/common', 'Sign in to your account');
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+    expect(result.evidence).toMatch(/email\/username input/);
+  });
+
+  test('returns null on auth host with sign-in text but no form fields', () => {
+    // "Stay signed in?" redirect — no input, so should not trip
+    const result = detectSignInWall([], 'https://login.microsoftonline.com/common', 'Stay signed in?');
+    expect(result).toBeNull();
+  });
+
+  test('returns null on auth host with no password, no text cues', () => {
+    const elements = [{ type: 'text', selector: '#search' }];
+    const result = detectSignInWall(elements, 'https://accounts.google.com/search', '');
+    expect(result).toBeNull();
+  });
+
+  test('handles null elements inside allElements array', () => {
+    const elements = [null, undefined, { type: 'password', selector: '' }];
+    const result = detectSignInWall(elements, 'https://login.okta.com/login', '');
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+    expect(result.selector).toBe('');
+  });
+
+  test('matches github.com/login via URL path pattern', () => {
+    const elements = [{ type: 'password', selector: '#password' }];
+    const result = detectSignInWall(elements, 'https://github.com/login', '');
+    expect(result).not.toBeNull();
+    expect(result.matched).toBe(true);
+  });
+
+  test('returns null when allElements is not an array for password check', () => {
+    // null allElements — password signal branch skipped, text cue branch checked
+    const result = detectSignInWall(null, 'https://login.microsoftonline.com/', 'sign in');
+    // No email field found either (allElements not array), so null
+    expect(result).toBeNull();
   });
 });
