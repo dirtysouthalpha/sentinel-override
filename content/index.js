@@ -1074,7 +1074,7 @@ if (window.__sentinelInitialized) {
         if (data === null) return;
         sendResponse({ ok: true, data });
       })
-      .catch(err => sendResponse({ ok: false, error: ((err && typeof err.message === 'string') ? err.message : String(err)) }));
+      .catch(err => sendResponse({ ok: false, error: getErrorMessage(err) }));
     return true; // keep message channel open for async responses
   });
 

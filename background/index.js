@@ -976,7 +976,7 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         const id = await pluginRegistry.installPlugin(request.manifestUrl);
         return { ok: true, pluginId: id };
       } catch (e) {
-        return { ok: false, error: e.message };
+        return { ok: false, error: getErrorMessage(e) };
       }
     }
     case 'plugin_uninstall': {

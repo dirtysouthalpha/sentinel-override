@@ -9,6 +9,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { getErrorMessage } from './error-utils.js';
 
 // Precompile regex for tenant validation (performance optimization)
 const ONMICROSOFT_TENANT_RE = /^[a-z0-9.-]+\.onmicrosoft\.com$/;
@@ -163,7 +164,7 @@ class UAPServer {
       }
     } catch (error) {
       console.error('[UAP] Message handling error:', error);
-      sendResponse({ type: 'error', id: id || 'unknown', error: 'internal_error', message: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
+      sendResponse({ type: 'error', id: id || 'unknown', error: 'internal_error', message: getErrorMessage(error) });
     }
   }
 
@@ -290,12 +291,12 @@ class UAPServer {
           type: 'goal_complete',
           id: runId,
           status: 'failed',
-          error: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error),
+          error: getErrorMessage(error),
           recoverable: this.isRecoverable(error)
         };
 
         this.broadcastToClient(run.clientId, errorMessage);
-        this.logAudit('goal_failed', run.clientId, { runId, error: (typeof error === 'object' && error !== null && typeof error.message === 'string') ? error.message : String(error) });
+        this.logAudit('goal_failed', run.clientId, { runId, error: getErrorMessage(error) });
       }
     }
   }
