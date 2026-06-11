@@ -55,4 +55,27 @@ describe('audit-export', () => {
     expect(result.json).toBe('[]');
     expect(result.hash).toBe('');
   });
+
+  test('CSV quotes fields with commas, quotes, and newlines', () => {
+    const log = [
+      { timestamp: '2026-01-01T00:00:00Z', kind: 'step', goal: 'goal with, comma', url: 'https://x.com', action: 'click', result: 'say "hello"', failed: false },
+      { timestamp: '2026-01-01T00:00:01Z', kind: 'step', goal: 'line1\nline2', url: 'https://x.com', action: 'type', result: 'ok', failed: false }
+    ];
+    const result = generateAuditExport(log);
+    expect(result.csv).toContain('"goal with, comma"');
+    expect(result.csv).toContain('"say ""hello"""');
+    expect(result.csv).toContain('"line1\nline2"');
+  });
+
+  test('verifyAuditExport returns invalid for null/missing entries', () => {
+    expect(verifyAuditExport(null).valid).toBe(false);
+    expect(verifyAuditExport({}).valid).toBe(false);
+  });
+
+  test('verifyAuditExport detects tampered integrityHash', () => {
+    const exported = JSON.parse(generateAuditExport(sampleLog).json);
+    exported.integrityHash = 'deadbeef';
+    const verification = verifyAuditExport(exported);
+    expect(verification.valid).toBe(false);
+  });
 });

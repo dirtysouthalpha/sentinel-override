@@ -1,8 +1,6 @@
 // Audit Export — v14 Enterprise
 // SOC2-compliant audit trail export with tamper-evident hashing.
 
-const _AUDIT_EXPORT_KEY = 'sentinel_audit_exports';
-
 /**
  * Generate a tamper-evident audit trail from run logs.
  * @param {Array} runLog - The forensic run log entries
