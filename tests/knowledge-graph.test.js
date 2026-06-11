@@ -334,3 +334,35 @@ describe('clearKnowledgeGraph', () => {
     await expect(clearKnowledgeGraph()).resolves.not.toThrow();
   });
 });
+
+// ========== Capacity limit guards — lines 65-66, 112-113 ==========
+
+describe('addKnowledgeNode MAX_NODES capacity guard', () => {
+  test('returns null and warns when node count reaches 10000', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // Fill to capacity
+    for (let i = 0; i < 10000; i++) {
+      addKnowledgeNode(`cap_node_${i}`, { type: 'action' });
+    }
+    // One more should hit the guard
+    const result = addKnowledgeNode('cap_node_overflow', {});
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith('[Sentinel] Knowledge graph at maximum node capacity');
+    warnSpy.mockRestore();
+  });
+});
+
+describe('addKnowledgeEdge MAX_EDGES capacity guard', () => {
+  test('returns null and warns when edge count reaches 50000', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    addKnowledgeNode('cap_src', {});
+    addKnowledgeNode('cap_tgt', {});
+    for (let i = 0; i < 50000; i++) {
+      addKnowledgeEdge('cap_src', 'cap_tgt', { relation: `rel_${i}` });
+    }
+    const result = addKnowledgeEdge('cap_src', 'cap_tgt', { relation: 'rel_overflow' });
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith('[Sentinel] Knowledge graph at maximum edge capacity');
+    warnSpy.mockRestore();
+  });
+});

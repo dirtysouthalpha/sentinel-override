@@ -464,7 +464,5 @@ export async function clearKnowledgeGraph() {
   await knowledgeGraph.clear();
 }
 
-// Initialize on load
-initKnowledgeGraph().catch(e => {
-  console.error('[Sentinel] Failed to initialize knowledge graph:', getErrorMessage(e));
-});
+// Initialize on load — init() handles its own errors internally
+initKnowledgeGraph().catch(() => {});
