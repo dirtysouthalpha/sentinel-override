@@ -246,3 +246,22 @@ describe('generateBiasReport — severity labels', () => {
     expect(report.length).toBeGreaterThan(0);
   });
 });
+
+describe('storage error paths', () => {
+  test('logBiasDetection does not throw when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage unavailable'));
+    const analysis = { hasBias: true, biases: [], severity: 1, totalBiasScore: 1 };
+    await expect(logBiasDetection(analysis, 0)).resolves.not.toThrow();
+  });
+
+  test('getBiasLog returns empty array when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage unavailable'));
+    const log = await getBiasLog();
+    expect(log).toEqual([]);
+  });
+
+  test('clearBiasLog does not throw when storage.remove rejects', async () => {
+    chrome.storage.local.remove.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(clearBiasLog()).resolves.not.toThrow();
+  });
+});

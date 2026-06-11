@@ -206,6 +206,25 @@ describe('analyzeForContradictions — conditional contradictions', () => {
   });
 });
 
+describe('storage error paths', () => {
+  test('logContradictionDetection does not throw when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage unavailable'));
+    const analysis = { hasContradictions: true, contradictions: [{ type: 'direct_negation', severity: 'high' }], totalScore: 1 };
+    await expect(logContradictionDetection(analysis, 0)).resolves.not.toThrow();
+  });
+
+  test('getContradictionLog returns empty array when storage.get rejects', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('storage unavailable'));
+    const log = await getContradictionLog();
+    expect(log).toEqual([]);
+  });
+
+  test('clearContradictionLog does not throw when storage.remove rejects', async () => {
+    chrome.storage.local.remove.mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(clearContradictionLog()).resolves.not.toThrow();
+  });
+});
+
 describe('compareResponsesForContradictions — cross-response', () => {
   test('detects cross-response contradictions between opposite statements', () => {
     const r1 = 'The service is accessible.';
