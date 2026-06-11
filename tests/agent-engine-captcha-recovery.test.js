@@ -129,9 +129,7 @@ jest.unstable_mockModule('../background/tab-context.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/client-knowledge.js', () => ({
-  getActiveClient: jest.fn(() => null),
-  getRelevantEntries: jest.fn(async () => []),
-  formatPromptSection: jest.fn(() => ''),
+  getClientStartupContext: jest.fn(async () => ({ client: null, relevantEntries: [], promptSection: '' })),
   markRunCompleted: jest.fn(async () => {}),
 }));
 

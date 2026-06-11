@@ -69,8 +69,8 @@ jest.unstable_mockModule('../background/tab-context.js', () => ({
   handleTabRemoved: jest.fn(), getTabCount: jest.fn(() => 0),
 }));
 jest.unstable_mockModule('../background/client-knowledge.js', () => ({
-  getActiveClient: jest.fn(async () => null), getRelevantEntries: jest.fn(async () => []),
-  formatPromptSection: jest.fn(async () => ''), markRunCompleted: jest.fn(async () => {}),
+  getClientStartupContext: jest.fn(async () => ({ client: null, relevantEntries: [], promptSection: '' })),
+  markRunCompleted: jest.fn(async () => {}),
 }));
 jest.unstable_mockModule('../background/adaptive-prompts.js', () => ({
   rewriteGoalForPlatform: jest.fn(async () => ({ adapted: false })),

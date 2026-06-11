@@ -255,7 +255,7 @@ import { generateReport, buildFallbackReport } from './report-generator.js';
 import { getActiveProvider, migrateLegacySettings } from './provider-registry.js';
 import { isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive } from './shared-state.js';
 import { getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount } from './tab-context.js';
-import { getActiveClient, getRelevantEntries, formatPromptSection, markRunCompleted } from './client-knowledge.js';
+import { getClientStartupContext, markRunCompleted } from './client-knowledge.js';
 import { generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP } from './agent-planning.js';
 import { appendAuditEntry, getAuditLog, auditLogToCsv } from './audit-log.js';
 import { runRecoverySkills, getSkillStats } from './skills/index.js';
@@ -995,17 +995,15 @@ export async function startAgent(goal, sender) {
   const tabInfo = await getTabInfo(startTabId);
   registerInitialTab(startTabId, tabInfo?.url || '');
 
-  // (3.12.0) Load client knowledge for the active client. Format relevant
-  // entries as a prompt section that gets injected into every step's
-  // system prompt via agentState.clientKnowledgeText.
+  // (3.12.0) Load client knowledge for the active client in a single storage
+  // round-trip via getClientStartupContext (replaces 3 sequential reads).
   try {
-    const activeClient = await getActiveClient();
-    if (activeClient && activeClient.id) {
+    const startUrl = tabInfo?.url || '';
+    const { client: activeClient, relevantEntries, promptSection } = await getClientStartupContext(startUrl);
+    if (activeClient) {
       activeClientId = activeClient.id;
-      const startUrl = tabInfo?.url || '';
-      const relevantEntries = await getRelevantEntries(activeClient.id, startUrl);
       clientKnowledgeUsedIds = relevantEntries.map(e => e.id);
-      clientKnowledgeText = await formatPromptSection(activeClient.id, startUrl);
+      clientKnowledgeText = promptSection;
       // (9.1) Broadcast which facts are being injected so popup can show them
       try { sendClientKnowledgePreview(activeClient.displayName || activeClient.id, relevantEntries); } catch (_previewErr) {
         /* Non-fatal: client knowledge preview send failed */

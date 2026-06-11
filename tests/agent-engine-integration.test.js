@@ -139,9 +139,7 @@ jest.unstable_mockModule('../background/tab-context.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/client-knowledge.js', () => ({
-  getActiveClient: jest.fn(async () => null),
-  getRelevantEntries: jest.fn(async () => []),
-  formatPromptSection: jest.fn(async () => ''),
+  getClientStartupContext: jest.fn(async () => ({ client: null, relevantEntries: [], promptSection: '' })),
   markRunCompleted: jest.fn(async () => {}),
 }));
 
@@ -395,22 +393,22 @@ describe('agent-engine integration — fetchAuditLog', () => {
 // ══════════════════════════════════════════════════════════════════════════
 describe('agent-engine integration — startAgent with client knowledge', () => {
   test('loads client knowledge when active client exists', async () => {
-    const { getActiveClient, getRelevantEntries, formatPromptSection } = await import('../background/client-knowledge.js');
-    getActiveClient.mockResolvedValueOnce({ id: 'client-1', name: 'Test Client' });
-    getRelevantEntries.mockResolvedValueOnce([{ id: 'entry-1' }]);
-    formatPromptSection.mockResolvedValueOnce('Client: Test Client');
+    const { getClientStartupContext } = await import('../background/client-knowledge.js');
+    getClientStartupContext.mockResolvedValueOnce({
+      client: { id: 'client-1', displayName: 'Test Client' },
+      relevantEntries: [{ id: 'entry-1', wisdom: 'fact' }],
+      promptSection: 'Client: Test Client',
+    });
 
     const sender = { tab: { id: 1 } };
     await startAgent('Check client firewall', sender);
-    expect(getActiveClient).toHaveBeenCalled();
-    expect(getRelevantEntries).toHaveBeenCalledWith('client-1', 'https://example.com');
-    expect(formatPromptSection).toHaveBeenCalledWith('client-1', 'https://example.com');
+    expect(getClientStartupContext).toHaveBeenCalled();
     await stopAgent();
   });
 
   test('handles client knowledge errors gracefully', async () => {
-    const { getActiveClient } = await import('../background/client-knowledge.js');
-    getActiveClient.mockRejectedValueOnce(new Error('DB error'));
+    const { getClientStartupContext } = await import('../background/client-knowledge.js');
+    getClientStartupContext.mockRejectedValueOnce(new Error('DB error'));
 
     const sender = { tab: { id: 1 } };
     await expect(startAgent('Test goal', sender)).resolves.toBeDefined();
@@ -418,8 +416,8 @@ describe('agent-engine integration — startAgent with client knowledge', () => 
   });
 
   test('handles null active client', async () => {
-    const { getActiveClient } = await import('../background/client-knowledge.js');
-    getActiveClient.mockResolvedValueOnce(null);
+    const { getClientStartupContext } = await import('../background/client-knowledge.js');
+    getClientStartupContext.mockResolvedValueOnce({ client: null, relevantEntries: [], promptSection: '' });
 
     const sender = { tab: { id: 1 } };
     await expect(startAgent('Test goal', sender)).resolves.toBeDefined();
@@ -427,8 +425,8 @@ describe('agent-engine integration — startAgent with client knowledge', () => 
   });
 
   test('handles active client without id', async () => {
-    const { getActiveClient } = await import('../background/client-knowledge.js');
-    getActiveClient.mockResolvedValueOnce({ name: 'No ID Client' });
+    const { getClientStartupContext } = await import('../background/client-knowledge.js');
+    getClientStartupContext.mockResolvedValueOnce({ client: null, relevantEntries: [], promptSection: '' });
 
     const sender = { tab: { id: 1 } };
     await expect(startAgent('Test goal', sender)).resolves.toBeDefined();

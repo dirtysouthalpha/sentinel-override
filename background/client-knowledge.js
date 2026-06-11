@@ -303,6 +303,16 @@ function _urlMatches(pattern, url) {
   }
 }
 
+// Sync helper — filters entries from an already-loaded client object.
+function _filterEntries(c, currentUrl) {
+  const url = (currentUrl || '').toLowerCase();
+  return (c.entries || []).filter(e => {
+    if (e.scope === 'global') return true;
+    if (e.scope === 'url' && e.urlPattern) return _urlMatches(e.urlPattern, url);
+    return false;
+  });
+}
+
 /**
  * Get knowledge entries relevant to the current run.
  * Returns global entries always, plus url-scoped entries that match currentUrl.
@@ -313,12 +323,7 @@ export async function getRelevantEntries(clientId, currentUrl) {
   const state = await _read();
   const c = state.clients[clientId];
   if (!c) return [];
-  const url = (currentUrl || '').toLowerCase();
-  return (c.entries || []).filter(e => {
-    if (e.scope === 'global') return true;
-    if (e.scope === 'url' && e.urlPattern) return _urlMatches(e.urlPattern, url);
-    return false;
-  });
+  return _filterEntries(c, currentUrl);
 }
 
 /**
@@ -330,10 +335,28 @@ export async function formatPromptSection(clientId, currentUrl) {
   const state = await _read();
   const c = state.clients[clientId];
   if (!c) return '';
-  const relevant = await getRelevantEntries(clientId, currentUrl);
+  const relevant = _filterEntries(c, currentUrl);
   if (!relevant.length) return '';
   const lines = relevant.map((e, i) => `${i + 1}. ${e.wisdom}`).join('\n');
   return `\n## CLIENT-SPECIFIC KNOWLEDGE for ${c.displayName}\nThese are facts learned from previous runs for this specific client. Treat as authoritative for THIS run unless the page actively contradicts them:\n\n${lines}\n`;
+}
+
+/**
+ * Single-read helper for agent startup: returns active client, relevant entries,
+ * and formatted prompt section in one storage round-trip.
+ */
+export async function getClientStartupContext(currentUrl) {
+  const state = await _read();
+  if (!state.activeClientId) return { client: null, relevantEntries: [], promptSection: '' };
+  const c = state.clients[state.activeClientId];
+  if (!c) return { client: null, relevantEntries: [], promptSection: '' };
+  const relevantEntries = _filterEntries(c, currentUrl);
+  let promptSection = '';
+  if (relevantEntries.length) {
+    const lines = relevantEntries.map((e, i) => `${i + 1}. ${e.wisdom}`).join('\n');
+    promptSection = `\n## CLIENT-SPECIFIC KNOWLEDGE for ${c.displayName}\nThese are facts learned from previous runs for this specific client. Treat as authoritative for THIS run unless the page actively contradicts them:\n\n${lines}\n`;
+  }
+  return { client: c, relevantEntries, promptSection };
 }
 
 /**
