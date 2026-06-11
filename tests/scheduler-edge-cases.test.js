@@ -219,21 +219,48 @@ describe('executeScheduledTask — result storage failures', () => {
 });
 
 describe('badge error handling', () => {
-  test.skip('handles setBadgeText promise rejection', async () => {
-    // NOTE: Badge error paths are difficult to test with unit mocks
-    // The error handlers exist in code and are logged
+  test('handles setBadgeText promise rejection', async () => {
+    const schedule = await makeSchedule();
+    jest.clearAllMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([]);
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockRejectedValue(new Error('Tab blocked'));
+    chrome.action.setBadgeText.mockRejectedValue(new Error('Badge API error'));
+
+    await expect(executeScheduledTask('schedule-' + schedule.id)).resolves.toBeUndefined();
   });
 
-  test.skip('handles setBadgeBackgroundColor promise rejection', async () => {
-    // NOTE: Badge error paths are difficult to test with unit mocks
-    // The error handlers exist in code and are logged
+  test('handles setBadgeBackgroundColor promise rejection', async () => {
+    const schedule = await makeSchedule();
+    jest.clearAllMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([]);
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockRejectedValue(new Error('Tab blocked'));
+    chrome.action.setBadgeBackgroundColor.mockRejectedValue(new Error('Badge color API error'));
+
+    await expect(executeScheduledTask('schedule-' + schedule.id)).resolves.toBeUndefined();
   });
 });
 
 describe('notification error handling', () => {
-  test.skip('handles notification.create rejection gracefully', async () => {
-    // NOTE: Notification error paths are difficult to test with unit mocks
-    // The error handlers exist in code and are logged
+  test('handles notification.create rejection gracefully', async () => {
+    const schedule = await makeSchedule();
+    jest.clearAllMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([]);
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockRejectedValue(new Error('Tab blocked'));
+    chrome.notifications.create.mockRejectedValue(new Error('Notification API error'));
+
+    await expect(executeScheduledTask('schedule-' + schedule.id)).resolves.toBeUndefined();
   });
 });
 

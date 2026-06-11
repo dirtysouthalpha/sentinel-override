@@ -70,9 +70,25 @@ describe('quick-assist-handler edge cases', () => {
   });
 
   describe('timeout handling', () => {
-    test.skip('request timeout after 30 seconds (requires real timer)', async () => {
-      // Skipped: Testing actual 30s timeout requires real timers
-      // This is tested manually in integration tests
+    test('request timeout after 30 seconds', async () => {
+      jest.useFakeTimers();
+      try {
+        globalThis.fetch = jest.fn((_url, opts) => {
+          return new Promise((_resolve, reject) => {
+            opts.signal.addEventListener('abort', () => {
+              reject(new DOMException('Aborted', 'AbortError'));
+            });
+          });
+        });
+        const promise = handleQuickAssist('test prompt');
+        // Drain microtasks so getActiveProvider() resolves and setTimeout is registered
+        await Promise.resolve();
+        await Promise.resolve();
+        jest.advanceTimersByTime(30000);
+        await expect(promise).rejects.toThrow('Request timed out after 30 seconds');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     test('AbortError is caught and rethrown with user-friendly message', async () => {

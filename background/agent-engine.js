@@ -878,8 +878,7 @@ export function pushUndoStack(entry) {
  */
 async function _handleModeMismatchCheck(goal, modeDirective, runLogId, runLogBuffer) {
   try {
-    const stored = await chrome.storage.local.get(['approvalMode']);
-    const actualWants = stored.approvalMode ? 'approval' : 'autonomous';
+    const actualWants = _runSettings.approvalMode ? 'approval' : 'autonomous';
     if (modeDirective.wants === actualWants) {
       return { cancel: false };
     }
