@@ -609,12 +609,8 @@ class UAPServer {
       this.auditLog = this.auditLog.slice(-5000);
     }
 
-    // Persist to chrome.storage
-    chrome.storage.local.get(['uapAuditLog'], (result) => {
-      const log = result.uapAuditLog || [];
-      log.push(entry);
-      chrome.storage.local.set({ uapAuditLog: log.slice(-10000) });
-    });
+    // Persist to chrome.storage (use in-memory log — no need to re-read)
+    chrome.storage.local.set({ uapAuditLog: this.auditLog.slice(-10000) });
   }
 
   /**
@@ -633,7 +629,6 @@ class UAPServer {
   _performCleanup() {
     const now = Date.now();
     const hourAgo = now - 3600000;
-    const _dayAgo = now - 86400000;
 
     // Clean old rate limit entries
     for (const [clientId, limit] of this.rateLimits.entries()) {
