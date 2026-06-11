@@ -44,6 +44,13 @@ describe('run-queue', () => {
     await expect(promise).rejects.toThrow('Run cancelled');
   });
 
+  test('cancelPendingRun returns true when run is cancelled', async () => {
+    const promise = queueRun('cancel-target', 5);
+    const result = cancelPendingRun('cancel-target');
+    expect(result).toBe(true);
+    await expect(promise).rejects.toThrow('Run cancelled');
+  });
+
   test('cancelPendingRun returns false for non-existent goal', () => {
     expect(cancelPendingRun('nonexistent')).toBe(false);
   });
