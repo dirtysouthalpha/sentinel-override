@@ -58,4 +58,72 @@ describe('run-queue', () => {
     expect(status).toHaveProperty('recentCompleted');
     expect(status.maxConcurrent).toBe(5);
   });
+
+  test('canStartRun rejects when MAX_CONCURRENT_RUNS reached', () => {
+    for (let i = 0; i < 5; i++) {
+      registerRun(i + 10, `goal ${i}`, Promise.resolve());
+    }
+    const result = canStartRun(99);
+    expect(result.canStart).toBe(false);
+    expect(result.reason).toMatch(/Max concurrent/);
+  });
+
+  test('completeRun returns undefined for unknown tabId', () => {
+    expect(completeRun(999, { summary: 'oops' })).toBeUndefined();
+  });
+
+  test('completeRun trims completed list when over _maxCompleted', () => {
+    // Fill to _maxCompleted (50) by completing 50 runs, then add one more
+    for (let i = 0; i < 50; i++) {
+      registerRun(i, `goal ${i}`, Promise.resolve());
+      completeRun(i, { summary: 'done' });
+    }
+    registerRun(99, 'one more', Promise.resolve());
+    completeRun(99, { summary: 'trim me' });
+    const status = getQueueStatus();
+    expect(status.completedCount).toBe(50);
+  });
+
+  test('_processNextPending resolves queued run when slot opens', async () => {
+    // Fill to max concurrent
+    for (let i = 0; i < 5; i++) {
+      registerRun(i + 10, `goal ${i}`, Promise.resolve());
+    }
+    // Queue a pending run
+    const pending = queueRun('pending goal', 20);
+    expect(getQueueStatus().pendingCount).toBe(1);
+
+    // Complete one active run — should trigger _processNextPending
+    completeRun(10, { summary: 'done' });
+    const resolved = await pending;
+    expect(resolved).toEqual({ canStart: true, tabId: 20 });
+    expect(getQueueStatus().pendingCount).toBe(0);
+  });
+
+  test('resetQueue rejects all pending runs with Queue reset error', async () => {
+    const p1 = queueRun('goal-a', 1);
+    const p2 = queueRun('goal-b', 2);
+    resetQueue();
+    await expect(p1).rejects.toThrow('Queue reset');
+    await expect(p2).rejects.toThrow('Queue reset');
+  });
+
+  test('completeRun result.summary defaults to empty string', () => {
+    registerRun(1, 'goal', Promise.resolve());
+    const result = completeRun(1, {});
+    expect(result.result).toBe('');
+  });
+
+  test('getQueueStatus truncates long goal in activeRuns', () => {
+    const longGoal = 'X'.repeat(200);
+    registerRun(1, longGoal, Promise.resolve());
+    const status = getQueueStatus();
+    expect(status.activeRuns[0].goal.length).toBe(100);
+  });
+
+  test('getQueueStatus handles null goal in active run', () => {
+    registerRun(1, null, Promise.resolve());
+    const status = getQueueStatus();
+    expect(status.activeRuns[0].goal).toBe('');
+  });
 });

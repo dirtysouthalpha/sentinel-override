@@ -187,3 +187,45 @@ describe('clearSynthesis', () => {
     await expect(clearSynthesis()).resolves.not.toThrow();
   });
 });
+
+describe('synthesizeKnowledge - conflict detection (line 149)', () => {
+  test('flags conflict when similar items have confidence range > 0.3', async () => {
+    // Two items with nearly identical content but very different confidences → merge triggers hasConflicts
+    const result = await synthesizeKnowledge([
+      { type: 'action', content: 'the server is running normally without errors', confidence: 0.1, source: 'a' },
+      { type: 'action', content: 'the server is running normally without errors', confidence: 0.9, source: 'b' }
+    ]);
+    expect(result.conflicts.length).toBeGreaterThan(0);
+    const conflict = result.conflicts[0];
+    expect(conflict.severity).toBe('medium');
+    expect(conflict.type).toBe('action');
+  });
+});
+
+describe('synthesizeKnowledge - areContradictory returns false (line 458)', () => {
+  test('no conflict when items share words but both have negation', async () => {
+    // Both contain "not" → hasNegation1 === hasNegation2 → areContradictory returns false
+    const result = await synthesizeKnowledge([
+      { type: 'observation', content: 'the button is not visible on page', confidence: 0.5, source: 'a' },
+      { type: 'form',        content: 'the form is not visible on page', confidence: 0.5, source: 'b' }
+    ]);
+    // Cross-type conflict detection runs but finds no actual contradiction
+    const crossConflicts = result.conflicts.filter(c => c.type === 'cross_type');
+    expect(crossConflicts.length).toBe(0);
+  });
+});
+
+describe('storeSynthesis - entry trimming (line 473)', () => {
+  test('trims to MAX_SYNTHESIS_ENTRIES when storage has 1000+ entries', async () => {
+    const STORAGE_KEY = 'synthesized_knowledge_current';
+    const existingEntries = Array.from({ length: 1000 }, (_, i) => ({ id: i }));
+    chrome.storage.local.get.mockImplementationOnce(async () => ({
+      [STORAGE_KEY]: { entries: existingEntries }
+    }));
+    const synthesis = { synthesized: [], conflicts: [], gaps: [], summary: 'overflow' };
+    await storeSynthesis(synthesis);
+    const saved = storageMock[STORAGE_KEY];
+    expect(saved.entries.length).toBeLessThanOrEqual(1000);
+    expect(saved.entries[saved.entries.length - 1].summary).toBe('overflow');
+  });
+});
