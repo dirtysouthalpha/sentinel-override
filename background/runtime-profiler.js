@@ -585,10 +585,11 @@ export function monitorCanary(metrics) {
     return { status: 'inactive' };
   }
   
+  const stepCount = metrics.stepCount || 1;
   const sample = {
     timestamp: Date.now(),
-    errorRate: metrics.failures / metrics.stepCount,
-    avgStepTime: metrics.totalTime / metrics.stepCount,
+    errorRate: metrics.failures / stepCount,
+    avgStepTime: metrics.totalTime / stepCount,
     memoryUsage: metrics.memoryUsage
   };
   
