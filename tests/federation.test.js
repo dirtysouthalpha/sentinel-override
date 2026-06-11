@@ -763,4 +763,219 @@ describe('Federation Controller', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('init — enabled:true path', () => {
+    test('runs generateKeyPair and startRebalanceLoop when enabled', async () => {
+      const ctrl = federation;
+      ctrl.config.enabled = true;
+      try {
+        await ctrl.init();
+        expect(ctrl.keyPair).toBeDefined();
+        expect(ctrl.rebalanceTimer).not.toBeNull();
+      } finally {
+        clearInterval(ctrl.rebalanceTimer);
+        ctrl.rebalanceTimer = null;
+        ctrl.config.enabled = false;
+      }
+    });
+
+    test('shutdown clears rebalanceTimer when it is running', async () => {
+      const ctrl = federation;
+      ctrl.config.enabled = true;
+      try {
+        await ctrl.init();
+        expect(ctrl.rebalanceTimer).not.toBeNull();
+        await ctrl.shutdown();
+        expect(ctrl.rebalanceTimer).toBeNull();
+      } finally {
+        ctrl.config.enabled = false;
+      }
+    });
+  });
+
+  describe('loadConfig — edge branches', () => {
+    test('merges stored federationConfig when present', async () => {
+      const ctrl = federation;
+      // Pre-load storage data with a config
+      chrome.storage.local.get.mockImplementationOnce((_keys, cb) => {
+        process.nextTick(() => cb({ federationConfig: { maxPeers: 99 } }));
+      });
+      const prevMax = ctrl.config.maxPeers;
+      await ctrl.loadConfig();
+      expect(ctrl.config.maxPeers).toBe(99);
+      ctrl.config.maxPeers = prevMax; // restore
+    });
+
+    test('rejects when chrome.runtime.lastError is set', async () => {
+      chrome.storage.local.get.mockImplementationOnce((_keys, cb) => {
+        chrome.runtime = { ...chrome.runtime, lastError: { message: 'Storage read fail' } };
+        process.nextTick(() => {
+          cb({});
+          chrome.runtime.lastError = null;
+        });
+      });
+      await expect(federation.loadConfig()).rejects.toThrow('Storage read fail');
+    });
+  });
+
+  describe('assignSubGoal — peer filter branches', () => {
+    test('skips inactive peer', async () => {
+      federation.peers.set('peer-inactive', {
+        id: 'peer-inactive',
+        status: 'stalled',
+        capabilities: ['vision'],
+        load: { activeGoals: 0, lastSeen: Date.now() },
+        trust: { current: 85, history: [] },
+        maxGoals: 3
+      });
+      const jobId = 'inactive-filter-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        subGoals: [{ id: 'sg1', description: 'test', requirements: ['vision'], status: 'pending', assignedTo: null, result: null, attempts: 0 }],
+        assignedPeers: [], results: [], startTime: Date.now()
+      });
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+      expect(federation.activeJobs.get(jobId).subGoals[0].status).toBe('failed');
+    });
+
+    test('skips peer at max load', async () => {
+      federation.peers.set('peer-full', {
+        id: 'peer-full',
+        status: 'active',
+        capabilities: ['vision'],
+        load: { activeGoals: 3, lastSeen: Date.now() },
+        trust: { current: 85, history: [] },
+        maxGoals: 3
+      });
+      const jobId = 'full-load-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        subGoals: [{ id: 'sg1', description: 'test', requirements: ['vision'], status: 'pending', assignedTo: null, result: null, attempts: 0 }],
+        assignedPeers: [], results: [], startTime: Date.now()
+      });
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+      expect(federation.activeJobs.get(jobId).subGoals[0].status).toBe('failed');
+    });
+
+    test('skips peer below minTrustScore', async () => {
+      federation.peers.set('peer-low-trust', {
+        id: 'peer-low-trust',
+        status: 'active',
+        capabilities: ['vision'],
+        load: { activeGoals: 0, lastSeen: Date.now() },
+        trust: { current: 10, history: [] },
+        maxGoals: 3
+      });
+      const jobId = 'low-trust-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        subGoals: [{ id: 'sg1', description: 'test', requirements: ['vision'], status: 'pending', assignedTo: null, result: null, attempts: 0 }],
+        assignedPeers: [], results: [], startTime: Date.now()
+      });
+      await federation.assignSubGoal(jobId, federation.activeJobs.get(jobId).subGoals[0]);
+      expect(federation.activeJobs.get(jobId).subGoals[0].status).toBe('failed');
+    });
+
+    test('does not double-push peer into assignedPeers when already present', async () => {
+      federation.peers.set('peer-already-in', {
+        id: 'peer-already-in',
+        status: 'active',
+        capabilities: ['vision'],
+        load: { activeGoals: 0, lastSeen: Date.now() },
+        trust: { current: 85, history: [] },
+        maxGoals: 5
+      });
+      const jobId = 'already-in-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        subGoals: [
+          { id: 'sg1', description: 'first', requirements: ['vision'], status: 'pending', assignedTo: null, result: null, attempts: 0 },
+          { id: 'sg2', description: 'second', requirements: ['vision'], status: 'pending', assignedTo: null, result: null, attempts: 0 }
+        ],
+        assignedPeers: [], results: [], startTime: Date.now()
+      });
+      // Assign both sub-goals to the same peer
+      const job = federation.activeJobs.get(jobId);
+      await federation.assignSubGoal(jobId, job.subGoals[0]);
+      await federation.assignSubGoal(jobId, job.subGoals[1]);
+      // assignedPeers should contain the peer only once
+      expect(job.assignedPeers.filter(p => p === 'peer-already-in').length).toBe(1);
+    });
+  });
+
+  describe('updatePeerTrustScores — bonus/penalty branches', () => {
+    function makeJob(assignedAt) {
+      return {
+        id: 'trust-job',
+        goal: 'test',
+        subGoals: [{ id: 'sub-1', status: 'complete', assignedTo: 'peer-t', assignedAt }]
+      };
+    }
+
+    beforeEach(() => {
+      federation.peers.set('peer-t', {
+        id: 'peer-t',
+        trust: { current: 80, history: [] },
+        load: { activeGoals: 0 }
+      });
+    });
+
+    test('no findings and no evidence: only success bonus (+5)', () => {
+      const job = makeJob(Date.now() - 5000);
+      const results = [{ peerId: 'peer-t', subGoalId: 'sub-1' }]; // no findings, no evidence
+      federation.updatePeerTrustScores(job, results);
+      expect(federation.peers.get('peer-t').trust.current).toBe(85); // 80 + 5
+    });
+
+    test('empty findings array: no quality bonus', () => {
+      const job = makeJob(Date.now() - 5000);
+      const results = [{ peerId: 'peer-t', subGoalId: 'sub-1', findings: [] }];
+      federation.updatePeerTrustScores(job, results);
+      expect(federation.peers.get('peer-t').trust.current).toBe(85); // 80 + 5, no +3
+    });
+
+    test('slow sub-goal (>60s) applies speed penalty (-2)', () => {
+      const job = makeJob(Date.now() - 70000); // 70s ago
+      const results = [{ peerId: 'peer-t', subGoalId: 'sub-1' }];
+      federation.updatePeerTrustScores(job, results);
+      expect(federation.peers.get('peer-t').trust.current).toBe(83); // 80 + 5 - 2
+    });
+
+    test('skips result when peer is not found', () => {
+      const job = makeJob(Date.now() - 5000);
+      const results = [{ peerId: 'peer-missing', subGoalId: 'sub-1' }];
+      expect(() => federation.updatePeerTrustScores(job, results)).not.toThrow();
+    });
+  });
+
+  describe('calculateJobTrustScore — unknown peer fallback', () => {
+    test('uses 0 for peer trust when peer not in map', () => {
+      const job = { subGoals: [{ id: 's1' }, { id: 's2' }] };
+      const results = [{ peerId: 'ghost-peer', subGoalId: 's1' }]; // peer not registered
+      const score = federation.calculateJobTrustScore(job, results);
+      // peerScore = 0, completionRate = 1/2 = 0.5 → 0 * 0.5 = 0
+      expect(score).toBe(0);
+    });
+  });
+
+  describe('rebalance — null peer reference', () => {
+    test('handles missing peer for assigned subGoal gracefully', async () => {
+      const jobId = 'null-peer-job';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        status: 'running',
+        subGoals: [{
+          id: 'sub-np',
+          description: 'test',
+          requirements: ['vision'],
+          status: 'assigned',
+          assignedTo: 'peer-deleted', // peer not in the peers map
+          attempts: 0
+        }],
+        assignedPeers: ['peer-deleted'], results: [], startTime: Date.now()
+      });
+      // peer-deleted is not in federation.peers — rebalance should handle this gracefully
+      expect(() => federation.rebalance()).not.toThrow();
+    });
+  });
 });
