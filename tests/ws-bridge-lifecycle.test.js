@@ -509,3 +509,158 @@ describe('sendStatus — ws not open', () => {
     // No crash = pass
   });
 });
+
+// ===== Heartbeat callback body (lines 100-101) =====
+// Fake timers don't intercept ESM bare globals reliably; capture the callback directly.
+
+describe('heartbeat timer — callback body executes (lines 100-101)', () => {
+  function captureHeartbeat(callback) {
+    const origSetInterval = globalThis.setInterval;
+    let fn = null;
+    globalThis.setInterval = (cb, delay) => { fn = cb; return origSetInterval(cb, delay); };
+    return callback().then(() => { globalThis.setInterval = origSetInterval; return fn; });
+  }
+
+  test('calls sendStatus when heartbeat fires and ws is OPEN', async () => {
+    const heartbeatFn = await captureHeartbeat(async () => {
+      await startBridge();
+      latestWs.onopen();
+    });
+    expect(heartbeatFn).not.toBeNull();
+    latestWs.send.mockClear();
+    heartbeatFn(); // true branch: ws is OPEN → sendStatus()
+    await flushAsync();
+    const calls = latestWs.send.mock.calls.map(c => JSON.parse(c[0]));
+    expect(calls.find(m => m.type === 'status')).toBeDefined();
+  });
+
+  test('skips sendStatus when ws is not OPEN (false branch, line 100)', async () => {
+    const heartbeatFn = await captureHeartbeat(async () => {
+      await startBridge();
+      latestWs.onopen();
+    });
+    latestWs.readyState = MockWebSocket.CLOSED; // ws exists but not OPEN
+    latestWs.send.mockClear();
+    heartbeatFn(); // false branch: condition fails, sendStatus not called
+    await flushAsync();
+    expect(latestWs.send).not.toHaveBeenCalled();
+  });
+});
+
+// ===== scheduleReconnect callback body (line 152) =====
+
+describe('scheduleReconnect — callback body executes (line 152)', () => {
+  function captureReconnect(callback) {
+    let fn = null;
+    const origSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = (cb) => { fn = cb; }; // capture but don't schedule
+    callback();
+    globalThis.setTimeout = origSetTimeout;
+    return fn;
+  }
+
+  test('calls connect() when reconnect fires while enabled (true branch)', async () => {
+    await startBridge();
+    latestWs.onopen();
+    const wsBefore = wsInstances.length;
+    const reconnectFn = captureReconnect(() => latestWs.onclose());
+    expect(reconnectFn).not.toBeNull();
+    reconnectFn(); // enabled=true → connect() → new WebSocket
+    expect(wsInstances.length).toBeGreaterThan(wsBefore);
+  });
+
+  test('skips connect() when bridge is disabled (false branch, line 152)', async () => {
+    await startBridge();
+    latestWs.onopen();
+    const wsBefore = wsInstances.length;
+    const reconnectFn = captureReconnect(() => latestWs.onclose());
+    expect(reconnectFn).not.toBeNull();
+    stopBridge(); // enabled=false
+    reconnectFn(); // enabled=false → connect() not called
+    expect(wsInstances.length).toBe(wsBefore);
+  });
+});
+
+// ===== sendResponse when ws is closed (line 300 false branch) =====
+
+describe('sendResponse — skips send when ws is not open', () => {
+  test('does not call ws.send when readyState is CLOSED', async () => {
+    await startAndConnect();
+    latestWs.readyState = MockWebSocket.CLOSED; // ws exists but not OPEN
+    latestWs.send.mockClear();
+    // Trigger sendResponse via unauthenticated task (authenticated=false after reset)
+    await sendMessage({ type: 'task', goal: 'x', request_id: 'closed-test' });
+    expect(latestWs.send).not.toHaveBeenCalled();
+  });
+});
+
+// ===== sendResponse with falsy requestId (line 301 false branch) =====
+
+describe('sendResponse — omits request_id when requestId is falsy (line 301)', () => {
+  test('response has no request_id field when message sent without request_id', async () => {
+    await startAndConnect();
+    latestWs.send.mockClear();
+    // Sending without request_id → requestId=undefined → if(requestId) false branch
+    await sendMessage({ type: 'task', goal: 'no-id-test' });
+    const calls = latestWs.send.mock.calls.map(c => JSON.parse(c[0]));
+    const errMsg = calls.find(m => m.type === 'error');
+    expect(errMsg).toBeDefined();
+    expect(errMsg.request_id).toBeUndefined();
+  });
+});
+
+// ===== sendStatus early return when ws closed (line 307 true branch) =====
+
+describe('sendStatus — early return when ws is not open', () => {
+  test('does not crash when ws is null at sendStatus call time', async () => {
+    await startAndConnect();
+    await sendMessage({ type: 'auth', success: true });
+    // _resetBridgeForTest sets ws=null; sendStatus guard fires on next call
+    _resetBridgeForTest();
+    setAuthTokenForTest('test-bridge-token');
+    // Simulate sending auth again — sendStatus fires but ws is now null → early return
+    await startBridge();
+    latestWs.onopen();
+    latestWs.readyState = MockWebSocket.CLOSED;
+    latestWs.send.mockClear();
+    await sendMessage({ type: 'auth', success: true });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    // No crash; send was not called because ws.readyState !== OPEN
+    expect(latestWs.send).not.toHaveBeenCalled();
+  });
+});
+
+// ===== _resetBridgeForTest with active heartbeatTimer (line 338) =====
+
+describe('_resetBridgeForTest — clears active heartbeatTimer (line 338)', () => {
+  test('calls clearInterval when heartbeatTimer is set before reset', async () => {
+    await startBridge();
+    latestWs.onopen(); // sets heartbeatTimer
+    const clearIntervalSpy = jest.spyOn(globalThis, 'clearInterval');
+    _resetBridgeForTest(); // heartbeatTimer is set → executes line 338 branch
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    clearIntervalSpy.mockRestore();
+  });
+});
+
+// ===== computeChallengeResponse: digestSync path (line 207) =====
+
+describe('computeChallengeResponse — uses digestSync when available (line 207)', () => {
+  test('produces hex digest from digestSync result', async () => {
+    const origCrypto = globalThis.crypto;
+    const mockDigestSync = jest.fn(() => new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
+    globalThis.crypto = { subtle: { digestSync: mockDigestSync } };
+    try {
+      await startAndConnect();
+      latestWs.send.mockClear();
+      await sendMessage({ type: 'auth_challenge', nonce: 'nonce123' });
+      expect(mockDigestSync).toHaveBeenCalledWith('SHA-256', expect.any(Uint8Array));
+      const calls = latestWs.send.mock.calls.map(c => JSON.parse(c[0]));
+      const resp = calls.find(m => m.type === 'auth_challenge_response');
+      expect(resp).toBeDefined();
+      expect(resp.response).toBe('deadbeef');
+    } finally {
+      globalThis.crypto = origCrypto;
+    }
+  });
+});
