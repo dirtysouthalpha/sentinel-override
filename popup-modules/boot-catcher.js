@@ -53,9 +53,7 @@ setTimeout(() => {
         __showBootBanner('[SW] NOT REACHABLE: ' + (chrome.runtime.lastError.message || 'unknown'), '#ff0040');
         return;
       }
-      if (resp && (resp.pong || resp.data?.pong)) {
-        console.log('[Sentinel/BOOT] SW alive, agentRunning:', resp.agentRunning || resp.data?.agentRunning);
-      } else {
+      if (!(resp && (resp.pong || resp.data?.pong))) {
         __showBootBanner('[SW] Unexpected response: ' + JSON.stringify(resp), '#ff8800');
       }
     });
@@ -71,21 +69,9 @@ setTimeout(() => {
     let hasKey = false;
     if (activeId && providers && providers[activeId] && providers[activeId].api_key) {
       hasKey = true;
-      console.log('[Sentinel/BOOT] Provider:', activeId, 'model:', providers[activeId].model);
     } else if (legacyKey) {
       hasKey = true;
-      console.log('[Sentinel/BOOT] Legacy provider key found');
     }
-
-    // Dump what we actually found in storage for debugging
-    const debugInfo = {
-      active_provider: activeId || '(empty)',
-      providers: providers ? Object.keys(providers) : '(empty)',
-      legacy_api_key: legacyKey ? '(has key)' : '(empty)',
-      activeConfig: (activeId && providers && providers[activeId]) ?
-        { api_key: providers[activeId].api_key ? '(has key)' : '(NO KEY)', endpoint: providers[activeId].endpoint, model: providers[activeId].model } : '(none)'
-    };
-    console.log('[Sentinel/BOOT] Storage state:', JSON.stringify(debugInfo, null, 2));
 
     if (!hasKey) {
       __showBootBanner('[CONFIG] No API key found — active_provider=' + (activeId || 'null') + ' providers=' + (providers ? Object.keys(providers).join(',') : 'null'), '#ffaa00');

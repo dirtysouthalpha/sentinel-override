@@ -92,4 +92,3 @@ export function getRetryCount(operationId) {
   return retryCounts.get(operationId) || 0;
 }
 
-console.log('[AGENT-RECOVERY] Module loaded');

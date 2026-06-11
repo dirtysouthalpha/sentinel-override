@@ -227,5 +227,4 @@ export async function getActivePlugins() {
   return active;
 }
 
-console.log('[PLUGIN-REGISTRY] Module loaded');
 

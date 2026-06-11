@@ -1159,7 +1159,6 @@ function hideStatus() {
 function _safeSendMessage(origin) {
   // send handler entry
   try {
-    console.log(`[Sentinel] (delegated:${origin}) → sendMessage()`);
     if (typeof sendMessage !== 'function') {
       console.error('[Sentinel] sendMessage is not a function');
       return;
@@ -1186,8 +1185,6 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
     if (!btn) return;
     _safeSendMessage('click');
   });
-  console.log('[Sentinel] delegated send handlers attached');
-  // delegated send handlers attached
 }
 
 // Input listeners (auto-resize, example-prompt buttons, Enter key, send button)
@@ -1262,8 +1259,6 @@ if (injectContextInput) {
 }
 
 function sendMessage() {
-  console.log('[Sentinel] sendMessage() called');
-
   if (typeof showToast !== 'function') {
     console.error('[Sentinel] showToast not available — initialization incomplete');
     alert('Extension not fully loaded. Please close and reopen the popup.');
@@ -1299,14 +1294,11 @@ function sendMessage() {
 
   const goal = _goalInput.value.trim();
   if (!goal) {
-    console.log('[Sentinel] sendMessage: empty goal, ignoring');
     return;
   }
-  console.log('[Sentinel] sendMessage: goal length=' + goal.length);
   // If agent is already running, send text as a mid-run correction instead of a new goal.
   const _isAgentRunning = activeIndicator && activeIndicator.classList.contains('active');
   if (_isAgentRunning) {
-    console.log('[Sentinel] Agent running — sending as correction:', goal);
     const _correctionTabId = __atsStripState.tabId || null;
     chrome.runtime.sendMessage({
       action: 'agent_correction',
@@ -1394,10 +1386,7 @@ The user wants you to continue or adjust the previous task. Look at the current 
     // MV3 service workers can be inactive when the popup opens, causing
     // sendMessage to silently fail. The ping ensures the SW is alive.
     const _sendGoal = () => {
-      console.log('[Sentinel] _sendGoal: sending run_agent_loop, goal length=' + fullGoal.length);
-      // Sending goal to agent
       chrome.runtime.sendMessage({ action: 'run_agent_loop', goal: fullGoal }, (response) => {
-        console.log('[Sentinel] run_agent_loop response:', JSON.stringify(response));
         if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
           console.error('[Sentinel] run_agent_loop lastError:', getErrorMessage(chrome.runtime.lastError));
           // Agent runtime error — already logged
@@ -1414,10 +1403,6 @@ The user wants you to continue or adjust the previous task. Look at the current 
           resetUI();
         }
         // If response is ok, the agent is running — agent_finished will reset UI
-        if (response && response.ok) {
-          console.log('[Sentinel] Agent started successfully');
-          // Agent started successfully
-        }
       });
     };
 
@@ -1426,8 +1411,6 @@ The user wants you to continue or adjust the previous task. Look at the current 
       // Consume any lastError from the ping so it doesn't poison the next call
       void chrome.runtime.lastError;
       const pong = pingResp && (pingResp.pong || pingResp.data?.pong);
-      console.log('[Sentinel] SW ping response:', pong ? 'alive' : 'dead', JSON.stringify(pingResp));
-      // SW ping result already logged
       if (pong) {
         _sendGoal();
       } else {

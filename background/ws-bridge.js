@@ -328,4 +328,3 @@ export function setAuthTokenForTest(token) { authToken = token; }
 
 // ========== Auto-start ==========
 // Start the bridge connection when this module loads
-console.log('[WS-BRIDGE] Module loaded, will connect to bridge server');

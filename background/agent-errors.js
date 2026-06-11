@@ -80,4 +80,3 @@ export function fromApiResponse(json) {
   });
 }
 
-console.log('[AGENT-ERRORS] Module loaded');
