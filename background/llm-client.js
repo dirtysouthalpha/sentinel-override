@@ -2025,6 +2025,16 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   if (!CONFIG) throw new Error('CONFIG is required');
   const _apiStart = Date.now();
   _rateLimiter.check();
+  // Credit protection: check daily limit before making API call
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+      const limitCheck = await chrome.runtime.sendMessage({ action: 'check_credit_limit' }).catch(() => null);
+      if (limitCheck && !limitCheck.allowed) {
+        console.warn('[Sentinel/LLM] Daily credit limit exceeded');
+        return { type: 'finish', summary: 'Daily credit limit reached. Increase limit in Settings or wait until tomorrow.' };
+      }
+    }
+  } catch (_e) { /* non-fatal — allow call if check fails */ }
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
   if (!providerConfig) {
@@ -2283,6 +2293,13 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     agentState.estimatedCostUsd = estimateCostUsd(agentState.totalInputTokens, agentState.totalOutputTokens, model);
     // Multi-provider cost tracking by tier
     recordModelUsage(agentState._lastModelTier || 'default', _in, _out);
+    // Credit protection: record usage for daily limit tracking
+    try {
+      const _msg = { action: 'record_credit_usage', inputTokens: _in, outputTokens: _out, model };
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage(_msg).catch(() => {});
+      }
+    } catch (_e) { /* non-fatal */ }
   }
   if (_u.cache_read_input_tokens)    agentState.totalCacheReadTokens  = (agentState.totalCacheReadTokens  || 0) + _u.cache_read_input_tokens;
   if (_u.cache_creation_input_tokens) agentState.totalCacheWriteTokens = (agentState.totalCacheWriteTokens || 0) + _u.cache_creation_input_tokens;

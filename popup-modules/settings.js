@@ -1592,3 +1592,203 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   refreshPluginList();
 })();
+
+// ========== Quick Model Switcher (free OpenRouter models) ==========
+(function wireQuickModelSwitcher() {
+  const select = document.getElementById('quickModelSelect');
+  if (!select) return;
+
+  // Free OpenRouter models with vision + tool support
+  const FREE_MODELS = [
+    { id: 'nex-agi/nex-n2-pro:free', label: 'Nex-N2-Pro (vision+tools)', vision: true, tools: true },
+    { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B (vision+tools)', vision: true, tools: true },
+    { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 3 Super (1M ctx)', vision: false, tools: true },
+    { id: 'poolside/laguna-m.1:free', label: 'Poolside Laguna (coding)', vision: false, tools: true },
+  ];
+
+  // Build dropdown
+  select.innerHTML = '';
+  for (const m of FREE_MODELS) {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.label;
+    select.appendChild(opt);
+  }
+
+  // Load saved selection
+  chrome.storage.local.get(['quick_model', 'active_provider', 'providers'], (result) => {
+    if (chrome.runtime.lastError) return;
+    const saved = result.quick_model || '';
+    if (saved && FREE_MODELS.some(m => m.id === saved)) {
+      select.value = saved;
+    } else {
+      // Default to first model
+      select.value = FREE_MODELS[0].id;
+    }
+    // Ensure provider is set to openrouter with the key
+    _ensureOpenRouterConfig(result);
+  });
+
+  // On model change: save + update provider config
+  select.addEventListener('change', () => {
+    const modelId = select.value;
+    if (!modelId) return;
+    try { localStorage.setItem('quick_model', modelId); } catch (_e) { /* non-fatal */ }
+    chrome.storage.local.set({ quick_model: modelId });
+
+    // Auto-switch provider to openrouter with this model
+    chrome.storage.local.get(['active_provider', 'providers'], (result) => {
+      if (chrome.runtime.lastError) return;
+      const providers = result.providers || {};
+      const orConfig = providers.openrouter || providers.nexn2 || {};
+
+      // If openrouter config exists, just update the model
+      if (orConfig.api_key) {
+        providers.openrouter = { ...orConfig, model: modelId };
+        chrome.storage.local.set({
+          active_provider: 'openrouter',
+          providers
+        }, () => {
+          if (!chrome.runtime.lastError) {
+            try { showToast(`Switched to ${modelId.split('/').pop()}`, 'success'); } catch (_e) { /* non-fatal */ }
+          }
+        });
+      } else {
+        // No openrouter key yet — prompt user to add it in settings
+        try { showToast('Set your OpenRouter API key in Settings first', 'info'); } catch (_e) { /* non-fatal */ }
+      }
+    });
+  });
+
+  function _ensureOpenRouterConfig(result) {
+    const providers = result.providers || {};
+    if (providers.openrouter && providers.openrouter.api_key) return; // already configured
+    // Check if any other openrouter-compatible provider has a key
+    for (const key of ['nexn2', 'gemma4', 'nemotron', 'poolside']) {
+      if (providers[key] && providers[key].api_key) {
+        // Migrate key to openrouter
+        providers.openrouter = { ...providers[key], model: select.value };
+        chrome.storage.local.set({ providers });
+        return;
+      }
+    }
+  }
+
+})();
+
+// ========== OpenRouter Credit Protection ==========
+(function wireCreditProtection() {
+  const badge = document.getElementById('quickModelCreditBadge');
+  if (!badge) return;
+
+  const DAILY_LIMIT = 5.00; // $5/day limit (configurable)
+
+  function _loadCreditData(callback) {
+    chrome.storage.local.get(['credit_usage', 'credit_limit'], (result) => {
+      if (chrome.runtime.lastError) { callback(null); return; }
+      const today = new Date().toISOString().split('T')[0];
+      const usage = result.credit_usage || {};
+      const todayUsage = usage[today] || { tokens: 0, cost: 0, calls: 0 };
+      const limit = result.credit_limit || DAILY_LIMIT;
+      callback({ todayUsage, limit, today });
+    });
+  }
+
+  // Expose for background to call after each LLM response
+  window._recordCreditUsage = function(inputTokens, outputTokens, model) {
+    chrome.storage.local.get(['credit_usage'], (result) => {
+      if (chrome.runtime.lastError) return;
+      const today = new Date().toISOString().split('T')[0];
+      const usage = result.credit_usage || {};
+      if (!usage[today]) usage[today] = { tokens: 0, cost: 0, calls: 0 };
+
+      // Free models = $0 cost, but track tokens for rate limiting
+      const isFree = (model || '').includes(':free');
+      const costPerToken = isFree ? 0 : 0.000003; // rough estimate for paid
+      const addedCost = ((inputTokens || 0) + (outputTokens || 0)) * costPerToken;
+
+      usage[today].tokens += (inputTokens || 0) + (outputTokens || 0);
+      usage[today].cost += addedCost;
+      usage[today].calls++;
+
+      // Keep only last 7 days
+      const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+      for (const key of Object.keys(usage)) {
+        if (key < cutoff) delete usage[key];
+      }
+
+      chrome.storage.local.set({ credit_usage: usage });
+      _refreshBadge();
+    });
+  };
+
+  function _refreshBadge() {
+    _loadCreditData((data) => {
+      if (!data) { badge.style.display = 'none'; return; }
+      const { todayUsage, limit } = data;
+      const pct = limit > 0 ? (todayUsage.cost / limit) * 100 : 0;
+
+      if (todayUsage.calls === 0) {
+        badge.style.display = 'none';
+        return;
+      }
+
+      badge.style.display = '';
+      badge.textContent = `$${todayUsage.cost.toFixed(2)}`;
+      badge.title = `Today: ${todayUsage.calls} calls, ${todayUsage.tokens.toLocaleString()} tokens, $${todayUsage.cost.toFixed(4)} / $${limit.toFixed(2)} limit`;
+
+      badge.classList.remove('warn', 'danger');
+      if (pct >= 90) badge.classList.add('danger');
+      else if (pct >= 70) badge.classList.add('warn');
+    });
+  }
+
+  // Refresh on load
+  _refreshBadge();
+
+  // Expose for background to check before calls
+  window._checkCreditLimit = function(callback) {
+    _loadCreditData((data) => {
+      if (!data) { callback(true); return; } // allow if unknown
+      const { todayUsage, limit } = data;
+      const allowed = todayUsage.cost < limit;
+      if (!allowed) {
+        try { showToast('Daily credit limit reached! Increase in Settings or wait until tomorrow.', 'error'); } catch (_e) { /* non-fatal */ }
+      }
+      callback(allowed);
+    });
+  };
+})();
+
+// ========== Credit Limit Settings UI ==========
+(function wireCreditLimitUI() {
+  const limitInput = document.getElementById('creditLimitInput');
+  const usageDisplay = document.getElementById('creditUsageDisplay');
+  if (!limitInput || !usageDisplay) return;
+
+  // Load saved limit
+  chrome.storage.local.get(['credit_limit', 'credit_usage'], (result) => {
+    if (chrome.runtime.lastError) return;
+    const limit = result.credit_limit || 5.00;
+    limitInput.value = limit;
+
+    const today = new Date().toISOString().split('T')[0];
+    const usage = result.credit_usage || {};
+    const todayUsage = usage[today] || { tokens: 0, cost: 0, calls: 0 };
+    usageDisplay.textContent = `$${todayUsage.cost.toFixed(2)} / $${limit.toFixed(2)} (${todayUsage.calls} calls, ${todayUsage.tokens.toLocaleString()} tokens)`;
+  });
+
+  // Save limit on change
+  limitInput.addEventListener('change', () => {
+    const val = parseFloat(limitInput.value);
+    if (isNaN(val) || val < 0) {
+      try { showToast('Enter a valid limit', 'error'); } catch (_e) { /* non-fatal */ }
+      return;
+    }
+    chrome.storage.local.set({ credit_limit: val }, () => {
+      if (!chrome.runtime.lastError) {
+        try { showToast(`Daily limit set to $${val.toFixed(2)}`, 'success'); } catch (_e) { /* non-fatal */ }
+      }
+    });
+  });
+})();

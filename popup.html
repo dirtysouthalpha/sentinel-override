@@ -139,6 +139,14 @@
       <span class="search-result-count" id="searchCount" style="display: none;"></span>
     </div>
     <div class="toolbar-divider"></div>
+    <!-- Quick-switch model dropdown (free OpenRouter models) -->
+    <div id="quickModelSwitcher" class="quick-model-switcher" title="Switch AI model on the fly">
+      <select id="quickModelSelect" class="quick-model-select">
+        <option value="">Loading models...</option>
+      </select>
+      <span id="quickModelCreditBadge" class="credit-badge" title="Daily usage" style="display:none;">$0.00</span>
+    </div>
+    <div class="toolbar-divider"></div>
     <button class="toolbar-icon-btn" id="previewBtn" title="Markdown preview">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -350,6 +358,22 @@
 
         <!-- Test connection -->
         <button type="button" id="testConnectionBtn" class="form-btn-sm" style="width:100%;padding:8px;font-size:13px;">🔌 Test Connection</button>
+
+        <!-- ══════ CREDIT PROTECTION ══════ -->
+        <div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-top:10px;">
+          <div class="settings-card-title" style="font-size:12px;margin-bottom:8px;">🛡️ Credit Protection (OpenRouter)</div>
+          <div class="form-grid-2">
+            <div class="modal-field">
+              <label>Daily Limit ($)</label>
+              <input type="number" id="creditLimitInput" class="form-input" min="0" step="0.50" value="5.00" placeholder="5.00">
+            </div>
+            <div class="modal-field">
+              <label>Today's Usage</label>
+              <div id="creditUsageDisplay" style="padding:8px;background:var(--bg-tertiary);border-radius:4px;font-size:12px;color:var(--text-secondary);">$0.00 / $5.00 (0 calls)</div>
+            </div>
+          </div>
+          <div class="text-subtle" style="margin-top:6px;font-size:10px;">Free models cost $0. Limit prevents accidental spend on paid models. Resets daily.</div>
+        </div>
 
         <!-- Persisted-state indicator -->
         <div id="providerSaveStatus" role="status" aria-live="polite" style="display:none;font-size:11px;margin-top:6px;font-weight:600;"></div>

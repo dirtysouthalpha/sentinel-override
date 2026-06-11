@@ -374,6 +374,52 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
         return { ok: false, error: getErrorMessage(e) };
       }
     }
+    case 'record_credit_usage': {
+      // Credit protection: record token usage for daily limit tracking
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const inputTokens = request.inputTokens || 0;
+        const outputTokens = request.outputTokens || 0;
+        const model = request.model || '';
+
+        const stored = await chrome.storage.local.get(['credit_usage', 'credit_limit']);
+        const usage = stored.credit_usage || {};
+        if (!usage[today]) usage[today] = { tokens: 0, cost: 0, calls: 0 };
+
+        // Free models = $0 cost, but track tokens for rate limiting
+        const isFree = (model || '').includes(':free');
+        const costPerToken = isFree ? 0 : 0.000003;
+        const addedCost = (inputTokens + outputTokens) * costPerToken;
+
+        usage[today].tokens += inputTokens + outputTokens;
+        usage[today].cost += addedCost;
+        usage[today].calls++;
+
+        // Keep only last 7 days
+        const cutoff = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+        for (const key of Object.keys(usage)) {
+          if (key < cutoff) delete usage[key];
+        }
+
+        await chrome.storage.local.set({ credit_usage: usage });
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: getErrorMessage(e) };
+      }
+    }
+    case 'check_credit_limit': {
+      // Credit protection: check if daily limit exceeded
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const stored = await chrome.storage.local.get(['credit_usage', 'credit_limit']);
+        const usage = stored.credit_usage || {};
+        const todayUsage = usage[today] || { tokens: 0, cost: 0, calls: 0 };
+        const limit = stored.credit_limit || 5.00;
+        return { allowed: todayUsage.cost < limit, usage: todayUsage, limit };
+      } catch (e) {
+        return { allowed: true, error: getErrorMessage(e) };
+      }
+    }
     case 'check_resume_available': {
       // (3.9.0) Look for a recent checkpoint that suggests an interrupted run.
       try {
