@@ -128,14 +128,6 @@ const _bootTimer = setTimeout(() => {
   if (!goalInput) console.error('[Sentinel/BOOT] goalInput NOT FOUND in DOM');
   if (!sendBtn) console.error('[Sentinel/BOOT] sendBtn NOT FOUND in DOM');
 
-  // Nuclear fallback: if chat.js listeners failed to attach, attach them here
-  if (sendBtn && goalInput) {
-    const _listeners = typeof getEventListeners === 'function' ? getEventListeners(sendBtn) : null;
-    // We can't check listeners in production, so only log when something is wrong
-    if (errors.length > 0 || !goalInput || !sendBtn) {
-      console.log('[Sentinel/BOOT] sendBtn + goalInput present — UI should work');
-    }
-  }
 }, 500);
 window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true });
 
