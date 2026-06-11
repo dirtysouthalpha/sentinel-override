@@ -84,8 +84,9 @@ describe('Error helpers', () => {
 
 describe('ERROR_CODES', () => {
   test('all expected codes are defined', () => {
-    const expected = ['TAB_CLOSED', 'LLM_TIMEOUT', 'LLM_ERROR', 'LLM_RATE_LIMITED',
-      'SELECTOR_MISS', 'AUTH_REQUIRED', 'NETWORK_ERROR', 'MAX_RETRIES_EXCEEDED',
+    const expected = ['TAB_CLOSED', 'TAB_NOT_FOUND', 'LLM_TIMEOUT', 'LLM_ERROR', 'LLM_RATE_LIMITED',
+      'SELECTOR_MISS', 'EXECUTE_JS_FAILED', 'AUTH_REQUIRED', 'CAPTCHA_DETECTED',
+      'NETWORK_ERROR', 'STORAGE_ERROR', 'PLUGIN_ERROR', 'MAX_RETRIES_EXCEEDED',
       'USER_ABORTED', 'UNKNOWN'];
     for (const code of expected) {
       expect(ERROR_CODES[code]).toBe(code);
