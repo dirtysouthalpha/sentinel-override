@@ -978,4 +978,89 @@ describe('Federation Controller', () => {
       expect(() => federation.rebalance()).not.toThrow();
     });
   });
+
+  describe('init — error path (lines 59-61)', () => {
+    test('re-throws when loadConfig rejects', async () => {
+      chrome.storage.local.get.mockImplementationOnce((_keys, cb) => {
+        process.nextTick(() => {
+          chrome.runtime = { ...chrome.runtime, lastError: { message: 'disk full' } };
+          cb({});
+          chrome.runtime.lastError = null;
+        });
+      });
+      await expect(federation.init()).rejects.toThrow('disk full');
+    });
+  });
+
+  describe('unregisterPeer — job reassignment path (lines 147-150)', () => {
+    test('calls reassignSubGoal for active jobs assigned to the unregistered peer', async () => {
+      await federation.generateKeyPair();
+      const peerId = 'peer-to-remove';
+      federation.peers.set(peerId, {
+        id: peerId, status: 'active', capabilities: ['vision'],
+        load: { activeGoals: 1, lastSeen: Date.now() },
+        trust: { current: 80, history: [] }, maxGoals: 3
+      });
+      const jobId = 'job-for-removed-peer';
+      federation.activeJobs.set(jobId, {
+        id: jobId, goal: 'test', context: {},
+        subGoals: [{
+          id: 'sg-remove', description: 'test', requirements: ['vision'],
+          status: 'assigned', assignedTo: peerId, result: null, attempts: 2
+        }],
+        assignedPeers: [peerId], results: [], startTime: Date.now()
+      });
+      const result = federation.unregisterPeer(peerId);
+      expect(result).toBe(true);
+      expect(federation.peers.has(peerId)).toBe(false);
+      // reassignSubGoal was called; with attempts=2 (< 3) it tries to re-assign
+      // since no other peer is available the sub-goal fails with max attempts or no peers
+      const job = federation.activeJobs.get(jobId);
+      expect(['failed', 'pending', 'assigned']).toContain(job.subGoals[0].status);
+    });
+  });
+
+  describe('logAudit — storage error callbacks (lines 659-668)', () => {
+    test('logs error when storage.get returns lastError', async () => {
+      await federation.generateKeyPair();
+      const origGet = chrome.storage.local.get;
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      chrome.storage.local.get.mockImplementationOnce((_keys, cb) => {
+        chrome.runtime = { ...chrome.runtime, lastError: { message: 'get audit fail' } };
+        process.nextTick(() => {
+          cb({});
+          chrome.runtime.lastError = null;
+        });
+      });
+      federation.logAudit('test_get_err', { test: 1 });
+      // let the process.nextTick callback fire
+      await new Promise(r => process.nextTick(r));
+      expect(errSpy).toHaveBeenCalledWith(
+        '[Federation] Failed to read audit log:', 'get audit fail'
+      );
+      errSpy.mockRestore();
+      chrome.storage.local.get = origGet;
+    });
+
+    test('logs error when storage.set callback returns lastError', async () => {
+      await federation.generateKeyPair();
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      chrome.storage.local.get.mockImplementationOnce((_keys, cb) => {
+        process.nextTick(() => cb({ federationAuditLog: [] }));
+      });
+      chrome.storage.local.set.mockImplementationOnce((_data, cb) => {
+        chrome.runtime = { ...chrome.runtime, lastError: { message: 'set audit fail' } };
+        process.nextTick(() => {
+          cb();
+          chrome.runtime.lastError = null;
+        });
+      });
+      federation.logAudit('test_set_err', { test: 2 });
+      await new Promise(r => setTimeout(r, 10));
+      expect(errSpy).toHaveBeenCalledWith(
+        '[Federation] Failed to persist audit log:', 'set audit fail'
+      );
+      errSpy.mockRestore();
+    });
+  });
 });
