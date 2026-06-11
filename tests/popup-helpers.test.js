@@ -224,3 +224,21 @@ describe('global aliases', () => {
     expect(window.formatDuration).toBe(Helpers.formatDuration);
   });
 });
+
+describe('Helpers.getErrorMessage (lines 23-25)', () => {
+  test('returns string directly when err is a string (line 23)', () => {
+    expect(Helpers.getErrorMessage('something failed')).toBe('something failed');
+    expect(Helpers.getErrorMessage('')).toBe('');
+  });
+
+  test('returns err.message when err is an Error object (line 24)', () => {
+    expect(Helpers.getErrorMessage(new Error('oops'))).toBe('oops');
+    expect(Helpers.getErrorMessage({ message: 'custom msg' })).toBe('custom msg');
+  });
+
+  test('returns String(err) for non-string non-Error value (line 25)', () => {
+    expect(Helpers.getErrorMessage(42)).toBe('42');
+    expect(Helpers.getErrorMessage(null)).toBe('');
+    expect(Helpers.getErrorMessage(undefined)).toBe('');
+  });
+});

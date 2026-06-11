@@ -248,6 +248,21 @@ describe('reasoning-trace — additional branch coverage', () => {
     expect(low[0].data.confidence).toBe(0.2);
   });
 
+  test('getReasoningTrace: returns from cache without hitting storage when trace is cached (line 121)', async () => {
+    await initReasoningTrace({ goal: 'cache-hit-test' });
+    // Derive runId from the key written to storage during init (format: reasoning_trace_<runId>)
+    const storageKey = Object.keys(storageMock).find(k => k.startsWith('reasoning_trace_'));
+    const runId = storageMock[storageKey].runId;
+    chrome.storage.local.get.mockClear();
+
+    const trace = await getReasoningTrace(runId);
+
+    expect(trace).not.toBeNull();
+    expect(trace.runId).toBe(runId);
+    // Line 121: cache hit — no storage read should occur
+    expect(chrome.storage.local.get).not.toHaveBeenCalled();
+  });
+
   test('_persistTrace timer-replaced guard: second captureReasoningStep replaces pending timer', async () => {
     // Line 35: when _persistTrace is called again before the timer fires, the old timerId
     // is replaced in _pendingWrites. If Jest fires the old timer anyway, the guard returns early.
