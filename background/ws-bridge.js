@@ -2,6 +2,8 @@
 // Connects to SENTINEL PRIME bridge server for external orchestration.
 // Receives task/query/cancel commands and routes to the agent engine.
 
+import { getErrorMessage } from './error-utils.js';
+
 // ========== Configuration ==========
 const BRIDGE_URL = 'ws://localhost:8001/extension-bridge';
 const RECONNECT_BASE_MS = 1000;
@@ -77,7 +79,7 @@ function connect() {
   try {
     ws = new WebSocket(BRIDGE_URL);
   } catch (e) {
-    console.warn('[WS-BRIDGE] Failed to create WebSocket:', e.message);
+    console.warn('[WS-BRIDGE] Failed to create WebSocket:', getErrorMessage(e));
     isConnecting = false;
     scheduleReconnect();
     return;

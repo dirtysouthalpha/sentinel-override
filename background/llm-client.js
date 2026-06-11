@@ -2589,7 +2589,7 @@ export function parseLLMResponse(content) {
     if (__reasoning) parsed.__reasoning = __reasoning;
     return parsed;
   } catch (err) {
-    console.error('Failed to parse LLM response:', (typeof err.message === 'string' ? err.message : String(err)), 'Content:', content);
+    console.error('Failed to parse LLM response:', getErrorMessage(err), 'Content:', content);
     // (3.8.4) Two-tier salvage:
     //  1. Try sanitize-then-parse on the raw content (in case extractFirstJsonObject
     //     truncated something we needed).

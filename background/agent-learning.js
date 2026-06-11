@@ -2,6 +2,8 @@
 // Tracks action success/failure per platform, learns optimal patterns,
 // and enables one-shot execution for well-known tasks.
 
+import { getErrorMessage } from './error-utils.js';
+
 const ACTION_HISTORY_KEY = 'agent_action_history';
 const PLATFORM_PATTERNS_KEY = 'agent_platform_patterns';
 const PLAYBOOK_AUTO_KEY = 'agent_auto_playbooks';
@@ -21,7 +23,7 @@ export async function initLearningEngine() {
     _platformPatterns = stored[PLATFORM_PATTERNS_KEY] || {};
     _autoPlaybooks = stored[PLAYBOOK_AUTO_KEY] || [];
   } catch (e) {
-    console.warn('[Sentinel/Learn] Init failed:', e.message);
+    console.warn('[Sentinel/Learn] Init failed:', getErrorMessage(e));
   }
 }
 
@@ -239,6 +241,6 @@ async function _persist() {
       [PLAYBOOK_AUTO_KEY]: _autoPlaybooks
     });
   } catch (e) {
-    console.warn('[Sentinel/Learn] Persist failed:', e.message);
+    console.warn('[Sentinel/Learn] Persist failed:', getErrorMessage(e));
   }
 }
