@@ -2,6 +2,7 @@
  * Tests for background/runtime-profiler.js
  */
 
+import { jest } from '@jest/globals';
 import {
   startProfiling,
   stopProfiling,
@@ -423,5 +424,161 @@ describe('RuntimeProfiler facade', () => {
   test('heal returns result', () => {
     const result = RuntimeProfiler.heal({ type: 'memory_leak' });
     expect(['healed', 'failed']).toContain(result.status);
+  });
+});
+
+// ========== Branch coverage gap tests ==========
+
+describe('takeProfilingSample - memory usagePercent (line 90)', () => {
+  let origPerf;
+  beforeEach(() => { origPerf = global.performance; });
+  afterEach(() => { global.performance = origPerf; });
+
+  test('calculates usagePercent when memory limit > 0', () => {
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 800, totalJSHeapSize: 900 } };
+    startProfiling();
+    const sample = takeProfilingSample();
+    expect(sample.memory.usagePercent).toBeCloseTo(80, 1);
+  });
+});
+
+describe('circular buffer overflow (lines 55, 98-99)', () => {
+  test('wraps around after maxSamples reached and _getSamples returns rotated array', () => {
+    startProfiling();
+    // Fill buffer to 3600 (maxSamples), then take one more to trigger overwrite path
+    for (let i = 0; i < 3601; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    // _getSamples returned the rotated array (line 55); buffer is at capacity
+    expect(summary.sampleCount).toBeGreaterThanOrEqual(3600);
+  });
+});
+
+describe('generateProfilingSummary recommendations', () => {
+  let origPerf;
+  beforeEach(() => { origPerf = global.performance; });
+  afterEach(() => { global.performance = origPerf; });
+
+  test('high memory recommendation when avgMemory > 70 (line 201)', () => {
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 800, totalJSHeapSize: 900 } };
+    startProfiling();
+    for (let i = 0; i < 5; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.recommendations).toContain('High memory usage detected - consider reducing history cache size');
+  });
+
+  test('memory trend increasing recommendation (line 205)', () => {
+    // 10 samples at 40% memory, then 1 at 52% → last > first * 1.1 → increasing trend
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 400, totalJSHeapSize: 500 } };
+    startProfiling();
+    for (let i = 0; i < 10; i++) takeProfilingSample();
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 520, totalJSHeapSize: 600 } };
+    takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.recommendations).toContain('Memory usage trending upward - investigate potential memory leaks');
+  });
+});
+
+describe('performance degrading recommendation (line 209)', () => {
+  let dateSpy;
+  afterEach(() => dateSpy?.mockRestore());
+
+  test('degrading recommendation when second-half intervals 20% slower', () => {
+    let call = 0;
+    // startProfiling calls Date.now() twice, then each sample once
+    const times = [1000, 1000, 1010, 1020, 1030, 1040, 1050, 1065, 1080, 1095, 1110, 1125];
+    dateSpy = jest.spyOn(Date, 'now').mockImplementation(() => times[Math.min(call++, times.length - 1)]);
+    startProfiling();
+    for (let i = 0; i < 10; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.recommendations).toContain('Performance degrading - review recent code changes and optimize hot paths');
+  });
+});
+
+describe('analyzeArchitecture branch coverage', () => {
+  test('identifies memory bottleneck when memoryUsage > 80 (line 290)', () => {
+    const analysis = analyzeArchitecture({ memoryUsage: 85, apiCallCount: 0, stepCount: 1, failures: 0 });
+    const b = analysis.bottlenecks.find(b => b.type === 'memory');
+    expect(b).toBeDefined();
+    expect(b.severity).toBe('critical');
+  });
+
+  test('identifies failure rate bottleneck when rate > 0.3 (line 302)', () => {
+    const analysis = analyzeArchitecture({ memoryUsage: 0, apiCallCount: 0, stepCount: 10, failures: 4 });
+    expect(analysis.bottlenecks.find(b => b.type === 'failure_rate')).toBeDefined();
+  });
+
+  test('calculates plan complexity from steps array (line 330)', () => {
+    const analysis = analyzeArchitecture({
+      plan: { steps: [1, 2, 3, 4, 5] }, history: null, memory: null,
+      memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 0
+    });
+    expect(analysis.complexity.planComplexity).toBe(5);
+  });
+
+  test('calculates history complexity from unique action types (lines 337-338)', () => {
+    const analysis = analyzeArchitecture({
+      plan: null,
+      history: [{ action: 'click' }, { action: 'type' }, { action: 'click' }],
+      memory: null,
+      memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 0
+    });
+    expect(analysis.complexity.historyComplexity).toBe(2);
+  });
+
+  test('calculates memory complexity from object key count (line 343)', () => {
+    const analysis = analyzeArchitecture({
+      plan: null, history: null,
+      memory: { key1: 1, key2: 2, key3: 3 },
+      memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 0
+    });
+    expect(analysis.complexity.memoryComplexity).toBe(3);
+  });
+
+  test('generates complexity recommendation when overallScore > 70 (line 433)', () => {
+    const analysis = analyzeArchitecture({
+      plan: { steps: Array(100).fill({}) },
+      history: Array.from({ length: 25 }, (_, i) => ({ action: `act_${i}` })),
+      memory: Object.fromEntries(Array.from({ length: 70 }, (_, i) => [`k${i}`, i])),
+      memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 0
+    });
+    const rec = analysis.recommendations.find(r => r.category === 'complexity');
+    expect(rec).toBeDefined();
+    expect(rec.recommendation).toContain('simplifying');
+  });
+});
+
+describe('monitorCanary rollback branches', () => {
+  beforeEach(() => stopCanaryDeployment(false));
+
+  const runBaseline = () => {
+    const m = { stepCount: 1, failures: 0, totalTime: 1000, memoryUsage: 50 };
+    for (let i = 0; i < 5; i++) monitorCanary(m);
+  };
+
+  test('triggers rollback on performance degradation (lines 642-643)', () => {
+    startCanaryDeployment({ type: 'perf_test' });
+    runBaseline();
+    // avgStepTime 2000 > 1000 * 1.5 threshold
+    const result = monitorCanary({ stepCount: 1, failures: 0, totalTime: 2000, memoryUsage: 50 });
+    expect(result.status).toBe('rolled_back');
+  });
+
+  test('triggers rollback on memory increase (lines 648-649)', () => {
+    startCanaryDeployment({ type: 'mem_test' });
+    runBaseline();
+    // memoryUsage 70 > 50 * 1.3 = 65 threshold
+    const result = monitorCanary({ stepCount: 1, failures: 0, totalTime: 1000, memoryUsage: 70 });
+    expect(result.status).toBe('rolled_back');
+  });
+
+  test('calls window.__sentinelRollbackHandler on rollback (line 671)', () => {
+    const handler = jest.fn();
+    globalThis.window = { __sentinelRollbackHandler: handler };
+    startCanaryDeployment({ type: 'handler_test' });
+    runBaseline();
+    // errorRate 0.5 > baseline 0 + threshold 0.1 → rollback
+    monitorCanary({ stepCount: 2, failures: 1, totalTime: 1000, memoryUsage: 50 });
+    expect(handler).toHaveBeenCalledWith({ type: 'handler_test' }, expect.any(String));
+    delete globalThis.window;
   });
 });
