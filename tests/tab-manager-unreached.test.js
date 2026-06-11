@@ -67,6 +67,10 @@ await cdpExecuteJs(TAB, 'return 0');
 
 describe('waitForPageLoad — addListener catch (lines 49-51)', () => {
   test('resolves cleanly when chrome.tabs.onUpdated.addListener throws', async () => {
+    // tabs.get must return a loading tab so waitForPageLoad doesn't exit early at line 37
+    chrome.tabs.get.mockImplementationOnce((tabId, cb) => {
+      cb({ id: tabId, status: 'loading' });
+    });
     chrome.tabs.onUpdated.addListener.mockImplementationOnce(() => {
       throw new Error('addListener blocked in test');
     });
@@ -118,7 +122,7 @@ describe('detachAllDebuggees — catch block (lines 585-586)', () => {
   });
 });
 
-// ── _checkDomReadyState — object parse path (lines 106-113) ─────────────────
+// ── _checkDomReadyState — various parse paths ─────────────────────────────────
 
 describe('_checkDomReadyState — object with .value string (lines 106-113)', () => {
   test('waitForPageReady resolves when sendMessage returns {value: readyStateJSON}', async () => {
@@ -128,6 +132,34 @@ describe('_checkDomReadyState — object with .value string (lines 106-113)', ()
       value: JSON.stringify({ readyState: 'complete', bodyLen: 100, hasSpinner: false })
     });
     await expect(waitForPageReady(TAB, 500)).resolves.toBeUndefined();
+  });
+});
+
+describe('_checkDomReadyState — sendMessage rejects (line 104 catch handler)', () => {
+  test('waitForPageReady continues when sendMessage rejects', async () => {
+    setPageLoadConfig({ networkIdleMs: 0, pollInterval: 0, pageLoadTimeout: 100 });
+    // First call rejects (exercises the .catch(() => null) handler on line 104),
+    // then subsequent calls return null so the loop exits via timeout.
+    tabsSendMessageMock.mockRejectedValue(new Error('content script gone'));
+    await expect(waitForPageReady(TAB, 200)).resolves.toBeUndefined();
+  });
+});
+
+describe('_checkDomReadyState — string data paths (lines 107-108, 114-123)', () => {
+  test('resolves when sendMessage returns a valid JSON string (line 108 parse succeeds → object path)', async () => {
+    setPageLoadConfig({ networkIdleMs: 0, pollInterval: 0 });
+    // Returns a JSON string (not an object) — exercises lines 107-108 (string → JSON.parse → object)
+    tabsSendMessageMock.mockResolvedValue(
+      JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false })
+    );
+    await expect(waitForPageReady(TAB, 500)).resolves.toBeUndefined();
+  });
+
+  test('continues when sendMessage returns an invalid JSON string (lines 114-118 else-if branch)', async () => {
+    setPageLoadConfig({ networkIdleMs: 0, pollInterval: 0, pageLoadTimeout: 100 });
+    // Returns a non-JSON string → JSON.parse throws → data stays a string → else-if branch (line 114)
+    tabsSendMessageMock.mockResolvedValue('not-valid-json{{{{');
+    await expect(waitForPageReady(TAB, 200)).resolves.toBeUndefined();
   });
 });
 
