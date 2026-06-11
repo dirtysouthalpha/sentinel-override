@@ -716,4 +716,28 @@ describe('client-knowledge edge cases', () => {
     expect(result.client.entries[0].capturedAt).toBeTruthy();
     expect(result.client.entries[0].capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
+
+  test('_read catch: logs error and returns safely when storage.get throws (lines 60-61)', async () => {
+    const errors = [];
+    const origError = console.error;
+    console.error = (...args) => { errors.push(args.join(' ')); origError(...args); };
+
+    const originalGet = chrome.storage.local.get;
+    chrome.storage.local.get = jest.fn(async () => { throw new Error('IDB unavailable'); });
+
+    const result = await listClients();
+    expect(Array.isArray(result)).toBe(true);
+
+    chrome.storage.local.get = originalGet;
+    console.error = origError;
+
+    expect(errors.some(m => m.includes('_read failed'))).toBe(true);
+  });
+
+  test('getRelevantEntries: url-scoped entry with empty urlPattern returns false (line 320)', async () => {
+    const { client } = await createClient({ displayName: 'EmptyPattern' });
+    await addEntry(client.id, { scope: 'url', wisdom: 'No pattern entry' });
+    const entries = await getRelevantEntries(client.id, 'https://example.com');
+    expect(entries).toHaveLength(0);
+  });
 });
