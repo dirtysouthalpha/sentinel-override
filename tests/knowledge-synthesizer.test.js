@@ -229,3 +229,64 @@ describe('storeSynthesis - entry trimming (line 473)', () => {
     expect(saved.entries[saved.entries.length - 1].summary).toBe('overflow');
   });
 });
+
+describe('knowledge-synthesizer — uncovered branch paths', () => {
+  test('storeSynthesis handles storage.set error gracefully', async () => {
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('disk full'));
+    await expect(storeSynthesis({ synthesized: [], conflicts: [], gaps: [], summary: 'x' }))
+      .resolves.not.toThrow();
+  });
+
+  test('identifyKnowledgeGaps skips gap when source content covers it', async () => {
+    // "error handling" appears in content → gap "error_handling" is filled → not reported
+    const result = await synthesizeKnowledge([
+      { type: 'action', content: 'with proper error handling implemented', confidence: 0.8, source: 'llm' }
+    ]);
+    const filledGap = result.gaps.find(g => g.gap === 'error_handling');
+    expect(filledGap).toBeUndefined();
+  });
+
+  test('groupByType uses generic fallback for source without type', async () => {
+    // source.type is falsy → grouped under 'generic'
+    const result = await synthesizeKnowledge([
+      { content: 'some content with no type field', confidence: 0.7, source: 'test' }
+    ]);
+    expect(result.synthesized.length).toBeGreaterThan(0);
+  });
+
+  test('areSemanticallySimilar returns false when words have no 4-char terms', async () => {
+    // All words are < 4 chars → filter returns empty arrays → early return false
+    // → no cross-type synthesis items generated
+    const result = await synthesizeKnowledge([
+      { type: 'action', content: 'a bc de', confidence: 0.5, source: 's1' },
+      { type: 'observation', content: 'a bc de', confidence: 0.5, source: 's2' }
+    ]);
+    const crossItems = result.synthesized.filter(i => i.type === 'cross_type');
+    expect(crossItems.length).toBe(0);
+  });
+
+  test('groupBySemanticSimilarity skips already-assigned items (outer continue)', async () => {
+    // 3 sources of different types with identical long-word content → all 3 synthesized items
+    // are semantically similar → items[1] and items[2] assigned at i=0 → outer continue fires
+    const content = 'clicking login button form screen';
+    const result = await synthesizeKnowledge([
+      { type: 'action', content, confidence: 0.8, source: 's1' },
+      { type: 'observation', content, confidence: 0.7, source: 's2' },
+      { type: 'decision', content, confidence: 0.6, source: 's3' }
+    ]);
+    const crossItems = result.synthesized.filter(i => i.type === 'cross_type');
+    expect(crossItems.length).toBeGreaterThan(0);
+    expect(crossItems.length).toBe(1); // 3 items → 1 group, not 2
+  });
+
+  test('getSynthesisStatistics accumulates items without a type key', async () => {
+    await storeSynthesis({
+      synthesized: [{ content: 'no type here' }],
+      conflicts: [],
+      gaps: [],
+      summary: 'test'
+    });
+    const stats = await getSynthesisStatistics();
+    expect(stats.totalSynthesized).toBe(1);
+  });
+});
