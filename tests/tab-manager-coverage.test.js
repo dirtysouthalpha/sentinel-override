@@ -45,6 +45,7 @@ const {
   cdpDispatchType,
   cdpExecuteJs,
   waitForPageReady,
+  getTabInfo,
 } = await import('../background/tab-manager.js');
 
 const TAB = 11111;
@@ -457,5 +458,37 @@ describe('cdpExecuteJs — debugger error path', () => {
 describe('waitForPageReady — maxWaitMs=0 exits immediately', () => {
   test('resolves immediately when cap is 0', async () => {
     await expect(waitForPageReady(TAB, 0)).resolves.toBeUndefined();
+  });
+});
+
+// ── cdpDispatchType — thinking pause branch (line 842) ───────────────────────
+
+describe('cdpDispatchType — thinking pause at 6th character', () => {
+  test('text of 7 chars triggers i%6===0 thinking-pause branch at i=6', async () => {
+    // 'abcdefg' has 7 chars; text.length=7 ≤ 25, so at i=6: i>0 && i%6===0 → line 842
+    sendMessageMock.mockResolvedValue(null);
+    const result = await cdpDispatchType(TAB, 'abcdefg');
+    expect(result).toEqual({ ok: true });
+    // Each char dispatches keyDown + keyUp = 2 sendCommand calls × 7 chars = 14 min
+    expect(debuggerSendCommandMock.mock.calls.length).toBeGreaterThanOrEqual(12);
+  });
+});
+
+// ── getTabInfo ────────────────────────────────────────────────────────────────
+
+describe('getTabInfo — callback pattern (lines 1057-1058)', () => {
+  test('resolves with tab info when lastError is null', async () => {
+    const info = await getTabInfo(TAB);
+    expect(info).toEqual({ id: TAB, status: 'complete' });
+  });
+
+  test('resolves with null when chrome.runtime.lastError is set', async () => {
+    chrome.tabs.get.mockImplementation((tabId, cb) => {
+      chrome.runtime.lastError = { message: 'tab not found' };
+      cb(null);
+      chrome.runtime.lastError = null;
+    });
+    const info = await getTabInfo(TAB);
+    expect(info).toBeNull();
   });
 });
