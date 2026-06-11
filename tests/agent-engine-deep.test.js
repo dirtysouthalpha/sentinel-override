@@ -892,14 +892,13 @@ describe('_runExecuteJsWithRetryLadder', () => {
     expect(result.raw).toContain('Body text content');
   });
 
-  test.skip('falls back to visible_text when body_text is unproductive - mock setup issue', async () => {
-    // Track call count
+  test('falls back to visible_text when body_text is unproductive', async () => {
     let callCount = 0;
     mockCdpExecuteJs.mockClear();
-    mockCdpExecuteJs.mockImplementation(async (tabId, code, opts) => {
+    mockCdpExecuteJs.mockImplementation(async () => {
       callCount++;
-      if (callCount === 1) return { ok: true, value: '' };       // original: empty
-      if (callCount === 2) return { ok: true, value: '' };        // body_text: empty
+      if (callCount === 1) return { ok: true, value: '' };
+      if (callCount === 2) return { ok: true, value: '' };
       return { ok: true, value: 'Visible element text aggregated from the page DOM' };
     });
     const result = await _runExecuteJsWithRetryLadder(1, 'return ""', 5000);

@@ -25,11 +25,11 @@ globalThis.chrome = {
       set: jest.fn(async (obj) => { Object.assign(mockSessionStorage, obj); }),
       remove: jest.fn(async (key) => { delete mockSessionStorage[key]; }),
     },
-    runtime: {
-      getPlatformInfo: jest.fn((cb) => {
-        if (cb) cb();
-      }),
-    },
+  },
+  runtime: {
+    getPlatformInfo: jest.fn((cb) => {
+      if (cb) cb();
+    }),
   },
   notifications: {
     create: jest.fn(async () => ''),
@@ -271,14 +271,26 @@ describe('shared-state edge cases', () => {
       jest.useRealTimers();
     });
 
-    test.skip('falls back to runtime.getPlatformInfo when storage unavailable (chrome mock needs runtime.getPlatformInfo)', () => {
-      // This test requires chrome.runtime.getPlatformInfo in the mock
-      // Skipping for now as it tests internal fallback behavior
+    test('falls back to runtime.getPlatformInfo when session storage unavailable', () => {
+      const origSet = chrome.storage.session.set;
+      delete chrome.storage.session.set;
+      expect(() => startSwKeepalive('fallback-test')).not.toThrow();
+      expect(chrome.runtime.getPlatformInfo).toHaveBeenCalled();
+      chrome.storage.session.set = origSet;
+      stopSwKeepalive('fallback-test');
+      stopSwKeepalive('fallback-test');
     });
 
-    test.skip('fallback handles callback correctly (chrome mock needs runtime.getPlatformInfo)', () => {
-      // This test requires chrome.runtime.getPlatformInfo in the mock
-      // Skipping for now as it tests internal fallback behavior
+    test('fallback triggers on interval tick when session storage unavailable', () => {
+      const origSet = chrome.storage.session.set;
+      delete chrome.storage.session.set;
+      startSwKeepalive('fallback-tick');
+      jest.clearAllMocks();
+      jest.advanceTimersByTime(20000);
+      expect(chrome.runtime.getPlatformInfo).toHaveBeenCalled();
+      chrome.storage.session.set = origSet;
+      stopSwKeepalive('fallback-tick');
+      stopSwKeepalive('fallback-tick');
     });
   });
 });
