@@ -511,21 +511,9 @@ describe('executeScheduledTask', () => {
     expect(chrome.tabs.create).toHaveBeenCalledWith({ url: 'about:blank' });
   });
 
-  test.skip('stores failure result when agent start fails', async () => {
-    agentEngineMock.startAgent.mockRejectedValueOnce(new Error('Agent crashed'));
-
-    const schedule = await makeSchedule();
-    jest.clearAllMocks();
-    agentEngineMock.startAgent.mockRejectedValueOnce(new Error('Agent crashed'));
-
-    chrome.tabs.query.mockImplementation((opts, cb) => {
-      if (cb) cb([{ id: 42 }]);
-      return Promise.resolve([{ id: 42 }]);
-    });
-
-    await executeScheduledTask('schedule-' + schedule.id);
-    // Should have stored a failure result (checked by verifying storage.set was called)
-  });
+  // startAgent-throws failure path is covered by tests/sched-probe.test.js,
+  // which uses dynamic imports so jest.unstable_mockModule correctly intercepts
+  // the scheduler's agent-engine.js import (not hoisted with static imports).
 
   test('stores failure when goal resolution fails', async () => {
     templateManagerMock.resolveTemplateGoal.mockRejectedValueOnce(new Error('Template not found'));
