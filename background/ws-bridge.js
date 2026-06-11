@@ -327,6 +327,16 @@ function sendStatus() {
 // Tests must set authToken before calling computeChallengeResponse.
 export { validateMessage, computeChallengeResponse };
 export function setAuthTokenForTest(token) { authToken = token; }
+export function _resetBridgeForTest() {
+  enabled = true;
+  authenticated = false;
+  isConnecting = false;
+  challengeNonce = null;
+  authToken = null;
+  reconnectDelay = RECONNECT_BASE_MS;
+  ws = null;
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
 
 // ========== Auto-start ==========
 // Start the bridge connection when this module loads
