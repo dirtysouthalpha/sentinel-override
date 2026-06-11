@@ -680,6 +680,14 @@ describe('generateHeuristicPlan via startAgent', () => {
   test('null goal is rejected with validation error', async () => {
     await expect(startAgent(null, makeSender())).rejects.toThrow('Goal must be a non-empty string');
   });
+
+  test('throws Agent already running when called while agent is running', async () => {
+    // Start first agent without awaiting — synchronous code runs up to the first
+    // await in startAgent, setting agentRunning = true before yielding.
+    startAgent('first goal', makeSender());
+    // Second call sees agentRunning === true and rejects immediately.
+    await expect(startAgent('second goal', makeSender())).rejects.toThrow('Agent already running');
+  });
 });
 
 // ==========================
