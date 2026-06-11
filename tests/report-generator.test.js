@@ -45,9 +45,9 @@ globalThis.fetch = jest.fn().mockResolvedValue(mockFetchResponse);
 // provider-registry.js is in the module registry when report-generator.js loads.
 // Static ESM imports are hoisted before jest.unstable_mockModule executes,
 // so report-generator.js would otherwise capture the real provider-registry.js.
-let generateReport;
+let generateReport, buildFallbackReport;
 beforeAll(async () => {
-  ({ generateReport } = await import('../background/report-generator.js'));
+  ({ generateReport, buildFallbackReport } = await import('../background/report-generator.js'));
 });
 
 // ---------- Helpers ----------
@@ -855,6 +855,41 @@ describe('report-generator', () => {
       const result = await generateReport(data, CONFIG);
       expect(result.structuredData.meta.totalSteps).toBe(20);
       expect(result).toHaveProperty('fullReport');
+    });
+
+    // --- Line 120: _buildMemorySummary returns early for Array agentMemory ---
+    test('_buildMemorySummary: returns no-usable-data message when agentMemory is an Array', async () => {
+      // agentMemory = [] is truthy so the || {} default is skipped; Array.isArray([]) triggers line 120
+      const data = makeExecutionData({ agentMemory: [] });
+      const result = await generateReport(data, CONFIG);
+      expect(result).toHaveProperty('fullReport');
+    });
+
+    // --- Line 278: planContext catch block for unstringifiable plan step ---
+    test('planContext catch block: unstringifiable plan step falls back to [unstringifiable step]', async () => {
+      // A plan step with a circular ref and no `description` property: JSON.stringify throws,
+      // stepStr is '', so the catch at line 278 returns '1. [unstringifiable step]'
+      const circular = {};
+      circular.self = circular;
+      const data = makeExecutionData({ agentPlan: [circular] });
+      const result = await generateReport(data, CONFIG);
+      expect(result).toHaveProperty('fullReport');
+    });
+
+    // --- Line 483: buildFallbackReport catch block for circular object memory value ---
+    test('buildFallbackReport: circular object memory value returns [object] (line 483)', () => {
+      // val is a non-null object with a circular reference: JSON.stringify throws → '[object]'
+      const circular = {};
+      circular.self = circular;
+      const report = buildFallbackReport({
+        goal: 'test goal',
+        history: [],
+        agentMemory: { circularVal: circular },
+        stepCount: 1,
+        apiCallCount: 1,
+      });
+      expect(report).toContain('circularVal');
+      expect(report).toContain('[object]');
     });
   });
 });

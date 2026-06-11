@@ -263,24 +263,33 @@ describe('reasoning-trace — additional branch coverage', () => {
     expect(chrome.storage.local.get).not.toHaveBeenCalled();
   });
 
-  test('_persistTrace timer-replaced guard: second captureReasoningStep replaces pending timer', async () => {
-    // Line 35: when _persistTrace is called again before the timer fires, the old timerId
-    // is replaced in _pendingWrites. If Jest fires the old timer anyway, the guard returns early.
+  test('_persistTrace stale-callback guard (line 36): fires stale callback directly', async () => {
+    // When clearTimeout is a no-op (e.g. fake timer edge cases), the old callback can still
+    // be invoked. Line 36 checks that the timerId still matches _pendingWrites before writing.
     await initReasoningTrace({ goal: 'timer-guard-test' });
 
-    // Two rapid captures: second call replaces the first timer in _pendingWrites
-    await captureReasoningStep('phase1', 'input', { n: 1 });
-    await captureReasoningStep('phase2', 'output', { n: 2 });
+    // Capture callbacks without scheduling via fake-setTimeout override.
+    // clearTimeout is also no-op so the "cancelled" callback stays callable.
+    const captured = [];
+    let nextId = 99000;
+    const origST = globalThis.setTimeout;
+    const origCT = globalThis.clearTimeout;
+    globalThis.setTimeout = (cb) => { const id = nextId++; captured.push({ id, cb }); return id; };
+    globalThis.clearTimeout = () => {};
 
-    // Run all timers — the guard on the replaced timer fires but returns early (line 35-36).
-    // The live timer writes successfully.
+    await captureReasoningStep('phase1', 'input', { n: 1 });  // captured[0] id=99000
+    await captureReasoningStep('phase2', 'output', { n: 2 }); // captured[1] id=99001; _pendingWrites = 99001
+
+    globalThis.setTimeout = origST;
+    globalThis.clearTimeout = origCT;
+
+    // Fire the STALE callback directly — _pendingWrites has id=99001, callback has id=99000
     chrome.storage.local.set.mockClear();
-    jest.runAllTimers();
-    await Promise.resolve();
-    await Promise.resolve();
+    await captured[0].cb(); // line 36 guard fires → returns early, no storage.set
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
 
-    // Exactly one storage write should have occurred (the live timer; the stale one was guarded)
-    const writeCalls = chrome.storage.local.set.mock.calls.length;
-    expect(writeCalls).toBe(1);
+    // Fire the LIVE callback — _pendingWrites has id=99001, matches → writes to storage
+    await captured[1].cb();
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
   });
 });
