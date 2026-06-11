@@ -145,7 +145,7 @@ class FederationController {
     // Cancel all jobs assigned to this peer
     for (const [jobId, job] of this.activeJobs.entries()) {
       if (job.assignedPeers.includes(peerId)) {
-        this.reassignSubGoal(jobId, peerId);
+        this.reassignSubGoal(jobId, peerId).catch(e => console.error('[Federation] reassignSubGoal failed:', getErrorMessage(e)));
       }
     }
 
@@ -598,7 +598,7 @@ class FederationController {
         if (subGoal.status === 'assigned') {
           const peer = this.peers.get(subGoal.assignedTo);
           if (!peer || peer.status === 'stalled') {
-            this.reassignSubGoal(jobId, subGoal.assignedTo);
+            this.reassignSubGoal(jobId, subGoal.assignedTo).catch(e => console.error('[Federation] reassignSubGoal failed:', getErrorMessage(e)));
           }
         }
       }

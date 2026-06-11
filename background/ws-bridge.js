@@ -306,7 +306,7 @@ function sendStatus() {
 
   // Get agent state asynchronously
   import('./agent-engine.js').then(({ agentRunning }) => {
-    import('./tab-context.js').then(({ getActiveTabId, getTabContext }) => {
+    return import('./tab-context.js').then(({ getActiveTabId, getTabContext }) => {
       const tabId = getActiveTabId();
       const ctx = tabId ? getTabContext(tabId) : null;
 
