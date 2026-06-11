@@ -8,6 +8,10 @@ import {
   initReasoningTrace,
   captureReasoningStep,
   getReasoningTrace,
+  getReasoningSummary,
+  reasoningTraceToJson,
+  getHighConfidenceDecisions,
+  getLowConfidenceDecisions,
   clearReasoningTrace,
   flushPendingWrites,
   _resetReasoningTraceCache
@@ -183,5 +187,85 @@ describe('reasoning-trace — error paths and edge cases', () => {
 
     console.error = origError;
     expect(errors.some(m => m.includes('Failed to flush reasoning trace'))).toBe(true);
+  });
+});
+
+describe('reasoning-trace — additional branch coverage', () => {
+  test('initReasoningTrace: legacy string API sets goal and model from positional args', async () => {
+    // Line 62: typeof metadata === 'string' branch
+    await initReasoningTrace('legacy-run-id', 'legacy-goal', 'legacy-model');
+    jest.runAllTimers();
+    await Promise.resolve();
+
+    const summary = await getReasoningSummary();
+    expect(summary.goal).toBe('legacy-goal');
+    expect(summary.model).toBe('legacy-model');
+  });
+
+  test('captureReasoningStep: returns early when no active run (_currentRunId is null)', async () => {
+    // Line 92: !_currentRunId guard — _resetReasoningTraceCache sets _currentRunId=null
+    // Calling captureReasoningStep without initReasoningTrace should silently return
+    await expect(captureReasoningStep('plan', 'input', {})).resolves.toBeUndefined();
+    // No storage writes should have occurred
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  test('getReasoningSummary: returns no-trace message for unknown runId not in storage', async () => {
+    // Line 146: trace not found in cache or storage
+    const summary = await getReasoningSummary('totally-unknown-run-id-xyz');
+    expect(summary.totalSteps).toBe(0);
+    expect(summary.summary).toBe('No reasoning trace found.');
+  });
+
+  test('reasoningTraceToJson: returns error JSON for unknown runId not in storage', async () => {
+    // Line 182: trace not found in cache or storage
+    const json = await reasoningTraceToJson('totally-unknown-run-id-xyz');
+    const parsed = JSON.parse(json);
+    expect(parsed.error).toBe('No reasoning trace found');
+  });
+
+  test('getHighConfidenceDecisions: returns all entries when data has no confidence (defaults to 1)', async () => {
+    // Line 218: filter with ?? 1 fallback — entries with no confidence are treated as 1.0 (high)
+    await initReasoningTrace({ goal: 'high-conf-test' });
+    await captureReasoningStep('plan', 'output', {}); // no confidence field → defaults to 1
+    await captureReasoningStep('plan', 'output', { confidence: 0.3 }); // below 0.8
+    jest.runAllTimers();
+
+    const high = await getHighConfidenceDecisions(0.8);
+    expect(high.length).toBe(1);
+    expect(high[0].data.confidence).toBeUndefined(); // the one with no confidence field
+  });
+
+  test('getLowConfidenceDecisions: excludes entries with no confidence (defaults to 1)', async () => {
+    // Line 230: filter with ?? 1 fallback — entries with no confidence are treated as 1.0 (not low)
+    await initReasoningTrace({ goal: 'low-conf-test' });
+    await captureReasoningStep('plan', 'output', {}); // no confidence → defaults to 1.0, excluded
+    await captureReasoningStep('plan', 'output', { confidence: 0.2 }); // below 0.5, included
+    jest.runAllTimers();
+
+    const low = await getLowConfidenceDecisions(0.5);
+    expect(low.length).toBe(1);
+    expect(low[0].data.confidence).toBe(0.2);
+  });
+
+  test('_persistTrace timer-replaced guard: second captureReasoningStep replaces pending timer', async () => {
+    // Line 35: when _persistTrace is called again before the timer fires, the old timerId
+    // is replaced in _pendingWrites. If Jest fires the old timer anyway, the guard returns early.
+    await initReasoningTrace({ goal: 'timer-guard-test' });
+
+    // Two rapid captures: second call replaces the first timer in _pendingWrites
+    await captureReasoningStep('phase1', 'input', { n: 1 });
+    await captureReasoningStep('phase2', 'output', { n: 2 });
+
+    // Run all timers — the guard on the replaced timer fires but returns early (line 35-36).
+    // The live timer writes successfully.
+    chrome.storage.local.set.mockClear();
+    jest.runAllTimers();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Exactly one storage write should have occurred (the live timer; the stale one was guarded)
+    const writeCalls = chrome.storage.local.set.mock.calls.length;
+    expect(writeCalls).toBe(1);
   });
 });
