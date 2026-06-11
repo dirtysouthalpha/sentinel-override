@@ -160,4 +160,44 @@ describe('Plugin Registry', () => {
   test('togglePlugin throws for unknown plugin', async () => {
     await expect(mod.togglePlugin('no-such-plugin')).rejects.toThrow('Plugin not found');
   });
+
+  test('setRegistryUrl throws for null', async () => {
+    await expect(mod.setRegistryUrl(null)).rejects.toThrow('Registry URL must be a non-empty string');
+  });
+
+  test('setRegistryUrl throws for non-string', async () => {
+    await expect(mod.setRegistryUrl(42)).rejects.toThrow('Registry URL must be a non-empty string');
+  });
+
+  test('fetchRegistry throws on HTTP error', async () => {
+    // Default registry URL is not in _mockFetch, so fetch returns 404
+    await expect(mod.fetchRegistry()).rejects.toThrow('Registry fetch failed');
+  });
+
+  test('fetchRegistry throws when response is not an array', async () => {
+    _mockFetch['https://registry.sentinel.dev/plugins.json'] = { not: 'an array' };
+    await expect(mod.fetchRegistry()).rejects.toThrow('Registry must return an array');
+  });
+
+  test('installPlugin throws on manifest fetch HTTP error', async () => {
+    await expect(mod.installPlugin('https://no-such-host.invalid/plugin.json')).rejects.toThrow('Failed to fetch manifest');
+  });
+
+  test('installPlugin throws on non-object manifest', async () => {
+    _mockFetch['https://bad-manifest.example.com/plugin.json'] = 'not an object';
+    await expect(mod.installPlugin('https://bad-manifest.example.com/plugin.json')).rejects.toThrow('Invalid manifest: must be an object');
+  });
+
+  test('installPlugin throws on manifest missing required fields', async () => {
+    _mockFetch['https://missing-fields.example.com/plugin.json'] = { id: 'test' }; // missing name, version, entryUrl
+    await expect(mod.installPlugin('https://missing-fields.example.com/plugin.json')).rejects.toThrow('Invalid manifest: missing required field');
+  });
+
+  test('installPlugin throws on version mismatch', async () => {
+    _mockFetch['https://new-version.example.com/plugin.json'] = {
+      id: 'future-plugin', name: 'Future', version: '1.0.0', entryUrl: 'https://x.com/main.js',
+      minSentinelVersion: '99.0.0'
+    };
+    await expect(mod.installPlugin('https://new-version.example.com/plugin.json')).rejects.toThrow('Plugin requires Sentinel v');
+  });
 });
