@@ -459,6 +459,10 @@ describe('dattoRmm — detect', () => {
   test('does not match generic URL', () => {
     expect(dattoRmm.detect('https://example.com/', '')).toBe(false);
   });
+
+  test('matches datto.com host with /rmm path (line 29)', () => {
+    expect(dattoRmm.detect('https://portal.datto.com/rmm/dashboard', '')).toBe(true);
+  });
 });
 
 describe('cisco — detect', () => {
