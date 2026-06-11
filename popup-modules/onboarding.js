@@ -98,7 +98,7 @@
         modal.classList.add('show');
       }, 250);
     } catch (error) {
-      console.error('Error checking onboarding state:', (typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string' ? error.message : String(error)));
+      console.error('Error checking onboarding state:', window.getErrorMessage ? window.getErrorMessage(error) : String(error));
     }
   })();
 
