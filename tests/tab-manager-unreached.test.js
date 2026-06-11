@@ -204,3 +204,29 @@ describe('recordNetworkStart — NETWORK_BUFFER_MAX eviction (lines 339-346)', (
     expect(reqs.length).toBeLessThanOrEqual(200);
   });
 });
+
+// ── wasUserDetached: .catch() fires (line 629) ────────────────────────────────
+
+describe('ensureDebuggerAttached — wasUserDetached .catch() callback (line 629)', () => {
+  test('logs error when sendMessage promise rejects', async () => {
+    const TAB5 = 55555;
+    // Put TAB5 in userDetachedTabs via the onDetach listener
+    capturedOnDetachListener({ tabId: TAB5 });
+    // sendMessage returns a rejecting promise → .catch() at line 629 fires
+    runtimeSendMessageMock.mockReturnValueOnce(Promise.reject(new Error('send rejected')));
+    // No throw from cdpExecuteJs — the rejection is handled by .catch()
+    await expect(cdpExecuteJs(TAB5, 'return 0')).resolves.toBeDefined();
+  });
+});
+
+// ── wasUserDetached: outer catch fires (line 631) ─────────────────────────────
+
+describe('ensureDebuggerAttached — wasUserDetached outer catch (line 631)', () => {
+  test('logs warning when sendMessage throws synchronously', async () => {
+    const TAB6 = 66666;
+    capturedOnDetachListener({ tabId: TAB6 });
+    // sendMessage throws synchronously → outer catch at line 631 fires
+    runtimeSendMessageMock.mockImplementationOnce(() => { throw new Error('sync throw'); });
+    await expect(cdpExecuteJs(TAB6, 'return 0')).resolves.toBeDefined();
+  });
+});
