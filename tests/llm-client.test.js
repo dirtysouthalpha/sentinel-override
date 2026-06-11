@@ -1230,6 +1230,78 @@ describe('generatePlan', () => {
     expect(Array.isArray(result)).toBe(true);
     expect(result[0]).toContain('Do something important');
   });
+
+  test('returns fallback when provider returns HTTP 200 with error payload (data.error auth failure)', async () => {
+    // Auth error throw at line 1178 is caught by the outer catch which returns fallback.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [], error: { message: 'Invalid API key' } })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]).toBe('Do task');
+  });
+
+  test('returns fallback when provider returns HTTP 200 with data.msg auth failure (Z.AI style)', async () => {
+    // data.msg + data.code + data.success===false triggers auth error → caught → fallback.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [], msg: 'Unauthorized', code: 401, success: false })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]).toBe('Do task');
+  });
+
+  test('extracts steps from phases format JSON (Strategy 1)', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '{"phases":[{"phase":1,"title":"Setup","steps":["Navigate to page","Click the button"]},{"phase":2,"title":"Verify","steps":["Check the result"]}]}' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Navigate to page', 'Click the button', 'Check the result']);
+  });
+
+  test('extracts steps from phases format JSON embedded in prose (Strategy 2)', async () => {
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Here is my plan: {"phases":[{"phase":1,"steps":["Step one","Step two","Step three"]}]} — hope that helps!' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Step one', 'Step two', 'Step three']);
+  });
+
+  test('extracts steps from phases format via Strategy 3 (first { last })', async () => {
+    // Strategy 3 picks up phases when Strategies 1 and 2 fail (e.g. invalid chars stripped).
+    // Wrap in non-JSON text to force Strategy 1/2 to fail; the outer { } will be valid for S3.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Prefix \x01 {"phases":[{"steps":["Alpha","Beta"]}]} suffix' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toContain('Alpha');
+    expect(result).toContain('Beta');
+  });
+
+  test('returns fallback when API response body is not an object (array)', async () => {
+    // `Array.isArray(data)` check throws internally, caught by outer catch → fallback.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve([1, 2, 3])
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]).toBe('Do task');
+  });
 });
 
 // ========== callLLMWithRetry ==========
