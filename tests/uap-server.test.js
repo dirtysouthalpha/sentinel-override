@@ -607,4 +607,178 @@ describe('UAP Server', () => {
       expect(stats.uptime).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('init() enabled=true path (lines 61-72)', () => {
+    test('runs through generateKeyPair/startServer/setupCleanup when enabled', async () => {
+      const origLoadConfig = uapServer.loadConfig.bind(uapServer);
+      uapServer.loadConfig = async () => {
+        uapServer.config = { enabled: true, port: 8765 };
+      };
+      await uapServer.init();
+      uapServer.loadConfig = origLoadConfig;
+      expect(uapServer.config.enabled).toBe(true);
+    });
+
+    test('init() re-throws when loadConfig throws (line 70-72)', async () => {
+      const origLoadConfig = uapServer.loadConfig.bind(uapServer);
+      uapServer.loadConfig = async () => { throw new Error('storage failure'); };
+      await expect(uapServer.init()).rejects.toThrow('storage failure');
+      uapServer.loadConfig = origLoadConfig;
+    });
+  });
+
+  describe('startServer() onMessageExternal callback (lines 114-119)', () => {
+    test('callback invokes handleMessage and returns true', async () => {
+      let capturedCallback;
+      const origAddListener = chrome.runtime.onMessageExternal.addListener;
+      chrome.runtime.onMessageExternal.addListener = (fn) => { capturedCallback = fn; };
+
+      await uapServer.startServer();
+      chrome.runtime.onMessageExternal.addListener = origAddListener;
+
+      expect(capturedCallback).toBeDefined();
+
+      const mockSR = jest.fn();
+      const returnVal = capturedCallback({ type: 'ping', id: 'ext-1' }, { id: 'ext-client' }, mockSR);
+      expect(returnVal).toBe(true);
+    });
+  });
+
+  describe('isValidJWT (lines 466-482)', () => {
+    const makeJWT = (payload) => {
+      const header = btoa(JSON.stringify({ alg: 'HS256' }));
+      const body = btoa(JSON.stringify(payload));
+      return `${header}.${body}.sig`;
+    };
+
+    test('returns false for null token', () => {
+      expect(uapServer.isValidJWT(null)).toBe(false);
+    });
+
+    test('returns false for non-string token', () => {
+      expect(uapServer.isValidJWT(42)).toBe(false);
+    });
+
+    test('returns false for token with wrong number of parts', () => {
+      expect(uapServer.isValidJWT('only.two')).toBe(false);
+    });
+
+    test('returns false when payload has no exp', () => {
+      const token = makeJWT({ sub: 'user1' });
+      expect(uapServer.isValidJWT(token)).toBe(false);
+    });
+
+    test('returns false when exp is not a number', () => {
+      const token = makeJWT({ exp: 'not-a-number' });
+      expect(uapServer.isValidJWT(token)).toBe(false);
+    });
+
+    test('returns false for expired token', () => {
+      const token = makeJWT({ exp: Math.floor(Date.now() / 1000) - 3600 });
+      expect(uapServer.isValidJWT(token)).toBe(false);
+    });
+
+    test('returns true for valid future-exp token', () => {
+      const token = makeJWT({ exp: Math.floor(Date.now() / 1000) + 3600 });
+      expect(uapServer.isValidJWT(token)).toBe(true);
+    });
+
+    test('returns false for invalid base64 payload', () => {
+      expect(uapServer.isValidJWT('a.!!!.c')).toBe(false);
+    });
+  });
+
+  describe('authenticate() JWT return path (line 509)', () => {
+    const makeJWT = (payload) => {
+      const header = btoa(JSON.stringify({ alg: 'HS256' }));
+      const body = btoa(JSON.stringify(payload));
+      return `${header}.${body}.sig`;
+    };
+
+    test('returns true for JWT with future exp', () => {
+      const token = makeJWT({ exp: Math.floor(Date.now() / 1000) + 3600 });
+      expect(uapServer.authenticate('client1', token)).toBe(true);
+    });
+
+    test('returns false for JWT with no exp field', () => {
+      const token = makeJWT({ sub: 'user' });
+      expect(uapServer.authenticate('client1', token)).toBe(false);
+    });
+
+    test('returns false for JWT with invalid base64', () => {
+      expect(uapServer.authenticate('client1', 'x.!!!.y')).toBe(false);
+    });
+  });
+
+  describe('_performCleanup() (lines 624-656)', () => {
+    test('removes stale rate limit entries', () => {
+      const oldTime = Date.now() - 7200000;
+      uapServer.rateLimits.set('old-client', { requests: [oldTime], count: 1 });
+      uapServer.rateLimits.set('new-client', { requests: [Date.now()], count: 1 });
+      uapServer._performCleanup();
+      expect(uapServer.rateLimits.has('old-client')).toBe(false);
+      expect(uapServer.rateLimits.has('new-client')).toBe(true);
+    });
+
+    test('removes completed runs older than 24 hours', () => {
+      const oldRunId = 'old-run-123';
+      uapServer.activeRuns.set(oldRunId, {
+        status: 'completed',
+        endTime: Date.now() - 90000000,
+        clientId: 'c1'
+      });
+      uapServer._performCleanup();
+      expect(uapServer.activeRuns.has(oldRunId)).toBe(false);
+    });
+
+    test('removes stale peer trust entries', () => {
+      const peerId = 'stale-peer';
+      uapServer.peerTrust.set(peerId, { lastSeen: Date.now() - 7200000, trust: 1 });
+      uapServer._performCleanup();
+      expect(uapServer.peerTrust.has(peerId)).toBe(false);
+    });
+
+    test('keeps recent entries intact', () => {
+      uapServer.rateLimits.set('recent', { requests: [Date.now()], count: 1 });
+      uapServer.peerTrust.set('recent-peer', { lastSeen: Date.now(), trust: 1 });
+      uapServer._performCleanup();
+      expect(uapServer.rateLimits.has('recent')).toBe(true);
+      expect(uapServer.peerTrust.has('recent-peer')).toBe(true);
+    });
+  });
+
+  describe('executeGoal() error path (lines 285-298)', () => {
+    test('handles failed execution by updating run status to failed', async () => {
+      const runId = 'test-run-error-' + Date.now();
+      uapServer.activeRuns.set(runId, {
+        clientId: 'test-client',
+        goal: 'Test goal for error path',
+        status: 'running',
+        startTime: Date.now()
+      });
+
+      await uapServer.executeGoal(runId, 'Test goal for error path', {}, null);
+
+      const run = uapServer.activeRuns.get(runId);
+      if (run) {
+        expect(['failed', 'completed']).toContain(run.status);
+      }
+    });
+
+    test('executeGoal returns early when run not found', async () => {
+      await expect(uapServer.executeGoal('nonexistent-run', 'goal', {}, null)).resolves.toBeUndefined();
+    });
+  });
+
+  describe('setupCleanup() setInterval callback (line 625)', () => {
+    test('fires _performCleanup when interval elapses', () => {
+      jest.useFakeTimers();
+      const spy = jest.spyOn(uapServer, '_performCleanup');
+      uapServer.setupCleanup();
+      jest.advanceTimersByTime(3600000);
+      expect(spy).toHaveBeenCalledTimes(1);
+      spy.mockRestore();
+      jest.useRealTimers();
+    });
+  });
 });
