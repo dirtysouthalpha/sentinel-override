@@ -143,21 +143,11 @@ window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true }
 // If chat.js IIFE failed to attach listeners, these catch it.
 // popup-full.js loads LAST, so all functions should be in global scope.
 (function attachFallbackListeners() {
-  const _DEBUG = false;
   const _goalInput = document.getElementById('goalInput');
   const _sendBtn = document.getElementById('sendBtn');
 
-  if (_DEBUG) {
-    console.log('[Sentinel/FALLBACK] Attaching fallback listeners...');
-    console.log('[Sentinel/FALLBACK] goalInput:', !!_goalInput, 'sendBtn:', !!_sendBtn);
-    console.log('[Sentinel/FALLBACK] sendMessage:', typeof sendMessage);
-    console.log('[Sentinel/FALLBACK] addMessage:', typeof addMessage);
-    console.log('[Sentinel/FALLBACK] showToast:', typeof showToast);
-  }
-
   if (_sendBtn) {
     _sendBtn.addEventListener('click', () => {
-      if (_DEBUG) { console.log('[Sentinel/FALLBACK] sendBtn clicked'); }
       if (typeof sendMessage === 'function') {
         sendMessage();
       } else {
@@ -165,7 +155,6 @@ window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true }
         alert('Sentinel Error: sendMessage function not found. Try reloading the extension.');
       }
     });
-    if (_DEBUG) { console.log('[Sentinel/FALLBACK] sendBtn click listener attached'); }
   } else {
     console.error('[Sentinel/FALLBACK] sendBtn NOT FOUND');
   }
@@ -174,7 +163,6 @@ window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true }
     _goalInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (_DEBUG) { console.log('[Sentinel/FALLBACK] Enter key pressed'); }
         if (typeof sendMessage === 'function') {
           sendMessage();
         } else {
@@ -183,7 +171,6 @@ window.addEventListener('unload', () => clearTimeout(_bootTimer), { once: true }
         }
       }
     });
-    if (_DEBUG) { console.log('[Sentinel/FALLBACK] goalInput keydown listener attached'); }
   } else {
     console.error('[Sentinel/FALLBACK] goalInput NOT FOUND');
   }

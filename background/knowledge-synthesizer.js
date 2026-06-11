@@ -373,6 +373,8 @@ function areSemanticallySimilar(item1, item2) {
   const words1 = content1.split(/\s+/).filter(w => w.length >= 4);
   const words2 = content2.split(/\s+/).filter(w => w.length >= 4);
 
+  if (words1.length === 0 || words2.length === 0) return false;
+
   let sharedCount = 0;
   for (const word of words1) {
     if (words2.includes(word)) {
@@ -380,8 +382,7 @@ function areSemanticallySimilar(item1, item2) {
     }
   }
 
-  const sharedRatio = sharedCount / Math.min(words1.length, words2.length);
-  return sharedRatio > 0.3; // 30% shared key terms
+  return sharedCount / Math.min(words1.length, words2.length) > 0.3;
 }
 
 /**
