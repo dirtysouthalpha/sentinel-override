@@ -46,6 +46,11 @@ import {
   getRelevantPatterns,
   resetLLMRateLimiter,
   callLLMSimple,
+  selectModelForStep,
+  recordModelUsage,
+  getCostTracker,
+  estimateCostUsd,
+  isSimpleStep,
 } from '../background/llm-client.js';
 
 import { PROVIDERS } from '../background/provider-registry.js';
@@ -2172,6 +2177,41 @@ describe('LLM rate limiter', () => {
     resetLLMRateLimiter();
     setLLMRateLimit(120, 60000);
   });
+
+  test('throws rate limit exceeded when limit is exhausted', async () => {
+    resetLLMRateLimiter();
+    setLLMRateLimit(1, 60000);
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions'
+        }
+      }
+    };
+    const cfg = {
+      maxRetries: 0, retryDelay: 100, maxRetryDelay: 500,
+      fetchTimeout: 30000, historyWindow: 10, strategyShiftThreshold: 3
+    };
+    const state = {
+      apiCallCount: 0, consecutiveFailures: 0,
+      currentStrategies: [], agentMemory: {}, agentPlan: null, currentPlanStep: 0
+    };
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: '{"type":"note","text":"ok"}' } }] })
+    });
+    // First call consumes the one allowed slot
+    await callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, cfg, state);
+    // Second call hits the rate limit
+    await expect(
+      callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, cfg, { ...state })
+    ).rejects.toThrow('rate limit exceeded');
+    // Restore defaults
+    setLLMRateLimit(120, 60000);
+  });
 });
 
 // ==========================
@@ -2504,5 +2544,160 @@ describe('callLLMSimple', () => {
     expect(err).toBeInstanceOf(Error);
     expect(typeof err.message === 'string' && err.message).toContain('API Error 500');
     expect(typeof err.message === 'string' && err.message.length).toBeLessThan(220);
+  });
+});
+
+// ========== selectModelForStep ==========
+describe('selectModelForStep', () => {
+  test('returns null for null or undefined input', () => {
+    expect(selectModelForStep(null)).toBeNull();
+    expect(selectModelForStep(undefined)).toBeNull();
+  });
+
+  test('returns light for all simple observation types', () => {
+    const simpleTypes = ['read_page', 'extract', 'extract_list', 'read_network_requests', 'read_console_messages', 'scroll', 'wait'];
+    for (const type of simpleTypes) {
+      expect(selectModelForStep({ type })).toBe('light');
+    }
+  });
+
+  test('returns default for complex type with 0 or 1 previous failures', () => {
+    expect(selectModelForStep({ type: 'click', previousFailures: 0 })).toBe('default');
+    expect(selectModelForStep({ type: 'type', previousFailures: 1 })).toBe('default');
+    expect(selectModelForStep({ type: 'navigate', previousFailures: 0 })).toBe('default');
+    expect(selectModelForStep({ type: 'form_fill', previousFailures: 1 })).toBe('default');
+    expect(selectModelForStep({ type: 'execute_js', previousFailures: 0 })).toBe('default');
+  });
+
+  test('returns heavy for complex type with more than 1 previous failure', () => {
+    expect(selectModelForStep({ type: 'click', previousFailures: 2 })).toBe('heavy');
+    expect(selectModelForStep({ type: 'form_fill', previousFailures: 5 })).toBe('heavy');
+  });
+
+  test('returns heavy when hasScreenshot is true', () => {
+    expect(selectModelForStep({ type: 'unknown_type', hasScreenshot: true })).toBe('heavy');
+    expect(selectModelForStep({ type: '', hasScreenshot: true })).toBe('heavy');
+  });
+
+  test('returns heavy for final or second-to-last step', () => {
+    expect(selectModelForStep({ type: '', stepNumber: 5, totalSteps: 6 })).toBe('heavy');
+    expect(selectModelForStep({ type: '', stepNumber: 4, totalSteps: 5 })).toBe('heavy');
+  });
+
+  test('returns null for non-final step with unknown type', () => {
+    expect(selectModelForStep({ type: '', stepNumber: 3, totalSteps: 6 })).toBeNull();
+    expect(selectModelForStep({ type: 'unknown_action' })).toBeNull();
+    expect(selectModelForStep({ type: '' })).toBeNull();
+  });
+});
+
+// ========== estimateCostUsd ==========
+describe('estimateCostUsd', () => {
+  test('returns 0 for zero tokens regardless of model', () => {
+    expect(estimateCostUsd(0, 0, 'gpt-4o')).toBe(0);
+    expect(estimateCostUsd(0, 0, '')).toBe(0);
+    expect(estimateCostUsd(0, 0, null)).toBe(0);
+  });
+
+  test('uses default rates (3.00 input / 15.00 output per M) when model is empty', () => {
+    expect(estimateCostUsd(1_000_000, 0, '')).toBeCloseTo(3.00, 5);
+    expect(estimateCostUsd(0, 1_000_000, null)).toBeCloseTo(15.00, 5);
+  });
+
+  test('handles null or undefined token counts gracefully', () => {
+    expect(() => estimateCostUsd(null, null, '')).not.toThrow();
+    expect(estimateCostUsd(null, null, '')).toBe(0);
+  });
+
+  test('returns a number for a known model', () => {
+    const cost = estimateCostUsd(100_000, 20_000, 'gpt-4o');
+    expect(typeof cost).toBe('number');
+    expect(cost).toBeGreaterThan(0);
+  });
+});
+
+// ========== isSimpleStep ==========
+describe('isSimpleStep', () => {
+  test('returns false for null agentState', () => {
+    expect(isSimpleStep(null, 1, [])).toBe(false);
+  });
+
+  test('returns false when consecutiveFailures > 0', () => {
+    expect(isSimpleStep({ consecutiveFailures: 1, goal: 'do task', quickMode: false }, 1, [])).toBe(false);
+  });
+
+  test('returns false when quickMode is true', () => {
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'do task', quickMode: true }, 1, [])).toBe(false);
+  });
+
+  test('returns false for runbook-style goals', () => {
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'runbook: deploy', quickMode: false }, 1, [])).toBe(false);
+  });
+
+  test('returns false when stepCount > 6', () => {
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'task', quickMode: false }, 7, [])).toBe(false);
+  });
+
+  test('returns false when history has more than 8 entries', () => {
+    const history = new Array(9).fill({});
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'task', quickMode: false }, 1, history)).toBe(false);
+  });
+
+  test('returns true when all conditions are met', () => {
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'click the button', quickMode: false }, 3, [{}, {}])).toBe(true);
+  });
+
+  test('returns true with null history', () => {
+    expect(isSimpleStep({ consecutiveFailures: 0, goal: 'do thing', quickMode: false }, 1, null)).toBe(true);
+  });
+});
+
+// ========== recordModelUsage + getCostTracker ==========
+describe('recordModelUsage and getCostTracker', () => {
+  test('getCostTracker returns the expected shape', () => {
+    const tracker = getCostTracker();
+    expect(tracker).toHaveProperty('totalCalls');
+    expect(tracker).toHaveProperty('byTier');
+    expect(tracker).toHaveProperty('estimatedCost');
+    expect(tracker.byTier).toHaveProperty('light');
+    expect(tracker.byTier).toHaveProperty('default');
+    expect(tracker.byTier).toHaveProperty('heavy');
+  });
+
+  test('estimatedCost is returned as a string (toFixed)', () => {
+    const tracker = getCostTracker();
+    expect(typeof tracker.estimatedCost).toBe('string');
+  });
+
+  test('recordModelUsage increments totalCalls', () => {
+    const before = getCostTracker().totalCalls;
+    recordModelUsage('light', 100, 50);
+    expect(getCostTracker().totalCalls).toBe(before + 1);
+  });
+
+  test('recordModelUsage increments light tier counter', () => {
+    const before = getCostTracker().byTier.light;
+    recordModelUsage('light', 200, 100);
+    expect(getCostTracker().byTier.light).toBe(before + 1);
+  });
+
+  test('recordModelUsage increments heavy tier counter', () => {
+    const before = getCostTracker().byTier.heavy;
+    recordModelUsage('heavy', 500, 200);
+    expect(getCostTracker().byTier.heavy).toBe(before + 1);
+  });
+
+  test('recordModelUsage falls back to default tier for unknown tier name', () => {
+    const before = getCostTracker().byTier.default;
+    recordModelUsage('ultra_tier', 100, 50);
+    expect(getCostTracker().byTier.default).toBe(before + 1);
+  });
+
+  test('getCostTracker returns a snapshot — mutations do not alias the internal state', () => {
+    const snap1 = getCostTracker();
+    recordModelUsage('light', 10, 5);
+    const snap2 = getCostTracker();
+    expect(snap2.totalCalls).toBe(snap1.totalCalls + 1);
+    expect(snap1.totalCalls).toBe(snap1.totalCalls); // snap1 unchanged
   });
 });
