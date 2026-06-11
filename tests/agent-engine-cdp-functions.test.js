@@ -141,6 +141,10 @@ jest.unstable_mockModule('../background/trust-score.js', () => ({
   computeTrustScore: jest.fn(() => ({ score: 95, grade: 'A' })),
   suggestRetryActions: jest.fn(() => []),
 }));
+jest.unstable_mockModule('../background/error-utils.js', () => ({
+  getErrorMessage: jest.fn((e) => (e && e.message) ? e.message : String(e)),
+  sleep: jest.fn(() => Promise.resolve()),
+}));
 
 const mod = await import('../background/agent-engine.js');
 const { recoverFromCaptcha } = mod;
