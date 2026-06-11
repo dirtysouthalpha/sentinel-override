@@ -390,6 +390,16 @@ describe('resolveTemplateGoal', () => {
     storageData['sentinel_templates'] = {};
     await expect(resolveTemplateGoal('xyz', {})).rejects.toThrow('not found');
   });
+
+  test('throws when template exists but has no goal field (lines 267-268)', async () => {
+    storageData['sentinel_templates'] = { 'no-goal': { id: 'no-goal', name: 'No Goal' } };
+    await expect(resolveTemplateGoal('no-goal', {})).rejects.toThrow('has no goal');
+  });
+
+  test('throws when template goal is not a string (lines 267-268)', async () => {
+    storageData['sentinel_templates'] = { 'bad-goal': { id: 'bad-goal', name: 'Bad', goal: 42 } };
+    await expect(resolveTemplateGoal('bad-goal', {})).rejects.toThrow('has no goal');
+  });
 });
 
 // ========== updateTemplateUsage ==========

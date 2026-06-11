@@ -854,3 +854,92 @@ describe('dom.getUniqueSelector — additional cases', () => {
     expect(selector).toContain('nth-of-type');
   });
 });
+
+// ========== findElementBySelector — self-healing paths 4-6 (lines 218-248) ==========
+
+describe('dom.findElementBySelector — strip pseudo-classes fallback (lines 218-222)', () => {
+  test('returns element when stripped selector matches after positional pseudo-classes removed', () => {
+    const el = createElement('div', { id: 'target' });
+    const doc = {
+      querySelector: (sel) => {
+        // Fail for the original selector; succeed for the stripped one
+        if (sel === 'div:nth-child(2)') return null;
+        if (sel === 'div') return el;
+        return null;
+      },
+      querySelectorAll: () => [],
+    };
+    // Ensure shadow queryDeepFirst does not intercept
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, 'div:nth-child(2)');
+    expect(result).toBe(el);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+
+  test('returns element when :first-child is stripped from complex selector', () => {
+    const el = createElement('li', { id: 'li-el' });
+    const doc = {
+      querySelector: (sel) => {
+        if (sel === 'ul > li:first-child') return null;
+        if (sel === 'ul > li') return el;
+        return null;
+      },
+      querySelectorAll: () => [],
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, 'ul > li:first-child');
+    expect(result).toBe(el);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+describe('dom.findElementBySelector — leaf segment fallback (lines 232-236)', () => {
+  test('returns element when leaf of path selector matches', () => {
+    const el = createElement('button', { className: 'save' });
+    const doc = {
+      querySelector: (sel) => {
+        // Fail for full path; succeed for the leaf
+        if (sel === 'div.container > button.save') return null;
+        if (sel === 'button.save') return el;
+        return null;
+      },
+      querySelectorAll: () => [],
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, 'div.container > button.save');
+    expect(result).toBe(el);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+describe('dom.findElementBySelector — placeholder hint fallback (lines 243-248)', () => {
+  test('returns input when placeholder attribute matches selector hint', () => {
+    const input = createElement('input', { placeholder: 'Username' });
+    input.getAttribute = (attr) => attr === 'placeholder' ? 'Username' : null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel === 'input, textarea') return [input];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    // Selector contains [placeholder="username"] — should match case-insensitively
+    const result = dom.findElementBySelector(doc, '[placeholder="username"]');
+    expect(result).toBe(input);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
