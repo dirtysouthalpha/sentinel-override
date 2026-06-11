@@ -3,6 +3,7 @@
 // Tests shape validation, detect() positive/negative cases,
 // pageTypes/knownSelectors/waitStrings structure, and platform-specific features.
 
+import { jest } from '@jest/globals';
 import { sonicwallNsm } from '../background/platforms/sonicwall_nsm.js';
 import { sonicwallOnbox } from '../background/platforms/sonicwall_onbox.js';
 import { m365Admin } from '../background/platforms/m365_admin.js';
@@ -627,6 +628,28 @@ describe('networkDevice — detect', () => {
 
   test('ignores URL entirely (goal-only detection)', () => {
     expect(networkDevice.detect('https://192.168.1.1/', '')).toBe(false);
+  });
+
+  test('returns false when both url and goal are falsy (early return)', () => {
+    expect(networkDevice.detect(null, null)).toBe(false);
+    expect(networkDevice.detect(undefined, undefined)).toBe(false);
+    expect(networkDevice.detect('', '')).toBe(false);
+  });
+
+  test('catch block returns false when goal.toString() throws an Error', () => {
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const badGoal = { toString() { throw new Error('stringify error'); } };
+    expect(networkDevice.detect('http://example.com', badGoal)).toBe(false);
+    expect(errSpy).toHaveBeenCalledWith('[Sentinel] Error in networkDevice detect:', 'stringify error');
+    errSpy.mockRestore();
+  });
+
+  test('catch block returns false when goal.toString() throws a non-Error primitive', () => {
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const badGoal = { toString() { throw 42; } };
+    expect(networkDevice.detect('http://example.com', badGoal)).toBe(false);
+    expect(errSpy).toHaveBeenCalledWith('[Sentinel] Error in networkDevice detect:', '42');
+    errSpy.mockRestore();
   });
 });
 
