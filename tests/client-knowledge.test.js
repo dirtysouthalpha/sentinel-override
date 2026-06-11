@@ -29,6 +29,7 @@ const {
   deleteEntry,
   getRelevantEntries,
   formatPromptSection,
+  getClientStartupContext,
   markRunCompleted,
   exportClient,
   importClient,
@@ -739,5 +740,60 @@ describe('client-knowledge edge cases', () => {
     await addEntry(client.id, { scope: 'url', wisdom: 'No pattern entry' });
     const entries = await getRelevantEntries(client.id, 'https://example.com');
     expect(entries).toHaveLength(0);
+  });
+});
+
+// ── getClientStartupContext (lines 348-359) ──────────────────────────────────
+
+describe('getClientStartupContext', () => {
+  // Seed a clean storage state before each test to avoid DEFAULT_STATE mutation
+  // from earlier describe blocks polluting these assertions.
+  beforeEach(async () => {
+    await chrome.storage.local.set({ sentinelClientKnowledge: { clients: {}, activeClientId: null } });
+  });
+
+  test('returns nulls when no active client is set', async () => {
+    const result = await getClientStartupContext('https://example.com');
+    expect(result).toEqual({ client: null, relevantEntries: [], promptSection: '' });
+  });
+
+  test('returns nulls when activeClientId points to a missing client', async () => {
+    // Write a state with an activeClientId that has no corresponding client entry
+    await chrome.storage.local.set({ sentinelClientKnowledge: { clients: {}, activeClientId: 'ghost-id' } });
+    const result = await getClientStartupContext('https://example.com');
+    expect(result).toEqual({ client: null, relevantEntries: [], promptSection: '' });
+  });
+
+  test('returns client with empty promptSection when no entries match', async () => {
+    const { client } = await createClient({ displayName: 'Startup Corp' });
+    await setActiveClient(client.id);
+    const result = await getClientStartupContext('https://example.com');
+    expect(result.client).not.toBeNull();
+    expect(result.client.id).toBe(client.id);
+    expect(result.relevantEntries).toHaveLength(0);
+    expect(result.promptSection).toBe('');
+  });
+
+  test('returns populated promptSection when global entries exist', async () => {
+    const { client } = await createClient({ displayName: 'Knowledge Co' });
+    await addEntry(client.id, { scope: 'global', wisdom: 'Always use MFA' });
+    await addEntry(client.id, { scope: 'global', wisdom: 'Prefer dark mode' });
+    await setActiveClient(client.id);
+    const result = await getClientStartupContext('https://example.com');
+    expect(result.relevantEntries).toHaveLength(2);
+    expect(result.promptSection).toContain('Knowledge Co');
+    expect(result.promptSection).toContain('Always use MFA');
+    expect(result.promptSection).toContain('Prefer dark mode');
+    expect(result.promptSection).toMatch(/^[\n]/);
+  });
+
+  test('returns url-scoped entries that match currentUrl', async () => {
+    const { client } = await createClient({ displayName: 'URL Client' });
+    // Pattern without '*' uses substring match so 'example.com' matches full URL string
+    await addEntry(client.id, { scope: 'url', urlPattern: 'example.com', wisdom: 'Use the sidebar' });
+    await setActiveClient(client.id);
+    const result = await getClientStartupContext('https://example.com/dashboard');
+    expect(result.relevantEntries).toHaveLength(1);
+    expect(result.promptSection).toContain('Use the sidebar');
   });
 });
