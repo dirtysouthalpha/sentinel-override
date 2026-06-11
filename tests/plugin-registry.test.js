@@ -200,4 +200,20 @@ describe('Plugin Registry', () => {
     };
     await expect(mod.installPlugin('https://new-version.example.com/plugin.json')).rejects.toThrow('Plugin requires Sentinel v');
   });
+
+  test('installPlugin succeeds when minSentinelVersion uses lower major (semver regression)', async () => {
+    // String comparison bug: '2.0.0' > '15.0.0' is true (wrong), numeric must be false
+    _mockFetch['https://compat.example.com/plugin.json'] = {
+      id: 'compat-plugin', name: 'Compat', version: '1.0.0', entryUrl: 'https://x.com/main.js',
+      minSentinelVersion: '2.0.0'
+    };
+    const id = await mod.installPlugin('https://compat.example.com/plugin.json');
+    expect(id).toBe('compat-plugin');
+  });
+
+  test('installPlugin error message includes quoted field name', async () => {
+    _mockFetch['https://quoted-field.example.com/plugin.json'] = { id: 'test' };
+    await expect(mod.installPlugin('https://quoted-field.example.com/plugin.json'))
+      .rejects.toThrow('"name"');
+  });
 });

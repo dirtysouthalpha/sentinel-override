@@ -33,6 +33,18 @@ function storageSet(data) {
   });
 }
 
+// ========== Semver comparison ==========
+
+function compareSemver(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 // ========== Registry URL (PLG-01) ==========
 
 export async function getRegistryUrl() {
@@ -73,11 +85,11 @@ function validateManifest(manifest) {
   const required = ['id', 'name', 'version', 'entryUrl'];
   for (const field of required) {
     if (!manifest[field]) {
-      throw new Error('Invalid manifest: missing required field ' + field + '"');
+      throw new Error('Invalid manifest: missing required field "' + field + '"');
     }
   }
   // Semantic version check
-  if (manifest.minSentinelVersion && manifest.minSentinelVersion > MIN_SENTINEL_VERSION) {
+  if (manifest.minSentinelVersion && compareSemver(manifest.minSentinelVersion, MIN_SENTINEL_VERSION) > 0) {
     throw new Error('Plugin requires Sentinel v' + manifest.minSentinelVersion + ', current is v' + MIN_SENTINEL_VERSION);
   }
   return true;
