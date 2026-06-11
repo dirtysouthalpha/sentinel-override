@@ -27,7 +27,7 @@ export function startProfiling() {
   profilerState.startTime = Date.now();
   profilerState.lastSampleTime = Date.now();
   profilerState.samples = [];
-  console.log('[Sentinel/RuntimeProfiler] Profiling started');
+  console.debug('[Sentinel/RuntimeProfiler] Profiling started');
 }
 
 /**
@@ -37,7 +37,7 @@ export function startProfiling() {
 export function stopProfiling() {
   profilerState.enabled = false;
   const summary = generateProfilingSummary();
-  console.log('[Sentinel/RuntimeProfiler] Profiling stopped', summary);
+  console.debug('[Sentinel/RuntimeProfiler] Profiling stopped', summary);
   return summary;
 }
 
@@ -566,7 +566,7 @@ export function startCanaryDeployment(mutation) {
   canaryState.samples = [];
   canaryState.rollbackTriggered = false;
   
-  console.log('[Sentinel/Canary] Starting canary deployment', mutation);
+  console.debug('[Sentinel/Canary] Starting canary deployment', mutation);
   
   return {
     status: 'started',
@@ -692,7 +692,7 @@ export function stopCanaryDeployment(success = true) {
     rolledBack: canaryState.rollbackTriggered
   };
   
-  console.log('[Sentinel/Canary] Deployment stopped', summary);
+  console.debug('[Sentinel/Canary] Deployment stopped', summary);
   
   canaryState.active = false;
   canaryState.mutation = null;
@@ -964,7 +964,7 @@ function selectHealingStrategies(issue) {
 }
 
 function tryHealingStrategy(healing, strategy) {
-  console.log(`[Sentinel/Healing] Trying strategy: ${strategy.name}`, strategy.action);
+  console.debug(`[Sentinel/Healing] Trying strategy: ${strategy.name}`, strategy.action);
   
   // Simulate healing attempt
   // In real implementation, this would execute the actual healing action
