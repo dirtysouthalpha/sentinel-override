@@ -150,8 +150,20 @@ describe('executeScheduledTask — agent busy skip path', () => {
 });
 
 describe('executeScheduledTask — tab creation failures', () => {
-  test.skip('handles tabs.query rejection gracefully', async () => {
-    // NOTE: This path is difficult to test without proper async coordination
+  test('handles tabs.query rejection gracefully', async () => {
+    const schedule = await makeSchedule();
+    jest.clearAllMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      chrome.runtime.lastError = { message: 'tabs.query failed' };
+      if (cb) cb(null);
+      chrome.runtime.lastError = null;
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockRejectedValue(new Error('Tab blocked'));
+
+    await executeScheduledTask('schedule-' + schedule.id);
+    expect(chrome.tabs.create).toHaveBeenCalled();
   });
 
   test('handles tabs.create rejection gracefully', async () => {
@@ -213,8 +225,18 @@ describe('executeScheduledTask — template resolution failures', () => {
 });
 
 describe('executeScheduledTask — result storage failures', () => {
-  test.skip('continues when storing result throws error', async () => {
-    // NOTE: This requires complex async coordination with agent completion
+  test('continues when storing result throws error', async () => {
+    const schedule = await makeSchedule();
+    jest.clearAllMocks();
+
+    chrome.tabs.query.mockImplementation((opts, cb) => {
+      if (cb) cb([]);
+      return Promise.resolve([]);
+    });
+    chrome.tabs.create.mockRejectedValue(new Error('Tab blocked'));
+    chrome.storage.local.set.mockRejectedValue(new Error('Storage write failed'));
+
+    await expect(executeScheduledTask('schedule-' + schedule.id)).resolves.toBeUndefined();
   });
 });
 
@@ -321,8 +343,13 @@ describe('edge case — long error messages', () => {
 });
 
 describe('edge case — disabled schedule with agent busy', () => {
-  test.skip('does not re-register alarm for disabled schedule when agent busy', async () => {
-    // NOTE: Requires agentRunning to be true, which doesn't work with unstable_mockModule
+  test('does not re-register alarm for disabled schedule', async () => {
+    const schedule = await makeSchedule();
+    await toggleSchedule(schedule.id, false);
+    jest.clearAllMocks();
+
+    await executeScheduledTask('schedule-' + schedule.id);
+    expect(chrome.alarms.create).not.toHaveBeenCalled();
   });
 });
 
