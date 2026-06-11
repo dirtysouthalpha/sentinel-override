@@ -408,4 +408,115 @@ describe('UAP Bridge', () => {
       expect(eventsCalls.length).toBe(3);
     });
   });
+
+  describe('_pollTasks coverage — internal branches', () => {
+    test('poll marks server unavailable when response is not ok', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge();
+
+      mockFetch.mockResolvedValueOnce({ ok: false });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      expect(isServerAvailable()).toBe(false);
+    });
+
+    test('poll uses Date.now() fallback when response has no timestamp', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tasks: [] }), // no timestamp field
+      });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      expect(isServerAvailable()).toBe(true);
+    });
+
+    test('poll uses empty-array fallback when response has no tasks field', async () => {
+      const goalCb = jest.fn();
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge({ onGoal: goalCb });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ timestamp: 9999 }), // no tasks field
+      });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      expect(goalCb).not.toHaveBeenCalled();
+      expect(isServerAvailable()).toBe(true);
+    });
+
+    test('poll marks server unavailable after 5 consecutive fetch failures', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge();
+
+      for (let i = 0; i < 5; i++) {
+        mockFetch.mockRejectedValueOnce(new Error('net fail'));
+        jest.advanceTimersByTime(5000);
+        await jest.advanceTimersByTimeAsync(200);
+      }
+
+      expect(isServerAvailable()).toBe(false);
+    });
+
+    test('poll retries health check when server is unavailable and comes back online', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge();
+
+      // 5 failures to mark server unavailable
+      for (let i = 0; i < 5; i++) {
+        mockFetch.mockRejectedValueOnce(new Error('fail'));
+        jest.advanceTimersByTime(5000);
+        await jest.advanceTimersByTimeAsync(200);
+      }
+      expect(isServerAvailable()).toBe(false);
+
+      // Next poll interval: server not available → health check succeeds
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      expect(isServerAvailable()).toBe(true);
+    });
+
+    test('poll stays unavailable when health check also fails', async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge();
+
+      for (let i = 0; i < 5; i++) {
+        mockFetch.mockRejectedValueOnce(new Error('fail'));
+        jest.advanceTimersByTime(5000);
+        await jest.advanceTimersByTimeAsync(200);
+      }
+      expect(isServerAvailable()).toBe(false);
+
+      // Health check fails too
+      mockFetch.mockRejectedValueOnce(new Error('still down'));
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      expect(isServerAvailable()).toBe(false);
+    });
+
+    test('does not start duplicate polling when already polling', async () => {
+      mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
+      await initBridge();
+      // Second initBridge calls _startPolling but _polling is already true → early return
+      await initBridge();
+
+      mockFetch.mockClear();
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ tasks: [], timestamp: 1 }) });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      // Only one /uap/tasks fetch — not two (no duplicate interval)
+      const taskCalls = mockFetch.mock.calls.filter(c => String(c[0]).includes('/uap/tasks'));
+      expect(taskCalls.length).toBeLessThanOrEqual(1);
+    });
+  });
 });

@@ -82,6 +82,61 @@ describe('Error helpers', () => {
   });
 });
 
+describe('wrapError — fallback branches', () => {
+  test('omitted code falls back to UNKNOWN', () => {
+    const err = wrapError(new Error('x'), null);
+    expect(err.code).toBe(ERROR_CODES.UNKNOWN);
+  });
+
+  test('omitted suggestion falls back to null', () => {
+    const err = wrapError(new Error('x'), 'MY_CODE', null);
+    expect(err.suggestion).toBeNull();
+  });
+
+  test('omitted retryable falls back to false', () => {
+    const err = wrapError(new Error('x'), 'MY_CODE');
+    expect(err.retryable).toBe(false);
+  });
+
+  test('omitted context falls back to empty object', () => {
+    const err = wrapError(new Error('x'), 'MY_CODE', null, false, null);
+    expect(err.context).toEqual({});
+  });
+
+  test('error without .message uses String(error)', () => {
+    const err = wrapError('raw string error', 'MY_CODE');
+    expect(err.message).toBe('raw string error');
+  });
+});
+
+describe('fromApiResponse — fallback branches', () => {
+  test('empty object falls back to UNKNOWN code and default message', () => {
+    const err = fromApiResponse({});
+    expect(err.code).toBe(ERROR_CODES.UNKNOWN);
+    expect(err.message).toBe('Unknown error');
+    expect(err.suggestion).toBeNull();
+    expect(err.retryable).toBe(false);
+    expect(err.context).toEqual({});
+  });
+
+  test('partial object: missing message falls back to default', () => {
+    const err = fromApiResponse({ code: 'LLM_ERROR' });
+    expect(err.code).toBe('LLM_ERROR');
+    expect(err.message).toBe('Unknown error');
+  });
+
+  test('retryable: false explicitly set', () => {
+    const err = fromApiResponse({ retryable: false });
+    expect(err.retryable).toBe(false);
+  });
+
+  test('non-object (number) is treated as invalid', () => {
+    const err = fromApiResponse(42);
+    expect(err.code).toBe(ERROR_CODES.UNKNOWN);
+    expect(err.message).toBe('Invalid error payload');
+  });
+});
+
 describe('ERROR_CODES', () => {
   test('all expected codes are defined', () => {
     const expected = ['TAB_CLOSED', 'TAB_NOT_FOUND', 'LLM_TIMEOUT', 'LLM_ERROR', 'LLM_RATE_LIMITED',
