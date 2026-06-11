@@ -216,4 +216,68 @@ describe('Plugin Registry', () => {
     await expect(mod.installPlugin('https://quoted-field.example.com/plugin.json'))
       .rejects.toThrow('"name"');
   });
+
+  // ========== Uncovered branch coverage ==========
+
+  test('storageGet rejects when chrome.runtime.lastError is set', async () => {
+    const orig = globalThis.chrome.storage.local.get;
+    globalThis.chrome.storage.local.get = (keys, cb) => {
+      globalThis.chrome.runtime.lastError = { message: 'storage get error' };
+      cb({});
+      globalThis.chrome.runtime.lastError = null;
+    };
+    await expect(mod.getRegistryUrl()).rejects.toThrow('storage get error');
+    globalThis.chrome.storage.local.get = orig;
+  });
+
+  test('storageSet rejects when chrome.runtime.lastError is set', async () => {
+    const orig = globalThis.chrome.storage.local.set;
+    globalThis.chrome.storage.local.set = (data, cb) => {
+      globalThis.chrome.runtime.lastError = { message: 'storage set error' };
+      cb();
+      globalThis.chrome.runtime.lastError = null;
+    };
+    await expect(mod.setRegistryUrl('https://example.com/r.json')).rejects.toThrow('storage set error');
+    globalThis.chrome.storage.local.set = orig;
+  });
+
+  test('fetchRegistry returns plugin array on success', async () => {
+    _mockFetch['https://registry.sentinel.dev/plugins.json'] = [
+      { id: 'plug-x', name: 'X', version: '1.0.0', entryUrl: 'https://x.com/main.js' },
+    ];
+    const data = await mod.fetchRegistry();
+    expect(Array.isArray(data)).toBe(true);
+    expect(data[0].id).toBe('plug-x');
+  });
+
+  test('installPlugin warns when plugin is already installed', async () => {
+    const warnings = [];
+    const origWarn = console.warn;
+    console.warn = (...a) => warnings.push(a);
+    _mockFetch['https://dup.example.com/plugin.json'] = {
+      id: 'dup-plugin', name: 'Dup', version: '1.0.0', entryUrl: 'https://dup.com/main.js',
+    };
+    await mod.installPlugin('https://dup.example.com/plugin.json');
+    await mod.installPlugin('https://dup.example.com/plugin.json');
+    console.warn = origWarn;
+    expect(warnings.some(w => w[0] === '[PLUGIN-REGISTRY] Plugin already installed, updating:' && w[1] === 'dup-plugin')).toBe(true);
+  });
+
+  test('uninstallPlugin warns when plugin is not found', async () => {
+    const warnings = [];
+    const origWarn = console.warn;
+    console.warn = (...a) => warnings.push(a);
+    await mod.uninstallPlugin('does-not-exist');
+    console.warn = origWarn;
+    expect(warnings.some(w => w[0] === '[PLUGIN-REGISTRY] Plugin not found:' && w[1] === 'does-not-exist')).toBe(true);
+  });
+
+  test('compareSemver returns 0 for equal minSentinelVersion (does not throw)', async () => {
+    _mockFetch['https://exact-version.example.com/plugin.json'] = {
+      id: 'exact-plugin', name: 'Exact', version: '1.0.0', entryUrl: 'https://x.com/main.js',
+      minSentinelVersion: '15.0.0', // equal to MIN_SENTINEL_VERSION — compareSemver returns 0
+    };
+    const id = await mod.installPlugin('https://exact-version.example.com/plugin.json');
+    expect(id).toBe('exact-plugin');
+  });
 });
