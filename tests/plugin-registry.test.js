@@ -86,4 +86,78 @@ describe('Plugin Registry', () => {
     expect(conflicts.length).toBeGreaterThan(0);
     expect(conflicts[0].type).toBe('platform_overlap');
   });
+
+  test('detectConflicts returns empty array when plugin not found', async () => {
+    const conflicts = await mod.detectConflicts('nonexistent-plugin');
+    expect(conflicts).toEqual([]);
+  });
+
+  test('detectConflicts finds action overlaps', async () => {
+    _mockFetch['https://a.com/p.json'] = {
+      id: 'plug-a', name: 'A', version: '1.0.0', entryUrl: 'https://a.com/main.js',
+      platforms: [], actions: { 'run_report': {} }
+    };
+    _mockFetch['https://b.com/p.json'] = {
+      id: 'plug-b', name: 'B', version: '1.0.0', entryUrl: 'https://b.com/main.js',
+      platforms: [], actions: { 'run_report': {} }
+    };
+    await mod.installPlugin('https://a.com/p.json');
+    await mod.togglePlugin('plug-a');
+    await mod.installPlugin('https://b.com/p.json');
+    const conflicts = await mod.detectConflicts('plug-b');
+    expect(conflicts.some(c => c.type === 'action_overlap')).toBe(true);
+  });
+
+  test('activatePlugin sets plugin to active', async () => {
+    _mockFetch['https://example.com/plugin.json'] = {
+      id: 'test-plugin', name: 'Test', version: '1.0.0', entryUrl: 'https://example.com/main.js'
+    };
+    await mod.installPlugin('https://example.com/plugin.json');
+    await mod.activatePlugin('test-plugin');
+    const plugins = await mod.getInstalledPlugins();
+    expect(plugins['test-plugin'].active).toBe(true);
+  });
+
+  test('activatePlugin throws for unknown plugin', async () => {
+    await expect(mod.activatePlugin('no-such-plugin')).rejects.toThrow('Plugin not found');
+  });
+
+  test('deactivatePlugin sets plugin to inactive', async () => {
+    _mockFetch['https://example.com/plugin.json'] = {
+      id: 'test-plugin', name: 'Test', version: '1.0.0', entryUrl: 'https://example.com/main.js'
+    };
+    await mod.installPlugin('https://example.com/plugin.json');
+    await mod.activatePlugin('test-plugin');
+    await mod.deactivatePlugin('test-plugin');
+    const plugins = await mod.getInstalledPlugins();
+    expect(plugins['test-plugin'].active).toBe(false);
+  });
+
+  test('deactivatePlugin throws for unknown plugin', async () => {
+    await expect(mod.deactivatePlugin('no-such-plugin')).rejects.toThrow('Plugin not found');
+  });
+
+  test('getActivePlugins returns only active plugins', async () => {
+    _mockFetch['https://a.com/p.json'] = {
+      id: 'plug-a', name: 'A', version: '1.0.0', entryUrl: 'https://a.com/main.js'
+    };
+    _mockFetch['https://b.com/p.json'] = {
+      id: 'plug-b', name: 'B', version: '1.0.0', entryUrl: 'https://b.com/main.js'
+    };
+    await mod.installPlugin('https://a.com/p.json');
+    await mod.installPlugin('https://b.com/p.json');
+    await mod.activatePlugin('plug-a');
+    const active = await mod.getActivePlugins();
+    expect(active['plug-a']).toBeDefined();
+    expect(active['plug-b']).toBeUndefined();
+  });
+
+  test('getActivePlugins returns empty object when no plugins installed', async () => {
+    const active = await mod.getActivePlugins();
+    expect(active).toEqual({});
+  });
+
+  test('togglePlugin throws for unknown plugin', async () => {
+    await expect(mod.togglePlugin('no-such-plugin')).rejects.toThrow('Plugin not found');
+  });
 });
