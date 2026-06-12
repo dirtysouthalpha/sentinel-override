@@ -511,7 +511,13 @@ describe('supportsVision — additional', () => {
     expect(supportsVision('gpt-4o')).toBe(true);
   });
 
-  test('known non-vision model returns false', () => {
+  test('known non-vision model returns false via early deny list (L963)', () => {
     expect(supportsVision('gpt-3.5-turbo')).toBe(false);
+  });
+
+  test('gpt-4 plain hits registry deny path and returns false (covers L974)', () => {
+    // gpt-4 doesn't match the L963 early deny-list (no GPT_3_5_RE / CLAUDE_2_RE match)
+    // but the provider-registry openai deny-list matches /^gpt-4$/ → returns false at L974.
+    expect(supportsVision('gpt-4')).toBe(false);
   });
 });
