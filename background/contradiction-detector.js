@@ -16,7 +16,7 @@ const NOT_PATTERN_RE = /(?:is|are|was|were)\s+not\s+([a-z][^,.]*)/i;
  */
 export function analyzeForContradictions(text) {
   if (!text || typeof text !== 'string') {
-    return { hasContradictions: false, contradictions: [] };
+    return { hasContradictions: false, contradictions: [], totalScore: 0 };
   }
 
   const contradictions = [];
@@ -452,8 +452,10 @@ export async function getContradictionStatistics() {
       // Count by type
       stats.byType[contradiction.type] = (stats.byType[contradiction.type] || 0) + 1;
 
-      // Count by severity
-      stats.bySeverity[contradiction.severity] = (stats.bySeverity[contradiction.severity] || 0) + 1;
+      // Count by severity — only increment known severity levels
+      if (contradiction.severity in stats.bySeverity) {
+        stats.bySeverity[contradiction.severity]++;
+      }
 
       // Track most common type
       if (stats.byType[contradiction.type] > maxTypeCount) {

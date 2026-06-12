@@ -340,3 +340,63 @@ describe('areContradictoryStatements — same negation state falls through to re
     expect(result.crossResponseContradictions.length).toBe(0);
   });
 });
+
+// ── analyzeForContradictions early-return includes totalScore: 0 ──────────────
+
+describe('analyzeForContradictions — early return includes totalScore', () => {
+  test('returns totalScore: 0 for null input', () => {
+    const result = analyzeForContradictions(null);
+    expect(result.totalScore).toBe(0);
+  });
+
+  test('returns totalScore: 0 for empty string input', () => {
+    const result = analyzeForContradictions('');
+    expect(result.totalScore).toBe(0);
+  });
+
+  test('compareResponsesForContradictions gives numeric totalContradictions when both inputs are empty', () => {
+    const result = compareResponsesForContradictions('', '');
+    expect(typeof result.totalContradictions).toBe('number');
+    expect(Number.isNaN(result.totalContradictions)).toBe(false);
+    expect(result.totalContradictions).toBe(0);
+  });
+
+  test('compareResponsesForContradictions gives numeric totalContradictions when inputs are null', () => {
+    const result = compareResponsesForContradictions(null, null);
+    expect(typeof result.totalContradictions).toBe('number');
+    expect(Number.isNaN(result.totalContradictions)).toBe(false);
+    expect(result.totalContradictions).toBe(0);
+  });
+});
+
+// ── getContradictionStatistics: unknown/undefined severity is silently ignored ─
+
+describe('getContradictionStatistics — unknown severity values are ignored', () => {
+  beforeEach(async () => { await clearContradictionLog(); });
+
+  test('undefined severity does not create a junk key in bySeverity', async () => {
+    await logContradictionDetection({
+      hasContradictions: true,
+      contradictions: [{ type: 'direct_negation', severity: undefined }],
+      totalScore: 1
+    });
+    const stats = await getContradictionStatistics();
+    // The known keys must still be zero (no valid severity to increment)
+    expect(stats.bySeverity.high).toBe(0);
+    expect(stats.bySeverity.medium).toBe(0);
+    expect(stats.bySeverity.low).toBe(0);
+    // No extra keys polluted into bySeverity
+    expect(Object.keys(stats.bySeverity)).toEqual(['high', 'medium', 'low']);
+  });
+
+  test('unknown string severity does not pollute bySeverity', async () => {
+    await logContradictionDetection({
+      hasContradictions: true,
+      contradictions: [{ type: 'temporal', severity: 'critical' }],
+      totalScore: 1
+    });
+    const stats = await getContradictionStatistics();
+    expect(Object.keys(stats.bySeverity)).toEqual(['high', 'medium', 'low']);
+    expect(stats.bySeverity.high).toBe(0);
+  });
+});
