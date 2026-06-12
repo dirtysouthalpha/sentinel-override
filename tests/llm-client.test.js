@@ -1277,9 +1277,38 @@ describe('generatePlan', () => {
     expect(result).toEqual(['Step one', 'Step two', 'Step three']);
   });
 
-  test('extracts steps from phases format via Strategy 3 (first { last })', async () => {
-    // Strategy 3 picks up phases when Strategies 1 and 2 fail (e.g. invalid chars stripped).
-    // Wrap in non-JSON text to force Strategy 1/2 to fail; the outer { } will be valid for S3.
+  test('extracts steps from {"plan":[...]} embedded in prose via Strategy 2', async () => {
+    // Strategy 1 fails (JSON.parse rejects the prose prefix).
+    // Strategy 2 balanced-brace scan finds {"plan":[...]} and returns the steps array.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Here is the plan: {"plan":["Navigate to settings","Click save","Verify change"]} — follow these steps.' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Navigate to settings', 'Click save', 'Verify change']);
+  });
+
+  test('extracts steps from {"steps":[...]} embedded in prose via Strategy 2', async () => {
+    // Strategy 1 fails (JSON.parse rejects the prose prefix).
+    // Strategy 2 balanced-brace scan finds {"steps":[...]} and returns the steps array.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Let me break this down: {"steps":["Open the app","Navigate to settings","Confirm"]}. Good luck!' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Open the app', 'Navigate to settings', 'Confirm']);
+  });
+
+  test('extracts steps from phases format with control char prefix via Strategy 2', async () => {
+    // Content has a control char (\x01) before the JSON object. Strategy 1's jsonStr strips
+    // control chars so "Prefix  {..." fails JSON.parse. Strategy 2 scans contentNoThink
+    // (which retains the \x01) and correctly finds the balanced {"phases":[...]} block.
     _mockFetch = () => Promise.resolve({
       ok: true,
       json: () => Promise.resolve({
