@@ -2034,10 +2034,6 @@ async function callLLM(trimmedElements, totalElementCount, pageContent, base64Im
   } catch (_e) { /* non-fatal — allow call if check fails */ }
   agentState.apiCallCount++; // increment before any throws so the count is always recorded
   const providerConfig = await getActiveProvider();
-  if (!providerConfig) {
-    console.error('[Sentinel/LLM] No active provider configured!');
-    return { type: 'finish', summary: 'Error: No provider configured. Open Settings and configure a provider.' };
-  }
   const { endpoint, apiKey } = providerConfig;
   if (!apiKey) {
     console.error('[Sentinel/LLM] No API key configured! Provider:', providerConfig.providerId || endpoint || 'unknown');

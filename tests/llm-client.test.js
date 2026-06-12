@@ -2171,6 +2171,35 @@ describe('callLLM: non-tool-use provider fallback paths', () => {
   });
 });
 
+// ========== callLLM early-exit paths (credit limit, no provider) ==========
+describe('callLLM: early-exit guard paths', () => {
+  const defaultConfig = {
+    maxRetries: 0,
+    retryDelay: 0,
+    maxRetryDelay: 100,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  function makeState(overrides = {}) {
+    return { apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [], agentMemory: {}, agentPlan: null, currentPlanStep: 0, ...overrides };
+  }
+
+  test('returns credit-limit finish when sendMessage reports limit exceeded (L2030-2031)', async () => {
+    const orig = globalThis.chrome.runtime.sendMessage;
+    globalThis.chrome.runtime.sendMessage = () => Promise.resolve({ allowed: false });
+    try {
+      const result = await callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, defaultConfig, makeState());
+      expect(result.type).toBe('finish');
+      expect(result.summary).toContain('Daily credit limit');
+    } finally {
+      globalThis.chrome.runtime.sendMessage = orig;
+    }
+  });
+
+});
+
 // ========== regexSalvageFinishOrNote: empty raw for note type (lines 1862-1863) ==========
 describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-1863)', () => {
   test('returns null from regexSalvageFinishOrNote when note text is empty (line 1862)', () => {
