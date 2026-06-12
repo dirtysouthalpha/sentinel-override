@@ -313,6 +313,7 @@ function sendStatus() {
       const tabId = getActiveTabId();
       const ctx = tabId ? getTabContext(tabId) : null;
 
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify({
         type: 'status',
         agent_running: agentRunning || false,

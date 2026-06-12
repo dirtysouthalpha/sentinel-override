@@ -316,6 +316,7 @@ export async function getBiasStatistics() {
     stats.bySeverity[getSeverityLabel(entry.severity).toLowerCase()]++;
 
     // Count by bias type
+    if (!Array.isArray(entry.biases)) continue;
     for (const bias of entry.biases) {
       if (!stats.byType[bias.type]) {
         stats.byType[bias.type] = 0;
