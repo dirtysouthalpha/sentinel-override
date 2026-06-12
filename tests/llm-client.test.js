@@ -2200,6 +2200,92 @@ describe('callLLM: early-exit guard paths', () => {
 
 });
 
+// ========== callLLM API response validation paths ==========
+describe('callLLM: API response validation paths', () => {
+  const defaultConfig = {
+    maxRetries: 0,
+    retryDelay: 0,
+    maxRetryDelay: 100,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  function makeState(overrides = {}) {
+    return { apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [], agentMemory: {}, agentPlan: null, currentPlanStep: 0, ...overrides };
+  }
+
+  function setupOpenAI() {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: { api_key: 'test-key', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions' }
+      }
+    };
+  }
+
+  test('throws when API returns array instead of object (L2268)', async () => {
+    setupOpenAI();
+    _mockFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve([1, 2, 3]) });
+    await expect(
+      callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://api.openai.com/v1/chat/completions', 0, defaultConfig, makeState())
+    ).rejects.toThrow('invalid response body');
+  });
+
+  test('throws auth error when 200 response contains error payload (L2272-2273)', async () => {
+    setupOpenAI();
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ error: { message: 'Invalid API key supplied.' } })
+    });
+    await expect(
+      callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://api.openai.com/v1/chat/completions', 0, defaultConfig, makeState())
+    ).rejects.toThrow('Authentication Failed');
+  });
+
+  test('throws auth error for msg-based error payload (L2272-2273 msg path)', async () => {
+    setupOpenAI();
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ msg: 'Unauthorized access' })
+    });
+    await expect(
+      callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://api.openai.com/v1/chat/completions', 0, defaultConfig, makeState())
+    ).rejects.toThrow('Authentication Failed');
+  });
+
+  test('returns note when parseResponse throws on non-tool-use provider (L2421-2422)', async () => {
+    setupOpenAI();
+    const orig = PROVIDERS.openai.supportsToolUse;
+    PROVIDERS.openai.supportsToolUse = false;
+    try {
+      // No choices in response → parseResponse throws → caught at L2420 → returns note
+      _mockFetch = () => Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      const result = await callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://api.openai.com/v1/chat/completions', 0, defaultConfig, makeState());
+      expect(result.type).toBe('note');
+      expect(result.text).toContain('unparseable');
+    } finally {
+      PROVIDERS.openai.supportsToolUse = orig;
+    }
+  });
+
+  test('warns and falls through when Anthropic parseToolUseResponse throws (L2328)', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: { api_key: 'test-key', model: 'claude-sonnet-4-6', endpoint: 'https://api.anthropic.com/v1/messages' }
+      }
+    };
+    // stop_reason=tool_use but malformed content → parseToolUseResponse throws → falls through to text parse → no content → note
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ stop_reason: 'tool_use', content: null })
+    });
+    const result = await callLLMWithRetry([], 0, 'page', null, 'goal', [], 1, 'https://api.anthropic.com/v1/messages', 0, defaultConfig, makeState());
+    expect(result.type).toBe('note');
+  });
+});
+
 // ========== regexSalvageFinishOrNote: empty raw for note type (lines 1862-1863) ==========
 describe('parseLLMResponse: regexSalvageFinishOrNote with empty raw (lines 1862-1863)', () => {
   test('returns null from regexSalvageFinishOrNote when note text is empty (line 1862)', () => {
