@@ -373,6 +373,24 @@ describe('level filtering', () => {
     listeners.storageChanged({ telemetryLevel: { newValue: undefined } }, 'local');
     expect(getLevel()).toBe('normal');
   });
+
+  test('telemetry_runs_index change populates in-memory cache (covers L205-206)', async () => {
+    const newIndex = [{ runId: 'cached-run', goal: 'Cached', startedAt: 1, status: 'completed' }];
+    listeners.storageChanged({ telemetry_runs_index: { newValue: newIndex } }, 'local');
+    jest.clearAllMocks();
+    const runs = await listPersistedRuns();
+    expect(runs).toEqual(newIndex);
+    expect(globalThis.chrome.storage.local.get).not.toHaveBeenCalled();
+  });
+
+  test('telemetry_runs_index change with non-array newValue sets empty cache (covers L205)', async () => {
+    listeners.storageChanged({ telemetry_runs_index: { newValue: null } }, 'local');
+    jest.clearAllMocks();
+    const runs = await listPersistedRuns();
+    expect(Array.isArray(runs)).toBe(true);
+    expect(runs).toHaveLength(0);
+    expect(globalThis.chrome.storage.local.get).not.toHaveBeenCalled();
+  });
 });
 
 // ========== Persistence flow ==========

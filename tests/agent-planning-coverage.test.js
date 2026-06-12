@@ -207,4 +207,47 @@ describe('_applyAdaptivePrompts — approval mode, approved decision (lines 322-
 
     expect(result).toBe('adapted goal text');
   });
+
+  test('sendMessage rejection logs error and flow continues via onMessage (covers L252)', async () => {
+    const errors = [];
+    const origError = console.error;
+    console.error = (...args) => errors.push(args.join(' '));
+
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'approval' });
+    rewriteGoalForPlatform.mockResolvedValueOnce({
+      adapted: true,
+      platform: { id: 'test-send-fail' },
+      summary: 'Test',
+      mismatchHints: [],
+      originalGoal: 'orig',
+      adaptedGoal: 'adapted-result',
+      durationMs: 1,
+    });
+
+    // Make sendMessage reject — triggers the .catch at L252.
+    // Also schedule firing the onMessage listener so the inner Promise resolves.
+    chrome.runtime.sendMessage.mockImplementationOnce(async (msg) => {
+      if (msg.action === 'adapted_goal_available') {
+        setTimeout(() => {
+          if (capturedOnMessageListener) {
+            capturedOnMessageListener({
+              action: 'adapted_goal_response',
+              requestId: msg.requestId,
+              approved: true,
+              useOriginal: false,
+              edited: false,
+            });
+          }
+        }, 0);
+        throw new Error('sendMessage failed');
+      }
+      return {};
+    });
+
+    const result = await _applyAdaptivePrompts('orig', { url: 'https://example.com' }, 1, null, []);
+    console.error = origError;
+
+    expect(errors.some(e => e.includes('[finish] Unhandled rejection:'))).toBe(true);
+    expect(result).toBe('adapted-result');
+  });
 });
