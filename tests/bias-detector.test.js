@@ -245,6 +245,24 @@ describe('generateBiasReport — severity labels', () => {
     expect(typeof report).toBe('string');
     expect(report.length).toBeGreaterThan(0);
   });
+
+  test('generates report with None severity label (covers L232)', () => {
+    const analysis = { hasBias: true, biases: [{ type: 'testBias', severity: 0, pattern: 'test', matches: ['test'] }], severity: 0, totalBiasScore: 0 };
+    const report = generateBiasReport(analysis);
+    expect(report).toContain('None');
+  });
+
+  test('generates report with Medium severity label (covers L236)', () => {
+    const analysis = { hasBias: true, biases: [{ type: 'testBias', severity: 2, pattern: 'test', matches: ['test'] }], severity: 2, totalBiasScore: 2 };
+    const report = generateBiasReport(analysis);
+    expect(report).toContain('Medium');
+  });
+
+  test('generates report with Unknown severity for out-of-range value (covers L240)', () => {
+    const analysis = { hasBias: true, biases: [{ type: 'testBias', severity: 99, pattern: 'test', matches: ['test'] }], severity: 99, totalBiasScore: 99 };
+    const report = generateBiasReport(analysis);
+    expect(report).toContain('Unknown');
+  });
 });
 
 describe('storage error paths', () => {

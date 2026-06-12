@@ -313,6 +313,38 @@ describe('callLLMWithRetry — _attachReasoning merges API and text reasoning', 
     strategyShiftThreshold: 3
   };
 
+  test('sets __reasoning directly from reasoning_content when no text preamble (covers L2311)', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions'
+        }
+      }
+    };
+    // Content starts directly with JSON (no preamble) → parseLLMResponse does NOT set cmd.__reasoning
+    // _attachReasoning then sets cmd.__reasoning = _apiReasoning directly (L2311)
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{
+          message: {
+            content: '{"type":"note","text":"all good"}',
+            reasoning_content: 'Chain-of-thought: evaluated the page'
+          }
+        }]
+      })
+    });
+    const result = await callLLMWithRetry(
+      [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
+      0, config, { apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [], agentMemory: {}, agentPlan: null, currentPlanStep: 0 }
+    );
+    expect(result.type).toBe('note');
+    expect(result.__reasoning).toBe('Chain-of-thought: evaluated the page');
+  });
+
   test('merges reasoning_content with pre-JSON __reasoning from parseLLMResponse (covers L2308-2309)', async () => {
     _storageData = {
       active_provider: 'openai',

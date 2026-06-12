@@ -147,6 +147,14 @@ describe('sendRuntimeMessage', () => {
 
     await expect(sendRuntimeMessage({ action: 'test' })).rejects.toThrow('receiver does not exist');
   });
+
+  test('rejects on timeout when callback never fires (covers L57)', async () => {
+    chrome.runtime.sendMessage.mockImplementation(() => {
+      // Never calls callback — simulate timeout
+    });
+
+    await expect(sendRuntimeMessage({ action: 'test' }, 50)).rejects.toThrow('timed out');
+  }, 10000);
 });
 
 // ========== wrapMessageHandler ==========

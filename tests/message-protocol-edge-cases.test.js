@@ -192,4 +192,24 @@ describe('message-protocol edge cases', () => {
       expect(() => sendAgentActivity('thinking', null)).not.toThrow();
     });
   });
+
+  describe('sendHeartbeat', () => {
+    test('sends heartbeat_update message with durationMs (covers L380)', async () => {
+      chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+      const { sendHeartbeat } = await import('../background/message-protocol.js');
+      sendHeartbeat(750);
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'heartbeat_update', durationMs: 750 })
+      );
+    });
+
+    test('defaults durationMs to 0 when called without argument', async () => {
+      chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+      const { sendHeartbeat } = await import('../background/message-protocol.js');
+      sendHeartbeat();
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'heartbeat_update', durationMs: 0 })
+      );
+    });
+  });
 });

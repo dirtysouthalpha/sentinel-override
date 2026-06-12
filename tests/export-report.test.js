@@ -46,6 +46,20 @@ describe('export-report', () => {
       expect(html).toContain('&lt;script&gt;');
     });
 
+    it("should escape single quote in goal to &#39; (covers escapeHtml L250)", () => {
+      const auditLog = [];
+      const metadata = {
+        goal: "User's firewall review task",
+        startTime: '2024-01-01T00:00:00Z',
+        endTime: '2024-01-01T00:01:00Z',
+        totalSteps: 0,
+        status: 'completed',
+      };
+
+      const html = generateHtmlReport(auditLog, metadata);
+      expect(html).toContain('&#39;');
+    });
+
     it('should handle missing metadata fields with defaults', () => {
       const auditLog = [];
       const metadata = {};
