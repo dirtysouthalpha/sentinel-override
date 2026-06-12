@@ -766,7 +766,9 @@ export async function getActiveProvider() {
       apiKey: p.api_key || '',
       model: p.model || provider.defaultModel,
       maxTokens: p.max_tokens || 8000,
-      temperature: p.temperature || 0.3
+      temperature: p.temperature || 0.3,
+      fastModel: p.fast_model || p.fastModel || null,
+      heavyModel: p.heavy_model || p.heavyModel || null,
     };
   }
 

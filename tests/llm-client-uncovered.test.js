@@ -67,6 +67,18 @@ describe('getPlatformContext — profile selector formatting', () => {
     const ctx = getPlatformContext('https://unknown-site.example.com/page', 'Read the page');
     expect(ctx).toBe('');
   });
+
+  test('NSM URL formats array and function selectors (covers L854-859)', () => {
+    // sonicwall_nsm has array-valued selectors (e.g. policyTabClientText: ['Client', ...])
+    // and function-valued selectors (e.g. policyDialogTab: (_name) => '...')
+    const ctx = getPlatformContext('https://nsm.sonicwall.com/manage/firewalls', 'configure policies');
+    expect(typeof ctx).toBe('string');
+    expect(ctx.length).toBeGreaterThan(0);
+    // Array-valued selector formatted as ["a", "b", ...]
+    expect(ctx).toContain('[');
+    // Function-valued selector described as parameterized
+    expect(ctx).toContain('parameterized');
+  });
 });
 
 // ========== generatePlan — empty response content (line 855-856) ==========
@@ -286,5 +298,108 @@ describe('parseLLMResponse — regex salvage edge cases', () => {
     const result = parseLLMResponse(content);
     expect(result).toBeTruthy();
     expect(['finish', 'note']).toContain(result.type);
+  });
+});
+
+// ========== callLLMWithRetry — step tier model routing (L2044-2049) ==========
+
+describe('callLLMWithRetry — step tier model routing', () => {
+  const routingConfig = {
+    maxRetries: 0,
+    retryDelay: 100,
+    maxRetryDelay: 500,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  function makeAgentState(overrides = {}) {
+    return {
+      apiCallCount: 0,
+      consecutiveFailures: 0,
+      currentStrategies: [],
+      agentMemory: {},
+      agentPlan: null,
+      currentPlanStep: 0,
+      ...overrides
+    };
+  }
+
+  function setMockFetchCapture(responseContent = '{"type":"note","text":"ok"}') {
+    let capturedBody = null;
+    _mockFetch = (url, opts) => {
+      try { capturedBody = JSON.parse(opts.body); } catch (_e) { capturedBody = opts.body; }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ choices: [{ message: { content: responseContent } }] })
+      });
+    };
+    return () => capturedBody;
+  }
+
+  test('uses fastModel when stepContext tier is light (covers L2045)', async () => {
+    const getBody = setMockFetchCapture();
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions',
+          fastModel: 'gpt-4o-mini'
+        }
+      }
+    };
+    // type: 'read_page' is in simpleTypes → selectModelForStep returns 'light' → L2045
+    await callLLMWithRetry(
+      [], 0, 'page content', null, 'read the page', [], 1, 'https://example.com',
+      0, routingConfig, makeAgentState({ stepContext: { type: 'read_page' } })
+    );
+    expect(getBody()).toBeTruthy();
+    expect(getBody().model).toBe('gpt-4o-mini');
+  });
+
+  test('uses heavyModel when stepContext tier is heavy (covers L2047)', async () => {
+    const getBody = setMockFetchCapture();
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions',
+          heavyModel: 'o3'
+        }
+      }
+    };
+    // hasScreenshot: true → selectModelForStep returns 'heavy' → L2047
+    await callLLMWithRetry(
+      [], 0, 'page content', null, 'analyze screenshot', [], 1, 'https://example.com',
+      0, routingConfig, makeAgentState({ stepContext: { hasScreenshot: true } })
+    );
+    expect(getBody()).toBeTruthy();
+    expect(getBody().model).toBe('o3');
+  });
+
+  test('uses fastModel via isSimpleStep when no stepContext (covers L2049)', async () => {
+    const getBody = setMockFetchCapture();
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions',
+          fastModel: 'gpt-4o-mini'
+        }
+      }
+    };
+    // No stepContext → _stepTier = null; isSimpleStep=true + fastModel set → _useSimple=true → L2049
+    await callLLMWithRetry(
+      [], 0, 'page content', null, 'click the button', [], 1, 'https://example.com',
+      0, routingConfig, makeAgentState()
+    );
+    expect(getBody()).toBeTruthy();
+    expect(getBody().model).toBe('gpt-4o-mini');
   });
 });
