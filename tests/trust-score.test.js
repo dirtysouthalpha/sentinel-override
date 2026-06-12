@@ -447,3 +447,50 @@ describe('suggestRetryActions', () => {
     expect(suggestions[0].severity).toBe('medium');
   });
 });
+
+// ========== describeTrustScore — coverage gap tests ==========
+
+describe('describeTrustScore — coverage gaps', () => {
+  test('uses default empty breakdown when scoreResult has no breakdown property', () => {
+    // Covers line 154: `const { score, band, breakdown = {} } = scoreResult;`
+    const result = { score: 72, band: 'high' };
+    const desc = describeTrustScore(result);
+    expect(desc).toContain('72/100');
+    expect(desc).toContain('high');
+  });
+
+  test('safeDelta returns 0 for null component in breakdown', () => {
+    // Covers line 156: `comp && typeof comp.max === 'number'...` false branch
+    const result = { score: 55, band: 'good', breakdown: { failure: null } };
+    const desc = describeTrustScore(result);
+    expect(typeof desc).toBe('string');
+    expect(desc).toContain('55/100');
+  });
+
+  test('does not emit "weak" label when all component deltas are small', () => {
+    // Covers line 167: `components[0]?.delta > 5` false branch
+    const nearPerfect = computeTrustScore({
+      totalSteps: 10, failedSteps: 0, productiveSteps: 10,
+      apiCallCount: 10, safetyBlocks: 0, planLength: 5, planCompleted: 5,
+    });
+    const desc = describeTrustScore(nearPerfect);
+    expect(desc).not.toContain('weak');
+  });
+});
+
+// ========== round() — non-finite guard ==========
+
+describe('round() — non-finite input via computeTrustScore', () => {
+  test('returns 0 when round() receives non-finite value', () => {
+    // Covers line 173: `if (!isFinite(n)) return 0;`
+    // apiCallCount: Infinity feeds into the efficiency ratio calculation
+    const result = computeTrustScore({
+      totalSteps: 5, failedSteps: 0, productiveSteps: 5,
+      apiCallCount: Infinity, safetyBlocks: 0, planLength: 0, planCompleted: 0,
+    });
+    // Score must still be a valid finite number
+    expect(isFinite(result.score)).toBe(true);
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+  });
+});

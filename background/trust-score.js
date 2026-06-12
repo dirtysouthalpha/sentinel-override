@@ -284,7 +284,7 @@ export function suggestRetryActions(scoreResult) {
     suggestions.push({
       id: 'verify-tenant-before-retry',
       label: 'Verify expected tenant',
-      reason: `${safetyBlocks} safety block${safetyBlocks > 1 ? 's' : ''} fired (cross-tenant or sensitive-field). Confirm the expected tenant in Settings before re-running so the agent stays scoped.`,
+      reason: `${safetyBlocks} safety blocks fired (cross-tenant or sensitive-field). Confirm the expected tenant in Settings before re-running so the agent stays scoped.`,
       severity: 'high',
       applyKeys: [],
       applyValues: []

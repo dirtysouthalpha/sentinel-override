@@ -458,6 +458,41 @@ describe('macro-recorder', () => {
 
       expect(macro.steps[0].delay).toBe(1000);
     });
+
+    it('should fall back to "unknown" when action object has no type property', async () => {
+      const history = [
+        { action: { params: { selector: '#btn' } }, duration: 500 },
+      ];
+
+      const macro = await historyToMacro(history, 'Test', 'Desc');
+
+      expect(macro.steps[0].action).toBe('unknown');
+    });
+  });
+
+  describe('loadMacros — storage missing key', () => {
+    it('should return empty array when storage returns object without the macro key', async () => {
+      chrome.storage.local.get.mockImplementationOnce(() => Promise.resolve({}));
+
+      const macros = await loadMacros();
+      expect(macros).toEqual([]);
+    });
+  });
+
+  describe('createMacro — crypto.randomUUID fallback', () => {
+    it('should generate id using fallback when crypto.randomUUID is not available', async () => {
+      const originalRandomUUID = crypto.randomUUID;
+      // eslint-disable-next-line no-undef
+      delete crypto.randomUUID;
+
+      try {
+        const macro = await createMacro('Fallback ID Test', 'Desc', []);
+        expect(typeof macro.id).toBe('string');
+        expect(macro.id.length).toBeGreaterThan(0);
+      } finally {
+        crypto.randomUUID = originalRandomUUID;
+      }
+    });
   });
 
   describe('Live Recording', () => {
