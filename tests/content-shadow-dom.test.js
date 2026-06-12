@@ -296,6 +296,35 @@ describe('shadow.walkShadowTree', () => {
     shadow.walkShadowTree({ shadowRoot: null, querySelectorAll: () => [] }, (el) => visited.push(el));
     expect(visited).toHaveLength(1);
   });
+
+  test('walks shadow root of slot-assigned element (line 84 true branch)', () => {
+    const innerChild = { shadowRoot: null, querySelectorAll: () => [] };
+    const assignedSR = {
+      querySelectorAll: () => [],
+    };
+    treeWalkerQueue.push(innerChild);
+    const assignedEl = {
+      nodeType: Node.ELEMENT_NODE,
+      shadowRoot: assignedSR,
+      querySelectorAll: () => [],
+    };
+    const slot = {
+      assignedNodes: () => [assignedEl],
+      querySelectorAll: () => [],
+    };
+    const child = {
+      shadowRoot: null,
+      querySelectorAll: (sel) => sel === 'slot' ? [slot] : [],
+    };
+
+    treeWalkerQueue.push(child);
+
+    const visited = [];
+    shadow.walkShadowTree({ shadowRoot: null }, (el) => visited.push(el));
+
+    expect(visited).toContain(assignedEl);
+    expect(visited).toContain(innerChild);
+  });
 });
 
 // ========== queryDeep ==========
@@ -418,6 +447,24 @@ describe('shadow.queryDeep', () => {
     treeWalkerQueue.push(host);
 
     expect(() => shadow.queryDeep(root, 'div')).not.toThrow();
+  });
+
+  test('adds element via el.matches path when not in results (line 124 true branch)', () => {
+    const el = {
+      matches: () => true,
+      shadowRoot: null,
+      querySelectorAll: () => [],
+    };
+    const root = {
+      querySelectorAll: () => [],  // fast path finds nothing
+      shadowRoot: null,
+    };
+
+    treeWalkerQueue.push(el);
+
+    const results = shadow.queryDeep(root, '.match');
+    expect(results).toContain(el);
+    expect(results).toHaveLength(1);
   });
 });
 
