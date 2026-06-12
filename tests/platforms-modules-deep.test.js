@@ -149,6 +149,14 @@ describe('cisco inferSurface', () => {
   test('defaults to fmc', () => {
     expect(cisco.inferSurface('something else')).toBe('fmc');
   });
+
+  test('null goal fires goal||"" fallback and defaults to fmc', () => {
+    expect(cisco.inferSurface(null)).toBe('fmc');
+  });
+
+  test('undefined goal fires goal||"" fallback and defaults to fmc', () => {
+    expect(cisco.inferSurface(undefined)).toBe('fmc');
+  });
 });
 
 // ── datto_rmm ───────────────────────────────────────────────────────────────
@@ -362,6 +370,14 @@ describe('m365_admin inferSurface', () => {
 
   test('defaults to admin', () => {
     expect(m365Admin.inferSurface('something else')).toBe('admin');
+  });
+
+  test('null goal fires goal||"" fallback and defaults to admin', () => {
+    expect(m365Admin.inferSurface(null)).toBe('admin');
+  });
+
+  test('undefined goal fires goal||"" fallback and defaults to admin', () => {
+    expect(m365Admin.inferSurface(undefined)).toBe('admin');
   });
 });
 
