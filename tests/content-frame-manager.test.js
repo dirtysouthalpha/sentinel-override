@@ -295,5 +295,19 @@ describe('frame-manager', () => {
       const info = fm.getIframeInfo(doc);
       expect(info[0].src).toBe('about:blank');
     });
+
+    test('handles isVisible throwing a string error (line 181 catch, line 11 String path)', () => {
+      const sandbox = createSandbox();
+      sandbox.window.__sentinelUtils.dom.isVisible = () => { throw 'visibility failed'; };
+      const iframeEl = {
+        src: 'https://x.com/frame',
+        getBoundingClientRect() { return { width: 100, height: 50 }; },
+        contentDocument: null,
+      };
+      const fm = getFm(loadModule(sandbox));
+      const doc = { querySelectorAll: (sel) => sel === 'iframe' ? [iframeEl] : [] };
+      const info = fm.getIframeInfo(doc);
+      expect(info[0].visible).toBe(false);
+    });
   });
 });

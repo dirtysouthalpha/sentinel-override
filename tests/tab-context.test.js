@@ -355,17 +355,12 @@ describe('openTab — chrome.tabs.create failure', () => {
 });
 
 describe('openTab — getTabInfo failure', () => {
-  test('still returns context when getTabInfo throws', async () => {
-    // The implementation should catch errors from getTabInfo and still return a context
-    // Note: Making the mock throw with ESM modules is tricky, so we'll just test
-    // that the context is created successfully.
+  test('still returns context when getTabInfo throws (line 97 catch)', async () => {
+    mockGetTabInfo.mockRejectedValueOnce(new Error('getTabInfo failed'));
     const ctx = await openTab('https://example.com', 'Info Fail Tab');
-    // Context should still be returned
     expect(ctx).toBeTruthy();
     expect(ctx.label).toBe('Info Fail Tab');
     expect(ctx.isAgentCreated).toBe(true);
-    // The title would be empty if getTabInfo threw, but we can't easily test that
-    // with ESM module mocking limitations.
   });
 });
 

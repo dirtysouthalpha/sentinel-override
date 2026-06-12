@@ -277,3 +277,73 @@ describe('_resetReasoningTraceCache', () => {
     expect(summary.totalSteps).toBe(0);
   });
 });
+
+describe('initReasoningTrace — backward compat string arg (lines 64-66)', () => {
+  test('accepts string first arg for backward compat', async () => {
+    await initReasoningTrace('old-run-id', 'my goal', 'claude-3');
+    const summary = await getReasoningSummary();
+    expect(summary.goal).toBe('my goal');
+  });
+});
+
+describe('clearReasoningTrace — with pending write (lines 36, 196-197)', () => {
+  test('cancels pending debounced write and stale timer returns early', async () => {
+    await initReasoningTrace({ goal: 'cancel test' });
+    chrome.storage.local.set.mockClear();
+    await captureReasoningStep('plan_generation', 'input', {});
+    // Timer is pending in _pendingWrites
+    await clearReasoningTrace();
+    // Advancing timers fires the stale callback — it should hit the cancelled-timer guard (line 36)
+    jest.runAllTimers();
+    await Promise.resolve();
+    // set should NOT have been called for the debounced write since it was cancelled
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('getReasoningTrace — cache miss paths (lines 131, 133)', () => {
+  test('returns null when storage throws (line 131 catch)', async () => {
+    chrome.storage.local.get.mockRejectedValueOnce(new Error('Storage error'));
+    const result = await getReasoningTrace('nonexistent-run-id');
+    expect(result).toBeNull();
+  });
+
+  test('returns null when trace not in storage (line 133 return null)', async () => {
+    // get returns an object but without the key (trace is undefined → falsy)
+    const result = await getReasoningTrace('missing-id');
+    expect(result).toBeNull();
+  });
+});
+
+describe('_persistTrace catch — storage error during timer (line 44)', () => {
+  test('logs error when storage.set fails during debounced write', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await initReasoningTrace({ goal: 'persist error test' });
+    await captureReasoningStep('plan_generation', 'input', {});
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('Disk full'));
+    jest.runAllTimers();
+    // Let the async callback resolve
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to persist reasoning trace:'),
+      expect.any(String)
+    );
+    consoleSpy.mockRestore();
+  });
+});
+
+describe('flushPendingWrites — storage error (line 247)', () => {
+  test('logs error when storage.set fails during flush', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await initReasoningTrace({ goal: 'flush error test' });
+    await captureReasoningStep('plan_generation', 'input', {});
+    chrome.storage.local.set.mockRejectedValueOnce(new Error('Quota exceeded'));
+    await flushPendingWrites();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to flush reasoning trace:'),
+      expect.any(String)
+    );
+    consoleSpy.mockRestore();
+  });
+});
