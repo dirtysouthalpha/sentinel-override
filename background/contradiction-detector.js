@@ -447,6 +447,7 @@ export async function getContradictionStatistics() {
   let maxTypeCount = 0;
 
   for (const entry of log) {
+    if (!Array.isArray(entry.contradictions)) continue;
     for (const contradiction of entry.contradictions) {
       // Count by type
       stats.byType[contradiction.type] = (stats.byType[contradiction.type] || 0) + 1;
