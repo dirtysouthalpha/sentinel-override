@@ -175,7 +175,7 @@ async function handleMessage(message) {
 
     case 'auth_challenge':
       challengeNonce = message.nonce;
-      const response = computeChallengeResponse(challengeNonce);
+      const response = await computeChallengeResponse(challengeNonce);
       ws.send(JSON.stringify({ type: 'auth_challenge_response', response }));
       break;
 
@@ -199,14 +199,15 @@ async function handleMessage(message) {
   }
 }
 
-function computeChallengeResponse(nonce) {
+async function computeChallengeResponse(nonce) {
   const enc = new TextEncoder();
   const data = enc.encode(authToken + ':' + nonce);
-  const hash = crypto.subtle.digestSync ? crypto.subtle.digestSync('SHA-256', data) : null;
-  if (hash) {
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (_e) {
+    return btoa(authToken + ':' + nonce);
   }
-  return btoa(authToken + ':' + nonce);
 }
 
 async function handleTask(goal, requestId) {

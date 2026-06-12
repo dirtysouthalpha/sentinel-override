@@ -643,18 +643,18 @@ describe('_resetBridgeForTest — clears active heartbeatTimer (line 338)', () =
   });
 });
 
-// ===== computeChallengeResponse: digestSync path (line 207) =====
+// ===== computeChallengeResponse: crypto.subtle.digest path =====
 
-describe('computeChallengeResponse — uses digestSync when available (line 207)', () => {
-  test('produces hex digest from digestSync result', async () => {
+describe('computeChallengeResponse — uses crypto.subtle.digest', () => {
+  test('produces hex digest from SHA-256', async () => {
     const origCrypto = globalThis.crypto;
-    const mockDigestSync = jest.fn(() => new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
-    globalThis.crypto = { subtle: { digestSync: mockDigestSync } };
+    const mockDigest = jest.fn().mockResolvedValue(new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer);
+    globalThis.crypto = { subtle: { digest: mockDigest } };
     try {
       await startAndConnect();
       latestWs.send.mockClear();
       await sendMessage({ type: 'auth_challenge', nonce: 'nonce123' });
-      expect(mockDigestSync).toHaveBeenCalledWith('SHA-256', expect.any(Uint8Array));
+      expect(mockDigest).toHaveBeenCalledWith('SHA-256', expect.any(Uint8Array));
       const calls = latestWs.send.mock.calls.map(c => JSON.parse(c[0]));
       const resp = calls.find(m => m.type === 'auth_challenge_response');
       expect(resp).toBeDefined();

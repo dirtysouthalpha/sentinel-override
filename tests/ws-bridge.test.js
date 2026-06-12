@@ -54,20 +54,20 @@ describe('validateMessage', () => {
 });
 
 describe('computeChallengeResponse', () => {
-  test('returns a string', () => {
-    const result = computeChallengeResponse('test-nonce');
+  test('returns a string', async () => {
+    const result = await computeChallengeResponse('test-nonce');
     expect(typeof result).toBe('string');
   });
 
-  test('returns different results for different nonces', () => {
-    const a = computeChallengeResponse('nonce-a');
-    const b = computeChallengeResponse('nonce-b');
+  test('returns different results for different nonces', async () => {
+    const a = await computeChallengeResponse('nonce-a');
+    const b = await computeChallengeResponse('nonce-b');
     expect(a).not.toBe(b);
   });
 
-  test('returns same result for same nonce', () => {
-    const a = computeChallengeResponse('test-nonce');
-    const b = computeChallengeResponse('test-nonce');
+  test('returns same result for same nonce', async () => {
+    const a = await computeChallengeResponse('test-nonce');
+    const b = await computeChallengeResponse('test-nonce');
     expect(a).toBe(b);
   });
 });
