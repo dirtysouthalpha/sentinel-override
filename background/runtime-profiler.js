@@ -297,8 +297,8 @@ function identifyBottlenecks(state) {
     });
   }
   
-  // Check failure rate
-  const failureRate = state.failures / state.stepCount;
+  // Check failure rate — guard against stepCount=0 producing Infinity
+  const failureRate = state.stepCount > 0 ? state.failures / state.stepCount : 0;
   if (failureRate > 0.3) {
     bottlenecks.push({
       type: 'failure_rate',
