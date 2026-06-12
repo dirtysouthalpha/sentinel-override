@@ -103,6 +103,14 @@ describe('hl.highlightElement', () => {
     expect(() => hl.highlightElement(0)).not.toThrow();
     expect(() => hl.highlightElement('')).not.toThrow();
   });
+
+  test('catch uses String(e) when error has no message (line 42 ternary false branch)', () => {
+    const el = {
+      classList: { add: () => { throw 'string-error'; } },
+    };
+    expect(() => hl.highlightElement(el)).not.toThrow();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('highlight element:'), 'string-error');
+  });
 });
 
 describe('hl.removeHighlight', () => {
@@ -163,6 +171,26 @@ describe('hl.removeHighlight', () => {
 
   test('handles undefined element gracefully', () => {
     expect(() => hl.removeHighlight(undefined)).not.toThrow();
+  });
+
+  test('inner catch uses String(e) when error has no message (line 55 ternary false branch)', () => {
+    jest.useFakeTimers();
+    const el = {
+      classList: { remove: () => { throw 42; } },
+    };
+    hl.removeHighlight(el);
+    expect(() => jest.advanceTimersByTime(500)).not.toThrow();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('remove highlight class:'), '42');
+    jest.useRealTimers();
+  });
+
+  test('outer catch uses String(e) when error has no message (line 57 ternary false branch)', () => {
+    const el = {};
+    Object.defineProperty(el, 'classList', {
+      get() { throw 'outer-err'; },
+    });
+    expect(() => hl.removeHighlight(el)).not.toThrow();
+    expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('removeHighlight:'), 'outer-err');
   });
 });
 
