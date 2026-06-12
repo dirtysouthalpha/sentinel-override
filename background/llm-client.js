@@ -1013,7 +1013,7 @@ function _buildPlanPrompt(goal, context) {
     : '';
   const platformContext = context.platformContext || '';
   const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length
-    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal && typeof p === 'object' ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && typeof s === 'object' && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
+    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
     : '';
 
   return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED hierarchical execution plan formatted as structured phases with sub-tasks.

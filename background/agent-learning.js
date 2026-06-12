@@ -209,7 +209,7 @@ export function getPlaybooks() {
  * Get all platform patterns (for UI display).
  */
 export function getPlatformPatterns() {
-  return JSON.parse(JSON.stringify(_platformPatterns));
+  return structuredClone(_platformPatterns);
 }
 
 /**

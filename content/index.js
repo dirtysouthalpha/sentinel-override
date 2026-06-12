@@ -1234,20 +1234,21 @@ if (window.__sentinelInitialized) {
           if (byId) return { el: byId, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] id fallback:', getErrorMessage(e)); }
       }
+      // Pre-compute once; used by fallbacks 3-6
+      const rawText = cmd.elementText ? String(cmd.elementText).trim() : '';
       // 3. visible text + tag match (e.g. a button that always says "Save")
       if (cmd.elementText && cmd.tag) {
         try {
           const tag = String(cmd.tag).toLowerCase();
-          const needle = String(cmd.elementText).trim();
           const byText = [...targetDoc.querySelectorAll(tag)]
-            .find(el => (el.innerText || el.textContent || '').trim() === needle);
+            .find(el => (el.innerText || el.textContent || '').trim() === rawText);
           if (byText) return { el: byText, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] text+tag fallback:', getErrorMessage(e)); }
       }
       // 4. XPath text search — find any visible element containing the text
       if (cmd.elementText) {
         try {
-          const needle = String(cmd.elementText).trim().substring(0, 60);
+          const needle = rawText.substring(0, 60);
           const byXPath = targetDoc.evaluate(
             `//*[not(self::script or self::style or self::noscript)]` +
             `[normalize-space(text())=${JSON.stringify(needle)}]`,
@@ -1259,7 +1260,7 @@ if (window.__sentinelInitialized) {
       // 5. aria-label partial / case-insensitive match (label may have changed slightly)
       if (cmd.elementText) {
         try {
-          const needle = String(cmd.elementText).trim().substring(0, 40).toLowerCase();
+          const needle = rawText.substring(0, 40).toLowerCase();
           const candidates = targetDoc.querySelectorAll('[aria-label]');
           for (const c of candidates) {
             if ((c.getAttribute('aria-label') || '').toLowerCase().includes(needle)) {
@@ -1271,7 +1272,7 @@ if (window.__sentinelInitialized) {
       // 6. data-testid / data-id partial match
       if (cmd.elementText) {
         try {
-          const needle = String(cmd.elementText).trim().substring(0, 30).toLowerCase().replace(/\s+/g, '-');
+          const needle = rawText.substring(0, 30).toLowerCase().replace(/\s+/g, '-');
           const byTestId = targetDoc.querySelector(`[data-testid*="${needle}" i], [data-id*="${needle}" i]`);
           if (byTestId) return { el: byTestId, viaRef: false, staleRef: true };
         } catch (e) { console.warn('[Sentinel] testid fallback:', getErrorMessage(e)); }
