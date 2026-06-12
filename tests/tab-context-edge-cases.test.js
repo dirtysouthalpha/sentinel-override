@@ -227,4 +227,99 @@ describe('tab-context edge cases', () => {
       expect(activeCtx.isActive).toBe(true);
     });
   });
+
+  describe('branch coverage gaps', () => {
+    test('LRU eviction skipped when oldest non-active tab has ID 0 (falsy)', async () => {
+      // Covers line 60: if (entries[0]?.[0]) — false branch when tab ID is 0
+      const { openTab, registerInitialTab, getTabCount } = await import('../background/tab-context.js');
+
+      // Register tab 0 first so it is the oldest entry in the map
+      registerInitialTab(0);
+
+      // Open 9 more tabs to reach TAB_LIMIT (10 total)
+      for (let i = 1; i <= 9; i++) {
+        chrome.tabs.create.mockResolvedValueOnce({ id: i });
+        await openTab(`https://example.com/${i}`);
+      }
+      // size === 10, activeTabId === 9
+
+      // One more open triggers LRU: oldest non-active is tab 0 → ID 0 is falsy → eviction skipped
+      chrome.tabs.create.mockResolvedValueOnce({ id: 200 });
+      const result = await openTab('https://example.com/new');
+
+      expect(result).not.toBeNull();
+      // chrome.tabs.remove should NOT have been called (eviction was skipped)
+      expect(chrome.tabs.remove).not.toHaveBeenCalled();
+    });
+
+    test('openTab uses original url when getTabInfo returns null (line 93 false branch)', async () => {
+      // Covers line 93: if (info) — false branch when getTabInfo resolves to null
+      const { openTab } = await import('../background/tab-context.js');
+      const { getTabInfo } = await import('../background/tab-manager.js');
+
+      getTabInfo.mockResolvedValueOnce(null);
+      chrome.tabs.create.mockResolvedValueOnce({ id: 555 });
+      const result = await openTab('https://original.example.com');
+
+      expect(result).not.toBeNull();
+      expect(result.url).toBe('https://original.example.com');
+    });
+
+    test('openTab falls back to original url/empty title when info fields are falsy (lines 94-95)', async () => {
+      // Covers binary-expr line 94: info.url || url — right side taken when info.url is null
+      // Covers binary-expr line 95: info.title || '' — right side taken when info.title is null
+      const { openTab } = await import('../background/tab-context.js');
+      const { getTabInfo } = await import('../background/tab-manager.js');
+
+      getTabInfo.mockResolvedValueOnce({ url: null, title: null });
+      chrome.tabs.create.mockResolvedValueOnce({ id: 556 });
+      const result = await openTab('https://fallback.example.com');
+
+      expect(result).not.toBeNull();
+      expect(result.url).toBe('https://fallback.example.com');
+      expect(result.title).toBe('');
+    });
+
+    test('registerInitialTab with no url uses empty string (line 207 || fallback)', async () => {
+      // Covers binary-expr line 207: url || '' — right side taken when url is undefined
+      const { registerInitialTab, getTabContext } = await import('../background/tab-context.js');
+
+      registerInitialTab(777);
+      const ctx = getTabContext(777);
+
+      expect(ctx).toBeDefined();
+      expect(ctx.url).toBe('');
+    });
+
+    test('findTabByLabel covers ctx.label || "" fallback for tab with empty label (line 234)', async () => {
+      // Covers binary-expr line 234: ctx.label || '' — right side taken when ctx.label is ''
+      // openTab with empty url gives ctx.label = '' (falsy)
+      const { openTab, findTabByLabel } = await import('../background/tab-context.js');
+
+      chrome.tabs.create.mockResolvedValueOnce({ id: 888 });
+      await openTab(''); // label = undefined || '' = '' (falsy)
+
+      // findTabByLabel loops through all contexts; String(ctx.label || '').toLowerCase()
+      // ctx.label='' is falsy → right side '' taken → branch 1 covered
+      const found = findTabByLabel('nomatch');
+      expect(found).toBeNull();
+    });
+
+    test('handleTabRemoved for non-active tab skips active-tab logic (line 254 false branch)', async () => {
+      // Covers line 254: if (wasActive) — false branch when removed tab is not active
+      const { openTab, setActiveTab, handleTabRemoved, getActiveTabId, getTabCount } = await import('../background/tab-context.js');
+
+      chrome.tabs.create.mockResolvedValueOnce({ id: 901 });
+      await openTab('https://example.com/1');
+      chrome.tabs.create.mockResolvedValueOnce({ id: 902 });
+      await openTab('https://example.com/2');
+
+      setActiveTab(901); // tab 901 is active
+
+      handleTabRemoved(902); // remove non-active tab 902
+
+      expect(getActiveTabId()).toBe(901); // active tab unchanged
+      expect(getTabCount()).toBe(1);
+    });
+  });
 });
