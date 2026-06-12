@@ -447,6 +447,57 @@ describe('fetchModelsList — error paths', () => {
     expect(result).toEqual(['good']);
   });
 
+  test('empty error body becomes (empty body) sentinel', async () => {
+    mockFetchError(400, '');
+    await expect(fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key'))
+      .rejects.toThrow('(empty body)');
+  });
+
+  test('skips null items in data.data array', async () => {
+    mockFetchOk({ data: [null, { id: 'valid-model' }] });
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['valid-model']);
+  });
+
+  test('skips null items in Ollama tagsResponse models array', async () => {
+    mockFetchOk({ models: [null, { name: 'llama3:latest' }] });
+    const result = await fetchModelsList({
+      modelsUrl: 'http://localhost:11434/api/tags',
+      tagsResponse: true,
+    }, '');
+    expect(result).toEqual(['llama3:latest']);
+  });
+
+  test('skips null items in non-tagsResponse models array', async () => {
+    mockFetchOk({ models: [null, { id: 'model-a' }] });
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['model-a']);
+  });
+
+  test('uses name when id absent in non-tagsResponse models array', async () => {
+    mockFetchOk({ models: [{ name: 'model-by-name' }, { id: 'model-by-id' }] });
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['model-by-id', 'model-by-name']);
+  });
+
+  test('skips models with neither id nor name in non-tagsResponse models array', async () => {
+    mockFetchOk({ models: [{ foo: 'bar' }, { id: 'keeper' }] });
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['keeper']);
+  });
+
+  test('skips null items in flat array', async () => {
+    mockFetchOk([null, 'valid-model']);
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['valid-model']);
+  });
+
+  test('skips flat-array objects with no id or name', async () => {
+    mockFetchOk([{}, 'valid-model']);
+    const result = await fetchModelsList({ modelsUrl: 'https://api.example.com/models' }, 'key');
+    expect(result).toEqual(['valid-model']);
+  });
+
   test('throws when provider has no modelsUrl', async () => {
     await expect(fetchModelsList({ label: 'Test' }, 'key'))
       .rejects.toThrow();
@@ -559,6 +610,100 @@ describe('PROVIDERS — zai parseResponse', () => {
   test('returns content on success', () => {
     const result = provider.parseResponse({ choices: [{ message: { content: 'GLM response' } }] });
     expect(result).toBe('GLM response');
+  });
+
+  test('returns reasoning_content when content is null', () => {
+    const result = provider.parseResponse({ choices: [{ message: { content: null, reasoning_content: 'zai chain-of-thought' } }] });
+    expect(result).toBe('zai chain-of-thought');
+  });
+
+  test('returns reasoning when content is null and no reasoning_content', () => {
+    const result = provider.parseResponse({ choices: [{ message: { content: null, reasoning: 'deep zai thought' } }] });
+    expect(result).toBe('deep zai thought');
+  });
+});
+
+describe('PROVIDERS — openai convertToolsToOpenAIFormat', () => {
+  const provider = PROVIDERS.openai;
+
+  test('returns [] for null tools', () => {
+    expect(provider.convertToolsToOpenAIFormat(null)).toEqual([]);
+  });
+
+  test('returns [] for non-array tools', () => {
+    expect(provider.convertToolsToOpenAIFormat('not-an-array')).toEqual([]);
+  });
+
+  test('returns [] for undefined tools', () => {
+    expect(provider.convertToolsToOpenAIFormat(undefined)).toEqual([]);
+  });
+});
+
+describe('PROVIDERS — openai parseToolUseResponse', () => {
+  const provider = PROVIDERS.openai;
+
+  test('throws on auth error message', () => {
+    expect(() => provider.parseToolUseResponse({ error: { message: 'Invalid API key' } }))
+      .toThrow(/Authentication/i);
+  });
+
+  test('throws when no choices', () => {
+    expect(() => provider.parseToolUseResponse({ choices: [] }))
+      .toThrow('no valid choice');
+  });
+
+  test('parses tool call with string arguments', () => {
+    const result = provider.parseToolUseResponse({
+      choices: [{
+        message: {
+          tool_calls: [{ function: { name: 'click', arguments: '{"selector":"#btn"}' } }],
+        },
+      }],
+    });
+    expect(result.type).toBe('click');
+    expect(result.selector).toBe('#btn');
+  });
+
+  test('parses tool call with pre-parsed object arguments', () => {
+    const result = provider.parseToolUseResponse({
+      choices: [{
+        message: {
+          tool_calls: [{ function: { name: 'type', arguments: { selector: '#input', text: 'hello' } } }],
+        },
+      }],
+    });
+    expect(result.type).toBe('type');
+    expect(result.selector).toBe('#input');
+    expect(result.text).toBe('hello');
+  });
+
+  test('parses tool call with null arguments (else branch)', () => {
+    const result = provider.parseToolUseResponse({
+      choices: [{
+        message: {
+          tool_calls: [{ function: { name: 'read_page', arguments: null } }],
+        },
+      }],
+    });
+    expect(result.type).toBe('read_page');
+  });
+
+  test('handles invalid JSON arguments as text fallback', () => {
+    const result = provider.parseToolUseResponse({
+      choices: [{
+        message: {
+          tool_calls: [{ function: { name: 'note', arguments: 'not valid json {' } }],
+        },
+      }],
+    });
+    expect(result.type).toBe('note');
+    expect(result.text).toBeDefined();
+  });
+
+  test('throws when no tool_calls', () => {
+    expect(() => provider.parseToolUseResponse({
+      choices: [{ message: { content: 'plain text' } }],
+    })).toThrow('no tool_calls');
   });
 });
 

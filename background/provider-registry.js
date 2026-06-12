@@ -482,20 +482,6 @@ export const PROVIDERS = {
       'Authorization': `Bearer ${apiKey}`
     }),
 
-    buildBody: (model, systemPrompt, userContent, opts = {}) => {
-      const body = {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent }
-        ],
-        temperature: opts.temperature ?? 0.3,
-        max_tokens: opts.maxTokens || 8000
-      };
-      if (opts.jsonMode) body.response_format = { type: 'json_object' };
-      return body;
-    },
-
     parseResponse: (data) => {
       // Detect Z.AI auth/API errors (HTTP 200 with error payload)
       if (!data.choices || !Array.isArray(data.choices) || !data.choices.length) {
@@ -522,38 +508,6 @@ export const PROVIDERS = {
         throw new Error(`API returned null content: ${JSON.stringify(data).slice(0, 500)}`);
       }
       return content;
-    },
-
-    buildVisionContent: (text, base64Image) => [
-      { type: 'text', text },
-      { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-    ],
-
-    convertToolsToOpenAIFormat(tools) {
-      if (!tools || !Array.isArray(tools)) return [];
-      return tools.map(t => ({
-        type: 'function',
-        function: {
-          name: t.name,
-          description: t.description,
-          parameters: t.input_schema || { type: 'object', properties: {} }
-        }
-      }));
-    },
-
-    buildBodyWithTools(model, systemPrompt, userContent, tools, opts = {}) {
-      const openaiTools = this.convertToolsToOpenAIFormat(tools);
-      return {
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent }
-        ],
-        temperature: opts.temperature ?? 0.1,
-        max_tokens: opts.maxTokens || 8000,
-        tools: openaiTools,
-        tool_choice: 'auto'
-      };
     },
 
     parseToolUseResponse(data) {
@@ -1247,7 +1201,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   if (provider.tagsResponse && Array.isArray(data.models)) {
     // Ollama: { models: [{ name: "llama3:latest", ... }] }
     // Single-pass optimization: filter and map in one loop
-    for (const m of data.models || []) {
+    for (const m of data.models) {
       if (m != null && typeof m === 'object' && m.name) {
         ids.push(m.name);
       }
@@ -1255,7 +1209,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   } else if (Array.isArray(data.data)) {
     // OpenAI-compatible: { data: [{ id: "gpt-4o" }] }
     // Single-pass optimization: filter and map in one loop
-    for (const m of data.data || []) {
+    for (const m of data.data) {
       if (m != null) {
         const val = m.id || m.name;
         if (val) ids.push(val);
@@ -1264,7 +1218,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
   } else if (Array.isArray(data.models)) {
     // Some providers: { models: [{ id }] }
     // Single-pass optimization: filter and map in one loop
-    for (const m of data.models || []) {
+    for (const m of data.models) {
       if (m != null) {
         const val = m.id || m.name;
         if (val) ids.push(val);
@@ -1272,7 +1226,7 @@ export async function fetchModelsList(provider, apiKey, customModelsUrl) {
     }
   } else if (Array.isArray(data)) {
     // Single-pass optimization: filter and map in one loop
-    for (const m of data || []) {
+    for (const m of data) {
       if (m != null) {
         const val = (typeof m === 'string') ? m : (m.id || m.name);
         if (val) ids.push(val);
