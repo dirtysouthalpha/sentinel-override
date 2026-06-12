@@ -1271,16 +1271,6 @@ export async function generatePlan(goal, settings, context = {}) {
         const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
         if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
         if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
-        // New phased format
-        if (Array.isArray(parsed.phases) && parsed.phases.length) {
-          const flatSteps = [];
-          for (const phase of parsed.phases) {
-            if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
-              flatSteps.push(...phase.steps);
-            }
-          }
-          if (flatSteps.length) return _normalizeSteps(flatSteps);
-        }
       }
       // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
       const arrStart = contentNoThink.indexOf('[');

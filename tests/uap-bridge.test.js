@@ -171,6 +171,7 @@ describe('UAP Bridge', () => {
       await new Promise(r => setTimeout(r, 200));
 
       expect(isServerAvailable()).toBe(false);
+      stopBridge(); // clear real interval before switching back to fake timers
       jest.useFakeTimers();
     }, 10000);
 

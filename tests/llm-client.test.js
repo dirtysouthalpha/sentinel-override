@@ -1376,6 +1376,21 @@ describe('generatePlan', () => {
     expect(Array.isArray(result)).toBe(true);
     expect(result[0]).toBe('Do task');
   });
+
+  test('extracts steps from phases format via Strategy 2 when step value contains } character', async () => {
+    // Strategy 1 fails (prose prefix prevents JSON.parse). Strategy 2's string-aware
+    // brace scanner correctly ignores the } inside the quoted string "Set value }=10"
+    // and parses the full phases object, returning all three steps.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Here is my plan: {"phases":[{"steps":["Open admin panel","Set value }=10","Verify config"]}]}' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Open admin panel', 'Set value }=10', 'Verify config']);
+  });
 });
 
 // ========== callLLMWithRetry ==========
@@ -2239,6 +2254,43 @@ describe('callLLM: non-tool-use provider fallback paths', () => {
       );
       expect(result.type).toBe('note');
       expect(result.text).toContain('Empty LLM response');
+    } finally {
+      PROVIDERS.anthropic.supportsToolUse = originalSupportsToolUse;
+    }
+  });
+
+  test('vision fallback uses buildBody when supportsToolUse is false (covers L2229)', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+
+    const originalSupportsToolUse = PROVIDERS.anthropic.supportsToolUse;
+    PROVIDERS.anthropic.supportsToolUse = false;
+    try {
+      let callCount = 0;
+      _mockFetch = () => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.resolve({ ok: false, status: 400, text: () => Promise.resolve('vision not supported') });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ content: [{ type: 'text', text: '{"type":"note","text":"done"}' }] })
+        });
+      };
+      const result = await callLLMWithRetry(
+        [], 0, 'page content', 'base64data==', 'do something', [], 1, 'https://example.com',
+        0, { ...defaultConfig, maxRetries: 0 }, makeAgentState()
+      );
+      expect(result.type).toBe('note');
+      expect(callCount).toBe(2);
     } finally {
       PROVIDERS.anthropic.supportsToolUse = originalSupportsToolUse;
     }
