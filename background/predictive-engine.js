@@ -13,17 +13,18 @@
  */
 export function simpleMovingAverage(data, periods = 5) {
   if (data.length < 3) return new Array(periods).fill(data[data.length - 1] || 0);
-  
+
   const window = Math.min(5, data.length);
   const forecasts = [];
-  
+  const working = data.slice();
+
   for (let i = 0; i < periods; i++) {
-    const recent = data.slice(-window);
+    const recent = working.slice(-window);
     const avg = recent.reduce((a, b) => a + b, 0) / window;
     forecasts.push(avg);
-    data.push(avg); // Append for iterative forecasting
+    working.push(avg);
   }
-  
+
   return forecasts;
 }
 
