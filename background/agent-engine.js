@@ -7330,8 +7330,6 @@ async function enforceRateLimit() {
 }
 
 /**
-
-/**
  * Escape a string for safe inclusion in JavaScript code (CDP injection).
  * Handles backslashes, quotes, newlines, carriage returns, and tabs.
  * @param {string} str - The string to escape.
@@ -7434,6 +7432,7 @@ async function requestApproval(command, stepNumber) {
       if (message && message.action === 'approval_response' && message.requestId === requestId) {
         chrome.runtime.onMessage.removeListener(listener);
         clearTimeout(timeoutId);
+        agentPaused = false; // clear pause if response arrives during soft-timeout notifyIfEnabled await
         finish({
           approved: !!message.approved,
           skipped: !!message.skipped,
