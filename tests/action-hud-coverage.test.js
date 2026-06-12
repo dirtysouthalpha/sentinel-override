@@ -238,3 +238,54 @@ describe('updateHUD — resultEl and result sub-branches (lines 221-227)', () =>
     expect(resultEl.textContent).toBe('');
   });
 });
+
+// ── Line 157: ensureStyle documentElement fallback ────────────────────────────
+
+describe('ensureStyle — documentElement fallback when head is null (line 157)', () => {
+  test('appends style to documentElement when document.head is null (line 157)', () => {
+    const origHead = globalThis.document.head;
+    globalThis.document.head = null;
+    hud.update({});
+    // Style was appended via documentElement — still registered
+    expect(_elementsById.get('__sentinel_action_hud_style__')).toBeDefined();
+    globalThis.document.head = origHead;
+  });
+});
+
+// ── Line 184: ensureHUD body fallback ─────────────────────────────────────────
+
+describe('ensureHUD — body fallback when documentElement is null (line 184)', () => {
+  test('appends HUD to document.body when documentElement is null (line 184)', () => {
+    const origDE = globalThis.document.documentElement;
+    globalThis.document.documentElement = null;
+    hud.update({});
+    // HUD was appended via body — still registered via body.appendChild
+    expect(_elementsById.get('__sentinel_action_hud__')).toBeDefined();
+    globalThis.document.documentElement = origDE;
+  });
+});
+
+// ── Lines 245-249: auto-hide timer callbacks ──────────────────────────────────
+
+describe('auto-hide timer callbacks (lines 245-249)', () => {
+  test("finish action: HUD hidden after outer 15s + inner 5s timers (lines 243-246)", () => {
+    hud.update({ action: 'finish' });
+    const hudEl = _elementsById.get('__sentinel_action_hud__');
+    expect(hudEl.classList.contains('visible')).toBe(true);
+
+    jest.advanceTimersByTime(15000); // outer hideTimer fires → inner 5000ms registered
+    expect(hudEl.classList.contains('visible')).toBe(true); // still visible
+
+    jest.advanceTimersByTime(5000); // inner timer fires → classList.remove('visible')
+    expect(hudEl.classList.contains('visible')).toBe(false);
+  });
+
+  test("non-finish action: HUD hidden after outer 15s timer (lines 248-249)", () => {
+    hud.update({ action: 'click' });
+    const hudEl = _elementsById.get('__sentinel_action_hud__');
+    expect(hudEl.classList.contains('visible')).toBe(true);
+
+    jest.advanceTimersByTime(15000); // hideTimer fires → else branch → classList.remove('visible')
+    expect(hudEl.classList.contains('visible')).toBe(false);
+  });
+});

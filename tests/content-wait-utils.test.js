@@ -376,3 +376,52 @@ describe('wait.handleWaitFor — catch block (line 73)', () => {
     globalThis.MutationObserver = OrigMO;
   });
 });
+
+// ========== handleWaitFor FALSE branches (lines 43 and 59) ==========
+
+describe('wait.handleWaitFor — observer/poll FALSE branches (lines 43, 59)', () => {
+  test('MutationObserver callback fires but condition still false — no premature resolve (line 43)', async () => {
+    jest.useFakeTimers();
+    let capturedObserver = null;
+    const OrigMO = globalThis.MutationObserver;
+    globalThis.MutationObserver = class {
+      constructor(cb) { this._cb = cb; capturedObserver = this; }
+      observe() {}
+      disconnect() {}
+    };
+
+    const origText = globalThis.document.body.innerText;
+    globalThis.document.body.innerText = 'BodyTextUnrelated';
+
+    const promise = wait.handleWaitFor({ type: 'wait_for_text', text: 'TargetNotHere', timeout: 2000 });
+
+    // Fire observer while condition is still false
+    if (capturedObserver) capturedObserver._cb();
+
+    jest.advanceTimersByTime(2001);
+    const result = await promise;
+    expect(result).toContain('Timeout');
+
+    jest.useRealTimers();
+    globalThis.MutationObserver = OrigMO;
+    globalThis.document.body.innerText = origText;
+  });
+
+  test('pollInterval fires but condition still false — continues to timeout (line 59)', async () => {
+    jest.useFakeTimers();
+
+    const origText = globalThis.document.body.innerText;
+    globalThis.document.body.innerText = 'BodyTextUnrelated';
+
+    // timeout > 500ms so poll fires at 500ms before the timeout
+    const promise = wait.handleWaitFor({ type: 'wait_for_text', text: 'NeverFound', timeout: 2000 });
+
+    jest.advanceTimersByTime(600); // poll fires at 500ms, condition still false
+    jest.advanceTimersByTime(1500); // timeout fires at 2000ms total
+    const result = await promise;
+    expect(result).toContain('Timeout');
+
+    jest.useRealTimers();
+    globalThis.document.body.innerText = origText;
+  });
+});
