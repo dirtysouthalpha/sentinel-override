@@ -425,6 +425,27 @@ describe('dom._addElement', () => {
     expect(elements[0].bbox).toBeNull();
   });
 
+  test('uses String(e) when getBoundingClientRect throws a non-Error (line 398)', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    dom._beginScan();
+    const elements = [];
+    const selectorMap = new Map();
+    const el = createElement('button', { 'data-testid': 'bbox-str-err' });
+    el.innerText = 'Bbox';
+    el.tagName = 'BUTTON';
+    el.getBoundingClientRect = () => { throw 'bbox string error'; };
+
+    dom._addElement(el, elements, selectorMap, '', false);
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0].bbox).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[Sentinel] bbox getBoundingClientRect:',
+      'bbox string error'
+    );
+    warnSpy.mockRestore();
+  });
+
   test('includes elementId when el has id', () => {
     dom._beginScan();
     const elements = [];
@@ -941,5 +962,300 @@ describe('dom.findElementBySelector — placeholder hint fallback (lines 243-248
     expect(result).toBe(input);
 
     globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+// ========== checkInteractable — isConnected and ownerDocument branches ==========
+
+describe('dom.checkInteractable — detached and no-defaultView branches', () => {
+  test('returns "Element is detached from DOM" when isConnected is false (line 44)', () => {
+    const el = createElement('div');
+    el.isConnected = false;
+    expect(dom.checkInteractable(el, 'click')).toBe('Element is detached from DOM');
+  });
+
+  test('uses window fallback when ownerDocument.defaultView is null (line 46)', () => {
+    const el = createElement('div');
+    el.ownerDocument = { defaultView: null };
+    // Falls back to global window (globalThis) which has getComputedStyle mocked
+    const result = dom.checkInteractable(el, 'click');
+    expect(result).toBeNull(); // null = interactable (no blocking style)
+  });
+});
+
+// ========== getNthOfTypePath — different-tag sibling false branch ==========
+
+describe('dom.getNthOfTypePath — different-tag sibling (line 119 false branch)', () => {
+  test('does not increment index for sibling of different tag', () => {
+    const parent = createElement('div');
+    parent.tagName = 'DIV';
+
+    const sib1 = createElement('div'); // different tag from sib2 (SPAN)
+    sib1.tagName = 'DIV';
+    sib1.parentElement = parent;
+    sib1.previousElementSibling = null;
+
+    const sib2 = createElement('span');
+    sib2.tagName = 'SPAN';
+    sib2.previousElementSibling = sib1; // sib1 exists but is DIV, not SPAN
+    sib2.parentElement = parent;
+
+    const selector = dom.getUniqueSelector(sib2);
+    // index stays 0 because sib1 has different tag → nth-of-type(1)
+    expect(selector).toContain('nth-of-type(1)');
+  });
+});
+
+// ========== findElementBySelector — String(e) catch path ==========
+
+describe('dom.findElementBySelector — String(e) in catch (line 143)', () => {
+  test('uses String(e) when querySelector throws a non-Error string', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const doc = {
+      querySelector: () => { throw 'bad selector string'; }, // non-Error thrown
+      querySelectorAll: () => [],
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, '.broken::pseudo');
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[Sentinel] selector query fallback:',
+      'bad selector string'
+    );
+
+    warnSpy.mockRestore();
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+// ========== findElementBySelector — nameMatch returns null (line 160 false branch) ==========
+
+describe('dom.findElementBySelector — nameMatch with null result (line 160)', () => {
+  test('falls through when nameMatch querySelector returns null', () => {
+    const doc = {
+      querySelector: () => null, // all queries return null
+      querySelectorAll: () => [],
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    // input[name="email"] matches the nameMatch regex → querySelector called → null → falls through
+    const result = dom.findElementBySelector(doc, 'input[name="email"]');
+    expect(result).toBeNull();
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+// ========== findElementBySelector — shadow.queryDeepFirst undefined (line 164 false) ==========
+
+describe('dom.findElementBySelector — shadow.queryDeepFirst absent (line 164)', () => {
+  test('skips shadow lookup when shadow.queryDeepFirst is not defined', () => {
+    const origShadow = globalThis.window.__sentinelUtils.shadow;
+    globalThis.window.__sentinelUtils.shadow = {}; // shadow exists but queryDeepFirst is undefined
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+
+    const result = dom.findElementBySelector(doc, '.no-shadow-target');
+    expect(result).toBeNull();
+
+    globalThis.window.__sentinelUtils.shadow = origShadow;
+  });
+});
+
+// ========== findElementBySelector — aria-label loop non-matching candidate (line 177) ==========
+
+describe('dom.findElementBySelector — aria-label loop with non-matching candidate', () => {
+  test('iterates past non-matching candidates before returning null (line 177 false path)', () => {
+    // Two candidates: one with null getAttribute (covers || '' fallback), one with mismatched label
+    const nullLabelEl = { getAttribute: () => null, tagName: 'BUTTON' };
+    const nonMatch = createElement('button', { 'aria-label': 'Different Label' });
+    nonMatch.getAttribute = (a) => a === 'aria-label' ? 'Different Label' : null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel === '[aria-label]') return [nullLabelEl, nonMatch];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    // Looks for aria-label="Submit" but neither candidate matches
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit"]');
+    expect(result).toBeNull();
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+// ========== findElementBySelector — textContent fallback and includes() (lines 207-208) ==========
+
+describe('dom.findElementBySelector — textContent fallback in text hint (lines 207-208)', () => {
+  test('matches via textContent fallback when innerText is empty', () => {
+    const btn = createElement('button');
+    btn.innerText = ''; // empty → falls through to textContent
+    btn.textContent = 'Submit Form'; // textContent fallback
+    btn.tagName = 'BUTTON';
+    btn.getAttribute = () => null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel.includes('button')) return [btn];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    // Use a selector with text hint "Submit Form"
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit Form"]');
+    expect(result).toBe(btn);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+
+  test('matches via getAttribute aria-label when innerText/textContent/value are all empty (line 207)', () => {
+    const input = createElement('input');
+    input.innerText = '';
+    input.textContent = '';
+    input.value = '';
+    input.tagName = 'INPUT';
+    input.getAttribute = (a) => a === 'aria-label' ? 'Submit' : null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel.includes('button') || sel.includes('input')) return [input];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit"]');
+    expect(result).toBe(input);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+
+  test('matches via value fallback when innerText and textContent are empty (line 207)', () => {
+    const input = createElement('input');
+    input.innerText = '';
+    input.textContent = '';
+    input.value = 'Submit';
+    input.tagName = 'INPUT';
+    input.getAttribute = () => null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel.includes('button') || sel.includes('input')) return [input];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit"]');
+    expect(result).toBe(input);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+
+  test('matches via includes() when text hint is substring of element text', () => {
+    // noMatchBtn comes first — its text doesn't match → exercises line 208 false branch
+    const noMatchBtn = createElement('button');
+    noMatchBtn.innerText = 'Cancel';
+    noMatchBtn.tagName = 'BUTTON';
+    noMatchBtn.getAttribute = () => null;
+
+    const btn = createElement('button');
+    btn.innerText = 'Submit the Form Now';
+    btn.tagName = 'BUTTON';
+    btn.getAttribute = () => null;
+
+    const doc = {
+      querySelector: () => null,
+      querySelectorAll: (sel) => {
+        if (sel.includes('button')) return [noMatchBtn, btn];
+        return [];
+      },
+    };
+    const origQDF = globalThis.window.__sentinelUtils.shadow.queryDeepFirst;
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = () => null;
+
+    // "Submit" is a substring of "Submit the Form Now" → includes() matches (line 208 true)
+    // "Cancel" neither equals nor includes "Submit" → line 208 false branch exercised first
+    const result = dom.findElementBySelector(doc, '[aria-label="Submit"]');
+    expect(result).toBe(btn);
+
+    globalThis.window.__sentinelUtils.shadow.queryDeepFirst = origQDF;
+  });
+});
+
+// ========== _addElement — scrollX/scrollY offset in bbox (lines 393-398) ==========
+
+describe('dom._addElement — bbox with non-zero scroll offset (lines 393-398)', () => {
+  test('adds scroll offsets to bbox coordinates', () => {
+    const origScrollX = globalThis.scrollX;
+    const origScrollY = globalThis.scrollY;
+    globalThis.scrollX = 200;
+    globalThis.scrollY = 150;
+
+    dom._beginScan();
+    const el = createElement('button', { 'data-testid': 'scrolled-btn' });
+    el.tagName = 'BUTTON';
+    el.innerText = 'Click';
+    // left=0, top=0, width=0, height=0: covers Number(r.*)||0 fallback branches
+    el.getBoundingClientRect = () => ({ left: 0, top: 0, width: 0, height: 0 });
+
+    const elements = [];
+    const selectorMap = new Map();
+    dom._addElement(el, elements, selectorMap, '');
+
+    expect(elements).toHaveLength(1);
+    expect(elements[0].bbox.x).toBe(200); // 0 + 200 (scrollX branch)
+    expect(elements[0].bbox.y).toBe(150); // 0 + 150 (scrollY branch)
+    expect(elements[0].bbox.w).toBe(0);   // Number(0)||0 fallback branch
+    expect(elements[0].bbox.h).toBe(0);   // Number(0)||0 fallback branch
+
+    globalThis.scrollX = origScrollX;
+    globalThis.scrollY = origScrollY;
+  });
+});
+
+// ========== _addElement — SELECT with non-string textContent option (line 417) ==========
+
+describe('dom._addElement — SELECT option with non-string textContent (line 417)', () => {
+  test('uses empty string for option text when textContent is not a string', () => {
+    dom._beginScan();
+    const opt1 = { value: 'a', textContent: 'Option A' };       // string → normal
+    const opt2 = { value: 'b', textContent: null };              // null → false branch → ''
+    const opt3 = { value: 'c', textContent: 42 };               // number → false branch → ''
+
+    const el = createElement('select');
+    el.tagName = 'SELECT';
+    el.innerText = '';
+    el.options = [opt1, opt2, opt3];
+    el.multiple = false;
+    el[Symbol.iterator] = function*() {};
+
+    const elements = [];
+    const selectorMap = new Map();
+    dom._addElement(el, elements, selectorMap, '');
+
+    expect(elements).toHaveLength(1);
+    const opts = elements[0].options;
+    expect(opts[0].text).toBe('Option A');
+    expect(opts[1].text).toBe('');
+    expect(opts[2].text).toBe('');
   });
 });
