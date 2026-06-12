@@ -499,6 +499,8 @@ class FederationController {
    */
   calculateJobTrustScore(job, results) {
     if (results.length === 0) return 0;
+    const subGoalCount = job.subGoals?.length || 0;
+    if (subGoalCount === 0) return 0;
 
     const peerScores = results.map(r => {
       const peer = this.peers.get(r.peerId);
@@ -506,9 +508,8 @@ class FederationController {
     });
 
     // Average trust score weighted by completion rate
-    const peerScoresLen = peerScores.length;
-    const avgTrust = peerScores.reduce((a, b) => a + b, 0) / peerScoresLen;
-    const completionRate = results.length / job.subGoals.length;
+    const avgTrust = peerScores.reduce((a, b) => a + b, 0) / peerScores.length;
+    const completionRate = results.length / subGoalCount;
 
     return Math.round(avgTrust * completionRate);
   }
