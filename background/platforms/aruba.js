@@ -31,10 +31,10 @@ export const aruba = {
       const u = new URL(url);
       const host = u.host.toLowerCase();
       const path = u.pathname.toLowerCase();
-      if (_ARUBA_HOST_RE.test(host)) return true;
-      // Aruba Central cloud
-      if (_ARUBA_CENTRAL_RE.test(host)) return true;
+      // Aruba Central cloud — check specific subdomains before generic /aruba/i
       if (_ARUBA_PORTAL_RE.test(host)) return true;
+      if (_ARUBA_CENTRAL_RE.test(host)) return true;
+      if (_ARUBA_HOST_RE.test(host)) return true;
       // Aruba Instant / on-IP — IP-based hosts with characteristic paths
       if (_ARUBA_PATH_RE.test(path) && _IP_ADDRESS_RE3.test(host)) return true;
     } catch (_e) { /* fall through */ }
