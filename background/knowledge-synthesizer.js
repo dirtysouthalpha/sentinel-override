@@ -220,10 +220,6 @@ function areItemsSimilar(item1, item2) {
  * @returns {object} Merge result
  */
 function mergeCluster(cluster) {
-  if (cluster.items.length === 0) {
-    return { synthesized: {}, hasConflicts: false };
-  }
-
   // Combine content (simple concatenation for now)
   const combinedContent = cluster.items
     .map(item => item.content || '')
