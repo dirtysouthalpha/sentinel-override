@@ -74,6 +74,29 @@ describe('evaluateHallucinationRisk', () => {
     const result = evaluateHallucinationRisk('', {}, []);
     expect(result.risky).toBe(false);
   });
+
+  test('flags risky: 4+ claims with too-few evidence sources and no caveats', () => {
+    // 5 numbered claims, 1 evidence key → claims(5) > evidence(1)*2=2, no caveats
+    const summary = '1. Item A\n2. Item B\n3. Item C\n4. Item D\n5. Item E';
+    const result = evaluateHallucinationRisk(summary, { key1: 'val1' }, []);
+    expect(result.risky).toBe(true);
+  });
+
+  test('flags risky: 5+ specific claims with no source tags', () => {
+    // No list structure (claims=0), but 6+ specific numeric/date claims, no [src:] tags
+    const summary = 'Revenue grew 47%. Reached 110,000 users by 2025-01-15. Churn at 15.5%. ARR $5,000,000. Added 1,234 accounts.';
+    const result = evaluateHallucinationRisk(summary, {}, []);
+    expect(result.risky).toBe(true);
+    expect(result.reason).toMatch(/specific claims/);
+  });
+
+  test('flags risky: 8+ specific claims wildly outnumbering source tags', () => {
+    // 1 source tag, 9 specific numeric claims → specificClaims(9) > sourceTags(1)*3=3
+    const summary = 'Revenue: $5,000,000 [src:crm]. Grew 47%. Users: 110,000. Churn: 15.5%. ARR $12,345,000. Date: 2025-01-15. New: 1,234. Cost: $567,890. Rate: 32.1%.';
+    const result = evaluateHallucinationRisk(summary, {}, []);
+    expect(result.risky).toBe(true);
+    expect(result.reason).toMatch(/source tags/);
+  });
 });
 
 describe('_countSummaryClaims', () => {
