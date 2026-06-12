@@ -133,4 +133,18 @@ describe('run-queue', () => {
     const status = getQueueStatus();
     expect(status.activeRuns[0].goal).toBe('');
   });
+
+  test('completeRun with null result does not crash and marks as completed', () => {
+    registerRun(1, 'goal', Promise.resolve());
+    const result = completeRun(1, null);
+    expect(result.status).toBe('completed');
+    expect(result.result).toBe('');
+  });
+
+  test('completeRun with undefined result does not crash and marks as completed', () => {
+    registerRun(1, 'goal', Promise.resolve());
+    const result = completeRun(1, undefined);
+    expect(result.status).toBe('completed');
+    expect(result.result).toBe('');
+  });
 });

@@ -515,6 +515,11 @@ describe('analyzeArchitecture branch coverage', () => {
     expect(analysis.bottlenecks.find(b => b.type === 'failure_rate')).toBeDefined();
   });
 
+  test('does not produce Infinity failure rate when stepCount is 0 with failures', () => {
+    const analysis = analyzeArchitecture({ memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 5 });
+    expect(analysis.bottlenecks.find(b => b.type === 'failure_rate')).toBeUndefined();
+  });
+
   test('calculates plan complexity from steps array (line 330)', () => {
     const analysis = analyzeArchitecture({
       plan: { steps: [1, 2, 3, 4, 5] }, history: null, memory: null,

@@ -321,4 +321,15 @@ describe('Plugin Registry', () => {
     const id = await mod.installPlugin('https://exact-version.example.com/plugin.json');
     expect(id).toBe('exact-plugin');
   });
+
+  test('installPlugin succeeds when minSentinelVersion is a non-string (number)', async () => {
+    // Guard: typeof manifest.minSentinelVersion === 'string' must be checked before compareSemver
+    // If it's a number like 99, compareSemver would crash calling .split on it.
+    _mockFetch['https://nonstring-version.example.com/plugin.json'] = {
+      id: 'nonstring-plugin', name: 'NonString', version: '1.0.0', entryUrl: 'https://x.com/main.js',
+      minSentinelVersion: 99
+    };
+    const id = await mod.installPlugin('https://nonstring-version.example.com/plugin.json');
+    expect(id).toBe('nonstring-plugin');
+  });
 });
