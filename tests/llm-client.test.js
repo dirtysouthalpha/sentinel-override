@@ -1321,6 +1321,51 @@ describe('generatePlan', () => {
     expect(result).toContain('Beta');
   });
 
+  test('Strategy 2 advances past non-plan JSON objects before finding plan (covers L1260 s2from advance)', async () => {
+    // Strategy 1: JSON.parse rejects the whole string (two JSON values).
+    // Strategy 2: scans {"action":"click"} first — valid JSON but no plan/steps/phases
+    // → s2from = s2end + 1 (L1260), then finds {"plan":[...]} and returns it.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: '{"action":"click","selector":"#btn"} then {"plan":["Open settings","Click save"]}' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Open settings', 'Click save']);
+  });
+
+  test('Strategy 2 else-break when brace is never closed (covers L1261)', async () => {
+    // Strategy 1: JSON.parse fails (not valid JSON).
+    // Strategy 2: finds { but never finds matching } — depth never returns to 0 — s2end stays -1
+    // → else { break; } at L1261 fires. Strategies 3-4 also fail (no }), Strategy 5 returns goal.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'The plan is: {"plan":["Open settings","Close dialog"' } }] // no closing }
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  test('Strategy 2 brace scanner handles backslash escapes in JSON strings (covers L1234-1235)', async () => {
+    // Content with \" inside JSON strings: Strategy 1 fails (prose prefix), Strategy 2 runs.
+    // During the brace-balance scan, hitting \ inside a string sets esc=true (L1235);
+    // the next char then hits the esc=true branch (L1234) to reset it and skip the char.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{ message: { content: 'Plan: {"plan":["Step with \\"quotes\\"","Step with \\nnewline","Final step"]}' } }]
+      })
+    });
+    const result = await generatePlan('Do task', openaiSettings);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(3);
+  });
+
   test('returns fallback when API response body is not an object (array)', async () => {
     // `Array.isArray(data)` check throws internally, caught by outer catch → fallback.
     _mockFetch = () => Promise.resolve({
@@ -2760,6 +2805,27 @@ describe('callLLMSimple', () => {
     expect(err).toBeInstanceOf(Error);
     expect(typeof err.message === 'string' && err.message).toContain('API Error 500');
     expect(typeof err.message === 'string' && err.message.length).toBeLessThan(220);
+  });
+
+  test('throws when systemPrompt is empty (L2664 guard)', async () => {
+    await expect(callLLMSimple('', 'user prompt')).rejects.toThrow('systemPrompt and userPrompt are required');
+  });
+
+  test('throws when userPrompt is null (L2664 guard)', async () => {
+    await expect(callLLMSimple('system prompt', null)).rejects.toThrow('systemPrompt and userPrompt are required');
+  });
+
+  test('covers inner response.text() catch when text() throws on error response (L2681)', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: { openai: { api_key: 'sk-test', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions' } }
+    };
+    _mockFetch = () => Promise.resolve({
+      ok: false,
+      status: 503,
+      text: () => Promise.reject(new Error('body stream error'))
+    });
+    await expect(callLLMSimple('sys', 'user')).rejects.toThrow('API Error 503');
   });
 });
 
