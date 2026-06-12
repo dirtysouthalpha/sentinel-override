@@ -461,3 +461,41 @@ describe('saveLearnedPattern', () => {
     expect(saved).toHaveLength(1);
   });
 });
+
+// ========== Branch coverage: lines 68, 77, 133, 144 ==========
+
+describe('generateRunReplay — falsy goal uses N/A (line 68 false branch)', () => {
+  test('empty goal string produces "Goal: N/A" in HTML output', () => {
+    startRunRecording(1, null); // goal = null || '' = ''
+    const html = generateRunReplay();
+    expect(html).toContain('Goal: N/A');
+  });
+});
+
+describe('generateRunReplay — step with no actionType or result (line 77 || branches)', () => {
+  test('step without actionType uses empty CSS class and "unknown" header label', () => {
+    startRunRecording(1, 'branch-test goal');
+    recordStep({}); // no actionType, no result, no action, no screenshot
+    const html = generateRunReplay();
+    expect(html).toContain('class="step "');  // (s.actionType || '') → ''
+    expect(html).toContain('>unknown<');      // (s.actionType || 'unknown') → 'unknown'
+  });
+});
+
+describe('scoreActionConfidence — falsy command.type (line 133 false branch)', () => {
+  test('command without type property defaults type to empty string', () => {
+    // command.type is undefined → undefined || '' fires the false branch
+    const score = scoreActionConfidence({ selector: '#btn' }, null);
+    expect(typeof score).toBe('number');
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('scoreActionConfidence — class selector hits else-if false branch (line 144)', () => {
+  test('selector not matching #, [aria-, or // skips all three patterns', () => {
+    // '.btn': not #... → skip L142, not [aria-... → skip L143, not //... → L144 false branch
+    const score = scoreActionConfidence({ type: 'click', selector: '.btn' }, null);
+    expect(score).toBe(60); // 50 baseline + 10 for having a selector
+  });
+});
