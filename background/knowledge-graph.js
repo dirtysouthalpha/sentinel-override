@@ -16,6 +16,7 @@ class KnowledgeGraph {
     this.nodes = new Map(); // nodeId → node object
     this.edges = new Map(); // edgeId → edge object
     this.adjacencyList = new Map(); // nodeId → Set of connected nodeIds
+    this.edgeRelationIndex = new Map(); // sourceId → Map<targetId, relation>
     this._loaded = false;
   }
 
@@ -35,7 +36,8 @@ class KnowledgeGraph {
         this.edges = new Map(Object.entries(data.edges || {}));
         this.adjacencyList = new Map();
         
-        // Reconstruct adjacency lists
+        // Reconstruct adjacency lists and edge relation index
+        this.edgeRelationIndex = new Map();
         for (const [nodeId, _node] of this.nodes) {
           this.adjacencyList.set(nodeId, new Set());
         }
@@ -45,6 +47,10 @@ class KnowledgeGraph {
           if (neighbors) {
             neighbors.add(edge.target);
           }
+          if (!this.edgeRelationIndex.has(edge.source)) {
+            this.edgeRelationIndex.set(edge.source, new Map());
+          }
+          this.edgeRelationIndex.get(edge.source).set(edge.target, edge.relation);
         }
       }
       this._loaded = true;
@@ -130,12 +136,18 @@ class KnowledgeGraph {
     };
 
     this.edges.set(edgeId, edge);
-    
-    // Update adjacency lists
+
+    // Update adjacency list
     const sourceNeighbors = this.adjacencyList.get(sourceId);
     if (sourceNeighbors) {
       sourceNeighbors.add(targetId);
     }
+
+    // Update edge relation index for O(1) lookups in getNeighbors
+    if (!this.edgeRelationIndex.has(sourceId)) {
+      this.edgeRelationIndex.set(sourceId, new Map());
+    }
+    this.edgeRelationIndex.get(sourceId).set(targetId, edge.relation);
 
     return edge;
   }
@@ -172,15 +184,11 @@ class KnowledgeGraph {
       const neighbors = this.adjacencyList.get(currentId);
 
       if (neighbors) {
+        const sourceIndex = this.edgeRelationIndex.get(currentId);
         for (const neighborId of neighbors) {
           if (!visited.has(neighborId)) {
-            // Find the edge relation
-            for (const edge of this.edges.values()) {
-              if (edge.source === currentId && edge.target === neighborId) {
-                result.set(neighborId, edge.relation);
-                break;
-              }
-            }
+            const relation = sourceIndex?.get(neighborId) ?? 'related';
+            result.set(neighborId, relation);
             queue.push({ nodeId: neighborId, depth: depth + 1 });
           }
         }
@@ -233,17 +241,23 @@ class KnowledgeGraph {
   findContradictions() {
     const contradictions = [];
 
-    // Find nodes with similar properties but conflicting values
+    // Group nodes by type+label so we only compare within each group (O(n) grouping)
+    const byTypeLabel = new Map();
     for (const node of this.nodes.values()) {
-      for (const otherNode of this.nodes.values()) {
-        if (node.id === otherNode.id) continue;
+      const key = `${node.type}:${node.label.toLowerCase()}`;
+      if (!byTypeLabel.has(key)) byTypeLabel.set(key, []);
+      byTypeLabel.get(key).push(node);
+    }
 
-        // Check for same type and label similarity
-        const label1 = node.label.toLowerCase();
-        const label2 = otherNode.label.toLowerCase();
-        if (node.type === otherNode.type && label1 === label2) {
+    for (const group of byTypeLabel.values()) {
+      const len = group.length;
+      if (len < 2) continue;
 
-          // Check for conflicting properties
+      for (let i = 0; i < len; i++) {
+        for (let j = i + 1; j < len; j++) {
+          const node = group[i];
+          const otherNode = group[j];
+
           for (const [key, value] of Object.entries(node.properties)) {
             const otherValue = otherNode.properties[key];
             if (otherValue !== undefined && otherValue !== value) {
@@ -399,6 +413,7 @@ class KnowledgeGraph {
     this.nodes.clear();
     this.edges.clear();
     this.adjacencyList.clear();
+    this.edgeRelationIndex.clear();
     
     try {
       await chrome.storage.local.remove(STORAGE_KEY);
