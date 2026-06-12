@@ -140,6 +140,22 @@ describe('SW keepalive', () => {
     jest.useRealTimers();
   });
 
+  test('does nothing when both session storage and getPlatformInfo are unavailable', () => {
+    // Covers the else-if false branch: session null + getPlatformInfo undefined
+    const originalSession = chrome.storage.session;
+    const originalGetPlatformInfo = chrome.runtime.getPlatformInfo;
+    chrome.storage.session = null;
+    chrome.runtime.getPlatformInfo = undefined;
+
+    jest.useFakeTimers();
+    expect(() => startSwKeepalive('no-fallback-test')).not.toThrow();
+
+    stopSwKeepalive('no-fallback-test');
+    chrome.storage.session = originalSession;
+    chrome.runtime.getPlatformInfo = originalGetPlatformInfo;
+    jest.useRealTimers();
+  });
+
   test('defaults name to "default" for non-string input', () => {
     jest.useFakeTimers();
     startSwKeepalive(null);

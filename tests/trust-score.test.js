@@ -478,6 +478,22 @@ describe('describeTrustScore — coverage gaps', () => {
   });
 });
 
+// ========== computeTrustScore — stat.fires || 0 fallback ==========
+
+describe('computeTrustScore — skill stat with no fires property', () => {
+  test('uses 0 for fires when stat has no fires property', () => {
+    // Covers line 83: stat.fires || 0 branch 1 (stat.fires is undefined)
+    const result = computeTrustScore({
+      totalSteps: 5, failedSteps: 0, productiveSteps: 5,
+      apiCallCount: 5, safetyBlocks: 0, planLength: 0, planCompleted: 0,
+      skillStats: { someSkill: { successes: 2 } }, // no fires property
+    });
+    expect(isFinite(result.score)).toBe(true);
+    // totalSkillFires stays 0 → recoveryRate = 1 → full recovery credit
+    expect(result.breakdown.recovery.fires).toBe(0);
+  });
+});
+
 // ========== round() — non-finite guard ==========
 
 describe('round() — non-finite input via computeTrustScore', () => {

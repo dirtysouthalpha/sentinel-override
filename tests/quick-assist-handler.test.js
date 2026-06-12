@@ -538,5 +538,27 @@ describe('quick-assist-handler', () => {
 
       clearTimeoutSpy.mockRestore();
     });
+
+    it('falls back to full prompt when separator produces empty userPart', async () => {
+      // Prompt ends with '\n---\n' leaving nothing after: userPart = '' → userPart || prompt uses prompt
+      storageData = {
+        active_provider: 'anthropic',
+        api_key: 'test-key',
+        api_endpoint: 'https://api.anthropic.com/v1/messages',
+        model: 'claude-3-opus-20240229',
+      };
+      const mockResponse = {
+        ok: true,
+        json: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await handleQuickAssist('System instructions\n---\n');
+
+      const fetchCall = global.fetch.mock.calls[0];
+      const body = JSON.parse(fetchCall[1].body);
+      // userPart is '' so falls back to full prompt
+      expect(body.messages[0].content).toBe('System instructions\n---\n');
+    });
   });
 });

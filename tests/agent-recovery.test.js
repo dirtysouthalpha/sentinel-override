@@ -94,3 +94,11 @@ describe('resetRetries / getRetryCount', () => {
     expect(getRetryCount('foo')).toBe(0);
   });
 });
+
+describe('withRecovery — default parameter coverage', () => {
+  test('uses default context and operationId when called with only fn', async () => {
+    // Covers default-arg branches for context = {} and operationId = 'default'
+    const result = await withRecovery(() => Promise.resolve('result-no-context'));
+    expect(result).toBe('result-no-context');
+  });
+});

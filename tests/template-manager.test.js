@@ -526,4 +526,28 @@ describe('template-manager edge cases', () => {
     const result = await updateTemplate('abc', { tags: 'not-array' });
     expect(result.tags).toEqual([]);
   });
+
+  test('listTemplates covers || 0 fallback when multiple templates lack updatedAt', async () => {
+    // 3 templates forces the comparator to run with both orderings, covering both
+    // sides of the (b.updatedAt || 0) and (a.updatedAt || 0) binary-exprs
+    storageData['sentinel_templates'] = {
+      a: { id: 'a', name: 'A' },
+      b: { id: 'b', name: 'B', updatedAt: 200 },
+      c: { id: 'c', name: 'C' },
+    };
+    const result = await listTemplates();
+    expect(result).toHaveLength(3);
+    // B (updatedAt=200) should come first
+    expect(result[0].id).toBe('b');
+  });
+
+  test('resolveTemplateGoal falls back to ::key:: when template has no params property', async () => {
+    // Covers template-manager.js line 278: (template.params || []).find(...)
+    storageData['sentinel_templates'] = {
+      noparams: { id: 'noparams', name: 'No Params', goal: 'Check ::host::' },
+    };
+    const result = await resolveTemplateGoal('noparams', {});
+    // No params → no defaultValue → placeholder stays
+    expect(result).toBe('Check ::host::');
+  });
 });

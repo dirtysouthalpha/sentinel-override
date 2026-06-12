@@ -84,6 +84,13 @@ describe('page-monitor', () => {
       expect(monitors).toEqual([]);
     });
 
+    it('should return empty array when storage key is missing from result', async () => {
+      chrome.storage.local.get.mockImplementationOnce(() => Promise.resolve({}));
+      clearMonitorCache();
+      const monitors = await loadMonitors();
+      expect(monitors).toEqual([]);
+    });
+
     it('should return existing monitors', async () => {
       const testMonitors = [
         {
