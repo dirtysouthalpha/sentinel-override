@@ -65,7 +65,7 @@ export function generateAuditExport(runLog, _options = {}) {
   const csvRows = [headers.join(',')];
   for (const entry of audited) {
     const row = headers.map(h => {
-      const val = String(entry[h] || '');
+      const val = entry[h] == null ? '' : String(entry[h]);
       // RFC-4180: quote fields containing commas, quotes, or newlines
       if (val.includes(',') || val.includes('"') || val.includes('\n')) {
         return '"' + val.replace(/"/g, '""') + '"';
