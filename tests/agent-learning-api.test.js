@@ -148,6 +148,18 @@ describe('getBestSelector', () => {
     // Ask for 'navigate' type but only 'click' recorded
     expect(getBestSelector('paloalto', 'navigate')).toBeNull();
   });
+
+  test('sorts by avgDuration when successRate is tied (covers L92 sort comparator)', () => {
+    // Two selectors with identical 100% success rate — sort falls back to avgDuration asc
+    recordActionOutcome('ubiquiti', 'click', '#slow-btn', true, 500);
+    recordActionOutcome('ubiquiti', 'click', '#slow-btn', true, 600); // avgDuration 550
+    recordActionOutcome('ubiquiti', 'click', '#fast-btn', true, 100);
+    recordActionOutcome('ubiquiti', 'click', '#fast-btn', true, 200); // avgDuration 150
+    const best = getBestSelector('ubiquiti', 'click');
+    expect(best).not.toBeNull();
+    expect(best.selector).toBe('#fast-btn');
+    expect(best.avgDuration).toBeLessThan(300);
+  });
 });
 
 // ===== getFailedSelectors =====
