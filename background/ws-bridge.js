@@ -34,12 +34,22 @@ async function ensureAuthToken() {
   if (authToken) return authToken;
   return new Promise((resolve) => {
     chrome.storage.local.get(['ws_bridge_token'], (result) => {
+      if (chrome.runtime.lastError) {
+        console.warn('[WS-BRIDGE] Failed to read auth token:', getErrorMessage(chrome.runtime.lastError));
+        const token = generateToken();
+        authToken = token;
+        resolve(token);
+        return;
+      }
       if (result.ws_bridge_token) {
         authToken = result.ws_bridge_token;
         resolve(authToken);
       } else {
         const token = generateToken();
         chrome.storage.local.set({ ws_bridge_token: token }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[WS-BRIDGE] Failed to persist auth token:', getErrorMessage(chrome.runtime.lastError));
+          }
           authToken = token;
           console.log('[WS-BRIDGE] Generated new bridge auth token');
           resolve(authToken);

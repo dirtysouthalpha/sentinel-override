@@ -80,6 +80,11 @@ class UAPServer {
   async loadConfig() {
     return new Promise((resolve) => {
       chrome.storage.local.get(['uapConfig'], (result) => {
+        if (chrome.runtime.lastError) {
+          console.warn('[UAP] Failed to load config:', chrome.runtime.lastError.message);
+          resolve();
+          return;
+        }
         if (result.uapConfig) {
           this.config = { ...this.config, ...result.uapConfig };
         }
@@ -612,7 +617,11 @@ class UAPServer {
     }
 
     // Persist to chrome.storage (use in-memory log — no need to re-read)
-    chrome.storage.local.set({ uapAuditLog: this.auditLog.slice(-10000) });
+    chrome.storage.local.set({ uapAuditLog: this.auditLog.slice(-10000) }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn('[UAP] Failed to persist audit log:', getErrorMessage(chrome.runtime.lastError));
+      }
+    });
   }
 
   /**

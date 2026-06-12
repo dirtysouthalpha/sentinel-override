@@ -33,6 +33,9 @@ globalThis.chrome = {
       set: jest.fn(),
     },
   },
+  runtime: {
+    lastError: null,
+  },
 };
 
 // ===== Dynamic import mocks =====
@@ -463,6 +466,31 @@ describe('ensureAuthToken', () => {
       expect.objectContaining({ ws_bridge_token: expect.any(String) }),
       expect.any(Function)
     );
+  });
+
+  test('falls back to ephemeral token when get fails with lastError', async () => {
+    setAuthTokenForTest(null);
+    chrome.storage.local.get.mockImplementation((keys, cb) => {
+      chrome.runtime.lastError = { message: 'Storage error' };
+      if (cb) cb({});
+      chrome.runtime.lastError = null;
+    });
+    // Should not throw — resolves with an ephemeral token
+    await expect(startBridge()).resolves.toBeUndefined();
+  });
+
+  test('resolves with generated token even when set fails with lastError', async () => {
+    setAuthTokenForTest(null);
+    chrome.storage.local.get.mockImplementation((keys, cb) => {
+      if (cb) cb({}); // no stored token
+    });
+    chrome.storage.local.set.mockImplementation((data, cb) => {
+      chrome.runtime.lastError = { message: 'Quota exceeded' };
+      if (cb) cb();
+      chrome.runtime.lastError = null;
+    });
+    // Should not throw — resolves even though persist failed
+    await expect(startBridge()).resolves.toBeUndefined();
   });
 });
 

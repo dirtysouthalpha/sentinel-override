@@ -160,6 +160,30 @@ describe('UAP Server — coverage gaps', () => {
     });
   });
 
+  // ── loadConfig() — lastError path ────────────────────────────────────────────
+  describe('loadConfig() — lastError path', () => {
+    test('resolves without crashing when chrome.runtime.lastError is set', async () => {
+      chrome.storage.local.get.mockImplementationOnce((keys, cb) => {
+        chrome.runtime.lastError = { message: 'Storage quota exceeded' };
+        if (cb) cb({});
+        chrome.runtime.lastError = null;
+      });
+      await expect(uapServer.loadConfig()).resolves.toBeUndefined();
+    });
+  });
+
+  // ── logAudit() — lastError on persist ────────────────────────────────────────
+  describe('logAudit() — storage persist lastError', () => {
+    test('does not throw when chrome.runtime.lastError is set on set callback', () => {
+      chrome.storage.local.set.mockImplementationOnce((data, cb) => {
+        chrome.runtime.lastError = { message: 'Quota exceeded' };
+        if (cb) cb();
+        chrome.runtime.lastError = null;
+      });
+      expect(() => uapServer.logAudit('test_event', 'test-client', { detail: 'x' })).not.toThrow();
+    });
+  });
+
   // ── shutdown() — running runs are cancelled ──────────────────────────────────
   describe('shutdown() — cancellation path', () => {
     test('marks running runs as cancelled and logs audit', async () => {
