@@ -271,6 +271,15 @@ describe('generateOptimizedPlan', () => {
     expect(taskDetails.every(t => t.slack !== undefined)).toBe(true);
     expect(taskDetails.every(t => typeof t.isCritical === 'boolean')).toBe(true);
   });
+
+  test('handles empty task list without returning -Infinity for projectDuration', () => {
+    const result = generateOptimizedPlan([]);
+    expect(result.executionOrder).toEqual([]);
+    expect(result.criticalPath).toEqual([]);
+    expect(result.tasks).toEqual([]);
+    expect(result.projectDuration).toBe(0);
+    expect(Number.isFinite(result.projectDuration)).toBe(true);
+  });
 });
 
 describe('analyzePredictively', () => {

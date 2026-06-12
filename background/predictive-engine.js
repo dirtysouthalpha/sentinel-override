@@ -425,7 +425,8 @@ export function generateOptimizedPlan(tasks) {
   }
   
   // Calculate latest start/finish times (backwards pass)
-  const projectDuration = Math.max(...Array.from(earliestFinish.values()));
+  const finishValues = Array.from(earliestFinish.values());
+  const projectDuration = finishValues.length > 0 ? Math.max(...finishValues) : 0;
   const latestFinish = new Map();
   const latestStart = new Map();
   
