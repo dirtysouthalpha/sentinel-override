@@ -482,3 +482,126 @@ describe('callLLMWithRetry — step tier model routing', () => {
     expect(getBody().model).toBe('gpt-4o-mini');
   });
 });
+
+// ========== callLLMWithRetry — vision fallback thinking path (L2225) ==========
+
+describe('callLLMWithRetry — vision fallback with thinking enabled (covers L2225)', () => {
+  const config = {
+    maxRetries: 0,
+    retryDelay: 100,
+    maxRetryDelay: 500,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3,
+  };
+
+  function makeAgentState(overrides = {}) {
+    return {
+      apiCallCount: 0,
+      consecutiveFailures: 0,
+      currentStrategies: [],
+      agentMemory: {},
+      agentPlan: null,
+      currentPlanStep: 0,
+      ...overrides,
+    };
+  }
+
+  function setupAnthropicStorage() {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'test-key',
+          model: 'claude-sonnet-4-6',
+          endpoint: 'https://api.anthropic.com/v1/messages',
+        },
+      },
+    };
+  }
+
+  test('retries text-only with thinking when vision 400 and consecutiveFailures >= threshold (L2225)', async () => {
+    setupAnthropicStorage();
+    let fetchCallCount = 0;
+    _mockFetch = () => {
+      fetchCallCount++;
+      if (fetchCallCount === 1) {
+        // First call: 400 from vision request
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('vision not supported by this endpoint'),
+        });
+      }
+      // Second call: vision fallback with thinking succeeds
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          stop_reason: 'tool_use',
+          content: [{ type: 'tool_use', name: 'click', input: { selector: '#vision-btn' } }],
+        }),
+      });
+    };
+    const result = await callLLMWithRetry(
+      [], 0, 'page content', 'base64encodedimage==', 'click the button', [], 1,
+      'https://example.com', 0, config, makeAgentState({ consecutiveFailures: 3 })
+    );
+    expect(fetchCallCount).toBe(2);
+    expect(result.type).toBe('click');
+    expect(result.selector).toBe('#vision-btn');
+  });
+
+  test('throws API Error when vision fallback returns non-429 error (L2246)', async () => {
+    setupAnthropicStorage();
+    let fetchCallCount = 0;
+    _mockFetch = () => {
+      fetchCallCount++;
+      if (fetchCallCount === 1) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('vision not supported'),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve('internal server error'),
+      });
+    };
+    await expect(
+      callLLMWithRetry(
+        [], 0, 'page content', 'base64encodedimage==', 'click the button', [], 1,
+        'https://example.com', 0, config, makeAgentState({ consecutiveFailures: 3 })
+      )
+    ).rejects.toThrow('API Error: 500');
+    expect(fetchCallCount).toBe(2);
+  });
+});
+
+// ========== parseLLMResponse — regexSalvageFinishOrNote throws (L2614) ==========
+
+describe('parseLLMResponse — regex salvage catch block (covers L2614)', () => {
+  test('warns and returns note when regexSalvageFinishOrNote throws', () => {
+    // Content parses as JSON with invalid type → outer parse throws → enters salvage path.
+    // sanitizeLlmJson + JSON.parse succeeds but type is not valid → falls through to regexSalvage.
+    // Override String.prototype.match to throw once, forcing L2614 to be reached.
+    const origMatch = String.prototype.match;
+    const warns = [];
+    const origWarn = console.warn;
+    console.warn = (...args) => { warns.push(args.join(' ')); };
+    String.prototype.match = function(re) {
+      String.prototype.match = origMatch;
+      throw new Error('forced match throw for coverage');
+    };
+    let result;
+    try {
+      result = parseLLMResponse('{"type":"bad_type","summary":"test content"}');
+    } finally {
+      String.prototype.match = origMatch;
+      console.warn = origWarn;
+    }
+    expect(result.type).toBe('note');
+    expect(warns.some(w => w.includes('[Sentinel/llm] Parse failed:'))).toBe(true);
+  });
+});
