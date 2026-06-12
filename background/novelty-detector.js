@@ -217,22 +217,18 @@ async function checkContextNovelty(context, history) {
     return { isNovel: false, confidence: 0 };
   }
 
-  let novelFeatures = 0;
-
-  for (const key of contextKeys) {
-    const value = context[key];
-    
-    // Check if this key-value combination is novel
-    let seenBefore = false;
-    for (const entry of history) {
-      const entryContext = entry.context || {};
-      if (entryContext[key] === value) {
-        seenBefore = true;
-        break;
-      }
+  // Pre-build a Set of "key\0value" combos from all history entries (O(history))
+  const seenCombos = new Set();
+  for (const entry of history) {
+    const entryContext = entry.context || {};
+    for (const [k, v] of Object.entries(entryContext)) {
+      seenCombos.add(`${k}\0${v}`);
     }
+  }
 
-    if (!seenBefore) {
+  let novelFeatures = 0;
+  for (const key of contextKeys) {
+    if (!seenCombos.has(`${key}\0${context[key]}`)) {
       novelFeatures++;
     }
   }
@@ -258,19 +254,20 @@ async function checkSemanticNovelty(content, history) {
 
   // Extract key concepts (nouns, verbs)
   const concepts = extractConcepts(content);
-  
+
+  // Pre-build a Set of all words seen across history (O(total words))
+  const historyWords = new Set();
+  for (const entry of history) {
+    const words = (entry.content || '').toLowerCase().split(WHITESPACE_SPLIT_RE);
+    for (const w of words) {
+      const clean = w.replace(NON_ALPHA_RE, '');
+      if (clean) historyWords.add(clean);
+    }
+  }
+
   let novelConcepts = 0;
   for (const concept of concepts) {
-    let seenBefore = false;
-    for (const entry of history) {
-      const entryContent = (entry.content || '').toLowerCase();
-      if (entryContent.includes(concept)) {
-        seenBefore = true;
-        break;
-      }
-    }
-
-    if (!seenBefore) {
+    if (!historyWords.has(concept)) {
       novelConcepts++;
     }
   }
