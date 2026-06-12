@@ -692,3 +692,222 @@ describe('sendCostUpdate', () => {
     expect(() => sendCostUpdate(0.01, 100, 50, 1)).not.toThrow();
   });
 });
+
+// ========== Branch coverage additions ==========
+
+describe('sendMessage — non-string lastError (line 29 false branch)', () => {
+  test('rejects using raw lastError object when lastError.message is not a string', async () => {
+    chrome.tabs.sendMessage.mockImplementation((_tabId, _msg, cb) => {
+      chrome.runtime.lastError = { code: 42 };
+      cb(undefined);
+    });
+    await expect(sendMessage(1, { action: 'test' })).rejects.toThrow();
+  });
+
+  test('rejects with "Unknown content script error" when response.error is falsy (line 38 branch)', async () => {
+    chrome.tabs.sendMessage.mockImplementation((_tabId, _msg, cb) => {
+      chrome.runtime.lastError = null;
+      cb({ ok: false });
+    });
+    await expect(sendMessage(1, { action: 'test' })).rejects.toThrow('Unknown content script error');
+  });
+});
+
+describe('sendRuntimeMessage — non-string lastError (line 63 false branch)', () => {
+  test('rejects using raw lastError object when lastError.message is not a string', async () => {
+    chrome.runtime.sendMessage.mockImplementation((_msg, cb) => {
+      chrome.runtime.lastError = { code: 99 };
+      cb(undefined);
+    });
+    await expect(sendRuntimeMessage({ action: 'test' })).rejects.toThrow();
+  });
+});
+
+describe('wrapMessageHandler — String(err) branch (line 87)', () => {
+  test('uses String(err) when thrown error has no .message property', async () => {
+    const handler = wrapMessageHandler(async () => { throw { code: 'BAD_INPUT' }; });
+    const sendResponse = jest.fn();
+    handler({ action: 'test' }, {}, sendResponse);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(sendResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ ok: false, error: '[object Object]' })
+    );
+  });
+});
+
+describe('sendPageContext — non-positive totalSteps (line 130 false branch)', () => {
+  test('defaults totalSteps to 0 when value is 0', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPageContext('https://x.com', 'Title', 1, 1, 0);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ totalSteps: 0 })
+    );
+  });
+
+  test('defaults totalSteps to 0 when value is negative', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPageContext('https://x.com', 'Title', 1, 1, -3);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ totalSteps: 0 })
+    );
+  });
+});
+
+describe('sendActionMessage — _describeCommand element label branches (lines 146-148)', () => {
+  test('describes hover with matching element label (line 146)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'hover', selector: '#tooltip-btn' },
+      1,
+      { elements: [{ selector: '#tooltip-btn', text: 'More info' }] }
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Hover "More info"');
+  });
+
+  test('describes select with matching element label (line 147)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'select', selector: '#dropdown' },
+      1,
+      { elements: [{ selector: '#dropdown', text: 'Country' }] }
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Select in "Country"');
+  });
+
+  test('describes extract with matching element label (line 148)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'extract', selector: '.result-text' },
+      1,
+      { elements: [{ selector: '.result-text', text: 'Total Revenue' }] }
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Extract from "Total Revenue"');
+  });
+
+  test('describes scroll without amount using 0 fallback — Scroll down (line 156 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'scroll' }, 5);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Scroll down');
+  });
+
+  test('describes execute_js without key uses "Run JS:" format (line 159 false branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'execute_js', code: 'document.title' }, 5);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toMatch(/^Run JS:/);
+    expect(msg.payload.description).not.toContain('save as');
+  });
+
+  test('describes execute_js without code uses empty preview (line 158 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'execute_js' }, 5);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Run JS: ...');
+  });
+
+  test('describes press_key without key defaults to Enter (line 161 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'press_key' }, 6);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Press Enter');
+  });
+
+  test('describes wait_for_text without text defaults to empty string (line 162 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'wait_for_text' }, 7);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Wait for text: ""');
+  });
+
+  test('describes open_tab without label falls back to url (line 166 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'open_tab', url: 'https://example.com' }, 11);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Open tab: https://example.com');
+  });
+
+  test('describes switch_tab without label falls back to tab_id (line 167 || branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage({ type: 'switch_tab', tab_id: 42 }, 12);
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.description).toBe('Switch to: 42');
+  });
+});
+
+describe('sendActionMessage — payload branch coverage (lines 198-226)', () => {
+  test('resolves element text into targetText when matching element exists (line 198 true branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'click', selector: '#save-btn' },
+      1,
+      { elements: [{ selector: '#save-btn', text: 'Save Changes' }] }
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.targetText).toBe('Save Changes');
+  });
+
+  test('includes reasoning when __reasoning is a non-empty string (line 224 true branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'click', selector: '#btn', __reasoning: 'Submitting the form' },
+      1
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.reasoning).toBe('Submitting the form');
+  });
+
+  test('omits reasoning when __reasoning is empty string (line 224 false branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'click', selector: '#btn', __reasoning: '' },
+      1
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.reasoning).toBeUndefined();
+  });
+
+  test('includes confidence when __confidence is a number (line 226 true branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendActionMessage(
+      { type: 'click', selector: '#btn', __confidence: 0.85 },
+      1
+    );
+    const msg = chrome.runtime.sendMessage.mock.calls[0]?.[0];
+    expect(msg.payload.confidence).toBe(0.85);
+  });
+});
+
+describe('sendScreenshotUpdate — viewportMeta branches (lines 349-350)', () => {
+  test('includes viewport dimensions when viewportMeta is provided (true branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendScreenshotUpdate('base64data', 3, { width: 1280, height: 720 });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ viewportW: 1280, viewportH: 720 })
+    );
+  });
+});
+
+describe('sendClientKnowledgePreview — clientName fallback (line 423)', () => {
+  test('defaults clientName to "Unknown Client" when null is passed', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendClientKnowledgePreview(null, [{ id: '1', wisdom: 'tip', scope: 'global' }]);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ clientName: 'Unknown Client' })
+    );
+  });
+});
+
+describe('sendPlanPreview — estimatedSteps fallback (line 435)', () => {
+  test('defaults estimatedSteps to steps.length when not provided', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    const steps = ['Step 1', 'Step 2', 'Step 3'];
+    sendPlanPreview(steps);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ estimatedSteps: 3 })
+    );
+  });
+});
