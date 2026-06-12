@@ -161,6 +161,15 @@ describe('_checkDomReadyState — string data paths (lines 107-108, 114-123)', (
     tabsSendMessageMock.mockResolvedValue('not-valid-json{{{{');
     await expect(waitForPageReady(TAB, 200)).resolves.toBeUndefined();
   });
+
+  test('resolves when sendMessage returns a double-encoded JSON string (line 117 return true)', async () => {
+    setPageLoadConfig({ networkIdleMs: 0, pollInterval: 0 });
+    // Outer JSON.parse yields another string (not an object) → else-if (typeof data === 'string') at line 114
+    // Inner JSON.parse then succeeds → return true at line 117
+    const innerJson = JSON.stringify({ readyState: 'complete', bodyLen: 200, hasSpinner: false });
+    tabsSendMessageMock.mockResolvedValue(JSON.stringify(innerJson));
+    await expect(waitForPageReady(TAB, 500)).resolves.toBeUndefined();
+  });
 });
 
 // ── getInFlightRequestCount + networkIdleSince reset (lines 73-81, 150) ──────

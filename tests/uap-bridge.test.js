@@ -504,6 +504,30 @@ describe('UAP Bridge', () => {
       expect(isServerAvailable()).toBe(false);
     });
 
+    test('goal callback error is caught and logged as warn (line 220)', async () => {
+      const warns = [];
+      const origWarn = console.warn;
+      console.warn = (...args) => warns.push(args);
+
+      const goalCb = jest.fn().mockRejectedValue(new Error('callback exploded'));
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+      await initBridge({ onGoal: goalCb });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tasks: [{ type: 'goal_request', status: 'pending', goal: 'do something', context: {} }],
+          timestamp: 1
+        }),
+      });
+      jest.advanceTimersByTime(5000);
+      await jest.advanceTimersByTimeAsync(200);
+
+      console.warn = origWarn;
+      expect(goalCb).toHaveBeenCalled();
+      expect(warns.some(a => String(a[0]).includes('[UAP Bridge] Goal callback error:'))).toBe(true);
+    });
+
     test('does not start duplicate polling when already polling', async () => {
       mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) });
       await initBridge();

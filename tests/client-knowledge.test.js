@@ -797,3 +797,37 @@ describe('getClientStartupContext', () => {
     expect(result.promptSection).toContain('Use the sidebar');
   });
 });
+
+describe('_urlMatches — catch block on non-string pattern (lines 301-302)', () => {
+  test('non-string urlPattern causes TypeError caught and logged, entry excluded', async () => {
+    const errors = [];
+    const origError = console.error;
+    console.error = (...args) => errors.push(args.join(' '));
+
+    // Bypass addEntry validation to inject a non-string urlPattern directly into storage
+    store['sentinelClientKnowledge'] = {
+      activeClientId: null,
+      clients: {
+        'direct-client': {
+          id: 'direct-client',
+          displayName: 'Direct',
+          entries: [{
+            id: 'entry_bad',
+            scope: 'url',
+            urlPattern: { notAString: true }, // truthy non-string → pattern.toLowerCase() throws
+            wisdom: 'Unreachable wisdom',
+            tags: [],
+            capturedAt: new Date().toISOString(),
+            useCount: 0
+          }]
+        }
+      }
+    };
+
+    const entries = await getRelevantEntries('direct-client', 'https://example.com');
+    console.error = origError;
+
+    expect(entries).toEqual([]);
+    expect(errors.some(m => m.includes('_matchesPattern failed'))).toBe(true);
+  });
+});
