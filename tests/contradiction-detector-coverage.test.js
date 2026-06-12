@@ -236,6 +236,85 @@ describe('findTemporalContradictions — before+after in same sentence (lines 11
   });
 });
 
+// ── findQuantifierContradictions: match1 or match2 null → if(match1 && match2) false (line 157) ──
+
+describe('findQuantifierContradictions — no "X is always" pattern → if(match1 && match2) false (line 157)', () => {
+  test('universal/existential words present but sentence lacks is/are → match null → no contradiction', () => {
+    // "always" in sent1, "sometimes" in sent2, but subjectPattern needs \b[word]\s+is/are\s+always
+    // "dogs always run" has no is/are before "always" → match1 = null → branch 10 false
+    const text = 'Dogs always run fast out there. Cats sometimes walk slowly.';
+    const result = analyzeForContradictions(text);
+    expect(result.contradictions.filter(c => c.type === 'quantifier')).toHaveLength(0);
+  });
+});
+
+// ── findNumericalContradictions: same unit same number → condition false (line 201) ──────────────
+
+describe('findNumericalContradictions — same unit same number → branch 12 false (line 201)', () => {
+  test('two occurrences of same number with same unit → no numerical contradiction', () => {
+    // matches[i].number === matches[j].number → second part of && is false → branch 12 false
+    const text = 'We have 5 cats. We also have 5 cats.';
+    const result = analyzeForContradictions(text);
+    expect(result.contradictions.filter(c => c.type === 'numerical')).toHaveLength(0);
+  });
+});
+
+// ── findConditionalContradictions: unrelated conditions → outer if false (branches 14 + 15[2]) ──
+
+describe('findConditionalContradictions — unrelated conditions → outer if false (line 248 branches 14 + 15[2])', () => {
+  test('independent conditions: neither includes the other, not equal → no conditional contradiction', () => {
+    // cond1="it rains", cond2="the sun shines"
+    // cond1.includes(cond2)=false (branch 15[0] evaluated, false) →
+    // cond2.includes(cond1)=false (branch 15[1] evaluated, false) →
+    // cond1===cond2=false (branch 15[2] evaluated, false) → whole if false (branch 14 false)
+    const text = 'If it rains then carry an umbrella. If the sun shines then wear sunglasses.';
+    const result = analyzeForContradictions(text);
+    expect(result.contradictions.filter(c => c.type === 'conditional')).toHaveLength(0);
+  });
+});
+
+// ── findConditionalContradictions: both consequences negated → inner if false (branch 16) ────────
+
+describe('findConditionalContradictions — both consequences negated → inner if false (line 254 branch 16)', () => {
+  test('same condition, both consequences contain "not" → (h1&&!h2)||(... false, no contradiction', () => {
+    // cond1 === cond2 = "it rains" → outer if true; enters block
+    // cons1 = "do not go out" → hasNegation1=true; cons2 = "do not forget your coat" → hasNegation2=true
+    // (true && false) || (false && true) = false → branch 16 false → no contradiction pushed
+    const text = 'If it rains then do not go out. If it rains then do not forget your coat.';
+    const result = analyzeForContradictions(text);
+    expect(result.contradictions.filter(c => c.type === 'conditional')).toHaveLength(0);
+  });
+});
+
+// ── findConditionalContradictions: only cons2 negated → (!h1 && h2) branch (branch 17[1]) ───────
+
+describe('findConditionalContradictions — only second consequence negated → branch 17[1] (!h1&&h2)', () => {
+  test('same condition, only cons2 has negation → A false so B evaluated and true → contradiction', () => {
+    // cond1===cond2="it rains" → outer if true
+    // cons1="go inside" → hasNegation1=false; cons2="do not go outside" → hasNegation2=true
+    // A=(false&&true)=false → B evaluated: (true&&true)=true → branch 17[1] covered → push contradiction
+    const text = 'If it rains then go inside. If it rains then do not go outside.';
+    const result = analyzeForContradictions(text);
+    expect(result.contradictions.filter(c => c.type === 'conditional').length).toBeGreaterThan(0);
+  });
+});
+
+// ── areContradictoryStatements: negation mismatch, objects unrelated → if false (branch 26) ─────
+
+describe('areContradictoryStatements — negation mismatch but objects unrelated → if false (line 373 branch 26)', () => {
+  test('one object negated, other not, cleaned objects share no overlap → return false', () => {
+    // stmt1: "The system is not available" → cleanObj1="available"
+    // stmt2: "The system is reliable" → cleanObj2="reliable"
+    // hasNegation1=true !== hasNegation2=false → enters block
+    // "available"!=="reliable", no includes match → branch 26 false → return false
+    const result = compareResponsesForContradictions(
+      'The system is not available for requests.',
+      'The system is reliable under load.'
+    );
+    expect(result.crossResponseContradictions.length).toBe(0);
+  });
+});
+
 // ── areContradictoryStatements: same negation state → return false (line 378) ─
 
 describe('areContradictoryStatements — same negation state falls through to return false (line 378)', () => {
