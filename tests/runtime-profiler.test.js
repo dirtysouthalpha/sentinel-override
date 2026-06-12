@@ -837,4 +837,77 @@ describe('attemptHealing fallback strategy success (line 884)', () => {
     expect(result.status).toBe('healed');
     expect(result.successStrategy.name).not.toBe('clear_caches'); // first strategy failed
   });
+
+  test('line 884 false branch: second strategy also fails, third strategy succeeds', () => {
+    // Covers the line 884 false branch (nextResult.success=false on first loop iteration)
+    // strategy[0] (attempts=1, prob=0.5): random=0.9 → 0.9 >= 0.5 → FAIL
+    // loop i=1, strategy[1] (attempts=3, prob=0.9): random=0.99 → 0.99 >= 0.9 → FAIL ← line 884 false
+    // loop i=2, strategy[2] (attempts=5, prob=1.3): random=0.5 → 0.5 < 1.3 → SUCCESS
+    const calls = [0.9, 0.99, 0.5];
+    let idx = 0;
+    randSpy = jest.spyOn(Math, 'random').mockImplementation(() => calls[Math.min(idx++, calls.length - 1)]);
+
+    const result = attemptHealing({ type: 'memory_leak', severity: 'high' });
+    expect(result.status).toBe('healed');
+    expect(result.successStrategy.name).toBe('restart_agent');
+  });
+});
+
+// ── window sentinel counters (lines 82-84) ────────────────────────────────────
+
+describe('takeProfilingSample — window sentinel counters (lines 82-84)', () => {
+  test('reads window sentinel counters when globalThis.window is defined', () => {
+    globalThis.window = { __sentinelStepCount: 5, __sentinelApiCallCount: 3, __sentinelFailures: 2 };
+    startProfiling();
+    const sample = takeProfilingSample();
+    delete globalThis.window;
+    expect(sample.agent.stepCount).toBe(5);
+    expect(sample.agent.apiCallCount).toBe(3);
+    expect(sample.agent.failures).toBe(2);
+  });
+});
+
+// ── memory status critical (line 192) ─────────────────────────────────────────
+
+describe('generateProfilingSummary — memory status critical (line 192)', () => {
+  test('returns critical when max memory usage exceeds 90%', () => {
+    Object.defineProperty(globalThis.performance, 'memory', {
+      value: { usedJSHeapSize: 95, jsHeapSizeLimit: 100, totalJSHeapSize: 100 },
+      configurable: true,
+    });
+    try {
+      startProfiling();
+      takeProfilingSample();
+      const summary = stopProfiling();
+      expect(summary.memory.status).toBe('critical');
+    } finally {
+      Object.defineProperty(globalThis.performance, 'memory', { value: undefined, configurable: true });
+    }
+  });
+});
+
+// ── step count medium severity (line 282) ─────────────────────────────────────
+
+describe('analyzeArchitecture — step count 31-50 gives medium severity (line 282)', () => {
+  test('stepCount=40 produces medium severity bottleneck', () => {
+    const result = analyzeArchitecture({ stepCount: 40, apiCallCount: 0, memoryUsage: 0, failures: 0 });
+    const b = result.bottlenecks.find(b => b.type === 'step_count');
+    expect(b).toBeDefined();
+    expect(b.severity).toBe('medium');
+  });
+});
+
+// ── runGeneticAlgorithm defaults populationSize=20, generations=50 (lines 704-705) ──
+
+describe('runGeneticAlgorithm — default populationSize and generations (lines 704-705)', () => {
+  test('omitting populationSize and generations uses defaults 20 and 50; mutationRate=1 covers mutate()', () => {
+    const result = runGeneticAlgorithm({
+      geneSpace: { x: { min: -1, max: 1 } },
+      fitnessFunction: (ind) => -Math.abs(ind.x),
+      mutationRate: 1,
+      crossoverRate: 0,
+    });
+    expect(result.history).toHaveLength(50);
+    expect(result.bestIndividual).toBeDefined();
+  });
 });
