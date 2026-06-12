@@ -581,12 +581,7 @@ export async function executeScheduledTask(alarmName) {
     error: completionResult.error,
   };
 
-  try {
-    await storeResult(schedule, finalResult);
-  } catch (e) {
-    console.error('Failed to store scheduled task result:', getErrorMessage(e));
-    try { tel.error('scheduler', 'Failed to store result', { error: getErrorMessage(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', getErrorMessage(nestedErr)); }
-  }
+  await storeResult(schedule, finalResult);
 
   schedule.lastRunAt = completedAt;
   schedule.lastRunStatus = completionResult.status;
@@ -600,12 +595,7 @@ export async function executeScheduledTask(alarmName) {
   }
 
   schedules[scheduleId] = schedule;
-  try {
-    await saveSchedules(schedules);
-  } catch (e) {
-    console.error('Failed to save schedule state after execution:', getErrorMessage(e));
-    try { tel.error('scheduler', 'Failed to save schedule state', { error: getErrorMessage(e) }); } catch (nestedErr) { console.error('[Sentinel] Error in scheduler.js:', getErrorMessage(nestedErr)); }
-  }
+  await saveSchedules(schedules);
 
   sendNotification(schedule, finalResult);
   setBadge(finalResult.status);
@@ -708,18 +698,14 @@ function _waitForAgentCompletion(timeoutMs) {
  * @param {object} resultPartial - { id?, startedAt, error } for storeResult
  */
 async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial) {
-  try {
-    await storeResult(schedule, {
-      id: resultPartial.id,
-      status: 'failure',
-      startedAt: resultPartial.startedAt,
-      completedAt: Date.now(),
-      report: null,
-      error: resultPartial.error,
-    });
-  } catch (storeErr) {
-    console.error('Failed to store failure result:', getErrorMessage(storeErr));
-  }
+  await storeResult(schedule, {
+    id: resultPartial.id,
+    status: 'failure',
+    startedAt: resultPartial.startedAt,
+    completedAt: Date.now(),
+    report: null,
+    error: resultPartial.error,
+  });
   schedule.lastRunStatus = 'failure';
   schedule.lastRunAt = Date.now();
   schedules[scheduleId] = schedule;

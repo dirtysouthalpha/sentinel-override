@@ -1117,6 +1117,16 @@ describe('fetchModelsList', () => {
     await expect(fetchModelsList(provider, 'key')).rejects.toThrow(/returned 429/);
   });
 
+  test('throws on non-ok response when resp.text() throws (line 1190)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: () => Promise.reject(new Error('body stream failed'))
+    });
+    const provider = { modelsUrl: 'https://api.test.com/models', auth: 'bearer' };
+    await expect(fetchModelsList(provider, 'key')).rejects.toThrow(/returned 503.*unreadable body/);
+  });
+
   test('throws when response is not JSON', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
