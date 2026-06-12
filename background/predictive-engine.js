@@ -495,7 +495,7 @@ export function analyzePredictively(data) {
   const durationForecast = linearTrendForecast(durations, 5);
 
   // Analyze failure patterns
-  const failurePatterns = analyzeFailurePatterns(failureHistory || []);
+  const failurePatterns = analyzeFailurePatterns(failureHistory);
 
   // Risk assessment
   const riskFactors = {

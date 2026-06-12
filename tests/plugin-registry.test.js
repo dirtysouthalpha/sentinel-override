@@ -272,6 +272,47 @@ describe('Plugin Registry', () => {
     expect(warnings.some(w => w[0] === '[PLUGIN-REGISTRY] Plugin not found:' && w[1] === 'does-not-exist')).toBe(true);
   });
 
+  test('getInstalledPlugins returns empty object when storage key is absent', async () => {
+    // Covers binary-expr line 229: result[STORAGE_KEY] || {} — storage returns no key
+    const plugins = await mod.getInstalledPlugins();
+    expect(plugins).toEqual({});
+  });
+
+  test('detectConflicts — existing plugin has no platforms property (covers || [] fallback line 186)', async () => {
+    _mockFetch['https://noplat.example.com/plugin.json'] = {
+      id: 'no-plat', name: 'No Platforms', version: '1.0.0', entryUrl: 'https://noplat.com/main.js',
+      // no platforms property
+    };
+    _mockFetch['https://new.example.com/plugin.json'] = {
+      id: 'new-plug', name: 'New', version: '1.0.0', entryUrl: 'https://new.com/main.js',
+      platforms: ['cisco'],
+    };
+    await mod.installPlugin('https://noplat.example.com/plugin.json');
+    await mod.togglePlugin('no-plat'); // activate it
+    await mod.installPlugin('https://new.example.com/plugin.json');
+    const conflicts = await mod.detectConflicts('new-plug');
+    // no-plat has no platforms, so no platform overlap — conflicts should be empty or only action-based
+    expect(Array.isArray(conflicts)).toBe(true);
+    expect(conflicts.filter(c => c.type === 'platform_overlap')).toHaveLength(0);
+  });
+
+  test('detectConflicts — existing plugin has no actions property (covers cond-expr line 193)', async () => {
+    _mockFetch['https://noact.example.com/plugin.json'] = {
+      id: 'no-act', name: 'No Actions', version: '1.0.0', entryUrl: 'https://noact.com/main.js',
+      platforms: [],
+      // no actions property
+    };
+    _mockFetch['https://new2.example.com/plugin.json'] = {
+      id: 'new-plug2', name: 'New2', version: '1.0.0', entryUrl: 'https://new2.com/main.js',
+      platforms: [], actions: { 'some_action': {} },
+    };
+    await mod.installPlugin('https://noact.example.com/plugin.json');
+    await mod.togglePlugin('no-act');
+    await mod.installPlugin('https://new2.example.com/plugin.json');
+    const conflicts = await mod.detectConflicts('new-plug2');
+    expect(conflicts.filter(c => c.type === 'action_overlap')).toHaveLength(0);
+  });
+
   test('compareSemver returns 0 for equal minSentinelVersion (does not throw)', async () => {
     _mockFetch['https://exact-version.example.com/plugin.json'] = {
       id: 'exact-plugin', name: 'Exact', version: '1.0.0', entryUrl: 'https://x.com/main.js',

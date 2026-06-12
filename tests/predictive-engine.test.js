@@ -307,6 +307,27 @@ describe('analyzePredictively', () => {
   });
 });
 
+describe('detectTrend — increasing branch via predictNextFailure', () => {
+  test('returns "increasing" when second half of intervals is >10% larger than first half', () => {
+    // First half: [10, 10, 10] avg=10; second half: [22, 22, 22] avg=22 → +120%
+    const intervals = [10, 10, 10, 22, 22, 22];
+    const result = predictNextFailure(intervals);
+    expect(result.trend).toBe('increasing');
+  });
+});
+
+describe('whatIfAnalysis — medium impact branch', () => {
+  test('classifies 11-20% change as "medium"', () => {
+    const metric = (s) => s.val;
+    const result = whatIfAnalysis({
+      baseline: { val: 100 },
+      changes: { variations: [{ val: 115 }] }, // 15% change
+      metric
+    });
+    expect(result.scenarios[0].impact).toBe('medium');
+  });
+});
+
 describe('PredictiveEngine facade', () => {
   test('exposes all expected methods', () => {
     expect(typeof PredictiveEngine.forecast).toBe('function');
