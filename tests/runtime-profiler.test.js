@@ -692,3 +692,149 @@ describe('runGeneticAlgorithm with provided initialPopulation', () => {
     expect(result.bestFitness).toBeGreaterThanOrEqual(0);
   });
 });
+
+// ── detectTrend 'decreasing' (line 169) ──────────────────────────────────────
+
+describe('detectTrend decreasing branch (line 169)', () => {
+  let origPerf;
+  beforeEach(() => { origPerf = global.performance; });
+  afterEach(() => { global.performance = origPerf; stopProfiling(); });
+
+  test('memory trend is decreasing when last value drops >10% vs first', () => {
+    // 9 samples at 80%, then 1 at 70% → change = (70-80)/80*100 = -12.5% → 'decreasing'
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 800, totalJSHeapSize: 900 } };
+    startProfiling();
+    for (let i = 0; i < 9; i++) takeProfilingSample();
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 700, totalJSHeapSize: 800 } };
+    takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.memory.trend).toBe('decreasing');
+  });
+});
+
+// ── detectPerformanceTrend 'improving' and 'stable' (lines 187-188) ──────────
+
+describe('detectPerformanceTrend improving and stable branches (lines 187-188)', () => {
+  let dateSpy;
+  afterEach(() => { dateSpy?.mockRestore(); stopProfiling(); });
+
+  test('performance is improving when second-half intervals are <80% of first-half', () => {
+    // Sample 1 always has sinceLastSample=0 (lastSampleTime = startTime).
+    // With 10 samples split at index 5:
+    //   firstHalf  = [0, 100, 100, 100, 100] → avg = 80
+    //   secondHalf = [100, 20, 20, 20, 20]   → avg = 36
+    //   36 < 80 * 0.8 = 64 → 'improving' ✓
+    let call = 0;
+    const now0 = 1000;
+    const times = [
+      now0, now0,      // startProfiling (2 calls)
+      now0,            // sample 1  sint=0
+      now0+100,        // sample 2  sint=100
+      now0+200,        // sample 3  sint=100
+      now0+300,        // sample 4  sint=100
+      now0+400,        // sample 5  sint=100
+      now0+500,        // sample 6  sint=100
+      now0+520,        // sample 7  sint=20
+      now0+540,        // sample 8  sint=20
+      now0+560,        // sample 9  sint=20
+      now0+580,        // sample 10 sint=20
+    ];
+    dateSpy = jest.spyOn(Date, 'now').mockImplementation(() => times[Math.min(call++, times.length - 1)]);
+    startProfiling();
+    for (let i = 0; i < 10; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.timing.performance).toBe('improving');
+  });
+
+  test('performance is stable when second-half intervals are within 20% of first-half', () => {
+    // firstHalf  = [0, 100, 100, 100, 100] → avg = 80
+    // secondHalf = [100, 75, 75, 75, 75]   → avg = 80
+    // 80 is neither > 80*1.2=96 nor < 80*0.8=64 → 'stable' ✓
+    let call = 0;
+    const now0 = 2000;
+    const times = [
+      now0, now0,      // startProfiling (2 calls)
+      now0,            // sample 1  sint=0
+      now0+100,        // sample 2  sint=100
+      now0+200,        // sample 3  sint=100
+      now0+300,        // sample 4  sint=100
+      now0+400,        // sample 5  sint=100
+      now0+500,        // sample 6  sint=100
+      now0+575,        // sample 7  sint=75
+      now0+650,        // sample 8  sint=75
+      now0+725,        // sample 9  sint=75
+      now0+800,        // sample 10 sint=75
+    ];
+    dateSpy = jest.spyOn(Date, 'now').mockImplementation(() => times[Math.min(call++, times.length - 1)]);
+    startProfiling();
+    for (let i = 0; i < 10; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.timing.performance).toBe('stable');
+  });
+});
+
+// ── getMemoryStatus 'high' and 'moderate' (lines 191-194) ────────────────────
+
+describe('getMemoryStatus high and moderate branches (lines 191-194)', () => {
+  let origPerf;
+  beforeEach(() => { origPerf = global.performance; });
+  afterEach(() => { global.performance = origPerf; stopProfiling(); });
+
+  test('memory status is high when avg > 70', () => {
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 750, totalJSHeapSize: 850 } };
+    startProfiling();
+    for (let i = 0; i < 5; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.memory.status).toBe('high');
+  });
+
+  test('memory status is moderate when avg > 50 (but not > 70)', () => {
+    global.performance = { memory: { jsHeapSizeLimit: 1000, usedJSHeapSize: 600, totalJSHeapSize: 700 } };
+    startProfiling();
+    for (let i = 0; i < 5; i++) takeProfilingSample();
+    const summary = stopProfiling();
+    expect(summary.memory.status).toBe('moderate');
+  });
+});
+
+// ── identifyTightCoupling 'moderate' (line 391) ───────────────────────────────
+
+describe('identifyTightCoupling moderate branch (line 391)', () => {
+  test('analyzeArchitecture returns moderate coupling when avgDependencies = 2.5', () => {
+    // analyzeDependencies always returns avgDependencies=2.5, so >2 but <=3 → 'moderate'
+    const analysis = analyzeArchitecture({ memoryUsage: 0, apiCallCount: 0, stepCount: 1, failures: 0 });
+    expect(analysis.coupling.tightCoupling).toBe('moderate');
+  });
+});
+
+// ── monitorCanary stepCount=0 → fallback to 1 (line 577) ─────────────────────
+
+describe('monitorCanary stepCount=0 fallback (line 577)', () => {
+  afterEach(() => stopCanaryDeployment(false));
+
+  test('stepCount=0 in metrics uses 1 as divisor (avoids NaN/division by zero)', () => {
+    startCanaryDeployment({ type: 'test' });
+    const result = monitorCanary({ stepCount: 0, failures: 0, totalTime: 100, memoryUsage: 30 });
+    // Should return active result without NaN values
+    expect(result.status).toBe('active');
+    expect(Number.isNaN(result.health?.errorRate)).toBe(false);
+  });
+});
+
+// ── healing fallback strategy success (line 884) ──────────────────────────────
+
+describe('attemptHealing fallback strategy success (line 884)', () => {
+  let randSpy;
+  afterEach(() => randSpy?.mockRestore());
+
+  test('falls through to second strategy when first fails, second succeeds', () => {
+    let callCount = 0;
+    // Call 1 (first strategy): return 0.9 → fails (prob ≈ 0.5, 0.9 >= 0.5)
+    // Call 2 (second strategy inside loop): return 0.05 → succeeds (prob ≈ 0.9, 0.05 < 0.9)
+    randSpy = jest.spyOn(Math, 'random').mockImplementation(() => callCount++ === 0 ? 0.9 : 0.05);
+
+    const result = attemptHealing({ type: 'memory_leak', severity: 'high' });
+    expect(result.status).toBe('healed');
+    expect(result.successStrategy.name).not.toBe('clear_caches'); // first strategy failed
+  });
+});
