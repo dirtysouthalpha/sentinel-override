@@ -301,6 +301,53 @@ describe('parseLLMResponse — regex salvage edge cases', () => {
   });
 });
 
+// ========== callLLMWithRetry — _attachReasoning merge path (L2308-2309) ==========
+
+describe('callLLMWithRetry — _attachReasoning merges API and text reasoning', () => {
+  const config = {
+    maxRetries: 0,
+    retryDelay: 100,
+    maxRetryDelay: 500,
+    fetchTimeout: 30000,
+    historyWindow: 10,
+    strategyShiftThreshold: 3
+  };
+
+  test('merges reasoning_content with pre-JSON __reasoning from parseLLMResponse (covers L2308-2309)', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: {
+        openai: {
+          api_key: 'test-key',
+          model: 'gpt-4o',
+          endpoint: 'https://api.openai.com/v1/chat/completions'
+        }
+      }
+    };
+    // Response has reasoning_content (API-level) AND content with preamble before JSON
+    // (text-preamble before the JSON sets cmd.__reasoning in parseLLMResponse)
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        choices: [{
+          message: {
+            content: 'I will note the observation. {"type":"note","text":"all good"}',
+            reasoning_content: 'API chain-of-thought reasoning here'
+          }
+        }]
+      })
+    });
+    const result = await callLLMWithRetry(
+      [], 0, 'page content', null, 'do something', [], 1, 'https://example.com',
+      0, config, { apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [], agentMemory: {}, agentPlan: null, currentPlanStep: 0 }
+    );
+    expect(result.type).toBe('note');
+    // _attachReasoning L2308-2309: both __reasoning fields merged
+    expect(result.__reasoning).toBeTruthy();
+    expect(result.__reasoning).toContain('API chain-of-thought reasoning here');
+  });
+});
+
 // ========== callLLMWithRetry — step tier model routing (L2044-2049) ==========
 
 describe('callLLMWithRetry — step tier model routing', () => {
