@@ -89,7 +89,7 @@ function validateManifest(manifest) {
     }
   }
   // Semantic version check
-  if (manifest.minSentinelVersion && compareSemver(manifest.minSentinelVersion, MIN_SENTINEL_VERSION) > 0) {
+  if (manifest.minSentinelVersion && typeof manifest.minSentinelVersion === 'string' && compareSemver(manifest.minSentinelVersion, MIN_SENTINEL_VERSION) > 0) {
     throw new Error('Plugin requires Sentinel v' + manifest.minSentinelVersion + ', current is v' + MIN_SENTINEL_VERSION);
   }
   return true;
