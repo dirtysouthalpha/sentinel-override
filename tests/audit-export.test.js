@@ -100,4 +100,19 @@ describe('audit-export', () => {
     expect(result.valid).toBe(true);
     expect(result.message).toContain('0 entries');
   });
+
+  test('CSV preserves boolean false as "false" not empty string', () => {
+    // Regression for commit 9114e45: String(entry[h] || '') coerces false → ''
+    // Fixed by: entry[h] == null ? '' : String(entry[h])
+    const log = [
+      { timestamp: '2026-01-01T00:00:00Z', kind: 'step', goal: 'g', url: 'https://x.com', action: 'click', result: 'ok', failed: false }
+    ];
+    const result = generateAuditExport(log);
+    const csvLines = result.csv.split('\n');
+    const headers = csvLines[0].split(',');
+    const failedIdx = headers.indexOf('failed');
+    expect(failedIdx).toBeGreaterThanOrEqual(0);
+    const dataFields = csvLines[1].split(',');
+    expect(dataFields[failedIdx]).toBe('false');
+  });
 });
