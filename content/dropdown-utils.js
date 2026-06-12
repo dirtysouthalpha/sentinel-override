@@ -369,8 +369,6 @@ window.__sentinelUtils.dropdown = window.__sentinelUtils.dropdown || {};
         if (clickSubItems.length === 0) return null; // Submenu never appeared
       }
     }
-
-    return currentEl;
   };
 
   // ========== Is Custom Dropdown ==========

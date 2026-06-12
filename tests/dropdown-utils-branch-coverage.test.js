@@ -414,4 +414,275 @@ describe('dropdown-utils — dismissDropdown branches', () => {
     });
     expect(dd.dismissDropdown(doc)).toBe(false);
   });
+
+  test('line 435 false: skips forEach loop when openDropdowns has no forEach method', () => {
+    const doc = makeDoc({
+      querySelectorAll: () => ({ length: 2 }), // truthy length but no forEach
+      activeElement: createElement('div'),
+    });
+    expect(dd.dismissDropdown(doc)).toBe(false);
+  });
+});
+
+// ─── findDropdownOptions — doc-wide forEach FALSE (lines 139, 145, 159) ──────────
+
+describe('dropdown-utils — findDropdownOptions no-forEach NodeList (lines 139,145,159)', () => {
+  test('skips forEach at lines 139/145/159 when querySelectorAll returns no-forEach result', () => {
+    const noForEach = { length: 0 }; // no forEach method
+    const doc = makeDoc({ querySelectorAll: () => noForEach });
+    const result = dd.findDropdownOptions(doc, null);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+});
+
+// ─── findDropdownOptions — sibling no-forEach (line 172) ────────────────────────
+
+describe('dropdown-utils — findDropdownOptions sibling no-forEach (line 172)', () => {
+  test('skips addUnique at line 172 when sibling querySelectorAll returns no-forEach', () => {
+    const parent = createElement('div');
+    parent.querySelectorAll = () => ({ length: 3 }); // no forEach
+    const trigger = createElement('div');
+    trigger.parentElement = parent;
+    const doc = makeDoc({ querySelectorAll: () => ({ forEach: () => {}, length: 0 }) });
+    const result = dd.findDropdownOptions(doc, trigger);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(0);
+  });
+});
+
+// ─── findDropdownOptions — parent container no-items (line 122 false) ───────────
+
+describe('dropdown-utils — findDropdownOptions container no-items (line 122 false)', () => {
+  test('does not break at line 122 when container adds no options', () => {
+    const emptyContainer = createElement('div');
+    emptyContainer.querySelectorAll = () => ({ forEach: () => {}, length: 0 });
+    const parent = createElement('div');
+    parent.querySelectorAll = (sel) => {
+      if (sel.includes('listbox')) {
+        return { forEach: (fn) => fn(emptyContainer), length: 1 };
+      }
+      return { forEach: () => {}, length: 0 };
+    };
+    parent.parentElement = null;
+    const trigger = createElement('div');
+    trigger.parentElement = parent;
+    const doc = makeDoc({ querySelectorAll: () => ({ forEach: () => {}, length: 0 }) });
+    const result = dd.findDropdownOptions(doc, trigger);
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── selectDropdownOption — || textContent fallbacks (lines 229, 239, 246) ──────
+
+describe('dropdown-utils — selectDropdownOption textContent fallbacks (lines 229,239,246)', () => {
+  test('line 229 ||: startsWith strategy uses textContent when innerText is empty', async () => {
+    // createElement default: innerText='' (falsy) — textContent fallback fires
+    const opt = createElement('li');
+    opt.textContent = 'hello world extra';
+    const result = await dd.selectDropdownOption(makeDoc(), [opt], 'hello');
+    expect(result).toBe(opt);
+  });
+
+  test('line 239 ||: word-boundary strategy uses textContent when innerText is empty', async () => {
+    const opt = createElement('li');
+    opt.textContent = 'the quick brown fox';
+    // strategy 1: 'the quick brown fox' !== 'brown'; strategy 3: doesn't start with 'brown'
+    // strategy 4: \bbrown\b matches → fires at line 239 using textContent
+    const result = await dd.selectDropdownOption(makeDoc(), [opt], 'brown');
+    expect(result).toBe(opt);
+  });
+
+  test('line 246 ||: partial-includes strategy uses textContent when innerText is empty', async () => {
+    const opt = createElement('li');
+    opt.textContent = 'aaahellbbb'; // 'hell' between word chars — no \b boundary
+    // strategy 1/3: doesn't match; strategy 4: \bhell\b fails (no boundary); strategy 5: includes → match
+    const result = await dd.selectDropdownOption(makeDoc(), [opt], 'hell');
+    expect(result).toBe(opt);
+  });
+
+  test('line 230 second || operand: P=FALSE (no trailing space), Q=TRUE (starts with value)', async () => {
+    // P: 'hello!'.startsWith('hello ') → FALSE → right side of || evaluated (Q,R,S checked)
+    // Q: 'hello!'.startsWith('hello') → TRUE; R: length differs → FALSE; S: '!'!=' ' → FALSE
+    // strategy 3 condition FALSE → no match; strategy 4: \bhello\b matches 'hello!' → match
+    const opt = createElement('li');
+    opt.textContent = 'hello!';
+    const result = await dd.selectDropdownOption(makeDoc(), [opt], 'hello');
+    expect(result).toBe(opt);
+  });
+});
+
+// ─── traverseNestedMenu — textContent fallback (line 322) ────────────────────────
+
+describe('dropdown-utils — traverseNestedMenu textContent fallback (line 322)', () => {
+  test('matches item via textContent when innerText is empty (line 322 || branch)', async () => {
+    // createElement default: innerText='' → || textContent fires at line 322
+    const targetItem = createElement('div');
+    targetItem.textContent = 'settings';
+    const origFind = dd.findDropdownOptions;
+    dd.findDropdownOptions = () => [targetItem];
+    try {
+      const result = await dd.traverseNestedMenu(makeDoc(), ['settings']);
+      expect(result).toBe(targetItem);
+    } finally {
+      dd.findDropdownOptions = origFind;
+    }
+  });
+});
+
+// ─── _findSearchInput — container branch (lines 466-468) ─────────────────────────
+
+describe('dropdown-utils — _findSearchInput container branch (lines 466-468)', () => {
+  test('line 468 true: returns searchInput found inside container', () => {
+    const searchInput = createElement('input');
+    const container = createElement('div');
+    container.querySelector = () => searchInput;
+    const opt = createElement('li');
+    opt.closest = () => container;
+    expect(dd._findSearchInput(makeDoc(), [opt])).toBe(searchInput);
+  });
+
+  test('line 468 false: falls through when container found but no matching input', () => {
+    const container = createElement('div');
+    container.querySelector = () => null;
+    const opt = createElement('li');
+    opt.closest = () => container;
+    // doc-wide search returns empty array (iterable, yields nothing)
+    const doc = makeDoc({ querySelectorAll: () => [] });
+    expect(dd._findSearchInput(doc, [opt])).toBeNull();
+  });
+
+  test('line 466 false: closest returns null → skips container block, falls through', () => {
+    // Default createElement has closest: () => null
+    const opt = createElement('li');
+    const doc = makeDoc({ querySelectorAll: () => [] });
+    expect(dd._findSearchInput(doc, [opt])).toBeNull();
+  });
+});
+
+// ─── selectDropdownOption — || '' final fallback (lines 229, 239, 246) ──────────
+
+describe('dropdown-utils — selectDropdownOption empty-text option covers || "" branches', () => {
+  test('emptyOpt with both innerText="" and textContent="" goes through all 5 strategies', async () => {
+    // emptyOpt: both innerText and textContent are '' → || '' fires in each strategy loop
+    // matchOpt only matches via strategy 5 (partial includes — no word boundary in 'aaahellbbb')
+    // so emptyOpt is iterated in all 5 strategy loops before matchOpt is matched in strategy 5
+    const emptyOpt = createElement('li'); // innerText='', textContent=''
+    const matchOpt = createElement('li');
+    matchOpt.textContent = 'aaahellbbb';
+    const result = await dd.selectDropdownOption(makeDoc(), [emptyOpt, matchOpt], 'hell');
+    expect(result).toBe(matchOpt);
+  });
+});
+
+// ─── traverseNestedMenu — || '' and includes() branches (lines 322-323) ─────────
+
+describe('dropdown-utils — traverseNestedMenu empty item + partial match (lines 322-323)', () => {
+  test('empty item covers || "" at line 322; partial-text item covers includes branch at line 323', async () => {
+    // emptyItem: itemText='', '' !== 'sett', ''.includes('sett') → false — covers || '' at 322
+    // partialItem: textContent='settings', 'settings' !== 'sett', 'settings'.includes('sett') → true — covers includes at 323
+    const emptyItem = createElement('div');
+    const partialItem = createElement('div');
+    partialItem.textContent = 'settings';
+    const origFind = dd.findDropdownOptions;
+    dd.findDropdownOptions = () => [emptyItem, partialItem];
+    try {
+      const result = await dd.traverseNestedMenu(makeDoc(), ['sett']);
+      expect(result).toBe(partialItem);
+    } finally {
+      dd.findDropdownOptions = origFind;
+    }
+  });
+});
+
+// ─── selectDropdownOption — large-list nativeSetter branch (lines 254-264) ──────
+
+describe('dropdown-utils — large-list search strategy nativeSetter (lines 254-264)', () => {
+  let origHTMLInputElement;
+
+  beforeAll(() => {
+    origHTMLInputElement = globalThis.HTMLInputElement;
+    class MockInput {
+      get value() { return this._val || ''; }
+      set value(v) { this._val = v; }
+    }
+    globalThis.HTMLInputElement = MockInput;
+  });
+
+  afterAll(() => {
+    globalThis.HTMLInputElement = origHTMLInputElement;
+  });
+
+  test('nativeSetter TRUE branch: types chars via nativeSetter when HTMLInputElement has value.set', async () => {
+    // 50 non-matching options trigger the large-list search path
+    const opts = Array.from({ length: 50 }, (_, i) => createElement('li', { innerText: `opt-${i}` }));
+    const searchInput = createElement('input');
+    searchInput.tagName = 'INPUT';
+    searchInput.focus = () => {};
+
+    const origFindSearch = dd._findSearchInput;
+    dd._findSearchInput = () => searchInput;
+
+    const filteredOpt = createElement('li', { innerText: 'target' });
+    const origFindOpts = dd.findDropdownOptions;
+    // line 273 calls dd.findDropdownOptions for filtered results — return the match
+    dd.findDropdownOptions = () => [filteredOpt];
+
+    try {
+      const result = await dd.selectDropdownOption(makeDoc(), opts, 'target');
+      expect(result).toBe(filteredOpt);
+    } finally {
+      dd._findSearchInput = origFindSearch;
+      dd.findDropdownOptions = origFindOpts;
+    }
+  });
+
+  test('nativeSetter FALSE branch: falls back to direct value assignment when no setter', async () => {
+    const savedHTMLInputElement = globalThis.HTMLInputElement;
+    // Override with plain object prototype (no getter/setter → no descriptor → nativeSetter is falsy)
+    globalThis.HTMLInputElement = { prototype: {} };
+
+    const opts = Array.from({ length: 50 }, (_, i) => createElement('li', { innerText: `item-${i}` }));
+    const searchInput = createElement('input');
+    searchInput.tagName = 'INPUT';
+    searchInput.focus = () => {};
+
+    const origFindSearch = dd._findSearchInput;
+    dd._findSearchInput = () => searchInput;
+    const filteredOpt = createElement('li', { innerText: 'needle' });
+    const origFindOpts = dd.findDropdownOptions;
+    dd.findDropdownOptions = () => [filteredOpt];
+
+    try {
+      const result = await dd.selectDropdownOption(makeDoc(), opts, 'needle');
+      expect(result).toBe(filteredOpt);
+    } finally {
+      dd._findSearchInput = origFindSearch;
+      dd.findDropdownOptions = origFindOpts;
+      globalThis.HTMLInputElement = savedHTMLInputElement;
+    }
+  });
+
+  test('line 276 || includes: filtered option matched via includes when === fails', async () => {
+    // filteredOpt.innerText='x-needle-x' — 'x-needle-x' !== 'needle' but includes('needle')
+    // covers the second operand of `optText === valueLower || optText.includes(valueLower)` at line 276
+    const opts = Array.from({ length: 50 }, (_, i) => createElement('li', { innerText: `item-${i}` }));
+    const searchInput = createElement('input');
+    searchInput.tagName = 'INPUT';
+    searchInput.focus = () => {};
+
+    const filteredOpt = createElement('li', { innerText: 'x-needle-x' });
+    const origFindSearch = dd._findSearchInput;
+    dd._findSearchInput = () => searchInput;
+    const origFindOpts = dd.findDropdownOptions;
+    dd.findDropdownOptions = () => [filteredOpt];
+
+    try {
+      const result = await dd.selectDropdownOption(makeDoc(), opts, 'needle');
+      expect(result).toBe(filteredOpt);
+    } finally {
+      dd._findSearchInput = origFindSearch;
+      dd.findDropdownOptions = origFindOpts;
+    }
+  });
 });
