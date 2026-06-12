@@ -486,6 +486,13 @@ describe('getRelevantPatterns', () => {
     const result = await getRelevantPatterns('search query words');
     expect(result.length).toBeLessThanOrEqual(3);
   });
+
+  test('catch block fires when stored patterns is non-array truthy (L2659)', async () => {
+    // 'corrupted'.filter is not a function → outer catch → returns []
+    _storageData = { learned_patterns: 'corrupted' };
+    const result = await getRelevantPatterns('test query words');
+    expect(result).toEqual([]);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════
