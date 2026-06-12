@@ -291,3 +291,69 @@ describe('showToast', () => {
     expect(stillPresent).toBeFalsy();
   });
 });
+
+describe('hasLastError and _getLastErrorMessage', () => {
+  let sandbox;
+
+  function createChromeSandbox() {
+    const { document, DOMParser: LinkedomDOMParser, HTMLElement, Node } = parseHTML(
+      '<!DOCTYPE html><html><body></body></html>'
+    );
+    const sb = {
+      window: {},
+      console,
+      JSON,
+      Error,
+      TypeError,
+      URL,
+      DOMParser: LinkedomDOMParser,
+      Node,
+      HTMLElement,
+      setTimeout: () => {},
+      clearTimeout: () => {},
+      document,
+      marked: { setOptions() {} },
+      chrome: {
+        runtime: { lastError: null },
+      },
+    };
+    sb.window = sb;
+    return sb;
+  }
+
+  beforeEach(() => {
+    sandbox = createChromeSandbox();
+    loadModule(sandbox);
+  });
+
+  test('hasLastError returns false when lastError is null', () => {
+    sandbox.chrome.runtime.lastError = null;
+    expect(sandbox.hasLastError()).toBe(false);
+  });
+
+  test('hasLastError returns false when lastError is undefined', () => {
+    sandbox.chrome.runtime.lastError = undefined;
+    expect(sandbox.hasLastError()).toBe(false);
+  });
+
+  test('hasLastError returns truthy when lastError is an object', () => {
+    sandbox.chrome.runtime.lastError = { message: 'Storage error' };
+    expect(sandbox.hasLastError()).toBeTruthy();
+  });
+
+  test('_getLastErrorMessage returns empty string when no error', () => {
+    sandbox.chrome.runtime.lastError = null;
+    expect(sandbox._getLastErrorMessage()).toBe('');
+  });
+
+  test('_getLastErrorMessage returns message string from lastError.message', () => {
+    sandbox.chrome.runtime.lastError = { message: 'Quota exceeded' };
+    expect(sandbox._getLastErrorMessage()).toBe('Quota exceeded');
+  });
+
+  test('_getLastErrorMessage falls back to String() when no message property', () => {
+    sandbox.chrome.runtime.lastError = 'plain string error';
+    // typeof 'string' !== 'object', so hasLastError returns false → returns ''
+    expect(sandbox._getLastErrorMessage()).toBe('');
+  });
+});
