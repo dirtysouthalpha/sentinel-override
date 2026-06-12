@@ -595,3 +595,100 @@ describe('monitorCanary rollback branches', () => {
     delete globalThis.window;
   });
 });
+
+// ── Branch coverage for uncovered paths ──────────────────────────────────────
+
+describe('identifyBottlenecks high-severity branches', () => {
+  test('apiCallCount > 100 produces severity "high"', () => {
+    const analysis = analyzeArchitecture({
+      apiCallCount: 150, stepCount: 0, memoryUsage: 0, failures: 0,
+      plan: null, history: null, memory: {}
+    });
+    const b = analysis.bottlenecks.find(b => b.type === 'api_calls');
+    expect(b).toBeDefined();
+    expect(b.severity).toBe('high');
+  });
+
+  test('stepCount > 50 produces severity "high"', () => {
+    const analysis = analyzeArchitecture({
+      apiCallCount: 0, stepCount: 60, memoryUsage: 0, failures: 0,
+      plan: null, history: null, memory: {}
+    });
+    const b = analysis.bottlenecks.find(b => b.type === 'step_count');
+    expect(b).toBeDefined();
+    expect(b.severity).toBe('high');
+  });
+});
+
+describe('calculatePlanComplexity plan without steps property', () => {
+  test('returns 0 when plan has no steps array', () => {
+    const analysis = analyzeArchitecture({
+      plan: { name: 'empty' }, // no .steps
+      history: null, memory: {},
+      memoryUsage: 0, apiCallCount: 0, stepCount: 0, failures: 0
+    });
+    expect(analysis.complexity.planComplexity).toBe(0);
+  });
+});
+
+describe('evaluateCanaryHealth degraded/warning/healthy status branches', () => {
+  beforeEach(() => stopCanaryDeployment(false));
+
+  test('health status is "degraded" when errorRate > baseline * 1.5 but below rollback threshold', () => {
+    // Baseline: 0 failures → avgBaselineError = 0
+    // Sample: 1/20 failures = 0.05 > 0 * 1.5 = 0 → 'degraded'
+    // NOT rollback: 0.05 NOT > 0 + 0.1 (threshold)
+    startCanaryDeployment({ type: 'degraded_test' });
+    for (let i = 0; i < 5; i++) {
+      monitorCanary({ stepCount: 20, failures: 0, totalTime: 1000, memoryUsage: 50 });
+    }
+    const result = monitorCanary({ stepCount: 20, failures: 1, totalTime: 1000, memoryUsage: 50 });
+    expect(result.status).toBe('active');
+    expect(result.health).toBe('degraded');
+  });
+
+  test('health status is "warning" when errorRate > baseline but ≤ baseline * 1.5', () => {
+    // Baseline: 2/10 = 0.2. Sample: 3/10 = 0.3
+    // Rollback check: 0.3 > 0.2 + 0.1 = 0.3? NO (not strictly >)
+    // Degraded check: 0.3 > 0.2 * 1.5 = 0.3? NO (not strictly >)
+    // Warning: 0.3 > 0.2? YES → 'warning'
+    startCanaryDeployment({ type: 'warning_test' });
+    for (let i = 0; i < 5; i++) {
+      monitorCanary({ stepCount: 10, failures: 2, totalTime: 1000, memoryUsage: 50 });
+    }
+    const result = monitorCanary({ stepCount: 10, failures: 3, totalTime: 1000, memoryUsage: 50 });
+    expect(result.status).toBe('active');
+    expect(result.health).toBe('warning');
+  });
+
+  test('health status is "healthy" when no anomalies detected', () => {
+    startCanaryDeployment({ type: 'healthy_test' });
+    for (let i = 0; i < 5; i++) {
+      monitorCanary({ stepCount: 10, failures: 0, totalTime: 1000, memoryUsage: 50 });
+    }
+    const result = monitorCanary({ stepCount: 10, failures: 0, totalTime: 1000, memoryUsage: 50 });
+    expect(result.health).toBe('healthy');
+    expect(result.status).toBe('active');
+  });
+});
+
+describe('runGeneticAlgorithm with provided initialPopulation', () => {
+  test('uses provided initialPopulation instead of generating one', () => {
+    const geneSpace = { x: { min: 0, max: 1 }, y: { min: 0, max: 1 } };
+    const initialPopulation = [
+      { x: 0.5, y: 0.5 },
+      { x: 0.1, y: 0.9 },
+      { x: 0.8, y: 0.2 },
+    ];
+    const result = runGeneticAlgorithm({
+      populationSize: 3,
+      generations: 2,
+      fitnessFunction: (ind) => ind.x + ind.y,
+      geneSpace,
+      initialPopulation
+    });
+    expect(result.bestIndividual).toBeDefined();
+    expect(result.history.length).toBe(2);
+    expect(result.bestFitness).toBeGreaterThanOrEqual(0);
+  });
+});
