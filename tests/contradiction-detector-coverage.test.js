@@ -209,3 +209,55 @@ describe('clearContradictionLog — with populated log', () => {
     expect(log.length).toBe(0);
   });
 });
+
+// ── findTemporalContradictions: push + break (lines 111, 117) ────────────────
+
+describe('findTemporalContradictions — before+after in same sentence (lines 111, 117)', () => {
+  test('sentence containing both a before-word and an after-word triggers temporal contradiction', () => {
+    // "before" is in markerGroup[0].before, "after" is in markerGroup[0].after
+    // Both appear in the same sentence → contradictions.push() (line 111) and break (line 117)
+    const text = 'The task was completed before the deadline, but after the review it was flagged.';
+    const result = analyzeForContradictions(text);
+    const temporal = result.contradictions.filter(c => c.type === 'temporal');
+    expect(temporal.length).toBeGreaterThan(0);
+    expect(temporal[0].markers).toContain('before');
+    expect(temporal[0].markers).toContain('after');
+    expect(temporal[0].severity).toBe('medium');
+  });
+
+  test('sentence with "previously" and "not yet" triggers temporal group 2', () => {
+    // "previously" is in markerGroup[1].before, "not yet" is in markerGroup[1].after
+    const text = 'The system was previously configured but is not yet fully deployed.';
+    const result = analyzeForContradictions(text);
+    const temporal = result.contradictions.filter(c => c.type === 'temporal');
+    expect(temporal.length).toBeGreaterThan(0);
+    expect(temporal[0].markers).toContain('previously');
+    expect(temporal[0].markers).toContain('not yet');
+  });
+});
+
+// ── areContradictoryStatements: same negation state → return false (line 378) ─
+
+describe('areContradictoryStatements — same negation state falls through to return false (line 378)', () => {
+  test('same subject and verb but both objects without negation → no cross-response contradiction', () => {
+    // stmt1: "The server is running fine" — obj: "running fine", no negation
+    // stmt2: "The server is working properly" — obj: "working properly", no negation
+    // hasNegation1 === hasNegation2 (both false) → skips the if block → return false (line 378)
+    const result = compareResponsesForContradictions(
+      'The server is running fine.',
+      'The server is working properly.'
+    );
+    expect(result.crossResponseContradictions.length).toBe(0);
+  });
+
+  test('same subject and verb but both objects with negation → no cross-response contradiction', () => {
+    // stmt1: "The service is not ready" — obj: "not ready", hasNegation=true
+    // stmt2: "The service is not available" — obj: "not available", hasNegation=true
+    // hasNegation1 === hasNegation2 (both true) → cleanObj check skipped → return false (line 378)
+    const result = compareResponsesForContradictions(
+      'The service is not ready for deployment.',
+      'The service is not available right now.'
+    );
+    expect(result.crossResponseContradictions.length).toBe(0);
+  });
+});
