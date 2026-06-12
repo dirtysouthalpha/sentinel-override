@@ -866,6 +866,22 @@ describe('runCommandInFrame', () => {
     expect(result.error).toContain('blocked by overlay');
   });
 
+  test('type with dismissible overlay awaits setTimeout then continues (line 260)', async () => {
+    const el = {
+      tagName: 'INPUT',
+      value: '',
+      scrollIntoView: jest.fn(),
+      focus: jest.fn(),
+      dispatchEvent: jest.fn(),
+    };
+    mockDom.findElementBySelector.mockReturnValue(el);
+    mockOv.isOverlayBlocking.mockReturnValue({ id: 'modal1' });
+    mockOv.dismissOverlay.mockReturnValue(true); // overlay dismissed
+    const result = await runCmd({ type: 'type', selector: '#input', text: 'hi' });
+    expect(result.ok).toBe(true);
+    expect(mockOv.dismissOverlay).toHaveBeenCalled();
+  });
+
   test('type uses native setter when available', async () => {
     const setter = jest.fn();
     const proto = {};
@@ -971,6 +987,33 @@ describe('runCommandInFrame', () => {
       if (sel === 'main') return mainEl;
       return null;
     });
+    const result = await runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+  });
+
+  test('read_page handles querySelectorAll throw on main clone (lines 358-360)', async () => {
+    const mainEl = {
+      cloneNode: jest.fn(() => ({
+        innerText: 'Main content '.repeat(20),
+        textContent: '',
+        querySelectorAll: jest.fn(() => { throw new Error('querySelectorAll blew up'); }),
+        remove: jest.fn(),
+      })),
+    };
+    mockDoc.querySelector.mockReturnValue(mainEl);
+    const result = await runCmd({ type: 'read_page' });
+    expect(result.ok).toBe(true);
+  });
+
+  test('read_page handles querySelectorAll throw on body clone (lines 368-370)', async () => {
+    // No main element → falls through to body path
+    mockDoc.querySelector.mockReturnValue(null);
+    mockDoc.body = {
+      cloneNode: jest.fn(() => ({
+        querySelectorAll: jest.fn(() => { throw new Error('body cleanup blew up'); }),
+        innerText: 'Some body content',
+      })),
+    };
     const result = await runCmd({ type: 'read_page' });
     expect(result.ok).toBe(true);
   });
