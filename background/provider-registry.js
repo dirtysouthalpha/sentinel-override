@@ -97,9 +97,14 @@ function _makeOpenRouterFreeProvider(id, name, defaultModel) {
       const msg = choice.message;
       if (msg?.tool_calls && msg.tool_calls.length > 0) {
         const tc = msg.tool_calls[0];
-        const args = typeof tc.function?.arguments === 'string'
-          ? JSON.parse(tc.function.arguments)
-          : tc.function?.arguments || {};
+        let args;
+        try {
+          args = typeof tc.function?.arguments === 'string'
+            ? JSON.parse(tc.function.arguments)
+            : tc.function?.arguments || {};
+        } catch (_e) {
+          args = {};
+        }
         return { type: tc.function.name, ...args };
       }
       return null;

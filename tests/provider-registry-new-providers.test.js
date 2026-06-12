@@ -175,6 +175,20 @@ describe('new providers — parseToolUseResponse', () => {
       expect(() => PROVIDERS[id].parseToolUseResponse({ choices: [] }))
         .toThrow(/no choices/i);
     });
+
+    test(`${id}.parseToolUseResponse handles malformed JSON arguments gracefully`, () => {
+      const data = {
+        choices: [{
+          message: {
+            tool_calls: [{
+              function: { name: 'click', arguments: '{not valid json' }
+            }]
+          }
+        }]
+      };
+      const result = PROVIDERS[id].parseToolUseResponse(data);
+      expect(result.type).toBe('click');
+    });
   }
 });
 
