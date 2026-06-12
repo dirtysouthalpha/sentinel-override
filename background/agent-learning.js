@@ -137,7 +137,7 @@ export function findOneShotPlaybook(goal, platform) {
   for (const playbook of _autoPlaybooks) {
     if (playbook.platform !== platform) continue;
     // Check if the goal matches the playbook's trigger patterns
-    const matches = playbook.triggerPatterns.some(p => goalLower.includes(p.toLowerCase()));
+    const matches = (playbook.triggerPatterns || []).some(p => goalLower.includes(p.toLowerCase()));
     if (matches && playbook.runCount >= 3 && playbook.successRate >= 0.8) {
       return playbook.steps;
     }
