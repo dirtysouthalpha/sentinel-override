@@ -262,7 +262,7 @@ describe('wait.checkCondition — edge cases', () => {
     expect(wait.checkCondition({ type: 'wait_for_text', text: undefined })).toBe(false);
   });
 
-  test('returns false for wait_for_text when condition.text is empty string', () => {
+  test('returns false for wait_for_text when condition.text is empty string (placeholder)', () => {
     // Empty string would match everything via includes(''), but we treat it as no condition
     expect(wait.checkCondition({ type: 'wait_for_text', text: '' })).toBe(false);
   });
@@ -358,5 +358,21 @@ describe('wait.checkCondition — shadow DOM fallback', () => {
     expect(querySelectorSpy).not.toHaveBeenCalledWith(undefined);
     globalThis.window.__sentinelUtils.dom = origDom;
     globalThis.document.querySelector = () => null;
+  });
+});
+
+// ========== handleWaitFor catch block (line 73) ==========
+
+describe('wait.handleWaitFor — catch block (line 73)', () => {
+  test('resolves with error message when MutationObserver constructor throws (line 73)', async () => {
+    const OrigMO = globalThis.MutationObserver;
+    globalThis.MutationObserver = class {
+      constructor() { throw new Error('MO constructor failed'); }
+    };
+
+    const result = await wait.handleWaitFor({ type: 'wait_for_text', text: 'NotPresent' });
+    expect(result).toMatch(/Error during condition check: MO constructor failed/);
+
+    globalThis.MutationObserver = OrigMO;
   });
 });
