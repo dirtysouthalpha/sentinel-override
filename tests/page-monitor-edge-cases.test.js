@@ -318,6 +318,145 @@ describe('page-monitor — edge cases and race conditions', () => {
     });
   });
 
+  describe(':contains() injected function logic', () => {
+    function runInjected(func, args, mockDoc) {
+      const origDoc = globalThis.document;
+      globalThis.document = mockDoc;
+      let result;
+      try {
+        result = func(...args);
+      } finally {
+        if (origDoc !== undefined) globalThis.document = origDoc;
+        else delete globalThis.document;
+      }
+      return result;
+    }
+
+    function makeExecuteScriptCapture(mockDoc) {
+      return jest.fn(async ({ func, args }) => {
+        const result = runInjected(func, args, mockDoc);
+        return [{ result }];
+      });
+    }
+
+    test(':contains() finds first matching leaf element (case-insensitive)', async () => {
+      const monitor = await createMonitor('https://example.com', "*:contains('hello')", 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [
+          { children: { length: 1 }, textContent: 'parent node' },
+          { children: { length: 0 }, textContent: 'hello world' },
+          { children: { length: 0 }, textContent: 'other text' },
+        ],
+        querySelector: () => null,
+        body: { textContent: 'body' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('hello world');
+    });
+
+    test(':contains() is case-insensitive', async () => {
+      const monitor = await createMonitor('https://example.com', "*:contains('WORLD')", 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [
+          { children: { length: 0 }, textContent: 'hello world' },
+        ],
+        querySelector: () => null,
+        body: { textContent: '' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('hello world');
+    });
+
+    test(':contains() returns empty string when no leaf matches', async () => {
+      const monitor = await createMonitor('https://example.com', "*:contains('missing')", 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [
+          { children: { length: 0 }, textContent: 'other text' },
+          { children: { length: 0 }, textContent: 'nothing here' },
+        ],
+        querySelector: () => null,
+        body: { textContent: 'body fallback' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('');
+    });
+
+    test(':contains() skips non-leaf elements', async () => {
+      const monitor = await createMonitor('https://example.com', "*:contains('target')", 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [
+          { children: { length: 2 }, textContent: 'target in parent' },
+          { children: { length: 0 }, textContent: 'target in leaf' },
+        ],
+        querySelector: () => null,
+        body: { textContent: '' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('target in leaf');
+    });
+
+    test('normal CSS selector returns element text via querySelector', async () => {
+      const monitor = await createMonitor('https://example.com', '#content', 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [],
+        querySelector: () => ({ textContent: '  page content  ' }),
+        body: { textContent: 'body' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('page content');
+    });
+
+    test('invalid CSS selector falls back to body text', async () => {
+      const monitor = await createMonitor('https://example.com', '###invalid', 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [],
+        querySelector: () => { throw new Error('SyntaxError: invalid selector'); },
+        body: { textContent: 'page body fallback content' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('page body fallback content');
+    });
+
+    test('querySelector returning null returns empty string', async () => {
+      const monitor = await createMonitor('https://example.com', '.notfound', 'Test');
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        body: { textContent: 'body' },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toBe('');
+    });
+
+    test('body.textContent is truncated to 500 chars on invalid selector', async () => {
+      const monitor = await createMonitor('https://example.com', '####', 'Test');
+      const longBody = 'x'.repeat(1000);
+      chrome.tabs.query.mockResolvedValue([{ id: 1 }]);
+      chrome.scripting.executeScript = makeExecuteScriptCapture({
+        querySelectorAll: () => [],
+        querySelector: () => { throw new Error('bad selector'); },
+        body: { textContent: longBody },
+      });
+
+      const result = await checkMonitor(monitor);
+      expect(result.content).toHaveLength(500);
+    });
+  });
+
   describe('data consistency', () => {
     test('handles toggle on non-existent monitor', async () => {
       await toggleMonitor('non-existent-id', true);

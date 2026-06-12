@@ -145,7 +145,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.runtime.sendMessage({
       action: 'context_menu_monitor_changes',
       params: {
-        selector: params.selectionText ? `*:contains('${String(params.selectionText || '').substring(0, 50)}')` : 'body',
+        selector: params.selectionText ? `*:contains('${String(params.selectionText || '').substring(0, 50).replace(/'/g, "\\'")}')` : 'body',
         label: params.selectionText ? `Monitor: "${String(params.selectionText || '').substring(0, 30)}"` : 'Page Monitor',
         url: params.pageUrl,
       },

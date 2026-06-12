@@ -158,8 +158,25 @@ export async function checkMonitor(monitor) {
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: (selector) => {
-        const el = document.querySelector(selector);
-        return el ? el.textContent.trim() : '';
+        // Handle :contains() pseudo-selectors (jQuery-style, not native CSS).
+        // Extract the text and scan elements manually.
+        const containsMatch = selector.match(/^[^:]*:contains\(['"]([^'"]*)['"]\)$/i);
+        if (containsMatch) {
+          const text = containsMatch[1].toLowerCase();
+          const all = document.querySelectorAll('*');
+          for (let i = 0; i < all.length; i++) {
+            if (all[i].children.length === 0 && all[i].textContent.toLowerCase().includes(text)) {
+              return all[i].textContent.trim();
+            }
+          }
+          return '';
+        }
+        try {
+          const el = document.querySelector(selector);
+          return el ? el.textContent.trim() : '';
+        } catch (_) {
+          return document.body ? document.body.textContent.trim().substring(0, 500) : '';
+        }
       },
       args: [monitor.selector],
     });
