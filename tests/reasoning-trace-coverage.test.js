@@ -292,4 +292,32 @@ describe('reasoning-trace — additional branch coverage', () => {
     await captured[1].cb();
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
   });
+
+  test('captureReasoningStep warns when _traceCache entry evicted mid-run (covers L95-96)', async () => {
+    const warns = [];
+    const origWarn = console.warn;
+    console.warn = (...args) => warns.push(args.join(' '));
+
+    await initReasoningTrace({ goal: 'cache-eviction-test' });
+    // _currentRunId is now set and _traceCache has the entry.
+    // Simulate cache eviction by making Map.prototype.get return undefined once for
+    // the run_ key, which is what _traceCache.get(_currentRunId) produces in captureReasoningStep.
+    const origGet = Map.prototype.get;
+    Map.prototype.get = function(key) {
+      if (typeof key === 'string' && key.startsWith('run_')) {
+        Map.prototype.get = origGet; // self-destruct after first interception
+        return undefined;            // simulate evicted cache entry
+      }
+      return origGet.call(this, key);
+    };
+
+    try {
+      await captureReasoningStep('plan', 'input', {});
+    } finally {
+      Map.prototype.get = origGet;
+      console.warn = origWarn;
+    }
+
+    expect(warns.some(w => w.includes('No active reasoning trace'))).toBe(true);
+  });
 });

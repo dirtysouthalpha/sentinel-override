@@ -317,4 +317,26 @@ describe('importTemplates', () => {
     const result = await importTemplates('not an array');
     expect(result).toEqual({ imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] });
   });
+
+  test('skips null element in array with "Invalid template" reason (covers L197-199)', async () => {
+    const result = await importTemplates([null]);
+    expect(result.skipped).toBe(1);
+    expect(result.results[0].action).toBe('skipped');
+    expect(result.results[0].reason).toContain('Invalid template');
+    expect(result.results[0].name).toBe('(unknown)');
+  });
+
+  test('skips template with missing name field (covers L197-199)', async () => {
+    const result = await importTemplates([{ goal: 'some goal', params: [] }]);
+    expect(result.skipped).toBe(1);
+    expect(result.results[0].action).toBe('skipped');
+    expect(result.results[0].reason).toContain('Invalid template');
+  });
+
+  test('skips template with non-string name (covers L197-199)', async () => {
+    const result = await importTemplates([{ name: 42, goal: 'some goal' }]);
+    expect(result.skipped).toBe(1);
+    expect(result.results[0].action).toBe('skipped');
+    expect(result.results[0].reason).toContain('Invalid template');
+  });
 });

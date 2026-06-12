@@ -271,4 +271,17 @@ describe('quick-assist-handler edge cases', () => {
       await expect(handleQuickAssist('test')).rejects.toThrow();
     });
   });
+
+  describe('null response body (covers L66)', () => {
+    test('throws when response.json() returns null', async () => {
+      globalThis.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => null,
+      });
+
+      await expect(handleQuickAssist('test')).rejects.toThrow(
+        'Quick Assist API returned null response body'
+      );
+    });
+  });
 });
