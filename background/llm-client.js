@@ -301,7 +301,7 @@ export function getMultiArticleDirective(goal) {
   // Try to extract N if present
   const m = goal.match(ARTICLE_GOAL_RE);
   const parsedN = m ? parseInt(m[1], 10) : 0;
-  const n = (Number.isNaN(parsedN) || parsedN < 0) ? 0 : parsedN;
+  const n = parsedN;
   const nLabel = (n > 0) ? n : 'N';
 
   return `
@@ -1506,9 +1506,6 @@ export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   let rates = [3.00, 15.00]; // default: Sonnet-class
   for (const [key, r] of _PRICING_SORTED) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
-  }
-  if (!rates || !Array.isArray(rates) || typeof rates.length !== 'number' || rates.length < 2) {
-    rates = [3.00, 15.00]; // fallback to default if pricing lookup fails
   }
   return ((inputTokens || 0) * (rates[0] || 0) + (outputTokens || 0) * (rates[1] || 0)) / 1_000_000;
 }

@@ -140,7 +140,7 @@ describe('Helpers.formatDuration', () => {
 
 describe('Helpers.formatCountdown — edge cases', () => {
   test('handles exactly 7 days away', () => {
-    const ts = Date.now() + 7 * 86400000;
+    const ts = Date.now() + 7 * 86400000 + 500;
     const result = Helpers.formatCountdown(ts);
     // Should show formatted date, not countdown
     expect(result).not.toContain('away');

@@ -38,6 +38,7 @@ import {
   extractFirstJsonObject,
   supportsVision,
   resetLLMRateLimiter,
+  getRelevantPatterns,
 } from '../background/llm-client.js';
 
 beforeEach(() => {
@@ -414,6 +415,76 @@ describe('extractFirstJsonObject — edge cases', () => {
     const input = '{"type": "smart_navigate", "url": "https://example.com"}';
     const result = extractFirstJsonObject(input);
     expect(result).toBeTruthy();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// getRelevantPatterns — branch coverage
+// ══════════════════════════════════════════════════════════════════
+describe('getRelevantPatterns', () => {
+  test('returns [] for null goal (b484[0] true branch)', async () => {
+    expect(await getRelevantPatterns(null)).toEqual([]);
+  });
+
+  test('returns [] for non-string goal (b484[0] true branch)', async () => {
+    expect(await getRelevantPatterns(42)).toEqual([]);
+  });
+
+  test('returns [] for undefined goal', async () => {
+    expect(await getRelevantPatterns(undefined)).toEqual([]);
+  });
+
+  test('returns [] when no patterns stored', async () => {
+    _storageData = { learned_patterns: [] };
+    expect(await getRelevantPatterns('find the button')).toEqual([]);
+  });
+
+  test('returns [] when stored patterns have no successful entries', async () => {
+    _storageData = { learned_patterns: [{ goal: 'click the search button', success: false }] };
+    expect(await getRelevantPatterns('search for something')).toEqual([]);
+  });
+
+  test('returns matched patterns sorted by score', async () => {
+    _storageData = {
+      learned_patterns: [
+        { goal: 'click the search button', success: true },
+        { goal: 'type into the search field', success: true },
+        { goal: 'navigate to home page', success: true },
+      ],
+    };
+    const result = await getRelevantPatterns('search results');
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.every(p => p.goal.includes('search'))).toBe(true);
+  });
+
+  test('null pattern goal takes ternary false path — pGoalLower = "" (b487[1])', async () => {
+    _storageData = {
+      learned_patterns: [
+        { goal: null, success: true },
+        { goal: undefined, success: true },
+      ],
+    };
+    // null/undefined goal → ternary false → pGoalLower = '' → score 0 → filtered out
+    const result = await getRelevantPatterns('test query words');
+    expect(result).toEqual([]);
+  });
+
+  test('numeric pattern goal takes ternary false path (b487[1])', async () => {
+    _storageData = { learned_patterns: [{ goal: 12345, success: true }] };
+    // typeof 12345 !== 'string' → false branch → pGoalLower = ''
+    const result = await getRelevantPatterns('test query words');
+    expect(result).toEqual([]);
+  });
+
+  test('returns at most 3 patterns', async () => {
+    _storageData = {
+      learned_patterns: Array.from({ length: 6 }, (_, i) => ({
+        goal: `search query words step ${i}`,
+        success: true,
+      })),
+    };
+    const result = await getRelevantPatterns('search query words');
+    expect(result.length).toBeLessThanOrEqual(3);
   });
 });
 
