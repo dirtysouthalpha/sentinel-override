@@ -312,8 +312,11 @@ export async function getBiasStatistics() {
   let maxTypeCount = 0;
 
   for (const entry of log) {
-    // Count by severity
-    stats.bySeverity[getSeverityLabel(entry.severity).toLowerCase()]++;
+    // Count by severity — only increment known severity keys
+    const sevKey = getSeverityLabel(entry.severity).toLowerCase();
+    if (sevKey in stats.bySeverity) {
+      stats.bySeverity[sevKey]++;
+    }
 
     // Count by bias type
     if (!Array.isArray(entry.biases)) continue;

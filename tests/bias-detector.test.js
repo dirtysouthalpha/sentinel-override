@@ -283,3 +283,17 @@ describe('storage error paths', () => {
     await expect(clearBiasLog()).resolves.not.toThrow();
   });
 });
+
+describe('getBiasStatistics — unknown severity does not pollute bySeverity', () => {
+  beforeEach(async () => { await clearBiasLog(); });
+
+  test('entry with unknown numeric severity is silently ignored in bySeverity', async () => {
+    // severity 99 maps to getSeverityLabel → 'Unknown' → 'unknown', not a key in bySeverity
+    const analysis = { hasBias: true, biases: [{ type: 'confirmationBias', severity: 1 }], severity: 99, totalBiasScore: 1 };
+    await logBiasDetection(analysis, 0);
+    const stats = await getBiasStatistics();
+    expect(Object.keys(stats.bySeverity)).toEqual(['none', 'low', 'medium', 'high']);
+    expect(stats.bySeverity.none).toBe(0);
+    expect(stats.bySeverity.low).toBe(0);
+  });
+});
