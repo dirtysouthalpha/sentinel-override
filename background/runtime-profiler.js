@@ -93,7 +93,8 @@ export function takeProfilingSample() {
   // Circular buffer: overwrite old samples instead of shifting
   if (profilerState.samples.length < profilerState.maxSamples) {
     profilerState.samples.push(sample);
-    profilerState.sampleIndex = profilerState.samples.length;
+    // % maxSamples so that when the buffer just became full, index wraps to 0
+    profilerState.sampleIndex = profilerState.samples.length % profilerState.maxSamples;
   } else {
     profilerState.samples[profilerState.sampleIndex] = sample;
     profilerState.sampleIndex = (profilerState.sampleIndex + 1) % profilerState.maxSamples;
