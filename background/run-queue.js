@@ -45,12 +45,13 @@ export function completeRun(tabId, result) {
   const run = runQueue.active.get(tabId);
   if (!run) return;
 
+  const r = result || {};
   const completed = {
     goal: run.goal,
     tabId,
-    status: result.error ? 'failed' : 'completed',
+    status: r.error ? 'failed' : 'completed',
     duration: Date.now() - run.startTime,
-    result: result.summary || '',
+    result: r.summary || '',
     timestamp: Date.now()
   };
 
