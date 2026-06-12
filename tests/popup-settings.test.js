@@ -462,3 +462,92 @@ describe('settings.js — provider save status indicator', () => {
     expect(statusEl.style.display).toBe('none');
   });
 });
+
+describe('settings.js — loadSettings', () => {
+  test('populates state from new provider structure', () => {
+    const sb = createSandbox();
+    const state = { providerConfigs: {}, activeProviderId: 'openai' };
+    sb.getState = () => state;
+    sb.chrome.storage.local.get = (_keys, cb) => cb({
+      active_provider: 'anthropic',
+      providers: { anthropic: { api_key: 'sk-ant', model: 'claude-haiku-4-5-20251001' } },
+    });
+    loadModule(sb);
+    sb.loadSettings();
+    expect(state.activeProviderId).toBe('anthropic');
+    expect(state.providerConfigs.anthropic.api_key).toBe('sk-ant');
+  });
+
+  test('uses legacy fallback when providers is absent (anthropic endpoint)', () => {
+    const sb = createSandbox();
+    const state = { providerConfigs: {}, activeProviderId: 'openai' };
+    sb.getState = () => state;
+    sb.chrome.storage.local.get = (_keys, cb) => cb({
+      api_endpoint: 'https://api.anthropic.com/v1/messages',
+      api_key: 'sk-anc',
+      model: 'claude-haiku-4-5-20251001',
+    });
+    loadModule(sb);
+    sb.loadSettings();
+    expect(state.activeProviderId).toBe('anthropic');
+    expect(state.providerConfigs.openai.api_key).toBe('sk-anc');
+  });
+
+  test('uses legacy fallback with openai when endpoint does not include anthropic', () => {
+    const sb = createSandbox();
+    const state = { providerConfigs: {}, activeProviderId: 'anthropic' };
+    sb.getState = () => state;
+    sb.chrome.storage.local.get = (_keys, cb) => cb({
+      api_endpoint: 'https://api.openai.com/v1/chat/completions',
+      api_key: 'sk-oai',
+      model: 'gpt-4o',
+    });
+    loadModule(sb);
+    sb.loadSettings();
+    expect(state.activeProviderId).toBe('openai');
+    expect(state.providerConfigs.openai.api_key).toBe('sk-oai');
+    expect(state.providerConfigs.openai.model).toBe('gpt-4o');
+  });
+
+  test('sets export_format value when present in storage', () => {
+    const sb = createSandbox();
+    sb.getState = () => ({ providerConfigs: {}, activeProviderId: 'openai' });
+    sb.chrome.storage.local.get = (_keys, cb) => cb({
+      providers: { openai: {} },
+      export_format: 'csv',
+    });
+    loadModule(sb);
+    sb.loadSettings();
+    const exportEl = sb.document.getElementById('export-format');
+    expect(exportEl.value).toBe('csv');
+  });
+
+  test('sets agent_context element value when present in storage', () => {
+    const sb = createSandbox();
+    sb.getState = () => ({ providerConfigs: {}, activeProviderId: 'openai' });
+    sb.chrome.storage.local.get = (_keys, cb) => cb({
+      providers: { openai: {} },
+      agent_context: 'Do everything with care.',
+    });
+    loadModule(sb);
+    sb.loadSettings();
+    const ctxEl = sb.document.getElementById('set-agent-context');
+    expect(ctxEl.value).toBe('Do everything with care.');
+  });
+
+  test('does not throw and returns early when chrome.runtime.lastError is set', () => {
+    const sb = createSandbox();
+    const state = { providerConfigs: {}, activeProviderId: 'openai' };
+    sb.getState = () => state;
+    sb.getErrorMessage = (e) => (e && e.message) || String(e);
+    sb.chrome.storage.local.get = (_keys, cb) => {
+      sb.chrome.runtime.lastError = { message: 'Storage quota exceeded' };
+      cb({});
+      sb.chrome.runtime.lastError = null;
+    };
+    loadModule(sb);
+    expect(() => sb.loadSettings()).not.toThrow();
+    // state should be unchanged (early return)
+    expect(state.activeProviderId).toBe('openai');
+  });
+});

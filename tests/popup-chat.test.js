@@ -525,3 +525,194 @@ describe('chat.js — updateActiveTabAction', () => {
     expect(actionEl.textContent).toBe('');
   });
 });
+
+// ── Pure utility functions ──────────────────────────────────────────────────
+
+describe('chat.js — friendlyError', () => {
+  let sandbox;
+  beforeAll(() => { sandbox = createSandbox(); loadModule(sandbox); });
+
+  test('returns generic fallback for null', () => {
+    expect(sandbox.friendlyError(null)).toBe('Something went wrong. Try again or check Settings.');
+  });
+
+  test('returns generic fallback for non-string', () => {
+    expect(sandbox.friendlyError(42)).toBe('Something went wrong. Try again or check Settings.');
+  });
+
+  test('detects api_key in message', () => {
+    expect(sandbox.friendlyError('Invalid api_key provided')).toContain('API key issue');
+  });
+
+  test('detects 401 in message', () => {
+    expect(sandbox.friendlyError('Request failed with status 401')).toContain('API key issue');
+  });
+
+  test('detects forbidden/403', () => {
+    expect(sandbox.friendlyError('403 forbidden')).toContain('Access denied');
+  });
+
+  test('detects network error', () => {
+    expect(sandbox.friendlyError('Failed to fetch from endpoint')).toContain('Network error');
+  });
+
+  test('detects timeout', () => {
+    expect(sandbox.friendlyError('Request timed out after 30s')).toContain('timed out');
+  });
+
+  test('detects 429 rate limit', () => {
+    expect(sandbox.friendlyError('429 Too Many Requests')).toContain('Rate limited');
+  });
+
+  test('detects 502 bad gateway', () => {
+    expect(sandbox.friendlyError('502 Bad Gateway')).toContain('502');
+  });
+
+  test('detects 503 service unavailable', () => {
+    expect(sandbox.friendlyError('503 Service Unavailable')).toContain('503');
+  });
+
+  test('detects vision 400 rejection', () => {
+    expect(sandbox.friendlyError('400 vision model rejected')).toContain('Vision');
+  });
+
+  test('detects context_length_exceeded', () => {
+    expect(sandbox.friendlyError('context_length_exceeded')).toContain('too large');
+  });
+
+  test('detects max_tokens error', () => {
+    expect(sandbox.friendlyError('max_tokens limit reached')).toContain('too large');
+  });
+
+  test('detects disconnected port', () => {
+    expect(sandbox.friendlyError('disconnected port error')).toContain('connection lost');
+  });
+
+  test('truncates long unknown errors at 200 chars', () => {
+    const long = 'x'.repeat(250);
+    const result = sandbox.friendlyError(long);
+    expect(result).toContain('…');
+    expect(result.length).toBeLessThan(250);
+  });
+
+  test('returns short unknown error as-is', () => {
+    const msg = 'Some other error';
+    expect(sandbox.friendlyError(msg)).toBe(msg);
+  });
+});
+
+describe('chat.js — _dedupHistory', () => {
+  let sandbox;
+  beforeAll(() => { sandbox = createSandbox(); loadModule(sandbox); });
+
+  test('returns non-array input as-is', () => {
+    expect(sandbox._dedupHistory(null)).toBeNull();
+    expect(sandbox._dedupHistory(undefined)).toBeUndefined();
+  });
+
+  test('returns empty array as-is', () => {
+    expect(sandbox._dedupHistory([])).toEqual([]);
+  });
+
+  test('returns single-element array unchanged', () => {
+    const h = [{ role: 'user', text: 'hello' }];
+    expect(sandbox._dedupHistory(h)).toEqual(h);
+  });
+
+  test('removes consecutive duplicate entries', () => {
+    const h = [
+      { role: 'user', text: 'hello' },
+      { role: 'user', text: 'hello' },
+      { role: 'assistant', text: 'hi' },
+    ];
+    const result = sandbox._dedupHistory(h);
+    expect(result).toHaveLength(2);
+    expect(result[0].text).toBe('hello');
+    expect(result[1].text).toBe('hi');
+  });
+
+  test('keeps non-consecutive identical entries', () => {
+    const h = [
+      { role: 'user', text: 'ping' },
+      { role: 'assistant', text: 'pong' },
+      { role: 'user', text: 'ping' },
+    ];
+    expect(sandbox._dedupHistory(h)).toHaveLength(3);
+  });
+
+  test('keeps entries with same text but different roles', () => {
+    const h = [
+      { role: 'user', text: 'same' },
+      { role: 'assistant', text: 'same' },
+    ];
+    expect(sandbox._dedupHistory(h)).toHaveLength(2);
+  });
+});
+
+describe('chat.js — _activityIcon', () => {
+  let sandbox;
+  beforeAll(() => { sandbox = createSandbox(); loadModule(sandbox); });
+
+  test('returns check SVG for done', () => {
+    const icon = sandbox._activityIcon('done');
+    expect(icon).toContain('polyline');
+    expect(icon).toContain('svg');
+  });
+
+  test('returns X SVG for failed', () => {
+    const icon = sandbox._activityIcon('failed');
+    expect(icon).toContain('line x1');
+    expect(icon).toContain('svg');
+  });
+
+  test('returns spinner SVG for in_progress', () => {
+    const icon = sandbox._activityIcon('in_progress');
+    expect(icon).toContain('activity-spinner');
+  });
+
+  test('returns pending SVG for any other status', () => {
+    const icon = sandbox._activityIcon('pending');
+    expect(icon).toContain('circle');
+    expect(icon).toContain('opacity:0.4');
+  });
+
+  test('returns pending SVG for unknown status', () => {
+    const icon = sandbox._activityIcon('unknown-status');
+    expect(icon).toContain('opacity:0.4');
+  });
+});
+
+describe('chat.js — _formatDuration', () => {
+  let sandbox;
+  beforeAll(() => { sandbox = createSandbox(); loadModule(sandbox); });
+
+  test('returns empty string for null', () => {
+    expect(sandbox._formatDuration(null)).toBe('');
+  });
+
+  test('returns empty string for 0', () => {
+    expect(sandbox._formatDuration(0)).toBe('');
+  });
+
+  test('returns empty string for negative', () => {
+    expect(sandbox._formatDuration(-100)).toBe('');
+  });
+
+  test('returns ms format for sub-second duration', () => {
+    expect(sandbox._formatDuration(500)).toBe('500ms');
+  });
+
+  test('returns seconds format for 1-60 seconds', () => {
+    expect(sandbox._formatDuration(2500)).toBe('2.5s');
+  });
+
+  test('returns minutes format for durations over 60 seconds', () => {
+    const result = sandbox._formatDuration(90000); // 1m 30s
+    expect(result).toBe('1m 30s');
+  });
+
+  test('returns 0m 0s for exactly 60000ms', () => {
+    const result = sandbox._formatDuration(60000);
+    expect(result).toBe('1m 0s');
+  });
+});
