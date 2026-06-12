@@ -1222,7 +1222,7 @@ export async function generatePlan(goal, settings, context = {}) {
     // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
     // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
     // Uses contentNoThink so thinking-block JSON doesn't get selected over the real plan.
-    try {
+    {
       let s2from = 0;
       const contentLen = contentNoThink.length;
       while (s2from < contentLen) {
@@ -1260,7 +1260,7 @@ export async function generatePlan(goal, settings, context = {}) {
           s2from = s2end + 1;
         } else { break; }
       }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 2 failed:', getErrorMessage(e)); }
+    }
 
     // Strategy 3: find first { and last } and try that substring; also try bare array.
     // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
