@@ -231,6 +231,20 @@ describe('Frame Manager', () => {
       // but it doesn't increment crossOriginCount because no catch occurs
       expect(result.iframeCount).toBe(1);
     });
+
+    test('skips forEach when iframes has no forEach method (line 39 false branch)', () => {
+      globalThis.document.querySelectorAll = () => ({ length: 0 });
+      const result = fm.scanIframes(globalThis.document);
+      expect(result).toEqual({ elements: [], iframeCount: 0, crossOriginCount: 0 });
+    });
+
+    test('skips null iframes in forEach (line 41 guard)', () => {
+      const realIframe = createElement('iframe', { src: 'https://x.com/' });
+      realIframe.contentWindow = { document: {} };
+      globalThis.document.querySelectorAll = () => [null, realIframe];
+      const result = fm.scanIframes(globalThis.document);
+      expect(result.iframeCount).toBe(1);
+    });
   });
 
   describe('findInIframe', () => {
@@ -340,6 +354,35 @@ describe('Frame Manager', () => {
 
       expect(result).not.toBeNull();
       expect(result.element).not.toBeNull();
+    });
+
+    test('uses getAttribute when src is empty in findInIframe (line 111 middle branch)', () => {
+      const iframe = createElement('iframe');
+      iframe.src = '';
+      iframe.getAttribute = (name) => name === 'src' ? 'https://via-attr.com' : null;
+      iframe.contentWindow = { document: {} };
+      globalThis.document.querySelectorAll = () => [iframe];
+      const result = fm.findInIframe(globalThis.document, 'frame:0:button');
+      expect(result?.frameUrl).toBe('https://via-attr.com');
+    });
+
+    test('uses about:blank when src and getAttribute both empty in findInIframe (line 111 right branch)', () => {
+      const iframe = createElement('iframe');
+      iframe.src = '';
+      iframe.getAttribute = () => null;
+      iframe.contentWindow = { document: {} };
+      globalThis.document.querySelectorAll = () => [iframe];
+      const result = fm.findInIframe(globalThis.document, 'frame:0:button');
+      expect(result?.frameUrl).toBe('about:blank');
+    });
+
+    test('returns cross-origin when contentWindow.document is null (line 116 false branch)', () => {
+      const iframe = createElement('iframe', { src: 'https://x.com' });
+      iframe.contentWindow = { document: null };
+      globalThis.document.querySelectorAll = () => [iframe];
+      const result = fm.findInIframe(globalThis.document, 'frame:0:button');
+      expect(result).not.toBeNull();
+      expect(result.crossOrigin).toBe(true);
     });
   });
 
@@ -481,6 +524,53 @@ describe('Frame Manager', () => {
       expect(result[1].index).toBe(1);
       expect(result[0].src).toBe('https://example.com/frame1.html');
       expect(result[1].src).toBe('https://example.com/frame2.html');
+    });
+
+    test('catches isVisible throwing a primitive (line 181 catch + line 11 String path)', () => {
+      const iframe = createElement('iframe', { src: 'https://x.com/f' });
+      iframe.contentWindow = { document: {} };
+      iframe.getBoundingClientRect = () => ({ width: 100, height: 100, x: 0, y: 0 });
+      globalThis.document.querySelectorAll = () => [iframe];
+
+      const orig = dom.isVisible;
+      dom.isVisible = () => { throw 'not-an-error'; };
+      try {
+        const result = fm.getIframeInfo(globalThis.document);
+        expect(result[0].visible).toBe(false);
+      } finally {
+        dom.isVisible = orig;
+      }
+    });
+
+    test('catches isVisible throwing null (line 11 || empty fallback branch)', () => {
+      const iframe = createElement('iframe', { src: 'https://x.com/f' });
+      iframe.contentWindow = { document: {} };
+      iframe.getBoundingClientRect = () => ({ width: 100, height: 100, x: 0, y: 0 });
+      globalThis.document.querySelectorAll = () => [iframe];
+
+      const orig = dom.isVisible;
+      dom.isVisible = () => { throw null; };
+      try {
+        const result = fm.getIframeInfo(globalThis.document);
+        expect(result[0].visible).toBe(false);
+      } finally {
+        dom.isVisible = orig;
+      }
+    });
+
+    test('skips forEach when iframes has no forEach method in getIframeInfo (line 156 false branch)', () => {
+      globalThis.document.querySelectorAll = () => ({ length: 0 });
+      const result = fm.getIframeInfo(globalThis.document);
+      expect(result).toEqual([]);
+    });
+
+    test('sets sameOrigin false when contentWindow.document is null (line 162 false branch)', () => {
+      const iframe = createElement('iframe', { src: 'https://x.com' });
+      iframe.contentWindow = { document: null };
+      iframe.getBoundingClientRect = () => ({ width: 100, height: 100, x: 0, y: 0 });
+      globalThis.document.querySelectorAll = () => [iframe];
+      const result = fm.getIframeInfo(globalThis.document);
+      expect(result[0].sameOrigin).toBe(false);
     });
   });
 });
