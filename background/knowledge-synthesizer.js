@@ -371,9 +371,10 @@ function areSemanticallySimilar(item1, item2) {
 
   if (words1.length === 0 || words2.length === 0) return false;
 
+  const words2Set = new Set(words2);
   let sharedCount = 0;
   for (const word of words1) {
-    if (words2.includes(word)) {
+    if (words2Set.has(word)) {
       sharedCount++;
     }
   }
@@ -436,9 +437,9 @@ function areContradictory(item1, item2) {
     for (const stmt2 of statements2) {
       // Check if they share key terms
       const words1 = stmt1.split(/\s+/);
-      const words2 = stmt2.split(/\s+/);
+      const words2Set = new Set(stmt2.split(/\s+/));
 
-      const sharedWords = words1.filter(w => words2.includes(w) && w.length >= 3);
+      const sharedWords = words1.filter(w => w.length >= 3 && words2Set.has(w));
       
       if (sharedWords.length >= 2) {
         // Check for negation in one but not the other
