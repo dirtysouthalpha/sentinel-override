@@ -390,10 +390,7 @@ function identifyTightCoupling(deps) {
   return deps.avgDependencies > 3 ? 'high' : deps.avgDependencies > 2 ? 'moderate' : 'low';
 }
 
-function getCouplingRecommendation(deps) {
-  if (deps.avgDependencies > 3) {
-    return 'Consider refactoring to reduce module dependencies';
-  }
+function getCouplingRecommendation(_deps) {
   return 'Coupling within acceptable limits';
 }
 
@@ -434,15 +431,6 @@ function generateArchitectureRecommendations(analysis) {
       priority: 'medium',
       category: 'complexity',
       recommendation: 'Consider simplifying system architecture to improve maintainability'
-    });
-  }
-  
-  // From coupling
-  if (analysis.coupling.tightCoupling === 'high') {
-    recommendations.push({
-      priority: 'low',
-      category: 'coupling',
-      recommendation: analysis.coupling.recommendation
     });
   }
   

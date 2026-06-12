@@ -242,14 +242,11 @@ const HTML_ESCAPE_RE = /[&<>'"]/g;
 function escapeHtml(str) {
   const s = (str == null) ? '' : String(str);
   return s.replace(HTML_ESCAPE_RE, (char) => {
-    switch (char) {
-      case '&': return '&amp;';
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '"': return '&quot;';
-      case "'": return '&#39;';
-      default: return char;
-    }
+    if (char === '&') return '&amp;';
+    if (char === '<') return '&lt;';
+    if (char === '>') return '&gt;';
+    if (char === '"') return '&quot;';
+    return '&#39;';
   });
 }
 

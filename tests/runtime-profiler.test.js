@@ -274,6 +274,14 @@ describe('attemptHealing', () => {
     // (since healings complete synchronously in this implementation)
     expect(active.length).toBe(0);
   });
+
+  test('all strategies fail → status set to failed (lines 906-909)', () => {
+    const spy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+    const result = attemptHealing({ type: 'unknown_exhausted' }); // 1 strategy (generic_recovery)
+    spy.mockRestore();
+    expect(result.status).toBe('failed');
+    expect(result.successStrategy).toBeNull();
+  });
 });
 
 describe('getHealingHistory and getActiveHealings', () => {
