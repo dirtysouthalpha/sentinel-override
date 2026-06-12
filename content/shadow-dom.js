@@ -103,12 +103,16 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
   shadow.queryDeep = function(root, selector) {
     if (!root || !selector) return [];
     const results = [];
+    const seen = new Set();
 
     // Fast path: try normal querySelectorAll on the root
     try {
       const direct = root.querySelectorAll(selector);
       if (direct && typeof direct.forEach === 'function') {
-        results.push(...Array.from(direct).filter(el => el));
+        Array.from(direct).filter(el => el).forEach(el => {
+          seen.add(el);
+          results.push(el);
+        });
       }
     } catch { /* invalid selector */ }
 
@@ -118,11 +122,9 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
       if (el === root) return;
       // Check if this element matches the selector
       try {
-        if (el.matches && el.matches(selector)) {
-          // Avoid duplicates (element might appear in both light and shadow DOM queries)
-          if (results.indexOf(el) === -1) {
-            results.push(el);
-          }
+        if (el.matches && el.matches(selector) && !seen.has(el)) {
+          seen.add(el);
+          results.push(el);
         }
       } catch { /* matches() not supported or invalid selector */ }
 
@@ -132,7 +134,8 @@ window.__sentinelUtils.shadow = window.__sentinelUtils.shadow || {};
         try {
           const shadowMatches = sr.querySelectorAll(selector);
           shadowMatches.forEach(function(matchEl) {
-            if (results.indexOf(matchEl) === -1) {
+            if (!seen.has(matchEl)) {
+              seen.add(matchEl);
               results.push(matchEl);
             }
           });
