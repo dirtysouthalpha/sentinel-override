@@ -251,3 +251,146 @@ describe('_applyAdaptivePrompts — approval mode, approved decision (lines 322-
     expect(result).toBe('adapted-result');
   });
 });
+
+describe('_generateInitialPlan — LLM returns plan (happy path)', () => {
+  test('returns plan array when generatePlan succeeds', async () => {
+    generatePlan.mockResolvedValueOnce(['Step 1', 'Step 2', 'Step 3']);
+    const result = await _generateInitialPlan('do the thing', 1, { quickMode: false });
+    expect(result).toEqual(['Step 1', 'Step 2', 'Step 3']);
+    expect(sendSilentUpdate).toHaveBeenCalledWith(expect.stringContaining('Plan ready'));
+  });
+});
+
+describe('_generateInitialPlan — LLM null, heuristic returns plan', () => {
+  test('returns heuristic plan when LLM returns null but heuristic succeeds', async () => {
+    generatePlan.mockResolvedValueOnce(null);
+    // A non-empty goal with a URL triggers heuristic navigation plan
+    const result = await _generateInitialPlan('go to https://example.com and click submit', 1, { quickMode: false });
+    expect(result).not.toBeNull();
+    expect(Array.isArray(result)).toBe(true);
+    expect(sendSilentUpdate).toHaveBeenCalledWith(expect.stringContaining('Basic plan'));
+  });
+});
+
+describe('_applyAdaptivePrompts — mode off', () => {
+  test('returns original goal immediately when mode is off', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'off' });
+    const result = await _applyAdaptivePrompts('my goal', { url: 'https://example.com' }, 1, null, []);
+    expect(result).toBe('my goal');
+    expect(rewriteGoalForPlatform).not.toHaveBeenCalled();
+  });
+});
+
+describe('_applyAdaptivePrompts — result.adapted is false', () => {
+  test('returns original goal when rewriteGoalForPlatform returns adapted=false', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'auto' });
+    rewriteGoalForPlatform.mockResolvedValueOnce({ adapted: false, adaptedGoal: 'ignored' });
+    const result = await _applyAdaptivePrompts('my goal', { url: 'https://example.com' }, 1, null, []);
+    expect(result).toBe('my goal');
+  });
+});
+
+describe('_applyAdaptivePrompts — result is null', () => {
+  test('returns original goal when rewriteGoalForPlatform returns null', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'auto' });
+    rewriteGoalForPlatform.mockResolvedValueOnce(null);
+    const result = await _applyAdaptivePrompts('my goal', { url: 'https://example.com' }, 1, null, []);
+    expect(result).toBe('my goal');
+  });
+});
+
+describe('_applyAdaptivePrompts — auto mode', () => {
+  test('returns adaptedGoal and broadcasts card in auto mode', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'auto' });
+    rewriteGoalForPlatform.mockResolvedValueOnce({
+      adapted: true,
+      platform: { id: 'jira' },
+      summary: 'Adapted for Jira',
+      mismatchHints: [],
+      originalGoal: 'my goal',
+      adaptedGoal: 'my jira-adapted goal',
+      durationMs: 10,
+    });
+    const result = await _applyAdaptivePrompts('my goal', { url: 'https://jira.example.com' }, 1, null, []);
+    expect(result).toBe('my jira-adapted goal');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'adapted_goal_available', mode: 'auto' })
+    );
+  });
+});
+
+describe('_applyAdaptivePrompts — approval: useOriginal=true', () => {
+  test('returns original goal when user selects useOriginal', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'approval' });
+    rewriteGoalForPlatform.mockResolvedValueOnce({
+      adapted: true,
+      platform: { id: 'salesforce' },
+      summary: 'Adapted',
+      mismatchHints: [],
+      originalGoal: 'original',
+      adaptedGoal: 'adapted',
+      durationMs: 5,
+    });
+    chrome.runtime.sendMessage.mockImplementationOnce(async (msg) => {
+      if (msg.action === 'adapted_goal_available') {
+        setTimeout(() => {
+          if (capturedOnMessageListener) {
+            capturedOnMessageListener({
+              action: 'adapted_goal_response',
+              requestId: msg.requestId,
+              approved: false,
+              useOriginal: true,
+              edited: false,
+            });
+          }
+        }, 0);
+      }
+      return {};
+    });
+    const result = await _applyAdaptivePrompts('original', { url: 'https://salesforce.com' }, 1, null, []);
+    expect(result).toBe('original');
+  });
+});
+
+describe('_applyAdaptivePrompts — approval: edited goal', () => {
+  test('returns editedGoal when user edits the adapted goal', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'approval' });
+    rewriteGoalForPlatform.mockResolvedValueOnce({
+      adapted: true,
+      platform: { id: 'salesforce' },
+      summary: 'Adapted',
+      mismatchHints: [],
+      originalGoal: 'original',
+      adaptedGoal: 'adapted',
+      durationMs: 5,
+    });
+    chrome.runtime.sendMessage.mockImplementationOnce(async (msg) => {
+      if (msg.action === 'adapted_goal_available') {
+        setTimeout(() => {
+          if (capturedOnMessageListener) {
+            capturedOnMessageListener({
+              action: 'adapted_goal_response',
+              requestId: msg.requestId,
+              approved: false,
+              useOriginal: false,
+              edited: true,
+              editedGoal: 'user-custom goal text here',
+            });
+          }
+        }, 0);
+      }
+      return {};
+    });
+    const result = await _applyAdaptivePrompts('original', { url: 'https://salesforce.com' }, 1, null, []);
+    expect(result).toBe('user-custom goal text here');
+  });
+});
+
+describe('_applyAdaptivePrompts — outer catch', () => {
+  test('returns original goal when rewriteGoalForPlatform throws', async () => {
+    chrome.storage.local.get.mockResolvedValueOnce({ adaptivePromptsMode: 'auto' });
+    rewriteGoalForPlatform.mockRejectedValueOnce(new Error('LLM service unavailable'));
+    const result = await _applyAdaptivePrompts('my goal', { url: 'https://example.com' }, 1, null, []);
+    expect(result).toBe('my goal');
+  });
+});
