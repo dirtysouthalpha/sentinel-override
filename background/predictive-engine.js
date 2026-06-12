@@ -377,7 +377,9 @@ export function generateOptimizedPlan(tasks) {
   
   for (const task of tasks) {
     for (const dep of task.dependencies || []) {
-      adjList.get(dep).push(task.id);
+      const depList = adjList.get(dep);
+      if (!depList) continue; // dep not in tasks — skip unknown dependency
+      depList.push(task.id);
       inDegree.set(task.id, (inDegree.get(task.id) || 0) + 1);
     }
   }
