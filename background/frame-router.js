@@ -3,11 +3,6 @@
 // Enables the agent to interact with elements inside cross-origin iframes.
 
 import { getErrorMessage } from './error-utils.js';
-import { THREE_HUNDRED_MS } from './constants.js';
-
-// Precompile regex patterns for hot path optimization
-const INPUT_TEXTAREA_TAG_RE = /^(INPUT|TEXTAREA)$/;
-const MULTIPLE_NEWLINES_RE = /\n{3,}/g;
 
 // ========== Content Script Files for Frame Injection ==========
 // Same set as tab-manager.js CONTENT_SCRIPT_FILES, minus index.js (handler injected separately)
@@ -206,6 +201,12 @@ export async function executeInFrame(tabId, frameId, command) {
  * @returns {{ok: boolean, error?: string, [key: string]: any}} Command result.
  */
 async function runCommandInFrame(command) {
+  // Inlined: chrome.scripting.executeScript serializes only the function body,
+  // dropping all closure scope (module imports and module-level constants).
+  const _300MS = 300;
+  const _inputTagRe = /^(INPUT|TEXTAREA)$/;
+  const _multiNlRe = /\n{3,}/g;
+  const _errMsg = (e) => typeof e === 'string' ? e : (e && typeof e.message === 'string' ? e.message : (e == null ? '' : String(e)));
   const utils = window.__sentinelUtils;
   if (!utils || !utils.dom) {
     return { ok: false, error: 'Sentinel utilities not loaded in frame' };
@@ -230,7 +231,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
+              await new Promise(resolve => setTimeout(resolve, _300MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
@@ -257,7 +258,7 @@ async function runCommandInFrame(command) {
           const blocking = ov.isOverlayBlocking(doc, el);
           if (blocking) {
             if (ov.dismissOverlay(doc, blocking)) {
-              await new Promise(resolve => setTimeout(resolve, THREE_HUNDRED_MS));
+              await new Promise(resolve => setTimeout(resolve, _300MS));
             } else {
               return { ok: false, error: 'Element blocked by overlay that could not be dismissed' };
             }
@@ -299,7 +300,7 @@ async function runCommandInFrame(command) {
         }
 
         // Standard INPUT/TEXTAREA
-        if (INPUT_TEXTAREA_TAG_RE.test(el.tagName)) {
+        if (_inputTagRe.test(el.tagName)) {
           const proto = el.tagName === 'TEXTAREA'
             ? (view.HTMLTextAreaElement && view.HTMLTextAreaElement.prototype)
             : (view.HTMLInputElement && view.HTMLInputElement.prototype);
@@ -356,9 +357,9 @@ async function runCommandInFrame(command) {
           try {
             clone.querySelectorAll(skipSelectors.join(',')).forEach(el => el.remove());
           } catch(e) {
-            console.warn('[Sentinel/frame-router] DOM cleanup failed:', getErrorMessage(e));
+            console.warn('[Sentinel/frame-router] DOM cleanup failed:', _errMsg(e));
           }
-          content = (clone.innerText || clone.textContent || '').replace(MULTIPLE_NEWLINES_RE, '\n\n').trim();
+          content = (clone.innerText || clone.textContent || '').replace(_multiNlRe, '\n\n').trim();
         }
         if ((!content || content.length < 200) && doc.body) {
           const bodyClone = doc.body.cloneNode(true);
@@ -366,9 +367,9 @@ async function runCommandInFrame(command) {
           try {
             bodyClone.querySelectorAll(skipSelectors.join(',')).forEach(el => el.remove());
           } catch(e) {
-            console.warn('[Sentinel/frame-router] Body cleanup failed:', getErrorMessage(e));
+            console.warn('[Sentinel/frame-router] Body cleanup failed:', _errMsg(e));
           }
-          content = (bodyClone.innerText || '').replace(MULTIPLE_NEWLINES_RE, '\n\n').trim();
+          content = (bodyClone.innerText || '').replace(_multiNlRe, '\n\n').trim();
         }
         return { ok: true, data: `Page Title: ${title}\nURL: ${url}\n\n${content}` };
       }
@@ -377,7 +378,7 @@ async function runCommandInFrame(command) {
         return { ok: false, error: `Unknown command type in frame: ${command.type}` };
     }
   } catch (e) {
-    return { ok: false, error: `Frame command error: ${getErrorMessage(e)}` };
+    return { ok: false, error: `Frame command error: ${_errMsg(e)}` };
   }
 }
 
