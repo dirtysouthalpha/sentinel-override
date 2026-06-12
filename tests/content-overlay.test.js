@@ -498,6 +498,42 @@ describe('ov.dismissOverlay — extended paths', () => {
     globalThis.window.__sentinelUtils.dom.isVisible = () => true;
     expect(result).toBe(false);
   });
+
+  test('returns true when ARIA close button dismisses overlay (line 161)', () => {
+    let dismissed = false;
+    const closeBtn = {
+      click: jest.fn(() => { dismissed = true; }),
+      dispatchEvent: jest.fn(),
+    };
+    const overlay = {
+      querySelectorAll: (sel) => sel === '[aria-label="Close" i]' ? [closeBtn] : [],
+    };
+    const doc = {
+      body: { contains: () => !dismissed },
+      activeElement: { dispatchEvent: fn },
+    };
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    const result = ov.dismissOverlay(doc, overlay);
+    expect(result).toBe(true);
+    expect(closeBtn.click).toHaveBeenCalled();
+  });
+
+  test('returns true when backdrop click dismisses overlay (line 224)', () => {
+    let dismissed = false;
+    let bodyDispatchCount = 0;
+    const body = {
+      contains: () => !dismissed,
+      dispatchEvent: jest.fn(() => { bodyDispatchCount++; if (bodyDispatchCount >= 3) dismissed = true; }),
+    };
+    const overlay = {
+      querySelectorAll: () => [],
+      getBoundingClientRect: () => ({ right: 300, bottom: 200 }),
+    };
+    const doc = { body, activeElement: { dispatchEvent: fn } };
+    globalThis.window.__sentinelUtils.dom.isVisible = () => true;
+    const result = ov.dismissOverlay(doc, overlay);
+    expect(result).toBe(true);
+  });
 });
 
 describe('ov.detectOverlay — additional branches', () => {
