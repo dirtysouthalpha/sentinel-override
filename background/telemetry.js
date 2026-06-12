@@ -213,9 +213,7 @@ function _scheduleFlush() {
   if (_persistFlushTimer) return;
   _persistFlushTimer = setInterval(() => {
     if (_pendingPersistFlush) {
-      _flushRunBuffer().catch((e) => {
-        console.error('[_scheduleFlush] Unhandled rejection:', e);
-      });
+      _flushRunBuffer();
     }
   }, PERSIST_FLUSH_INTERVAL_MS);
 }
