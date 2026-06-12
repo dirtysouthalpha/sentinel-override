@@ -97,6 +97,7 @@ function _collectUrlsVisited(history) {
   const urlsVisited = [];
   const seenUrls = new Set();
   for (const h of history) {
+    if (!h) continue;
     if (h.action && h.action.type === 'navigate' && h.action.url) {
       const u = h.action.url;
       if (!seenUrls.has(u)) { urlsVisited.push(u); seenUrls.add(u); }
