@@ -768,3 +768,41 @@ describe('context_menu_extract goal fallback', () => {
       .toContain('"Name, Age, Email"');
   });
 });
+
+// ===================== context_menu_monitor_changes selector construction =====================
+
+function buildMonitorSelector(selectionText) {
+  return selectionText
+    ? `*:contains('${String(selectionText || '').substring(0, 50).replace(/'/g, "\\'")}')`
+    : 'body';
+}
+
+describe('context_menu_monitor_changes selector construction', () => {
+  test('uses body selector when no selectionText', () => {
+    expect(buildMonitorSelector('')).toBe('body');
+    expect(buildMonitorSelector(null)).toBe('body');
+    expect(buildMonitorSelector(undefined)).toBe('body');
+  });
+
+  test('wraps selectionText in :contains() selector', () => {
+    expect(buildMonitorSelector('hello')).toBe("*:contains('hello')");
+  });
+
+  test('truncates selectionText to 50 chars', () => {
+    const long = 'a'.repeat(60);
+    const selector = buildMonitorSelector(long);
+    expect(selector).toBe("*:contains('" + 'a'.repeat(50) + "')");
+  });
+
+  test('escapes single quotes in selectionText', () => {
+    expect(buildMonitorSelector("it's here")).toBe("*:contains('it\\'s here')");
+  });
+
+  test('escapes multiple single quotes', () => {
+    expect(buildMonitorSelector("'quoted'")).toBe("*:contains('\\'quoted\\'')");
+  });
+
+  test('leaves text without quotes unchanged', () => {
+    expect(buildMonitorSelector('price: $99')).toBe("*:contains('price: $99')");
+  });
+});

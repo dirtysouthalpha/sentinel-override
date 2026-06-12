@@ -129,7 +129,7 @@ class FederationController {
     this.logAudit('peer_registered', { peer_id, capabilities });
 
     return {
-      federation_id: this.keyPair.publicKey,
+      federation_id: this.keyPair?.publicKey || '',
       status: 'registered'
     };
   }
@@ -648,7 +648,7 @@ class FederationController {
     const entry = {
       timestamp: new Date().toISOString(),
       event_type: eventType,
-      federation_id: this.keyPair.publicKey,
+      federation_id: this.keyPair?.publicKey || '',
       ...data
     };
 
