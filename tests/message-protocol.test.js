@@ -751,6 +751,14 @@ describe('sendPageContext — non-positive totalSteps (line 130 false branch)', 
       expect.objectContaining({ totalSteps: 0 })
     );
   });
+
+  test('passes totalSteps when value is a positive number (line 130 true branch)', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPageContext('https://x.com', 'Title', 1, 1, 5);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ totalSteps: 5 })
+    );
+  });
 });
 
 describe('sendActionMessage — _describeCommand element label branches (lines 146-148)', () => {
@@ -908,6 +916,68 @@ describe('sendPlanPreview — estimatedSteps fallback (line 435)', () => {
     sendPlanPreview(steps);
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ estimatedSteps: 3 })
+    );
+  });
+});
+
+describe('sendMessage — empty-string lastError.message (line 29 || fallback)', () => {
+  test('uses fallback message when lastError.message is empty string', async () => {
+    chrome.tabs.sendMessage.mockImplementation((_tabId, _msg, cb) => {
+      chrome.runtime.lastError = { message: '' };
+      cb(undefined);
+      chrome.runtime.lastError = null;
+    });
+    await expect(sendMessage(1, { action: 'test' })).rejects.toThrow('Content script message failed');
+  });
+});
+
+describe('sendRuntimeMessage — empty-string lastError.message (line 63 || fallback)', () => {
+  test('uses fallback message when lastError.message is empty string', async () => {
+    chrome.runtime.sendMessage.mockImplementation((_msg, cb) => {
+      chrome.runtime.lastError = { message: '' };
+      cb(undefined);
+      chrome.runtime.lastError = null;
+    });
+    await expect(sendRuntimeMessage({ action: 'test' })).rejects.toThrow('Runtime message failed');
+  });
+});
+
+describe('sendPageContext — non-number totalSteps (line 130 && short-circuit)', () => {
+  test('defaults totalSteps to 0 when value is a string', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPageContext(1, {}, 'Title', 1, 'not-a-number');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ totalSteps: 0 })
+    );
+  });
+
+  test('defaults totalSteps to 0 when value is undefined', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    sendPageContext(1, {}, 'Title', 1, undefined);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ totalSteps: 0 })
+    );
+  });
+});
+
+describe('sendActionMessage — resolvedText stays empty (line 198 && branches)', () => {
+  test('targetText is empty when matching element has no text', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    const cmd = { type: 'click', selector: '#btn' };
+    const obs = { elements: [{ selector: '#btn' }] }; // no .text property
+    sendActionMessage(cmd, 1, obs);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ targetText: '' }) })
+    );
+  });
+
+  test('targetText is empty when element text is "No label"', () => {
+    chrome.runtime.sendMessage.mockReturnValue(Promise.resolve());
+    const cmd = { type: 'click', selector: '#btn' };
+    const obs = { elements: [{ selector: '#btn', text: 'No label' }] };
+    sendActionMessage(cmd, 1, obs);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ targetText: '' }) })
     );
   });
 });
