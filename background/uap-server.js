@@ -557,10 +557,12 @@ class UAPServer {
     }
 
     // Budget validation - clamp to valid range
-    if (validated.budget < 1) {
-      validated.budget = 1; // Minimum budget
+    if (typeof validated.budget !== 'number' || isNaN(validated.budget)) {
+      validated.budget = 100;
+    } else if (validated.budget < 1) {
+      validated.budget = 1;
     } else if (validated.budget > 1000) {
-      validated.budget = 1000; // Maximum budget
+      validated.budget = 1000;
     }
 
     return validated;
