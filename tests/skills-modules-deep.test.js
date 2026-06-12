@@ -371,6 +371,18 @@ describe('selector-miss', () => {
     expect(skill.matches(ctx)).toBe(false);
   });
 
+  test('b3[1] both regex and startsWith false — returns false', () => {
+    // regex doesn't match AND r.startsWith('error: element') is false → b3[1] fires
+    const ctx = { lastResult: 'click operation timed out', lastActionFailed: true };
+    expect(skill.matches(ctx)).toBe(false);
+  });
+
+  test('b3[1] non-string lastResult that does not match either pattern', () => {
+    // non-string lastResult → String(obj||'') = '[object Object]', neither regex nor startsWith matches
+    const ctx = { lastResult: { code: 404 }, lastActionFailed: true };
+    expect(skill.matches(ctx)).toBe(false);
+  });
+
   test('autoApply returns read_page', () => {
     const result = skill.autoApply({});
     expect(result.type).toBe('read_page');
@@ -525,6 +537,25 @@ describe('unproductive-extract', () => {
       lastCommand: { type: 'extract', key: 'd' },
       lastResult: 'Extracted 42 items successfully',
       lastActionFailed: true,
+    };
+    expect(skill.matches(ctx)).toBe(false);
+  });
+
+  test('b4[1] non-string lastResult fires String(obj||"") ternary path — matches pattern', () => {
+    // typeof 42 !== 'string' → ternary false path fires (b4[1])
+    // String(42 || '') = '42' — no pattern matches → returns false
+    const ctx = {
+      lastCommand: { type: 'extract', key: 'x' },
+      lastResult: 42,
+    };
+    expect(skill.matches(ctx)).toBe(false);
+  });
+
+  test('b4[1] object lastResult — String([object Object]) matches no pattern', () => {
+    // typeof {} !== 'string' → b4[1] fires; String({} || '') = '[object Object]' → no match
+    const ctx = {
+      lastCommand: { type: 'execute_js', key: 'y' },
+      lastResult: { status: 'empty' },
     };
     expect(skill.matches(ctx)).toBe(false);
   });
