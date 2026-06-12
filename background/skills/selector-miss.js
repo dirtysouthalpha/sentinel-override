@@ -12,7 +12,7 @@ export const selectorMiss = {
 
   matches(ctx) {
     if (!ctx || !ctx.lastResult || !ctx.lastActionFailed) return false;
-    const r = (typeof ctx.lastResult === 'string' ? ctx.lastResult : String(ctx.lastResult || '')).toLowerCase();
+    const r = (typeof ctx.lastResult === 'string' ? ctx.lastResult : String(ctx.lastResult)).toLowerCase();
     return /element not found|no element|not in element list/.test(r) ||
            r.startsWith('error: element');
   },
