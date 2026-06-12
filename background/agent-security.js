@@ -3,7 +3,6 @@
 // Extracted from agent-engine.js for modularity.
 
 import { TEXT_SAMPLE_LENGTH } from './constants.js';
-import { getErrorMessage } from './error-utils.js';
 
 // ──────────────────────────────────────────────────────────────
 // Helper: count own enumerable keys on a plain object (no Array/Object.keys)
@@ -266,7 +265,7 @@ const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|e
 function detectSignInWall(allElements, currentUrl, pageText) {
   if (!currentUrl) return null;
   let host;
-  try { host = new URL(currentUrl).host; } catch (e) { console.error('[Sentinel] Error in agent-security.js:', getErrorMessage(e)); return null; }
+  try { host = new URL(currentUrl).host; } catch (_e) { return null; }
   if (!SIGN_IN_WALL_HOSTS_RE.test(host) && !SIGN_IN_WALL_HOSTS_RE.test(currentUrl)) return null;
 
   // Signal 1: a password input is present in the observed elements
