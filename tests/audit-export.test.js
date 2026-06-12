@@ -78,4 +78,26 @@ describe('audit-export', () => {
     const verification = verifyAuditExport(exported);
     expect(verification.valid).toBe(false);
   });
+
+  test('generates export with entries missing optional fields — hits fallback branches', () => {
+    const sparseLog = [
+      {},
+      { kind: undefined, goal: undefined, url: undefined, tenant: undefined, timestamp: undefined },
+    ];
+    const result = generateAuditExport(sparseLog);
+    expect(result.entryCount).toBe(2);
+    const parsed = JSON.parse(result.json);
+    expect(parsed.entries[0].kind).toBe('unknown');
+    expect(parsed.entries[0].timestamp).toBe('');
+    expect(parsed.entries[0].goal).toBe('');
+    expect(parsed.entries[0].url).toBe('');
+    expect(parsed.entries[0].tenant).toBe('');
+  });
+
+  test('verifyAuditExport on empty entries skips final hash check', () => {
+    const exported = JSON.parse(generateAuditExport([]).json);
+    const result = verifyAuditExport(exported);
+    expect(result.valid).toBe(true);
+    expect(result.message).toContain('0 entries');
+  });
 });

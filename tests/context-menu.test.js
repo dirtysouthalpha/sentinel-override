@@ -362,5 +362,29 @@ describe('context-menu', () => {
         params: { pageUrl: '', tabId: 123 },
       });
     });
+
+    it('should handle monitor action without selection text', () => {
+      const result = handleMenuClick(
+        { menuItemId: 'sentinel-monitor' },
+        mockTab
+      );
+
+      expect(result).toEqual({
+        action: 'monitor_changes',
+        params: { selectionText: '', tabId: 123 },
+      });
+    });
+
+    it('should handle quick assist action without selection text', () => {
+      const result = handleMenuClick(
+        { menuItemId: 'sentinel-quick-assist' },
+        mockTab
+      );
+
+      expect(result).toEqual({
+        action: 'quick_assist',
+        params: { selectionText: '', pageUrl: 'https://example.com', tabId: 123 },
+      });
+    });
   });
 });
