@@ -477,12 +477,36 @@ export function buildFallbackReport(executionData) {
   if (!executionData) return 'Report generation failed: no execution data available.';
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 
+  // Render one extracted item readably. Arrays of objects previously stringified
+  // to "[object Object]"; instead lead with a title-like field (title/name/
+  // headline/text/label) when present, then join the remaining non-empty values.
+  const _fmtItem = (v) => {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') {
+      try {
+        const titleKeys = ['title', 'name', 'headline', 'text', 'label'];
+        const tk = titleKeys.find(key => v[key] != null && String(v[key]).trim());
+        const lead = tk ? String(v[tk]).trim() : '';
+        const rest = Object.entries(v)
+          .filter(([key, x]) => key !== tk && x != null && String(x).trim())
+          .map(([, x]) => String(x).trim());
+        const parts = (lead ? [lead] : []).concat(rest);
+        return (parts.length ? parts.join(' · ') : JSON.stringify(v)).substring(0, 160);
+      } catch { return '[object]'; }
+    }
+    return String(v).substring(0, 160);
+  };
+
   const memoryLines = Object.entries(agentMemory || {}).map(([k, val]) => {
-    const valStr = Array.isArray(val)
-      ? `${val.length} items: ${val.slice(0, 5).map(v => String(v).substring(0, 100)).join(', ')}`
-      : (val !== null && typeof val === 'object')
-        ? (() => { try { return JSON.stringify(val).substring(0, 300); } catch { return '[object]'; } })()
-        : String(val).substring(0, 300);
+    if (Array.isArray(val)) {
+      const shown = val.slice(0, 10).map((v, i) => `  ${i + 1}. ${_fmtItem(v)}`).join('\n');
+      const more = val.length > 10 ? `\n  …and ${val.length - 10} more` : '';
+      // Keep the "N items" phrasing (matched by tests) and add readable rows.
+      return `- **${k}** (${val.length} item${val.length === 1 ? '' : 's'}):\n${shown}${more}`;
+    }
+    const valStr = (val !== null && typeof val === 'object')
+      ? (() => { try { return JSON.stringify(val).substring(0, 300); } catch { return '[object]'; } })()
+      : String(val).substring(0, 300);
     return `- **${k}**: ${valStr}`;
   });
 
