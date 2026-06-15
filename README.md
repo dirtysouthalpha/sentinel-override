@@ -15,7 +15,7 @@
    ╚██████╔╝ ╚████╔╝ ███████╗██║  ██║██║  ██║██║██████╔╝███████╗
     ╚═════╝   ╚═══╝  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═════╝ ╚══════╝
 
-                v20.0.0 — Full-Visibility AI Browser Operator
+                v20.0.1 — Full-Visibility AI Browser Operator
 ```
 
 ### Professional AI Browser Automation for IT Pros & MSPs
@@ -24,7 +24,7 @@ A self-healing, vision-powered browser agent built for the work technicians actu
 multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see,
 click, read, think, and produce defensible reports.
 
-![Version](https://img.shields.io/badge/version-20.0.0-orange)
+![Version](https://img.shields.io/badge/version-20.0.1-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Chrome](https://img.shields.io/badge/chrome-supported-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
@@ -34,7 +34,7 @@ click, read, think, and produce defensible reports.
 ![Platforms](https://img.shields.io/badge/platform%20profiles-19-ff69b4)
 
 <p>
-  <a href="#-whats-new-in-v190">What's New</a> •
+  <a href="#-whats-new-in-v2001">What's New</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-providers">Providers</a> •
   <a href="#-msp-features">MSP Features</a> •
@@ -54,7 +54,16 @@ click, read, think, and produce defensible reports.
 
 ---
 
-## ⚡ What's New in v19.0
+## ⚡ What's New in v20.0.1
+
+### v20.0.1 — Reliability fixes
+
+- **Reports reliably display.** Forensic run logs embed step screenshots and were filling `chrome.storage` (10 MB cap), which silently blocked the run report from saving — so it never appeared. Added the `unlimitedStorage` permission plus self-healing run-log writes that prune old logs on a quota error.
+- **"View Full Report" and Print no longer hang.** Their inline page scripts were blocked by MV3 CSP (`script-src 'self'`); moved to external `report-view.js` / `report-print.js`.
+- **Content-script re-injection fix.** A top-level `const` redeclaration aborted the content script on every re-inject, forcing the slow CDP fallback on every page — now `var`-scoped and idempotent, with the error/rejection listeners registered once.
+- **Stuck-loop watchdog.** Hard-stops a run that keeps clicking the same spot with zero productive output (weak-model fixation) instead of grinding to the step cap.
+- **Readable report Evidence.** Extracted object-lists render as titled rows instead of `[object Object]`.
+- Service worker ignores action-less runtime messages (no more `Unknown action: undefined`); the run-complete notification now respects the off-by-default sound toggle.
 
 ### v16–v17 — Foundation & Developer Velocity
 
@@ -599,7 +608,7 @@ sentinel-override/
 ├── popup.html                      # Side-panel entry
 ├── popup.css                       # 14 themes + custom CSS hooks
 ├── popup-full.js                   # Bootstrap
-├── manifest.json                   # MV3 manifest, v20.0.0
+├── manifest.json                   # MV3 manifest, v20.0.1
 ├── fonts/                          # Bundled Inter + Space Grotesk (no CDN)
 └── tests/                          # 164 suites, 8,313 passing tests
 ```
