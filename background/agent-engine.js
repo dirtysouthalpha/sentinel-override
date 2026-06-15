@@ -303,6 +303,15 @@ const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped 
 const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
+// (stuck-loop watchdog) The click_at loop detector below fires ONLY when the run
+// has produced nothing (productiveSteps === 0) and keeps clicking the same spot
+// — the exact "weak vision model fixates on one element" failure (e.g. CNN with
+// glm/gemma). Count those fires and hard-stop after a few rather than grinding to
+// the step cap (~80 wasted LLM calls). Runs that produce ANY result (extract /
+// note / execute_js output) never trip this, so legitimately-slow or
+// execute_js-looping-but-progressing runs are unaffected.
+const STUCK_CLICK_LOOP_ABORT_FIRES = 4;
+let _clickAtLoopFires = 0;
 // (3.30.0) Trust-score counters. Module-level so the loop can update them
 // from any branch and the run finalize block can read them at the end.
 let failedSteps = 0;            // running count of steps where actionFailed=true
@@ -535,6 +544,9 @@ try {
 // to prevent unbounded growth.
 const RUN_LOG_INDEX_MAX = 20;
 const RUN_LOG_INDEX_KEY = 'run_log_index';
+// Set once per run when a per-step run-log write hits a storage quota error, so
+// the heal-by-pruning pass runs at most once per run instead of on every step.
+let _runLogQuotaPruned = false;
 
 async function _updateRunLogIndex(runLogId, fields) {
   if (!runLogId) return;
@@ -763,6 +775,7 @@ export function resetAgentState() {
   lastApiCallTime = 0;
   agentMemory = {};
   productiveSteps = 0;
+  _clickAtLoopFires = 0;
   consecutiveFailures = 0;
   _pageStagnation = 0;
   currentStrategies = [];
@@ -1036,6 +1049,7 @@ export async function startAgent(goal, sender) {
   // every step to chrome.storage.local.run_logs[runLogId] for export.
   try {
     runLogId = crypto.randomUUID();
+    _runLogQuotaPruned = false;
     runLogBuffer = [{
       step: 0,
       timestamp: new Date().toISOString(),
@@ -6756,6 +6770,23 @@ return { ok: true, value: el.value };
           _clickAtLoopCount = 0;
           agentPlan = null;
           currentPlanStep = 0;
+          // (stuck-loop watchdog) Escalate: the advisory note + overlay-dismiss
+          // above often don't help a weak model that keeps re-picking the same
+          // element. After several such fires with STILL zero productive output,
+          // stop the run with a clear message + report rather than grinding to
+          // the step cap.
+          _clickAtLoopFires++;
+          if (_clickAtLoopFires >= STUCK_CLICK_LOOP_ABORT_FIRES) {
+            const _stuckSummary = `Stopped early: the agent clicked the same area ~${_clickAtLoopFires * 3} times and produced nothing — it's stuck (commonly a weak vision model fixating on one element). Try a more specific goal, a different starting page, or a stronger model.`;
+            sendSilentUpdate(_stuckSummary, stepCount);
+            finished = true;
+            reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+            chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⏹ ${_stuckSummary}` }).catch((e) => {
+              console.error('[stuck-loop abort] Unhandled rejection:', e);
+            });
+            sendReportUpdate('generating');
+            break;
+          }
         }
       } else {
         // Reset on any non-click_at action
@@ -6992,8 +7023,26 @@ return { ok: true, value: el.value };
           // Persist to storage every step.
           chrome.storage.local.set({
             [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
-          }).catch((e) => {
-            console.error('[agent-engine] Unhandled rejection:', e);
+          }).catch(async (e) => {
+            const msg = (e && e.message) ? e.message : String(e);
+            // Run logs carry base64 screenshots and can fill chrome.storage. When
+            // that happens, OTHER writes — including last_agent_report — start
+            // failing, which is why reports silently never appeared. Self-heal:
+            // drop every OTHER run's forensic log (keep the current one), at most
+            // once per run, and stop spamming the console every step.
+            if (/quota/i.test(msg)) {
+              if (_runLogQuotaPruned) return;
+              _runLogQuotaPruned = true;
+              try {
+                const all = await chrome.storage.local.get(null);
+                const stale = Object.keys(all).filter(k =>
+                  k.indexOf('run_log_') === 0 && k !== RUN_LOG_INDEX_KEY && k !== `run_log_${runLogId}`);
+                if (stale.length) await chrome.storage.local.remove(stale);
+                console.warn(`[agent-engine] Storage quota hit — pruned ${stale.length} old run log(s) to reclaim space.`);
+              } catch (_pe) { /* best effort */ }
+              return;
+            }
+            console.error('[agent-engine] Run log persist failed:', msg);
           });
         }
       } catch (_) { /* never crash the loop on logging */ }

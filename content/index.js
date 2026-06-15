@@ -7,8 +7,22 @@
 // (CSH-01) Top-level error boundary — reports uncaught content script errors
 // to the background service worker so they appear in telemetry/logs instead
 // of silently vanishing in the content script context.
-window.addEventListener('error', (event) => {
+// Named function declarations (not inline arrows) so re-running this file on
+// re-injection doesn't throw, and so the listeners can be registered exactly
+// once below.
+function __sentinelReportContentError(event) {
   try {
+    // A content script runs in an isolated JS world but shares the page's
+    // `window`, so this 'error' listener ALSO fires for the HOST PAGE's own
+    // script errors (ad/tracking/framework code — heavy on sites like cnn.com).
+    // Those were being mislabeled "Uncaught error in content script" and
+    // flooding telemetry / the SW console. Only report errors that actually
+    // originate from our own extension bundle; ignore the host page's. Our real
+    // bugs still surface here because their filename is a chrome-extension:// URL.
+    const ourPrefix = (chrome.runtime && typeof chrome.runtime.getURL === 'function')
+      ? chrome.runtime.getURL('') : '';
+    const filename = String(event.filename || '');
+    if (!ourPrefix || filename.indexOf(ourPrefix) !== 0) return; // host-page error — not ours
     chrome.runtime.sendMessage({
       action: 'content_telemetry_event',
       category: 'content',
@@ -16,15 +30,15 @@ window.addEventListener('error', (event) => {
       message: 'Uncaught error in content script',
       payload: {
         message: String(event.message || ''),
-        filename: String(event.filename || ''),
+        filename,
         lineno: event.lineno || 0,
         colno: event.colno || 0
       }
     }).catch(() => {});
   } catch (_e) { /* truly non-fatal */ }
-});
+}
 
-window.addEventListener('unhandledrejection', (event) => {
+function __sentinelReportContentRejection(event) {
   try {
     chrome.runtime.sendMessage({
       action: 'content_telemetry_event',
@@ -34,7 +48,17 @@ window.addEventListener('unhandledrejection', (event) => {
       payload: { reason: String(event.reason || '') }
     }).catch(() => {});
   } catch (_e) {}
-});
+}
+
+// Register ONCE. This file is re-injected into the same frame on every agent
+// step and runs before the re-injection guard below; without this flag each
+// injection would add another listener pair, so one error would be reported N
+// times and the listeners would leak.
+if (!window.__sentinelBootListeners) {
+  window.__sentinelBootListeners = true;
+  window.addEventListener('error', __sentinelReportContentError);
+  window.addEventListener('unhandledrejection', __sentinelReportContentRejection);
+}
 //
 // (3.26.0) Content-side telemetry helper — fires `content_telemetry_event`
 // messages to the background, which re-emits via tel.emit() (telemetry.js).
@@ -47,19 +71,30 @@ function getErrorMessage(e) {
   return String(e || '');
 }
 
+// NOTE: these top-level declarations use `var`, NOT `const`, on purpose. This
+// content script is injected repeatedly into the same frame (once per agent
+// step / on navigation). A top-level `const`/`let`/`class` lives in the global
+// lexical environment, which PERSISTS across injections — so a second injection
+// throws `SyntaxError: Identifier 'X' has already been declared` during
+// declaration instantiation, BEFORE any statement (including the re-injection
+// guard below at `if (window.__sentinelInitialized)`) can run. That aborted the
+// entire content script on every re-injection, forcing the slow CDP fallback.
+// `var` redeclaration is a no-op, so re-injection reaches the guard and exits
+// cleanly. Do NOT convert these back to `const`.
+//
 // Precompile regex for Microsoft 365 tenant detection (performance optimization)
-const ONMICROSOFT_TENANT_RE = /[a-z0-9-]+\.onmicrosoft\.com/i;
+var ONMICROSOFT_TENANT_RE = /[a-z0-9-]+\.onmicrosoft\.com/i;
 
 // Precompile regex for modal/overlay detection (hot path in dismissOverlays)
-const DIALOG_ROLE_RE = /^(dialog|alertdialog)$/;
-const MODAL_TEXT_RE = /\b(modal|dialog|sign in|subscribe)\b/;
-const ADBLOCK_TEXT_RE = /\b(ad.?block|adblocker|ad.?blocker|whitelist|white.?list|turn.?off.?ad|disable.?ad|remove.?ad|blocker.?detect|using.?an?.ad)\b/;
-const PAYWALL_TEXT_RE = /\b(paywall|premium|subscription|required|register.?to.?read|subscribe.?to.?continue|sign.?up.?to.?continue)\b/;
-const CONSENT_TEXT_RE = /\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/;
-const DISMISS_TEXT_RE = /\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i;
+var DIALOG_ROLE_RE = /^(dialog|alertdialog)$/;
+var MODAL_TEXT_RE = /\b(modal|dialog|sign in|subscribe)\b/;
+var ADBLOCK_TEXT_RE = /\b(ad.?block|adblocker|ad.?blocker|whitelist|white.?list|turn.?off.?ad|disable.?ad|remove.?ad|blocker.?detect|using.?an?.ad)\b/;
+var PAYWALL_TEXT_RE = /\b(paywall|premium|subscription|required|register.?to.?read|subscribe.?to.?continue|sign.?up.?to.?continue)\b/;
+var CONSENT_TEXT_RE = /\b(consent|cookie|privacy|gdpr| ccpa|notice|we.?use.?cookies|this.?site.?uses)\b/;
+var DISMISS_TEXT_RE = /\b(continue.?to.?site|continue.?anyway|continue.?reading|continue.?with|dismiss|not.?now|maybe.?later|no.?thanks|i.?understand)\b/i;
 
 // Precompile regex for UI component skip pattern (hot path in dismissOverlays)
-const UI_COMPONENT_SKIP_RE = /compose|drawer|figma|sheet|panel/i;
+var UI_COMPONENT_SKIP_RE = /compose|drawer|figma|sheet|panel/i;
 
 // (3.26.0) Content-script telemetry emit helper. Bound to window so it
 // survives the re-injection guard (re-injection skips the else-branch but

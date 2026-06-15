@@ -224,44 +224,60 @@ describe('emitLearnedPatterns', () => {
 // ========== notifyRunComplete ==========
 
 describe('notifyRunComplete', () => {
-  test('creates notification on success', () => {
-    notifyRunComplete('Do the thing', true, 5, 10000);
+  beforeEach(() => {
+    // notifyRunComplete now routes through notifyIfEnabled (shared-state), which
+    // (1) only fires when sound notifications are enabled and (2) resolves the
+    // icon via chrome.runtime.getURL. Enable the toggle and stub getURL so the
+    // create() call is reached.
+    global.chrome.runtime.getURL = jest.fn((p) => 'chrome-extension://test/' + p);
+    global.chrome.storage.local.get = jest.fn().mockResolvedValue({ sentinelSoundEnabled: true });
+  });
+
+  test('creates notification on success', async () => {
+    await notifyRunComplete('Do the thing', true, 5, 10000);
     expect(global.chrome.notifications.create).toHaveBeenCalledTimes(1);
     const [, opts] = global.chrome.notifications.create.mock.calls[0];
     expect(opts.message).toContain('Completed successfully');
     expect(opts.message).toContain('5 steps');
     expect(opts.message).toContain('10s');
     expect(opts.title).toContain('Do the thing');
+    expect(opts.iconUrl).toContain('icon-128.png');
   });
 
-  test('creates notification on failure', () => {
-    notifyRunComplete('Do the thing', false, 2, 3000);
+  test('creates notification on failure', async () => {
+    await notifyRunComplete('Do the thing', false, 2, 3000);
     const [, opts] = global.chrome.notifications.create.mock.calls[0];
     expect(opts.message).toContain('Failed');
   });
 
-  test('truncates long goal to 50 chars', () => {
+  test('truncates long goal to 50 chars', async () => {
     const longGoal = 'A'.repeat(80);
-    notifyRunComplete(longGoal, true, 1, 0);
+    await notifyRunComplete(longGoal, true, 1, 0);
     const [, opts] = global.chrome.notifications.create.mock.calls[0];
     expect(opts.title.length).toBeLessThanOrEqual('Sentinel Override: '.length + 50);
   });
 
-  test('handles null/undefined goal gracefully', () => {
-    expect(() => notifyRunComplete(null, true, 0, 0)).not.toThrow();
+  test('handles null/undefined goal gracefully', async () => {
+    await notifyRunComplete(null, true, 0, 0);
     const [, opts] = global.chrome.notifications.create.mock.calls[0];
     expect(opts.title).toContain('Task');
   });
 
-  test('handles undefined duration without NaN', () => {
-    notifyRunComplete('goal', true, 3, undefined);
+  test('handles undefined duration without NaN', async () => {
+    await notifyRunComplete('goal', true, 3, undefined);
     const [, opts] = global.chrome.notifications.create.mock.calls[0];
     expect(opts.message).toContain('0s');
   });
 
-  test('does not throw when notifications API is unavailable', () => {
+  test('stays silent when sound notifications are disabled', async () => {
+    global.chrome.storage.local.get = jest.fn().mockResolvedValue({ sentinelSoundEnabled: false });
+    await notifyRunComplete('goal', true, 1, 1000);
+    expect(global.chrome.notifications.create).not.toHaveBeenCalled();
+  });
+
+  test('does not throw when notifications API is unavailable', async () => {
     global.chrome.notifications = undefined;
-    expect(() => notifyRunComplete('goal', true, 1, 1000)).not.toThrow();
+    await expect(notifyRunComplete('goal', true, 1, 1000)).resolves.toBeUndefined();
   });
 });
 

@@ -269,7 +269,18 @@ chrome.tabs.onCreated.addListener((tab) => {
 
 
 // ========== Unified Message Handler ==========
-chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) => {
+// (v10.3.2) This service worker registers several onMessage listeners
+// (scheduler, tab-manager, agent-engine, agent-planning, and UAP completion
+// waiters), and the runtime message bus also carries action-less broadcasts —
+// e.g. UAP's { channel: 'uap', ... } and voice/status pings. Every listener
+// sees every message, so this catch-all router must ignore what isn't
+// addressed to it. Only messages with a non-empty string `action` are ours;
+// the guard below returns false synchronously for anything else (releasing the
+// channel so a sibling listener can still respond) instead of falling through
+// to `default:` and throwing "Unknown action: undefined" — which spammed the
+// SW console (message-protocol.js:88) and sent a bogus error response back to
+// fire-and-forget senders.
+const handleRuntimeMessage = async (request, sender) => {
   switch (request.action) {
     // Diagnostic ping — remove after startup bug is fixed
     case 'ping': {
@@ -880,6 +891,12 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     case 'content_script_ready':
       return null;
 
+    // UAP federation envelope broadcast by uap-server.broadcastToClient. It is
+    // addressed to external/peer UAP consumers, not this router — acknowledge
+    // and ignore so it never falls through to the `default:` throw.
+    case 'uap_broadcast':
+      return null;
+
     // ========== Voice Input Message Forwarding (Bug #3 fix) ==========
     // Content scripts send voice messages via chrome.runtime.sendMessage;
     // we forward them to the popup so the voice input UI can update.
@@ -1037,7 +1054,17 @@ chrome.runtime.onMessage.addListener(wrapMessageHandler(async (request, sender) 
     default:
       throw new Error(`Unknown action: ${request.action}`);
   }
-}));
+};
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Not addressed to this router (action-less broadcast or another listener's
+  // message) — ignore it without holding the channel open. See the comment on
+  // handleRuntimeMessage above.
+  if (!request || typeof request.action !== 'string' || request.action === '') {
+    return false;
+  }
+  return wrapMessageHandler(handleRuntimeMessage)(request, sender, sendResponse);
+});
 
 // ========== Tab Event Listeners ==========
 

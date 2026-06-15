@@ -3369,10 +3369,28 @@ if (document.readyState === 'loading') {
 // The agent saves the report to chrome.storage.local but sendReportUpdate
 // via runtime.sendMessage can be lost if the panel isn't listening.
 // This uses BOTH a storage change listener AND a polling fallback.
-let _reportShown = false;
+// Dedup by report timestamp, NOT a one-shot boolean. The side panel document
+// persists across runs, so a boolean latched `true` on run 1 permanently killed
+// this storage safety-net for every later run — if that run's direct
+// report_update/agent_loop_complete message was then missed (which the note
+// above says happens), no report ever appeared. Tracking the last-shown
+// timestamp re-arms the net for each NEW report while still preventing the same
+// report from rendering twice across the direct + storage paths.
+let _lastShownReportTs = null;
+
+// Single choke point used by all three render paths (report_update 'ready',
+// agent_loop_complete, and the storage fallback below). Renders each distinct
+// report exactly once.
+function _showReportOnce(report) {
+  if (!report || typeof report !== 'object' || report === null) return false;
+  const ts = String(report.timestamp || '');
+  if (ts && ts === _lastShownReportTs) return false; // this exact report already shown
+  _lastShownReportTs = ts;
+  try { addReportCard(report); } catch (e) { console.error('[Sentinel] addReportCard error:', getErrorMessage(e)); }
+  return true;
+}
 
 async function _tryShowReport() {
-  if (_reportShown) return;
   try {
     const stored = await chrome.storage.local.get(['last_agent_report']);
     const report = stored.last_agent_report;
@@ -3380,13 +3398,7 @@ async function _tryShowReport() {
     // Only show if report is less than 5 minutes old
     const age = Date.now() - new Date(report.timestamp).getTime();
     if (Number.isNaN(age) || age > 5 * 60 * 1000) return;
-    // Don't show if there's already a report card in the chat
-    if (chatContainer && chatContainer.querySelector('.report-card-title')) {
-      _reportShown = true;
-      return;
-    }
-    addReportCard(report);
-    _reportShown = true;
+    if (!_showReportOnce(report)) return; // already rendered this exact report
     // Auto-scroll to the report card
     setTimeout(() => {
       const card = chatContainer && chatContainer.querySelector('.report-card-title');
@@ -3626,12 +3638,14 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'cdp_reattach_warning') {
     updateStatus(`⚠️ ${typeof message.message === 'string' ? message.message : 'Debugger re-attached after banner was dismissed.'}`);
   }
-  // (3.51) Report display — show report card in chat when report is ready
+  // (3.51) Report display — show report card in chat when report is ready.
+  // Both paths (and the storage fallback) funnel through _showReportOnce so a
+  // report renders exactly once regardless of which signal arrives first.
   if (message.action === 'report_update' && message.status === 'ready' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', getErrorMessage(e)); }
+    _showReportOnce(message.report);
   }
   if (message.action === 'agent_loop_complete' && message.report) {
-    try { addReportCard(message.report); } catch (e) { console.error('[Sentinel] addReportCard error:', getErrorMessage(e)); }
+    _showReportOnce(message.report);
   }
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
@@ -3672,7 +3686,7 @@ chrome.runtime.onMessage.addListener((message) => {
         healthBar = document.createElement('div');
         healthBar.id = 'api-health-bar';
         healthBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:5px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;';
-        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
         if (chatArea) chatArea.parentNode.insertBefore(healthBar, chatArea);
       }
       const colors = { healthy: '#4caf50', slow: '#ff9800', down: '#f44336', idle: '#666', unknown: '#666' };
@@ -3710,7 +3724,7 @@ chrome.runtime.onMessage.addListener((message) => {
         knowledgeBar.id = 'knowledge-context-bar';
         knowledgeBar.style.cssText = 'padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(255,255,255,0.06);color:#888;background:transparent;cursor:pointer;';
         knowledgeBar.title = 'Click to see facts';
-        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
         if (chatArea) chatArea.parentNode.insertBefore(knowledgeBar, chatArea);
         knowledgeBar.addEventListener('click', () => {
           const details = document.getElementById('knowledge-details');
@@ -3833,13 +3847,18 @@ chrome.runtime.onMessage.addListener((message) => {
     planPanel.appendChild(stepsList);
 
     // Insert after status bars, before chat messages
-    const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+    const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
     if (chatArea) chatArea.parentNode.insertBefore(planPanel, chatArea);
 
-    // Toggle collapse
-    document.getElementById('plan-toggle').addEventListener('click', () => {
+    // Toggle collapse. Guard against a null toggle: if planPanel never got
+    // inserted (e.g. chatContainer missing), getElementById returns null and the
+    // unguarded .addEventListener used to throw, crashing the whole onMessage
+    // handler for this message.
+    const planToggle = document.getElementById('plan-toggle');
+    if (planToggle) planToggle.addEventListener('click', () => {
       const list = document.getElementById('plan-steps-list');
       const toggle = document.getElementById('plan-toggle');
+      if (!list || !toggle) return;
       if (list.style.display === 'none') { list.style.display = 'block'; toggle.textContent = 'Collapse'; }
       else { list.style.display = 'none'; toggle.textContent = 'Expand'; }
     });
@@ -3950,7 +3969,7 @@ chrome.runtime.onMessage.addListener((message) => {
       previewPanel.id = 'screenshot-preview';
       previewPanel.style.cssText = 'position:relative;width:100%;max-height:200px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;';
       previewPanel.title = 'Click to expand';
-      const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+      const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
       if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
       previewPanel.addEventListener('click', () => {
         const isExpanded = previewPanel.style.maxHeight === '500px';
@@ -4271,7 +4290,7 @@ chrome.runtime.onMessage.addListener((message) => {
         patternsPanel = document.createElement('div');
         patternsPanel.id = 'patterns-panel';
         patternsPanel.style.cssText = 'padding:8px 12px;margin:4px 8px;background:rgba(255,255,255,0.02);border-radius:6px;border:1px solid rgba(255,255,255,0.06);font-size:11px;';
-        const chatArea = document.getElementById('chatMessages') || document.querySelector('.chat-messages');
+        const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
         if (chatArea) chatArea.parentNode.insertBefore(patternsPanel, chatArea);
       }
       const header = '<div style="color:#888;margin-bottom:4px;">Learned Patterns (' + message.patterns.length + ')</div>';

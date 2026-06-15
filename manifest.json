@@ -13,6 +13,7 @@
     "tabGroups",
     "sidePanel",
     "storage",
+    "unlimitedStorage",
     "debugger",
     "webNavigation",
     "alarms",

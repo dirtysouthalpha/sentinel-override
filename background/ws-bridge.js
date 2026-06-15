@@ -183,11 +183,12 @@ async function handleMessage(message) {
       }
       break;
 
-    case 'auth_challenge':
+    case 'auth_challenge': {
       challengeNonce = message.nonce;
       const response = await computeChallengeResponse(challengeNonce);
       ws.send(JSON.stringify({ type: 'auth_challenge_response', response }));
       break;
+    }
 
     case 'task':
       if (!authenticated) { sendResponse(requestId, { type: 'error', message: 'Not authenticated' }); return; }

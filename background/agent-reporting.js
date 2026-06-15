@@ -3,6 +3,7 @@
 // desktop notifications, and learned-pattern dashboard emission.
 
 import { getErrorMessage } from './error-utils.js';
+import { notifyIfEnabled } from './shared-state.js';
 
 // ========== Module State ==========
 
@@ -111,15 +112,25 @@ function notifyRunComplete(goal, success, stepCount, duration) {
     const truncatedGoal = (goal || 'Task').substring(0, 50);
     const status = success ? 'Completed successfully' : 'Failed';
     const body = `${status} · ${stepCount} steps · ${Math.round((duration || 0) / 1000)}s`;
-    chrome.notifications.create('run-complete-' + Date.now(), {
+    // Route through notifyIfEnabled (shared-state) instead of calling
+    // chrome.notifications.create directly. This:
+    //   1. Respects the default-OFF "sound notifications" toggle — Sentinel stays
+    //      silent unless the user opts in (this was the only one of the six
+    //      notification sites still bypassing the toggle).
+    //   2. Awaits + catches the create() promise inside the helper. The old code
+    //      used a relative iconUrl ('icon-128.png') which rejects with
+    //      "Unable to download all specified images." as an UNCAUGHT promise on
+    //      MV3 — the sync try/catch here never saw it. We also resolve the icon
+    //      to a fully-qualified extension URL via chrome.runtime.getURL.
+    return notifyIfEnabled('run-complete-' + Date.now(), {
       type: 'basic',
-      iconUrl: 'icon-128.png',
+      iconUrl: chrome.runtime.getURL('icon-128.png'),
       title: 'Sentinel Override: ' + truncatedGoal,
       message: body,
       priority: 2
     });
   } catch (_e) {
-    // notifications API may not be available
+    // notifications API / runtime may not be available — non-fatal.
   }
 }
 

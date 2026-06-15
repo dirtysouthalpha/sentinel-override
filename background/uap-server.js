@@ -331,6 +331,11 @@ class UAPServer {
    */
   broadcastToClient(clientId, message) {
     chrome.runtime.sendMessage({
+      // `action` makes this envelope explicit on the shared runtime message bus
+      // so the background router recognizes it instead of treating it as an
+      // unknown/action-less message. The inner `message.type` carries the UAP
+      // payload kind (goal_complete, step_update, …) for client consumers.
+      action: 'uap_broadcast',
       channel: 'uap',
       clientId,
       message
