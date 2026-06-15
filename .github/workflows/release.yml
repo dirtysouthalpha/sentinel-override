@@ -1,8 +1,13 @@
 name: Release
 
 # Sentinel Override is a Chrome (MV3) extension — NOT an npm package. On a vX.Y.Z
-# tag this builds the Chrome Web Store .zip and attaches it to a GitHub Release.
-# Chrome Web Store submission is a separate step (see RELEASING.md).
+# tag this builds the Chrome Web Store .zip, attaches it to a GitHub Release, and
+# (optionally) uploads + submits it to the Chrome Web Store.
+#
+# The Chrome Web Store step only runs when the CWS secrets are configured, so the
+# release never fails for anyone who hasn't set up store automation. Add these repo
+# secrets to enable it (Settings → Secrets and variables → Actions):
+#   CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
 
 on:
   push:
@@ -15,6 +20,9 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    env:
+      # Mirrored to env so the optional CWS step can gate on its presence in `if`.
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,8 +38,25 @@ jobs:
       - name: Build Chrome Web Store zip
         run: npm run build # -> dist/sentinel-override-v<manifest.version>.zip
 
+      - name: Locate built zip
+        id: zip
+        run: echo "path=$(ls dist/*.zip | head -n1)" >> "$GITHUB_OUTPUT"
+
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
           generate_release_notes: true
+
+      # Uploads the zip and submits it for Chrome Web Store review. Skipped unless
+      # the CWS secrets are set. Google still reviews before it goes live to users.
+      - name: Publish to Chrome Web Store
+        if: ${{ env.CWS_CLIENT_ID != '' }}
+        uses: mnao305/chrome-extension-upload@v5
+        with:
+          file-path: ${{ steps.zip.outputs.path }}
+          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
+          client-id: ${{ secrets.CWS_CLIENT_ID }}
+          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
+          publish: true
