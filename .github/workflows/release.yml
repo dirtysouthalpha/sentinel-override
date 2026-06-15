@@ -1,0 +1,37 @@
+name: Release
+
+# Sentinel Override is a Chrome (MV3) extension — NOT an npm package. On a vX.Y.Z
+# tag this builds the Chrome Web Store .zip and attaches it to a GitHub Release.
+# Chrome Web Store submission is a separate step (see RELEASING.md).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build Chrome Web Store zip
+        run: npm run build # -> dist/sentinel-override-v<manifest.version>.zip
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
