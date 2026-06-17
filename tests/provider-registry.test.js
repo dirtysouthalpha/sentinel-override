@@ -957,7 +957,8 @@ describe('migrateLegacySettings', () => {
     expect(setCalls.length).toBeGreaterThan(0);
     const setObj = setCalls[0];
     expect(setObj.providers.openai.model).toBe('gpt-3.5-turbo');
-    expect(setObj.providers.anthropic.model).toBe('claude-sonnet-4-6');
+    // (v20.3) Anthropic default upgraded to Opus 4.8 for best agentic performance.
+    expect(setObj.providers.anthropic.model).toBe('claude-opus-4-8');
   });
 });
 

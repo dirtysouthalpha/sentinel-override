@@ -679,9 +679,12 @@ function formatZoomRegion(region) {
 // ========== Configuration ==========
 const CONFIG = {
   minDelayBetweenCalls: 500,
-  maxRetries: 2,
+  // (v20.3) Raised 2 → 6. On heavy admin pages a single 429/overload/timeout used
+  // to hard-stop the run; free/community models on OpenRouter rate-limit often, so
+  // a deeper retry budget with a longer backoff cap keeps runs alive across them.
+  maxRetries: 6,
   retryDelay: TWO_SECONDS_MS,
-  maxRetryDelay: TEN_SECONDS_MS,
+  maxRetryDelay: 2 * TEN_SECONDS_MS, // 20s cap (was 10s)
   screenshotQuality: 30,
   fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
   pageLoadTimeout: 25000,
