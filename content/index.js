@@ -19,6 +19,7 @@ function __sentinelReportContentError(event) {
     // flooding telemetry / the SW console. Only report errors that actually
     // originate from our own extension bundle; ignore the host page's. Our real
     // bugs still surface here because their filename is a chrome-extension:// URL.
+    if (!__sentinelContextValid()) return; // orphaned — stay quiet
     const ourPrefix = (chrome.runtime && typeof chrome.runtime.getURL === 'function')
       ? chrome.runtime.getURL('') : '';
     const filename = String(event.filename || '');
@@ -40,6 +41,7 @@ function __sentinelReportContentError(event) {
 
 function __sentinelReportContentRejection(event) {
   try {
+    if (!__sentinelContextValid()) return; // orphaned — stay quiet
     chrome.runtime.sendMessage({
       action: 'content_telemetry_event',
       category: 'content',
@@ -69,6 +71,16 @@ if (!window.__sentinelBootListeners) {
 function getErrorMessage(e) {
   if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;
   return String(e || '');
+}
+
+// True while this content script's extension runtime is still live. After the
+// extension is reloaded/updated/disabled, scripts already injected into open
+// tabs are "orphaned" — chrome.runtime.id goes undefined and any sendMessage
+// throws "Extension context invalidated". Every outbound sender below checks
+// this first so an orphaned script goes quiet instead of spamming the console.
+function __sentinelContextValid() {
+  try { return !!(chrome && chrome.runtime && chrome.runtime.id); }
+  catch (_e) { return false; }
 }
 
 // NOTE: these top-level declarations use `var`, NOT `const`, on purpose. This
@@ -102,6 +114,7 @@ var UI_COMPONENT_SKIP_RE = /compose|drawer|figma|sheet|panel/i;
 if (!window.__sentinelContentTel) {
   window.__sentinelContentTel = function _ctel(category, level, message, payload) {
     try {
+      if (!__sentinelContextValid()) return; // orphaned — stay quiet
       chrome.runtime.sendMessage({
         action: 'content_telemetry_event',
         category: String(category || 'content'),
@@ -2685,18 +2698,57 @@ if (window.__sentinelInitialized) {
     }
   }
 
-  function safeSendMessage(msg) {
-    try { chrome.runtime.sendMessage(msg).catch((e) => {
-      console.warn('[Sentinel] safe send failed:', getErrorMessage(e));
-    }); } catch (e) { console.warn('[Sentinel] safe send msg:', getErrorMessage(e)); }
-  }
-
   // SPA observer at module scope for cleanup access
   let domObserver = null;
   let spaDebounce = null;
+  // Patched-history refs + popstate handler, captured by setupSPAObservers so the
+  // orphan teardown below can restore the originals.
+  let _spaOriginalPushState = null;
+  let _spaOriginalReplaceState = null;
+  let _spaPopStateHandler = null;
+  let __sentinelTornDown = false;
+
+  // Orphaned content scripts keep running their observers/listeners. On SPA
+  // dashboards (e.g. SonicWall NSM) the DOM mutates constantly, so the SPA
+  // MutationObserver would fire safeSendMessage on every mutation and spam
+  // "Extension context invalidated" forever. Detect the dead context once and
+  // tear ourselves down: stop observing, restore the patched history methods,
+  // drop the popstate listener, and go quiet. The page must be reloaded to get a
+  // fresh content script bound to the new extension context.
+  function tearDownOrphanedContentScript() {
+    if (__sentinelTornDown) return;
+    __sentinelTornDown = true;
+    try { if (domObserver) { domObserver.disconnect(); domObserver = null; } } catch (_e) { /* non-fatal */ }
+    try { if (insertionObserver) { insertionObserver.disconnect(); insertionObserver = null; } } catch (_e) { /* non-fatal */ }
+    try { if (spaDebounce) { clearTimeout(spaDebounce); spaDebounce = null; } } catch (_e) { /* non-fatal */ }
+    try { if (_spaOriginalPushState) history.pushState = _spaOriginalPushState; } catch (_e) { /* non-fatal */ }
+    try { if (_spaOriginalReplaceState) history.replaceState = _spaOriginalReplaceState; } catch (_e) { /* non-fatal */ }
+    try { if (_spaPopStateHandler) window.removeEventListener('popstate', _spaPopStateHandler); } catch (_e) { /* non-fatal */ }
+    try { console.warn('[Sentinel] Extension context invalidated — content script orphaned and shut down. Reload this tab to re-enable the agent here.'); } catch (_e) { /* non-fatal */ }
+  }
+
+  function safeSendMessage(msg) {
+    if (__sentinelTornDown) return;
+    // Cheap pre-check: if the runtime is already gone, tear down without even
+    // attempting a send (which would throw synchronously).
+    if (!__sentinelContextValid()) { tearDownOrphanedContentScript(); return; }
+    const _isContextLost = (m) => /context invalidated|message port closed|receiving end does not exist/i.test(m || '');
+    try {
+      chrome.runtime.sendMessage(msg).catch((e) => {
+        const m = getErrorMessage(e);
+        if (_isContextLost(m)) tearDownOrphanedContentScript();
+        else console.warn('[Sentinel] safe send failed:', m);
+      });
+    } catch (e) {
+      const m = getErrorMessage(e);
+      if (_isContextLost(m)) tearDownOrphanedContentScript();
+      else console.warn('[Sentinel] safe send msg:', m);
+    }
+  }
 
   function setupSPAObservers() {
     domObserver = new MutationObserver((mutations) => {
+      if (__sentinelTornDown) return;
       const significantChange = mutations.some(m =>
         m.addedNodes.length > 0 || m.removedNodes.length > 0
       );
@@ -2732,11 +2784,12 @@ if (window.__sentinelInitialized) {
       }, 300);
     };
 
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
+    // Capture originals at module scope so the orphan teardown can restore them.
+    _spaOriginalPushState = history.pushState;
+    _spaOriginalReplaceState = history.replaceState;
 
     history.pushState = function(...args) {
-      originalPushState.apply(this, args);
+      _spaOriginalPushState.apply(this, args);
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         dispatchSPATransition(lastUrl);
@@ -2744,19 +2797,20 @@ if (window.__sentinelInitialized) {
     };
 
     history.replaceState = function(...args) {
-      originalReplaceState.apply(this, args);
+      _spaOriginalReplaceState.apply(this, args);
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         dispatchSPATransition(lastUrl);
       }
     };
 
-    window.addEventListener('popstate', () => {
+    _spaPopStateHandler = () => {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         dispatchSPATransition(lastUrl);
       }
-    });
+    };
+    window.addEventListener('popstate', _spaPopStateHandler);
 
     // Cleanup on page unload to prevent memory leaks
     window.addEventListener('beforeunload', () => {
