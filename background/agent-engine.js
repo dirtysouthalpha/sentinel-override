@@ -4653,8 +4653,6 @@ async function runAgentLoop(goal, workingTabId) {
           if (_vEndpoint.includes('api.anthropic.com')) {
             throw new Error('Vision LLM not supported for Anthropic provider');
           }
-          const _vCtrl = new AbortController();
-          const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
           let _vResponse;
           // Prepare request body safely
           let _visionBody;
@@ -4675,21 +4673,46 @@ async function runAgentLoop(goal, workingTabId) {
             console.warn('[Sentinel/v4] Vision payload serialization failed:', getErrorMessage(_stringifyErr));
             break; // Exit vision mode on serialization failure
           }
-          try {
-            _vResponse = await fetch(
-              _vEndpoint,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${_vApiKey}`
-                },
-                body: _visionBody,
-                signal: _vCtrl.signal
-              }
-            );
-          } finally {
-            clearTimeout(_vTimeoutId);
+          // (v20.5) Retry the vision call on transient failures (network error,
+          // 429/5xx) before falling through to the legacy path. This brings the
+          // resilience Fix 5 wanted WITHOUT routing through legacy — keeping the
+          // set-of-marks numbered-label grounding that weak vision models depend
+          // on (legacy clicks by estimated coordinates, which grounds worse). A
+          // 45s timeout is NOT retried — it would just time out again; the faster
+          // path is to fall through to legacy.
+          const _vMaxAttempts = 2;
+          for (let _vAttempt = 0; _vAttempt < _vMaxAttempts; _vAttempt++) {
+            const _vCtrl = new AbortController();
+            const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
+            let _vTransient = false;
+            try {
+              _vResponse = await fetch(
+                _vEndpoint,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${_vApiKey}`
+                  },
+                  body: _visionBody,
+                  signal: _vCtrl.signal
+                }
+              );
+            } catch (_vFetchErr) {
+              const _aborted = _vFetchErr && typeof _vFetchErr === 'object' && _vFetchErr.name === 'AbortError';
+              _vTransient = !_aborted; // retry real network errors, not a 45s timeout
+              console.warn(`[Sentinel/v4] Vision fetch attempt ${_vAttempt + 1} failed${_aborted ? ' (timeout)' : ''}:`, getErrorMessage(_vFetchErr));
+            } finally {
+              clearTimeout(_vTimeoutId);
+            }
+            if (!_vTransient && _vResponse && (_vResponse.status === 429 || _vResponse.status >= 500)) {
+              _vTransient = true;
+              console.warn('[Sentinel/v4] Vision LLM retryable status:', _vResponse.status);
+            }
+            if (!_vTransient) break; // success, or a non-retryable response
+            if (_vAttempt < _vMaxAttempts - 1) {
+              await new Promise((r) => setTimeout(r, TWO_SECONDS_MS));
+            }
           }
           if (_vResponse && !_vResponse.ok) {
             console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
