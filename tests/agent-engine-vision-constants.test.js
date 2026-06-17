@@ -11,22 +11,63 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(resolve(__dirname, '../background/agent-engine.js'), 'utf8');
 
 describe('VISION_DISCOVER', () => {
-  const constLine = (typeof src === 'string' ? src.split('\n') : []).find(l => l.startsWith('const VISION_DISCOVER'));
+  // VISION_DISCOVER is a multi-line template literal — grab the whole block.
+  const discoverBlock = (() => {
+    const m = typeof src === 'string' ? src.match(/const VISION_DISCOVER = `([\s\S]*?)`;/) : null;
+    return m ? m[1] : '';
+  })();
 
   it('is defined', () => {
-    expect(constLine).toBeTruthy();
+    expect(discoverBlock).toBeTruthy();
   });
 
   it('stamps data-sentinel-index on each element', () => {
-    expect(constLine).toContain("e.setAttribute('data-sentinel-index', String(index))");
+    expect(discoverBlock).toContain("e.setAttribute('data-sentinel-index', String(index))");
   });
 
   it('stores element references in window.__sentinelElements', () => {
-    expect(constLine).toContain('window.__sentinelElements.set(index, e)');
+    expect(discoverBlock).toContain('window.__sentinelElements.set(index, e)');
   });
 
   it('caps at 150 elements', () => {
-    expect(constLine).toContain('filtered.slice(0, 150)');
+    expect(discoverBlock).toContain('var CAP = 150');
+    expect(discoverBlock).toContain('filtered.slice(0, CAP)');
+  });
+
+  it('ranks by salience before capping (keeps likely targets when over cap)', () => {
+    expect(discoverBlock).toContain('_salience');
+    // sort by descending salience, then restore DOM order for stable numbering
+    expect(discoverBlock).toContain('b._sal - a._sal');
+    expect(discoverBlock).toContain('a._ord - b._ord');
+  });
+});
+
+describe('VISION_SOM (grounding-tuned overlay)', () => {
+  // VISION_SOM is now a multi-line template literal, so grab the whole block.
+  const somBlock = (() => {
+    const m = typeof src === 'string' ? src.match(/const VISION_SOM = `([\s\S]*?)`;/) : null;
+    return m ? m[1] : '';
+  })();
+
+  it('is defined', () => {
+    expect(somBlock).toBeTruthy();
+  });
+
+  it('uses a large bold font so numerals survive JPEG compression', () => {
+    expect(somBlock).toContain("ctx.font = 'bold 16px monospace'");
+  });
+
+  it('scales label width with digit count so 2-/3-digit indices never clip', () => {
+    expect(somBlock).toContain('label.length * 10');
+  });
+
+  it('performs collision avoidance so labels do not stack', () => {
+    expect(somBlock).toContain('function collides');
+    expect(somBlock).toContain('placed.push');
+  });
+
+  it('still stamps the canvas with the expected overlay id', () => {
+    expect(somBlock).toContain("canvas.id = 'sentinel-som-overlay'");
   });
 });
 

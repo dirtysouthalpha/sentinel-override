@@ -36,6 +36,7 @@ globalThis.chrome = {
 
 jest.unstable_mockModule('../background/llm-client.js', () => ({
   callLLMWithRetry: jest.fn(async () => ({ type: 'finish', summary: 'done' })),
+  parseVisionResponse: jest.fn((raw) => { try { return JSON.parse(raw); } catch { return null; } }),
   generatePlan: jest.fn(async () => ['Step 1']),
   supportsVision: jest.fn(() => true), getPlatformContext: jest.fn(() => ''),
   getRelevantPatterns: jest.fn(async () => []), estimateCostUsd: jest.fn(() => 0), isSimpleStep: jest.fn(() => false),
