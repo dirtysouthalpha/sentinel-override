@@ -2,21 +2,349 @@
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker } from './llm-client.js';
+import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
-const VISION_DISCOVER = "const __sentinel_discoverElements = function() {\n  'use strict';\n\n  // ---- Selector for all interactive element types ----\n  var SELECTOR = 'a, button, input, select, textarea, [role=\"button\"], [role=\"link\"], '\n    + '[role=\"textbox\"], [role=\"combobox\"], [role=\"checkbox\"], [role=\"radio\"], '\n    + '[role=\"tab\"], [role=\"menuitem\"], [role=\"switch\"], [role=\"option\"], '\n    + '[onclick], [contenteditable]:not([contenteditable=\"false\"]), '\n    + '[tabindex]:not([tabindex=\"-1\"]), [aria-label], summary, [data-testid], label[for]';\n\n  // ---- Tags whose subtrees should be completely skipped ----\n  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);\n\n  function isInSkippedParent(el) {\n    var node = el;\n    while (node) {\n      if (SKIP_TAGS.has(node.tagName)) return true;\n      node = node.parentElement;\n    }\n    return false;\n  }\n\n  // ---- Computed-style checks ----\n  function isHiddenByStyle(el) {\n    var s = window.getComputedStyle(el);\n    if (s.opacity === '0') return true;\n    if (s.visibility === 'hidden') return true;\n    if (s.display === 'none') return true;\n    if (s.pointerEvents === 'none') return true;\n    return false;\n  }\n\n  // ---- Visibility helpers ----\n  function isRectVisible(rect) {\n    if (!rect) return false;\n    if (rect.width <= 0 || rect.height <= 0) return false;\n    return true;\n  }\n\n  function isOnScreen(rect) {\n    // Allow elements that are at least partially within the viewport\n    if (rect.right <= 0 || rect.bottom <= 0) return false;\n    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;\n    return true;\n  }\n\n  // ---- Overlap / dedup helpers ----\n  function intersectionArea(r1, r2) {\n    var x1 = Math.max(r1.x, r2.x);\n    var y1 = Math.max(r1.y, r2.y);\n    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);\n    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);\n    if (x2 <= x1 || y2 <= y1) return 0;\n    return (x2 - x1) * (y2 - y1);\n  }\n\n  function overlapRatio(r1, r2) {\n    var area1 = r1.w * r1.h;\n    var area2 = r2.w * r2.h;\n    if (area1 === 0 || area2 === 0) return 0;\n    var inter = intersectionArea(r1, r2);\n    // Use the smaller area as denominator so parent/child overlap is detected\n    var minArea = Math.min(area1, area2);\n    return inter / minArea;\n  }\n\n  // ---- Extract display text ----\n  function getText(el) {\n    var t = '';\n    if (el.innerText) t = el.innerText;\n    else if (el.value) t = el.value;\n    else if (el.placeholder) t = el.placeholder;\n    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');\n    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');\n    return (t || '').replace(/[\\\\s\\\\n]+/g, ' ').trim().substring(0, 60);\n  }\n\n  // ---- Main ----\n  var candidates = document.querySelectorAll(SELECTOR);\n  var elements = [];\n  var i, el, rect, cs;\n\n  for (i = 0; i < candidates.length; i++) {\n    el = candidates[i];\n\n    // Skip elements inside script/style/etc.\n    if (isInSkippedParent(el)) continue;\n\n    // Check offsetParent (unless fixed)\n    cs = window.getComputedStyle(el);\n    var isFixed = cs.position === 'fixed';\n    if (!el.offsetParent && !isFixed) continue;\n\n    // Get bounding rect\n    var cRect = el.getBoundingClientRect();\n    if (!isRectVisible(cRect)) continue;\n    if (!isOnScreen(cRect)) continue;\n\n    // Check computed style\n    if (isHiddenByStyle(el)) continue;\n\n    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });\n  }\n\n  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----\n  var removed = new Set();\n  for (i = 0; i < elements.length; i++) {\n    if (removed.has(i)) continue;\n    for (var j = i + 1; j < elements.length; j++) {\n      if (removed.has(j)) continue;\n      var ratio = overlapRatio(elements[i].rect, elements[j].rect);\n      if (ratio > 0.8) {\n        // Keep the one deeper in the DOM (more specific)\n        // j > i means j comes later in DOM order (deeper child usually)\n        // Compare actual DOM depth\n        var depthI = 0, depthJ = 0, n;\n        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }\n        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }\n        if (depthJ >= depthI) {\n          removed.add(i);\n        } else {\n          removed.add(j);\n        }\n      }\n    }\n  }\n\n  var filtered = [];\n  for (i = 0; i < elements.length; i++) {\n    if (!removed.has(i)) filtered.push(elements[i]);\n  }\n\n  // ---- Cap at 150 ----\n  if (filtered.length > 150) filtered = filtered.slice(0, 150);\n\n  // ---- Build output and store references ----\n  window.__sentinelElements = new Map();\n  var result = [];\n  var clickableTags = new Set(['a', 'button', 'summary']);\n  var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);\n\n  for (i = 0; i < filtered.length; i++) {\n    var index = i + 1;\n    var e = filtered[i].el;\n    var r = filtered[i].rect;\n\n    window.__sentinelElements.set(index, e);\n    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}\n\n    var tag = e.tagName.toLowerCase();\n    var text = getText(e);\n    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';\n    var role = e.getAttribute && e.getAttribute('role') || '';\n    var type = e.getAttribute && e.getAttribute('type') || '';\n    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';\n    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);\n\n    // Determine interactivity\n    var isClickable = clickableTags.has(tag)\n      || clickableRoles.has(role)\n      || e.hasAttribute && e.hasAttribute('onclick')\n      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');\n    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'\n      || role === 'textbox' || role === 'combobox'\n      || (e.hasAttribute && e.hasAttribute('contenteditable'));\n\n    result.push({\n      index: index,\n      tag: tag,\n      text: text,\n      ariaLabel: ariaLabel,\n      role: role,\n      type: type,\n      placeholder: placeholder,\n      href: href,\n      rect: r,\n      isClickable: isClickable,\n      isInput: isInput\n    });\n  }\n\n  return JSON.stringify(result);\n}; return __sentinel_discoverElements();";
-const VISION_SOM = "const __sentinel_drawSoMOverlay = function() {\n  'use strict';\n\n  // ---- Remove any existing overlay ----\n  var existing = document.getElementById('sentinel-som-overlay');\n  if (existing) existing.remove();\n\n  // ---- Create canvas ----\n  var canvas = document.createElement('canvas');\n  canvas.id = 'sentinel-som-overlay';\n  canvas.style.position = 'fixed';\n  canvas.style.top = '0';\n  canvas.style.left = '0';\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n  canvas.style.zIndex = '2147483647';\n  canvas.style.pointerEvents = 'none';\n  canvas.width = window.innerWidth * (window.devicePixelRatio || 1);\n  canvas.height = window.innerHeight * (window.devicePixelRatio || 1);\n  canvas.style.width = window.innerWidth + 'px';\n  canvas.style.height = window.innerHeight + 'px';\n\n  var ctx = canvas.getContext('2d');\n  var dpr = window.devicePixelRatio || 1;\n  ctx.scale(dpr, dpr);\n\n  // ---- Guard ----\n  if (!window.__sentinelElements || typeof window.__sentinelElements.forEach !== 'function') {\n    (document.body || document.documentElement).appendChild(canvas);\n    return 'ok';\n  }\n\n  var vw = window.innerWidth;\n  var vh = window.innerHeight;\n\n  // ---- Draw boxes and labels ----\n  window.__sentinelElements.forEach(function(el, idx) {\n    if (!el || !el.getBoundingClientRect) return;\n\n    var cRect = el.getBoundingClientRect();\n    var x = cRect.left;\n    var y = cRect.top;\n    var w = cRect.width;\n    var h = cRect.height;\n\n    // Skip zero-size\n    if (w <= 0 || h <= 0) return;\n\n    // Draw bounding box\n    ctx.strokeStyle = '#00ff88';\n    ctx.lineWidth = 2;\n    ctx.strokeRect(x, y, w, h);\n\n    // ---- Label dimensions ----\n    var lw = 24;\n    var lh = 18;\n    var lx = x;\n    var ly = y - lh;\n\n    // If label would go above the viewport, move it inside the box\n    if (ly < 0) {\n      ly = y;\n    }\n    // If label would go off the left edge, nudge right\n    if (lx < 0) {\n      lx = 0;\n    }\n    // If label would go off the right edge, nudge left\n    if (lx + lw > vw) {\n      lx = vw - lw;\n    }\n\n    // Draw label background\n    ctx.fillStyle = '#00ff88';\n    ctx.fillRect(lx, ly, lw, lh);\n\n    // Draw label text\n    ctx.fillStyle = '#000000';\n    ctx.font = 'bold 12px monospace';\n    ctx.textAlign = 'center';\n    ctx.textBaseline = 'middle';\n    ctx.fillText(String(idx), lx + lw / 2, ly + lh / 2);\n  });\n\n  (document.body || document.documentElement).appendChild(canvas);\n  return 'ok';\n}; __sentinel_drawSoMOverlay();";
+const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
+  'use strict';
+
+  // ---- Selector for all interactive element types ----
+  var SELECTOR = 'a, button, input, select, textarea, [role="button"], [role="link"], '
+    + '[role="textbox"], [role="combobox"], [role="checkbox"], [role="radio"], '
+    + '[role="tab"], [role="menuitem"], [role="switch"], [role="option"], '
+    + '[onclick], [contenteditable]:not([contenteditable="false"]), '
+    + '[tabindex]:not([tabindex="-1"]), [aria-label], summary, [data-testid], label[for]';
+
+  // ---- Tags whose subtrees should be completely skipped ----
+  var SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE']);
+
+  function isInSkippedParent(el) {
+    var node = el;
+    while (node) {
+      if (SKIP_TAGS.has(node.tagName)) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  // ---- Computed-style checks ----
+  function isHiddenByStyle(el) {
+    var s = window.getComputedStyle(el);
+    if (s.opacity === '0') return true;
+    if (s.visibility === 'hidden') return true;
+    if (s.display === 'none') return true;
+    if (s.pointerEvents === 'none') return true;
+    return false;
+  }
+
+  // ---- Visibility helpers ----
+  function isRectVisible(rect) {
+    if (!rect) return false;
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    return true;
+  }
+
+  function isOnScreen(rect) {
+    // Allow elements that are at least partially within the viewport
+    if (rect.right <= 0 || rect.bottom <= 0) return false;
+    if (rect.left >= window.innerWidth || rect.top >= window.innerHeight) return false;
+    return true;
+  }
+
+  // ---- Overlap / dedup helpers ----
+  function intersectionArea(r1, r2) {
+    var x1 = Math.max(r1.x, r2.x);
+    var y1 = Math.max(r1.y, r2.y);
+    var x2 = Math.min(r1.x + r1.w, r2.x + r2.w);
+    var y2 = Math.min(r1.y + r1.h, r2.y + r2.h);
+    if (x2 <= x1 || y2 <= y1) return 0;
+    return (x2 - x1) * (y2 - y1);
+  }
+
+  function overlapRatio(r1, r2) {
+    var area1 = r1.w * r1.h;
+    var area2 = r2.w * r2.h;
+    if (area1 === 0 || area2 === 0) return 0;
+    var inter = intersectionArea(r1, r2);
+    // Use the smaller area as denominator so parent/child overlap is detected
+    var minArea = Math.min(area1, area2);
+    return inter / minArea;
+  }
+
+  // ---- Extract display text ----
+  function getText(el) {
+    var t = '';
+    if (el.innerText) t = el.innerText;
+    else if (el.value) t = el.value;
+    else if (el.placeholder) t = el.placeholder;
+    else if (el.getAttribute && el.getAttribute('aria-label')) t = el.getAttribute('aria-label');
+    else if (el.getAttribute && el.getAttribute('title')) t = el.getAttribute('title');
+    return (t || '').replace(/[\\s\\n]+/g, ' ').trim().substring(0, 60);
+  }
+
+  // ---- Main ----
+  var candidates = document.querySelectorAll(SELECTOR);
+  var elements = [];
+  var i, el, rect, cs;
+
+  for (i = 0; i < candidates.length; i++) {
+    el = candidates[i];
+
+    // Skip elements inside script/style/etc.
+    if (isInSkippedParent(el)) continue;
+
+    // Check offsetParent (unless fixed)
+    cs = window.getComputedStyle(el);
+    var isFixed = cs.position === 'fixed';
+    if (!el.offsetParent && !isFixed) continue;
+
+    // Get bounding rect
+    var cRect = el.getBoundingClientRect();
+    if (!isRectVisible(cRect)) continue;
+    if (!isOnScreen(cRect)) continue;
+
+    // Check computed style
+    if (isHiddenByStyle(el)) continue;
+
+    elements.push({ el: el, rect: { x: cRect.left, y: cRect.top, w: cRect.width, h: cRect.height } });
+  }
+
+  // ---- Deduplicate overlapping elements (>80% overlap, keep more specific) ----
+  var removed = new Set();
+  for (i = 0; i < elements.length; i++) {
+    if (removed.has(i)) continue;
+    for (var j = i + 1; j < elements.length; j++) {
+      if (removed.has(j)) continue;
+      var ratio = overlapRatio(elements[i].rect, elements[j].rect);
+      if (ratio > 0.8) {
+        // Keep the one deeper in the DOM (more specific)
+        // j > i means j comes later in DOM order (deeper child usually)
+        // Compare actual DOM depth
+        var depthI = 0, depthJ = 0, n;
+        n = elements[i].el; while (n.parentElement) { depthI++; n = n.parentElement; }
+        n = elements[j].el; while (n.parentElement) { depthJ++; n = n.parentElement; }
+        if (depthJ >= depthI) {
+          removed.add(i);
+        } else {
+          removed.add(j);
+        }
+      }
+    }
+  }
+
+  var filtered = [];
+  for (i = 0; i < elements.length; i++) {
+    if (!removed.has(i)) filtered.push(elements[i]);
+  }
+
+  // ---- Salience-ranked cap ----
+  // When more interactive elements are on screen than CAP, an arbitrary DOM-order
+  // slice can drop the user's actual target. Instead, score each element by how
+  // likely it is to be a real interaction target — genuinely interactive tag/role,
+  // has a visible name, sensibly sized (not a 1px tracker or a giant wrapper),
+  // near the viewport center, above the fold — and keep the top CAP. Survivors are
+  // then restored to DOM order so numbering stays top-to-bottom and predictable
+  // (and so click resolution by data-sentinel-index stays consistent).
+  var CAP = 150;
+  if (filtered.length > CAP) {
+    var _vw = window.innerWidth, _vh = window.innerHeight;
+    var _interactiveTags = new Set(['a', 'button', 'input', 'select', 'textarea', 'summary']);
+    var _interactiveRoles = new Set(['button', 'link', 'tab', 'menuitem', 'checkbox', 'radio', 'switch', 'option', 'combobox', 'textbox']);
+    var _salience = function(item) {
+      var sel = item.el, sr = item.rect, score = 0;
+      var stag = sel.tagName ? sel.tagName.toLowerCase() : '';
+      var srole = (sel.getAttribute && sel.getAttribute('role')) || '';
+      if (_interactiveTags.has(stag)) score += 50;
+      if (_interactiveRoles.has(srole)) score += 40;
+      var named = (sel.innerText && sel.innerText.trim())
+        || (sel.getAttribute && (sel.getAttribute('aria-label') || sel.getAttribute('placeholder') || sel.getAttribute('title')));
+      if (named) score += 30;
+      var area = sr.w * sr.h;
+      if (area >= 200 && area <= 120000) score += 20; else if (area > 120000) score -= 10;
+      var cx = sr.x + sr.w / 2, cy = sr.y + sr.h / 2;
+      var dx = cx - _vw / 2, dy = cy - _vh / 2;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+      var maxDist = Math.sqrt((_vw / 2) * (_vw / 2) + (_vh / 2) * (_vh / 2)) || 1;
+      score += (1 - Math.min(dist / maxDist, 1)) * 20;
+      if (sr.y >= 0 && sr.y < _vh) score += 10;
+      return score;
+    };
+    for (var si = 0; si < filtered.length; si++) {
+      filtered[si]._ord = si;
+      filtered[si]._sal = _salience(filtered[si]);
+    }
+    filtered.sort(function(a, b) { return b._sal - a._sal; });
+    filtered = filtered.slice(0, CAP);
+    filtered.sort(function(a, b) { return a._ord - b._ord; });
+  }
+
+  // ---- Build output and store references ----
+  window.__sentinelElements = new Map();
+  var result = [];
+  var clickableTags = new Set(['a', 'button', 'summary']);
+  var clickableRoles = new Set(['button', 'link', 'tab', 'menuitem', 'switch', 'option', 'checkbox', 'radio']);
+
+  for (i = 0; i < filtered.length; i++) {
+    var index = i + 1;
+    var e = filtered[i].el;
+    var r = filtered[i].rect;
+
+    window.__sentinelElements.set(index, e);
+    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}
+
+    var tag = e.tagName.toLowerCase();
+    var text = getText(e);
+    var ariaLabel = e.getAttribute && e.getAttribute('aria-label') || '';
+    var role = e.getAttribute && e.getAttribute('role') || '';
+    var type = e.getAttribute && e.getAttribute('type') || '';
+    var placeholder = e.getAttribute && e.getAttribute('placeholder') || '';
+    var href = (e.getAttribute && e.getAttribute('href') || '').substring(0, 100);
+
+    // Determine interactivity
+    var isClickable = clickableTags.has(tag)
+      || clickableRoles.has(role)
+      || e.hasAttribute && e.hasAttribute('onclick')
+      || tag === 'input' && (type === 'submit' || type === 'button' || type === 'image' || type === 'reset');
+    var isInput = tag === 'input' || tag === 'textarea' || tag === 'select'
+      || role === 'textbox' || role === 'combobox'
+      || (e.hasAttribute && e.hasAttribute('contenteditable'));
+
+    result.push({
+      index: index,
+      tag: tag,
+      text: text,
+      ariaLabel: ariaLabel,
+      role: role,
+      type: type,
+      placeholder: placeholder,
+      href: href,
+      rect: r,
+      isClickable: isClickable,
+      isInput: isInput
+    });
+  }
+
+  return JSON.stringify(result);
+}; return __sentinel_discoverElements();`;
+// (v20.5) SoM overlay tuned for weak-vision grounding (GLM-4.xV):
+//  - Larger, digit-aware labels (2- and 3-digit indices never clip).
+//  - 16px bold text + dark outline so numerals survive JPEG compression and
+//    stay legible over busy / green page content.
+//  - Greedy collision avoidance: labels that would stack on dense dashboards
+//    are nudged to alternate anchors, so each [N] is readable and unambiguous.
+// Authored as a template literal (no backticks / ${} inside) — functionally
+// identical to the old escaped one-line string when run via cdpExecuteJs.
+const VISION_SOM = `const __sentinel_drawSoMOverlay = function() {
+  'use strict';
+  var existing = document.getElementById('sentinel-som-overlay');
+  if (existing) existing.remove();
+
+  var dpr = window.devicePixelRatio || 1;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+
+  var canvas = document.createElement('canvas');
+  canvas.id = 'sentinel-som-overlay';
+  canvas.style.position = 'fixed';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.zIndex = '2147483647';
+  canvas.style.pointerEvents = 'none';
+  canvas.width = vw * dpr;
+  canvas.height = vh * dpr;
+  canvas.style.width = vw + 'px';
+  canvas.style.height = vh + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (!window.__sentinelElements || typeof window.__sentinelElements.forEach !== 'function') {
+    (document.body || document.documentElement).appendChild(canvas);
+    return 'ok';
+  }
+
+  ctx.font = 'bold 16px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Track placed label rects so numbers do not stack on top of each other.
+  var placed = [];
+  function overlaps(a, b) {
+    return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+  }
+  function collides(r) {
+    for (var k = 0; k < placed.length; k++) { if (overlaps(r, placed[k])) return true; }
+    return false;
+  }
+
+  var items = [];
+  window.__sentinelElements.forEach(function(el, idx) {
+    if (!el || !el.getBoundingClientRect) return;
+    var cr = el.getBoundingClientRect();
+    if (cr.width <= 0 || cr.height <= 0) return;
+    items.push({ idx: idx, x: cr.left, y: cr.top, w: cr.width, h: cr.height });
+  });
+
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var x = it.x, y = it.y, w = it.w, h = it.h;
+
+    // Element bounding box
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, w, h);
+
+    // Label size scales with digit count so indices never clip.
+    var label = String(it.idx);
+    var lw = 14 + label.length * 10;
+    var lh = 22;
+
+    // Candidate anchors: above-left, inside top-left, above-right, below-left.
+    var cands = [
+      { x: x, y: y - lh },
+      { x: x, y: y },
+      { x: x + w - lw, y: y - lh },
+      { x: x, y: y + h }
+    ];
+    var lx = x, ly = y - lh, picked = false;
+    for (var c = 0; c < cands.length; c++) {
+      var cx = cands[c].x, cy = cands[c].y;
+      if (cy < 0) cy = y;
+      if (cx < 0) cx = 0;
+      if (cx + lw > vw) cx = vw - lw;
+      var rect = { x: cx, y: cy, w: lw, h: lh };
+      if (!collides(rect)) { lx = cx; ly = cy; picked = true; placed.push(rect); break; }
+    }
+    if (!picked) {
+      lx = x; ly = y - lh;
+      if (ly < 0) ly = y;
+      if (lx < 0) lx = 0;
+      if (lx + lw > vw) lx = vw - lw;
+      placed.push({ x: lx, y: ly, w: lw, h: lh });
+    }
+
+    // Label background + dark outline for contrast against any content.
+    ctx.fillStyle = '#00ff88';
+    ctx.fillRect(lx, ly, lw, lh);
+    ctx.strokeStyle = '#003322';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx + 0.5, ly + 0.5, lw - 1, lh - 1);
+
+    // Label text
+    ctx.fillStyle = '#000000';
+    ctx.fillText(label, lx + lw / 2, ly + lh / 2 + 1);
+  }
+
+  (document.body || document.documentElement).appendChild(canvas);
+  return 'ok';
+}; __sentinel_drawSoMOverlay();`;
 const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0, _taggedLen = _tagged.length; _ti < _taggedLen; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch(_ae) {} }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
 
 // Precompute valid agent speed modes for O(1) lookup
 const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
-
-// Precompile regex for extracting JSON from markdown code blocks
-const CODE_BLOCK_REGEX = /```(?:json)?\s*\n?([\s\S]*?)\n?```/;
 
 // Precompile regex for extract command type checks
 const EXTRACT_TYPE_RE = /^extract(_list)?$/;
@@ -698,7 +1026,12 @@ const CONFIG = {
   maxRetries: 6,
   retryDelay: TWO_SECONDS_MS,
   maxRetryDelay: 2 * TEN_SECONDS_MS, // 20s cap (was 10s)
-  screenshotQuality: 30,
+  // (v20.5) Was 30. The SoM grounding approach lives or dies on the model being
+  // able to READ the small green [N] labels off the screenshot, and JPEG q30
+  // shreds sharp text edges with ringing artifacts — the exact failure mode that
+  // makes GLM-4.xV misread an index. q50 roughly doubles edge fidelity for the
+  // numerals while staying well under half the size of q80. Worth the bytes.
+  screenshotQuality: 50,
   fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
   pageLoadTimeout: 25000,
   maxSteps: 100,
@@ -4574,7 +4907,12 @@ async function runAgentLoop(goal, workingTabId) {
       if (_visionMode && _visionElements) {
         const _visionHistoryParts = [];
         const promptHistLen = promptHistory.length;
-        const visionStart = Math.max(0, promptHistLen - 6);
+        // (v20.5) Show the last 10 steps (was 6). GLM-4.xV loses track of what it
+        // already tried and re-clicks the same element; a longer window + the
+        // explicit "ALREADY ATTEMPTED" framing below makes prior actions
+        // unmistakable. The extra ~4 short lines are negligible next to the
+        // screenshot already in the prompt.
+        const visionStart = Math.max(0, promptHistLen - 10);
         for (let i = visionStart; i < promptHistLen; i++) {
           const h = promptHistory[i];
           if (!h || !h.action) continue;
@@ -4591,7 +4929,7 @@ async function runAgentLoop(goal, workingTabId) {
           '',
           '<rules>',
           '1. Interactive elements on the page have [index] numbers shown as green labels.',
-          '2. You MUST reference elements by their [index] number.',
+          '2. You MUST reference elements by their [index] number. ONLY use index numbers that actually appear in the Elements list below — NEVER invent or guess an index. If the element you want has no number, scroll to bring it into view first.',
           '3. CRITICAL: If you see a popup, cookie banner, consent dialog, or overlay — dismiss it FIRST. Look for buttons with text like Accept, Agree, OK, Continue, I agree, Got it, Close, or Dismiss.',
           '4. Overlays often use role="button" or specific aria-labels. Check the element list for these patterns.',
           '5. If clicking an index does not dismiss the overlay after 2 attempts, try a DIFFERENT index — the correct button might be behind another element.',
@@ -4612,9 +4950,19 @@ async function runAgentLoop(goal, workingTabId) {
           '</actions>',
           '',
           '<output_format>',
-          'Respond with ONLY valid JSON, no markdown:',
+          'Respond with ONLY a single valid JSON object. No markdown fences, no <think> blocks, no text before or after the JSON.',
           '{"thinking":"what you see and why","evaluation":"previous action success/fail/partial","memory":"progress notes","next_goal":"one clear goal","action":{"type":"...","index":N,"text":"...","direction":"up|down","url":"...","code":"..."}}',
-          '</output_format>'
+          'Include ONLY the fields relevant to the chosen action type. "type" is required; "index" is required for click and input.',
+          'Example — click the element labeled [7]: {"thinking":"The Accept button is labeled 7","evaluation":"n/a","memory":"dismissing cookie banner","next_goal":"accept cookies","action":{"type":"click","index":7}}',
+          '</output_format>',
+          '',
+          '<visual_grounding>',
+          'Each clickable element is marked on the screenshot with a GREEN NUMBERED LABEL like [7]. The same numbers appear in the Elements list below.',
+          'To click or type, copy the number from the label EXACTLY — do not estimate, increment, or guess it. [7] means index 7, never 6 or 8.',
+          'Before you emit "index":N, confirm that [N] actually appears in the Elements list. If the element you want has no number, it is not yet actionable — scroll to bring it into view first.',
+          'NEGATIVE EXAMPLE (do NOT do this): seeing a button labeled [12] but writing {"action":{"type":"click","index":9}}. A wrong index clicks the wrong thing or wastes the step.',
+          'When unsure which number maps to your target, prefer the entry in the Elements list whose text matches your goal over a number you only half-see on the screenshot.',
+          '</visual_grounding>'
         ].join('\n');
 
         const _zoomAnnotation = formatZoomRegion(_zoomRegion);
@@ -4626,8 +4974,8 @@ async function runAgentLoop(goal, workingTabId) {
           'Elements:',
           _visionElementTree || '(none)',
           '',
-          'History:',
-          _visionHistory || '(first step)',
+          'ALREADY ATTEMPTED (do NOT repeat an action that did not change the page — try a different element or approach):',
+          _visionHistory || '(first step — nothing attempted yet)',
           _zoomAnnotation,
           '',
           'What is your next action?'
@@ -4656,37 +5004,75 @@ async function runAgentLoop(goal, workingTabId) {
           if (_vEndpoint.includes('api.anthropic.com')) {
             throw new Error('Vision LLM not supported for Anthropic provider');
           }
-          const _vCtrl = new AbortController();
-          const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
-          let _vResponse;
+          let _vResponse = null;
           // Prepare request body safely
           let _visionBody;
           try {
             _visionBody = JSON.stringify({
               model: _vModel,
               messages: _visionMessages,
-              max_tokens: 600,
-              temperature: 0.1
+              // GLM-4.xV emits a <think> reasoning block (300-500 tokens) BEFORE
+              // the JSON action. At 600 the action was routinely truncated
+              // mid-emit, forcing parseVisionResponse into its salvage paths or
+              // failing outright. 1200 leaves ample room for think + full action.
+              max_tokens: 1200,
+              // Index selection is a precision task, not a creative one. temp 0
+              // makes the chosen [index] deterministic so a re-observe of the same
+              // screenshot yields the same decision instead of a different (and
+              // possibly hallucinated) number each time.
+              temperature: 0
             });
           } catch (_stringifyErr) {
             console.warn('[Sentinel/v4] Vision payload serialization failed:', getErrorMessage(_stringifyErr));
             break; // Exit vision mode on serialization failure
           }
-          try {
-            _vResponse = await fetch(
-              _vEndpoint,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${_vApiKey}`
-                },
-                body: _visionBody,
-                signal: _vCtrl.signal
-              }
-            );
-          } finally {
-            clearTimeout(_vTimeoutId);
+          // (v20.5) Bounded retry-with-backoff for TRANSIENT failures (HTTP 429 /
+          // 5xx, network errors, timeouts). The vision-first path is GLM's better
+          // grounding path (numbered SoM indices vs. the legacy path's raw x,y
+          // coordinate estimation); a single transient blip shouldn't forfeit it.
+          // On exhausted retries / non-transient failures we fall through to the
+          // legacy callLLMWithRetry path (command stays null), so this only adds a
+          // chance to stay on the SoM path — it never removes the existing fallback.
+          const _VISION_MAX_ATTEMPTS = 2; // 1 initial + 1 retry
+          const _isTransientStatus = (s) => s === 429 || (s >= 500 && s <= 599);
+          for (let _vAttempt = 0; _vAttempt < _VISION_MAX_ATTEMPTS; _vAttempt++) {
+            const _vCtrl = new AbortController();
+            const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
+            let _vFetchErr = null;
+            try {
+              _vResponse = await fetch(
+                _vEndpoint,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${_vApiKey}`
+                  },
+                  body: _visionBody,
+                  signal: _vCtrl.signal
+                }
+              );
+            } catch (_fe) {
+              _vFetchErr = _fe; // network error or 45s timeout abort
+            } finally {
+              clearTimeout(_vTimeoutId);
+            }
+            if (_vResponse && _vResponse.ok) break; // success
+            const _transient = _vFetchErr ? true : (_vResponse ? _isTransientStatus(_vResponse.status) : false);
+            const _attemptsLeft = _vAttempt < _VISION_MAX_ATTEMPTS - 1;
+            if (!_transient || !_attemptsLeft) {
+              if (_vFetchErr) throw _vFetchErr; // surface to outer catch → legacy fallback
+              break; // non-transient non-ok response: handled below
+            }
+            // Honour Retry-After on 429 when it's a sane small value; else linear backoff.
+            let _backoffMs = 700 * (_vAttempt + 1);
+            if (_vResponse && _vResponse.status === 429 && _vResponse.headers && typeof _vResponse.headers.get === 'function') {
+              const _ra = Number(_vResponse.headers.get('retry-after'));
+              if (Number.isFinite(_ra) && _ra > 0 && _ra <= 10) _backoffMs = _ra * 1000;
+            }
+            console.warn(`[Sentinel/v4] Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorMessage(_vFetchErr)}); retrying in ${_backoffMs}ms`);
+            _vResponse = null;
+            await sleep(_backoffMs);
           }
           if (_vResponse && !_vResponse.ok) {
             console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
@@ -4699,26 +5085,68 @@ async function runAgentLoop(goal, workingTabId) {
               _vData = null; // Explicitly mark as failed
               // Don't break - let the null check on line 4433 handle it
             }
-            const _vRaw = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0] && _vData.choices[0].message
-              ? (_vData.choices[0].message.content || '') : '';
+            // (v20.5) Prefer message.content, but fall back to reasoning_content.
+            // GLM/DeepSeek-style reasoning models sometimes return an empty
+            // content with the actual JSON action sitting in reasoning_content (or
+            // emit both). Reading content-only silently produced an empty response
+            // → parse failure → a wasted call. The legacy path already handles
+            // reasoning_content; mirror that here so the SoM path doesn't lose it.
+            const _vMsg = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0]
+              ? _vData.choices[0].message : null;
+            const _vContent = (_vMsg && typeof _vMsg.content === 'string') ? _vMsg.content : '';
+            const _vReasoning = (_vMsg && typeof _vMsg.reasoning_content === 'string') ? _vMsg.reasoning_content
+              : (_vMsg && typeof _vMsg.reasoning === 'string') ? _vMsg.reasoning : '';
+            // If content lacks a JSON object but reasoning has one, parse reasoning too.
+            const _contentHasJson = _vContent.includes('{') && _vContent.includes('}');
+            const _vRaw = _contentHasJson
+              ? _vContent
+              : [_vContent, _vReasoning].filter(Boolean).join('\n').trim();
             
-            // Parse structured JSON output
-            let _vParsed = null;
-            try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
-              // Try extracting from code block
-              const _m = _vRaw.match(CODE_BLOCK_REGEX);
-              if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) { console.warn('[Sentinel] Vision code block parse failed:', getErrorMessage(_e2)); }
-            }
+            // Parse structured JSON output. Weak vision models (GLM-4V) wrap the
+            // JSON in <think> blocks / markdown / prose and emit invalid escapes;
+            // parseVisionResponse mirrors the legacy path's multi-tier hardening
+            // (sanitize → balanced-object extraction → regex salvage) so a single
+            // malformed brace doesn't cost an entire step.
+            const _vParsed = parseVisionResponse(_vRaw);
+            if (!_vParsed) console.warn('[Sentinel/v4] Vision: response not parseable:', (_vRaw || '').slice(0, 200));
 
             if (_vParsed && _vParsed.action) {
               const _va = _vParsed.action;
+              // (v20.4) Resolve + validate the element index. GLM-4V frequently
+              // hallucinates an [index] that isn't on the page, or omits it
+              // entirely. Only accept an index that actually exists in the
+              // current vision element map; otherwise fall through to a
+              // corrective note so the model re-picks from real numbers instead
+              // of dispatching a dead no-op click_at that wastes a step.
+              const _rawIdx = (typeof _va.index === 'number') ? _va.index
+                : (typeof _va.index === 'string' && /^\d+$/.test(_va.index.trim())) ? Number(_va.index)
+                : NaN;
+              const _validIdx = (Number.isInteger(_rawIdx) && _rawIdx > 0
+                && _visionElementMap && _visionElementMap.has(_rawIdx)) ? _rawIdx : null;
+              // Build a precise correction hint when the model picks a bad index.
+              // We deliberately do NOT auto-click a numeric neighbour: the index is
+              // DOM-scan order, not visual proximity, so [N±1] is often an unrelated
+              // (sometimes destructive) control. Instead we hand the model the real
+              // valid range so it re-picks correctly on the next step.
+              const _badIndexHint = (want) => {
+                const _keys = _visionElementMap
+                  ? Array.from(_visionElementMap.keys()).filter(n => Number.isInteger(n) && n > 0).sort((a, b) => a - b)
+                  : [];
+                if (!_keys.length) return 'No numbered elements are currently visible — scroll or re-observe to reveal them.';
+                const _lead = want > 0 ? `[${want}] is not on this page.` : 'No index was given.';
+                return `${_lead} Valid indices on this page: ${_keys[0]}–${_keys[_keys.length - 1]} (${_keys.length} elements). Re-read the green labels / Elements list and pick a number that actually exists.`;
+              };
               // Map vision action types to legacy command format
               switch (_va.type) {
                 case 'click':
-                  command = { type: 'click_at', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index) && _va.index > 0) ? _va.index : null, _visionAction: true };
+                  command = _validIdx
+                    ? { type: 'click_at', _visionIndex: _validIdx, _visionAction: true }
+                    : { type: 'note', text: `SYSTEM: click needs a valid [index]. ${_badIndexHint(_rawIdx)} Then emit {"action":{"type":"click","index":N}}.`, _visionAction: true };
                   break;
                 case 'input':
-                  command = { type: 'type', text: _va.text || '', _visionIndex: (typeof _va.index === 'number' && !Number.isNaN(_va.index) && _va.index > 0) ? _va.index : null, _visionAction: true };
+                  command = _validIdx
+                    ? { type: 'type', text: _va.text || '', _visionIndex: _validIdx, _visionAction: true }
+                    : { type: 'note', text: `SYSTEM: input needs a valid [index] for the field. ${_badIndexHint(_rawIdx)} Then emit {"action":{"type":"input","index":N,"text":"…"}}.`, _visionAction: true };
                   break;
                 case 'scroll':
                   command = { type: 'scroll', direction: _va.direction || 'down', _visionAction: true };
@@ -4775,6 +5203,18 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Legacy LLM fallback (only if vision didn't produce a command)
       if (!command || !command.type) {
+        // (v20.5) Bridge the vocabulary switch. If we got here with vision mode
+        // active, the SoM path failed this step and we're now on the legacy
+        // selector/tool path. Prior history shows index-based actions like
+        // "click(7)" which are NOT usable here — give the model an explicit
+        // heads-up so it doesn't try to reuse a numbered index it can't address.
+        if (_visionMode) {
+          promptHistory.push({
+            step: stepCount,
+            action: { type: 'note' },
+            result: 'SYSTEM: numbered-index (vision) mode is unavailable this step. Switch to selector-based interaction — use the selector or ref from the element list (e.g. click with "ref" or "selector"), NOT numbered [index] actions.'
+          });
+        }
         // v10.0: Capture reasoning before LLM call
         await captureReasoningStep('action_decision', 'input', {
           stepCount,

@@ -40,6 +40,7 @@ import {
   getMultiArticleDirective,
   supportsVision,
   parseLLMResponse,
+  parseVisionResponse,
   getPlatformContext,
   generatePlan,
   callLLMWithRetry,
@@ -788,6 +789,59 @@ describe('parseLLMResponse', () => {
     const result = parseLLMResponse(input);
     expect(result.type).toBe('note');
     expect(result.text).toBeTruthy();
+  });
+});
+
+// ========== parseVisionResponse ==========
+describe('parseVisionResponse', () => {
+  test('parses a clean vision response object', () => {
+    const r = parseVisionResponse('{"thinking":"x","action":{"type":"click","index":3}}');
+    expect(r.action.type).toBe('click');
+    expect(r.action.index).toBe(3);
+  });
+
+  test('strips a markdown code fence (GLM-4V wraps JSON in ```)', () => {
+    const r = parseVisionResponse('```json\n{"action":{"type":"click","index":5}}\n```');
+    expect(r.action.index).toBe(5);
+  });
+
+  test('strips <think> reasoning blocks before the JSON', () => {
+    const r = parseVisionResponse('<think>I should click accept</think>\n{"action":{"type":"click","index":2}}');
+    expect(r.action.index).toBe(2);
+  });
+
+  test('tolerates explanatory prose before and after the JSON', () => {
+    const r = parseVisionResponse('Sure! Here is my decision:\n{"action":{"type":"input","index":7,"text":"hi"}}\nLet me know if that works.');
+    expect(r.action.type).toBe('input');
+    expect(r.action.index).toBe(7);
+    expect(r.action.text).toBe('hi');
+  });
+
+  test('recovers the nested action object when the outer wrapper is malformed', () => {
+    // trailing garbage after the action object breaks a naive JSON.parse
+    const r = parseVisionResponse('{"thinking":"x","action":{"type":"click","index":4}} <<< done');
+    expect(r.action.index).toBe(4);
+  });
+
+  test('sanitizes invalid escape sequences inside string values', () => {
+    const r = parseVisionResponse('{"thinking":"path C:\\\\temp \\`x\\`","action":{"type":"scroll","direction":"down"}}');
+    expect(r.action.type).toBe('scroll');
+  });
+
+  test('regex-salvages a bare type when JSON is too broken to parse', () => {
+    const r = parseVisionResponse('garbage "type": "click", "index": 9 more garbage }');
+    expect(r.action.type).toBe('click');
+    expect(r.action.index).toBe(9);
+  });
+
+  test('returns null for empty or non-string input', () => {
+    expect(parseVisionResponse('')).toBeNull();
+    expect(parseVisionResponse(null)).toBeNull();
+    expect(parseVisionResponse(42)).toBeNull();
+  });
+
+  test('returns null for content with no recoverable action', () => {
+    expect(parseVisionResponse('I am not sure what to do here.')).toBeNull();
   });
 });
 

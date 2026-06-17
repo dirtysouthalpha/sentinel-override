@@ -2649,6 +2649,95 @@ export function parseLLMResponse(content) {
   }
 }
 
+// (v20.4) Find the first balanced { … } object in a string, optionally one that
+// contains a marker substring (e.g. '"action"'). String-aware brace matching so
+// braces inside quoted values don't confuse depth tracking. Tolerates reasoning
+// prose before the JSON (scans from each '{') and trailing prose after it (stops
+// at the matching '}'). Shared by the vision parser below.
+function firstBalancedJsonObject(str, marker) {
+  if (typeof str !== 'string') return null;
+  let searchFrom = 0;
+  const strLen = str.length;
+  while (searchFrom < strLen) {
+    const start = str.indexOf('{', searchFrom);
+    if (start === -1) return null;
+    let depth = 0, inString = false, escape = false, end = -1;
+    for (let i = start; i < strLen; i++) {
+      const ch = str[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    if (end === -1) return null;
+    const candidate = str.substring(start, end + 1);
+    if (!marker || candidate.includes(marker)) return candidate;
+    searchFrom = end + 1;
+  }
+  return null;
+}
+
+/**
+ * Robustly parse the v4 vision-first JSON response shape:
+ *   {"thinking":…,"evaluation":…,"memory":…,"next_goal":…,"action":{"type":…,"index":N,…}}
+ *
+ * Weak vision models (notably GLM-4V / GLM-4.xv) routinely wrap this object in
+ * <think> reasoning blocks, markdown code fences, or trailing prose, emit invalid
+ * escape sequences, or append explanatory text — all of which break a naive
+ * JSON.parse. This mirrors the hardening in parseLLMResponse so the vision path is
+ * just as forgiving as the legacy text path.
+ *
+ * @param {string} raw - Raw LLM response content.
+ * @returns {Object|null} Parsed response object (with .action when present), or null.
+ */
+export function parseVisionResponse(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const tryParse = (str) => {
+    if (typeof str !== 'string' || !str) return null;
+    try { const o = JSON.parse(str); return (o && typeof o === 'object') ? o : null; }
+    catch (_e) { return null; }
+  };
+  let s = raw.trim();
+  // Strip <think>…</think> reasoning blocks (GLM/DeepSeek extended thinking).
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  // Strip a surrounding markdown code fence if present.
+  if (s.includes('```')) {
+    const fence = s.match(CODE_BLOCK_REGEX);
+    if (fence && fence[1]) s = fence[1].trim();
+  }
+  // 1) Direct parse, then sanitized parse.
+  let parsed = tryParse(s) || tryParse(sanitizeLlmJson(s));
+  if (parsed) return parsed;
+  // 2) Extract the first balanced object that looks like a vision response
+  //    (handles preamble/trailing prose around the JSON).
+  const candidate = firstBalancedJsonObject(s, '"action"')
+    || firstBalancedJsonObject(s, '"next_goal"')
+    || firstBalancedJsonObject(s);
+  if (candidate) {
+    parsed = tryParse(candidate) || tryParse(sanitizeLlmJson(candidate));
+    if (parsed) return parsed;
+  }
+  // 3) Pull just the nested action object out of the noise.
+  const actMatch = s.match(/"action"\s*:\s*(\{[\s\S]*?\})/);
+  if (actMatch && actMatch[1]) {
+    const actObj = tryParse(actMatch[1]) || tryParse(sanitizeLlmJson(actMatch[1]));
+    if (actObj && actObj.type) return { action: actObj };
+  }
+  // 4) Last-ditch: scrape a bare type (+ optional index/text) from anywhere.
+  const typeMatch = s.match(/"type"\s*:\s*"([a-zA-Z_]+)"/);
+  if (typeMatch) {
+    const action = { type: typeMatch[1] };
+    const idxMatch = s.match(/"index"\s*:\s*(\d+)/);
+    if (idxMatch) action.index = Number(idxMatch[1]);
+    const strFieldMatch = s.match(/"(?:text|url|code|direction|query)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (strFieldMatch) action.text = strFieldMatch[1];
+    return { action };
+  }
+  return null;
+}
+
 // ========== Self-Learning ==========
 /**
  * Retrieve learned action patterns relevant to the current goal from storage.

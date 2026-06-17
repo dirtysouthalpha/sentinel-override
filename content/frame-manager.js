@@ -11,6 +11,18 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
     return String(e || '');
   }
 
+  // Accessing contentWindow.document on a cross-origin iframe always throws a
+  // SecurityError ("Blocked a frame with origin ... from accessing a cross-origin
+  // frame"). That's the EXPECTED signal that a frame is cross-origin (ads, embeds,
+  // social widgets) — not a real fault. Detect it so callers can log it quietly
+  // and fall back to placeholders instead of spamming the console with red errors.
+  function isCrossOriginError(e) {
+    if (!e) return false;
+    if (e.name === 'SecurityError') return true;
+    const msg = getErrorMessage(e).toLowerCase();
+    return msg.includes('cross-origin') || msg.includes('blocked a frame');
+  }
+
   const fm = window.__sentinelUtils.frame;
   const dom = window.__sentinelUtils && window.__sentinelUtils.dom;
 
@@ -59,7 +71,8 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
           });
         }
       } catch (error) {
-        // Cross-origin: add placeholder
+        // Cross-origin: add placeholder so the background script can route to the
+        // frame out-of-process. This is the normal path for ad/embed iframes.
         crossOriginCount++;
         elements.push({
           index: elements.length,
@@ -71,7 +84,13 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
           frameUrl: src,
           frameId: null
         });
-        console.error(`Error scanning iframe ${index}:`, getErrorMessage(error));
+        // Expected for cross-origin frames — log quietly so the console isn't
+        // flooded with red errors on ad-heavy pages. Surface anything unexpected.
+        if (isCrossOriginError(error)) {
+          console.debug(`Sentinel: iframe ${index} is cross-origin (${src}) — placeholder added`);
+        } else {
+          console.error(`Error scanning iframe ${index}:`, getErrorMessage(error));
+        }
       }
       });
     }
@@ -121,8 +140,11 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
         return { element: null, frameDoc: iframeDoc, frameIndex, frameUrl: src, remainingSelector };
       }
     } catch (error) {
-      // Cross-origin
-      console.error(`Error accessing iframe ${frameIndex} content:`, getErrorMessage(error));
+      // Cross-origin access is expected here — fall through to the cross-origin
+      // result below. Only log genuinely unexpected failures.
+      if (!isCrossOriginError(error)) {
+        console.error(`Error accessing iframe ${frameIndex} content:`, getErrorMessage(error));
+      }
     }
 
     // Cross-origin iframe
@@ -163,7 +185,11 @@ window.__sentinelUtils.frame = window.__sentinelUtils.frame || {};
             sameOrigin = true;
           }
         } catch (error) {
-          console.error(`Error checking origin for iframe ${index}:`, getErrorMessage(error));
+          // Expected for cross-origin frames — sameOrigin correctly stays false,
+          // so there's nothing to report. Surface only unexpected errors.
+          if (!isCrossOriginError(error)) {
+            console.error(`Error checking origin for iframe ${index}:`, getErrorMessage(error));
+          }
         }
 
         let rect;
