@@ -940,6 +940,46 @@ describe('callLLM — provider body building', () => {
     // Thinking is incompatible with forced tool choice — must be 'auto'.
     expect(capturedBody.tool_choice).toEqual({ type: 'auto' });
   });
+
+  test('(v20.4) compacts history beyond the window into a digest entry', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: {
+        anthropic: {
+          api_key: 'test-key',
+          model: 'claude-opus-4-8',
+          endpoint: 'https://api.anthropic.com/v1/messages'
+        }
+      }
+    };
+    let capturedBody = null;
+    _mockFetch = (url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ type: 'tool_use', name: 'note', input: { text: 'ok' } }],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 100, output_tokens: 50 }
+        })
+      });
+    };
+    // 14 steps with a window of 10 → 4 oldest steps must be compacted, not dropped.
+    const longHistory = Array.from({ length: 14 }, (_, i) => ({
+      step: i + 1,
+      action: { type: i === 1 ? 'extract' : 'click', selector: `#el-${i}` },
+      result: i === 1 ? { text: `FOUND-SECRET-${i}` } : { success: true }
+    }));
+    const result = await callLLMWithRetry(
+      [], 0, 'page content', null, 'do something', longHistory, 15, 'https://example.com',
+      0, defaultConfig, makeAgentState()
+    );
+    expect(result.type).toBe('note');
+    const promptText = capturedBody.messages[0].content;
+    // The digest entry is present, and evidence from a dropped step survives in it.
+    expect(promptText).toContain('(earlier steps, compacted)');
+    expect(promptText).toContain('FOUND-SECRET-1');
+  });
 });
 
 // ========== getRelevantPatterns — edge cases with storage ==========
@@ -1104,5 +1144,142 @@ describe('callLLM — vision fallback on 400', () => {
         'https://example.com', 0, defaultConfig, makeAgentState()
       );
     }).rejects.toThrow('Network error');
+  });
+});
+
+// ========== (v20.4) Streaming (SSE) ==========
+// Reconstruct the non-streaming response shape from an SSE byte stream and feed
+// it through the existing parse path. A streaming response is one with a
+// text/event-stream content-type and a readable body.getReader().
+describe('callLLM — streaming (SSE)', () => {
+  const defaultConfig = {
+    maxRetries: 3, retryDelay: 100, maxRetryDelay: 500,
+    fetchTimeout: 30000, historyWindow: 10, strategyShiftThreshold: 3,
+  };
+  function makeAgentState(overrides = {}) {
+    return {
+      apiCallCount: 0, consecutiveFailures: 0, currentStrategies: [],
+      agentMemory: {}, agentPlan: null, currentPlanStep: 0,
+      totalInputTokens: 0, totalOutputTokens: 0, ...overrides
+    };
+  }
+  // Build a streaming Response whose body yields the given string chunks in order.
+  // Chunks may split SSE events at arbitrary byte boundaries to exercise buffering.
+  function makeSSEResponse(chunks) {
+    const enc = new TextEncoder();
+    let i = 0;
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (String(k).toLowerCase() === 'content-type' ? 'text/event-stream' : null) },
+      body: {
+        getReader() {
+          return {
+            read() {
+              if (i < chunks.length) return Promise.resolve({ done: false, value: enc.encode(chunks[i++]) });
+              return Promise.resolve({ done: true, value: undefined });
+            },
+            releaseLock() {}
+          };
+        }
+      }
+    };
+  }
+
+  test('Anthropic tool_use stream reconstructs the action and token usage', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: { anthropic: { api_key: 'k', model: 'claude-opus-4-8', endpoint: 'https://api.anthropic.com/v1/messages' } }
+    };
+    const events = [
+      'data: ' + JSON.stringify({ type: 'message_start', message: { model: 'claude-opus-4-8', usage: { input_tokens: 120, output_tokens: 1 } } }) + '\n\n',
+      'data: ' + JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't1', name: 'click', input: {} } }) + '\n\n',
+      // Split the tool input JSON across two SSE events AND two read() chunks.
+      'data: ' + JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"ref":' } }) + '\n\n',
+      'data: ' + JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '"ref_5"}' } }) + '\n\n',
+      'data: ' + JSON.stringify({ type: 'content_block_stop', index: 0 }) + '\n\n',
+      'data: ' + JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'tool_use' }, usage: { output_tokens: 30 } }) + '\n\n',
+      'data: ' + JSON.stringify({ type: 'message_stop' }) + '\n\n',
+    ];
+    // Re-chunk: deliberately break one event across a read() boundary.
+    const joined = events.join('');
+    const mid = Math.floor(joined.length / 2);
+    _mockFetch = () => Promise.resolve(makeSSEResponse([joined.slice(0, mid), joined.slice(mid)]));
+    const agentState = makeAgentState();
+    const result = await callLLMWithRetry(
+      [], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, defaultConfig, agentState
+    );
+    expect(result).toMatchObject({ type: 'click', ref: 'ref_5' });
+    expect(agentState.totalInputTokens).toBe(120);
+    expect(agentState.totalOutputTokens).toBe(30);
+  });
+
+  test('OpenAI tool_calls stream assembles across deltas', async () => {
+    _storageData = {
+      active_provider: 'openai',
+      providers: { openai: { api_key: 'k', model: 'gpt-4o', endpoint: 'https://api.openai.com/v1/chat/completions' } }
+    };
+    const chunks = [
+      'data: ' + JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'type', arguments: '' } }] } }] }) + '\n\n',
+      'data: ' + JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '{"ref":"#in",' } }] } }] }) + '\n\n',
+      'data: ' + JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: '"value":"hi"}' } }] }, finish_reason: 'tool_calls' }] }) + '\n\n',
+      'data: ' + JSON.stringify({ choices: [], usage: { prompt_tokens: 40, completion_tokens: 12 } }) + '\n\n',
+      'data: [DONE]\n\n',
+    ];
+    _mockFetch = () => Promise.resolve(makeSSEResponse(chunks));
+    const agentState = makeAgentState();
+    const result = await callLLMWithRetry(
+      [], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, defaultConfig, agentState
+    );
+    expect(result).toMatchObject({ type: 'type', ref: '#in', value: 'hi' });
+    expect(agentState.totalInputTokens).toBe(40);
+    expect(agentState.totalOutputTokens).toBe(12);
+  });
+
+  test('non-SSE response (no event-stream content-type) falls back to json()', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: { anthropic: { api_key: 'k', model: 'claude-opus-4-8', endpoint: 'https://api.anthropic.com/v1/messages' } }
+    };
+    // body.getReader exists but content-type is application/json → must NOT be
+    // parsed as SSE; the json() path handles it.
+    _mockFetch = () => Promise.resolve({
+      ok: true,
+      status: 200,
+      headers: { get: (k) => (String(k).toLowerCase() === 'content-type' ? 'application/json' : null) },
+      body: { getReader: () => { throw new Error('should not read body as stream'); } },
+      json: () => Promise.resolve({
+        content: [{ type: 'tool_use', name: 'note', input: { text: 'ok' } }],
+        stop_reason: 'tool_use', usage: { input_tokens: 10, output_tokens: 5 }
+      })
+    });
+    const result = await callLLMWithRetry(
+      [], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0, defaultConfig, makeAgentState()
+    );
+    expect(result.type).toBe('note');
+  });
+
+  test('CONFIG.streaming=false sends no stream flag and uses json()', async () => {
+    _storageData = {
+      active_provider: 'anthropic',
+      providers: { anthropic: { api_key: 'k', model: 'claude-opus-4-8', endpoint: 'https://api.anthropic.com/v1/messages' } }
+    };
+    let capturedBody = null;
+    _mockFetch = (url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          content: [{ type: 'tool_use', name: 'note', input: { text: 'ok' } }],
+          stop_reason: 'tool_use', usage: { input_tokens: 10, output_tokens: 5 }
+        })
+      });
+    };
+    const result = await callLLMWithRetry(
+      [], 0, 'page', null, 'goal', [], 1, 'https://example.com', 0,
+      { ...defaultConfig, streaming: false }, makeAgentState()
+    );
+    expect(result.type).toBe('note');
+    expect(capturedBody.stream).toBeUndefined();
   });
 });
