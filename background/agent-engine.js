@@ -4626,6 +4626,12 @@ async function runAgentLoop(goal, workingTabId) {
           // (GLM-4.xV etc.) that imprecisely map green [N] labels to numbers and
           // invent indices — which fails the step and forces a re-pick.
           '<visual_grounding>',
+          // (v20.6) Reconcile the two inputs explicitly. Weaker vision models can
+          // treat the on-screen [N] labels and the text Elements list as competing
+          // signals; state that they are the SAME index so the screenshot is for
+          // locating and the list is for identifying. (Removing either channel
+          // would strip set-of-marks grounding, so we reinforce rather than drop.)
+          '- The screenshot and the Elements list use the SAME numbers: a green [N] drawn on the screenshot is the exact element shown as [N] in the Elements list below. Use the screenshot to LOCATE an element and the list to CONFIRM what it is.',
           '- The "index" in your action MUST be a green [N] label you can actually SEE on the screenshot AND that appears in the Elements list below.',
           '- NEVER invent or guess an index. If you are not sure an element exists, scroll or choose a different visible element instead.',
           '- Choosing an index that is not in the Elements list wastes a step — cross-check the number before you answer.',
