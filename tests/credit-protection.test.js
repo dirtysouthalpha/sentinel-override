@@ -18,12 +18,13 @@ function recordCreditUsage(existingUsage, today, inputTokens, outputTokens, mode
     calls: usage[today].calls + 1,
   };
 
-  // Keep only last 7 days — cutoff = 7 days ago
-  const cutoffMs = 7 * 86400000;
+  // Keep only last 7 days. Derive the cutoff from `today` (the recording day),
+  // not the wall clock, and compare date strings — mirrors background/index.js
+  // (`key < cutoff`) and keeps this pure function deterministic regardless of
+  // when the suite runs.
+  const cutoff = new Date(new Date(today).getTime() - 7 * 86400000).toISOString().split('T')[0];
   for (const key of Object.keys(usage)) {
-    if (key < today && Date.now() - new Date(key).getTime() > cutoffMs) {
-      delete usage[key];
-    }
+    if (key < cutoff) delete usage[key];
   }
 
   return usage;

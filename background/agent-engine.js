@@ -303,15 +303,28 @@ const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped 
 const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
 let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
-// (stuck-loop watchdog) The click_at loop detector below fires ONLY when the run
-// has produced nothing (productiveSteps === 0) and keeps clicking the same spot
-// — the exact "weak vision model fixates on one element" failure (e.g. CNN with
-// glm/gemma). Count those fires and hard-stop after a few rather than grinding to
-// the step cap (~80 wasted LLM calls). Runs that produce ANY result (extract /
-// note / execute_js output) never trip this, so legitimately-slow or
-// execute_js-looping-but-progressing runs are unaffected.
+// (stuck-loop watchdog) The click_at loop detector below fires when a streak of
+// consecutive click_at commands produces no new output AND never moves the page
+// — the "weak vision model fixates on one element" failure (e.g. CNN with
+// glm/gemma, or SonicWall NSM showing an offline firewall). Count those fires and
+// hard-stop after a few rather than grinding to the step cap (~80 wasted LLM
+// calls). Progress is judged per-streak (productiveSteps snapshot + page-change
+// flag), NOT lifetime: a run that extracted something earlier but is now spinning
+// on click_at still trips this. Streaks that change the page or yield a productive
+// non-click_at action reset, so wizards and execute_js-looping-but-progressing
+// runs are unaffected.
 const STUCK_CLICK_LOOP_ABORT_FIRES = 4;
 let _clickAtLoopFires = 0;
+// (stuck-loop watchdog fix) The abort above used to gate on lifetime
+// productiveSteps === 0, so a run that produced ANY result early (e.g. one
+// execute_js extraction) could then spin on click_at forever — exactly the
+// failure seen on SonicWall NSM (firewall offline, agent clicks the same tab
+// 50+ times). These two track the CURRENT click_at streak instead: the
+// productiveSteps snapshot at streak start, and whether any click in the
+// streak actually changed the page. A streak that produces nothing new AND
+// never moves the page is stuck regardless of earlier progress.
+let _clickAtStreakBaseline = 0;
+let _clickAtStreakSawPageChange = false;
 // (3.30.0) Trust-score counters. Module-level so the loop can update them
 // from any branch and the run finalize block can read them at the end.
 let failedSteps = 0;            // running count of steps where actionFailed=true
@@ -780,6 +793,8 @@ export function resetAgentState() {
   agentMemory = {};
   productiveSteps = 0;
   _clickAtLoopFires = 0;
+  _clickAtStreakBaseline = 0;
+  _clickAtStreakSawPageChange = false;
   consecutiveFailures = 0;
   _pageStagnation = 0;
   currentStrategies = [];
@@ -6787,9 +6802,22 @@ return { ok: true, value: el.value };
       // keeps generating click_at with wrong coordinates (e.g., CNN overlay with glm-5).
       // If we see 4+ consecutive click_at commands with no progress, inject recovery.
       if (command.type === 'click_at') {
+        // Start of a new click_at streak (previous action was something else):
+        // snapshot progress markers. If real progress happened since the last
+        // stuck episode, forgive earlier fires so isolated stuck moments in a
+        // long, otherwise-productive run don't accumulate to a false abort.
+        if (_clickAtLoopCount === 0) {
+          if (productiveSteps > _clickAtStreakBaseline) _clickAtLoopFires = 0;
+          _clickAtStreakBaseline = productiveSteps;
+          _clickAtStreakSawPageChange = false;
+        }
         _clickAtLoopCount++;
-        if (_clickAtLoopCount >= 3 && productiveSteps === 0) {
-          console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with 0 productive steps');
+        if (_pageChanged) _clickAtStreakSawPageChange = true;
+        // Stuck = repeated click_at that produced no NEW output during this
+        // streak and never moved the page. Judged per-streak, not lifetime.
+        const _streakStuck = (productiveSteps === _clickAtStreakBaseline) && !_clickAtStreakSawPageChange;
+        if (_clickAtLoopCount >= 3 && _streakStuck) {
+          console.error('[Sentinel/RECOVERY] click_at loop detected:', _clickAtLoopCount, 'consecutive click_at with no new progress + no page change');
           // Auto-dismiss common overlay patterns. Two passes:
           //   1. selector-based: known consent libraries (OneTrust, Didomi,
           //      Sourcepoint, etc.) and aria-label heuristics.

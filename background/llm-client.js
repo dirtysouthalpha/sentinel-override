@@ -2160,13 +2160,20 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   });
 
   const controller = new AbortController();
-  const fetchTimeout = setTimeout(() => controller.abort(), CONFIG.fetchTimeout);
+  // Adaptive timeout: a vision request (screenshot payload + a slower vision
+  // model such as glm-4.6v) legitimately takes longer than a text-only call.
+  // The flat 30s ceiling was aborting these mid-flight ("signal is aborted
+  // without reason" → "API timed out after 30s"), forcing a wasted retry on
+  // every slow step. Give vision calls 2x headroom; text calls keep 30s.
+  const _isVisionCall = !!base64Image && typeof provider.buildVisionContent === 'function';
+  const _effectiveTimeout = _isVisionCall ? CONFIG.fetchTimeout * 2 : CONFIG.fetchTimeout;
+  const fetchTimeout = setTimeout(() => controller.abort(), _effectiveTimeout);
 
   // Build request body using provider registry
   // (3.51) Send vision content when we have an image and the provider supports it.
   // If the endpoint rejects the vision request with 400, we fall back to text-only
   // (see the 400-retry block below) so non-vision model variants don't silently fail.
-  const _useVision = !!base64Image && typeof provider.buildVisionContent === 'function';
+  const _useVision = _isVisionCall;
   const userContent = (_useVision)
     ? provider.buildVisionContent(prompt, base64Image)
     : prompt;
@@ -2197,7 +2204,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     clearTimeout(fetchTimeout);
     _apiHealth.record(_apiStart, false);
     console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
-    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${CONFIG.fetchTimeout/ONE_SECOND_MS}s`) : err;
+    throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${_effectiveTimeout/ONE_SECOND_MS}s`) : err;
   }
   clearTimeout(fetchTimeout);
   console.log('[Sentinel/LLM] Response received. status=' + (response ? response.status : 'null'));
@@ -2403,6 +2410,20 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       if (/\b(?:finish|done|complete|here\s+(?:is|are)|summary|report)\b/i.test(_intentText) && /\b(?:task|report|findings|articles|results)\b/i.test(_intentText)) {
         console.warn('[Sentinel/FALLBACK] Detected finish intent from content');
         return { type: 'finish', summary: _intentText.substring(0, 500) };
+      }
+    }
+    // (fix) Salvage substantive assistant text as a note instead of discarding it.
+    // Some providers (e.g. z.ai GLM) return finish_reason="tool_calls" but put the
+    // real work — reasoning plus already-extracted data — in content/reasoning_content
+    // with no parseable tool call. Dropping it ("will retry") loses data the model
+    // already gathered (e.g. a SonicWall interface table) and burns a step. Keep it
+    // as a note so it persists in history/memory for the finish summary.
+    if (choice && choice.message) {
+      const _m = choice.message;
+      const _salvageText = `${(typeof _m.content === 'string' ? _m.content : '') || ''}\n${(typeof _m.reasoning_content === 'string' ? _m.reasoning_content : '') || ''}`.trim();
+      if (_salvageText.length > 40) {
+        console.warn('[Sentinel/llm] No parseable action — salvaging assistant text as a note (' + _salvageText.length + ' chars).');
+        return _attachReasoning({ type: 'note', text: _salvageText.substring(0, 4000) });
       }
     }
     return { type: 'note', text: 'LLM returned an unparseable response. Will retry.' };
