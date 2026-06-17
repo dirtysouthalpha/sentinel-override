@@ -822,3 +822,67 @@ describe('Multi-select null guard', () => {
     expect(opts.find(o => o.value === 'Alpha').selected).toBe(true);
   });
 });
+
+// ===================== Orphaned-context teardown =====================
+// Mirrors __sentinelContextValid + safeSendMessage/tearDownOrphanedContentScript
+// from content/index.js. After the extension is reloaded, content scripts in
+// open tabs are orphaned (chrome.runtime.id === undefined) and every
+// sendMessage throws "Extension context invalidated". The script must detect
+// this once and go quiet instead of spamming on every SPA mutation.
+
+function makeOrphanHarness(chromeObj) {
+  let tornDown = false;
+  let teardownCount = 0;
+  const sent = [];
+  const contextValid = () => {
+    try { return !!(chromeObj && chromeObj.runtime && chromeObj.runtime.id); }
+    catch (_e) { return false; }
+  };
+  const tearDown = () => { if (tornDown) return; tornDown = true; teardownCount++; };
+  const isContextLost = (m) => /context invalidated|message port closed|receiving end does not exist/i.test(m || '');
+  const safeSendMessage = (msg) => {
+    if (tornDown) return;
+    if (!contextValid()) { tearDown(); return; }
+    try {
+      const r = chromeObj.runtime.sendMessage(msg);
+      if (r && typeof r.catch === 'function') r.catch((e) => { if (isContextLost(e && e.message)) tearDown(); });
+    } catch (e) {
+      if (isContextLost(e && e.message)) tearDown();
+    }
+  };
+  return { safeSendMessage, get tornDown() { return tornDown; }, get teardownCount() { return teardownCount; }, sent };
+}
+
+describe('orphaned-context teardown', () => {
+  test('sends normally while the runtime context is valid', () => {
+    const sent = [];
+    const chromeObj = { runtime: { id: 'abc', sendMessage: (m) => { sent.push(m); return Promise.resolve(); } } };
+    const h = makeOrphanHarness(chromeObj);
+    h.safeSendMessage({ action: 'spa_content_changed' });
+    expect(sent).toHaveLength(1);
+    expect(h.tornDown).toBe(false);
+  });
+
+  test('tears down without sending when chrome.runtime.id is gone', () => {
+    let sendCalls = 0;
+    const chromeObj = { runtime: { id: undefined, sendMessage: () => { sendCalls++; return Promise.resolve(); } } };
+    const h = makeOrphanHarness(chromeObj);
+    h.safeSendMessage({ action: 'spa_content_changed' });
+    expect(sendCalls).toBe(0); // never even attempted
+    expect(h.tornDown).toBe(true);
+  });
+
+  test('tears down once and stays quiet across repeated SPA mutations', () => {
+    const chromeObj = { runtime: { id: undefined, sendMessage: () => Promise.resolve() } };
+    const h = makeOrphanHarness(chromeObj);
+    for (let i = 0; i < 50; i++) h.safeSendMessage({ action: 'spa_content_changed' });
+    expect(h.teardownCount).toBe(1); // not 50
+  });
+
+  test('tears down when sendMessage throws "Extension context invalidated"', () => {
+    const chromeObj = { runtime: { id: 'abc', sendMessage: () => { throw new Error('Extension context invalidated.'); } } };
+    const h = makeOrphanHarness(chromeObj);
+    h.safeSendMessage({ action: 'spa_content_changed' });
+    expect(h.tornDown).toBe(true);
+  });
+});
