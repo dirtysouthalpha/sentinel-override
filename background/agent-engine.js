@@ -4577,7 +4577,10 @@ async function runAgentLoop(goal, workingTabId) {
       if (_visionMode && _visionElements) {
         const _visionHistoryParts = [];
         const promptHistLen = promptHistory.length;
-        const visionStart = Math.max(0, promptHistLen - 6);
+        // (v20.5) Show the last 10 steps (was 6). Weaker vision models repeat
+        // actions when earlier attempts scroll out of context; the extra steps
+        // are the "already tried X" signal they don't infer on their own.
+        const visionStart = Math.max(0, promptHistLen - 10);
         for (let i = visionStart; i < promptHistLen; i++) {
           const h = promptHistory[i];
           if (!h || !h.action) continue;
@@ -4617,7 +4620,16 @@ async function runAgentLoop(goal, workingTabId) {
           '<output_format>',
           'Respond with ONLY valid JSON, no markdown:',
           '{"thinking":"what you see and why","evaluation":"previous action success/fail/partial","memory":"progress notes","next_goal":"one clear goal","action":{"type":"...","index":N,"text":"...","direction":"up|down","url":"...","code":"..."}}',
-          '</output_format>'
+          '</output_format>',
+          '',
+          // (v20.5) Explicit visual-grounding guard for weaker vision models
+          // (GLM-4.xV etc.) that imprecisely map green [N] labels to numbers and
+          // invent indices — which fails the step and forces a re-pick.
+          '<visual_grounding>',
+          '- The "index" in your action MUST be a green [N] label you can actually SEE on the screenshot AND that appears in the Elements list below.',
+          '- NEVER invent or guess an index. If you are not sure an element exists, scroll or choose a different visible element instead.',
+          '- Choosing an index that is not in the Elements list wastes a step — cross-check the number before you answer.',
+          '</visual_grounding>'
         ].join('\n');
 
         const _zoomAnnotation = formatZoomRegion(_zoomRegion);
@@ -4659,8 +4671,6 @@ async function runAgentLoop(goal, workingTabId) {
           if (_vEndpoint.includes('api.anthropic.com')) {
             throw new Error('Vision LLM not supported for Anthropic provider');
           }
-          const _vCtrl = new AbortController();
-          const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
           let _vResponse;
           // Prepare request body safely
           let _visionBody;
@@ -4668,28 +4678,59 @@ async function runAgentLoop(goal, workingTabId) {
             _visionBody = JSON.stringify({
               model: _vModel,
               messages: _visionMessages,
-              max_tokens: 600,
-              temperature: 0.1
+              // (v20.5) 600 was too tight for reasoning vision models (GLM-4.xV,
+              // DeepSeek-VL) that emit a <think> block before the JSON action —
+              // the action got truncated mid-emit, forcing salvage/retries.
+              max_tokens: 1200,
+              // (v20.5) 0 (was 0.1) — index selection from a screenshot should be
+              // as deterministic as the API allows; the JSON format already
+              // constrains the output so there's no creativity to preserve.
+              temperature: 0
             });
           } catch (_stringifyErr) {
             console.warn('[Sentinel/v4] Vision payload serialization failed:', getErrorMessage(_stringifyErr));
             break; // Exit vision mode on serialization failure
           }
-          try {
-            _vResponse = await fetch(
-              _vEndpoint,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${_vApiKey}`
-                },
-                body: _visionBody,
-                signal: _vCtrl.signal
-              }
-            );
-          } finally {
-            clearTimeout(_vTimeoutId);
+          // (v20.5) Retry the vision call on transient failures (network error,
+          // 429/5xx) before falling through to the legacy path. This brings the
+          // resilience Fix 5 wanted WITHOUT routing through legacy — keeping the
+          // set-of-marks numbered-label grounding that weak vision models depend
+          // on (legacy clicks by estimated coordinates, which grounds worse). A
+          // 45s timeout is NOT retried — it would just time out again; the faster
+          // path is to fall through to legacy.
+          const _vMaxAttempts = 2;
+          for (let _vAttempt = 0; _vAttempt < _vMaxAttempts; _vAttempt++) {
+            const _vCtrl = new AbortController();
+            const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
+            let _vTransient = false;
+            try {
+              _vResponse = await fetch(
+                _vEndpoint,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${_vApiKey}`
+                  },
+                  body: _visionBody,
+                  signal: _vCtrl.signal
+                }
+              );
+            } catch (_vFetchErr) {
+              const _aborted = _vFetchErr && typeof _vFetchErr === 'object' && _vFetchErr.name === 'AbortError';
+              _vTransient = !_aborted; // retry real network errors, not a 45s timeout
+              console.warn(`[Sentinel/v4] Vision fetch attempt ${_vAttempt + 1} failed${_aborted ? ' (timeout)' : ''}:`, getErrorMessage(_vFetchErr));
+            } finally {
+              clearTimeout(_vTimeoutId);
+            }
+            if (!_vTransient && _vResponse && (_vResponse.status === 429 || _vResponse.status >= 500)) {
+              _vTransient = true;
+              console.warn('[Sentinel/v4] Vision LLM retryable status:', _vResponse.status);
+            }
+            if (!_vTransient) break; // success, or a non-retryable response
+            if (_vAttempt < _vMaxAttempts - 1) {
+              await new Promise((r) => setTimeout(r, TWO_SECONDS_MS));
+            }
           }
           if (_vResponse && !_vResponse.ok) {
             console.warn('[Sentinel/v4] Vision LLM non-ok response:', _vResponse.status);
@@ -4704,13 +4745,38 @@ async function runAgentLoop(goal, workingTabId) {
             }
             const _vRaw = _vData && _vData.choices && Array.isArray(_vData.choices) && _vData.choices[0] && _vData.choices[0].message
               ? (_vData.choices[0].message.content || '') : '';
-            
-            // Parse structured JSON output
+
+            // (v20.5) Record token usage — the v4 vision path previously bumped
+            // only apiCallCount, so cost/credit tracking silently missed every
+            // vision step (worst on metered free tiers).
+            const _vu = (_vData && _vData.usage) || {};
+            const _vIn  = _vu.prompt_tokens || _vu.input_tokens || 0;
+            const _vOut = _vu.completion_tokens || _vu.output_tokens || 0;
+            if (_vIn || _vOut) {
+              agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _vIn;
+              agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _vOut;
+              try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                  chrome.runtime.sendMessage({ action: 'record_credit_usage', inputTokens: _vIn, outputTokens: _vOut, model: _vModel }).catch(() => {});
+                }
+              } catch (_creditErr) { /* non-fatal */ }
+            }
+
+            // Parse structured JSON output. (v20.5) Strip <think>…</think> wrappers
+            // first — reasoning vision models (GLM-4.xV, DeepSeek-VL) emit them
+            // before the JSON, which broke the bare JSON.parse and left us relying
+            // on a code fence that those models often omit.
+            const _vClean = _vRaw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
             let _vParsed = null;
-            try { _vParsed = JSON.parse(_vRaw); } catch(_e) {
-              // Try extracting from code block
-              const _m = _vRaw.match(CODE_BLOCK_REGEX);
-              if (_m && _m[1]) try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) { console.warn('[Sentinel] Vision code block parse failed:', getErrorMessage(_e2)); }
+            try { _vParsed = JSON.parse(_vClean); } catch(_e) {
+              // Try a fenced code block …
+              const _m = _vClean.match(CODE_BLOCK_REGEX);
+              if (_m && _m[1]) { try { _vParsed = JSON.parse(_m[1].trim()); } catch(_e2) { console.warn('[Sentinel] Vision code block parse failed:', getErrorMessage(_e2)); } }
+              // … then the first balanced JSON object anywhere in the text.
+              if (!_vParsed) {
+                const _b = _vClean.match(/\{[\s\S]*\}/);
+                if (_b) { try { _vParsed = JSON.parse(_b[0]); } catch(_e3) { /* give up — legacy fallback handles it */ } }
+              }
             }
 
             if (_vParsed && _vParsed.action) {
