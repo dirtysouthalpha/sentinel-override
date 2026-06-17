@@ -932,9 +932,13 @@ describe('callLLM — provider body building', () => {
       0, defaultConfig, makeAgentState({ consecutiveFailures: 5 })
     );
     expect(result.type).toBe('note');
-    // Thinking mode should set temperature: 1 and include thinking field
-    expect(capturedBody.thinking).toBeDefined();
-    expect(capturedBody.temperature).toBe(1);
+    // (v20.3) Sonnet 4.6 uses ADAPTIVE thinking — no budget_tokens, no temperature
+    // (legacy enabled+budget+temperature:1 is deprecated and 400s on Opus 4.7/4.8).
+    expect(capturedBody.thinking).toEqual({ type: 'adaptive' });
+    expect(capturedBody.temperature).toBeUndefined();
+    expect(capturedBody.output_config).toEqual({ effort: 'high' });
+    // Thinking is incompatible with forced tool choice — must be 'auto'.
+    expect(capturedBody.tool_choice).toEqual({ type: 'auto' });
   });
 });
 

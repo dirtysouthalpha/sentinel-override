@@ -1400,7 +1400,9 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
   } catch (err) {
     console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
     const msg = (typeof err.message === 'string' ? err.message : String(err));
-    const isRetryable = (msg.includes('429') || msg.includes('502') || msg.includes('503') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
+    // (v20.3) Added 500 / 529 / "overloaded" — Anthropic returns 529 overloaded_error
+    // and transient 500s under load; these are retryable just like 429/502/503.
+    const isRetryable = (msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('529') || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
       const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
       const delay = Math.min(baseDelay * Math.pow(2, retryCount) + Math.floor(Math.random() * TWO_SECONDS_MS), CONFIG.maxRetryDelay);
@@ -1956,7 +1958,11 @@ ${base64Image ? (function() {
   // (v3.52) Gate click_at preference on actual vision capability.
     // Text-only models receive screenshots but can't process them for coordinates.
     // Forcing click_at on text models causes infinite click loops (glm-5 + CNN).
-    const _visionCapable = supportsVision(agentState && agentState.model);
+    // (v20.3) Also drop to selector-mode if the endpoint rejected our image at
+    // runtime (vision 400 → text-only fallback set agentState.visionDegraded). A
+    // model that "supports" vision but whose endpoint refuses image_url is blind in
+    // practice; without this it keeps preferring click_at and loops.
+    const _visionCapable = supportsVision(agentState && agentState.model) && !(agentState && agentState.visionDegraded);
     const _visionHeader = _visionCapable
       ? 'VISUAL MODE — SCREENSHOT ACTIVE. You have a screenshot of the current page. PREFER coordinate-based interaction:\n'
       : `SCREENSHOT ACTIVE — a screenshot is attached for visual context, but you cannot determine pixel coordinates from it.\nUse selector-based click (with ref or selector from the element list) for all interactions. Do NOT use click_at.\n`;
@@ -2207,6 +2213,9 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // GLM variants) reject image_url even though the protocol accepts it.
     if (response.status === 400 && _useVision) {
       console.warn('[Sentinel] Vision request rejected (400) — retrying without image. Error:', (errorData || 'unknown error').slice(0, 200));
+      // (v20.3) Mark the run blind so subsequent steps switch to selector-based
+      // interaction instead of preferring click_at coordinates it can't derive.
+      if (agentState) agentState.visionDegraded = true;
       _rateLimiter.check(); // rate-limit the fallback call just like the original
       agentState.apiCallCount++; // second attempt counts as its own call
       const _fbContent = prompt; // text-only
