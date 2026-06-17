@@ -2276,32 +2276,64 @@ function addReportCard(report) {
   header.appendChild(title);
   header.appendChild(time);
 
-  const summary = document.createElement('div');
-  summary.className = 'report-card-summary';
-  summary.textContent = report.summary || 'Report generated.';
+  // (v20.2) Render the FULL report inline in the chat — like Claude does —
+  // instead of hiding it behind a one-line summary + button. The markdown is
+  // parsed and sanitized, code blocks get copy buttons, and [src:*] citation
+  // chips stay clickable.
+  const md = report.fullReport || report.summary || 'Report generated.';
+  const body = document.createElement('div');
+  body.className = 'report-card-body markdown-body';
+  try {
+    if (typeof marked !== 'undefined' && marked.parse && typeof sanitizeHtml === 'function') {
+      body.innerHTML = sanitizeHtml(marked.parse(md));
+      try { addCodeCopyButtons(body); } catch { /* non-fatal */ }
+      try { renderSourceChipsIn(body); } catch { /* non-fatal */ }
+    } else {
+      body.textContent = md;
+    }
+  } catch (e) {
+    console.warn('[Sentinel] inline report render failed:', getErrorMessage(e));
+    body.textContent = md;
+  }
 
   const actions = document.createElement('div');
   actions.className = 'report-card-actions';
 
+  // Primary action: download the report as a Markdown (.md) file.
+  const downloadBtn = document.createElement('button');
+  downloadBtn.className = 'report-view-btn';
+  downloadBtn.textContent = 'Download .md';
+  downloadBtn.addEventListener('click', () => {
+    if (window.exportReportFile) window.exportReportFile(report);
+  });
+
+  // Copy the raw markdown to the clipboard.
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'report-view-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(md);
+      const orig = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+    } catch { try { showToast('Copy failed', 'error'); } catch { /* detached popup */ } }
+  });
+
+  // Open the full-width report view in its own browser tab.
   const viewBtn = document.createElement('button');
   viewBtn.className = 'report-view-btn';
-  viewBtn.textContent = 'View Full Report';
+  viewBtn.textContent = 'Open full view';
   viewBtn.addEventListener('click', () => {
     openReportModal(report.fullReport);
   });
 
-  const exportBtn = document.createElement('button');
-  exportBtn.className = 'report-view-btn';
-  exportBtn.textContent = 'Export .md';
-  exportBtn.addEventListener('click', () => {
-    if (window.exportReportFile) window.exportReportFile(report);
-  });
-
+  actions.appendChild(downloadBtn);
+  actions.appendChild(copyBtn);
   actions.appendChild(viewBtn);
-  actions.appendChild(exportBtn);
 
   group.appendChild(header);
-  group.appendChild(summary);
+  group.appendChild(body);
   group.appendChild(actions);
   chatContainer.appendChild(group);
   chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -3967,13 +3999,13 @@ chrome.runtime.onMessage.addListener((message) => {
     if (!previewPanel) {
       previewPanel = document.createElement('div');
       previewPanel.id = 'screenshot-preview';
-      previewPanel.style.cssText = 'position:relative;width:100%;max-height:200px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;';
+      previewPanel.style.cssText = 'position:relative;width:100%;max-height:110px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;';
       previewPanel.title = 'Click to expand';
       const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
       if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
       previewPanel.addEventListener('click', () => {
-        const isExpanded = previewPanel.style.maxHeight === '500px';
-        previewPanel.style.maxHeight = isExpanded ? '200px' : '500px';
+        const isExpanded = previewPanel.style.maxHeight === '380px';
+        previewPanel.style.maxHeight = isExpanded ? '110px' : '380px';
       });
     }
     previewPanel.textContent = '';

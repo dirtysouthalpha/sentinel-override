@@ -2603,6 +2603,18 @@ export function parseLLMResponse(content) {
         }
       } catch (e) { console.warn('[Sentinel/llm] Parse failed:', getErrorMessage(e)); }
     }
+    // (v20.2) Preserve the model's prose instead of discarding it. Some models
+    // (especially with extended thinking, or non-tool endpoints) narrate their
+    // findings in plain text instead of emitting an action JSON — e.g. reading
+    // SonicWall interface IPs aloud, then "Let me navigate to…". The old path
+    // threw that away as a bare "Parse error" and looped, losing real extracted
+    // data. Capture substantial prose as a note so it survives into history and
+    // the final report. Keep the "Parse error" marker (telemetry + tests rely on
+    // it) and keep the generic message for short/garbage responses.
+    const _prose = (typeof content === 'string' ? content.trim() : '').replace(/\s+/g, ' ');
+    if (_prose.length > 40) {
+      return { type: 'note', text: `Parse error (will retry) — captured model output: ${_prose.substring(0, 1500)}` };
+    }
     return { type: 'note', text: `Parse error (will retry): ${getErrorMessage(err)}` };
   }
 }

@@ -38,7 +38,11 @@ function checkCreditLimit(usage, today, limit) {
 // ---- Tests ----
 
 describe('recordCreditUsage', () => {
-  const TODAY = '2026-06-11';
+  // (v20.2) Use a date relative to "now" rather than a hardcoded one. The prune
+  // step keys off the real Date.now(), so a fixed TODAY drifts past the 7-day
+  // window over time and silently broke the "preserves existing usage" case.
+  const _fmtDay = (d) => d.toISOString().slice(0, 10);
+  const TODAY = _fmtDay(new Date());
 
   test('creates today entry when none exists', () => {
     const result = recordCreditUsage({}, TODAY, 100, 50, 'gpt-4o');
@@ -90,10 +94,19 @@ describe('recordCreditUsage', () => {
   });
 
   test('preserves existing usage for other days', () => {
-    const existing = { '2026-06-10': { tokens: 999, cost: 1.5, calls: 10 } };
+    // Yesterday is well within the 7-day retention window, so it must survive.
+    const yesterday = _fmtDay(new Date(Date.now() - 86400000));
+    const existing = { [yesterday]: { tokens: 999, cost: 1.5, calls: 10 } };
     const result = recordCreditUsage(existing, TODAY, 100, 50, 'gpt-4o');
-    expect(result['2026-06-10']).toBeDefined();
-    expect(result['2026-06-10'].tokens).toBe(999);
+    expect(result[yesterday]).toBeDefined();
+    expect(result[yesterday].tokens).toBe(999);
+  });
+
+  test('prunes usage older than the 7-day window', () => {
+    const eightDaysAgo = _fmtDay(new Date(Date.now() - 8 * 86400000));
+    const existing = { [eightDaysAgo]: { tokens: 1, cost: 0.1, calls: 1 } };
+    const result = recordCreditUsage(existing, TODAY, 100, 50, 'gpt-4o');
+    expect(result[eightDaysAgo]).toBeUndefined();
   });
 });
 

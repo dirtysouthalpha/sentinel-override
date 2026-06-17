@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isAgentAttachedTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay } from './agent-engine.js';
+import { startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay } from './agent-engine.js';
 import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
 import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
@@ -1104,10 +1104,12 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (!activeInfo || typeof activeInfo.tabId !== 'number') return;
   try {
     if (agentRunning) {
-      const attached = isAgentAttachedTab(activeInfo.tabId);
+      // (v20.1) Only the primary working tab shows the panel during a run —
+      // not every agent-attached tab. Switching to any other tab hides it.
+      const showPanel = isPrimaryPanelTab(activeInfo.tabId);
       await chrome.sidePanel.setOptions({
         tabId: activeInfo.tabId,
-        enabled: attached,
+        enabled: showPanel,
         path: 'popup.html'
       });
     } else {

@@ -266,9 +266,24 @@ export async function generateReport(executionData, CONFIG) {
     detail: (function() { const a = h.action; return a && a.selector && typeof a.selector === 'string' ? a.selector.substring(0, 80) : (a && (a.url || a.text) || ''); })(),
     result: typeof h.result === 'string' ? h.result.substring(0, 150) : (h.result != null ? String(h.result).substring(0, 150) : '')
   }));
-  const condensedHistory = _allHistory.length > 14
-    ? [..._allHistory.slice(0, 2), { step: '...', action: `(${_allHistory.length - 14} steps omitted)`, detail: '', result: '' }, ..._allHistory.slice(-12)]
-    : _allHistory;
+  // Collapse consecutive duplicate steps so loop noise — e.g. the same
+  // execute_js fired dozens of times when the agent is stuck — doesn't dominate
+  // the prompt and starve the report writer of real signal.
+  const _dedupedHistory = [];
+  for (const h of _allHistory) {
+    const prev = _dedupedHistory[_dedupedHistory.length - 1];
+    if (prev && prev.action === h.action && prev.result === h.result) {
+      prev._reps = (prev._reps || 1) + 1;
+      continue;
+    }
+    _dedupedHistory.push({ ...h });
+  }
+  for (const h of _dedupedHistory) {
+    if (h._reps) h.result = `${h.result} (repeated ×${h._reps})`;
+  }
+  const condensedHistory = _dedupedHistory.length > 14
+    ? [..._dedupedHistory.slice(0, 2), { step: '...', action: `(${_dedupedHistory.length - 14} steps omitted)`, detail: '', result: '' }, ..._dedupedHistory.slice(-12)]
+    : _dedupedHistory;
   const { memorySummary, citableKeysList } = _buildMemorySummary(agentMemory);
   const planContext = agentPlan && agentPlan.length
     ? `\nOriginal plan (${agentPlan.length} steps):\n${agentPlan.map((s, i) => {
@@ -477,56 +492,113 @@ export function buildFallbackReport(executionData) {
   if (!executionData) return 'Report generation failed: no execution data available.';
   const { goal, history, agentMemory, stepCount, apiCallCount } = executionData;
 
-  // Render one extracted item readably. Arrays of objects previously stringified
-  // to "[object Object]"; instead lead with a title-like field (title/name/
-  // headline/text/label) when present, then join the remaining non-empty values.
+  const TITLE_KEYS = ['title', 'name', 'headline', 'text', 'label', 'heading'];
+  const URL_KEYS = ['url', 'href', 'link', 'source'];
+  const _isUrl = (s) => /^https?:\/\//i.test(String(s == null ? '' : s).trim());
+  const _mdLink = (label, url) => {
+    const clean = String(label == null ? url : label).replace(/[[\]]/g, '').trim() || String(url).trim();
+    return `[${clean}](${String(url).trim()})`;
+  };
+
+  // Render one extracted item as polished markdown. Objects carrying a title +
+  // URL become a bold clickable link (the workhorse for news/article briefings);
+  // other objects lead with a title-like field, then join remaining values.
   const _fmtItem = (v) => {
     if (v === null || v === undefined) return '';
     if (typeof v === 'object') {
       try {
-        const titleKeys = ['title', 'name', 'headline', 'text', 'label'];
-        const tk = titleKeys.find(key => v[key] != null && String(v[key]).trim());
-        const lead = tk ? String(v[tk]).trim() : '';
+        const tk = TITLE_KEYS.find(key => v[key] != null && String(v[key]).trim());
+        const uk = URL_KEYS.find(key => v[key] != null && _isUrl(v[key]));
+        const title = tk ? String(v[tk]).trim() : '';
+        const url = uk ? String(v[uk]).trim() : '';
+        if (url) {
+          const used = new Set([tk, uk]);
+          const extra = Object.entries(v)
+            .filter(([key, x]) => !used.has(key) && x != null && String(x).trim() && !_isUrl(x))
+            .map(([, x]) => String(x).trim())
+            .join(' — ');
+          return `**${_mdLink(title || url, url)}**${extra ? `  \n   ${extra.substring(0, 200)}` : ''}`;
+        }
         const rest = Object.entries(v)
           .filter(([key, x]) => key !== tk && x != null && String(x).trim())
           .map(([, x]) => String(x).trim());
-        const parts = (lead ? [lead] : []).concat(rest);
-        return (parts.length ? parts.join(' · ') : JSON.stringify(v)).substring(0, 160);
+        const parts = (title ? [title] : []).concat(rest);
+        return (parts.length ? parts.join(' · ') : JSON.stringify(v)).substring(0, 220);
       } catch { return '[object]'; }
     }
-    return String(v).substring(0, 160);
+    if (_isUrl(v)) return _mdLink(v, v);
+    return String(v).substring(0, 220);
   };
 
-  const memoryLines = Object.entries(agentMemory || {}).map(([k, val]) => {
-    if (Array.isArray(val)) {
-      const shown = val.slice(0, 10).map((v, i) => `  ${i + 1}. ${_fmtItem(v)}`).join('\n');
-      const more = val.length > 10 ? `\n  …and ${val.length - 10} more` : '';
-      // Keep the "N items" phrasing (matched by tests) and add readable rows.
-      return `- **${k}** (${val.length} item${val.length === 1 ? '' : 's'}):\n${shown}${more}`;
-    }
-    const valStr = (val !== null && typeof val === 'object')
-      ? (() => { try { return JSON.stringify(val).substring(0, 300); } catch { return '[object]'; } })()
-      : String(val).substring(0, 300);
-    return `- **${k}**: ${valStr}`;
+  // De-duplicate memory entries holding identical content. Agents frequently
+  // save the same extraction under two keys (e.g. `headlines` + `drudge_headlines`),
+  // which would otherwise render the same list twice.
+  const _sig = (v) => { try { return typeof v === 'string' ? v : JSON.stringify(v); } catch { return String(v); } };
+  const seenSigs = new Set();
+  const memEntries = Object.entries(agentMemory || {}).filter(([, val]) => {
+    const s = _sig(val);
+    if (s && seenSigs.has(s)) return false;
+    if (s) seenSigs.add(s);
+    return true;
   });
 
-  const stepsTaken = (history || [])
-    .filter(h => h && h.action && h.action.type && !FILTERED_ACTION_TYPES.has(h.action.type))
-    .map(h => `${h.step || '?'}. **${h.action.type}**${h.action.selector ? ` on ${h.action.selector.substring(0, 60)}` : ''}: ${typeof h.result === 'string' ? h.result.substring(0, 150) : ''}`)
+  const evidenceBlocks = memEntries.map(([k, val]) => {
+    if (Array.isArray(val)) {
+      const shown = val.slice(0, 20).map((v, i) => `${i + 1}. ${_fmtItem(v)}`).join('\n');
+      const more = val.length > 20 ? `\n\n_…and ${val.length - 20} more_` : '';
+      // Keep the "N items" phrasing (matched by tests) and add readable rows.
+      return `### ${k} — ${val.length} item${val.length === 1 ? '' : 's'}\n\n${shown}${more}`;
+    }
+    const valStr = (val !== null && typeof val === 'object')
+      ? (() => { try { return JSON.stringify(val, null, 2).substring(0, 600); } catch { return '[object]'; } })()
+      : String(val).substring(0, 600);
+    return `### ${k}\n\n${valStr}`;
+  });
+
+  // Build a clean step trail: drop pure-noise actions, drop loop-recovery notes
+  // and rolled-up summaries, and collapse consecutive identical steps (the agent
+  // sometimes repeats the same call dozens of times when stuck).
+  const SKIP_STEP_TYPES = new Set([...FILTERED_ACTION_TYPES, 'history_summary', 'note']);
+  const cleaned = (history || []).filter(h => h && h.action && h.action.type && !SKIP_STEP_TYPES.has(h.action.type));
+  const collapsed = [];
+  for (const h of cleaned) {
+    const sel = h.action.selector && typeof h.action.selector === 'string' ? ` on \`${h.action.selector.substring(0, 50)}\`` : '';
+    const res = typeof h.result === 'string' ? h.result.replace(/\s+/g, ' ').trim().substring(0, 120) : '';
+    const sig = `${h.action.type}|${sel}|${res}`;
+    const prev = collapsed[collapsed.length - 1];
+    if (prev && prev.sig === sig) { prev.count++; continue; }
+    collapsed.push({ step: h.step, type: h.action.type, sel, res, sig, count: 1 });
+  }
+  const stepsTaken = collapsed
+    .map(l => `${l.step || '?'}. **${l.type}**${l.sel}${l.res ? `: ${l.res}` : ''}${l.count > 1 ? ` _(repeated ×${l.count})_` : ''}`)
     .join('\n');
 
-  return `### Goal
-${goal}
+  // Heading + opening line adapt to what the task was after.
+  const taskType = _detectTaskType(goal || '');
+  const heading = taskType === 'briefing' ? 'Your Briefing'
+    : taskType === 'comparison' ? 'Comparison Results'
+    : taskType === 'extraction' ? 'Extracted Data'
+    : taskType === 'configuration' ? 'Configuration Summary'
+    : 'Investigation Summary';
+  const arrayKeys = memEntries.filter(([, v]) => Array.isArray(v) && v.length);
+  const totalItems = arrayKeys.reduce((n, [, v]) => n + v.length, 0);
+  let lead;
+  if (arrayKeys.length) {
+    lead = `I pulled together **${totalItems}** item${totalItems === 1 ? '' : 's'} across ${arrayKeys.length} list${arrayKeys.length === 1 ? '' : 's'} for this run — highlights below.`;
+  } else if (memEntries.length) {
+    lead = `Here's what I extracted during this run.`;
+  } else {
+    lead = `I wasn't able to capture structured data this time — the step trail below shows what happened.`;
+  }
 
-### Steps Taken
-${stepsTaken || 'No significant steps recorded.'}
-
-### Key Findings
-Report generation encountered an error. The raw extracted data is shown below.
-
-### Evidence
-${memoryLines.length ? memoryLines.join('\n') : 'No data was extracted during this investigation.'}
-
-### Conclusions
-Investigation completed in ${stepCount} steps (${apiCallCount} API calls). For a detailed report, retry the task or check the agent's step-by-step log above.`;
+  const parts = [
+    `## ${heading}`,
+    lead,
+    evidenceBlocks.length ? evidenceBlocks.join('\n\n') : '_No structured data was extracted during this investigation._',
+    '## Steps Taken',
+    stepsTaken || '_No significant steps recorded._',
+    '---',
+    `*Run details — ${stepCount || 0} step${stepCount === 1 ? '' : 's'}, ${apiCallCount || 0} API call${apiCallCount === 1 ? '' : 's'}.*  \n*Goal: ${goal || '(none specified)'}*`
+  ];
+  return parts.join('\n\n');
 }

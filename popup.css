@@ -2472,6 +2472,50 @@ body {
   margin-bottom: 8px;
 }
 
+/* (v20.2) Full report rendered inline in the chat feed, Claude-style. Capped
+   height with scroll so a long report doesn't swallow the whole side panel;
+   "Open full view" remains for the full-width tab. */
+.report-card-body {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  line-height: 1.55;
+  margin-bottom: 10px;
+  max-height: 440px;
+  overflow-y: auto;
+  word-break: break-word;
+}
+.report-card-body h1,
+.report-card-body h2,
+.report-card-body h3 {
+  font-family: var(--font-headline);
+  line-height: 1.3;
+  margin: 12px 0 6px;
+}
+.report-card-body h1 { font-size: 15px; }
+.report-card-body h2 { font-size: 14px; }
+.report-card-body h3 { font-size: 13px; }
+.report-card-body p { margin: 6px 0; }
+.report-card-body ul,
+.report-card-body ol { margin: 6px 0; padding-left: 20px; }
+.report-card-body li { margin: 3px 0; }
+.report-card-body a { color: var(--cyan); word-break: break-all; }
+.report-card-body code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--bg-tertiary, rgba(255,255,255,0.06));
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.report-card-body pre {
+  background: var(--bg-tertiary, rgba(0,0,0,0.25));
+  padding: 8px 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.report-card-body pre code { background: none; padding: 0; }
+.report-card-body hr { border: none; border-top: 1px solid var(--border-color); margin: 10px 0; }
+
 .report-card-actions {
   display: flex;
   gap: 6px;
@@ -2943,13 +2987,13 @@ input[type="checkbox"] {
 .mini-shot-panel .mini-shot-img-wrap {
   display: block;
   background: #111;
-  max-height: 180px;
+  max-height: 110px; /* (v20.2) smaller footprint so the screenshot doesn't dominate the narrow side panel — still visible, click to zoom */
   overflow: hidden;
   text-align: center;
 }
 .mini-shot-panel .mini-shot-img-wrap img {
   max-width: 100%;
-  max-height: 180px;
+  max-height: 110px;
   display: inline-block;
   object-fit: contain;
   image-rendering: -webkit-optimize-contrast;
