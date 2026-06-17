@@ -699,6 +699,9 @@ const CONFIG = {
   retryDelay: TWO_SECONDS_MS,
   maxRetryDelay: 2 * TEN_SECONDS_MS, // 20s cap (was 10s)
   screenshotQuality: 30,
+  // (v20.4) Stream LLM responses (per-chunk idle timeout) so slow/thinking models
+  // aren't aborted mid-generation. Set false to force the legacy buffered path.
+  streaming: true,
   fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
   pageLoadTimeout: 25000,
   maxSteps: 100,

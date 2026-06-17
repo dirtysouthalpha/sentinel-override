@@ -1708,8 +1708,17 @@ function _buildTabCtx() {
  */
 function _sanitizeHistory(history, isRunbook, CONFIG) {
   const historyWindowSize = isRunbook ? 25 : CONFIG.historyWindow;
-  const slicedHistory = Array.isArray(history) ? history.slice(-historyWindowSize) : [];
-  return slicedHistory.map((h, idx) => {
+  const fullHistory = Array.isArray(history) ? history : [];
+  // (v20.4) Compaction: steps that fall outside the window used to vanish, so
+  // long / multi-portal runs lost the earlier trajectory and re-tried dead ends.
+  // Summarize the dropped steps into a single deterministic digest entry (no
+  // extra LLM call) and prepend it, so the model keeps cheap awareness of what
+  // it already did without paying full per-step token cost.
+  const dropped = fullHistory.length > historyWindowSize
+    ? fullHistory.slice(0, fullHistory.length - historyWindowSize)
+    : [];
+  const slicedHistory = fullHistory.slice(-historyWindowSize);
+  const mapped = slicedHistory.map((h, idx) => {
     const isMostRecent = idx === slicedHistory.length - 1;
     const action = h.action || {};
     const safeAction = {
@@ -1744,7 +1753,211 @@ function _sanitizeHistory(history, isRunbook, CONFIG) {
     }
     return cleanedEntry;
   });
+  if (dropped.length) {
+    mapped.unshift(_compactHistoryDigest(dropped));
+  }
+  return mapped;
 }
+
+/**
+ * Build a single compacted digest entry summarizing history steps that fell
+ * outside the live window. Deterministic (no LLM call), bounded in size, and
+ * shaped like a normal history entry so it renders through the existing
+ * JSON.stringify(sanitizedHistory) path.
+ *
+ * @param {Array} dropped - History entries being dropped from the live window.
+ * @returns {{step: string, action: {type: string}, result: string}} Digest entry.
+ */
+function _compactHistoryDigest(dropped) {
+  const lines = [];
+  for (const h of dropped) {
+    const a = h.action || {};
+    const t = a.type || '?';
+    let r = '';
+    if (typeof h.result === 'string') {
+      r = h.result;
+    } else if (h.result && typeof h.result === 'object') {
+      const res = h.result;
+      r = res.text || res.value || res.summary || res.message
+        || (res.success === false ? `failed: ${res.error || ''}` : (res.success ? 'ok' : ''));
+    }
+    r = String(r || '').replace(/\s+/g, ' ').trim().slice(0, 100);
+    const detail = [a.url, a.selector].filter(Boolean).join(' ').slice(0, 60);
+    lines.push(`#${h.step != null ? h.step : '?'} ${t}${detail ? ' ' + detail : ''}${r ? ` → ${r}` : ''}`);
+  }
+  // Keep the digest bounded: retain the most recent dropped steps, count the rest.
+  const kept = lines.slice(-14);
+  const omitted = lines.length - kept.length;
+  const text = (omitted > 0 ? `(+${omitted} earlier steps) ` : '') + kept.join(' | ');
+  return {
+    step: `1-${dropped.length}`,
+    action: { type: '(earlier steps, compacted)' },
+    result: text.slice(0, 1400)
+  };
+}
+
+// ========== Streaming (SSE) ==========
+// (v20.4) Stream LLM responses so slow/thinking models keep the connection alive
+// via a per-chunk idle timeout instead of a single wall-clock deadline — the abort
+// that produced "API timed out after 60s" mid-generation on heavy pages. The
+// accumulators reconstruct the SAME object shape the non-streaming parsers expect,
+// so the downstream parse path is untouched. Streaming only activates on a genuine
+// text/event-stream response; anything else (non-SSE proxy, a provider that ignored
+// stream:true, unit-test mocks) falls back to response.json().
+
+/** Accumulate an Anthropic Messages SSE stream into a non-streaming-shaped object. */
+function _anthropicStreamAcc() {
+  const blocks = [];
+  let stopReason = null;
+  let model;
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  return {
+    handle(ev) {
+      const type = ev && ev.type;
+      if (type === 'message_start' && ev.message) {
+        model = ev.message.model;
+        const u = ev.message.usage || {};
+        usage.input_tokens = u.input_tokens || 0;
+        usage.output_tokens = u.output_tokens || 0;
+        if (u.cache_read_input_tokens) usage.cache_read_input_tokens = u.cache_read_input_tokens;
+        if (u.cache_creation_input_tokens) usage.cache_creation_input_tokens = u.cache_creation_input_tokens;
+      } else if (type === 'content_block_start') {
+        const b = { ...(ev.content_block || {}) };
+        if (b.type === 'tool_use') b._partialJson = '';
+        blocks[ev.index] = b;
+      } else if (type === 'content_block_delta') {
+        const b = blocks[ev.index]; if (!b) return;
+        const d = ev.delta || {};
+        if (d.type === 'text_delta') b.text = (b.text || '') + (d.text || '');
+        else if (d.type === 'thinking_delta') b.thinking = (b.thinking || '') + (d.thinking || '');
+        else if (d.type === 'input_json_delta') b._partialJson = (b._partialJson || '') + (d.partial_json || '');
+      } else if (type === 'content_block_stop') {
+        const b = blocks[ev.index];
+        if (b && b.type === 'tool_use') {
+          try { b.input = JSON.parse(b._partialJson || '{}'); } catch (_e) { b.input = b.input || {}; }
+          delete b._partialJson;
+        }
+      } else if (type === 'message_delta') {
+        if (ev.delta && ev.delta.stop_reason) stopReason = ev.delta.stop_reason;
+        if (ev.usage && typeof ev.usage.output_tokens === 'number') usage.output_tokens = ev.usage.output_tokens;
+      }
+    },
+    finalize() {
+      const content = blocks.filter(Boolean).map(b => { const c = { ...b }; delete c._partialJson; return c; });
+      const out = { content, stop_reason: stopReason, usage };
+      if (model) out.model = model;
+      return out;
+    }
+  };
+}
+
+/** Accumulate an OpenAI-compatible chat-completions SSE stream into a non-streaming-shaped object. */
+function _openaiStreamAcc() {
+  let content = '';
+  let reasoning = '';
+  const toolCalls = [];
+  let finishReason = null;
+  let usage = null;
+  return {
+    handle(chunk) {
+      if (chunk && chunk.usage) usage = chunk.usage;
+      const choice = chunk && Array.isArray(chunk.choices) && chunk.choices[0];
+      if (!choice) return;
+      if (choice.finish_reason) finishReason = choice.finish_reason;
+      const d = choice.delta || {};
+      if (typeof d.content === 'string') content += d.content;
+      if (typeof d.reasoning_content === 'string') reasoning += d.reasoning_content;
+      else if (typeof d.reasoning === 'string') reasoning += d.reasoning;
+      if (Array.isArray(d.tool_calls)) {
+        for (const tc of d.tool_calls) {
+          const i = typeof tc.index === 'number' ? tc.index : toolCalls.length;
+          if (!toolCalls[i]) toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+          const slot = toolCalls[i];
+          if (tc.id) slot.id = tc.id;
+          if (tc.type) slot.type = tc.type;
+          if (tc.function) {
+            if (tc.function.name) slot.function.name = tc.function.name;
+            if (typeof tc.function.arguments === 'string') slot.function.arguments += tc.function.arguments;
+          }
+        }
+      }
+    },
+    finalize() {
+      const message = { role: 'assistant', content: content || '' };
+      const tc = toolCalls.filter(Boolean);
+      if (tc.length) message.tool_calls = tc;
+      if (reasoning) message.reasoning_content = reasoning;
+      const out = { choices: [{ message, finish_reason: finishReason }] };
+      if (usage) out.usage = usage;
+      return out;
+    }
+  };
+}
+
+/** Parse one raw SSE event block and dispatch its JSON data payload to the accumulator. */
+function _consumeSSEEvent(rawEvent, acc) {
+  const dataLines = [];
+  for (const line of rawEvent.split('\n')) {
+    const trimmed = line.replace(/\r$/, '');
+    if (trimmed.startsWith('data:')) dataLines.push(trimmed.slice(5).replace(/^ /, ''));
+  }
+  if (!dataLines.length) return;
+  const payload = dataLines.join('\n');
+  if (payload === '[DONE]') return;
+  let obj;
+  try { obj = JSON.parse(payload); } catch (_e) { return; } // ignore non-JSON keepalives/comments
+  acc.handle(obj);
+}
+
+/**
+ * Read a streaming fetch Response (SSE) to completion and reconstruct the
+ * non-streaming response object. Resets an idle timer on every chunk so a model
+ * that keeps producing output is never aborted mid-generation.
+ *
+ * @param {Response} response - Streaming fetch Response (text/event-stream).
+ * @param {object} provider - Resolved provider (provider.id selects the accumulator).
+ * @param {AbortController} controller - The fetch's AbortController (idle timeout aborts it).
+ * @param {number} idleMs - Abort if no chunk arrives within this many ms.
+ * @returns {Promise<object>} Reconstructed response data object.
+ */
+async function _readSSEToData(response, provider, controller, idleMs) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const acc = provider.id === 'anthropic' ? _anthropicStreamAcc() : _openaiStreamAcc();
+  let buffer = '';
+  let idleTimer = setTimeout(() => controller.abort(), idleMs);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => controller.abort(), idleMs);
+      buffer += decoder.decode(value, { stream: true });
+      let sep;
+      while ((sep = buffer.indexOf('\n\n')) >= 0) {
+        const rawEvent = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        if (rawEvent.trim()) _consumeSSEEvent(rawEvent, acc);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) _consumeSSEEvent(buffer, acc);
+  } finally {
+    clearTimeout(idleTimer);
+    try { reader.releaseLock(); } catch (_e) { /* already released */ }
+  }
+  return acc.finalize();
+}
+
+/** True when a Response is a genuine SSE stream we can read incrementally. */
+function _isStreamingResponse(response) {
+  const ctype = (response && response.headers && typeof response.headers.get === 'function')
+    ? (response.headers.get('content-type') || '') : '';
+  return /event-stream/i.test(ctype)
+    && response.body != null
+    && typeof response.body.getReader === 'function';
+}
+
 
 /**
  * Build the system prompt string for the agent's main LLM call.
@@ -2182,15 +2395,30 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     && typeof provider.buildBodyWithThinking === 'function'
     && CONFIG.strategyShiftThreshold > 0
     && agentState.consecutiveFailures >= CONFIG.strategyShiftThreshold;
+  // (v20.4) Streaming gate. Default on; a provider can opt out with
+  // supportsStreaming:false, or globally via CONFIG.streaming:false. Adds the
+  // stream flag to the request body (and OpenAI-style usage opt-in). The parse
+  // path only treats the response as a stream if it actually comes back as SSE
+  // (see _isStreamingResponse), so providers that ignore stream:true are safe.
+  const _wantStream = CONFIG.streaming !== false && provider.supportsStreaming !== false;
+  const _withStream = (obj) => {
+    if (!_wantStream) return obj;
+    const o = { ...obj, stream: true };
+    if (provider.id !== 'anthropic') o.stream_options = { include_usage: true };
+    return o;
+  };
   let requestBody;
   if (useThinking) {
-    requestBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));
+    requestBody = JSON.stringify(_withStream(provider.buildBodyWithThinking(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 })));
   } else if (provider.supportsToolUse) {
-    requestBody = JSON.stringify(provider.buildBodyWithTools(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, { maxTokens: 8000, temperature: 0.1 }));
+    requestBody = JSON.stringify(_withStream(provider.buildBodyWithTools(model, provider.systemPromptTweak, userContent, SENTINEL_TOOLS, { maxTokens: 8000, temperature: 0.1 })));
   } else {
-    requestBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000, temperature: 0.1 }));
+    requestBody = JSON.stringify(_withStream(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000, temperature: 0.1 })));
   }
   const requestHeaders = provider.buildHeaders(apiKey, { thinking: useThinking });
+  // Tracks which AbortController owns the response we ultimately parse (the
+  // vision fallback below swaps in its own controller).
+  let activeController = controller;
 
   let response;
   try {
@@ -2228,11 +2456,11 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       const _fbContent = prompt; // text-only
       let _fbBody;
       if (useThinking) {
-        _fbBody = JSON.stringify(provider.buildBodyWithThinking(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 }));
+        _fbBody = JSON.stringify(_withStream(provider.buildBodyWithThinking(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, 8000, { maxTokens: 8000 })));
       } else if (provider.supportsToolUse) {
-        _fbBody = JSON.stringify(provider.buildBodyWithTools(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, { maxTokens: 8000, temperature: 0.1 }));
+        _fbBody = JSON.stringify(_withStream(provider.buildBodyWithTools(model, provider.systemPromptTweak, _fbContent, SENTINEL_TOOLS, { maxTokens: 8000, temperature: 0.1 })));
       } else {
-        _fbBody = JSON.stringify(provider.buildBody(model, provider.systemPromptTweak, _fbContent, { maxTokens: 8000, temperature: 0.1 }));
+        _fbBody = JSON.stringify(_withStream(provider.buildBody(model, provider.systemPromptTweak, _fbContent, { maxTokens: 8000, temperature: 0.1 })));
       }
       const _fbCtrl = new AbortController();
       const _fbTimeout = setTimeout(() => _fbCtrl.abort(), CONFIG.fetchTimeout);
@@ -2253,16 +2481,30 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
       }
       // Replace `response` with the successful fallback response for the parse logic below
       response = _fbResp;
+      activeController = _fbCtrl; // idle-stream timeout must abort the fallback fetch
     } else {
       throw new Error(`API Error: ${response.status} - ${errorData}`);
     }
   }
 
   let data;
-  try {
-    data = await response.json();
-  } catch (e) {
-    throw new Error(`API returned invalid JSON: ${getErrorMessage(e)}`);
+  if (_wantStream && _isStreamingResponse(response)) {
+    // (v20.4) Read the SSE stream with a per-chunk idle timeout — slow/thinking
+    // models that keep producing output are never aborted mid-generation.
+    try {
+      data = await _readSSEToData(response, provider, activeController, CONFIG.fetchTimeout);
+    } catch (e) {
+      const aborted = typeof e === 'object' && e !== null && e.name === 'AbortError';
+      throw aborted
+        ? new Error(`API timed out after ${CONFIG.fetchTimeout / ONE_SECOND_MS}s`)
+        : new Error(`API stream read failed: ${getErrorMessage(e)}`);
+    }
+  } else {
+    try {
+      data = await response.json();
+    } catch (e) {
+      throw new Error(`API returned invalid JSON: ${getErrorMessage(e)}`);
+    }
   }
 
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
