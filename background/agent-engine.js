@@ -1032,6 +1032,9 @@ const CONFIG = {
   // makes GLM-4.xV misread an index. q50 roughly doubles edge fidelity for the
   // numerals while staying well under half the size of q80. Worth the bytes.
   screenshotQuality: 50,
+  // (v20.4) Stream LLM responses (per-chunk idle timeout) so slow/thinking models
+  // aren't aborted mid-generation. Set false to force the legacy buffered path.
+  streaming: true,
   fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
   pageLoadTimeout: 25000,
   maxSteps: 100,
@@ -4907,11 +4910,12 @@ async function runAgentLoop(goal, workingTabId) {
       if (_visionMode && _visionElements) {
         const _visionHistoryParts = [];
         const promptHistLen = promptHistory.length;
-        // (v20.5) Show the last 10 steps (was 6). GLM-4.xV loses track of what it
-        // already tried and re-clicks the same element; a longer window + the
-        // explicit "ALREADY ATTEMPTED" framing below makes prior actions
-        // unmistakable. The extra ~4 short lines are negligible next to the
-        // screenshot already in the prompt.
+        // (v20.5) Show the last 10 steps (was 6). Weaker vision models (GLM-4.xV)
+        // lose track of what they already tried as earlier attempts scroll out of
+        // context and re-click the same element; a longer window + the explicit
+        // "ALREADY ATTEMPTED" framing below is the "already tried X" signal they
+        // don't infer on their own. The extra ~4 short lines are negligible next
+        // to the screenshot already in the prompt.
         const visionStart = Math.max(0, promptHistLen - 10);
         for (let i = visionStart; i < promptHistLen; i++) {
           const h = promptHistory[i];
@@ -4956,12 +4960,19 @@ async function runAgentLoop(goal, workingTabId) {
           'Example — click the element labeled [7]: {"thinking":"The Accept button is labeled 7","evaluation":"n/a","memory":"dismissing cookie banner","next_goal":"accept cookies","action":{"type":"click","index":7}}',
           '</output_format>',
           '',
+          // (v20.6) Visual-grounding guard for weaker vision models (GLM-4.xV etc.)
+          // that imprecisely map green [N] labels to numbers and invent indices —
+          // which fails the step and forces a re-pick. Reconcile the two inputs
+          // explicitly: the on-screen labels and the text Elements list are the
+          // SAME index (screenshot LOCATES, list CONFIRMS). Removing either channel
+          // would strip set-of-marks grounding, so we reinforce rather than drop.
           '<visual_grounding>',
-          'Each clickable element is marked on the screenshot with a GREEN NUMBERED LABEL like [7]. The same numbers appear in the Elements list below.',
-          'To click or type, copy the number from the label EXACTLY — do not estimate, increment, or guess it. [7] means index 7, never 6 or 8.',
-          'Before you emit "index":N, confirm that [N] actually appears in the Elements list. If the element you want has no number, it is not yet actionable — scroll to bring it into view first.',
-          'NEGATIVE EXAMPLE (do NOT do this): seeing a button labeled [12] but writing {"action":{"type":"click","index":9}}. A wrong index clicks the wrong thing or wastes the step.',
-          'When unsure which number maps to your target, prefer the entry in the Elements list whose text matches your goal over a number you only half-see on the screenshot.',
+          '- The screenshot and the Elements list use the SAME numbers: a green [N] drawn on the screenshot is the exact element shown as [N] in the Elements list below. Use the screenshot to LOCATE an element and the list to CONFIRM what it is.',
+          '- The "index" in your action MUST be a green [N] label you can actually SEE on the screenshot AND that appears in the Elements list below.',
+          '- Copy the number from the label EXACTLY — do not estimate, increment, or guess it. [7] means index 7, never 6 or 8.',
+          '- NEVER invent or guess an index. If you are not sure an element exists, scroll or choose a different visible element instead.',
+          '- NEGATIVE EXAMPLE (do NOT do this): seeing a button labeled [12] but writing {"action":{"type":"click","index":9}}. A wrong index clicks the wrong thing or wastes the step.',
+          '- When unsure which number maps to your target, prefer the entry in the Elements list whose text matches your goal over a number you only half-see on the screenshot.',
           '</visual_grounding>'
         ].join('\n');
 
@@ -5011,10 +5022,10 @@ async function runAgentLoop(goal, workingTabId) {
             _visionBody = JSON.stringify({
               model: _vModel,
               messages: _visionMessages,
-              // GLM-4.xV emits a <think> reasoning block (300-500 tokens) BEFORE
-              // the JSON action. At 600 the action was routinely truncated
-              // mid-emit, forcing parseVisionResponse into its salvage paths or
-              // failing outright. 1200 leaves ample room for think + full action.
+              // GLM-4.xV / DeepSeek-VL emit a <think> reasoning block (300-500
+              // tokens) BEFORE the JSON action. At 600 the action was routinely
+              // truncated mid-emit, forcing parseVisionResponse into its salvage
+              // paths. 1200 leaves ample room for think + full action.
               max_tokens: 1200,
               // Index selection is a precision task, not a creative one. temp 0
               // makes the chosen [index] deterministic so a re-observe of the same
@@ -5026,19 +5037,21 @@ async function runAgentLoop(goal, workingTabId) {
             console.warn('[Sentinel/v4] Vision payload serialization failed:', getErrorMessage(_stringifyErr));
             break; // Exit vision mode on serialization failure
           }
-          // (v20.5) Bounded retry-with-backoff for TRANSIENT failures (HTTP 429 /
-          // 5xx, network errors, timeouts). The vision-first path is GLM's better
-          // grounding path (numbered SoM indices vs. the legacy path's raw x,y
-          // coordinate estimation); a single transient blip shouldn't forfeit it.
-          // On exhausted retries / non-transient failures we fall through to the
-          // legacy callLLMWithRetry path (command stays null), so this only adds a
-          // chance to stay on the SoM path — it never removes the existing fallback.
+          // (v20.5) Bounded retry-with-backoff for TRANSIENT failures (network
+          // error, 429/5xx) before falling through to the legacy path. Keeps the
+          // set-of-marks numbered-label grounding weak vision models depend on
+          // (legacy clicks by estimated coordinates, which grounds worse); a
+          // single transient blip shouldn't forfeit it. A 45s timeout (AbortError)
+          // is NOT retried — it would just time out again, so we surface it and
+          // fall through to the legacy callLLMWithRetry path (command stays null).
+          // Honours Retry-After on 429.
           const _VISION_MAX_ATTEMPTS = 2; // 1 initial + 1 retry
           const _isTransientStatus = (s) => s === 429 || (s >= 500 && s <= 599);
           for (let _vAttempt = 0; _vAttempt < _VISION_MAX_ATTEMPTS; _vAttempt++) {
             const _vCtrl = new AbortController();
             const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
             let _vFetchErr = null;
+            let _vAborted = false;
             try {
               _vResponse = await fetch(
                 _vEndpoint,
@@ -5054,11 +5067,14 @@ async function runAgentLoop(goal, workingTabId) {
               );
             } catch (_fe) {
               _vFetchErr = _fe; // network error or 45s timeout abort
+              _vAborted = !!(_fe && typeof _fe === 'object' && _fe.name === 'AbortError');
             } finally {
               clearTimeout(_vTimeoutId);
             }
             if (_vResponse && _vResponse.ok) break; // success
-            const _transient = _vFetchErr ? true : (_vResponse ? _isTransientStatus(_vResponse.status) : false);
+            // A 45s timeout won't get better on retry — treat it as non-transient
+            // so we surface it and fall through to legacy instead of waiting again.
+            const _transient = _vFetchErr ? !_vAborted : (_vResponse ? _isTransientStatus(_vResponse.status) : false);
             const _attemptsLeft = _vAttempt < _VISION_MAX_ATTEMPTS - 1;
             if (!_transient || !_attemptsLeft) {
               if (_vFetchErr) throw _vFetchErr; // surface to outer catch → legacy fallback
@@ -5101,12 +5117,28 @@ async function runAgentLoop(goal, workingTabId) {
             const _vRaw = _contentHasJson
               ? _vContent
               : [_vContent, _vReasoning].filter(Boolean).join('\n').trim();
-            
+
+            // (v20.5) Record token usage — the v4 vision path previously bumped
+            // only apiCallCount, so cost/credit tracking silently missed every
+            // vision step (worst on metered free tiers).
+            const _vu = (_vData && _vData.usage) || {};
+            const _vIn  = _vu.prompt_tokens || _vu.input_tokens || 0;
+            const _vOut = _vu.completion_tokens || _vu.output_tokens || 0;
+            if (_vIn || _vOut) {
+              agentState.totalInputTokens  = (agentState.totalInputTokens  || 0) + _vIn;
+              agentState.totalOutputTokens = (agentState.totalOutputTokens || 0) + _vOut;
+              try {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                  chrome.runtime.sendMessage({ action: 'record_credit_usage', inputTokens: _vIn, outputTokens: _vOut, model: _vModel }).catch(() => {});
+                }
+              } catch (_creditErr) { /* non-fatal */ }
+            }
+
             // Parse structured JSON output. Weak vision models (GLM-4V) wrap the
             // JSON in <think> blocks / markdown / prose and emit invalid escapes;
             // parseVisionResponse mirrors the legacy path's multi-tier hardening
-            // (sanitize → balanced-object extraction → regex salvage) so a single
-            // malformed brace doesn't cost an entire step.
+            // (strip <think>/fences → sanitize → balanced-object extraction →
+            // regex salvage) so a single malformed brace doesn't cost a step.
             const _vParsed = parseVisionResponse(_vRaw);
             if (!_vParsed) console.warn('[Sentinel/v4] Vision: response not parseable:', (_vRaw || '').slice(0, 200));
 
