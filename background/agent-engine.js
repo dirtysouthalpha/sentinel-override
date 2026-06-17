@@ -318,6 +318,7 @@ let failedSteps = 0;            // running count of steps where actionFailed=tru
 let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
 let _pageStagnation = 0;      // (3.46.1) Counts consecutive non-mutating clicks on same page state — detects click-spam loops
 const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
+let primaryPanelTabId = null;   // (v20.1) the single "working" tab the run was launched on — the ONLY tab that shows the side panel during a run
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
@@ -1007,6 +1008,9 @@ export async function startAgent(goal, sender) {
   // Register the starting tab in the tab context map
   const tabInfo = await getTabInfo(startTabId);
   registerInitialTab(startTabId, tabInfo?.url || '');
+  // (v20.1) This is the "working" tab — the only tab that shows the side panel
+  // for the duration of the run. Tabs the agent opens later never show it.
+  primaryPanelTabId = startTabId;
 
   // (3.12.0) Load client knowledge for the active client in a single storage
   // round-trip via getClientStartupContext (replaces 3 sequential reads).
@@ -1084,8 +1088,10 @@ export async function startAgent(goal, sender) {
   // Subsequent open_tab handlers add their tabs to the same group.
   try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
 
-  // (v3.53) Disable side panel on all tabs except the working tab
-  // (v3.57) sidePanel scoping removed — was closing panel on start
+  // (v20.1) Pin the side panel to the single working tab. The agent may open
+  // additional tabs during the run, but the panel only ever shows on the tab
+  // the user launched the task with.
+  try { await _scopeSidePanelToPrimary(); } catch (e) { console.warn('[Sentinel] Side panel scope failed:', getErrorMessage(e)); }
 
   // (3.15.2) Mode-directive mismatch check. If the goal text says "Mode:
   // APPROVAL" / "agent pauses for approval" but chrome.storage.local.approvalMode
@@ -1503,12 +1509,12 @@ async function attachTabToSentinelGroup(tabId) {
       }
     }
     agentAttachedTabs.add(tabId);
-    // Ensure side panel is enabled on this attached tab.
+    // (v20.1) The side panel is pinned to the single primary working tab. Newly
+    // attached (agent-opened) tabs must NOT show it — enable on the primary tab,
+    // explicitly disable on every other attached tab.
     try {
-      await chrome.sidePanel.setOptions({ tabId, enabled: true, path: 'popup.html' });
-    } catch (e) { console.warn('[Sentinel] Side panel enable failed (API unavailable?):', getErrorMessage(e)); }
-    // (v3.53) Re-scope: enable panel on this new tab, disable on others
-    // (v3.57) sidePanel scoping removed from tab attach
+      await chrome.sidePanel.setOptions({ tabId, enabled: isPrimaryPanelTab(tabId), path: 'popup.html' });
+    } catch (e) { console.warn('[Sentinel] Side panel scope failed (API unavailable?):', getErrorMessage(e)); }
   } catch (e) {
     console.warn('[Sentinel] attachTabToSentinelGroup failed:', getErrorMessage(e));
   }
@@ -1519,6 +1525,7 @@ async function detachAllSentinelTabs() {
   const ids = [...agentAttachedTabs];
   agentAttachedTabs.clear();
   agentTabGroupId = null;
+  primaryPanelTabId = null; // (v20.1) run is over — release the pinned working tab
   if (!ids.length) return;
   try {
     await chrome.tabs.ungroup(ids);
@@ -1550,7 +1557,38 @@ export function isAgentAttachedTab(tabId) {
   return agentAttachedTabs.has(tabId);
 }
 
+/**
+ * Check if a tab is the primary "working" tab the current run was launched on.
+ * (v20.1) During a run this is the ONLY tab that shows the side panel — agent-
+ * opened tabs and tabs the user switches to are kept panel-free.
+ * @param {number} tabId - Chrome tab ID to check.
+ * @returns {boolean} True if tabId is the pinned working tab.
+ */
+export function isPrimaryPanelTab(tabId) {
+  return primaryPanelTabId != null && tabId === primaryPanelTabId;
+}
+
 // ========== Side Panel Scoping (v3.53) ==========
+// (v20.1) Enable the side panel only on the primary working tab, and disable it
+// on every other currently-open tab. Called at run start so pre-existing tabs
+// don't keep the panel from before the run began.
+async function _scopeSidePanelToPrimary() {
+  if (primaryPanelTabId == null) return;
+  try {
+    const allTabs = await chrome.tabs.query({});
+    for (const tab of allTabs) {
+      if (!tab.id) continue;
+      try {
+        await chrome.sidePanel.setOptions({
+          tabId: tab.id,
+          enabled: tab.id === primaryPanelTabId,
+          path: 'popup.html'
+        });
+      } catch (_e) { /* side panel may be unavailable in some contexts */ }
+    }
+  } catch (_e) { /* tab query failed non-critically */ }
+}
+
 async function _enableSidePanelEverywhere() {
   try {
     const allTabs = await chrome.tabs.query({});

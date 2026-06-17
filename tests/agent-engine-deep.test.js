@@ -1591,11 +1591,13 @@ describe('tab group management', () => {
     expect(chrome.tabs.group).not.toHaveBeenCalled();
   });
 
-  test('attachTabToSentinelGroup enables side panel on tab', async () => {
+  test('attachTabToSentinelGroup scopes side panel to the primary working tab only', async () => {
     resetAgentState();
     await attachTabToSentinelGroup(10);
+    // (v20.1) Tab 10 isn't the primary launch tab (no run was started here), so
+    // the panel is explicitly disabled on it — only the working tab shows it.
     expect(chrome.sidePanel.setOptions).toHaveBeenCalledWith(
-      expect.objectContaining({ tabId: 10, enabled: true, path: 'popup.html' })
+      expect.objectContaining({ tabId: 10, enabled: false, path: 'popup.html' })
     );
   });
 
