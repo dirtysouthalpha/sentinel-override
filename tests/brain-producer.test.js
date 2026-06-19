@@ -256,3 +256,60 @@ describe('publishRunLearning — consent + fail-open/fail-closed', () => {
     expect(res.ok).toBe(false);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// (hardening 1B) One-warn-per-run signal for the WRITE path
+// ──────────────────────────────────────────────────────────────────────
+describe('publishRunLearning — one-warn-per-run signal (1B)', () => {
+  const goodCtx = () => ({
+    platformId: 'm365_admin',
+    healingHistory: [{ id: 'h1', status: 'healed', attempts: 1, successStrategy: 'fallback_selector', endTime: Date.now() }],
+    recoveryEvents: [],
+    notes: [],
+    clientIdentity: { displayName: 'Unrelated Co', tenant: 'unrelated.onmicrosoft.com' },
+  });
+
+  beforeEach(() => { producer.resetBrainProducerRunSignals(); });
+
+  test('network failure -> exactly ONE console.warn (unreachable)', async () => {
+    storageData.brainProducerEnabled = true;
+    storageData.brainProducerLastConfirmedAt = new Date().toISOString();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    globalThis.fetch.mockRejectedValue(new Error('Connection refused'));
+    await producer.publishRunLearning(goodCtx());
+    // Second ship attempt in the same run -> still one warn.
+    await producer.publishRunLearning(goodCtx());
+    const warns = warnSpy.mock.calls.filter((a) => String(a[0]).includes('BrainProducer') && String(a[0]).includes('UNREACHABLE'));
+    expect(warns).toHaveLength(1);
+    warnSpy.mockRestore();
+  });
+
+  test('success -> ZERO warns', async () => {
+    storageData.brainProducerEnabled = true;
+    storageData.brainProducerLastConfirmedAt = new Date().toISOString();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ neuron: { id: 1 } }) });
+    await producer.publishRunLearning(goodCtx());
+    expect(warnSpy.mock.calls.filter((a) => String(a[0]).includes('BrainProducer'))).toHaveLength(0);
+    warnSpy.mockRestore();
+  });
+
+  test('gate-rejected candidates -> ZERO warns (NOT an outage, the trust gate worked)', async () => {
+    storageData.brainProducerEnabled = true;
+    storageData.brainProducerLastConfirmedAt = new Date().toISOString();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // ONLY candidate references the client name -> denylist drops it; never
+    // reaches fetch, never warns. (No healing survivor, which would ship.)
+    const ctx = {
+      platformId: 'm365_admin',
+      healingHistory: [],
+      recoveryEvents: [],
+      notes: ['Acme Corp custom flow'],
+      clientIdentity: ACME,
+    };
+    await producer.publishRunLearning(ctx);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(warnSpy.mock.calls.filter((a) => String(a[0]).includes('BrainProducer'))).toHaveLength(0);
+    warnSpy.mockRestore();
+  });
+});

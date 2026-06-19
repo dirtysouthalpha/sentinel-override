@@ -170,6 +170,7 @@ const mockGetBrainStartupContext = jest.fn(async () => ({
 }));
 jest.unstable_mockModule('../background/brain-client.js', () => ({
   getBrainStartupContext: mockGetBrainStartupContext,
+  resetBrainRunSignals: jest.fn(), // (1B) no-op in tests; agent-engine calls it at run start
 }));
 
 const { startAgent, stopAgent, resetAgentState } = await import('../background/agent-engine.js');

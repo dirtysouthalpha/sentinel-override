@@ -4,8 +4,8 @@
 
 import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
-import { getBrainStartupContext } from './brain-client.js';
-import { publishRunLearning } from './brain-producer.js';
+import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
+import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
@@ -1475,6 +1475,11 @@ export async function startAgent(goal, sender) {
   }
 
   const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
+
+  // (hardening 1B) Reset the one-warn-per-run signals so each run gets at most
+  // one "brain unreachable" warning per path (read + write), not one per call.
+  resetBrainRunSignals();
+  resetBrainProducerRunSignals();
 
   // (sub-project B) Neuralis brain READ path. One recall call per run, gated
   // by the brainEnabled toggle (default OFF — read inside getBrainStartupContext).

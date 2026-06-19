@@ -202,3 +202,51 @@ describe('getBrainStartupContext — fails-open guarantee', () => {
     expect(String(url)).toContain('192.168.1.10:9000');
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────
+// (hardening 1B) One-warn-per-run signal: unreachable vs empty
+// ──────────────────────────────────────────────────────────────────────
+describe('getBrainStartupContext — one-warn-per-run signal (1B)', () => {
+  beforeEach(() => {
+    // Each test resets the per-run flag.
+    brainClient.resetBrainRunSignals();
+  });
+
+  test('network failure -> exactly ONE console.warn (unreachable), not per-call', async () => {
+    storageData.brainEnabled = true;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    globalThis.fetch.mockRejectedValue(new Error('Connection refused'));
+    // Call recall 3 times in one "run" — must warn ONCE, not three times.
+    await brainClient.getBrainStartupContext('a');
+    await brainClient.getBrainStartupContext('b');
+    await brainClient.getBrainStartupContext('c');
+    const brainWarns = warnSpy.mock.calls.filter((a) => String(a[0]).includes('Brain UNREACHABLE'));
+    expect(brainWarns).toHaveLength(1);
+    warnSpy.mockRestore();
+  });
+
+  test('success (even empty) -> ZERO warns', async () => {
+    storageData.brainEnabled = true;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // Brain reachable but no matches -> empty section, NOT a warning.
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ direct: [], associated: [] }) });
+    await brainClient.getBrainStartupContext('a');
+    await brainClient.getBrainStartupContext('b');
+    const brainWarns = warnSpy.mock.calls.filter((a) => String(a[0]).includes('Brain'));
+    expect(brainWarns).toHaveLength(0);
+    warnSpy.mockRestore();
+  });
+
+  test('after resetBrainRunSignals(), a new run warns again once', async () => {
+    storageData.brainEnabled = true;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    globalThis.fetch.mockRejectedValue(new Error('down'));
+    await brainClient.getBrainStartupContext('a');
+    expect(warnSpy.mock.calls.filter((a) => String(a[0]).includes('Brain UNREACHABLE'))).toHaveLength(1);
+    // Reset for a new run -> allowed to warn again.
+    brainClient.resetBrainRunSignals();
+    await brainClient.getBrainStartupContext('b');
+    expect(warnSpy.mock.calls.filter((a) => String(a[0]).includes('Brain UNREACHABLE'))).toHaveLength(2);
+    warnSpy.mockRestore();
+  });
+});

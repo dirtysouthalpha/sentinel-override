@@ -42,6 +42,36 @@
 const DEFAULT_BASE_URL = 'http://localhost:8000';
 const DEFAULT_TIMEOUT_MS = 10000;
 
+// (hardening 1B) One-warn-per-run signal. When the brain is unreachable we
+// surface a single console.warn so the user has a signal (the hermes-agent/:8000
+// port-conflict case otherwise fails open silently). This flag guarantees ONE
+// warn per process/run — not one per recall — so a noisy multi-call path never
+// spams. Reset by resetBrainRunSignals() at run start.
+let _brainUnreachableWarnedThisRun = false;
+
+/**
+ * Emit exactly one "brain unreachable" warning per run. Distinguishes the two
+ * failure modes the user cares about:
+ *   - UNREACHABLE (network/timeout/non-200/brain down): warned once.
+ *   - EMPTY (brain responded, no matches): NOT warned — that's healthy, the
+ *     brain just had nothing for this platform. Don't cry wolf.
+ */
+function _warnUnreachable(detail) {
+  if (_brainUnreachableWarnedThisRun) return;
+  _brainUnreachableWarnedThisRun = true;
+  try {
+    console.warn('[Sentinel/Brain] Brain UNREACHABLE at recall time — run will proceed without shared knowledge. ' + (detail || ''));
+  } catch (_e) { /* console may be unavailable in some contexts */ }
+}
+
+/**
+ * Reset the one-warn-per-run flags. agent-engine should call this at run start
+ * so each run gets a fresh single warning (not one ever). Exported for tests.
+ */
+export function resetBrainRunSignals() {
+  _brainUnreachableWarnedThisRun = false;
+}
+
 // ========== Config ==========
 
 async function _readConfig() {
@@ -208,10 +238,14 @@ export async function getBrainStartupContext(context) {
   try {
     result = await recallNeurons(context, cfg);
   } catch (e) {
-    // FAILS OPEN: never throw into the run path.
+    // FAILS OPEN: never throw into the run path. But DO signal the user once
+    // per run that the brain was unreachable (distinct from "brain returned
+    // empty", which is healthy and stays quiet).
+    const detail = (e && e.message) ? e.message : String(e);
+    _warnUnreachable(detail);
     return {
       ok: false, section: '', directCount: 0, associatedCount: 0,
-      error: (e && e.message) ? e.message : String(e),
+      error: detail,
     };
   }
 
@@ -219,6 +253,6 @@ export async function getBrainStartupContext(context) {
   const associatedCount = result.associated.length;
   const section = formatBrainSection(result.direct, result.associated);
   // ok reflects that we got a healthy response; section may still be '' when
-  // the brain had no matches for this key (that is NOT an error).
+  // the brain had no matches for this key (that is NOT an error, NOT a warn).
   return { ok: true, section, directCount, associatedCount };
 }

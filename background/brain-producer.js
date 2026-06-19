@@ -28,6 +28,20 @@
 // A "failed-then-recovered" action = a healingHistory entry with status
 // 'healed', or a recovery skill that auto-applied. Plain failures (no
 // recovery) are NOT candidates — they teach nothing procedural.
+//
+// ---------------------------------------------------------------------------
+// CONCURRENCY / DEDUPE BEHAVIOR (live API probe, 2026-06-19):
+// POST /neurons/think does NOT dedupe. Probed by POSTing the same content
+// twice (identical content+region+source) then GET /neurons/search?q=... —
+// the brain created TWO distinct neurons (ids 301, 302), each fire_count 1.
+// So under concurrent writes from many installs, identical learnings WILL
+// accumulate as duplicate neurons; the API offers no collision/coordination
+// today. To be forward-compatible with a future server-side dedupe layer,
+// shipNeuron attaches a client-side SHA-256 `content_hash` (hex) computed
+// over (source + region + redacted content) on every neuron. If the API
+// ignores the field today this is harmless; the moment a dedupe layer keys
+// on it, duplicate writes from many installs collapse to one. (Web Crypto
+// crypto.subtle.digest, available in MV3 service workers — no npm dep.)
 // ---------------------------------------------------------------------------
 //
 // THE GATE (mandatory, in this order) — redactCandidate:
@@ -61,6 +75,29 @@ const MAX_CONTENT_CHARS = 1000;
 const SOURCE = 'sentinel-override';
 // Consent staleness: re-prompt if the last confirmation is older than this.
 const CONFIRM_STALE_MS = 7 * 24 * 3600 * 1000; // 7 days
+
+// (hardening 1B) One-warn-per-run signal for the WRITE path. Distinct from the
+// read path's signal (different user concern). Fires ONCE per run when the
+// brain is UNREACHABLE at ship time (network/timeout/non-200) — never when
+// candidates were rejected by the redaction gate (that's the trust gate doing
+// its job, not an outage). resetBrainProducerRunSignals() resets at run start.
+let _producerUnreachableWarnedThisRun = false;
+
+function _warnProducerUnreachable(detail) {
+  if (_producerUnreachableWarnedThisRun) return;
+  _producerUnreachableWarnedThisRun = true;
+  try {
+    console.warn('[Sentinel/BrainProducer] Brain UNREACHABLE at run end — this run\'s redacted notes were dropped (no offline queue). ' + (detail || ''));
+  } catch (_e) { /* console may be unavailable in some contexts */ }
+}
+
+/**
+ * Reset the producer one-warn-per-run flag. agent-engine calls this at run start.
+ * Exported for tests.
+ */
+export function resetBrainProducerRunSignals() {
+  _producerUnreachableWarnedThisRun = false;
+}
 
 // Region mapping (kept to two, both sensible):
 const REGION_HEAL = 'hippocampus';       // successful self-heal/recovery
@@ -230,6 +267,28 @@ export function buildCandidates(runContext = {}) {
   return out;
 }
 
+// ========== Content hash (concurrency / forward-compat dedupe) ==========
+
+/**
+ * SHA-256 hex hash over (source + region + redacted content). Computed
+ * client-side so a future server-side dedupe layer can collapse duplicate
+ * writes from many installs. The live API does not dedupe today (see the
+ * CONCURRENCY/DEDUPE note at the top of this file), so this field is currently
+ * ignored by the server — harmless until it isn't.
+ * @param {string} content
+ * @param {string} region
+ * @returns {Promise<string>} 64-char hex digest, or '' if Web Crypto is absent.
+ */
+async function _contentHash(content, region) {
+  try {
+    const data = `${SOURCE}\u0000${region}\u0000${String(content || '')}`;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (_e) {
+    return ''; // Web Crypto unavailable -> ship without a hash (still valid).
+  }
+}
+
 // ========== Shipping ==========
 
 /**
@@ -248,11 +307,17 @@ export async function shipNeuron(neuron, opts = {}) {
   const region = (neuron && typeof neuron.region === 'string' && neuron.region.trim())
     ? neuron.region.trim()
     : REGION_FALLBACK;
+  const content = String((neuron && neuron.content) || '');
+
+  // Forward-compat dedupe key: client-side SHA-256 over source+region+content.
+  const content_hash = await _contentHash(content, region);
 
   const body = JSON.stringify({
-    content: String((neuron && neuron.content) || ''),
+    content,
     region,
     source: SOURCE,
+    // Ignored by the live API today; present so a future dedupe layer can use it.
+    content_hash,
   });
 
   let resp;
@@ -374,8 +439,11 @@ export async function publishRunLearning(runContext = {}) {
       shipped++;
     } catch (e) {
       // Brain down / non-200 — drop this one and the rest (no queue), but keep
-      // the run-finish path unaffected.
+      // the run-finish path unaffected. Signal the user once per run that the
+      // brain was unreachable (distinct from gate-rejected candidates, which
+      // never reach here and are NOT an outage).
       lastError = (e && e.message) ? e.message : String(e);
+      _warnProducerUnreachable(lastError);
       break;
     }
   }
