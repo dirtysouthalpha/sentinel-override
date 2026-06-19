@@ -4,6 +4,8 @@
 
 import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
+import { getBrainStartupContext } from './brain-client.js';
+import { publishRunLearning } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
@@ -663,6 +665,8 @@ let primaryPanelTabId = null;   // (v20.1) the single "working" tab the run was 
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
+let brainKnowledgeText = '';   // (sub-project B) pre-formatted "BRAIN KNOWLEDGE" section from Neuralis /recall
+let _runStartPlatformId = '';  // (sub-project C) platform id detected at run start; reused as producer tag at run end
 let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this run; useCount bumps at run end
 let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
 let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
@@ -1471,6 +1475,29 @@ export async function startAgent(goal, sender) {
   }
 
   const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
+
+  // (sub-project B) Neuralis brain READ path. One recall call per run, gated
+  // by the brainEnabled toggle (default OFF — read inside getBrainStartupContext).
+  // Leak-zero by construction: the recall key is the adaptive-prompts platform id
+  // (preferred) or the start-URL host (fallback) — NEVER client name, tenant, or
+  // raw goal text. Fails open: any error leaves brainKnowledgeText = '' so a down
+  // brain cannot break an MSP's run.
+  try {
+    let brainContextKey = '';
+    try {
+      const _profile = getPlatformProfile(tabInfo?.url || '', goal);
+      if (_profile && _profile.id) {
+        brainContextKey = String(_profile.id);
+      } else if (tabInfo && tabInfo.url) {
+        brainContextKey = (() => { try { return new URL(tabInfo.url).hostname || ''; } catch (_) { return ''; } })();
+      }
+    } catch (_) { brainContextKey = ''; }
+    _runStartPlatformId = brainContextKey; // (sub-project C) reuse as producer tag at run end
+    const brainCtx = await getBrainStartupContext(brainContextKey);
+    brainKnowledgeText = (brainCtx && brainCtx.ok && typeof brainCtx.section === 'string') ? brainCtx.section : '';
+  } catch (_) {
+    brainKnowledgeText = '';
+  }
 
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
@@ -4844,7 +4871,7 @@ async function runAgentLoop(goal, workingTabId) {
       };
 
       const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -7896,6 +7923,40 @@ return { ok: true, value: el.value };
       await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
     }
   } catch (_) { /* non-fatal */ }
+  // (sub-project C) Neuralis brain WRITE path. After a run, ship REDACTED
+  // procedural learning (successful self-heals, scrubbed UI notes) to the brain
+  // as source:"sentinel-override" neurons. Consent-gated (brainProducerEnabled +
+  // last-confirmed freshness), redaction-gated (PII scrub + client denylist,
+  // fail-closed), and FAILS OPEN — same isolation as the client-knowledge block
+  // above. Never breaks the run finish path. No offline queue.
+  try {
+    // Gather run context conservatively — each piece is optional.
+    // Platform id was captured at run start (sub-project B's block) into the
+    // module-level _runStartPlatformId; reuse it as the producer tag here.
+    const _producerPlatformId = (typeof _runStartPlatformId === 'string') ? _runStartPlatformId : '';
+    let _producerNotes = [];
+    try {
+      // `note` actions the agent took during the run -> UI-structure observations.
+      _producerNotes = (history || [])
+        .filter((h) => h && h.action && h.action.type === 'note' && typeof h.action.text === 'string')
+        .map((h) => h.action.text)
+        .filter((t) => t && t.trim());
+    } catch (_) { _producerNotes = []; }
+    let _producerClientIdentity = {};
+    try {
+      // The producer's _loadDenylist reads the full client identity (name,
+      // tenant) + all known clients from chrome.storage.local. We only need to
+      // hand it the active client id as a hint so it can resolve the active one.
+      if (activeClientId) _producerClientIdentity = { id: activeClientId };
+    } catch (_) { _producerClientIdentity = {}; }
+    await publishRunLearning({
+      platformId: _producerPlatformId,
+      healingHistory: Array.isArray(healingHistory) ? healingHistory.slice() : [],
+      recoveryEvents: [],
+      notes: _producerNotes,
+      clientIdentity: _producerClientIdentity,
+    });
+  } catch (_) { /* non-fatal: producer must never break the run finish */ }
   // Phase 8.2: Emit final status narration for popup status bar
   emitAgentStatus(workingTabId, 'complete', `Agent finished — ${stepCount} steps, ${apiCallCount} API calls`);
   // (Phase 5) Final learned patterns emission on run finish

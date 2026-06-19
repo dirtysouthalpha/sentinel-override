@@ -25,6 +25,20 @@ const PII_TICKET_RE = /(?:\b(?:TKT|TICKET|INC|INCIDENT|SR)|#)\s*\d+/gi;
 const PII_CLIENT_STRING_RE = /"[^"]{2,60}"/g;
 const PII_CLIENT_SINGLE_RE = /'[^']{2,60}'/g;
 
+// (sub-project C) Module-level PII scrubber, exported so the brain producer
+// can reuse the SAME redaction pass the learned-pattern path already applies.
+// Lifted verbatim from the inline closure that was in saveLearnedPattern —
+// behavior is identical; the inline site now calls this. Do NOT alter the
+// replacements: they are the production-tested gate.
+function _scrubPii(str) {
+  return String(str)
+    .replace(PII_IP_RE, '[REDACTED:ip]')
+    .replace(PII_EMAIL_RE, '[REDACTED:email]')
+    .replace(PII_TICKET_RE, '[REDACTED:ticket]')
+    .replace(PII_CLIENT_STRING_RE, '"[REDACTED:client]"')
+    .replace(PII_CLIENT_SINGLE_RE, "'[REDACTED:client]'");
+}
+
 // Default config — mirrors CONFIG.maxLearnedPatterns from agent-engine.js
 const REPORTING_CONFIG = {
   maxLearnedPatterns: 100
@@ -179,12 +193,7 @@ async function saveLearnedPattern(goal, history, success) {
     // Scrub PII before persisting — IPs, emails, ticket numbers, and quoted
     // strings (often client names) are replaced with safe placeholders so
     // chrome.storage.local doesn't accumulate identifiable client data.
-    const _scrubPii = (str) => String(str)
-      .replace(PII_IP_RE, '[REDACTED:ip]')
-      .replace(PII_EMAIL_RE, '[REDACTED:email]')
-      .replace(PII_TICKET_RE, '[REDACTED:ticket]')
-      .replace(PII_CLIENT_STRING_RE, '"[REDACTED:client]"')
-      .replace(PII_CLIENT_SINGLE_RE, "'[REDACTED:client]'");
+    // (sub-project C) now uses the exported module-level _scrubPii.
     const steps = [];
     for (const h of history) {
       if (h.action) {
@@ -214,5 +223,12 @@ export {
   emitLearnedPatterns,
   notifyRunComplete,
   scoreActionConfidence,
-  saveLearnedPattern
+  saveLearnedPattern,
+  // (sub-project C) PII scrubber + regex constants, reused by brain-producer.js.
+  _scrubPii,
+  PII_IP_RE,
+  PII_EMAIL_RE,
+  PII_TICKET_RE,
+  PII_CLIENT_STRING_RE,
+  PII_CLIENT_SINGLE_RE
 };

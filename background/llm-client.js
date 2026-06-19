@@ -1983,6 +1983,7 @@ function _isStreamingResponse(response) {
  * @param {string} params.patternCtx - Past successful patterns context string.
  * @param {string} params.memoryCtx - Agent memory context string.
  * @param {string} params.clientKnowledgeCtx - Client knowledge context string.
+ * @param {string} params.brainKnowledgeCtx - Neuralis brain knowledge context string (sub-project B).
  * @param {string} params.tabCtxSection - Multi-tab context section string.
  * @param {string} params.loopCtx - Loop / stall-detection directive string.
  * @param {Object} params.agentState - Live agent state (for budgetHint and screenshotMeta).
@@ -1998,7 +1999,7 @@ function _buildAgentPrompt(params) {
     historyWindowSize, isRunbook, sanitizedHistory,
     lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
-    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, brainKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
   } = params;
 
@@ -2056,7 +2057,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.zoomAnnotation ? agentState.zoomAnnotation : ''}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
+${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${brainKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.zoomAnnotation ? agentState.zoomAnnotation : ''}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? `Budget: ${agentState.budgetHint}\n` : ''}<GOAL>
 ${goal}
@@ -2336,6 +2337,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     ? agentState.clientKnowledgeText
     : '';
 
+  // (sub-project B) Brain knowledge context. agent-engine.js pre-formats this
+  // string at run start (via background/brain-client.js → getBrainStartupContext,
+  // which recalls from the Neuralis brain by platform id / host) and passes it
+  // through agentState.brainKnowledgeText. Renders as a DISTINCT, LABELED section
+  // ("## BRAIN KNOWLEDGE (shared, cross-installation)") adjacent to the local
+  // Client Knowledge section — different trust tier, different framing, both
+  // visible to the model. Fails open: empty when the brain is off/down/empty.
+  const brainKnowledgeCtx = (agentState.brainKnowledgeText && typeof agentState.brainKnowledgeText === 'string')
+    ? agentState.brainKnowledgeText
+    : '';
+
   // (3.12.0) Vision-based action verification. When the immediately prior
   // step was a modifying action (click, type, select, check, press_key,
   // upload_file), force the model to look at the post-action screenshot
@@ -2368,7 +2380,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     historyWindowSize, isRunbook, sanitizedHistory,
     lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
-    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, brainKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
   });
 
