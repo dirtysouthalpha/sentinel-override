@@ -8,6 +8,8 @@ import { resolveProvider, getActiveProvider, getModelSupportsVision } from './pr
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage, sleep } from './error-utils.js';
 import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
+import { _rateLimiter, setLLMRateLimit, resetLLMRateLimiter } from './llm-rate-limiter.js';
+export { setLLMRateLimit, resetLLMRateLimiter };
 
 // Constants for response parsing - avoid recreating on every call
 const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
@@ -1413,42 +1415,6 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
     throw err;
   }
 }
-
-// ========== LLM Rate Limiter ==========
-// Sliding-window rate limiter: prevents accidental runaway LLM spend.
-// Default: max 120 calls per 60-second window (2/sec burst cap).
-// Exported so CONFIG changes in agent-engine can adjust limits.
-const _rateLimiter = {
-  windowMs: 60_000,
-  maxCalls: 120,
-  timestamps: /** @type {number[]} */ ([]),
-  check() {
-    const now = Date.now();
-    // Drop timestamps outside the sliding window
-    this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    const timestampsLen = this.timestamps.length;
-    if (timestampsLen >= this.maxCalls) {
-      const oldestInWindow = timestampsLen ? this.timestamps[0] : now;
-      const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / ONE_SECOND_MS);
-      throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / ONE_SECOND_MS}s. Resets in ~${resetIn}s.`);
-    }
-    this.timestamps.push(now);
-  },
-  reset() { this.timestamps = []; }
-};
-
-/**
- * Override the LLM rate limiter thresholds at runtime.
- * @param {number} maxCalls - Maximum API calls allowed per window.
- * @param {number} windowMs - Window duration in milliseconds.
- */
-export function setLLMRateLimit(maxCalls, windowMs) {
-  if (typeof maxCalls === 'number' && maxCalls > 0) _rateLimiter.maxCalls = maxCalls;
-  if (typeof windowMs === 'number' && windowMs > 0) _rateLimiter.windowMs = windowMs;
-}
-
-/** Reset the LLM rate limiter call count and window start time. */
-export function resetLLMRateLimiter() { _rateLimiter.reset(); }
 
 // ========== Cost Estimation (9.2) ==========
 // Per-million-token pricing table (input / output) in USD.
