@@ -1,8 +1,9 @@
 const fs = require('fs');
+const path = require('path');
 
 // Read coverage and source files
 const cov = JSON.parse(fs.readFileSync('coverage/coverage-final.json', 'utf8'));
-const agentEnginePath = 'C:\\Users\\Administrator\\Projects\\sentinel-override\\background\\agent-engine.js';
+const agentEnginePath = path.resolve(__dirname, '..', 'background', 'agent-engine.js');
 const data = cov[agentEnginePath];
 
 // Read source file
