@@ -94,10 +94,9 @@ export async function detachAllSentinelTabs() {
       }
     }
   }
-  // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
-  try {
-    await chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' });
-  } catch (_e) { /* side panel API may not be available */ }
+  // (v21.6) Do NOT re-enable the side panel globally — that causes it to show
+  // on every tab. Per-tab settings remain as they were. The user opens the panel
+  // by clicking the icon on whichever tab they want it on.
 }
 
 // Public accessor so background/index.js can decide side-panel visibility on
@@ -144,20 +143,10 @@ export async function _scopeSidePanelToPrimary() {
 }
 
 export async function _enableSidePanelEverywhere() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    for (const tab of allTabs) {
-      if (tab.id) {
-        try {
-          await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
-        } catch (_e) {
-          // Side panel may not be available in all contexts
-        }
-      }
-    }
-  } catch (_e) {
-    // Side panel API call failed non-critically
-  }
+  // (v21.6) No-op: Do NOT enable the side panel on all tabs. This was causing
+  // the panel to appear on tabs the user never opened it on. The panel should
+  // only appear on tabs where the user explicitly clicked the extension icon.
+  // Per-tab settings from the agent run remain scoped to agent-attached tabs.
 }
 
 

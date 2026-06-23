@@ -289,6 +289,8 @@ try {
 // whether the panel is enabled on a given tab during a run -- those
 // two APIs coexist fine.
 try {
+  // (v21.6) Set global default to disabled — panel only shows per-tab via icon click.
+  chrome.sidePanel.setOptions({ enabled: false, path: 'popup.html' }).catch(() => {});
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', getErrorMessage(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
@@ -1220,12 +1222,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     } else {
-      // No run in progress — keep the panel available everywhere.
-      await chrome.sidePanel.setOptions({
-        tabId: activeInfo.tabId,
-        enabled: true,
-        path: 'popup.html'
-      });
+      // (v21.6) No run in progress — do NOT enable the panel on every tab
+      // the user switches to. The panel only opens via explicit icon click
+      // (openPanelOnActionClick handles that). Enabling it here causes the
+      // panel to persist across tabs the user never opened it on.
     }
   } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', getErrorMessage(e)); }
 });
