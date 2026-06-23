@@ -5413,39 +5413,12 @@ return { ok: true, value: el.value };
       // (3.9.0) Forensic run log: persist a structured record per step.
       try {
         if (runLogId) {
-          runLogBuffer.push({
-            step: stepCount,
-            timestamp: new Date().toISOString(),
-            kind: 'action',
-            url: currentUrl,
-            tenant: detectedTenant ? (detectedTenant.chipText || detectedTenant.onmicrosoft || detectedTenant.tid || '') : '',
-            action_type: command.type,
-            action: {
-              selector: command.selector,
-              ref: command.ref,
-              url: command.url,
-              key: command.key,
-              text: (() => {
-                const t = command.text;
-                return (typeof t === 'string') ? t.substring(0, 200) : undefined;
-              })(),
-              x: command.x, y: command.y
-            },
-            result: (() => {
-              const r = result;
-              if (typeof r === 'string') {
-                return r.substring(0, 500);
-              }
-              const jsonStr = JSON.stringify(r || '');
-              return jsonStr.substring(0, 500);
-            })(),
-            failed: !!actionFailed,
-            reasoning: (() => {
-              const r = command.__reasoning;
-              return (typeof r === 'string' && r) ? r.substring(0, 400) : undefined;
-            })(),
-            screenshot: _stepScreenshots.get(stepCount) || undefined,
-          });
+          runLogBuffer.push(buildRunLogEntry(
+            stepCount, currentUrl, command, result, actionFailed,
+            detectedTenant ? (detectedTenant.chipText || detectedTenant.onmicrosoft || detectedTenant.tid || '') : '',
+            command.__reasoning,
+            _stepScreenshots.get(stepCount)
+          ));
           // Keep last 200 entries; older ones get rolled into a summary.
           if (runLogBuffer.length > 200) {
             runLogBuffer.splice(0, runLogBuffer.length - 200);
