@@ -310,6 +310,18 @@
   </div>
 
   <!-- Settings Modal -->
+<!-- ══════ AGENT POOL STATUS PANEL ══════ -->
+<div id="agentPoolPanel" class="agent-pool-panel" style="display:none;">
+  <div class="pool-header">
+    <span class="pool-icon">🤖</span>
+    <span class="pool-title">Parallel Agents</span>
+    <span id="poolAgentCount" class="pool-count-badge">0</span>
+    <button id="poolStopAllBtn" class="pool-stop-all-btn" title="Stop all agents">⏹ All</button>
+  </div>
+  <div id="poolAgentList" class="pool-agent-list"></div>
+</div>
+
+
   <div id="settings-modal" class="modal">
     <div class="modal-content" style="max-width:580px;">
       <div class="flex-between" style="margin-bottom:16px;">
