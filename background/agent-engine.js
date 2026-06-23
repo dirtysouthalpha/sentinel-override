@@ -4,6 +4,7 @@
 
 import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
+import { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat, getFirstLine, getFirstSentence } from './agent-ticket-format.js';
 import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
 import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
@@ -382,15 +383,9 @@ const PORTAL_EXCHANGE_RE = /admin\.exchange/i;
 const PORTAL_PURVIEW_RE = /purview/i;
 const PORTAL_M365_ADMIN_RE = /admin\.microsoft/i;
 
-// Precompile regex for ticket number extraction
-const TICKET_NUMBER_RE1 = /(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i;
-const TICKET_NUMBER_RE2 = /#(\d{3,8})/;
 
-// Precompile regex for string operations (performance optimization)
-const NEWLINE_SPLIT_RE = /\n+/;
 const WHITESPACE_NORMALIZE_RE = /\s+/g;
 const WHITESPACE_SPLIT_RE = /\s+/;
-const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 
 // Precompile regex for email removal (URL extraction)
 const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -403,8 +398,6 @@ const TRAILING_SLASH_RE = /\/$/;
 const FIELD_LIST_SPLIT_RE = /[,]|\s+and\s+|\s+&\s+/i;
 const FIELD_PREFIX_CLEAN_RE = /^the\s+|\.$/gi;
 
-// Precompile regex for ticket prefix removal
-const TICKET_PREFIX_RE = /^(ticket|incident)\s*#?\d*[:\-\s]+/i;
 
 // Precompile regex for domain cleaning
 const DOMAIN_CLEAN_RE = /^https?:\/\/|\/.*$/gi;
@@ -424,8 +417,6 @@ const REF_SELECTOR_RE = /^ref_/;
 // Precompile regex for memory variable replacement
 const MEMORY_VAR_RE = /::(\w+)::/g;
 
-// Precompile regex for step list prefix
-const STEP_PREFIX_RE = /^(\d+[.)]|-|\*)\s+/;
 
 // Helper function to check if object is empty without creating intermediate array
 const isEmptyObject = (obj) => {
@@ -446,19 +437,7 @@ const getObjectLength = (obj) => {
   return count;
 };
 
-// Helper function to get first line without creating array
-const getFirstLine = (str) => {
-  if (!str) return '';
-  const idx = str.indexOf('\n');
-  return idx === -1 ? str : str.slice(0, idx);
-};
 
-// Helper function to get first sentence without creating array
-const getFirstSentence = (str) => {
-  if (!str) return '';
-  const idx = str.indexOf('. ');
-  return idx === -1 ? str : str.slice(0, idx + 1);
-};
 
 // Precompile regex for PII redaction (error logging)
 const _PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
@@ -476,18 +455,7 @@ const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
 // Precompile regex for stall detection
 const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
 
-// Precompile regex for environment detection in ticket formatting
-const ENV_M365_RE = /m365|microsoft|entra|exchange|defender|purview/i;
-const ENV_FIREWALL_RE = /sonicwall|fortigate|firewall/i;
-const ENV_EDR_RE = /sentinelone|crowdstrike|defender for endpoint/i;
-const ENV_RMM_RE = /connectwise|ninjaone|kaseya|datto/i;
 
-// Precompile regex for ticket state detection
-const TICKET_VENDOR_RE = /waiting on (the )?vendor|vendor (case|ticket)|vendor support/;
-const TICKET_CLIENT_RE = /waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/;
-const TICKET_ITGLUE_RE = /(create|document|write).*(kb|knowledge base|it glue)/;
-const TICKET_EMAIL_RE = /draft (an?|the) email|send (an?|the) email|email the client/;
-const TICKET_KICKOFF_RE = /kickoff|new ticket|just opened|investigate this ticket/;
 
 // Precompile regex for overlay dismissal (hot path in CDP observe)
 const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
@@ -495,14 +463,10 @@ const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|conti
 // Precompile regex for history failure detection (hot path in history summarization)
 const HISTORY_FAILURE_RE = /error|fail|not found|blocked|timed out/i;
 
-// Precompile regex for plan step analysis
-const PLAN_PARTIAL_RE = /step limit|extraction.*fail|not yet|incomplete|manually search/i;
 
 // Precompile regex for incomplete marker detection (hot path in reporting)
 const INCOMPLETE_MARKER_RE = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i;
 
-// Precompile regex for tried action detection
-const TRIED_ACTION_RE = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
 
 // Precompile regex for multi-page goal detection
 const _MULTI_PAGE_GOAL_RE = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i;
@@ -678,6 +642,8 @@ let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained bef
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
+// Re-exports from agent-ticket-format.js (backward compatibility)
+export { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat } from './agent-ticket-format.js';
 let _learnedPatterns = null;   // (Phase 5) Runtime pattern tracking: { key: { uses, successes, lastUsed } }
 // Phase 5: Advanced Intelligence State
 let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
@@ -2460,371 +2426,6 @@ function hasPostCommitVerification(history) {
     }
   }
   return false;
-}
-
-// ========== Ticket FINAL_NOTES Auto-Formatter (3.8.0) ==========
-// Post-processes the agent's finish summary into the preferred ticket
-// FINAL_NOTES format when the goal is recognized as a ticket investigation.
-// The format (per user prefs):
-//   Action Taken: [1-2 sentences]
-//   Contact Attempt Details: [method/time]
-//   Next Step and Time: [follow-up time or "None required. Ticket closed."]
-//   Ownership Statement: [technician name + resolution confirmation]
-//
-// Technician details are pulled from chrome.storage.local.technicianInfo
-// with sensible defaults that match the user's preferences.
-
-const TICKET_GOAL_RE = /\b(ticket|incident|alert|investigat|threat\s+hunt|malware|sentinelone|connectwise|kaseya)\b|#\d{3,}/i;
-
-function isTicketInvestigationGoal(goal) {
-  if (!goal || typeof goal !== 'string') return false;
-  return TICKET_GOAL_RE.test(goal);
-}
-
-async function getTechnicianInfo() {
-  const defaults = {
-    name: 'John Smith',
-    title: 'IT Support Technician',
-    company: 'Acme IT',
-    phone: '555-000-0000',
-    email: 'support@example.com'
-  };
-  try {
-    const stored = await chrome.storage.local.get(['technicianInfo']);
-    if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object' && stored.technicianInfo !== null) {
-      return { ...defaults, ...stored.technicianInfo };
-    }
-  } catch (_e) { /* storage read non-fatal */ }
-  return defaults;
-}
-
-// Best-effort ticket-number extraction: matches "ticket #NNN", "ticket NNN",
-// "incident #NNN", or a leading "#NNN" pattern.
-function extractTicketNumber(goal) {
-  if (!goal) return '';
-  const m = goal.match(TICKET_NUMBER_RE1)
-         || goal.match(TICKET_NUMBER_RE2);
-  return m ? m[1] : '';
-}
-
-function formatTicketFinalNotes(summary, goal, tech, options) {
-  const ticketNum = extractTicketNumber(goal);
-  const opts = options || {};
-  const stepCount = opts.stepCount || 0;
-  const apiCallCount = opts.apiCallCount || 0;
-  const now = new Date();
-  const stamp = `${now.toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  // Default to "ticket-resolved" framing. If the agent indicates partial
-  // results (step-limit / extraction failure), shift to "waiting" framing.
-  const partial = PLAN_PARTIAL_RE.test(summary || '');
-
-  // Action Taken: take the first 2 sentences from the summary (or up to 240 chars).
-  const summaryStr = typeof summary === 'string' ? summary : '';
-  let actionTaken = summaryStr.split(SENTENCE_SPLIT_RE).slice(0, 2).join(' ').trim();
-  if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
-  if (actionTaken.length > 240) actionTaken = `${actionTaken.slice(0, 237)}...`;
-
-  const nextStep = partial
-    ? 'Manual review required — see investigation findings below. Recommend follow-up within 1 business day.'
-    : 'None required. Ticket closed pending client confirmation.';
-
-  const ownership = `${tech.name} (${tech.title}, ${tech.company}) — ${partial ? 'investigation in progress' : 'investigation completed and findings documented'}.`;
-
-  let header = '';
-  if (ticketNum) header = `**Ticket #${ticketNum}** — `;
-  header += partial ? 'Investigation Notes (partial)' : 'Final Notes';
-
-  // Build the formatted block.
-  const block = [
-    `## ${header}`,
-    '',
-    '**Action Taken:**',
-    `- ${actionTaken}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Automated investigation via Sentinel Override agent at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
-    '',
-    '**Next Step and Time:**',
-    `- ${nextStep}`,
-    '',
-    '**Ownership Statement:**',
-    `- ${ownership}`,
-    '',
-    '---',
-    '',
-    '### Full investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
-  ].join('\n');
-
-  return block;
-}
-
-// ========== Ticket Mode Formatters (3.14.0) ==========
-// Additional MSP output templates per the user's preference doc. Each takes
-// (summary, goal, tech, options) and returns a markdown-formatted block. The
-// dispatcher `formatTicketOutput(format, ...)` routes to the right one based on
-// chrome.storage.local.ticketMode/ticketFormat settings.
-//
-// Formats: TICKET_KICKOFF, FINAL_NOTES (existing), WAITING_ON_CLIENT,
-// WAITING_ON_VENDOR, IT_GLUE_KB, CLIENT_EMAIL.
-
-function _ticketHeader(ticketNum, label) {
-  return ticketNum ? `**Ticket #${ticketNum}** — ${label}` : label;
-}
-
-function _ticketStamp() {
-  return `${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-}
-
-function _splitTriedSection(summary) {
-  // Pull "what's been tried" candidates from the summary — anything that reads
-  // like a remediation step. Falls back to a single line if nothing matches.
-  if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
-  const lines = summary.split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const triedRe = TRIED_ACTION_RE;
-  const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
-  return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
-}
-
-function formatTicketKickoff(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const tried = _splitTriedSection(summary).map(s => `- ${s}`).join('\n');
-  // Resolution path: derive from the summary's last 1-3 sentences (treat them
-  // as recommended next steps). If empty, leave numbered placeholders so the
-  // tech can fill in.
-  const sentences = (summary || '').split(SENTENCE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const tail = sentences.slice(-3);
-  const pathLines = tail.length
-    ? tail.map((s, i) => `${i + 1}. ${s.replace(WHITESPACE_NORMALIZE_RE, ' ').slice(0, 240)}`)
-    : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
-    '',
-    '**MAIN ISSUE:**',
-    `- ${getFirstLine(goal || '').slice(0, 280)}`,
-    '',
-    '**WHAT HAS BEEN TRIED:**',
-    tried,
-    '',
-    '**FASTEST SAFE RESOLUTION PATH:**',
-    pathLines.join('\n'),
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatWaitingOnClient(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const stamp = _ticketStamp();
-  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
-  const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Waiting on Client')}`,
-    '',
-    '**Action Taken:**',
-    `- ${firstSentence}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Automated investigation completed at ${stamp}. Awaiting client confirmation or additional details.`,
-    '',
-    '**Next Step and Time:**',
-    `- Follow up by ${followUp} (or sooner if client responds).`,
-    '',
-    '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will re-engage once client responds.`,
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatWaitingOnVendor(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const stamp = _ticketStamp();
-  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
-  const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Waiting on Vendor')}`,
-    '',
-    '**Action Taken:**',
-    `- ${firstSentence}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Vendor case opened at ${stamp}. Awaiting vendor response / ETA.`,
-    '',
-    '**Next Step and Time:**',
-    `- Follow up by ${followUp} (or on vendor response).`,
-    '',
-    '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will follow up with vendor and update ticket.`,
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatItGlueKb(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const goalShort = getFirstLine(goal || '').slice(0, 100);
-  const ticketNum = extractTicketNumber(goal);
-  const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
-
-  // Derive resolution steps from the summary's numbered/bulleted lines or
-  // sentence breakdown.
-  const lines = (summary || '').split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
-  const steps = stepCandidates.length
-    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(STEP_PREFIX_RE, '')}`)
-    : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
-
-  const envBits = [];
-  if (ENV_M365_RE.test(goal || '')) envBits.push('Microsoft 365 / Entra ID');
-  if (ENV_FIREWALL_RE.test(goal || '')) envBits.push('Firewall (vendor-specific)');
-  if (ENV_EDR_RE.test(goal || '')) envBits.push('EDR platform');
-  if (ENV_RMM_RE.test(goal || '')) envBits.push('RMM/PSA platform');
-  if (!envBits.length) envBits.push('General — see investigation findings for specifics');
-
-  const out = [
-    '## IT Glue Knowledge Base Entry',
-    '',
-    '**Title:**',
-    `- ${(title || 'Untitled')}`,
-    '',
-    '**Issue:**',
-    `- ${getFirstSentence(summary || '').slice(0, 240)}`,
-    '',
-    '**Environment:**',
-    `- ${envBits.join('; ')}`,
-    '',
-    '**Resolution Steps:**',
-    steps.length ? steps.join('\n') : '1. (steps not auto-derivable — fill in manually)',
-    '',
-    '**Verification:**',
-    '- Confirm the configured state is present and the original symptom no longer reproduces.',
-    '',
-    '**Screenshots:**',
-    '- (attach the agent\'s screenshots from the investigation report)',
-    '',
-    '---',
-    '',
-    '### Source — Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_Documented by ${tech.name} · ${tech.company}_`
-  ];
-  return out.join('\n');
-}
-
-function formatClientEmail(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
-  const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
-  const briefIssue = getFirstLine(goal || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
-  const oneLine = getFirstSentence(summary || 'The issue has been investigated and addressed.').slice(0, 240);
-
-  const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
-
-  const body = [
-    'Hello [Client Name],',
-    '',
-    `The issue reported in ${ticketRef} has been resolved. ${oneLine}`,
-    '',
-    `Everything is now working as expected. If you need further assistance, contact us at ${tech.phone} or ${tech.email}.`,
-    '',
-    'Best regards,',
-    tech.name,
-    tech.title,
-    tech.company,
-    `Phone: ${tech.phone} | Email: ${tech.email}`
-  ];
-
-  const block = [
-    '## Client Email',
-    '',
-    `**Subject:** ${subject}`,
-    '',
-    '**Body:**',
-    '',
-    body.join('\n'),
-    '',
-    '---',
-    '',
-    '_Replace `[Client Name]` before sending. Investigation findings (for your reference, not in email body):_',
-    '',
-    summary || '(no summary)'
-  ];
-  return block.join('\n');
-}
-
-// Dispatcher — returns formatted text for the requested format. Format values
-// match the user's preference doc: 'TICKET_KICKOFF', 'FINAL_NOTES',
-// 'WAITING_ON_CLIENT', 'WAITING_ON_VENDOR', 'IT_GLUE_KB', 'CLIENT_EMAIL', or
-// 'auto'. 'auto' picks based on goal/summary heuristics.
-function _autoPickFormat(summary, goal) {
-  const text = `${goal} ${summary}`.toLowerCase();
-  if (TICKET_VENDOR_RE.test(text)) return 'WAITING_ON_VENDOR';
-  if (TICKET_CLIENT_RE.test(text)) return 'WAITING_ON_CLIENT';
-  if (TICKET_ITGLUE_RE.test(text)) return 'IT_GLUE_KB';
-  if (TICKET_EMAIL_RE.test(text)) return 'CLIENT_EMAIL';
-  if (TICKET_KICKOFF_RE.test(text)) return 'TICKET_KICKOFF';
-  return 'FINAL_NOTES';  // default
-}
-
-function formatTicketOutput(format, summary, goal, tech, options) {
-  const fmt = (format || 'auto').toString().toUpperCase();
-  const resolved = (fmt === 'AUTO') ? _autoPickFormat(summary, goal) : fmt;
-  switch (resolved) {
-    case 'TICKET_KICKOFF':     return formatTicketKickoff(summary, goal, tech, options);
-    case 'WAITING_ON_CLIENT':  return formatWaitingOnClient(summary, goal, tech, options);
-    case 'WAITING_ON_VENDOR':  return formatWaitingOnVendor(summary, goal, tech, options);
-    case 'IT_GLUE_KB':         return formatItGlueKb(summary, goal, tech, options);
-    case 'CLIENT_EMAIL':       return formatClientEmail(summary, goal, tech, options);
-    case 'FINAL_NOTES':
-    default:                   return formatTicketFinalNotes(summary, goal, tech, options);
-  }
 }
 
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
@@ -8153,13 +7754,6 @@ export {
   _checkPreFinishCompleteness,
   _detectActionTypeLoop,
   generateHeuristicPlan,
-  formatTicketOutput,
-  formatTicketFinalNotes,
-  formatTicketKickoff,
-  formatWaitingOnClient,
-  formatWaitingOnVendor,
-  formatItGlueKb,
-  formatClientEmail,
   summarizeHistoryBatch,
   maybeRollupHistory,
   detectStall,
@@ -8167,9 +7761,6 @@ export {
   hasRecentCommitClick,
   hasPostCommitVerification,
   _detectGoalModeDirective,
-  _autoPickFormat,
-  extractTicketNumber,
-  isTicketInvestigationGoal,
   captureReportData,
   _countSummaryClaims,
   _countSpecificClaims,
@@ -8178,7 +7769,6 @@ export {
   describeAction,
   _describeTarget,
   // Additional test-only exports for deep coverage
-  getTechnicianInfo,
   saveLearnedPattern,
   enforceRateLimit,
   sleep,
