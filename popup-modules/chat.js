@@ -1212,6 +1212,19 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
           console.warn('[Sentinel] Safety reset: UI was stuck disabled but no agent running');
           resetUI();
         }
+        // If agent IS running, make sure stop/pause buttons are visible
+        if (_pong && _isRunning) {
+          const _stopBtn = document.getElementById('stopBtn');
+          const _pauseBtn = document.getElementById('pauseBtn');
+          const _sendBtn = document.getElementById('sendBtn');
+          const _goalInput = document.getElementById('goalInput');
+          if (_stopBtn) _stopBtn.classList.remove('btn-ctrl-disabled');
+          if (_pauseBtn) _pauseBtn.classList.remove('btn-ctrl-disabled');
+          if (_sendBtn) _sendBtn.disabled = true;
+          if (_goalInput) _goalInput.placeholder = 'Type a correction or instruction...';
+          setAgentActive(true);
+          console.warn('[Sentinel] Agent is running — restored stop/pause buttons');
+        }
         // If SW is unreachable, also reset — no agent could be running
         if (!resp) {
           console.warn('[Sentinel] Safety reset: SW unreachable, clearing stuck UI');
@@ -1330,8 +1343,8 @@ function sendMessage() {
   _goalInput.value = '';
   _goalInput.style.height = 'auto';
   if (_sendBtn) _sendBtn.disabled = true;
-  if (_stopBtn) _stopBtn.style.display = 'flex';
-  if (_pauseBtn) { _pauseBtn.style.display = 'flex'; _pauseBtn.dataset.paused = 'false'; _pauseBtn.innerHTML = PAUSE_ICON; _pauseBtn.title = 'Pause agent'; }
+  if (_stopBtn) _stopBtn.classList.remove('btn-ctrl-disabled');
+  if (_pauseBtn) { _pauseBtn.classList.remove('btn-ctrl-disabled'); _pauseBtn.dataset.paused = 'false'; _pauseBtn.innerHTML = PAUSE_ICON; _pauseBtn.title = 'Pause agent'; }
   if (_undoBtn) { _undoBtn.style.display = 'flex'; _undoBtn.disabled = true; }
   _goalInput.placeholder = 'Type a correction or instruction...';
   state.selectedAttachments = [];
@@ -1430,8 +1443,8 @@ function resetUI() {
   const _goalInput = document.getElementById('goalInput');
   
   if (_sendBtn) _sendBtn.disabled = false;
-  if (_stopBtn) _stopBtn.style.display = 'none';
-  if (_pauseBtn) { _pauseBtn.style.display = 'none'; _pauseBtn.dataset.paused = 'false'; }
+  if (_stopBtn) _stopBtn.classList.add('btn-ctrl-disabled');
+  if (_pauseBtn) { _pauseBtn.classList.add('btn-ctrl-disabled'); _pauseBtn.dataset.paused = 'false'; }
   if (_undoBtn) { _undoBtn.style.display = 'none'; _undoBtn.disabled = true; }
   if (_goalInput) {
     _goalInput.disabled = false;
@@ -1527,14 +1540,14 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
     if (inText) return;
     const _undoBtn = document.getElementById('undoBtn');
-    if (!_undoBtn || _undoBtn.disabled || _undoBtn.style.display === 'none') return;
+    if (!_undoBtn || _undoBtn.disabled || _undoBtn.classList.contains('btn-ctrl-disabled')) return;
     e.preventDefault();
     _undoBtn.click();
   }
   if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     if (inText) return;
     const _pauseBtn = document.getElementById('pauseBtn');
-    if (!_pauseBtn || _pauseBtn.style.display === 'none') return;
+    if (!_pauseBtn || _pauseBtn.classList.contains('btn-ctrl-disabled')) return;
     e.preventDefault();
     _pauseBtn.click();
   }

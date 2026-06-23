@@ -3978,3 +3978,11 @@ body {
   color: var(--text-primary);
   font-size: 12px;
 }
+
+
+/* Control button disabled state (always visible, dimmed when no agent running) */
+.btn-ctrl-disabled {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: default;
+}
