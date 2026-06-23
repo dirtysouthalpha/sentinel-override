@@ -23,7 +23,6 @@ import { callLLM } from './llm-client.js';
  * @returns {Promise<Object>} Parsed LLM response object.
  */
 export async function callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount, CONFIG, agentState) {
-  console.log('[Sentinel/LLM] callLLMWithRetry called. model=' + (agentState && agentState.model ? agentState.model : 'default') + ' messages=' + (history ? history.length : 0));
   try {
     return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
   } catch (err) {

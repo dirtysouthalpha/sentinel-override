@@ -54,9 +54,7 @@ export async function initBridge(options = {}) {
 
   if (_serverAvailable) {
     _startPolling();
-    console.log('[UAP Bridge] Connected to', _serverUrl);
   } else {
-    console.log('[UAP Bridge] Server not available at', _serverUrl, '— will retry on next broadcast');
   }
 }
 

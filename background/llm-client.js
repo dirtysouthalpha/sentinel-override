@@ -1965,7 +1965,6 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     throw (typeof err === 'object' && err !== null && typeof err.name === 'string' && err.name === 'AbortError') ? new Error(`API timed out after ${_effectiveTimeout/ONE_SECOND_MS}s`) : err;
   }
   clearTimeout(fetchTimeout);
-  console.log('[Sentinel/LLM] Response received. status=' + (response ? response.status : 'null'));
   let _apiHealthRecorded = false;
   try {
   if (!response.ok) {

@@ -57,7 +57,6 @@ class UAPServer {
       await this.loadConfig();
       
       if (!this.config.enabled) {
-        console.log('[UAP] Server disabled in config');
         return;
       }
 
@@ -70,7 +69,7 @@ class UAPServer {
       // Setup periodic cleanup
       this.setupCleanup();
 
-      console.log('[UAP] Server initialized on port', this.config.port);
+      console.debug('[UAP] Server initialized on port', this.config.port);
     } catch (error) {
       console.error('[UAP] Initialization failed:', error);
       throw error;
@@ -106,7 +105,6 @@ class UAPServer {
       publicKey: 'p_placeholder_' + uuidv4(),
       secretKey: 's_placeholder_' + uuidv4()
     };
-    console.log('[UAP] Federation keypair generated');
   }
 
   /**
@@ -120,7 +118,7 @@ class UAPServer {
     // For this implementation, we'll use a message-based protocol
     // that simulates WebSocket behavior over chrome.runtime
     
-    console.log('[UAP] Message-based server started');
+    console.debug('[UAP] Message-based server started');
     
     // Listen for UAP messages from content scripts or external apps
     chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
@@ -702,7 +700,6 @@ class UAPServer {
     this.clients.clear();
     this.activeRuns.clear();
     
-    console.log('[UAP] Server shut down');
   }
 }
 

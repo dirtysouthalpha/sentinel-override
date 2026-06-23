@@ -60,7 +60,6 @@ async function ensureAuthToken() {
             console.warn('[WS-BRIDGE] Failed to persist auth token:', getErrorMessage(chrome.runtime.lastError));
           }
           authToken = token;
-          console.log('[WS-BRIDGE] Generated new bridge auth token');
           resolve(authToken);
         });
       }
@@ -72,13 +71,11 @@ async function ensureAuthToken() {
 
 export async function startBridge() {
   if (!enabled) return;
-  console.log('[WS-BRIDGE] Starting WebSocket bridge client...');
   await ensureAuthToken();
   connect();
 }
 
 export function stopBridge() {
-  console.log('[WS-BRIDGE] Stopping...');
   enabled = false;
   authenticated = false;
   if (ws) {
@@ -105,7 +102,6 @@ function connect() {
   }
 
   ws.onopen = () => {
-    console.log('[WS-BRIDGE] Connected to bridge server');
     isConnecting = false;
     reconnectDelay = RECONNECT_BASE_MS;
     authenticated = false;
@@ -140,7 +136,6 @@ function connect() {
   };
 
   ws.onclose = () => {
-    console.log('[WS-BRIDGE] Disconnected');
     isConnecting = false;
     authenticated = false;
     if (heartbeatTimer) {
@@ -166,7 +161,6 @@ function scheduleReconnect() {
   if (!enabled) return;
   const jitter = Math.random() * 0.3 * reconnectDelay;
   const delay = reconnectDelay + jitter;
-  console.log(`[WS-BRIDGE] Reconnecting in ${(delay / 1000).toFixed(1)}s...`);
   setTimeout(() => {
     if (enabled) connect();
   }, delay);
@@ -179,13 +173,11 @@ async function handleMessage(message) {
   const msgType = message.type;
   const requestId = message.request_id;
 
-  console.log(`[WS-BRIDGE] Received: ${msgType}${requestId ? ` (req: ${requestId})` : ''}`);
 
   switch (msgType) {
     case 'auth':
       if (message.success) {
         authenticated = true;
-        console.log('[WS-BRIDGE] Authenticated successfully');
         sendStatus();
       } else {
         console.error('[WS-BRIDGE] Authentication failed:', message.message);
@@ -236,7 +228,6 @@ async function handleTask(goal, requestId) {
     return;
   }
 
-  console.log(`[WS-BRIDGE] Starting agent task: ${goal.slice(0, 80)}...`);
 
   try {
     // Import and call the agent engine's startAgent function
@@ -266,7 +257,6 @@ async function handleTask(goal, requestId) {
 }
 
 async function handleQuery(queryText, requestId) {
-  console.log(`[WS-BRIDGE] Query: ${queryText?.slice(0, 80)}...`);
 
   try {
     // Get current page content and answer the query

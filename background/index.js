@@ -48,8 +48,6 @@ if (typeof self !== 'undefined' && self.addEventListener && typeof window === 'u
 
 
 // v10.3.1: Startup diagnostics
-console.log('[Sentinel/SW] Service worker starting...');
-console.log('[Sentinel/SW] All imports resolved successfully');
 
 // Service worker health heartbeat — confirms the SW event loop is alive
 chrome.alarms.create('sw_heartbeat', { periodInMinutes: 0.5 });
@@ -88,16 +86,13 @@ registerLocalPeers().catch(e => console.warn('[Federation] Local peer registrati
       const age = Date.now() - (stored.agentStartTime || 0);
       // Only auto-resume if the run started less than 10 minutes ago
       if (age < 10 * 60 * 1000) {
-        console.log('[Sentinel/self-heal] Detected interrupted run. Goal:', stored.agentGoal, 'Age:', `${Math.floor(age/1000)}s`);
         // Check for checkpoint with more state
         const cp = await chrome.storage.session.get('agent_checkpoint');
         if (cp && cp.agent_checkpoint && cp.agent_checkpoint.lastGoal) {
-          console.log('[Sentinel/self-heal] Checkpoint found, resuming...');
           const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
           const result = await restoreFromCheckpoint();
           if (result.restored) {
             await clearCheckpoint();
-            console.log('[Sentinel/self-heal] State restored, restarting agent loop');
             const { startAgent } = await import('./agent-engine.js');
             // Get any active tab to restart on
             const tabs = await new Promise(resolve => {
@@ -120,7 +115,6 @@ registerLocalPeers().catch(e => console.warn('[Federation] Local peer registrati
         }
       } else {
         // Stale run — clear the flag
-        console.log('[Sentinel/self-heal] Stale run detected (', Math.floor(age/ONE_MINUTE_MS), 'min old), clearing');
         try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch (_) { /* session storage may be empty */ }
       }
     }
@@ -232,7 +226,6 @@ addFrameRouterListeners();
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   // v10.3.1: Heartbeat diagnostic
   if (alarm.name === 'sw_heartbeat') {
-    console.log('[Sentinel/SW] Heartbeat — service worker alive');
     return;
   }
   if (alarm.name.startsWith('schedule-')) {
@@ -508,7 +501,6 @@ const handleRuntimeMessage = async (request, sender) => {
           historyLength: result.historyLength,
           memoryKeys: result.memoryKeys
         });
-        console.log('[Sentinel/SW] resume_from_checkpoint — starting agent...');
         return await startAgent(result.goal, sender);
       } catch (e) {
         console.error('[Sentinel/SW] resume_from_checkpoint error:', e);
@@ -639,9 +631,7 @@ const handleRuntimeMessage = async (request, sender) => {
     case 'run_agent_loop': {
       // v10.3.1: Explicit error catch for startAgent — surfaces LLM/config errors
       try {
-        console.log('[Sentinel/SW] run_agent_loop received — starting agent...');
         const result = await startAgent(request.goal, sender);
-        console.log('[Sentinel/SW] startAgent returned successfully');
         return result;
       } catch (agentErr) {
         console.error('[Sentinel/SW] startAgent threw:', agentErr);

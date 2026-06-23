@@ -62,7 +62,7 @@ async function _initRunState(goal) {
       clearNoveltyHistory(),
       clearSynthesis()
     ]);
-    console.log('[Sentinel] Intelligence systems initialized');
+    console.debug('[Sentinel] Intelligence systems initialized');
   } catch (e) {
     console.warn('[Sentinel] Intelligence systems initialization failed:', getErrorMessage(e));
   }

@@ -57,14 +57,12 @@ export async function setRegistryUrl(url) {
     throw new Error('Registry URL must be a non-empty string');
   }
   await storageSet({ [REGISTRY_URL_KEY]: url });
-  console.log('[PLUGIN-REGISTRY] Registry URL set to:', url);
 }
 
 // ========== Registry fetch (PLG-02) ==========
 
 export async function fetchRegistry() {
   const url = await getRegistryUrl();
-  console.log('[PLUGIN-REGISTRY] Fetching registry from:', url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Registry fetch failed: ' + response.status + ' ' + response.statusText);
@@ -96,7 +94,6 @@ function validateManifest(manifest) {
 }
 
 export async function installPlugin(manifestUrl) {
-  console.log('[PLUGIN-REGISTRY] Installing plugin from:', manifestUrl);
   const response = await fetch(manifestUrl);
   if (!response.ok) {
     throw new Error('Failed to fetch manifest: ' + response.status);
@@ -118,12 +115,10 @@ export async function installPlugin(manifestUrl) {
   };
 
   await storageSet({ [STORAGE_KEY]: plugins });
-  console.log('[PLUGIN-REGISTRY] Plugin installed:', manifest.id, 'v' + manifest.version);
   return manifest.id;
 }
 
 export async function uninstallPlugin(pluginId) {
-  console.log('[PLUGIN-REGISTRY] Uninstalling plugin:', pluginId);
   const result = await storageGet([STORAGE_KEY]);
   const plugins = result[STORAGE_KEY] || {};
 
@@ -134,7 +129,6 @@ export async function uninstallPlugin(pluginId) {
 
   delete plugins[pluginId];
   await storageSet({ [STORAGE_KEY]: plugins });
-  console.log('[PLUGIN-REGISTRY] Plugin uninstalled:', pluginId);
 }
 
 // ========== Toggle/Activate/Deactivate (PLG-04) ==========
@@ -147,7 +141,6 @@ export async function togglePlugin(pluginId) {
   }
   plugins[pluginId].active = !plugins[pluginId].active;
   await storageSet({ [STORAGE_KEY]: plugins });
-  console.log('[PLUGIN-REGISTRY] Plugin toggled:', pluginId, 'active=' + plugins[pluginId].active);
   return plugins[pluginId].active;
 }
 
@@ -159,7 +152,6 @@ export async function activatePlugin(pluginId) {
   }
   plugins[pluginId].active = true;
   await storageSet({ [STORAGE_KEY]: plugins });
-  console.log('[PLUGIN-REGISTRY] Plugin activated:', pluginId);
 }
 
 export async function deactivatePlugin(pluginId) {
@@ -170,7 +162,6 @@ export async function deactivatePlugin(pluginId) {
   }
   plugins[pluginId].active = false;
   await storageSet({ [STORAGE_KEY]: plugins });
-  console.log('[PLUGIN-REGISTRY] Plugin deactivated:', pluginId);
 }
 
 // ========== Conflict detection (PLG-05) ==========

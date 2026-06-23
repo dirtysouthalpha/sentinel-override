@@ -494,7 +494,6 @@ async function _visionObserve(tab, _currentUrl) {
         indexedElements = Array.isArray(parsed) ? parsed : [];
       } catch (e) { console.warn('[Sentinel/v4] Element parse error:', getErrorMessage(e)); }
     }
-    console.log(`[Sentinel/v4] Discovered ${indexedElements.length} interactive elements`);
 
     // Step 2: Draw SoM overlay (numbered bounding boxes on canvas)
     try { await cdpExecuteJs(tab, VISION_SOM, { timeout: FIVE_SECONDS_MS }); }
@@ -1631,8 +1630,6 @@ import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
-  console.log('[Sentinel] Agent starting loop for goal:', goal);
-  console.log('[Sentinel/Loop] Agent loop entered. goal="' + (goal||'').substring(0,60) + '" tabId=' + workingTabId);
   _lastGoal = goal || '';
   startRunRecording(workingTabId, goal);
   let finished = false;
@@ -1668,7 +1665,6 @@ async function runAgentLoop(goal, workingTabId) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', getErrorMessage(e));
     agentPlan = null;
   }
-  console.log('[Sentinel/Loop] Plan generated. Steps: ' + (agentPlan ? agentPlan.length : 'none'));
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_e) {
     // Plan preview send failed non-fatally
   }
@@ -1693,7 +1689,7 @@ async function runAgentLoop(goal, workingTabId) {
   _predictiveAnalysisEnabled = true;
   selfHealingEnabled = true;
   RuntimeProfiler.start();
-  console.log('[Sentinel Phase 5] Runtime profiling started');
+  console.debug('[Sentinel Phase 5] Runtime profiling started');
   const _profilingInterval = 10; // Take sample every 10 steps
 
   let command;
@@ -1757,7 +1753,6 @@ async function runAgentLoop(goal, workingTabId) {
       if (profilingEnabled && stepCount % _profilingInterval === 0) {
         try {
           RuntimeProfiler.sample();
-          console.log('[Sentinel Phase 5] Profiling sample taken at step', stepCount);
         } catch (e) {
           console.warn('[Sentinel Phase 5] Profiling sample failed:', getErrorMessage(e));
         }
@@ -2022,9 +2017,7 @@ async function runAgentLoop(goal, workingTabId) {
           if (consecutiveInjectionFailures === 2) {
             try {
               const pgCheck = await cdpExecuteJs(tab, 'return{hasBody:!!document.body,children:(document.body||document.documentElement).childNodes.length,title:document.title||"",url:window.location.href};', { timeout: THREE_SECONDS_MS });
-              console.log('[Sentinel/CDP] Page check on first CDP activation: hasBody=%s children=%d', !!(pgCheck && pgCheck.value && pgCheck.value.hasBody), (pgCheck && pgCheck.value && pgCheck.value.children) || 0);
               if (pgCheck && pgCheck.ok && pgCheck.value && (!pgCheck.value.hasBody || (pgCheck.value.children === 0 && !pgCheck.value.title))) {
-                console.log('[Sentinel/CDP] Page has no DOM — reloading via CDP Page.reload...');
                 await chrome.debugger.sendCommand({ tabId: tab }, 'Page.reload', { ignoreCache: true });
                 await new Promise(r => setTimeout(r, TWO_SECONDS_MS));
               }
@@ -2756,7 +2749,6 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0: Vision-first ALWAYS active
       {
         try {
-          console.log('[Sentinel/v4] Vision observation starting...');
           const visionResult = await _visionObserve(tab, currentUrl);
           if (visionResult.elements.length) {
             _visionElements = visionResult.elements;
@@ -2785,7 +2777,6 @@ async function runAgentLoop(goal, workingTabId) {
             // Enhance vision elements with visual descriptions
             enhanceWithVisualProperties(trimmedElements);
             allElements = [...trimmedElements]; // reassign (not mutate) so cached observation.elements stays intact
-            console.log(`[Sentinel/v4] Vision: ${_visionElements.length} indexed elements`);
           }
         } catch (e) {
           console.warn('[Sentinel/v4] Vision observe failed:', e);
@@ -3114,7 +3105,6 @@ async function runAgentLoop(goal, workingTabId) {
                 sendSilentUpdate(`[Vision] ${_vParsed.thinking}`, stepCount);
                 if (command && typeof command === 'object') command.__reasoning = _vParsed.thinking.substring(0, 600);
               }
-              console.log('[Sentinel/v4] Vision decided:', _va.type, 'index:', _va.index || 'N/A');
             } else {
               // Fallback: couldn't parse structured output, try the legacy LLM path
               console.warn('[Sentinel/v4] Vision: could not parse structured output, falling back to legacy');
@@ -3176,7 +3166,6 @@ async function runAgentLoop(goal, workingTabId) {
           }
         }
         try {
-          console.log('[Sentinel/Loop] Calling LLM for step ' + (stepCount+1) + '...');
           command = await callLLMWithRetry(
             trimmedElements, allElements.length, pageText, base64Image,
             goal, promptHistory, stepCount, currentUrl,
@@ -3184,7 +3173,6 @@ async function runAgentLoop(goal, workingTabId) {
             CONFIG,
             agentState
           );
-          console.log('[Sentinel/Loop] LLM responded. Type: ' + (command ? command.type : 'null'));
           // v10.0: Capture reasoning result and analyze for bias
           await captureReasoningStep('action_decision', 'output', {
             commandType: command?.type || 'none',
@@ -4137,7 +4125,6 @@ async function runAgentLoop(goal, workingTabId) {
                   await new Promise(r => setTimeout(r, 30));
                   await chrome.debugger.sendCommand({ tabId: tab }, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: _cx, y: _cy, button: 'left', clickCount: 1 });
                   result = `Clicked [${command._visionIndex}] at (${_cx},${_cy})${_liveRect ? ' [live-rect]' : ' [cached-rect]'}`;
-                  console.log('[Sentinel/v4]', result);
                   _cdpClickOk = true;
                 } catch (_cme) { /* fall through to JS .click() */ }
 
@@ -4183,7 +4170,6 @@ async function runAgentLoop(goal, workingTabId) {
                   actionFailed = true;
                 } else {
                   result = `Typed into [${command._visionIndex}]: ${_typeVal || 'unknown'}`;
-                  console.log('[Sentinel/v4]', result);
                 }
               } catch (_te) {
                 result = `Type failed for [${command._visionIndex}]`;
@@ -4237,13 +4223,11 @@ async function runAgentLoop(goal, workingTabId) {
         const batchActions = command.actions.filter(a => a && a.type);
         const batchLen = batchActions.length;
         if (batchLen) {
-          console.log(`[Sentinel/SPEED] Batch: queuing ${batchLen} actions`);
           // Push in reverse so shift() gets them in order
           for (let i = batchLen - 1; i >= 0; i--) {
             _pendingCommandQueue.unshift(batchActions[i]);
           }
           command = _pendingCommandQueue.shift();
-          console.log(`[Sentinel/SPEED] Batch: executing first action: ${command.type}`);
         } else {
           result = 'Batch contained no valid actions';
           actionFailed = true;
@@ -4257,7 +4241,6 @@ async function runAgentLoop(goal, workingTabId) {
         const smartUrl = buildSmartUrl(site, command.query);
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
-          console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
         } else {
           command = { type: 'navigate', url: buildGoogleFallbackUrl(command.query) };
         }
@@ -4566,7 +4549,6 @@ async function runAgentLoop(goal, workingTabId) {
         //   strategy: 'all_failed'            -> surface error to LLM
         const ladder = await _runExecuteJsWithRetryLadder(tab, command.code || '', command.timeout);
         if (ladder.strategy !== 'original') {
-          console.log('[Sentinel] execute_js auto-recovered via:', ladder.strategy);
           // Append a hint to the result so the LLM knows which strategy
           // succeeded. Helps it adapt subsequent extractions on this page.
           ladder.raw = `${ladder.raw}\n\n[ENGINE NOTE: original execute_js was unproductive; auto-recovered via ${ladder.strategy} strategy. The data above is from ${ladder.strategy === 'body_text_fallback' ? 'document.body.innerText' : 'aggregated visible-element text'}. Parse it with regex/string ops in your finish summary.]`;
@@ -4957,7 +4939,6 @@ return { ok: true, value: el.value };
             result = _ufbResult.result || 'Executed via universal CDP fallback';
             actionFailed = false;
             sendSilentUpdate(`[CDP-UFB] ${command.type} success`, stepCount);
-            console.log('[Sentinel/UFB] Universal fallback succeeded for', command.type);
           } else if (_ufbResult && _ufbResult.result) {
             result = _ufbResult.result;
             // Don't mark success but LLM gets useful feedback about what happened
@@ -5130,7 +5111,6 @@ return { ok: true, value: el.value };
             };
             const healingResult = RuntimeProfiler.heal(issue);
             if (healingResult.healed) {
-              console.log('[Sentinel Phase 5] Self-healing successful:', healingResult.strategy);
               healingHistory.push(healingResult);
               consecutiveFailures = 0; // Reset after successful heal
             } else {
@@ -5644,13 +5624,12 @@ return { ok: true, value: el.value };
   try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
 
   agentRunning = false;
-  console.log(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
+  console.debug(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
   
   // Phase 5: v8.0/v9.0 Advanced Intelligence - Final analytics
   try {
     // Stop profiling and generate summary
     const profilingSummary = RuntimeProfiler.stop();
-    console.log('[Sentinel Phase 5] Profiling stopped:', profilingSummary);
     
     // Run predictive analysis on this run
     const predictiveData = {
@@ -5663,7 +5642,7 @@ return { ok: true, value: el.value };
       stagnation: sharedState.pageStagnation
     };
     const predictiveInsights = PredictiveEngine.analyze(predictiveData);
-    console.log('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);
+    console.debug('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);
 
     // Generate mutation proposals for optimization
     if ((predictiveInsights.riskAssessment?.score || 0) > 50) {
@@ -5679,7 +5658,6 @@ return { ok: true, value: el.value };
       };
       const mutations = RuntimeProfiler.proposeMutations(currentState);
       mutationProposals = mutations.proposals || [];
-      console.log('[Sentinel Phase 5] Mutation proposals generated:', mutationProposals.length);
     }
     
     // Store Phase 5 results in audit log
@@ -5704,7 +5682,7 @@ return { ok: true, value: el.value };
     const runId = runLogId || 'current';
     const noveltyResults = await analyzeForNovelty(runId, noveltyData);
     await storeNoveltyResult(runId, noveltyData, noveltyResults);
-    console.log('[Sentinel] Novelty detection complete:', noveltyResults.isNovel ? 'novel' : 'familiar');
+    console.debug('[Sentinel] Novelty detection complete:', noveltyResults.isNovel ? 'novel' : 'familiar');
   } catch (e) {
     console.warn('[Sentinel] Novelty detection failed:', getErrorMessage(e));
   }
@@ -5718,7 +5696,6 @@ return { ok: true, value: el.value };
       contradictionStats: await getContradictionStatistics(),
       noveltyStats: await getNoveltyStatistics(runLogId || 'current')
     });
-    console.log('[Sentinel] Knowledge synthesis generated:', synthesis.summary);
   } catch (e) {
     console.warn('[Sentinel] Knowledge synthesis failed:', getErrorMessage(e));
   }
@@ -5748,7 +5725,6 @@ return { ok: true, value: el.value };
       message: 'V10.0 Intelligence Compliance Report',
       report: complianceReport
     });
-    console.log('[Sentinel] Compliance report generated and added to audit log');
   } catch (e) {
     console.warn('[Sentinel] Compliance report generation failed:', getErrorMessage(e));
   }
