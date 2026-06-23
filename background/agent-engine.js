@@ -2911,22 +2911,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-        const _visionUserContent = [
-          `Goal: ${goal}`,
-          `URL: ${currentUrl}`,
-          `Step: ${stepCount}/${dynamicMaxSteps}`,
-          '',
-          'Elements:',
-          _visionElementTree || '(none)',
-          '',
-          'ALREADY ATTEMPTED (do NOT repeat an action that did not change the page — try a different element or approach):',
-          _visionHistory || '(first step — nothing attempted yet)',
-          _zoomAnnotation,
-          '',
-          'What is your next action?'
-        ].join('\n');
-        // Clear zoom region after consuming it (one-shot)
-        setZoomRegion(null);
+        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation);
 
         // Build messages with screenshot
         const _visionMessages = [
