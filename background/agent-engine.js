@@ -930,78 +930,14 @@ function activityUpdate(stepNumber, key, label) {
   try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Agent activity send failed:', getErrorMessage(e)); }
 }
 
-// ========== Step Screenshot Capture ==========
-// Lightweight screenshot helper for before/after action capture.
-// Uses chrome.tabs.captureVisibleTab for quick JPEG captures without
-// the full takeScreenshot pipeline (no cache, no CDP, no DPR metadata).
-async function captureStepScreenshot(tabId) {
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    const windowId = tab.windowId;
-    const dataUrl = await new Promise((resolve, reject) => {
-      chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 60 }, (result) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(result);
-      });
-    });
-    return dataUrl; // base64 data URL
-  } catch (_e) { return null; }
-}
-
-// ========== Zoom & Inspect — Region-of-Interest Markup ==========
-// When the LLM specifies a zoom/inspect region (dense UI where detail matters),
-// this appends region coordinates to the screenshot prompt so the model knows
-// which viewport area to focus on. Service-worker compatible — no canvas needed.
-let _zoomRegion = null; // { x, y, width, height } in viewport coordinates
-
-/**
- * Set the current zoom/inspect region for the next LLM call.
- * @param {Object|null} region - { x, y, width, height } in viewport coords, or null to clear.
- */
-export function setZoomRegion(region) {
-  _zoomRegion = region || null;
-}
-
-/**
- * Get the current zoom region (for status display).
- * @returns {Object|null}
- */
-export function getZoomRegion() {
-  return _zoomRegion;
-}
-
-/**
- * Format zoom region as a text annotation for the LLM prompt.
- * Appended to the user content alongside the screenshot so the model
- * knows which area of the dense UI to focus on.
- * @param {Object|null} region - { x, y, width, height } in viewport coords.
- * @returns {string} Annotation text, or empty string if no region set.
- */
-function formatZoomRegion(region) {
-  if (!region || typeof region !== 'object') return '';
-  const { x, y, width, height } = region;
-  if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return '';
-  return `\n[ZOOM REGION] Focus on viewport area: x=${Math.round(x)}, y=${Math.round(y)}, width=${Math.round(width)}, height=${Math.round(height)}. The relevant content is in this region — pay extra attention to detail here.`;
-}
+// ========== Step Screenshot Capture + Zoom — extracted to agent-screenshot.js ==========
+import { captureStepScreenshot, setZoomRegion, getZoomRegion, formatZoomRegion } from './agent-screenshot.js';
+export { setZoomRegion, getZoomRegion };
 
 // ========== Configuration ==========
 
-// ========== Live Status Narration (Phase 8.2) ==========
-// Emits structured status messages to the popup for real-time narration.
-// Uses `type: 'agent_status'` (distinct from the existing `action: 'agent_status'`
-// from message-protocol.js) so the popup can render a dedicated status bar
-// with tab-scoped context alongside the legacy ticker.
-function emitAgentStatus(tabId, status, detail) {
-  try {
-    chrome.runtime.sendMessage({
-      type: 'agent_status',
-      tabId: tabId || 0,
-      status: status || 'idle',
-      detail: detail || '',
-      timestamp: Date.now()
-    }).catch(() => {});
-  } catch (_) { /* non-fatal */ }
-}
+// ========== Live Status Narration — extracted to agent-narration.js ==========
+import { emitAgentStatus } from './agent-narration.js';
 
 // ========== History Helpers ==========
 // Deduplicated from ~47 inline occurrences across the agent loop.
@@ -1095,7 +1031,7 @@ export function resetAgentState() {
   _activeCanaryDeployment = null;
   selfHealingEnabled = false;
   healingHistory = [];
-  _zoomRegion = null; // reset zoom/inspect region between runs
+  setZoomRegion(null); // reset zoom/inspect region between runs
   resetAllContexts();
 }
 
@@ -1671,249 +1607,43 @@ export async function fetchAuditLog(id) {
 }
 export { auditLogToCsv };
 
-// ========== Configuration Verification Gate (3.7.0) ==========
-// Prevents the agent from declaring "done" on a configuration-change task
-// (firewall rule add, M365 permission grant, RMM script deploy, etc.) before
-// it has actually clicked Save/Apply/Commit AND verified the change is
-// reflected on the page. Stops false-positive completions cold — the most
-// common reason a ticket gets reopened.
+// ========== Configuration Verification Gate — extracted to agent-config-gate.js ==========
+import {
+  CHANGE_VERBS_RE,
+  COMMIT_TARGET_RE,
+  CONFIG_PLATFORM_RE,
+  MULTI_PORTAL_RE,
+  MODE_TIER1_RE,
+  MODE_TIER2_RE,
+  _URL_NAV_RE,
+  _URL_ANY_RE,
+  _BARE_SITE_RE,
+  _SEARCH_LONG_RE,
+  _ABOUT_RE,
+  _COUNT_RE,
+  ARTICLE_RE,
+  ARTICLE_KEY_RE,
+  isConfigChangeGoal,
+  hasRecentCommitClick,
+  hasPostCommitVerification,
+  MODIFYING_ACTIONS,
+  NON_PRODUCTIVE_READ_ACTIONS,
+  REF_DRIVEN_ACTIONS,
+  TARGETABLE_ACTIONS,
+  LOOP_EXCLUDE_TYPES,
+  DATA_ACTIONS,
+  TAB_ACTIONS,
+  INTERACTIVE_ACTIONS,
+  CDP_FALLBACK_BLOCKED,
+  EXTRACT_ACTIONS,
+  MEMORY_WRITING_ACTIONS,
+  MODIFYING_INTERACTIVE_ACTIONS,
+  OTHER_ACTIONS,
+  _hostnameOf,
+} from './agent-config-gate.js';
 
-const CHANGE_VERBS_RE = /\b(add|create|delete|modify|update|enable|disable|block|allow|configure|grant|revoke|assign|remove|change|deploy|push)\b/i;
-const COMMIT_TARGET_RE = /\b(apply|applied|save|saved|commit|committed|deploy|deployed|accept|accepted|update|updated|create|created|delete|deleted|publish|published|submit|submitted|confirm|confirmed|ok)\b/i;
-const CONFIG_PLATFORM_RE = /(sonicwall|sonicos|fortinet|fortigate|cisco|paloalto|pan-os|panorama|admin\.microsoft|admin\.exchange|entra\.microsoft|portal\.azure|connectwise|ninjaone|ninja\.io|ninjarmm|datto|autotask|itglue|it-glue|huntress|screenconnect)/i;
-const MULTI_PORTAL_RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|intune|defender|sentinelone|connectwise|ninjaone|datto|itglue|huntress|m365|admin\.microsoft|portal\.azure)\b/gi;
-
-// Precompiled regex patterns for goal parsing
-const MODE_TIER1_RE = /\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i;
-const MODE_TIER2_RE = /\b(approval|autonomous|yolo)\s+mode\b/i;
-const _URL_NAV_RE = /(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i;
-const _URL_ANY_RE = /(https?:\/\/[^\s]+)/i;
-const _BARE_SITE_RE = /(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
-const _SEARCH_LONG_RE = /(?:search|find|look up|google)\s+(?:for\s+)?["']?([^"']{10,80})/i;
-const _ABOUT_RE = /(?:about|on|regarding)\s+([^,.\n]{10,60})/i;
-const _COUNT_RE = /(?:top\s+)?(\d+)/;
-const ARTICLE_RE = /\b(?:top|first|best|recent)\s+(\d{1,2})\s+(articles?|stories|posts?|items?|headlines?|results?)\b/i;
-const ARTICLE_KEY_RE = /article[_\s]?\d/i;
-
-
-function isConfigChangeGoal(goal, currentUrl) {
-  const text = String(goal || '');
-  const url  = String(currentUrl || '');
-  return CHANGE_VERBS_RE.test(text) && (CONFIG_PLATFORM_RE.test(url) || CONFIG_PLATFORM_RE.test(text));
-}
-
-function hasRecentCommitClick(history) {
-  // Look at last 12 entries for a click whose target text or result mentions
-  // commit-style verbs. Tolerate both selector-based and click_at clicks.
-  const lookback = history.slice(-12);
-  for (const h of lookback) {
-    if (!h || !h.action) continue;
-    const t = h.action.type;
-    if (t !== 'click' && t !== 'click_at') continue;
-    const probe = [
-      typeof h.action.text === 'string' ? h.action.text : '',
-      typeof h.action.selector === 'string' ? h.action.selector : '',
-      typeof h.action.ref === 'string' ? h.action.ref : '',
-      typeof h.action.description === 'string' ? h.action.description : '',
-      typeof h.result === 'string' ? h.result : ''
-    ].join(' ').toLowerCase();
-    if (COMMIT_TARGET_RE.test(probe)) return true;
-  }
-  return false;
-}
-
-function hasPostCommitVerification(history) {
-  // After the most recent commit click, did a read_page / extract / extract_list / note run?
-  // We require ordering: commit FIRST, verification AFTER.
-  const lookback = history.slice(-12);
-  let sawCommit = false;
-  for (const h of lookback) {
-    if (!h || !h.action) continue;
-    const t = h.action.type;
-    if (!sawCommit) {
-      if (t === 'click' || t === 'click_at') {
-        const probe = [
-          typeof h.action.text === 'string' ? h.action.text : '',
-          typeof h.action.selector === 'string' ? h.action.selector : '',
-          typeof h.action.ref === 'string' ? h.action.ref : '',
-          typeof h.result === 'string' ? h.result : ''
-        ].join(' ').toLowerCase();
-        if (COMMIT_TARGET_RE.test(probe)) sawCommit = true;
-      }
-    } else {
-      if (MEMORY_WRITING_ACTIONS.has(t)) return true;
-    }
-  }
-  return false;
-}
-
-const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
-
-// Pre-computed Sets for loop detection - avoid recreating on every action
-const NON_PRODUCTIVE_READ_ACTIONS = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
-const REF_DRIVEN_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'extract', 'extract_list', 'wait_for_element', 'scroll_to']);
-const TARGETABLE_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
-const LOOP_EXCLUDE_TYPES = new Set(['finish', 'navigate', 'extract', 'extract_list']);
-const DATA_ACTIONS = new Set(['extract', 'extract_list', 'note', 'finish']);
-const TAB_ACTIONS = new Set(['open_tab', 'switch_tab', 'close_tab']);
-const INTERACTIVE_ACTIONS = new Set(['navigate', 'click', 'click_at', 'type', 'press_key', 'select', 'scroll_to', 'scroll']);
-const CDP_FALLBACK_BLOCKED = new Set(['navigate', 'click', 'click_at', 'type', 'press_key', 'execute_js', 'finish', 'extract', 'extract_list', 'note', 'batch', 'smart_navigate']);
-const EXTRACT_ACTIONS = new Set(['extract', 'extract_list', 'read_page']);
-const MEMORY_WRITING_ACTIONS = new Set(['read_page', 'extract', 'extract_list', 'note']);
-const MODIFYING_INTERACTIVE_ACTIONS = new Set(['click', 'type', 'select', 'navigate', 'check', 'check_all']);
-const OTHER_ACTIONS = new Set(['execute_js', 'scroll', 'dismiss_overlay']);
-
-function _hostnameOf(url) {
-  try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return ''; }
-}
-
-
-// ========== Run Setup Helpers ==========
-
-// Load run-stable settings, initialize module-level state, and return the
-// (possibly context-prepended) goal string. Called once at the start of each run.
-async function _initRunState(goal) {
-  await migrateLegacySettings();
-  // (3.41.0) Batch all run-stable settings in one read — avoids per-step round-trips.
-  let stored;
-  try {
-    stored = await chrome.storage.local.get([
-      'agent_history', 'agent_context', 'agent_memory', 'expectedTenant',
-      'ticketMode', 'ticketFormat', 'approvalMode', 'useTrustedInput',
-      'quickMode',
-    ]);
-  } catch (e) {
-    console.warn('[Sentinel] runAgentLoop settings load failed:', getErrorMessage(e));
-    stored = {};
-  }
-  _runSettings = {
-    ticketMode:      stored.ticketMode     ?? false,
-    ticketFormat:    stored.ticketFormat   ?? 'standard',
-    approvalMode:    stored.approvalMode   ?? false,
-    useTrustedInput: stored.useTrustedInput ?? false,
-    quickMode:       stored.quickMode      ?? false,
-  };
-  expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
-  detectedTenant = null;
-  // Each run gets a clean memory namespace — never carry over data from a prior task.
-  // Cross-client contamination: yesterday's findings must never leak into today's run.
-  agentMemory = {};
-  try {
-    await chrome.storage.local.set({ agent_history: [] });
-  } catch (e) {
-    console.warn('[Sentinel] agent_history clear failed:', getErrorMessage(e));
-  }
-  // v10.0: Initialize intelligence systems for each new run
-  try {
-    await Promise.all([
-      initReasoningTrace(),
-      initKnowledgeGraph(),
-      clearBiasLog(),
-      clearContradictionLog(),
-      clearNoveltyHistory(),
-      clearSynthesis()
-    ]);
-    console.log('[Sentinel] Intelligence systems initialized');
-  } catch (e) {
-    console.warn('[Sentinel] Intelligence systems initialization failed:', getErrorMessage(e));
-  }
-  if (stored.agent_context && stored.agent_context.trim()) {
-    return `Previous context: ${stored.agent_context.trim()}\n\nCurrent goal: ${goal}`;
-  }
-  return goal;
-}
-
-// Build a plain-English one-liner describing what the agent can see on the page.
-// Pure heuristic — no LLM call. Used for Phase 8.2 page state narration.
-function _buildPageNarration(url, title, observation, pageContent) {
-  try {
-    const els = (observation && observation.elements) || [];
-    const _text = (pageContent && pageContent.content) || '';
-    const host = (() => { try { return new URL(url).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { return url; } })();
-    const pageTitle = (title || '').trim();
-
-    // Single-pass optimization: count all element types and collect headings in one loop
-    let forms = 0, buttons = 0, inputs = 0, links = 0, errorEl = null;
-    const headings = [];
-
-    for (const e of els) {
-      const tag = e.tag || '';
-
-      // Count element types
-      if (ELEMENT_TAG_FORM_RE.test(tag)) {
-        forms++;
-      } else if (ELEMENT_TAG_BUTTON_RE.test(tag) || e.role === 'button') {
-        buttons++;
-      } else if (ELEMENT_TAG_INPUT_RE.test(tag)) {
-        inputs++;
-      } else if (ELEMENT_TAG_A_RE.test(tag)) {
-        links++;
-      }
-
-      // Collect headings
-      if (ELEMENT_TAG_HEADING_RE.test(tag)) {
-        const text = e.text || '';
-        if (text) headings.push(text);
-      }
-
-      // Find error element (if not already found)
-      if (!errorEl) {
-        const t = typeof e.text === 'string' ? e.text.toLowerCase() : '';
-        if (ELEMENT_ERROR_TEXT_RE.test(t)) {
-          errorEl = e;
-        }
-      }
-    }
-
-    const parts = [];
-    if (pageTitle) parts.push(pageTitle);
-    else if (host) parts.push(host);
-
-    if (headings[0]) {
-      const hText = typeof headings[0] === 'string' ? headings[0] : '';
-      const h = hText.length > 60 ? `${hText.substring(0, 57)}...` : hText;
-      const hLower = typeof h === 'string' ? h.toLowerCase() : '';
-      const pTitleLower = typeof pageTitle === 'string' ? pageTitle.toLowerCase() : '';
-      if (hLower !== pTitleLower) parts.push(`"${h}"`);
-    }
-
-    const details = [];
-    if (forms > 0) details.push(`${forms} form${forms > 1 ? 's' : ''}`);
-    if (inputs > 0) details.push(`${inputs} input${inputs > 1 ? 's' : ''}`);
-    if (buttons > 0) details.push(`${buttons} button${buttons > 1 ? 's' : ''}`);
-    if (links > 5) details.push(`${links} links`);
-    if (errorEl) details.push('⚠ error message visible');
-
-    const summary = `${parts.join(' — ')}${details.length ? ` (${details.join(', ')})` : ''}`;
-    return `I can see: ${summary || host}`;
-  } catch (_) {
-    return '';
-  }
-}
-
-// Page state narration helper — generates a plain-English summary of page context.
-// Takes a pageContext object with optional title, url, forms, buttons, links,
-// inputs, tables, and bodyText fields. Returns a human-readable narration string.
-function narratePageState(pageContext) {
-  if (!pageContext) return 'Page state unknown.';
-  const parts = [];
-  if (pageContext.title) parts.push('Page: ' + pageContext.title);
-  if (pageContext.url) {
-    try { parts.push('on ' + new URL(pageContext.url).hostname); } catch(_e) {}
-  }
-  if (pageContext.forms && pageContext.forms.length > 0) parts.push(pageContext.forms.length + ' form(s) visible');
-  if (pageContext.buttons && pageContext.buttons.length > 0) parts.push(pageContext.buttons.length + ' button(s)');
-  if (pageContext.links && pageContext.links.length > 0) parts.push(pageContext.links.length + ' link(s)');
-  if (pageContext.inputs && pageContext.inputs.length > 0) parts.push(pageContext.inputs.length + ' input field(s)');
-  if (pageContext.tables && pageContext.tables.length > 0) parts.push(pageContext.tables.length + ' table(s)');
-  // Check for specific platform indicators
-  const text = (pageContext.bodyText || '').toLowerCase();
-  if (text.includes('login') || text.includes('sign in')) parts.push('login page detected');
-  if (text.includes('dashboard')) parts.push('dashboard detected');
-  if (text.includes('error') || text.includes('404') || text.includes('403')) parts.push('error page detected');
-  return parts.length > 0 ? parts.join(' · ') : 'Page loaded.';
-}
-
+// ========== Run Setup Helpers — extracted to agent-run-setup.js ==========
+import { _initRunState, _buildPageNarration, narratePageState } from './agent-run-setup.js';
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
@@ -1931,7 +1661,12 @@ async function runAgentLoop(goal, workingTabId) {
   currentPlanStep = 0;
   const _loopStartTime = Date.now();
 
-  goal = await _initRunState(goal);
+  const _runInit = await _initRunState(goal);
+  goal = _runInit.goal;
+  _runSettings = _runInit.runSettings;
+  expectedTenant = _runInit.expectedTenant;
+  detectedTenant = null;
+  agentMemory = {};
 
   let consecutiveNavigates = 0;
   let consecutiveInjectionFailures = 0;
@@ -3063,8 +2798,8 @@ async function runAgentLoop(goal, workingTabId) {
         previousFailures: consecutiveFailures || 0
       };
 
-      const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const _zoomAnnotation = formatZoomRegion(getZoomRegion());
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -3196,7 +2931,7 @@ async function runAgentLoop(goal, workingTabId) {
           '</visual_grounding>'
         ].join('\n');
 
-        const _zoomAnnotation = formatZoomRegion(_zoomRegion);
+        const _zoomAnnotation = formatZoomRegion(getZoomRegion());
         const _visionUserContent = [
           `Goal: ${goal}`,
           `URL: ${currentUrl}`,
@@ -3212,7 +2947,7 @@ async function runAgentLoop(goal, workingTabId) {
           'What is your next action?'
         ].join('\n');
         // Clear zoom region after consuming it (one-shot)
-        _zoomRegion = null;
+        setZoomRegion(null);
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -3542,7 +3277,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Non-fatal but could affect next action execution
           }
           base64Image = null; // release screenshot memory after LLM call
-          _zoomRegion = null; // clear zoom region after consuming it
+          setZoomRegion(null); // clear zoom region after consuming it
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
           // module-level var must still be updated or the final log shows 0.
@@ -6195,138 +5930,14 @@ function escapeJsString(str, quote = '"') {
   });
 }
 
-// ========== Approval Mode ==========
-// (3.20.1) Defensive target-formatter — never shows "undefined". Falls back
-// to ref, then to (x,y) coordinates, then to a "(no target)" placeholder so
-// the activity stream label is always meaningful.
-function _describeTarget(cmd) {
-  if (!cmd) return '(no target)';
-  // Prefer human-readable labels over raw CSS selectors for approval card readability
-  if (cmd.description) return `"${String(cmd.description).slice(0, 80)}"`;
-  if (cmd.ariaLabel) return `"${String(cmd.ariaLabel).slice(0, 80)}"`;
-  if (cmd.elementText) return `"${String(cmd.elementText).slice(0, 80)}"`;
-  if (cmd.label) return `"${String(cmd.label).slice(0, 80)}"`;
-  if (cmd.selector) return cmd.selector;
-  if (cmd.ref) return `ref:${cmd.ref}`;
-  if (typeof cmd.x === 'number' && typeof cmd.y === 'number') return `(${cmd.x},${cmd.y})`;
-  return '(no target)';
-}
-function describeAction(command) {
-  switch (command.type) {
-    case 'navigate_back':    return 'Navigate back';
-    case 'navigate_forward': return 'Navigate forward';
-    case 'click':        return `Click: ${_describeTarget(command)}${command._matchedByVisual ? ' [visual match]' : ''}`;
-    case 'right_click':  return `Right-click: ${_describeTarget(command)}`;
-    case 'double_click': return `Double-click: ${_describeTarget(command)}`;
-    case 'drag_and_drop':return `Drag ${_describeTarget({ ref: command.source_ref, selector: command.source_selector, label: command.source_label })} → ${_describeTarget({ ref: command.target_ref, selector: command.target_selector, label: command.target_label })}`;
-    case 'click_at':    return `Click at: ${_describeTarget(command)}`;
-    case 'type':        return `Type into ${_describeTarget(command)}: '${(command.text || '').toString().slice(0, 80)}'${command._matchedByVisual ? ' [visual match]' : ''}`;
-    case 'navigate':    return `Navigate to ${command.url || '(no url)'}`;
-    case 'scroll':      return `Scroll ${(command.amount || 0) >= 0 ? 'down' : 'up'}`;
-    case 'scroll_to':   return `Scroll to ${_describeTarget(command)}`;
-    case 'select':      return `Select "${command.value || ''}" in ${_describeTarget(command)}`;
-    case 'hover':       return `Hover: ${_describeTarget(command)}`;
-    case 'check':       return `Check: ${_describeTarget(command)}`;
-    case 'check_all':   return `Check all matching ${_describeTarget(command)}`;
-    case 'press_key':   return `Press: ${command.key || '(no key)'}`;
-    case 'execute_js':  return `Run JS: ${(command.code || '').toString().slice(0, 60)}${command.key ? ` → ${command.key}` : ''}`;
-    case 'extract':     return `Extract "${command.key || ''}" from ${_describeTarget(command)}`;
-    case 'extract_list':return `Extract list "${command.key || ''}" from ${_describeTarget(command)}`;
-    case 'open_tab':    return `Open tab: ${command.label || command.url || '(no url)'}`;
-    case 'switch_tab':  return `Switch to: ${command.label || command.tab_id || ''}`;
-    case 'close_tab':   return `Close tab: ${command.label || command.tab_id || ''}`;
-    case 'note':        return `Note: ${(command.text || command.summary || '').toString().slice(0, 80)}`;
-    case 'finish':      return `Finish: ${(command.summary || '').toString().slice(0, 80)}`;
-    case 'wait_for_text':       return `Wait for text: "${(command.text || '').toString().slice(0, 60)}"`;
-    case 'wait_for_element':    return `Wait for element: ${_describeTarget(command)}`;
-    case 'wait_for_navigation': return 'Wait for navigation';
-    case 'read_page':   return 'Read page';
-    case 'dismiss_overlay': return 'Dismiss overlay';
-    case 'lookup':            return `DNS lookup: ${command.domain || '(no domain)'} (${command.record_type || 'A'})`;
-    case 'run_remote_command': return `Remote cmd (${command.command_type || 'powershell'}): ${(command.command || '').toString().slice(0, 60)}`;
-    default: return `${command.type}: ${JSON.stringify(command).slice(0, 100)}`;
-  }
-}
+// ========== Approval Mode — extracted to agent-approval.js ==========
+import { _describeTarget, describeAction, requestApproval as _requestApprovalImpl } from './agent-approval.js';
 
+// Wrapper to handle agentPaused mutation locally
 async function requestApproval(command, stepNumber) {
-  const description = describeAction(command);
-  // Per-call requestId so concurrent approvals don't cross-contaminate listeners.
-  const requestId = crypto.randomUUID();
-  // (3.14.0) Pin the service worker alive while we wait for the user. Without
-  // this, an AFK user past the ~30s MV3 idle timer kills the SW and the
-  // listener gets GC'd — silent timeout, no recovery.
-  const kaName = 'approval_' + requestId;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-  return new Promise((resolve) => {
-    const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-      resolve(payload);
-    };
-    chrome.runtime.sendMessage({
-      action: 'request_approval',
-      payload: { action: command.type, description, stepNumber, requestId,
-        ariaLabel: command.ariaLabel || null,
-        elementText: command.elementText || null,
-        selector: command.selector || null },
-      requestId
-    }).catch((e) => {
-      console.error('[finish] Unhandled rejection:', e);
-    });
-    const listener = (message) => {
-      if (message && message.action === 'approval_response' && message.requestId === requestId) {
-        chrome.runtime.onMessage.removeListener(listener);
-        clearTimeout(timeoutId);
-        agentPaused = false; // clear pause if response arrives during soft-timeout notifyIfEnabled await
-        finish({
-          approved: !!message.approved,
-          skipped: !!message.skipped,
-          rejected: !!message.rejected
-        });
-      }
-    };
-    chrome.runtime.onMessage.addListener(listener);
-    // After 60 s with no response: pause the agent and notify the user rather
-    // than silently rejecting. The agent stays paused until the user responds
-    // (or hits the 5-minute hard wall).
-    const timeoutId = setTimeout(async () => {
-      // Pause the loop so the step isn't counted as failed while the tech is AFK.
-      agentPaused = true;
-      sendSilentUpdate('⏸ Approval pending — agent paused. Click Approve/Reject in the chat or the notification to continue.', stepNumber);
-      try {
-        await notifyIfEnabled(`approval_pending_${requestId}`, {
-          type: 'basic',
-          iconUrl: chrome.runtime.getURL('icon-48.png'),
-          title: 'Sentinel Override — Approval needed',
-          message: `Step ${stepNumber}: ${description.substring(0, 100)}. Open Sentinel to approve or reject.`
-        });
-      } catch (_e) {
-        // Notification create failed non-fatally
-      }
-      // Hard-reject after 5 minutes total (4 more minutes from here).
-      // The listener is still active so a user response still resolves early.
-      const hardRejectId = setTimeout(() => {
-        chrome.runtime.onMessage.removeListener(listener);
-        chrome.runtime.onMessage.removeListener(hardTimeoutListener);
-        agentPaused = false; // unblock loop so it can clean up
-        finish({ approved: false, skipped: false, rejected: true, reason: 'approval_hard_timeout' });
-      }, 240000);
-      // If the user responds before the hard wall, clear the hard-reject timer.
-      const origListener = listener;
-      chrome.runtime.onMessage.removeListener(origListener);
-      const hardTimeoutListener = (message) => {
-        if (message && message.action === 'approval_response' && message.requestId === requestId) {
-          clearTimeout(hardRejectId);
-          agentPaused = false;
-          chrome.runtime.onMessage.removeListener(hardTimeoutListener);
-          finish({
-            approved: !!message.approved,
-            skipped: !!message.skipped,
-            rejected: !!message.rejected
-          });
-        }
-      };
-      chrome.runtime.onMessage.addListener(hardTimeoutListener);
-    }, ONE_MINUTE_MS);
+  return _requestApprovalImpl(command, stepNumber, {
+    onPause: () => { agentPaused = true; },
+    onResume: () => { agentPaused = false; }
   });
 }
 
