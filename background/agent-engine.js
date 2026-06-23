@@ -6,7 +6,7 @@ import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as 
 import { getPlatformProfile } from './platforms/index.js';
 import { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat, getFirstLine, getFirstSentence } from './agent-ticket-format.js';
 import { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
-import { summarizeHistoryBatch, maybeRollupHistory } from './agent-progress.js';
+import { summarizeHistoryBatch, maybeRollupHistory, detectStall } from './agent-progress.js';
 import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
 import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
@@ -451,7 +451,6 @@ const PORTAL_SENTINELONE_RE = /sentinelone/i;
 const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
 
 // Precompile regex for stall detection
-const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
 
 
 
@@ -617,7 +616,6 @@ let _clickAtStreakSawPageChange = false;
 // from any branch and the run finalize block can read them at the end.
 let failedSteps = 0;            // running count of steps where actionFailed=true
 let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
-let _pageStagnation = 0;      // (3.46.1) Counts consecutive non-mutating clicks on same page state — detects click-spam loops
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
@@ -1065,7 +1063,7 @@ export function resetAgentState() {
   _clickAtStreakBaseline = 0;
   _clickAtStreakSawPageChange = false;
   consecutiveFailures = 0;
-  _pageStagnation = 0;
+  sharedState.pageStagnation = 0;
   currentStrategies = [];
   agentPlan = null;
   currentPlanStep = 0;
@@ -1659,52 +1657,6 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
   } catch (e) { console.warn('[Sentinel] HUD update failed:', getErrorMessage(e)); }
 }
 
-// ========== Stall Detection ==========
-function detectStall(history, consecutiveFailures, _currentStrategies) {
-  const recent = history.slice(-CONFIG.stallConfig.similarityWindow);
-
-  // Check 1: All recent actions are the same type with the same failure result
-  if (recent.length >= CONFIG.stallConfig.similarityWindow) {
-    const first = recent[0];
-    const firstResult = first ? first.result : undefined;
-    const allSameType = first && first.action && recent.every(h => h.action && h.action.type === first.action.type);
-    const allSameResult = recent.every(h => h.result === firstResult);
-    const allFailed = recent.every(h => {
-      const r = typeof h.result === 'string' ? h.result : '';
-      return STALL_ERROR_RE.test(r);
-    });
-
-    if (allSameType && allSameResult && allFailed) {
-      const actionType = first.action.type || 'unknown';
-      const resultStr = typeof firstResult === 'string' ? firstResult : '';
-      return {
-        stalled: true,
-        reason: `Repeated "${actionType}" with same failure: "${resultStr}"`,
-        recoveryAction: 'RESCAN_AND_REPLAN'
-      };
-    }
-  }
-
-  // Check 2: Page stagnation — too many clicks/types without page change
-  if (_pageStagnation >= CONFIG.stallConfig.stateRecheckSteps) {
-    return {
-      stalled: true,
-      reason: `${_pageStagnation} consecutive clicks/types without page change (stagnation)`,
-      recoveryAction: 'RESCAN_AND_REPLAN'
-    };
-  }
-
-  // Check 3: High consecutive failures regardless of action type
-  if (consecutiveFailures >= CONFIG.stallConfig.maxConsecutiveFailures) {
-    return {
-      stalled: true,
-      reason: `${consecutiveFailures} consecutive failures without progress`,
-      recoveryAction: 'FORCE_STRATEGY_SHIFT'
-    };
-  }
-
-  return { stalled: false };
-}
 
 
 
@@ -5533,9 +5485,9 @@ return { ok: true, value: el.value };
       const _isPageMutating = PAGE_MUTATING_ACTIONS_RE.test(command.type);
       const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
-        _pageStagnation++;
+        sharedState.pageStagnation++;
       } else {
-        _pageStagnation = 0;
+        sharedState.pageStagnation = 0;
       }
 
       // (v3.52) click_at loop detector — catches the pattern where a text-only model
@@ -5641,7 +5593,7 @@ return { ok: true, value: el.value };
           agentPlan = null;
           currentPlanStep = 0;
           consecutiveFailures = 0;
-          _pageStagnation = 0;
+          sharedState.pageStagnation = 0;
           currentStrategies = [];
 
           // Inject stall context into history so the LLM knows what happened
@@ -6059,7 +6011,7 @@ return { ok: true, value: el.value };
       apiCalls: apiCallCount,
       history: history,
       failures: failedSteps,
-      stagnation: _pageStagnation
+      stagnation: sharedState.pageStagnation
     };
     const predictiveInsights = PredictiveEngine.analyze(predictiveData);
     console.log('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);
