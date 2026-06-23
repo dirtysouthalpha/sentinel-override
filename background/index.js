@@ -181,14 +181,43 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       .catch(() => {});
   } else if (action === 'quick_assist') {
     // (3.46.0) Quick Assist — open side panel and inject selected text as prompt
+    // (v21.3.1) On-demand injection: quick-assist.js is no longer in static content_scripts.
+    // Inject it here only when the user explicitly triggers Quick Assist via context menu.
     chrome.sidePanel.open({ tabId: tab?.id }).catch(() => {});
-    // Send show_quick_assist to the content script so quick-assist.js shows the floating panel
     if (tab?.id) {
-      chrome.tabs.sendMessage(tab.id, {
-        action: 'show_quick_assist',
-        selectedText: params.selectionText || '',
-        pageInfo: { url: params.pageUrl || '' },
-      }).catch(() => {});
+      // Check if content script is loaded; if not, inject quick-assist.js on-demand
+      chrome.tabs.sendMessage(tab.id, { action: 'ping_content_script' })
+        .then(async (resp) => {
+          if (!resp || !resp.ok) {
+            // Content script not loaded — inject quick-assist.js directly
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ['content/quick-assist.js']
+              });
+            } catch (_) { /* injection failed — page may block scripts */ }
+          }
+          // Now send show_quick_assist to display the floating panel
+          chrome.tabs.sendMessage(tab.id, {
+            action: 'show_quick_assist',
+            selectedText: params.selectionText || '',
+            pageInfo: { url: params.pageUrl || '' },
+          }).catch(() => {});
+        })
+        .catch(async () => {
+          // Content script not loaded at all — inject and then send message
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['content/quick-assist.js']
+            });
+            chrome.tabs.sendMessage(tab.id, {
+              action: 'show_quick_assist',
+              selectedText: params.selectionText || '',
+              pageInfo: { url: params.pageUrl || '' },
+            }).catch(() => {});
+          } catch (_) { /* page blocks script injection */ }
+        });
     }
   }
 });

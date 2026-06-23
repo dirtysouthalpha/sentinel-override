@@ -2680,3 +2680,20 @@ A focused pass on **what the user sees in the popup while the agent runs**. The 
 - `ABSOLUTE_MAX_STEPS = 150` replaces the old soft cap that could be bumped indefinitely
 - Circuit breaker directive injection before LLM call
 - Forensic logging to run log when circuit breaker triggers
+
+## [21.3.1] — 2026-06-23
+
+### 🔧 Tab Scoping Fix — Extension No Longer Attaches to All Tabs
+
+**Root cause:** manifest.json had a static `content_scripts` block matching `<all_urls>` that auto-injected `highlight.js`, `cursor.js`, and `quick-assist.js` into EVERY tab the user opened — even tabs with nothing to do with the agent.
+
+**Fix:** Removed the static content_scripts block for UI scripts. The extension now only loads visual/interaction scripts on tabs the agent is actively working in. Quick Assist is injected on-demand when the user right-clicks → Quick Assist.
+
+#### Changes
+- `manifest.json`: Removed static `content_scripts` block for `highlight.js`, `cursor.js`, `quick-assist.js`
+- `background/index.js`: Quick Assist context menu handler now injects `quick-assist.js` on-demand via `chrome.scripting.executeScript` instead of relying on auto-injection
+- `shadow-intercept.js` remains static (needs `document_start` in MAIN world for shadow DOM interception)
+
+**Behavior change:**
+- **Before:** Every new tab loaded highlight/cursor/quick-assist scripts immediately
+- **After:** Only agent-attached tabs get these scripts. Quick Assist loads on right-click → Quick Assist
