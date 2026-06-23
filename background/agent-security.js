@@ -255,9 +255,9 @@ function detectMfaInText(text, currentUrl) {
 // This guards against false positives on post-auth redirect pages that
 // briefly pass through login.microsoftonline.com without showing a form.
 
-const SIGN_IN_WALL_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|accounts\.google\.com|accounts\.youtube\.com|login\.okta\.com|[^.]+\.okta\.com|[^.]+\.oktapreview\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|github\.com\/login|gitlab\.com\/users\/sign_in|bitbucket\.org\/account\/signin|login\.salesforce\.com|[^.]+\.my\.salesforce\.com|signin\.intuit\.com|login\.duosecurity\.com|connect\.secureauth\.com|adfs\..+|sts\..+)/i;
+const SIGN_IN_WALL_HOSTS_RE = /(login\.microsoftonline\.com|login\.live\.com|login\.microsoft\.com|login\.windows\.net|accounts\.google\.com|accounts\.youtube\.com|login\.okta\.com|[^.]+\.okta\.com|[^.]+\.oktapreview\.com|auth0\.com|[^.]+\.auth0\.com|signin\.aws\.amazon\.com|github\.com\/login|gitlab\.com\/users\/sign_in|bitbucket\.org\/account\/signin|login\.salesforce\.com|[^.]+\.my\.salesforce\.com|signin\.intuit\.com|login\.duosecurity\.com|connect\.secureauth\.com|adfs\..+|sts\..+|login\.partner\.microsoft\.com|[^.]+\.admin\.microsoft\.com|admin\.microsoft\.com|admin\.teams\.microsoft\.com|login\.microsoft\.com\/common\/oauth2|teams\.microsoft\.com\/go|login\.live\.com\/login\.srf)/i;
 
-const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|email)|use\s+your\s+microsoft\s+account|stay\s+signed\s+in)\b/i;
+const SIGN_IN_WALL_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s+your\s+(?:password|email)|use\s+your\s+microsoft\s+account|stay\s+signed\s+in|pick\s+an\s+account|choose\s+your\s+account|consent|permissions\s+required|grant\s+permission|admin\s+consent|approve\s+access|accept\s+permissions|continue\s+to\s+sign\s*in)\b/i;
 
 // Returns { matched: true, host, evidence } when a sign-in wall is detected,
 // or null. Evidence describes WHY we matched (URL + password-field selector
@@ -281,6 +281,16 @@ function detectSignInWall(allElements, currentUrl, pageText) {
   }
   if (pwField) {
     return { matched: true, host, evidence: `password input on ${host}`, selector: pwField.selector || '' };
+  }
+
+  // (v21.3) Signal 1b: Microsoft consent / "Pick an account" / admin approval wall.
+  // These pages have no password field and may not have an email field, but they
+  // block agent progress until the user manually selects an account or approves.
+  if (pageText) {
+    const _consentHit = /(?:pick\s+an\s+account|choose\s+your\s+account|use\s+a\s+different\s+account|admin\s+consent\s+required|needs\s+review|permission\s+to\s+access|grant.*admin.*consent|approve.*request|continue.*as)/i.test(pageText);
+    if (_consentHit) {
+      return { matched: true, host, evidence: `consent/account-picker page on ${host}`, selector: '' };
+    }
   }
 
   // Signal 2 (fallback): page text contains sign-in cues AND we're on a known auth host

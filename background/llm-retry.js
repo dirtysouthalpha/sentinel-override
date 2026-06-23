@@ -33,9 +33,18 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
     // and transient 500s under load; these are retryable just like 429/502/503.
     const isRetryable = (msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('529') || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
-      const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
+      // (v21.3) Provider-aware backoff: different providers have different rate
+      // limit characteristics. GLM/Z.ai 429s need longer backoff than Claude/OpenAI.
+      const _model = (agentState && agentState.model) || '';
+      const _isGlm = /glm/i.test(_model);
+      const _isDeepSeek = /deepseek/i.test(_model);
+      const _isFreeTier = /free|openrouter/i.test(_model);
+      // GLM/DeepSeek free tiers are heavily rate-limited — give them more room.
+      const _providerMultiplier = (_isGlm || _isDeepSeek) ? 2.0 : (_isFreeTier ? 1.5 : 1.0);
+      const baseDelay = msg.includes('429') ? CONFIG.retryDelay * _providerMultiplier : CONFIG.retryDelay / 2;
       const delay = Math.min(baseDelay * Math.pow(2, retryCount) + Math.floor(Math.random() * TWO_SECONDS_MS), CONFIG.maxRetryDelay);
-      sendSilentUpdate(`Retrying in ${Math.round(delay/ONE_SECOND_MS)}s...`, stepCount);
+      const _reason = msg.includes('429') ? 'rate limited' : msg.includes('overloaded') ? 'overloaded' : 'transient error';
+      sendSilentUpdate(`Retrying (${_reason}) in ${Math.round(delay/ONE_SECOND_MS)}s... (attempt ${retryCount + 1}/${CONFIG.maxRetries})`, stepCount);
       await sleep(delay);
       return callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount + 1, CONFIG, agentState);
     }

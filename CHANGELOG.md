@@ -2642,3 +2642,41 @@ A focused pass on **what the user sees in the popup while the agent runs**. The 
 - `chrome.debugger` attaches **once per agent run** instead of once per screenshot, eliminating the per-step CDP banner flicker.
 - Service-worker checkpoint to `chrome.storage.session` every step so a SW termination mid-run can be resumed (#16).
 - Manifest bumped to `3.5.0`.
+
+## [21.3.0] — 2026-06-23
+
+### 🔴 Agent Loop Circuit Breaker (Fixes Teams Admin Ticket #1139516)
+
+**Root causes fixed:** Agent loop stuck at 228+ steps, repeated identical clicks, auth-wall recovery failing, GLM 429 rate limits, unparseable vision responses.
+
+### New Module: `agent-circuit-breaker.js` (193 lines, 21 tests)
+- **Identical-action detection**: Breaks loops when the exact same action (same selector + type) repeats 3+ times
+- **Repeated target clicks**: Detects same element clicked 3+ times within an 8-step window (non-consecutive)
+- **ABSOLUTE_MAX_STEPS = 150**: Hard ceiling that `productiveSteps` bumps cannot override
+- **High failure rate detection**: Warns when 70%+ of recent actions fail
+- **Stale page detection**: Detects when page hasn't changed despite multiple actions
+
+### Fixes
+
+#### 1. Vision Parser Hardened (`llm-client.js: parseVisionResponse`)
+- Handles unclosed `<think>` blocks (GLM-4V truncation at max_tokens)
+- Aggressive markdown code fence stripping (unclosed fences)
+- Fixes raw newlines inside JSON string values (GLM-4V emits unescaped \n in text fields)
+- Ultra last-ditch regex extraction for nested action objects
+
+#### 2. Auth-Wall Detection Expanded (`agent-security.js: detectSignInWall`)
+- Added Teams Admin hosts: `admin.teams.microsoft.com`, `admin.microsoft.com`, `login.partner.microsoft.com`
+- Added Microsoft OAuth2 consent flow URLs
+- New consent/account-picker signal: detects "Pick an account", "Admin consent required", "Approve access"
+- Expanded text regex for consent/permission pages
+
+#### 3. Provider-Aware 429 Retry Backoff (`llm-retry.js`)
+- GLM/DeepSeek models get 2x base delay multiplier (heavily rate-limited free tiers)
+- Free/OpenRouter models get 1.5x multiplier
+- Claude/OpenAI keep standard backoff (1.0x)
+- Shows reason + attempt count in status messages
+
+#### 4. Hard Step Ceiling (`agent-engine.js`)
+- `ABSOLUTE_MAX_STEPS = 150` replaces the old soft cap that could be bumped indefinitely
+- Circuit breaker directive injection before LLM call
+- Forensic logging to run log when circuit breaker triggers

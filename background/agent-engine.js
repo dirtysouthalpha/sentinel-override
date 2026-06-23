@@ -637,6 +637,7 @@ let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verificat
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
 import { sharedState } from './agent-shared-state.js';
 import { attachTabToSentinelGroup, detachAllSentinelTabs, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds } from './agent-tabs.js';
+import { checkCircuitBreaker, ABSOLUTE_MAX_STEPS } from './agent-circuit-breaker.js';
 
 // Re-export originally-public functions for backward compatibility
 export { isAgentAttachedTab, isPrimaryPanelTab, getAttachedTabIds };
@@ -2627,20 +2628,27 @@ async function runAgentLoop(goal, workingTabId) {
           : `\n⚠ STEP LIMIT -- You are on step ${stepCount}. If you have not found useful data, call "finish" with what you know. Do not continue looping.\n`;
       }
 
-      // 3. Step-based soft cap: force a clean finish ~5 steps before the
-      //    hard dynamic cap so the agent gets a chance to build a summary
-      //    from collected memory instead of just being broken out of.
-      const _softCap = Math.max(40, dynamicMaxSteps - 5);
-      if (stepCount >= _softCap) {
+      // 3. (v21.3) HARD CEILING + circuit breaker: force a clean finish
+      //    at ABSOLUTE_MAX_STEPS (150) regardless of dynamicMaxSteps bumps.
+      //    Also inject circuit breaker directives when degenerate loops detected.
+      const _cbResult = checkCircuitBreaker(history, stepCount, dynamicMaxSteps);
+      if (_cbResult.directive) {
+        loopDirective += _cbResult.directive;
+      }
+      // (v21.3) Hard stop on circuit breaker or absolute step ceiling
+      if (_cbResult.shouldHardStop || stepCount >= ABSOLUTE_MAX_STEPS) {
+        const _hardReason = _cbResult.shouldHardStop
+          ? _cbResult.reason
+          : `ABSOLUTE STEP CEILING reached (${stepCount} >= ${ABSOLUTE_MAX_STEPS})`;
+        sendSilentUpdate(`🔴 ${_hardReason}`, stepCount);
         const memLines = Object.entries(agentMemory).slice(0, 10).map(([k, v]) => {
           const vStr = Array.isArray(v) ? v.slice(0, 5).map(i => String(i)).join(', ') : String(v).substring(0, 200);
           return `- ${k}: ${vStr}`;
         }).join('\n');
         const summary = memCount > 0
           ? `Task completed after ${stepCount} steps with ${memCount} data points extracted:\n\n${memLines}${memCount > 10 ? `\n...and ${memCount - 10} more items.` : ''}`
-          : `Task timed out after ${stepCount} steps without extracting useful data.`;
+          : `Task timed out after ${stepCount} steps. ${_hardReason}`;
         finished = true;
-        sendSilentUpdate('Step limit reached -- finishing', stepCount);
         sendActionResult(stepCount, { type: 'finish', summary }, false);
         historyPush({ step: stepCount, action: { type: 'finish', summary }, result: summary });
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
@@ -2649,6 +2657,23 @@ async function runAgentLoop(goal, workingTabId) {
         });
         sendReportUpdate('generating');
         break;
+      }
+
+      // (v21.3) Circuit breaker logging when triggered
+      if (_cbResult && _cbResult.severity !== 'none') {
+        try {
+          console.warn(`[Sentinel/CircuitBreaker] ${_cbResult.reason}`);
+          if (runLogId) {
+            runLogBuffer.push({
+              step: stepCount,
+              timestamp: new Date().toISOString(),
+              kind: 'circuit_breaker',
+              severity: _cbResult.severity,
+              reason: _cbResult.reason
+            });
+            chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
+          }
+        } catch (_) {}
       }
 
       // (3.21.0) Recovery skill library — consult before the LLM call.

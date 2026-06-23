@@ -2456,16 +2456,66 @@ export function parseVisionResponse(raw) {
     catch (_e) { return null; }
   };
   let s = raw.trim();
-  // Strip <think>…</think> reasoning blocks (GLM/DeepSeek extended thinking).
-  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-  // Strip a surrounding markdown code fence if present.
-  if (s.includes('```')) {
-    const fence = s.match(CODE_BLOCK_REGEX);
-    if (fence && fence[1]) s = fence[1].trim();
+
+  // (v21.3) GLM-4V/DeepSeek sometimes return the action wrapped in <think> WITHOUT
+  // a closing tag (truncated by max_tokens). Strip everything up to the last
+  // { that starts a JSON object — the model's thinking prose before it is noise.
+  // First try the normal closed-tag strip.
+  const thinkStripped = s.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  if (thinkStripped.length > 0 && thinkStripped !== s) {
+    s = thinkStripped;
+  } else {
+    // Unclosed <think> — strip everything before the opening tag.
+    const openThink = s.indexOf('<think>');
+    if (openThink >= 0) {
+      const afterThink = s.substring(openThink + 7);
+      const firstBrace = afterThink.indexOf('{');
+      if (firstBrace >= 0) {
+        s = afterThink.substring(firstBrace).trim();
+      }
+    }
   }
+
+  // (v21.3) Strip markdown code fences more aggressively.
+  // (v21.3) Strip markdown code fences more aggressively (GLM-4V wraps JSON in fences).
+  while (s.includes('```')) {
+    const fence = s.match(/```(?:json|JSON|javascript|js)?\s*([\s\S]*?)```/);
+    if (fence && fence[1]) {
+      s = fence[1].trim();
+    } else {
+      // Unclosed code fence — take everything after the opening ```
+      const openFence = s.indexOf('```');
+      if (openFence >= 0) {
+        const afterFence = s.substring(openFence + 3);
+        const langEnd = afterFence.indexOf('\n');
+        if (langEnd >= 0) {
+          s = afterFence.substring(langEnd + 1).trim();
+        } else {
+          s = afterFence.trim();
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  // (v21.3) Fix raw newlines inside JSON string values.
+  // GLM-4V frequently emits unescaped \n inside "text" fields, breaking JSON.parse.
+  // This regex finds string values and escapes literal newlines/tabs within them.
+  s = s.replace(/("(?:text|url|code|thinking|evaluation|memory|next_goal|direction|query|summary)"\s*:\s*")(.*?)("")/gs,
+    (match, prefix, content, suffix) => {
+      // Escape literal newlines, tabs, and carriage returns inside the string value
+      const fixed = content
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/\t/g, '\\t');
+      return prefix + fixed + suffix;
+    });
+
   // 1) Direct parse, then sanitized parse.
   let parsed = tryParse(s) || tryParse(sanitizeLlmJson(s));
   if (parsed) return parsed;
+
   // 2) Extract the first balanced object that looks like a vision response
   //    (handles preamble/trailing prose around the JSON).
   const candidate = firstBalancedJsonObject(s, '"action"')
@@ -2475,12 +2525,16 @@ export function parseVisionResponse(raw) {
     parsed = tryParse(candidate) || tryParse(sanitizeLlmJson(candidate));
     if (parsed) return parsed;
   }
+
   // 3) Pull just the nested action object out of the noise.
-  const actMatch = s.match(/"action"\s*:\s*(\{[\s\S]*?\})/);
+  // (v21.3) Made the regex non-greedy + handle nested braces better.
+  const actMatch = s.match(/"action"\s*:\\s*(\{[^]*(?:\}|$))/) ||
+                   s.match(/"action"\s*:\s*(\{[\s\S]*?\})/);
   if (actMatch && actMatch[1]) {
     const actObj = tryParse(actMatch[1]) || tryParse(sanitizeLlmJson(actMatch[1]));
     if (actObj && actObj.type) return { action: actObj };
   }
+
   // 4) Last-ditch: scrape a bare type (+ optional index/text) from anywhere.
   const typeMatch = s.match(/"type"\s*:\s*"([a-zA-Z_]+)"/);
   if (typeMatch) {
@@ -2491,6 +2545,20 @@ export function parseVisionResponse(raw) {
     if (strFieldMatch) action.text = strFieldMatch[1];
     return { action };
   }
+
+  // (v21.3) ULTRA last-ditch: try extracting from reasoning_content.
+  // GLM-4V sometimes puts the JSON ONLY in reasoning_content with empty content.
+  if (s.includes('"action"') || s.includes('"type"')) {
+    // Already tried above, but try one more with extreme tolerance.
+    const ultraMatch = s.match(/\{[^{}]*"type"\s*:\s*"([a-zA-Z_]+)"[^{}]*\}/);
+    if (ultraMatch) {
+      try {
+        const ultra = JSON.parse(ultraMatch[0]);
+        if (ultra && ultra.type) return { action: ultra };
+      } catch (_) {}
+    }
+  }
+
   return null;
 }
 
