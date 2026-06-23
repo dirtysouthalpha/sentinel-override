@@ -4260,11 +4260,8 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.51) FIXED: if we're on a DIFFERENT page, navigating back to a previous
       // URL is recovery, not a loop — allow it (e.g., click_at landed on wrong site).
       if (command.type === 'navigate' && typeof command.url === 'string') {
-        const _currentHost = (() => { try { return new URL(currentUrl).hostname.toLowerCase(); } catch(_) { return ''; } })();
-        const _targetHost = (() => { try { return new URL(command.url).hostname.toLowerCase(); } catch(_) { return ''; } })();
-                const _targetHostNoWww = _targetHost.replace(WWW_PREFIX_RE, '');
-        const _currentHostNoWww = _currentHost.replace(WWW_PREFIX_RE, '');
-        const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
+        const _hostCompare = compareHostnames(currentUrl, command.url);
+        const _alreadyThere = _hostCompare.alreadyThere;
         if (_alreadyThere) {
           let _recent = false;
           const checkStart = Math.max(0, _histLen - 2);
