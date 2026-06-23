@@ -3694,6 +3694,34 @@ chrome.runtime.onMessage.addListener((message) => {
     _showReportOnce(message.report);
   }
   // (6.0) Live status narration ticker
+  // (v21.5) Live streaming token display — shows partial AI response as it generates
+  if (message.action === 'ai_streaming_chunk') {
+    try {
+      const streamEl = document.getElementById('streaming-text') || (() => {
+        const wrap = document.createElement('div');
+        wrap.id = 'streaming-container';
+        wrap.style.cssText = 'padding:8px 12px;margin:4px 0;border-radius:8px;background:rgba(99,102,241,0.08);border-left:3px solid rgba(99,102,241,0.4);';
+        const inner = document.createElement('div');
+        inner.id = 'streaming-text';
+        inner.style.cssText = 'font-size:13px;line-height:1.5;color:var(--text-secondary, #94a3b8);white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto;';
+        wrap.appendChild(inner);
+        const chatEl = chatContainer;
+        if (chatEl) chatEl.appendChild(wrap);
+        return inner;
+      })();
+      if (streamEl) {
+        streamEl.textContent = message.text || '';
+        streamEl.scrollTop = streamEl.scrollHeight;
+      }
+    } catch(e) {}
+  }
+  // Clear streaming display when a new step starts or agent finishes
+  if (message.action === 'agent_step_start' || message.action === 'agent_finished' || message.action === 'agent_error') {
+    try {
+      const old = document.getElementById('streaming-container');
+      if (old) old.remove();
+    } catch(e) {}
+  }
   if (message.action === 'agent_status') {
     _showStatusTicker(message.state, message.text, message.timestamp);
     try {

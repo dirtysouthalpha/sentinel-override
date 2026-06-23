@@ -2834,7 +2834,23 @@ async function runAgentLoop(goal, workingTabId) {
       };
 
       const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
+      // (v21.5) Streaming token callback — broadcasts partial content to popup.
+      // Throttled to every ~200ms to avoid message bus flooding.
+      let _lastStreamBroadcast = 0;
+      const _onStreamChunk = (partialText) => {
+        const now = Date.now();
+        if (now - _lastStreamBroadcast < 200) return;
+        _lastStreamBroadcast = now;
+        try {
+          chrome.runtime.sendMessage({
+            action: 'ai_streaming_chunk',
+            step: stepCount,
+            text: partialText.substring(0, 500),
+            timestamp: now
+          }).catch(() => {});
+        } catch (_) {}
+      };
+      const agentState = { apiCallCount, agentMemory, onStreamChunk: _onStreamChunk, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).

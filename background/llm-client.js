@@ -1344,6 +1344,10 @@ function _anthropicStreamAcc() {
         if (ev.usage && typeof ev.usage.output_tokens === 'number') usage.output_tokens = ev.usage.output_tokens;
       }
     },
+    getPartial() {
+      const textBlock = blocks.find(b => b && b.type === 'text' && b.text);
+      return textBlock ? textBlock.text : '';
+    },
     finalize() {
       const content = blocks.filter(Boolean).map(b => { const c = { ...b }; delete c._partialJson; return c; });
       const out = { content, stop_reason: stopReason, usage };
@@ -1384,6 +1388,9 @@ function _openaiStreamAcc() {
         }
       }
     },
+    getPartial() {
+      return content || '';
+    },
     finalize() {
       const message = { role: 'assistant', content: content || '' };
       const tc = toolCalls.filter(Boolean);
@@ -1422,7 +1429,7 @@ function _consumeSSEEvent(rawEvent, acc) {
  * @param {number} idleMs - Abort if no chunk arrives within this many ms.
  * @returns {Promise<object>} Reconstructed response data object.
  */
-async function _readSSEToData(response, provider, controller, idleMs) {
+async function _readSSEToData(response, provider, controller, idleMs, onChunk) {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const acc = provider.id === 'anthropic' ? _anthropicStreamAcc() : _openaiStreamAcc();
@@ -1439,7 +1446,16 @@ async function _readSSEToData(response, provider, controller, idleMs) {
       while ((sep = buffer.indexOf('\n\n')) >= 0) {
         const rawEvent = buffer.slice(0, sep);
         buffer = buffer.slice(sep + 2);
-        if (rawEvent.trim()) _consumeSSEEvent(rawEvent, acc);
+        if (rawEvent.trim()) {
+        _consumeSSEEvent(rawEvent, acc);
+        // (v21.5) Stream partial tokens to popup for live AI response display
+        if (onChunk) {
+          try {
+            const partial = acc.getPartial && acc.getPartial();
+            if (partial) onChunk(partial);
+          } catch (_) { /* non-fatal */ }
+        }
+      }
       }
     }
     buffer += decoder.decode();
@@ -2006,7 +2022,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     // (v20.4) Read the SSE stream with a per-chunk idle timeout — slow/thinking
     // models that keep producing output are never aborted mid-generation.
     try {
-      data = await _readSSEToData(response, provider, activeController, CONFIG.fetchTimeout);
+      data = await _readSSEToData(response, provider, activeController, CONFIG.fetchTimeout, agentState && agentState.onStreamChunk);
     } catch (e) {
       const aborted = typeof e === 'object' && e !== null && e.name === 'AbortError';
       throw aborted
