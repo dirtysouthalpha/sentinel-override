@@ -11,8 +11,46 @@ import { sendSilentUpdate, sendAgentStatus } from './message-protocol.js';
 import { captureReasoningStep } from './reasoning-trace.js';
 import { analyzeForBias, shouldTriggerBiasWarning, logBiasDetection } from './bias-detector.js';
 import { startSwKeepalive, stopSwKeepalive } from './shared-state.js';
+import { isInvestigationGoal, parseInvestigationChecklist, formatChecklistForPrompt } from './investigation-checklist.js';
 import { FIVE_MINUTES_MS } from './constants.js';
 import { getErrorMessage } from './error-utils.js';
+
+// ── Investigation checklist integration ──────────────────────────
+// Module-level storage for the current run's parsed checklist. agent-engine.js
+// reads this after _applyAdaptivePrompts() to track progress.
+let _currentInvestigationChecklist = null;
+
+/**
+ * Enhance a goal with investigation checklist tracking directive if applicable.
+ * @param {string} goal - The goal text (possibly already adapted by platform rewrite).
+ * @returns {string} Enhanced goal with checklist directive appended, or original if not an investigation.
+ */
+export function _enhanceWithInvestigationChecklist(goal) {
+  try {
+    if (!goal || typeof goal !== 'string') return goal;
+    if (!isInvestigationGoal(goal)) return goal;
+    const checklist = parseInvestigationChecklist(goal);
+    _currentInvestigationChecklist = checklist;
+    return goal + '\n' + formatChecklistForPrompt(checklist);
+  } catch (_e) {
+    return _enhanceWithInvestigationChecklist(goal);
+  }
+}
+
+/**
+ * Get the investigation checklist parsed during the last _applyAdaptivePrompts call.
+ * @returns {object|null} Parsed checklist or null.
+ */
+export function getCurrentInvestigationChecklist() {
+  return _currentInvestigationChecklist;
+}
+
+/**
+ * Reset the investigation checklist state (called at agent start).
+ */
+export function resetInvestigationChecklist() {
+  _currentInvestigationChecklist = null;
+}
 
 // ── Regex constants for plan generation ──────────────────────────
 // Duplicated from agent-engine.js to keep this module self-contained.
@@ -289,7 +327,7 @@ export async function _applyAdaptivePrompts(goal, tabInfo, startTabId, currentRu
   try {
     const apSettings = await chrome.storage.local.get(['adaptivePromptsMode', 'adaptiveExpansionMode', 'technicianInfo']);
     const apMode = (apSettings.adaptivePromptsMode || 'auto').toString();
-    if (apMode === 'off') return goal;
+    if (apMode === 'off') return _enhanceWithInvestigationChecklist(goal);
     const result = await rewriteGoalForPlatform(
       goal,
       tabInfo?.url || '',
@@ -317,10 +355,10 @@ export async function _applyAdaptivePrompts(goal, tabInfo, startTabId, currentRu
     } catch (_) { /* non-fatal */ }
     if (apMode === 'approval') {
       const decision = await _waitForAdaptedGoalDecision(result, startTabId);
-      if (decision.useOriginal) return goal;
-      if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) return decision.editedGoal;
+      if (decision.useOriginal) return _enhanceWithInvestigationChecklist(goal);
+      if (decision.edited && typeof decision.editedGoal === 'string' && decision.editedGoal.length > 10) return _enhanceWithInvestigationChecklist(decision.editedGoal);
       // approved, timeout, or unknown → use adapted
-      return result.adaptedGoal;
+      return _enhanceWithInvestigationChecklist(result.adaptedGoal);
     }
     // Auto mode: swap silently but broadcast the card for the popup diff view
     try {
@@ -336,7 +374,7 @@ export async function _applyAdaptivePrompts(goal, tabInfo, startTabId, currentRu
         console.error('[_applyAdaptivePrompts] Unhandled rejection:', getErrorMessage(e));
       });
     } catch (_e) { /* non-fatal */ }
-    return result.adaptedGoal;
+    return _enhanceWithInvestigationChecklist(result.adaptedGoal);
   } catch (e) {
     console.warn('[Sentinel] adaptive-prompts pass failed (non-fatal):', getErrorMessage(e));
     return goal;

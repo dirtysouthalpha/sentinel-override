@@ -70,6 +70,8 @@ function extractTicketNumber(goal) {
 }
 
 // ── FINAL_NOTES format ───────────────────────────────────────────────────
+import { parseInvestigationChecklist, formatFindingsForReport } from './investigation-checklist.js';
+
 function formatTicketFinalNotes(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
   const opts = options || {};
@@ -115,6 +117,16 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
     '### Full investigation findings',
     '',
     summary || '(no summary)',
+    '',
+    (() => {
+      try {
+        const checklist = (options && options.investigationChecklist) || parseInvestigationChecklist(goal);
+        if (checklist && checklist.isInvestigation && checklist.sections.length > 0) {
+          return formatFindingsForReport(checklist) + '\n---';
+        }
+      } catch (_e) { /* non-fatal */ }
+      return '';
+    })(),
     '',
     '---',
     '',

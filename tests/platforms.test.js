@@ -534,7 +534,7 @@ describe('listAllProfiles', () => {
   test('returns an array of profile descriptors', () => {
     const list = listAllProfiles();
     expect(Array.isArray(list)).toBe(true);
-    expect(list.length).toBe(18);
+    expect(list.length).toBe(19);
   });
 
   test('each profile descriptor has id, label, and memoryKeyPrefix', () => {
