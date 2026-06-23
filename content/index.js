@@ -1000,7 +1000,7 @@ if (window.__sentinelInitialized) {
       const overlay = getOrCreateOverlay();
       if (!overlay) return;
       const label = escapeHtml(description || actionType);
-      overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${label}`;
+      overlay.innerHTML = `<span class="sentinel-action">Sentinel:</span> ${escapeHtml(label)}`;
       overlay.style.opacity = '1';
     } catch (e) { console.warn('[Sentinel] Extension context invalidated:', getErrorMessage(e)); }
   }
@@ -1108,7 +1108,7 @@ if (window.__sentinelInitialized) {
       const safeText = String(text || '');
       const preview = escapeHtml(safeText.substring(0, 40) + (safeText.length > 40 ? '...' : ''));
       const progress = position !== undefined ? ` (${position}/${total})` : '';
-      overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${preview}"</span>${progress}`;
+      overlay.innerHTML = `<span class="sentinel-action">⌨ Typing:</span> <span class="sentinel-target">"${escapeHtml(preview)}"</span>${progress}`;
       overlay.style.opacity = '1';
     } catch (e) { console.warn('[Sentinel] typing banner show:', getErrorMessage(e)); }
   }
