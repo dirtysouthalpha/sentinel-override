@@ -684,6 +684,192 @@ async function showRunHistory(scheduleId, scheduleName) {
   }
 }
 
+// ========== Natural Language Schedule Parser Integration ==========
+
+/**
+ * Handle NLP parse button click.
+ * Sends natural language input to background for parsing,
+ * then auto-fills the schedule form fields.
+ */
+async function handleNlpParse() {
+  const inputEl = document.getElementById('sch-nlp-input');
+  if (!inputEl) return;
+  const input = inputEl.value.trim();
+  if (!input) {
+    showToast('Enter a schedule description first', 'error');
+    return;
+  }
+
+  const parseBtn = document.getElementById('sch-nlp-parse-btn');
+  const previewEl = document.getElementById('sch-nlp-preview');
+  const altEl = document.getElementById('sch-nlp-alternatives');
+
+  if (parseBtn) parseBtn.textContent = 'Parsing...';
+  if (parseBtn) parseBtn.disabled = true;
+  if (previewEl) previewEl.style.display = 'none';
+  if (altEl) altEl.style.display = 'none';
+
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'parse_schedule_nl', input });
+
+    if (!response || !response.schedule) {
+      if (previewEl) {
+        previewEl.textContent = 'Could not parse schedule. Try rephrasing.';
+        previewEl.style.display = 'block';
+        previewEl.style.color = 'var(--error-color)';
+      }
+      return;
+    }
+
+    // Auto-fill the form with parsed data
+    _fillScheduleForm(response.schedule);
+
+    // Show preview
+    if (previewEl) {
+      previewEl.textContent = formatSchedulePreviewLocal(response.schedule) +
+        ' (confidence: ' + Math.round(response.confidence * 100) + '%)';
+      previewEl.style.display = 'block';
+      previewEl.style.color = 'var(--text-secondary)';
+    }
+
+    // Show alternatives if low confidence
+    if (response.confidence < 0.7 && response.alternatives && response.alternatives.length > 0) {
+      if (altEl) {
+        altEl.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px;">Did you mean?</div>' +
+          response.alternatives.map(function(alt, i) {
+            return '<button type="button" class="nlp-alt-btn" data-alt-idx="' + i + '" ' +
+              'style="display:block;margin:4px 0;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;cursor:pointer;font-size:13px;color:var(--text-primary);width:100%;text-align:left;">' +
+              formatSchedulePreviewLocal(alt) + '</button>';
+          }).join('');
+        altEl.style.display = 'block';
+
+        altEl.querySelectorAll('.nlp-alt-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var idx = parseInt(btn.dataset.altIdx, 10);
+            var alt = response.alternatives[idx];
+            if (alt) {
+              _fillScheduleForm(alt);
+              if (previewEl) {
+                previewEl.textContent = formatSchedulePreviewLocal(alt) + ' (selected)';
+              }
+              altEl.style.display = 'none';
+            }
+          });
+        });
+      }
+    }
+  } catch (err) {
+    if (previewEl) {
+      previewEl.textContent = 'Parse error: ' + getErrorMessage(err);
+      previewEl.style.display = 'block';
+      previewEl.style.color = 'var(--error-color)';
+    }
+  } finally {
+    if (parseBtn) { parseBtn.textContent = 'Parse'; parseBtn.disabled = false; }
+  }
+}
+
+/**
+ * Fill the schedule form fields from a parsed schedule object.
+ */
+function _fillScheduleForm(schedule) {
+  var nameEl = document.getElementById('sch-name');
+  if (nameEl && schedule.name) nameEl.value = schedule.name;
+
+  if (schedule.goal) {
+    var sourceEl = document.getElementById('sch-source-type');
+    if (sourceEl) {
+      sourceEl.value = 'goal';
+      sourceEl.dispatchEvent(new Event('change'));
+    }
+    var goalEl = document.getElementById('sch-goal');
+    if (goalEl) goalEl.value = schedule.goal;
+  }
+
+  var typeEl = document.getElementById('sch-type');
+  if (typeEl && schedule.type) {
+    typeEl.value = schedule.type;
+    typeEl.dispatchEvent(new Event('change'));
+  }
+
+  if (schedule.type === 'recurring' && schedule.recurrence) {
+    var r = schedule.recurrence;
+    var intervalEl = document.getElementById('sch-interval');
+    if (intervalEl) {
+      if (r.interval === 'hourly' || r.interval === 'custom') {
+        intervalEl.value = 'custom';
+      } else {
+        intervalEl.value = r.interval || 'daily';
+      }
+      intervalEl.dispatchEvent(new Event('change'));
+    }
+
+    var timeEl = document.getElementById('sch-time');
+    if (timeEl && r.time) timeEl.value = r.time;
+
+    if (r.interval === 'weekly' && r.daysOfWeek) {
+      document.querySelectorAll('.sch-day-check').forEach(function(cb) {
+        cb.checked = r.daysOfWeek.includes(parseInt(cb.value, 10));
+      });
+    }
+
+    if (r.interval === 'hourly' || r.interval === 'custom') {
+      var periodEl = document.getElementById('sch-period');
+      if (periodEl && r.periodInMinutes) periodEl.value = r.periodInMinutes;
+    }
+  }
+
+  if (schedule.type === 'once' && schedule.runAt) {
+    var runAtEl = document.getElementById('sch-run-at');
+    if (runAtEl) {
+      var d = new Date(schedule.runAt);
+      function pad(n) { return String(n).padStart(2, '0'); }
+      runAtEl.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+  }
+}
+
+/**
+ * Local preview formatter.
+ */
+function formatSchedulePreviewLocal(schedule) {
+  if (!schedule) return '';
+  var goal = schedule.goal ? ' -- Goal: ' + schedule.goal : '';
+  if (schedule.type === 'once') return 'Once' + goal;
+  var r = schedule.recurrence || {};
+  var time = r.time || '09:00';
+  var freqText = 'Recurring';
+  if (r.interval === 'daily') freqText = 'Daily at ' + time;
+  else if (r.interval === 'weekly') {
+    var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    if (r.daysOfWeek && r.daysOfWeek.length > 1) {
+      freqText = 'Weekly on ' + r.daysOfWeek.map(function(d) { return dayNames[d] || '?'; }).join(', ') + ' at ' + time;
+    } else {
+      var idx = r.dayOfWeek != null ? r.dayOfWeek : (r.daysOfWeek ? r.daysOfWeek[0] : 1);
+      freqText = 'Weekly on ' + (dayNames[idx] || 'Mon') + ' at ' + time;
+    }
+  } else if (r.interval === 'monthly') {
+    freqText = 'Monthly on day ' + (r.dayOfMonth || 1) + ' at ' + time;
+  } else if (r.interval === 'hourly') {
+    freqText = 'Every ' + (r.periodInMinutes || 60) + ' min';
+  }
+  return freqText + goal;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', function() {
+    var parseBtn = document.getElementById('sch-nlp-parse-btn');
+    if (parseBtn) parseBtn.addEventListener('click', handleNlpParse);
+    var nlpInput = document.getElementById('sch-nlp-input');
+    if (nlpInput) {
+      nlpInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); handleNlpParse(); }
+      });
+    }
+  });
+}
+
 // ========== Popup Unload Cleanup ==========
 // Clear intervals when popup closes to prevent memory leaks
 if (typeof window !== 'undefined' && window.addEventListener) {

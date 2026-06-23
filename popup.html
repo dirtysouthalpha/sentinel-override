@@ -886,6 +886,15 @@
   <div id="schedule-modal" class="modal">
     <div class="modal-content" style="max-width:480px;">
       <h2 id="schedule-modal-title">New Schedule</h2>
+      <div class="modal-field" style="background:var(--bg-tertiary);border-radius:8px;padding:12px;margin-bottom:12px;">
+        <label style="font-size:13px;font-weight:600;color:var(--text-secondary);">⚡ Natural Language Input</label>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <input type="text" id="sch-nlp-input" placeholder="e.g., Check SonicWall every morning at 8am" style="flex:1;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;">
+          <button id="sch-nlp-parse-btn" type="button" style="padding:10px 16px;background:var(--accent-color);color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;font-weight:600;white-space:nowrap;">Parse</button>
+        </div>
+        <div id="sch-nlp-preview" style="margin-top:8px;font-size:13px;color:var(--text-secondary);display:none;"></div>
+        <div id="sch-nlp-alternatives" style="margin-top:8px;display:none;"></div>
+      </div>
       <div class="modal-field">
         <label>Name</label>
         <input type="text" id="sch-name" placeholder="e.g., Daily VPN Health Check">

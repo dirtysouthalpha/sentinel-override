@@ -1,4 +1,5 @@
 // Sentinel Override v3 -- Agent Engine
+import { buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isGoalComplete, isExplicitNavigation } from './agent-loop-helpers.js';
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
@@ -1947,9 +1948,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Only auto-navigate when the goal starts with an explicit navigation
         // imperative OR contains a full https:// URL. Avoid triggering on ticket
         // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
-        const _isExplicitNav = typeof _goalForUrlExtract === 'string' && (/^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
-          || /\bbegin at:\s*\S/i.test(_goalForUrlExtract)
-          || /\bstart url:\s*\S/i.test(_goalForUrlExtract));
+        const _isExplicitNav = isExplicitNavigation(_goalForUrlExtract);
         let urlMatch = null;
         if (typeof _goalForUrlExtract === 'string') {
           urlMatch = _isExplicitNav
@@ -2753,10 +2752,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
       // from knowing they have 200 vs 50 steps remaining.
-      const _stepsRemaining = Math.max(0, dynamicMaxSteps - stepCount);
-      const _budgetHint = `Current step: ${stepCount} of ${dynamicMaxSteps} ` +
-        `(${_stepsRemaining} remaining; ${productiveSteps} productive bumps so far). ` +
-        'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
+      const _budgetHint = buildBudgetHint(stepCount, dynamicMaxSteps, productiveSteps);
         'Aimless read_page / scroll = unproductive (does not extend).';
       
       // v4.0 Vision-First Observation Override
@@ -2890,91 +2886,12 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
-        const _visionHistoryParts = [];
-        const promptHistLen = promptHistory.length;
-        // (v20.5) Show the last 10 steps (was 6). Weaker vision models (GLM-4.xV)
-        // lose track of what they already tried as earlier attempts scroll out of
-        // context and re-click the same element; a longer window + the explicit
-        // "ALREADY ATTEMPTED" framing below is the "already tried X" signal they
-        // don't infer on their own. The extra ~4 short lines are negligible next
-        // to the screenshot already in the prompt.
-        const visionStart = Math.max(0, promptHistLen - 10);
-        for (let i = visionStart; i < promptHistLen; i++) {
-          const h = promptHistory[i];
-          if (!h || !h.action) continue;
-          const a = h.action;
-          const actionText = a.text ? (typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)) : null;
-          const actionTextStr = actionText ? ` "${actionText}"` : '';
-          const stepResult = typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80);
-          _visionHistoryParts.push(`Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${actionTextStr} -> ${stepResult}`);
-        }
-        const _visionHistory = _visionHistoryParts.join('\n');
+        const _visionHistory = formatVisionHistory(promptHistory, 10);
 
-        const _visionSystemPrompt = [
-          'You are Sentinel, an AI agent that automates browser tasks by looking at screenshots with numbered elements.',
-          '',
-          '<rules>',
-          '1. Interactive elements on the page have [index] numbers shown as green labels.',
-          '2. You MUST reference elements by their [index] number. ONLY use index numbers that actually appear in the Elements list below — NEVER invent or guess an index. If the element you want has no number, scroll to bring it into view first.',
-          '3. CRITICAL: If you see a popup, cookie banner, consent dialog, or overlay — dismiss it FIRST. Look for buttons with text like Accept, Agree, OK, Continue, I agree, Got it, Close, or Dismiss.',
-          '4. Overlays often use role="button" or specific aria-labels. Check the element list for these patterns.',
-          '5. If clicking an index does not dismiss the overlay after 2 attempts, try a DIFFERENT index — the correct button might be behind another element.',
-          '6. If an action fails 2 times, CHANGE your approach entirely.',
-          '7. After each action, evaluate whether the page changed. If not, try a different element.',
-          '8. Be concise — one action per response.',
-          '</rules>',
-          '',
-          '<actions>',
-          'click(index) — Click element by index',
-          'input(index, text) — Type text into input element',  
-          'scroll(direction) — Scroll up or down',
-          'navigate(url) — Go to URL',
-          'go_back() — Go back in browser history',
-          'extract(query) — Read current page text',
-          'execute_js(code) — Run custom JavaScript',
-          'done(text) — Task complete, provide final answer',
-          '</actions>',
-          '',
-          '<output_format>',
-          'Respond with ONLY a single valid JSON object. No markdown fences, no <think> blocks, no text before or after the JSON.',
-          '{"thinking":"what you see and why","evaluation":"previous action success/fail/partial","memory":"progress notes","next_goal":"one clear goal","action":{"type":"...","index":N,"text":"...","direction":"up|down","url":"...","code":"..."}}',
-          'Include ONLY the fields relevant to the chosen action type. "type" is required; "index" is required for click and input.',
-          'Example — click the element labeled [7]: {"thinking":"The Accept button is labeled 7","evaluation":"n/a","memory":"dismissing cookie banner","next_goal":"accept cookies","action":{"type":"click","index":7}}',
-          '</output_format>',
-          '',
-          // (v20.6) Visual-grounding guard for weaker vision models (GLM-4.xV etc.)
-          // that imprecisely map green [N] labels to numbers and invent indices —
-          // which fails the step and forces a re-pick. Reconcile the two inputs
-          // explicitly: the on-screen labels and the text Elements list are the
-          // SAME index (screenshot LOCATES, list CONFIRMS). Removing either channel
-          // would strip set-of-marks grounding, so we reinforce rather than drop.
-          '<visual_grounding>',
-          '- The screenshot and the Elements list use the SAME numbers: a green [N] drawn on the screenshot is the exact element shown as [N] in the Elements list below. Use the screenshot to LOCATE an element and the list to CONFIRM what it is.',
-          '- The "index" in your action MUST be a green [N] label you can actually SEE on the screenshot AND that appears in the Elements list below.',
-          '- Copy the number from the label EXACTLY — do not estimate, increment, or guess it. [7] means index 7, never 6 or 8.',
-          '- NEVER invent or guess an index. If you are not sure an element exists, scroll or choose a different visible element instead.',
-          '- NEGATIVE EXAMPLE (do NOT do this): seeing a button labeled [12] but writing {"action":{"type":"click","index":9}}. A wrong index clicks the wrong thing or wastes the step.',
-          '- When unsure which number maps to your target, prefer the entry in the Elements list whose text matches your goal over a number you only half-see on the screenshot.',
-          '</visual_grounding>'
-        ].join('\n');
+        const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-        const _visionUserContent = [
-          `Goal: ${goal}`,
-          `URL: ${currentUrl}`,
-          `Step: ${stepCount}/${dynamicMaxSteps}`,
-          '',
-          'Elements:',
-          _visionElementTree || '(none)',
-          '',
-          'ALREADY ATTEMPTED (do NOT repeat an action that did not change the page — try a different element or approach):',
-          _visionHistory || '(first step — nothing attempted yet)',
-          _zoomAnnotation,
-          '',
-          'What is your next action?'
-        ].join('\n');
-        // Clear zoom region after consuming it (one-shot)
-        setZoomRegion(null);
+        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation);
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -4328,21 +4245,12 @@ async function runAgentLoop(goal, workingTabId) {
       // If goal mentions a site+query, construct the direct URL instead of clicking through
       if (command.type === 'smart_navigate' && command.query) {
         const site = command.site || 'google';
-        const q = encodeURIComponent(command.query);
-        let smartUrl = '';
-        if (site === 'google') smartUrl = `https://www.google.com/search?q=${q}`;
-        else if (site === 'weather.gov') smartUrl = `https://forecast.weather.gov/zipcity.php?inputstring=${q}`;
-        else if (site === 'wikipedia') smartUrl = `https://en.wikipedia.org/wiki/Special:Search?search=${q}`;
-        else if (site === 'youtube') smartUrl = `https://www.youtube.com/results?search_query=${q}`;
-        else if (site === 'amazon') smartUrl = `https://www.amazon.com/s?k=${q}`;
-        else if (site === 'reddit') smartUrl = `https://www.reddit.com/search/?q=${q}`;
-        else if (/^(twitter|x)$/.test(site)) smartUrl = `https://x.com/search?q=${q}`;
+        const smartUrl = buildSmartUrl(site, command.query);
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
           console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
         } else {
-          // Fallback to Google
-          command = { type: 'navigate', url: `https://www.google.com/search?q=${q}` };
+          command = { type: 'navigate', url: buildGoogleFallbackUrl(command.query) };
         }
       }
 
@@ -4350,11 +4258,8 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.51) FIXED: if we're on a DIFFERENT page, navigating back to a previous
       // URL is recovery, not a loop — allow it (e.g., click_at landed on wrong site).
       if (command.type === 'navigate' && typeof command.url === 'string') {
-        const _currentHost = (() => { try { return new URL(currentUrl).hostname.toLowerCase(); } catch(_) { return ''; } })();
-        const _targetHost = (() => { try { return new URL(command.url).hostname.toLowerCase(); } catch(_) { return ''; } })();
-                const _targetHostNoWww = _targetHost.replace(WWW_PREFIX_RE, '');
-        const _currentHostNoWww = _currentHost.replace(WWW_PREFIX_RE, '');
-        const _alreadyThere = _currentHost && _targetHost && (_currentHost === _targetHost || _currentHost.includes(_targetHostNoWww) || _targetHost.includes(_currentHostNoWww));
+        const _hostCompare = compareHostnames(currentUrl, command.url);
+        const _alreadyThere = _hostCompare.alreadyThere;
         if (_alreadyThere) {
           let _recent = false;
           const checkStart = Math.max(0, _histLen - 2);
@@ -5506,39 +5411,12 @@ return { ok: true, value: el.value };
       // (3.9.0) Forensic run log: persist a structured record per step.
       try {
         if (runLogId) {
-          runLogBuffer.push({
-            step: stepCount,
-            timestamp: new Date().toISOString(),
-            kind: 'action',
-            url: currentUrl,
-            tenant: detectedTenant ? (detectedTenant.chipText || detectedTenant.onmicrosoft || detectedTenant.tid || '') : '',
-            action_type: command.type,
-            action: {
-              selector: command.selector,
-              ref: command.ref,
-              url: command.url,
-              key: command.key,
-              text: (() => {
-                const t = command.text;
-                return (typeof t === 'string') ? t.substring(0, 200) : undefined;
-              })(),
-              x: command.x, y: command.y
-            },
-            result: (() => {
-              const r = result;
-              if (typeof r === 'string') {
-                return r.substring(0, 500);
-              }
-              const jsonStr = JSON.stringify(r || '');
-              return jsonStr.substring(0, 500);
-            })(),
-            failed: !!actionFailed,
-            reasoning: (() => {
-              const r = command.__reasoning;
-              return (typeof r === 'string' && r) ? r.substring(0, 400) : undefined;
-            })(),
-            screenshot: _stepScreenshots.get(stepCount) || undefined,
-          });
+          runLogBuffer.push(buildRunLogEntry(
+            stepCount, currentUrl, command, result, actionFailed,
+            detectedTenant ? (detectedTenant.chipText || detectedTenant.onmicrosoft || detectedTenant.tid || '') : '',
+            command.__reasoning,
+            _stepScreenshots.get(stepCount)
+          ));
           // Keep last 200 entries; older ones get rolled into a summary.
           if (runLogBuffer.length > 200) {
             runLogBuffer.splice(0, runLogBuffer.length - 200);
