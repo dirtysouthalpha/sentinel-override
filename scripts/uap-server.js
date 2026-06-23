@@ -36,6 +36,10 @@ const activeRuns = new Map();    // runId → { goal, status, result, startTime,
 const eventBuffer = [];          // ring buffer of recent events
 const taskQueue = [];            // pending tasks from external clients
 const auditLog = [];
+
+// Federation Registry (server-side)
+const fedPeers = new Map();
+const fedJobs = new Map();
 const MAX_EVENT_BUFFER = 1000;
 const MAX_AUDIT_LOG = 10000;
 
@@ -310,6 +314,25 @@ const server = createServer((req, res) => {
     }
 
     // 404 for unknown routes
+    // Federation routes
+    if (req.method === 'GET' && url === '/federation/peers') {
+      return handleFedGetPeers(req, res);
+    }
+    if (req.method === 'POST' && url === '/federation/register') {
+      return handleFedRegister(req, res);
+    }
+    if (req.method === 'POST' && url === '/federation/distribute') {
+      return handleFedDistribute(req, res);
+    }
+    if (req.method === 'GET' && url.startsWith('/federation/jobs/') && url.endsWith('/results')) {
+      const parts = url.replace('/federation/jobs/', '').split('/');
+      return handleFedGetResults(req, res, parts[0]);
+    }
+    if (req.method === 'GET' && url.startsWith('/federation/jobs/')) {
+      const jobId = url.replace('/federation/jobs/', '');
+      return handleFedGetJob(req, res, jobId);
+    }
+
     sendJSON(res, 404, { error: 'not_found' });
   } catch (e) {
     console.error('[UAP] Request handler error:', e);
@@ -318,6 +341,65 @@ const server = createServer((req, res) => {
 });
 
 // ── Periodic cleanup ──
+
+// Federation Handlers
+function handleFedGetPeers(req, res) {
+  if (!authenticate(req)) return sendJSON(res, 401, { error: 'authentication_failed' });
+  const peers = [...fedPeers.entries()].map(([id, p]) => ({ id, ...p.info, trust: p.trust, load: p.load, status: p.status }));
+  sendJSON(res, 200, { peers, count: peers.length });
+}
+
+function handleFedRegister(req, res) {
+  if (!authenticate(req)) return sendJSON(res, 401, { error: 'authentication_failed' });
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    try {
+      const { peer_id, capabilities, max_concurrent_goals, trust_score_baseline, endpoint, name } = JSON.parse(body);
+      if (!peer_id) return sendJSON(res, 400, { error: 'invalid_request', message: 'peer_id is required' });
+      const peer = { id: peer_id, info: { name: name || peer_id, type: 'remote', endpoint: endpoint || null, capabilities: capabilities || [], maxGoals: max_concurrent_goals || 3 }, trust: trust_score_baseline || 75, load: { activeGoals: 0, lastSeen: Date.now() }, status: 'active' };
+      fedPeers.set(peer_id, peer);
+      addEvent({ type: 'peer_registered', data: { peer_id, capabilities } });
+      addAudit('peer_registered', peer_id, { endpoint });
+      sendJSON(res, 200, { ok: true, peer_id, status: 'registered', peer_count: fedPeers.size });
+    } catch (e) { sendJSON(res, 400, { error: 'invalid_json', message: e.message }); }
+  });
+}
+
+function handleFedDistribute(req, res) {
+  if (!authenticate(req)) return sendJSON(res, 401, { error: 'authentication_failed' });
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    try {
+      const { goal, context } = JSON.parse(body);
+      if (!goal) return sendJSON(res, 400, { error: 'invalid_request', message: 'goal is required' });
+      const jobId = randomUUID();
+      const activePeers = [...fedPeers.values()].filter(p => p.status === 'active');
+      const job = { id: jobId, goal, context: context || {}, status: 'distributing', subGoals: [{ id: jobId + '_sub_0', description: goal, status: activePeers.length > 0 ? 'assigned' : 'pending', assignedTo: activePeers.length > 0 ? activePeers[0].id : null }], results: [], assignedPeers: activePeers.slice(0, 3).map(p => p.id), startTime: Date.now() };
+      fedJobs.set(jobId, job);
+      addEvent({ type: 'goal_distributed', data: { jobId, goal: goal.substring(0, 200), peerCount: activePeers.length } });
+      addAudit('goal_distributed', 'federation', { jobId });
+      sendJSON(res, 200, { ok: true, jobId, status: 'distributed', peerCount: activePeers.length });
+    } catch (e) { sendJSON(res, 400, { error: 'invalid_json', message: e.message }); }
+  });
+}
+
+function handleFedGetJob(req, res, jobId) {
+  if (!authenticate(req)) return sendJSON(res, 401, { error: 'authentication_failed' });
+  const job = fedJobs.get(jobId);
+  if (!job) return sendJSON(res, 404, { error: 'job_not_found', jobId });
+  sendJSON(res, 200, { found: true, ...job });
+}
+
+function handleFedGetResults(req, res, jobId) {
+  if (!authenticate(req)) return sendJSON(res, 401, { error: 'authentication_failed' });
+  const job = fedJobs.get(jobId);
+  if (!job) return sendJSON(res, 404, { error: 'job_not_found', jobId });
+  const completed = job.subGoals.filter(sg => sg.status === 'complete');
+  sendJSON(res, 200, { jobId, status: completed.length > 0 ? 'success' : 'pending', completedSubGoals: completed.length, totalSubGoals: job.subGoals.length, results: job.results });
+}
+
 const cleanupInterval = setInterval(() => {
   const now = Date.now();
   // Clean stale runs (older than 1 hour)
@@ -364,3 +446,5 @@ function shutdown() {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+export { fedPeers, fedJobs };

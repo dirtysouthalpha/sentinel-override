@@ -27,6 +27,8 @@ const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
 // Precompute agent-starting actions for O(1) lookup
 const AGENT_STARTING_ACTIONS = new Set(['analyze', 'extract', 'fill_form', 'screenshot', 'summarize']);
 import { getErrorMessage } from './error-utils.js';
+import { federation } from './federation.js';
+import { registerLocalPeers, getLocalPeerStatus } from './federation-local-bridge.js';
 // (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
 import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
 import {
@@ -79,6 +81,7 @@ chrome.runtime.onInstalled.addListener(() => {
 // ========== Scheduler Initialization ==========
 // Re-register alarms on service worker restart (handles browser restart alarm loss)
 initScheduler();
+registerLocalPeers().catch(e => console.warn('[Federation] Local peer registration failed:', e));
 
 // ========== Self-Healing: Auto-resume interrupted runs ==========
 // On SW restart, check if an agent run was in progress and auto-resume it.
@@ -1078,6 +1081,52 @@ const handleRuntimeMessage = async (request, sender) => {
     case 'plugin_toggle': {
       const active = await pluginRegistry.togglePlugin(request.pluginId);
       return { ok: true, active };
+    }
+
+    // ── Federation handlers ──
+    case 'federation_status': {
+      const peers = [...federation.peers.entries()].map(([id, p]) => ({
+        id, ...p.info, trust: p.trust.current, load: p.load.activeGoals, status: p.status,
+      }));
+      const jobs = [...federation.activeJobs.entries()].map(([id, j]) => ({
+        id, goal: j.goal, status: j.status, subGoalCount: j.subGoals.length,
+      }));
+      return {
+        enabled: federation.config.enabled,
+        peers,
+        jobs,
+        peerCount: peers.length,
+        activeJobs: jobs.length,
+      };
+    }
+    case 'federation_distribute': {
+      const { goal, context } = request;
+      const jobId = await federation.distributeGoal(goal, context || {});
+      return { jobId, status: 'distributed', peerCount: federation.peers.size };
+    }
+    case 'federation_enable': {
+      federation.config.enabled = true;
+      await federation.loadConfig();
+      await registerLocalPeers();
+      return { enabled: true };
+    }
+    case 'federation_disable': {
+      federation.config.enabled = false;
+      await federation.shutdown();
+      return { enabled: false };
+    }
+    case 'federation_job_status': {
+      const { jobId } = request;
+      const job = federation.activeJobs.get(jobId);
+      return job ? { found: true, ...job } : { found: false };
+    }
+    case 'federation_get_results': {
+      const { jobId } = request;
+      const results = await federation.reconcileResults(jobId);
+      return { jobId, results };
+    }
+    case 'federation_local_peers': {
+      return { peers: getLocalPeerStatus() };
     }
 
     default:

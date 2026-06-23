@@ -1087,6 +1087,20 @@
     </div>
   </div>
 
+  <!-- Federation Panel -->
+  <div id="federation-panel" class="federation-panel" style="display:none;">
+    <div class="federation-header">
+      <h3>Agent Federation</h3>
+      <button id="fed-toggle-btn" class="fed-toggle btn-micro">Enable</button>
+    </div>
+    <div id="fed-peer-list" class="fed-peer-list"></div>
+    <div id="fed-job-list" class="fed-job-list"></div>
+    <div class="fed-distribute">
+      <input id="fed-goal-input" class="fed-goal-input" type="text" placeholder="Enter complex goal to distribute..." />
+      <button id="fed-distribute-btn" class="fed-distribute-btn btn-micro">Distribute</button>
+    </div>
+  </div>
+
   <!-- Global error catcher — external file to satisfy MV3 CSP -->
   <script src="popup-modules/boot-catcher.js"></script>
   <script src="popup-modules/popup-state.js"></script>
@@ -1103,6 +1117,7 @@
   <script src="popup-modules/modal-drag.js"></script>
   <script src="popup-modules/recent-chats.js"></script>
   <script src="popup-modules/telemetry-panel.js"></script>
+  <script src="popup-modules/federation-ui.js"></script>
   <script src="popup-full.js"></script>
 </body>
 </html>

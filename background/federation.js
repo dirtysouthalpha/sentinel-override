@@ -111,6 +111,7 @@ class FederationController {
     // Register peer
     this.peers.set(peer_id, {
       id: peer_id,
+      info: peerInfo, // Store full peer info for local/remote type detection
       capabilities: capabilities || [],
       maxGoals: max_concurrent_goals || 3,
       trust: {
@@ -328,12 +329,26 @@ class FederationController {
    * Send goal to peer
    */
   async sendGoalToPeer(peerId, subGoal) {
-    // Implementation depends on transport mechanism
-    // Could use WebSocket, HTTP, or chrome.runtime messaging
-    console.warn('[Federation] Sending goal to peer:', peerId, subGoal.description);
-    
-    // Placeholder - would send actual message via UAP server
+    const peer = this.peers.get(peerId);
+    if (!peer) throw new Error('Unknown peer: ' + peerId);
+    console.warn('[Federation] Sending goal to peer:', peerId, subGoal.description || subGoal);
     this.logAudit('goal_sent_to_peer', { peer_id: peerId, sub_goal_id: subGoal.id });
+    // Local peer - use agent pool via federation-local-bridge
+    if (peer.info && peer.info.type === 'local') {
+      const { sendGoalToLocalPeer } = await import('./federation-local-bridge.js');
+      return await sendGoalToLocalPeer(peerId, subGoal);
+    }
+    // Remote peer - send via UAP/HTTP (Phase 4 will implement this fully)
+    if (peer.info && peer.info.endpoint) {
+      const response = await fetch(peer.info.endpoint + '/uap/task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: subGoal.description || subGoal, requestId: subGoal.id })
+      });
+      return await response.json();
+    }
+    // Unknown peer type - log warning
+    console.warn('[Federation] No transport for peer type:', (peer.info && peer.info.type) || 'unknown');
   }
 
   /**
