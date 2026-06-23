@@ -3880,3 +3880,101 @@ body {
   background: var(--bg-tertiary);
   border-color: var(--cyan);
 }
+/* ── Federation Panel ── */
+.federation-panel {
+  margin: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.federation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.federation-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.fed-toggle {
+  min-width: 60px;
+}
+.fed-toggle.active {
+  background: var(--cyan, #0ff);
+  color: #000;
+}
+.fed-peer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.fed-peer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-input, var(--bg-primary));
+  font-size: 12px;
+}
+.fed-peer-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.fed-peer-trust {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.fed-peer-state {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+.fed-peer-state.running {
+  color: var(--success, #0f0);
+}
+.fed-peer-state.idle {
+  color: var(--text-secondary);
+}
+.fed-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fed-job-item {
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-input, var(--bg-primary));
+  font-size: 12px;
+}
+.fed-job-goal {
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.fed-job-status {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.fed-distribute {
+  display: flex;
+  gap: 6px;
+}
+.fed-goal-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-input, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: 12px;
+}
