@@ -12,6 +12,7 @@ import { callLLMSimple } from './llm-client.js';
 import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
 import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
 import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
+import { parseNaturalLanguageSchedule } from './scheduler-nlp.js';
 import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
 // (3.26.0) Bridge for content-script telemetry — content/index.js cannot
 // import telemetry.js directly (different context), so it posts a
@@ -286,6 +287,15 @@ const handleRuntimeMessage = async (request, sender) => {
     // Diagnostic ping — remove after startup bug is fixed
     case 'ping': {
       return { pong: true, ts: Date.now(), agentRunning: typeof agentRunning !== 'undefined' ? agentRunning : 'unknown' };
+    }
+    case 'parse_schedule_nl': {
+      try {
+        const result = parseNaturalLanguageSchedule(request.input);
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({ schedule: null, error: getErrorMessage(err) });
+      }
+      return true;
     }
     // (3.26.0) Content-script telemetry bridge. The content script can't
     // import telemetry.js (different execution context, no module access in
