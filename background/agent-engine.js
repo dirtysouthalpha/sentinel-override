@@ -636,7 +636,7 @@ let undoStack = [];                 // (3.49.1) Undo entries for reversible acti
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
 import { sharedState } from './agent-shared-state.js';
-import { attachTabToSentinelGroup, detachAllSentinelTabs, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds } from './agent-tabs.js';
+import { attachTabToSentinelGroup, detachAllSentinelTabs, closeAttachedTabsExceptPrimary, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds } from './agent-tabs.js';
 import { checkCircuitBreaker, ABSOLUTE_MAX_STEPS } from './agent-circuit-breaker.js';
 
 // Re-export originally-public functions for backward compatibility
@@ -1531,9 +1531,9 @@ export async function stopAgent() {
   // Release any CDP attachments held by the screenshot pipeline.
   try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
-  try { await detachAllSentinelTabs();
-    // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', getErrorMessage(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  // (v21.5.4) Close agent-opened tabs BEFORE detaching (detach clears the set)
+  try { await closeAttachedTabsExceptPrimary(); } catch (e) { console.warn('[Sentinel] Close attached tabs failed:', getErrorMessage(e)); }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -5667,13 +5667,13 @@ return { ok: true, value: el.value };
   // Release any CDP debugger attachments held during the run.
   try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
 
+  // (v21.5.4) Close agent-opened tabs BEFORE detaching (detach clears the set)
+  try { await closeAttachedTabsExceptPrimary(); } catch (e) { console.warn('[Sentinel] Close attached tabs failed:', getErrorMessage(e)); }
   // Batch-close all agent-created tabs
   await closeAllAgentTabs();
 
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs();
-    // (v3.53) Re-enable side panel on all tabs now that agent stopped
-    try { await _enableSidePanelEverywhere(); } catch (e) { console.warn('[Sentinel] Side panel enable failed:', getErrorMessage(e)); } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
 
   agentRunning = false;
   console.log(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);

@@ -74,6 +74,23 @@ export async function attachTabToSentinelGroup(tabId) {
   }
 }
 
+// ========== Auto-Close Agent Tabs (v21.5.4) ==========
+// Close all agent-attached tabs EXCEPT the primary panel tab (the tab the user
+// started the run from). This ensures tabs opened by link clicks during the run
+// are cleaned up, even if they weren't flagged isAgentCreated.
+export async function closeAttachedTabsExceptPrimary() {
+  const ids = [...agentAttachedTabs];
+  for (const tabId of ids) {
+    // Keep the primary panel tab open — user started there
+    if (tabId === primaryPanelTabId) continue;
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch (_e) {
+      // Tab may already be closed by the user — not an error
+    }
+  }
+}
+
 export async function detachAllSentinelTabs() {
   // Ungroup every attached tab. Safe even if some are already gone.
   const ids = [...agentAttachedTabs];
