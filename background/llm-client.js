@@ -8,6 +8,14 @@ import { resolveProvider, getActiveProvider, getModelSupportsVision } from './pr
 import { getPlatformProfile } from './platforms/index.js';
 import { getErrorMessage, sleep } from './error-utils.js';
 import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
+import { _rateLimiter, setLLMRateLimit, resetLLMRateLimiter } from './llm-rate-limiter.js';
+export { setLLMRateLimit, resetLLMRateLimiter };
+import { estimateCostUsd, isSimpleStep, recordModelUsage, getCostTracker } from './llm-cost-estimation.js';
+export { estimateCostUsd, isSimpleStep, recordModelUsage, getCostTracker };
+import { generatePlan } from './llm-planning.js';
+export { generatePlan };
+import { callLLMWithRetry } from './llm-retry.js';
+export { callLLMWithRetry };
 
 // Constants for response parsing - avoid recreating on every call
 const VALID_ACTION_TYPES = new Set(['click', 'type', 'navigate', 'scroll', 'select', 'hover', 'press_key',
@@ -988,339 +996,6 @@ export function supportsVision(model, providerHint) {
   return visionPatterns.some(re => re.test(m));
 }
 
-// ========== Pre-flight Planning ==========
-// Generates a numbered plan from the goal before execution begins.
-// This gives the agent a map of what it's accomplished and what's left,
-// dramatically improving reliability on multi-step and multi-site tasks.
-/**
- * Generate an initial step plan for a goal using a planning LLM call.
- * Sends the goal + context to the configured model and returns parsed action steps.
- * @param {string} goal - The user's automation goal.
- * @param {Object} settings - Extension settings (api_key, model, api_endpoint, etc.).
- * @param {Object} [context={}] - Additional context (currentUrl, pageTitle, etc.).
- * @returns {Promise<Array|null>} Parsed plan steps, or null on failure.
- */
-/**
- * Build the plan-generation prompt string from a goal and context object.
- * Extracted from generatePlan to keep that function under 50 lines.
- * @param {string} goal
- * @param {object} context - { currentUrl, pageTitle, platformContext, relevantPatterns }
- * @returns {string}
- */
-function _buildPlanPrompt(goal, context) {
-  const urlContext = context.currentUrl
-    ? `Current page: ${context.currentUrl}${context.pageTitle ? ` (${context.pageTitle})` : ''}\n`
-    : '';
-  const platformContext = context.platformContext || '';
-  const patternContext = Array.isArray(context.relevantPatterns) && context.relevantPatterns.length
-    ? `\nPast successful patterns for similar tasks:\n${context.relevantPatterns.map(p => p && p.goal ? `- "${p.goal}" -> ${Array.isArray(p.steps) ? p.steps.map(s => s && s.type ? s.type : '?').join(', ') : '(no steps)'}` : '').join('\n')}\n`
-    : '';
-
-  return `You are an expert browser automation planner for an MSP (Managed Service Provider) tool. Given a user goal and current context, produce a DETAILED hierarchical execution plan formatted as structured phases with sub-tasks.
-
-OUTPUT FORMAT:
-{
-  "phases": [
-    {
-      "phase": 1,
-      "title": "Phase 1 – Setup",
-      "steps": ["step 1", "step 2"]
-    },
-    {
-      "phase": 2,
-      "title": "Phase 2 – Discovery",
-      "steps": ["step 1", "step 2"]
-    }
-  ]
-}
-
-DECOMPOSITION RULES — follow these exactly:
-1. Break every task into EXPLICIT, atomic browser actions. NEVER combine multiple actions into one step.
-2. Login flows: navigate to login page → type username → type password → click submit → wait for dashboard
-3. Form interactions: locate field → clear/focus → type value → move to next field
-4. Navigation: click menu item → wait for content → scan elements → proceed
-5. Table/filter tasks: navigate to table → locate filter → set filter → wait for results → read → extract data
-6. Configuration changes: navigate to config section → find item → open edit → set values → save → verify success
-7. Multi-page research: navigate to source → extract links → open each in tab → read → note findings → close tabs → summarize
-8. ALWAYS include data extraction steps (extract, execute_js with key, or note) — never just navigate and read without saving
-9. ALWAYS include verification after saves/commits (wait for success message, then use a verify action to confirm the value persisted)
-10. For firewalls/network devices: ALWAYS include the save/commit/apply step after any configuration change, followed by a verify action
-11. Phases must be numbered sequentially starting at 1. Phase titles are short descriptive strings.
-12. If the goal naturally splits into independent sub-goals, create separate phases for each sub-goal.
-13. Maximum overall steps still limited to 100, but phases may contain multiple steps.
-
-${urlContext}${platformContext}${patternContext}${getMultiPortalDirective(goal) || ''}${getMultiArticleDirective(goal) || ''}
-<GOAL>
-${goal}
-</GOAL>
-
-Return ONLY a JSON object: { "phases": [...] }
-
-Example GOOD phased plan for a complex MSP task:
-{
-  "phases": [
-    {
-      "phase": 1,
-      "title": "Initialize",
-      "steps": ["Navigate to https://192.168.1.1"]
-    },
-    {
-      "phase": 2,
-      "title": "Authenticate",
-      "steps": ["Type the username into the login field", "Type the password into the password field", "Click the Login button and wait for dashboard"]
-    },
-    {
-      "phase": 3,
-      "title": "Navigate to Rules",
-      "steps": ["Click Policy or Firewall in the left navigation menu", "Click Access Rules or IPv4 Rules", "Wait for the rules table to load"]
-    },
-    {
-      "phase": 4,
-      "title": "Create Block Rule",
-      "steps": ["Click Add Rule or the + button to create a new rule", "Set the Source Zone dropdown to WAN", "Set the Destination Zone dropdown to LAN", "Set the Service dropdown to RDP (port 3389) or type 3389", "Set the Action to Deny or Drop", "Type a descriptive name in the Comment/Name field", "Click Save or Apply", "Wait for the success confirmation banner"]
-    },
-    {
-      "phase": 5,
-      "title": "Verify",
-      "steps": ["Finish with confirmation that the RDP block rule was created"]
-    }
-  ]
-}
-
-Example GOOD phased plan for a multi-page research task:
-{
-  "phases": [
-    {
-      "phase": 1,
-      "title": "Source",
-      "steps": ["Navigate to cnn.com", "Read the homepage content to identify top stories"]
-    },
-    {
-      "phase": 2,
-      "title": "Extract Links",
-      "steps": ["Use execute_js with key 'headlines' to extract the top 10 headline titles, links, and descriptions"]
-    },
-    {
-      "phase": 3,
-      "title": "Detail Pages",
-      "steps": ["For each article that needs more detail, open it in a new tab using open_tab with label", "Switch to each article tab, read the page, and note a brief summary", "Close article tabs when done"]
-    },
-    {
-      "phase": 4,
-      "title": "Summarize",
-      "steps": ["Finish with a numbered briefing of all 10 articles with headlines and key takeaways"]
-    }
-  ]
-}
-
-Example BAD plan (too vague):
-{
-  "phases": [
-    {
-      "phase": 1,
-      "title": "Phase 1",
-      "steps": ["Go to the website", "Find the information", "Get the data"]
-    }
-  ]
-}`;
-}
-
-/**
- * Generate a step-by-step execution plan for the given goal using the LLM.
- * Returns an array of step strings, or null if planning fails or no API key is set.
- *
- * @param {string} goal - The user's task description.
- * @param {object} settings - Provider settings: { api_endpoint, api_key, model }.
- * @param {object} [context] - Optional context: { currentUrl, pageTitle, platformContext, relevantPatterns }.
- * @returns {Promise<string[]|null>}
- */
-export async function generatePlan(goal, settings, context = {}) {
-  const endpoint = settings.api_endpoint || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
-  const apiKey = settings.api_key;
-  const model = settings.model || 'glm-5';
-  if (!apiKey) return null;
-
-  // Helper to normalize plan step objects/strings into consistent string array
-  const _normalizeSteps = arr => arr.map(s => (typeof s === 'string' ? s : (s && typeof s === 'object' ? (s.action || s.description || s.step || JSON.stringify(s)) : String(s)))).filter(Boolean);
-
-  const planPrompt = _buildPlanPrompt(goal, context);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-  try {
-    const provider = resolveProvider(endpoint);
-    // Only send response_format:json_object to OpenAI proper — Z.AI and other
-    // compatible providers may reject or ignore it, causing 400 errors.
-    // The fallback strategies in the parse block below handle non-JSON responses.
-    const useJsonMode = endpoint.includes('api.openai.com');
-    const planBody = JSON.stringify(provider.buildBody(model, 'You are a planning assistant. Return ONLY valid JSON.', planPrompt, { maxTokens: 1200, temperature: 0.2, jsonMode: useJsonMode }));
-    const planHeaders = provider.buildHeaders(apiKey);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: planHeaders,
-      body: planBody,
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (!response.ok) {
-      console.warn('Plan generation API returned', response.status, '— using goal as single-step fallback');
-      return [(goal || 'Complete the task').substring(0, 300)];
-    }
-    const data = await response.json();
-    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Plan API returned invalid response body');
-    // Early detection of auth errors from providers that return HTTP 200 with error payloads
-    if ((!data.choices || !data.choices.length) && (data.error || data.msg || (data.code && data.success === false))) {
-      const errMsg = data.error?.message || data.msg || data.message || JSON.stringify(data);
-      throw new Error(`🔑 API Authentication Failed: ${errMsg}. Check your API key in extension settings.`);
-    }
-    const content = provider.parseResponse(data);
-    if (!content) {
-      console.warn('Plan generation: empty response content — using single-step fallback');
-      return [(goal || 'Complete the task').substring(0, 300)];
-    }
-    // Pre-process: strip <think>...</think> blocks that some GLM/DeepSeek models embed
-    // directly in the content field. These must be removed BEFORE any JSON scanning so
-    // that a plan-like JSON snippet inside the thinking block isn't mistaken for the
-    // real plan. This is a no-op when no think tags are present.
-    const contentNoThink = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-    // Strategy 1: strip markdown fences, strip control chars, then JSON.parse
-    let jsonStr = contentNoThink;
-    if (jsonStr.includes('```')) {
-      const match = jsonStr.match(CODE_BLOCK_REGEX);
-      if (match && match[1]) jsonStr = match[1].trim();
-    }
-    jsonStr = jsonStr.replace(/[\x00-\x1f]/gu, '');  // eslint-disable-line no-control-regex
-    try {
-      const parsed = JSON.parse(jsonStr);
-      // Some models (Z.AI/GLM) return a bare array ["step1","step2"] with no wrapper object
-      if (Array.isArray(parsed) && parsed.length) {
-        const strs = _normalizeSteps(parsed);
-        if (strs.length) return strs;
-      }
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.plan) && parsed.plan.length) {
-        const strs = _normalizeSteps(parsed.plan);
-        if (strs.length) return strs;
-      }
-      // New phased format: { "phases": [{ phase: 1, title: "...", steps: [...] }] }
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.phases) && parsed.phases.length) {
-        const flatSteps = [];
-        for (const phase of parsed.phases) {
-          if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
-            flatSteps.push(...phase.steps);
-          }
-        }
-        if (flatSteps.length) return _normalizeSteps(flatSteps);
-      }
-      // Some models return { "steps": [...] } instead of { "plan": [...] }
-      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.steps) && parsed.steps.length) {
-        const strs = _normalizeSteps(parsed.steps);
-        if (strs.length) return strs;
-      }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 1 failed:', getErrorMessage(e)); }
-
-    // Strategy 2: scan for the first balanced JSON object containing "plan" or "steps".
-    // extractFirstJsonObject() checks for action "type" fields and never matches plan JSON.
-    // Uses contentNoThink so thinking-block JSON doesn't get selected over the real plan.
-    {
-      let s2from = 0;
-      const contentLen = contentNoThink.length;
-      while (s2from < contentLen) {
-        const s2start = contentNoThink.indexOf('{', s2from);
-        if (s2start === -1) break;
-        let depth = 0, inStr = false, esc = false, s2end = -1;
-        for (let i = s2start; i < contentLen; i++) {
-          const ch = contentNoThink[i];
-          if (esc) { esc = false; continue; }
-          if (ch === '\\' && inStr) { esc = true; continue; }
-          if (ch === '"') { inStr = !inStr; continue; }
-          if (inStr) continue;
-          if (ch === '{') depth++;
-          else if (ch === '}') { depth--; if (depth === 0) { s2end = i; break; } }
-        }
-        if (s2end !== -1) {
-          try {
-            const parsed = JSON.parse(contentNoThink.substring(s2start, s2end + 1));
-            if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
-            if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
-            // New phased format
-            if (Array.isArray(parsed.phases) && parsed.phases.length) {
-              const flatSteps = [];
-              for (const phase of parsed.phases) {
-                if (phase && typeof phase === 'object' && Array.isArray(phase.steps)) {
-                  flatSteps.push(...phase.steps);
-                }
-              }
-              if (flatSteps.length) return _normalizeSteps(flatSteps);
-            }
-          } catch (parseErr) {
-            /* Not valid JSON at this position - keep scanning for next { */
-            console.warn('[Sentinel/llm] JSON parse attempt at position', s2start, 'failed:', getErrorMessage(parseErr));
-          }
-          s2from = s2end + 1;
-        } else { break; }
-      }
-    }
-
-    // Strategy 3: find first { and last } and try that substring; also try bare array.
-    // Uses contentNoThink so thinking-block JSON doesn't pollute the search range.
-    try {
-      const objStart = contentNoThink.indexOf('{');
-      const objEnd = contentNoThink.lastIndexOf('}');
-      if (objStart !== -1 && objEnd > objStart) {
-        const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
-        if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
-        if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
-      }
-      // Also handle bare JSON arrays that may appear in prose: find first [ and last ]
-      const arrStart = contentNoThink.indexOf('[');
-      const arrEnd = contentNoThink.lastIndexOf(']');
-      if (arrStart !== -1 && arrEnd > arrStart && (objStart === -1 || arrStart < objStart)) {
-        const parsed = JSON.parse(contentNoThink.slice(arrStart, arrEnd + 1));
-        if (Array.isArray(parsed) && parsed.length) { const r = _normalizeSteps(parsed); if (r.length) return r; }
-      }
-    } catch (e) { console.warn('[Sentinel/llm] Strategy 3 failed:', getErrorMessage(e)); }
-
-    // Strategy 4: extract numbered or bulleted steps from prose.
-    // Uses contentNoThink so think-block text isn't mistaken for real plan steps.
-    {
-      const lines = contentNoThink.split(/\n/).map(l => {
-        const _trimmed = l.trim(); // Cache to avoid repeated trim calls
-        return _trimmed.replace(/^\*{1,2}|\*{1,2}$/g, '').trim();
-      }).filter(Boolean);
-      // Numbered: "1. Step", "1) Step", "Step 1: Step"
-      const numberedLines = lines.filter(l => /^\d+[.)]\s+.{8,}/.test(l) || /^[Ss]tep\s+\d+[:.)\s]+.{8,}/.test(l));
-      if (numberedLines.length >= 2) {
-        // Single replace with alternation is more efficient than chained replaces
-        const steps = numberedLines.map(l => l.replace(/^(?:\d+[.)]\s+|[Ss]tep\s+\d+[:.)\s]+)/, '').trim()).filter(s => s.length >= 8);
-        if (steps.length >= 2) {
-          console.warn(`Plan generation: extracted ${steps.length} numbered steps from prose`);
-          return steps;
-        }
-      }
-      // Bulleted: "- Step", "* Step", "• Step"
-      const bulletLines = lines.filter(l => /^[-*•→]\s+.{8,}/.test(l));
-      if (bulletLines.length >= 2) {
-        const steps = bulletLines.map(l => l.replace(/^[-*•→]\s+/, '').trim()).filter(s => s.length >= 8);
-        if (steps.length >= 2) {
-          console.warn(`Plan generation: extracted ${steps.length} bullet steps from prose`);
-          return steps;
-        }
-      }
-    }
-
-    // Strategy 5: single-step fallback from goal — guarantees a non-null plan
-    // even when the model ignores the JSON instruction entirely.
-    console.warn('Plan generation: all JSON strategies failed, creating single-step fallback. Content:', contentNoThink.slice(0, 200));
-    return [(goal || 'Complete the task').substring(0, 300)];
-  } catch (e) {
-    clearTimeout(timeout);
-    console.warn('Plan generation failed (non-fatal):', getErrorMessage(e));
-    // Even on hard exception, return a minimal fallback so the loop has a plan.
-    return goal ? [goal.substring(0, 300)] : ['Complete the task'];
-  }
-}
-
 // ========== Anthropic Tool Definitions ==========
 // One tool per action type. Used when the active provider supportsToolUse.
 // The model selects a tool and fills its input_schema fields — no JSON parsing needed.
@@ -1375,149 +1050,6 @@ const SENTINEL_TOOLS = [
     input_schema: { type: 'object', properties: { actions: { type: 'array', description: 'Array of action objects to execute in order', items: { type: 'object' } } }, required: ['actions'] } },
 ];
 
-// ========== API Call with Retry ==========
-// CONFIG is passed as a parameter to avoid coupling to agent-engine state.
-/**
- * Call the LLM with automatic retry on transient errors (429, 502, 503, timeouts).
- * Uses exponential backoff with jitter. On permanent failure, re-throws.
- * @param {Array} trimmedElements - Trimmed DOM elements for context.
- * @param {number} totalElementCount - Total elements on page before trimming.
- * @param {string} pageContent - Extracted page text content.
- * @param {string|null} base64Image - Screenshot as base64, or null.
- * @param {string} goal - Current goal text.
- * @param {Array} history - Conversation history messages.
- * @param {number} stepCount - Current step number.
- * @param {string} currentUrl - Active tab URL.
- * @param {number} retryCount - Current retry attempt number.
- * @param {Object} CONFIG - Agent configuration object.
- * @param {Object} agentState - Mutable agent state (plan, etc.).
- * @returns {Promise<Object>} Parsed LLM response object.
- */
-export async function callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount, CONFIG, agentState) {
-  console.log('[Sentinel/LLM] callLLMWithRetry called. model=' + (agentState && agentState.model ? agentState.model : 'default') + ' messages=' + (history ? history.length : 0));
-  try {
-    return await callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState);
-  } catch (err) {
-    console.error('[Sentinel/LLM] API call failed:', getErrorMessage(err));
-    const msg = (typeof err.message === 'string' ? err.message : String(err));
-    // (v20.3) Added 500 / 529 / "overloaded" — Anthropic returns 529 overloaded_error
-    // and transient 500s under load; these are retryable just like 429/502/503.
-    const isRetryable = (msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('529') || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
-    if (isRetryable) {
-      const baseDelay = msg.includes('429') ? CONFIG.retryDelay : CONFIG.retryDelay / 2;
-      const delay = Math.min(baseDelay * Math.pow(2, retryCount) + Math.floor(Math.random() * TWO_SECONDS_MS), CONFIG.maxRetryDelay);
-      sendSilentUpdate(`Retrying in ${Math.round(delay/ONE_SECOND_MS)}s...`, stepCount);
-      await sleep(delay);
-      return callLLMWithRetry(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, retryCount + 1, CONFIG, agentState);
-    }
-    throw err;
-  }
-}
-
-// ========== LLM Rate Limiter ==========
-// Sliding-window rate limiter: prevents accidental runaway LLM spend.
-// Default: max 120 calls per 60-second window (2/sec burst cap).
-// Exported so CONFIG changes in agent-engine can adjust limits.
-const _rateLimiter = {
-  windowMs: 60_000,
-  maxCalls: 120,
-  timestamps: /** @type {number[]} */ ([]),
-  check() {
-    const now = Date.now();
-    // Drop timestamps outside the sliding window
-    this.timestamps = this.timestamps.filter(t => now - t < this.windowMs);
-    const timestampsLen = this.timestamps.length;
-    if (timestampsLen >= this.maxCalls) {
-      const oldestInWindow = timestampsLen ? this.timestamps[0] : now;
-      const resetIn = Math.ceil((this.windowMs - (now - oldestInWindow)) / ONE_SECOND_MS);
-      throw new Error(`LLM rate limit exceeded: ${this.maxCalls} calls per ${this.windowMs / ONE_SECOND_MS}s. Resets in ~${resetIn}s.`);
-    }
-    this.timestamps.push(now);
-  },
-  reset() { this.timestamps = []; }
-};
-
-/**
- * Override the LLM rate limiter thresholds at runtime.
- * @param {number} maxCalls - Maximum API calls allowed per window.
- * @param {number} windowMs - Window duration in milliseconds.
- */
-export function setLLMRateLimit(maxCalls, windowMs) {
-  if (typeof maxCalls === 'number' && maxCalls > 0) _rateLimiter.maxCalls = maxCalls;
-  if (typeof windowMs === 'number' && windowMs > 0) _rateLimiter.windowMs = windowMs;
-}
-
-/** Reset the LLM rate limiter call count and window start time. */
-export function resetLLMRateLimiter() { _rateLimiter.reset(); }
-
-// ========== Cost Estimation (9.2) ==========
-// Per-million-token pricing table (input / output) in USD.
-// Approximate public rates as of 2025-Q3. Falls back to $3/$15 if unknown.
-const _PRICING = {
-  // Anthropic
-  'claude-haiku-4-5': [0.80, 4.00],
-  'claude-haiku-4-5-20251001': [0.80, 4.00],
-  'claude-3-5-haiku': [0.80, 4.00],
-  'claude-3-haiku': [0.25, 1.25],
-  'claude-sonnet-4-6': [3.00, 15.00],
-  'claude-sonnet-4-5': [3.00, 15.00],
-  'claude-3-5-sonnet': [3.00, 15.00],
-  'claude-3-sonnet': [3.00, 15.00],
-  'claude-opus-4-6': [15.00, 75.00],
-  'claude-opus-4-7': [15.00, 75.00],
-  'claude-opus-4-5': [15.00, 75.00],
-  'claude-3-opus': [15.00, 75.00],
-  // OpenAI
-  'gpt-4o': [2.50, 10.00],
-  'gpt-4o-mini': [0.15, 0.60],
-  'gpt-4.1': [2.00, 8.00],
-  'gpt-4.1-mini': [0.40, 1.60],
-  'gpt-4.1-nano': [0.10, 0.40],
-  'o4-mini': [1.10, 4.40],
-  'o3': [10.00, 40.00],
-};
-
-// Cache sorted pricing entries by key length (longest first) for efficient matching
-const _PRICING_SORTED = Object.entries(_PRICING).sort((a, b) => b[0].length - a[0].length);
-
-/**
- * Estimate run cost in USD from token counts and model name.
- * @param {number} inputTokens
- * @param {number} outputTokens
- * @param {string} modelName
- * @returns {number} estimated cost in USD
- */
-export function estimateCostUsd(inputTokens, outputTokens, modelName) {
-  const m = (modelName || '').toLowerCase();
-  if (!m) return ((inputTokens || 0) * 3.00 + (outputTokens || 0) * 15.00) / 1_000_000;
-  let rates = [3.00, 15.00]; // default: Sonnet-class
-  for (const [key, r] of _PRICING_SORTED) {
-    if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
-  }
-  return ((inputTokens || 0) * (rates[0] || 0) + (outputTokens || 0) * (rates[1] || 0)) / 1_000_000;
-}
-
-/**
- * (9.2) Determine whether the current step is "simple" enough to route to a
- * cheaper / faster model. Simple = early in the run, no failures, not runbook,
- * and the pending action type (if known) is a low-stakes operation.
- *
- * @param {object} agentState
- * @param {number} stepCount
- * @param {Array} history
- * @returns {boolean}
- */
-export function isSimpleStep(agentState, stepCount, history) {
-  if (!agentState) return false;
-  if (agentState.consecutiveFailures > 0) return false;
-  if (agentState.quickMode) return false; // quick mode already uses fewer tokens
-  const isRunbook = RUNBOOK_PATTERN_RE.test(agentState.goal || '');
-  if (isRunbook) return false;
-  if (stepCount > 6) return false;
-  if ((history || []).length > 8) return false;
-  return true;
-}
-
 // ========== Multi-Provider Model Routing ==========
 // Routes steps to cheap/light models for simple tasks and powerful/heavy
 // models for complex ones. Reduces cost on observation-heavy runs while
@@ -1558,36 +1090,6 @@ export function selectModelForStep(stepContext) {
 
 // Cost tracker for multi-provider routing — accumulates per-tier call counts
 // and rough cost estimates across the run lifetime.
-const _costTracker = {
-  totalCalls: 0,
-  byTier: { light: 0, default: 0, heavy: 0 },
-  estimatedCost: 0
-};
-
-/**
- * Record a model usage event for cost tracking.
- * @param {string} tier - 'light', 'default', or 'heavy'
- * @param {number} inputTokens - Input token count for this call.
- * @param {number} outputTokens - Output token count for this call.
- */
-export function recordModelUsage(tier, inputTokens, outputTokens) {
-  _costTracker.totalCalls++;
-  if (_costTracker.byTier[tier] !== undefined) _costTracker.byTier[tier]++;
-  else _costTracker.byTier.default++;
-  // Cost estimates per tier — [input rate, output rate] per token
-  // Output tokens typically 3-5x more expensive than input
-  const rates = { light: [0.15, 0.60], default: [3.00, 15.00], heavy: [15.00, 75.00] };
-  const [inRate, outRate] = rates[tier] || rates.default;
-  _costTracker.estimatedCost += (inRate * (inputTokens || 0) + outRate * (outputTokens || 0)) / 1_000_000;
-}
-
-/**
- * Get a snapshot of the cost tracker state.
- * @returns {Object} { totalCalls, byTier, estimatedCost }
- */
-export function getCostTracker() {
-  return { ..._costTracker, byTier: { ..._costTracker.byTier }, estimatedCost: _costTracker.estimatedCost.toFixed(4) };
-}
 
 // ========== LLM Prompt Context Builders ==========
 
@@ -1983,6 +1485,7 @@ function _isStreamingResponse(response) {
  * @param {string} params.patternCtx - Past successful patterns context string.
  * @param {string} params.memoryCtx - Agent memory context string.
  * @param {string} params.clientKnowledgeCtx - Client knowledge context string.
+ * @param {string} params.brainKnowledgeCtx - Neuralis brain knowledge context string (sub-project B).
  * @param {string} params.tabCtxSection - Multi-tab context section string.
  * @param {string} params.loopCtx - Loop / stall-detection directive string.
  * @param {Object} params.agentState - Live agent state (for budgetHint and screenshotMeta).
@@ -1998,7 +1501,7 @@ function _buildAgentPrompt(params) {
     historyWindowSize, isRunbook, sanitizedHistory,
     lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
-    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, brainKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
   } = params;
 
@@ -2056,7 +1559,7 @@ ref ids are stable across re-renders and immune to DOM reordering. Selectors
 remain supported as a fallback for actions where \`ref\` is unavailable, and
 older runtimes that don't emit \`ref\` continue to work as before.
 
-${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.zoomAnnotation ? agentState.zoomAnnotation : ''}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
+${quickModeCtx}${runbookCtx}${platformCtx}${getMultiPortalDirective(goal)}${getMultiArticleDirective(goal)}${planCtx}${strategyCtx}${finishCtx}${verificationCtx}${patternCtx}${memoryCtx}${clientKnowledgeCtx}${brainKnowledgeCtx}${tabCtxSection}${loopCtx}${agentState && agentState.zoomAnnotation ? agentState.zoomAnnotation : ''}${agentState && agentState.cdpFallbackActive ? '\n⚠️ CDP FALLBACK MODE: Content script could not inject (likely CSP). Use click_at with pixel coordinates from the screenshot, or execute_js with document.querySelector() for DOM interaction. Do NOT use ref-based clicks — use coordinate-based click_at or execute_js with selectors.\n' : ''}Current URL: ${currentUrl}
 Current step: ${stepCount}
 ${agentState && agentState.budgetHint ? `Budget: ${agentState.budgetHint}\n` : ''}<GOAL>
 ${goal}
@@ -2221,7 +1724,7 @@ ${provider.supportsToolUse ? '' : 'IMPORTANT: Return ONLY a single JSON object l
  * @param {Object} agentState - Mutable agent state (apiCallCount, plan, memory, etc.).
  * @returns {Promise<Object>} Parsed LLM response object.
  */
-async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
+export async function callLLM(trimmedElements, totalElementCount, pageContent, base64Image, goal, history, stepCount, currentUrl, CONFIG, agentState) {
   if (!agentState) throw new Error('agentState is required');
   if (!CONFIG) throw new Error('CONFIG is required');
   const _apiStart = Date.now();
@@ -2336,6 +1839,17 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     ? agentState.clientKnowledgeText
     : '';
 
+  // (sub-project B) Brain knowledge context. agent-engine.js pre-formats this
+  // string at run start (via background/brain-client.js → getBrainStartupContext,
+  // which recalls from the Neuralis brain by platform id / host) and passes it
+  // through agentState.brainKnowledgeText. Renders as a DISTINCT, LABELED section
+  // ("## BRAIN KNOWLEDGE (shared, cross-installation)") adjacent to the local
+  // Client Knowledge section — different trust tier, different framing, both
+  // visible to the model. Fails open: empty when the brain is off/down/empty.
+  const brainKnowledgeCtx = (agentState.brainKnowledgeText && typeof agentState.brainKnowledgeText === 'string')
+    ? agentState.brainKnowledgeText
+    : '';
+
   // (3.12.0) Vision-based action verification. When the immediately prior
   // step was a modifying action (click, type, select, check, press_key,
   // upload_file), force the model to look at the post-action screenshot
@@ -2368,7 +1882,7 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
     historyWindowSize, isRunbook, sanitizedHistory,
     lastAction, lastResult,
     planCtx, strategyCtx, finishCtx, verificationCtx,
-    patternCtx, memoryCtx, clientKnowledgeCtx, tabCtxSection, loopCtx,
+    patternCtx, memoryCtx, clientKnowledgeCtx, brainKnowledgeCtx, tabCtxSection, loopCtx,
     agentState, base64Image, provider
   });
 

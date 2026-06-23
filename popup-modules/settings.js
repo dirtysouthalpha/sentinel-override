@@ -165,6 +165,108 @@ if (quickAssistToggle) {
   });
 }
 
+// ========== Neuralis Brain Toggle + Base URL (sub-project B) ==========
+// Opt-in (default OFF): when enabled, the agent makes ONE recall call to the
+// Neuralis brain at run start to inject shared community knowledge. The recall
+// key is platform id / start-URL host only — never client name or goal (leak-zero).
+// Fails open: a down brain never breaks a run.
+const brainEnabledToggle = document.getElementById('brainEnabledToggle');
+const brainEnabledLabel = document.getElementById('brainEnabledLabel');
+const brainBaseUrlInput = document.getElementById('brainBaseUrlInput');
+if (brainEnabledToggle) {
+  chrome.storage.local.get({ brainEnabled: false, brainBaseUrl: 'http://localhost:8000' }, (result) => {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read brain settings:', getErrorMessage(chrome.runtime.lastError)); return; }
+    brainEnabledToggle.checked = result.brainEnabled === true; // default OFF
+    if (brainBaseUrlInput && typeof result.brainBaseUrl === 'string') brainBaseUrlInput.value = result.brainBaseUrl;
+  });
+  brainEnabledToggle.addEventListener('change', () => {
+    const enabled = brainEnabledToggle.checked;
+    chrome.storage.local.set({ brainEnabled: enabled }, () => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.error('[Sentinel/settings] Failed to save brainEnabled:', getErrorMessage(chrome.runtime.lastError));
+        showToast('Failed to save setting', 'error');
+        return;
+      }
+      try {
+        showToast(
+          enabled
+            ? 'Neuralis Brain ON — will recall shared knowledge at run start'
+            : 'Neuralis Brain OFF',
+          enabled ? 'success' : 'info'
+        );
+      } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
+    });
+  });
+}
+if (brainBaseUrlInput) {
+  // Persist the base URL on blur (don't fight the user on every keystroke).
+  brainBaseUrlInput.addEventListener('change', () => {
+    const val = (brainBaseUrlInput.value || '').trim();
+    chrome.storage.local.set({ brainBaseUrl: val || 'http://localhost:8000' }, () => {
+      if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+        console.error('[Sentinel/settings] Failed to save brainBaseUrl:', getErrorMessage(chrome.runtime.lastError));
+        showToast('Failed to save Brain base URL', 'error');
+        return;
+      }
+      try { showToast('Brain base URL saved', 'success'); } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
+    });
+  });
+}
+
+// ========== Neuralis Brain Producer Toggle (sub-project C — WRITE path) ==========
+// Distinct opt-in from the read toggle (sub-project B). Default OFF. Three
+// consent layers, all required:
+//   1. Master toggle (brainProducerEnabled), OFF by default.
+//   2. First-run confirmation on enable (and re-prompt if off >7 days), exact text.
+//   3. Toggling OFF stops all writes immediately; no pending queue ships.
+// On enable + confirm we stamp brainProducerLastConfirmedAt = now; the producer
+// re-prompts (via this same staleness check) if that stamp is older than 7 days.
+const PRODUCER_CONFIRM_TEXT = 'This will send redacted, platform-level operating notes to your Neuralis brain. No client names, tenants, emails, or IPs are sent. Continue?';
+const PRODUCER_STALE_MS = 7 * 24 * 3600 * 1000; // 7 days
+const brainProducerToggle = document.getElementById('brainProducerEnabledToggle');
+const brainProducerLabel = document.getElementById('brainProducerEnabledLabel');
+if (brainProducerToggle) {
+  chrome.storage.local.get({ brainProducerEnabled: false, brainProducerLastConfirmedAt: null }, (result) => {
+    if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) { console.warn('[Sentinel/settings] Failed to read producer settings:', getErrorMessage(chrome.runtime.lastError)); return; }
+    brainProducerToggle.checked = result.brainProducerEnabled === true; // default OFF
+  });
+  brainProducerToggle.addEventListener('change', () => {
+    const enabled = brainProducerToggle.checked;
+    if (enabled) {
+      // Consent layer 2: explicit confirmation before the first write is allowed.
+      const ok = globalThis.confirm(PRODUCER_CONFIRM_TEXT);
+      if (!ok) {
+        // Declined -> revert the toggle, do NOT enable writes.
+        brainProducerToggle.checked = false;
+        return;
+      }
+      // Confirmed -> stamp now so the producer treats consent as fresh.
+      chrome.storage.local.set({
+        brainProducerEnabled: true,
+        brainProducerLastConfirmedAt: new Date().toISOString(),
+      }, () => {
+        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+          console.error('[Sentinel/settings] Failed to save producer enable:', getErrorMessage(chrome.runtime.lastError));
+          showToast('Failed to save setting', 'error');
+          brainProducerToggle.checked = false;
+          return;
+        }
+        try { showToast('Neuralis Brain Producer ON — redacted notes will be sent after runs', 'success'); } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
+      });
+    } else {
+      // Consent layer 3: revoking stops all writes immediately; no queue ships.
+      chrome.storage.local.set({ brainProducerEnabled: false }, () => {
+        if (typeof chrome.runtime.lastError === 'object' && chrome.runtime.lastError !== null) {
+          console.error('[Sentinel/settings] Failed to save producer disable:', getErrorMessage(chrome.runtime.lastError));
+          showToast('Failed to save setting', 'error');
+          return;
+        }
+        try { showToast('Neuralis Brain Producer OFF — no notes will be sent', 'info'); } catch (e) { console.warn('[Sentinel] showToast unavailable:', getErrorMessage(e)); }
+      });
+    }
+  });
+}
+
 // ========== Trusted Input Toggle (#9 — CDP-based input dispatch) ==========
 // Opt-in: when enabled, the agent routes click/type/press_key through
 // chrome.debugger so events are dispatched with isTrusted: true. Default OFF

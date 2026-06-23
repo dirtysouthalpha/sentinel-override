@@ -4,6 +4,11 @@
 
 import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse } from './llm-client.js';
 import { getPlatformProfile } from './platforms/index.js';
+import { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat, getFirstLine, getFirstSentence } from './agent-ticket-format.js';
+import { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
+import { summarizeHistoryBatch, maybeRollupHistory } from './agent-progress.js';
+import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
+import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
@@ -380,15 +385,8 @@ const PORTAL_EXCHANGE_RE = /admin\.exchange/i;
 const PORTAL_PURVIEW_RE = /purview/i;
 const PORTAL_M365_ADMIN_RE = /admin\.microsoft/i;
 
-// Precompile regex for ticket number extraction
-const TICKET_NUMBER_RE1 = /(?:ticket|incident|alert)[#\s:]*(\d{3,8})/i;
-const TICKET_NUMBER_RE2 = /#(\d{3,8})/;
 
-// Precompile regex for string operations (performance optimization)
-const NEWLINE_SPLIT_RE = /\n+/;
 const WHITESPACE_NORMALIZE_RE = /\s+/g;
-const WHITESPACE_SPLIT_RE = /\s+/;
-const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 
 // Precompile regex for email removal (URL extraction)
 const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -397,12 +395,7 @@ const EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
 const WWW_PREFIX_RE = /^www\./;
 const TRAILING_SLASH_RE = /\/$/;
 
-// Precompile regex for field list parsing
-const FIELD_LIST_SPLIT_RE = /[,]|\s+and\s+|\s+&\s+/i;
-const FIELD_PREFIX_CLEAN_RE = /^the\s+|\.$/gi;
 
-// Precompile regex for ticket prefix removal
-const TICKET_PREFIX_RE = /^(ticket|incident)\s*#?\d*[:\-\s]+/i;
 
 // Precompile regex for domain cleaning
 const DOMAIN_CLEAN_RE = /^https?:\/\/|\/.*$/gi;
@@ -422,8 +415,6 @@ const REF_SELECTOR_RE = /^ref_/;
 // Precompile regex for memory variable replacement
 const MEMORY_VAR_RE = /::(\w+)::/g;
 
-// Precompile regex for step list prefix
-const STEP_PREFIX_RE = /^(\d+[.)]|-|\*)\s+/;
 
 // Helper function to check if object is empty without creating intermediate array
 const isEmptyObject = (obj) => {
@@ -444,19 +435,7 @@ const getObjectLength = (obj) => {
   return count;
 };
 
-// Helper function to get first line without creating array
-const getFirstLine = (str) => {
-  if (!str) return '';
-  const idx = str.indexOf('\n');
-  return idx === -1 ? str : str.slice(0, idx);
-};
 
-// Helper function to get first sentence without creating array
-const getFirstSentence = (str) => {
-  if (!str) return '';
-  const idx = str.indexOf('. ');
-  return idx === -1 ? str : str.slice(0, idx + 1);
-};
 
 // Precompile regex for PII redaction (error logging)
 const _PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
@@ -474,33 +453,16 @@ const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
 // Precompile regex for stall detection
 const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
 
-// Precompile regex for environment detection in ticket formatting
-const ENV_M365_RE = /m365|microsoft|entra|exchange|defender|purview/i;
-const ENV_FIREWALL_RE = /sonicwall|fortigate|firewall/i;
-const ENV_EDR_RE = /sentinelone|crowdstrike|defender for endpoint/i;
-const ENV_RMM_RE = /connectwise|ninjaone|kaseya|datto/i;
 
-// Precompile regex for ticket state detection
-const TICKET_VENDOR_RE = /waiting on (the )?vendor|vendor (case|ticket)|vendor support/;
-const TICKET_CLIENT_RE = /waiting on (the )?client|awaiting client|client to respond|client (callback|reply)/;
-const TICKET_ITGLUE_RE = /(create|document|write).*(kb|knowledge base|it glue)/;
-const TICKET_EMAIL_RE = /draft (an?|the) email|send (an?|the) email|email the client/;
-const TICKET_KICKOFF_RE = /kickoff|new ticket|just opened|investigate this ticket/;
 
 // Precompile regex for overlay dismissal (hot path in CDP observe)
 const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
 
-// Precompile regex for history failure detection (hot path in history summarization)
-const HISTORY_FAILURE_RE = /error|fail|not found|blocked|timed out/i;
 
-// Precompile regex for plan step analysis
-const PLAN_PARTIAL_RE = /step limit|extraction.*fail|not yet|incomplete|manually search/i;
 
 // Precompile regex for incomplete marker detection (hot path in reporting)
 const INCOMPLETE_MARKER_RE = /\b(incomplete|step budget|could not access|unable to|exhausted|not yet|did not complete|did not reach|was unable|failed to extract)\b/i;
 
-// Precompile regex for tried action detection
-const TRIED_ACTION_RE = /^(tried|attempted|ran|tested|restart|reboot|reinstall|reset|verified|confirmed|checked|cleared|escalated)/i;
 
 // Precompile regex for multi-page goal detection
 const _MULTI_PAGE_GOAL_RE = /\b(top\s+\d|each|every|all|10|5|3)\b.*\b(articles?|pages?|sites?|links?|urls?|results?|sources?)\b/i;
@@ -663,6 +625,8 @@ let primaryPanelTabId = null;   // (v20.1) the single "working" tab the run was 
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
+let brainKnowledgeText = '';   // (sub-project B) pre-formatted "BRAIN KNOWLEDGE" section from Neuralis /recall
+let _runStartPlatformId = '';  // (sub-project C) platform id detected at run start; reused as producer tag at run end
 let clientKnowledgeUsedIds = []; // (3.12.0) ids of entries injected into this run; useCount bumps at run end
 let pendingVerification = null; // (3.12.0) {type,description,attemptedAt} of the last MODIFYING_ACTIONS step; consumed by next observation cycle to force explicit "did this work?" check
 let _pendingContextInjections = []; // Mid-run context notes queued by the user; drained at top of each step
@@ -674,6 +638,10 @@ let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained bef
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
+// Re-exports from agent-ticket-format.js (backward compatibility)
+export { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat } from './agent-ticket-format.js';
+export { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
+export { summarizeHistoryBatch, maybeRollupHistory } from './agent-progress.js';
 let _learnedPatterns = null;   // (Phase 5) Runtime pattern tracking: { key: { uses, successes, lastUsed } }
 // Phase 5: Advanced Intelligence State
 let _predictiveAnalysisEnabled = false;  // Predictive analytics enabled (reserved for future)
@@ -1472,6 +1440,34 @@ export async function startAgent(goal, sender) {
 
   const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
 
+  // (hardening 1B) Reset the one-warn-per-run signals so each run gets at most
+  // one "brain unreachable" warning per path (read + write), not one per call.
+  resetBrainRunSignals();
+  resetBrainProducerRunSignals();
+
+  // (sub-project B) Neuralis brain READ path. One recall call per run, gated
+  // by the brainEnabled toggle (default OFF — read inside getBrainStartupContext).
+  // Leak-zero by construction: the recall key is the adaptive-prompts platform id
+  // (preferred) or the start-URL host (fallback) — NEVER client name, tenant, or
+  // raw goal text. Fails open: any error leaves brainKnowledgeText = '' so a down
+  // brain cannot break an MSP's run.
+  try {
+    let brainContextKey = '';
+    try {
+      const _profile = getPlatformProfile(tabInfo?.url || '', goal);
+      if (_profile && _profile.id) {
+        brainContextKey = String(_profile.id);
+      } else if (tabInfo && tabInfo.url) {
+        brainContextKey = (() => { try { return new URL(tabInfo.url).hostname || ''; } catch (_) { return ''; } })();
+      }
+    } catch (_) { brainContextKey = ''; }
+    _runStartPlatformId = brainContextKey; // (sub-project C) reuse as producer tag at run end
+    const brainCtx = await getBrainStartupContext(brainContextKey);
+    brainKnowledgeText = (brainCtx && brainCtx.ok && typeof brainCtx.section === 'string') ? brainCtx.section : '';
+  } catch (_) {
+    brainKnowledgeText = '';
+  }
+
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
   runAgentLoop(finalGoal, startTabId).catch(err => {
@@ -1660,79 +1656,6 @@ export function setAgentSpeed(mode) {
     console.error('[setAgentSpeed] Unhandled rejection:', e);
   });
   return `Speed set to ${mode}`;
-}
-
-// ========== Rolling History Summarization (3.8.2) ==========
-// Long runs (200+ steps) bloat the LLM prompt with historical action data.
-// When history exceeds 30 entries, condense the oldest 15 into a single
-// SUMMARY entry so the prompt stays bounded. The summary preserves what
-// matters for the agent's decision-making: per-portal step counts, key
-// extractions, navigations, and any failure clusters.
-
-const HISTORY_SUMMARIZE_THRESHOLD = 30;
-const HISTORY_SUMMARIZE_BATCH = 15;
-
-function summarizeHistoryBatch(batch) {
-  if (!batch || !batch.length) return null;
-  const batchLen = batch.length;
-  const firstValid = batch.find(h => h && h.step !== undefined);
-  let lastValid = null;
-  for (let i = batchLen - 1; i >= 0; i--) {
-    if (batch[i] && batch[i].step !== undefined) {
-      lastValid = batch[i];
-      break;
-    }
-  }
-  if (!firstValid || !lastValid) return null;
-  const counts = {};
-  const navUrls = [];
-  const extractedKeys = [];
-  const failures = [];
-  const notes = [];
-  for (const h of batch) {
-    if (!h || !h.action) continue;
-    const t = h.action.type;
-    counts[t] = (counts[t] || 0) + 1;
-    if (t === 'navigate' && h.action.url) {
-      const url = h.action.url;
-      navUrls.push(typeof url === 'string' ? url.substring(0, 100) : String(url).substring(0, 100));
-    }
-    if ((EXTRACT_TYPE_RE.test(t)) && h.action.key) extractedKeys.push(h.action.key);
-    if (t === 'execute_js' && h.action.key) extractedKeys.push(h.action.key);
-    if (t === 'note' && h.action.text) {
-      const text = h.action.text;
-      notes.push(typeof text === 'string' ? text.substring(0, 200) : String(text).substring(0, 200));
-    }
-    const r = (h && typeof h.result === 'string') ? h.result : '';
-    if (HISTORY_FAILURE_RE.test(r)) failures.push(`${t}: ${r.substring(0, 120)}`);
-  }
-  const summaryParts = [];
-  summaryParts.push(`Action counts: ${Object.entries(counts).map(([k, v]) => `${k}×${v}`).join(', ')}`);
-  if (navUrls.length) summaryParts.push(`Navigated to: ${[...new Set(navUrls)].slice(0, 5).join(' | ')}`);
-  if (extractedKeys.length) summaryParts.push(`Memory keys saved: ${[...new Set(extractedKeys)].slice(0, 8).join(', ')}`);
-  if (notes.length) summaryParts.push(`Notes recorded: ${notes.slice(0, 3).join(' || ')}`);
-  if (failures.length) summaryParts.push(`Failures: ${failures.slice(0, 3).join(' || ')}`);
-  return {
-    step: `${firstValid?.step || '?'}-${lastValid?.step || '?'}`,
-    action: { type: 'history_summary' },
-    result: `[ROLLED-UP SUMMARY of steps ${firstValid?.step || '?'}-${lastValid?.step || '?'}] ${summaryParts.join(' • ')}`
-  };
-}
-
-function maybeRollupHistory(history) {
-  if (history.length <= HISTORY_SUMMARIZE_THRESHOLD) return;
-  // Already-summarized batches stay at the front (their action.type === 'history_summary')
-  // and we don't re-summarize them. Find the first non-summary entry to
-  // determine whether we need to roll up.
-  const firstNonSummary = history.findIndex(h => !h.action || h.action.type !== 'history_summary');
-  if (firstNonSummary < 0) return;
-  const detailed = history.slice(firstNonSummary);
-  if (detailed.length <= HISTORY_SUMMARIZE_THRESHOLD) return;
-  const oldest = detailed.slice(0, HISTORY_SUMMARIZE_BATCH);
-  const summary = summarizeHistoryBatch(oldest);
-  if (!summary) return;
-  // Splice: replace the oldest batch with the summary entry.
-  history.splice(firstNonSummary, HISTORY_SUMMARIZE_BATCH, summary);
 }
 
 // ========== Periodic Progress Updates (3.8.2) ==========
@@ -2366,9 +2289,6 @@ const MULTI_PORTAL_RE = /\b(entra|exchange|purview|onedrive|sharepoint|teams|int
 // Precompiled regex patterns for goal parsing
 const MODE_TIER1_RE = /\bMode\s*[:=-]\s*(APPROVAL|AUTONOMOUS|YOLO)\b/i;
 const MODE_TIER2_RE = /\b(approval|autonomous|yolo)\s+mode\b/i;
-const SEARCH_QUERY_RE = /(?:search|find|look).{0,5}(?:for|about|on)\s+([^,.]+)/i;
-const SEARCH_SIMPLE_RE = /(?:search|find|look)\s+(?:for\s+)?["']?([^"']{3,60})/i;
-const FIELD_LIST_RE = /(?:extract|find|pull|give\s+me|return)[^.]*?:\s*([^.\n]+)/i;
 const _URL_NAV_RE = /(?:go to|navigate to|visit|check|open)\s+(https?:\/\/[^\s,]+|[\w.-]+\.(?:com|org|net|io|gov|edu|co)[^\s,]*)/i;
 const _URL_ANY_RE = /(https?:\/\/[^\s]+)/i;
 const _BARE_SITE_RE = /(?:go to|navigate to|visit|check|open)\s+(?:the\s+)?([\w\s]+?)(?:\s+(?:and|then|,|\.))?(?:\s|$)/i;
@@ -2430,380 +2350,13 @@ function hasPostCommitVerification(history) {
   return false;
 }
 
-// ========== Ticket FINAL_NOTES Auto-Formatter (3.8.0) ==========
-// Post-processes the agent's finish summary into the preferred ticket
-// FINAL_NOTES format when the goal is recognized as a ticket investigation.
-// The format (per user prefs):
-//   Action Taken: [1-2 sentences]
-//   Contact Attempt Details: [method/time]
-//   Next Step and Time: [follow-up time or "None required. Ticket closed."]
-//   Ownership Statement: [technician name + resolution confirmation]
-//
-// Technician details are pulled from chrome.storage.local.technicianInfo
-// with sensible defaults that match the user's preferences.
-
-const TICKET_GOAL_RE = /\b(ticket|incident|alert|investigat|threat\s+hunt|malware|sentinelone|connectwise|kaseya)\b|#\d{3,}/i;
-
-function isTicketInvestigationGoal(goal) {
-  if (!goal || typeof goal !== 'string') return false;
-  return TICKET_GOAL_RE.test(goal);
-}
-
-async function getTechnicianInfo() {
-  const defaults = {
-    name: 'John Smith',
-    title: 'IT Support Technician',
-    company: 'Acme IT',
-    phone: '555-000-0000',
-    email: 'support@example.com'
-  };
-  try {
-    const stored = await chrome.storage.local.get(['technicianInfo']);
-    if (stored && stored.technicianInfo && typeof stored.technicianInfo === 'object' && stored.technicianInfo !== null) {
-      return { ...defaults, ...stored.technicianInfo };
-    }
-  } catch (_e) { /* storage read non-fatal */ }
-  return defaults;
-}
-
-// Best-effort ticket-number extraction: matches "ticket #NNN", "ticket NNN",
-// "incident #NNN", or a leading "#NNN" pattern.
-function extractTicketNumber(goal) {
-  if (!goal) return '';
-  const m = goal.match(TICKET_NUMBER_RE1)
-         || goal.match(TICKET_NUMBER_RE2);
-  return m ? m[1] : '';
-}
-
-function formatTicketFinalNotes(summary, goal, tech, options) {
-  const ticketNum = extractTicketNumber(goal);
-  const opts = options || {};
-  const stepCount = opts.stepCount || 0;
-  const apiCallCount = opts.apiCallCount || 0;
-  const now = new Date();
-  const stamp = `${now.toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  // Default to "ticket-resolved" framing. If the agent indicates partial
-  // results (step-limit / extraction failure), shift to "waiting" framing.
-  const partial = PLAN_PARTIAL_RE.test(summary || '');
-
-  // Action Taken: take the first 2 sentences from the summary (or up to 240 chars).
-  const summaryStr = typeof summary === 'string' ? summary : '';
-  let actionTaken = summaryStr.split(SENTENCE_SPLIT_RE).slice(0, 2).join(' ').trim();
-  if (!actionTaken) actionTaken = 'Investigation completed via Sentinel Override agent.';
-  if (actionTaken.length > 240) actionTaken = `${actionTaken.slice(0, 237)}...`;
-
-  const nextStep = partial
-    ? 'Manual review required — see investigation findings below. Recommend follow-up within 1 business day.'
-    : 'None required. Ticket closed pending client confirmation.';
-
-  const ownership = `${tech.name} (${tech.title}, ${tech.company}) — ${partial ? 'investigation in progress' : 'investigation completed and findings documented'}.`;
-
-  let header = '';
-  if (ticketNum) header = `**Ticket #${ticketNum}** — `;
-  header += partial ? 'Investigation Notes (partial)' : 'Final Notes';
-
-  // Build the formatted block.
-  const block = [
-    `## ${header}`,
-    '',
-    '**Action Taken:**',
-    `- ${actionTaken}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Automated investigation via Sentinel Override agent at ${stamp} (${stepCount} steps, ${apiCallCount} AI calls).`,
-    '',
-    '**Next Step and Time:**',
-    `- ${nextStep}`,
-    '',
-    '**Ownership Statement:**',
-    `- ${ownership}`,
-    '',
-    '---',
-    '',
-    '### Full investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
-  ].join('\n');
-
-  return block;
-}
-
-// ========== Ticket Mode Formatters (3.14.0) ==========
-// Additional MSP output templates per the user's preference doc. Each takes
-// (summary, goal, tech, options) and returns a markdown-formatted block. The
-// dispatcher `formatTicketOutput(format, ...)` routes to the right one based on
-// chrome.storage.local.ticketMode/ticketFormat settings.
-//
-// Formats: TICKET_KICKOFF, FINAL_NOTES (existing), WAITING_ON_CLIENT,
-// WAITING_ON_VENDOR, IT_GLUE_KB, CLIENT_EMAIL.
-
-function _ticketHeader(ticketNum, label) {
-  return ticketNum ? `**Ticket #${ticketNum}** — ${label}` : label;
-}
-
-function _ticketStamp() {
-  return `${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-}
-
-function _splitTriedSection(summary) {
-  // Pull "what's been tried" candidates from the summary — anything that reads
-  // like a remediation step. Falls back to a single line if nothing matches.
-  if (!summary || typeof summary !== 'string') return ['Pending technician input.'];
-  const lines = summary.split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const triedRe = TRIED_ACTION_RE;
-  const matches = lines.filter(l => triedRe.test(l)).slice(0, 6);
-  return matches.length ? matches : [(lines.length ? lines[0] : '').slice(0, 200)];
-}
-
-function formatTicketKickoff(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const tried = _splitTriedSection(summary).map(s => `- ${s}`).join('\n');
-  // Resolution path: derive from the summary's last 1-3 sentences (treat them
-  // as recommended next steps). If empty, leave numbered placeholders so the
-  // tech can fill in.
-  const sentences = (summary || '').split(SENTENCE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const tail = sentences.slice(-3);
-  const pathLines = tail.length
-    ? tail.map((s, i) => `${i + 1}. ${s.replace(WHITESPACE_NORMALIZE_RE, ' ').slice(0, 240)}`)
-    : ['1. Low-risk check (verify configuration, run diagnostics).', '2. Next step (apply targeted fix or escalate).', '3. Escalation/fix (vendor case, change request, or remediation)'];
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Ticket Kickoff')}`,
-    '',
-    '**MAIN ISSUE:**',
-    `- ${getFirstLine(goal || '').slice(0, 280)}`,
-    '',
-    '**WHAT HAS BEEN TRIED:**',
-    tried,
-    '',
-    '**FASTEST SAFE RESOLUTION PATH:**',
-    pathLines.join('\n'),
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_${tech.name} · ${tech.title} · ${tech.company}_`,
-    `_Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatWaitingOnClient(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const stamp = _ticketStamp();
-  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Investigation in progress; awaiting client response.';
-  const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Waiting on Client')}`,
-    '',
-    '**Action Taken:**',
-    `- ${firstSentence}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Automated investigation completed at ${stamp}. Awaiting client confirmation or additional details.`,
-    '',
-    '**Next Step and Time:**',
-    `- Follow up by ${followUp} (or sooner if client responds).`,
-    '',
-    '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will re-engage once client responds.`,
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatWaitingOnVendor(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const stamp = _ticketStamp();
-  const firstSentence = getFirstSentence(summary || '').slice(0, 240) || 'Diagnostics completed; vendor case opened.';
-  const followUp = `${new Date(Date.now() + ONE_DAY_MS).toISOString().replace('T', ' ').slice(0, 16)} UTC`;
-
-  const lines = [
-    `## ${_ticketHeader(ticketNum, 'Waiting on Vendor')}`,
-    '',
-    '**Action Taken:**',
-    `- ${firstSentence}`,
-    '',
-    '**Contact Attempt Details:**',
-    `- Vendor case opened at ${stamp}. Awaiting vendor response / ETA.`,
-    '',
-    '**Next Step and Time:**',
-    `- Follow up by ${followUp} (or on vendor response).`,
-    '',
-    '**Ownership Statement:**',
-    `- ${tech.name} (${tech.title}, ${tech.company}) — will follow up with vendor and update ticket.`,
-    '',
-    '---',
-    '',
-    '### Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_ ${tech.name} · Phone: ${tech.phone} · Email: ${tech.email}_`
-  ];
-  return lines.join('\n');
-}
-
-function formatItGlueKb(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const goalShort = getFirstLine(goal || '').slice(0, 100);
-  const ticketNum = extractTicketNumber(goal);
-  const title = ticketNum ? `${goalShort} (Ref: Ticket #${ticketNum})` : goalShort;
-
-  // Derive resolution steps from the summary's numbered/bulleted lines or
-  // sentence breakdown.
-  const lines = (summary || '').split(NEWLINE_SPLIT_RE).map(s => s.trim()).filter(Boolean);
-  const stepCandidates = lines.filter(l => /^(\d+[.)]|-|\*)\s+/.test(l)).slice(0, 8);
-  const steps = stepCandidates.length
-    ? stepCandidates.map((s, i) => `${i + 1}. ${s.replace(STEP_PREFIX_RE, '')}`)
-    : (lines.slice(0, 5).map((s, i) => `${i + 1}. ${s}`));
-
-  const envBits = [];
-  if (ENV_M365_RE.test(goal || '')) envBits.push('Microsoft 365 / Entra ID');
-  if (ENV_FIREWALL_RE.test(goal || '')) envBits.push('Firewall (vendor-specific)');
-  if (ENV_EDR_RE.test(goal || '')) envBits.push('EDR platform');
-  if (ENV_RMM_RE.test(goal || '')) envBits.push('RMM/PSA platform');
-  if (!envBits.length) envBits.push('General — see investigation findings for specifics');
-
-  const out = [
-    '## IT Glue Knowledge Base Entry',
-    '',
-    '**Title:**',
-    `- ${(title || 'Untitled')}`,
-    '',
-    '**Issue:**',
-    `- ${getFirstSentence(summary || '').slice(0, 240)}`,
-    '',
-    '**Environment:**',
-    `- ${envBits.join('; ')}`,
-    '',
-    '**Resolution Steps:**',
-    steps.length ? steps.join('\n') : '1. (steps not auto-derivable — fill in manually)',
-    '',
-    '**Verification:**',
-    '- Confirm the configured state is present and the original symptom no longer reproduces.',
-    '',
-    '**Screenshots:**',
-    '- (attach the agent\'s screenshots from the investigation report)',
-    '',
-    '---',
-    '',
-    '### Source — Investigation findings',
-    '',
-    summary || '(no summary)',
-    '',
-    '---',
-    '',
-    `_Documented by ${tech.name} · ${tech.company}_`
-  ];
-  return out.join('\n');
-}
-
-function formatClientEmail(summary, goal, tech, options) {
-  const _opts = options || {}; // reserved for future template options
-  const ticketNum = extractTicketNumber(goal);
-  const ticketRef = ticketNum ? `Ticket #${ticketNum}` : 'your recent ticket';
-  const ticketRefShort = ticketNum ? `Ticket #${ticketNum}` : 'your ticket';
-  const briefIssue = getFirstLine(goal || '').replace(TICKET_PREFIX_RE, '').slice(0, 80) || 'your reported issue';
-  const oneLine = getFirstSentence(summary || 'The issue has been investigated and addressed.').slice(0, 240);
-
-  const subject = `Resolved: ${ticketRefShort} – ${briefIssue}`;
-
-  const body = [
-    'Hello [Client Name],',
-    '',
-    `The issue reported in ${ticketRef} has been resolved. ${oneLine}`,
-    '',
-    `Everything is now working as expected. If you need further assistance, contact us at ${tech.phone} or ${tech.email}.`,
-    '',
-    'Best regards,',
-    tech.name,
-    tech.title,
-    tech.company,
-    `Phone: ${tech.phone} | Email: ${tech.email}`
-  ];
-
-  const block = [
-    '## Client Email',
-    '',
-    `**Subject:** ${subject}`,
-    '',
-    '**Body:**',
-    '',
-    body.join('\n'),
-    '',
-    '---',
-    '',
-    '_Replace `[Client Name]` before sending. Investigation findings (for your reference, not in email body):_',
-    '',
-    summary || '(no summary)'
-  ];
-  return block.join('\n');
-}
-
-// Dispatcher — returns formatted text for the requested format. Format values
-// match the user's preference doc: 'TICKET_KICKOFF', 'FINAL_NOTES',
-// 'WAITING_ON_CLIENT', 'WAITING_ON_VENDOR', 'IT_GLUE_KB', 'CLIENT_EMAIL', or
-// 'auto'. 'auto' picks based on goal/summary heuristics.
-function _autoPickFormat(summary, goal) {
-  const text = `${goal} ${summary}`.toLowerCase();
-  if (TICKET_VENDOR_RE.test(text)) return 'WAITING_ON_VENDOR';
-  if (TICKET_CLIENT_RE.test(text)) return 'WAITING_ON_CLIENT';
-  if (TICKET_ITGLUE_RE.test(text)) return 'IT_GLUE_KB';
-  if (TICKET_EMAIL_RE.test(text)) return 'CLIENT_EMAIL';
-  if (TICKET_KICKOFF_RE.test(text)) return 'TICKET_KICKOFF';
-  return 'FINAL_NOTES';  // default
-}
-
-function formatTicketOutput(format, summary, goal, tech, options) {
-  const fmt = (format || 'auto').toString().toUpperCase();
-  const resolved = (fmt === 'AUTO') ? _autoPickFormat(summary, goal) : fmt;
-  switch (resolved) {
-    case 'TICKET_KICKOFF':     return formatTicketKickoff(summary, goal, tech, options);
-    case 'WAITING_ON_CLIENT':  return formatWaitingOnClient(summary, goal, tech, options);
-    case 'WAITING_ON_VENDOR':  return formatWaitingOnVendor(summary, goal, tech, options);
-    case 'IT_GLUE_KB':         return formatItGlueKb(summary, goal, tech, options);
-    case 'CLIENT_EMAIL':       return formatClientEmail(summary, goal, tech, options);
-    case 'FINAL_NOTES':
-    default:                   return formatTicketFinalNotes(summary, goal, tech, options);
-  }
-}
-
 const MODIFYING_ACTIONS = new Set(['click', 'click_at', 'type', 'select', 'check', 'check_all', 'press_key', 'upload_file']);
 
 // Pre-computed Sets for loop detection - avoid recreating on every action
-const NON_PRODUCTIVE_ACTIONS = new Set(['navigate', 'switch_tab', 'click', 'scroll', 'wait_for_text', 'wait_for_element', 'read_page']);
 const NON_PRODUCTIVE_READ_ACTIONS = new Set(['read_page', 'execute_js', 'scroll', 'wait_for_text', 'wait_for_element']);
 const REF_DRIVEN_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'extract', 'extract_list', 'wait_for_element', 'scroll_to']);
 const TARGETABLE_ACTIONS = new Set(['click', 'type', 'hover', 'select', 'check', 'check_all', 'extract', 'extract_list', 'scroll_to', 'wait_for_element']);
 const LOOP_EXCLUDE_TYPES = new Set(['finish', 'navigate', 'extract', 'extract_list']);
-const FILLER_WORDS = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'for', 'each', 'one', 'sentence', 'summary', 'whether', 'has', 'have', 'been', 'observed', 'in', 'is']);
 const DATA_ACTIONS = new Set(['extract', 'extract_list', 'note', 'finish']);
 const TAB_ACTIONS = new Set(['open_tab', 'switch_tab', 'close_tab']);
 const INTERACTIVE_ACTIONS = new Set(['navigate', 'click', 'click_at', 'type', 'press_key', 'select', 'scroll_to', 'scroll']);
@@ -2815,736 +2368,6 @@ const OTHER_ACTIONS = new Set(['execute_js', 'scroll', 'dismiss_overlay']);
 
 function _hostnameOf(url) {
   try { return new URL(url).hostname; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return ''; }
-}
-
-
-// ========== CAPTCHA / Bot Detection (v3.65) ==========
-const CAPTCHA_URL_PATTERNS = [
-  /validateCaptcha/i,
-  /\/captcha[/?#]/i,
-  /\/challenge[/?#]/i,
-  /\/bot-detect/i,
-  /\/verify[/?#]/i,
-  /captcha\./i,
-  /recaptcha/i,
-  /hcaptcha/i,
-  /turnstile/i,
-  /cf-chl/i,
-  /\/errors\//i,        // Amazon /errors/ pages
-  /blocked/i,
-  /\/access.denied/i,
-  /\/security.check/i,
-];
-
-const CAPTCHA_TEXT_PATTERNS = [
-  /verify.{0,10}(you are|you.re).{0,5}human/i,
-  /not.a.robot/i,
-  /prove.{0,10}(you are|you.re).{0,5}human/i,
-  /are you a robot/i,
-  /complete.the.security/i,
-  /enter.the.characters/i,
-  /type.the.characters/i,
-  /solve.this.puzzle/i,
-  /please.complete.this/i,
-  /sorry.{0,20}interrupt/i,
-  /automated.access/i,
-  /bot.detect/i,
-  /unusual.traffic/i,
-  /our.systems.have.detected/i,
-  /sorry.we.just.need/i,
-  /checking.your.browser/i,
-  /before.we.proceed/i,
-  /human.verification/i,
-  /are.you.human/i,
-];
-
-const CAPTCHA_HOST_MAP = {
-  'amazon': { altUrl: 'https://www.amazon.com', searchPath: '/s?k=' },
-  'google': { altUrl: 'https://www.google.com', searchPath: '/search?q=' },
-  'reddit': { altUrl: 'https://www.reddit.com', searchPath: '/search/?q=' },
-};
-
-function detectCaptcha(currentUrl, pageText, elementsCount) {
-  if (!currentUrl) return null;
-  
-  // URL-based detection
-  const urlHit = CAPTCHA_URL_PATTERNS.find(p => p.test(currentUrl));
-  if (urlHit) {
-    // Also check if page text confirms it
-    const textHit = pageText && CAPTCHA_TEXT_PATTERNS.find(p => p.test(pageText));
-    // Low element count on a flagged URL is strong signal
-    const lowElements = elementsCount !== undefined && elementsCount <= 5;
-    return {
-      matched: true,
-      type: 'captcha_url',
-      url: currentUrl,
-      pattern: urlHit.source,
-      textConfirm: !!textHit,
-      lowElements: !!lowElements,
-      confidence: (textHit ? 0.9 : 0.0) + (lowElements ? 0.1 : 0.0)
-    };
-  }
-  
-  // Content-based detection (only if strong signal)
-  if (pageText) {
-    const textHit = CAPTCHA_TEXT_PATTERNS.find(p => p.test(pageText));
-    if (textHit && elementsCount !== undefined && elementsCount <= 10) {
-      return {
-        matched: true,
-        type: 'captcha_text',
-        url: currentUrl,
-        pattern: textHit.source,
-        textConfirm: true,
-        lowElements: elementsCount <= 5,
-        confidence: 0.85
-      };
-    }
-  }
-  
-  return null;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// (v3.69) Smart Recovery Engine — "MacGyver Mode"
-// When stuck, analyzes page + goal and generates creative solutions.
-// Can construct URLs, suggest execute_js, find alternative approaches.
-// ═══════════════════════════════════════════════════════════════════
-function _generateSmartRecovery(goal, currentUrl, pageText, _observation, _history, _stepCount) {
-  var strategies = [];
-  var url = currentUrl || '';
-  var text = pageText || '';
-
-  // URL manipulation strategies
-  if (/amazon/i.test(url)) {
-    if (/\/s\?/i.test(url)) {
-      if (!/s=review-rank/.test(url)) strategies.push('Sort by rating: add "&s=review-rank" to URL via smart_navigate');
-      if (!/s=price-asc-rank/.test(url)) strategies.push('Sort by price: add "&s=price-asc-rank" to URL via smart_navigate');
-      if (!/s=date-desc-rank/.test(url)) strategies.push('Sort by newest: add "&s=date-desc-rank" to URL via smart_navigate');
-    }
-    strategies.push('Extract products via execute_js: document.querySelectorAll(".s-result-item") for title/price/rating/link');
-  }
-  if (/reddit/i.test(url)) {
-    strategies.push('Extract posts via execute_js: document.querySelectorAll("[data-testid=\\"post-container\\"]")');
-    if (/search/i.test(url)) strategies.push('Add "&sort=top" or "&sort=relevance" to URL');
-  }
-  if (/google/i.test(url) && /search/i.test(url)) {
-    strategies.push('Extract results via execute_js: document.querySelectorAll(".g") for title/link/snippet');
-  }
-  if (/youtube/i.test(url)) {
-    strategies.push('Extract videos via execute_js: document.querySelectorAll("ytd-video-renderer")');
-  }
-  if (/cnn|bbc|nytimes|reuters/i.test(url)) {
-    strategies.push('Extract articles via execute_js: document.querySelectorAll("article, h2, h3, [class*=headline]")');
-  }
-
-  // Goal-based strategies
-  if (/top \d|find.*\d|list.*\d|best/i.test(goal)) {
-    strategies.push('Use execute_js to extract all matching items from the page in one shot');
-  }
-  if (/then go to|also check|compare/i.test(goal)) {
-    strategies.push('Use navigate with direct URL instead of clicking through pages');
-  }
-
-  // Direct URL construction for multi-site goals
-  var siteUrls = {
-    amazon: 'amazon.com/s?k=',
-    reddit: 'reddit.com/search/?q=',
-    youtube: 'youtube.com/results?search_query=',
-    google: 'google.com/search?q='
-  };
-  var goalLower = typeof goal === 'string' ? goal.toLowerCase() : '';
-  var urlLower = typeof url === 'string' ? url.toLowerCase() : '';
-  for (const [site, siteUrl] of Object.entries(siteUrls)) {
-    if (goalLower.includes(site) && !urlLower.includes(site)) {
-      var qm = goal.match(SEARCH_QUERY_RE);
-      if (qm && qm[1]) {
-        strategies.push(`Navigate directly to https://www.${siteUrl}${encodeURIComponent(typeof qm[1] === 'string' ? qm[1].trim() : '')}`);
-      }
-    }
-  }
-
-  // Fallback strategies
-  if (text.length > 1000) {
-    strategies.push('Read the page text — you may already have enough data');
-  }
-  if (!strategies.length) {
-    strategies.push('Use execute_js to inspect DOM and find alternative approach');
-    strategies.push('Try read_page to get full content and extract what you need');
-    strategies.push('Use navigate_back and try a different path');
-  }
-
-  return strategies;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// (v3.69) Universal CDP Fallback Engine — "Nothing Stops the Agent"
-// When content script is dead AND per-action CDP fallbacks fail,
-// this translates ANY action into equivalent JavaScript via CDP.
-// Includes fuzzy selector resolution (by text, aria, role, class).
-// ═══════════════════════════════════════════════════════════════════
-async function _universalCdpFallback(tab, cmd, opts) {
-  var timeout = (opts && opts.timeout) || 5000;
-  var sel = cmd.selector || (cmd.ref ? cmd.ref.replace(REF_SELECTOR_RE, '#') : '') || '';
-  var textHint = cmd.text || cmd.value || '';
-  
-  // Build the fuzzy element finder as a self-contained JS string
-  // This gets embedded into each action's JS code
-  var finderCode = '(function(){'
-    + `var _s=${JSON.stringify(sel)},_t=${JSON.stringify(textHint)};`
-    + 'var el=null;'
-    + 'try{el=document.querySelector(_s)}catch(e){}'
-    + 'if(el&&el.offsetParent!==null)return el;'
-    + 'if(_t){'
-    +   'var _tl=_t.toLowerCase();'
-    +   'var _cands=document.querySelectorAll("button,a,input,select,[role=button],[role=link],span,div");'
-    +   'for(var i=0,_candsLen=_cands.length;i<_candsLen;i++){'
-    +     'if(_cands[i].textContent&&_cands[i].textContent.trim().toLowerCase().indexOf(_tl)>=0&&_cands[i].offsetParent!==null)return _cands[i]'
-    +   '}'
-    + '}'
-    + 'if(_s){'
-    +   'var _parts=_s.replace(/[.#\\[\\]]/g," ").trim().split(/\\s+/);'
-    +   'for(var p=0,_partsLen=_parts.length;p<_partsLen;p++){'
-    +     'if(_parts[p].length>3){'
-    +       'var _w=document.querySelectorAll("[class*="+_parts[p]+"],[id*="+_parts[p]+"]");'
-    +       'for(var w=0,_wLen=_w.length;w<_wLen;w++){if(_w[w].offsetParent!==null)return _w[w]}'
-    +     '}'
-    +   '}'
-    + '}'
-    + 'return null'
-    + '})()';
-
-  var jsCode = '';
-  
-  switch (cmd.type) {
-    case 'click':
-    case 'double_click':
-    case 'right_click': {
-      var btn = cmd.type === 'right_click' ? '2' : '0';
-      var detail = cmd.type === 'double_click' ? '2' : '1';
-      jsCode = '(function(){'
-        + `var el=${finderCode};`
-        + 'if(!el)return JSON.stringify({ok:false,error:"not found"});'
-        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
-        + `el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,button:${btn},detail:${detail}}));`
-        + 'if(typeof el.click==="function")try{el.click()}catch(e){}'
-        + 'return JSON.stringify({ok:true,result:"clicked "+el.tagName});'
-        + '})()';
-      break;
-    }
-    case 'type': {
-      var safeText = escapeJsString(cmd.text || '', '"');
-      jsCode = '(function(){'
-        + `var el=${finderCode};`
-        + 'if(!el)return JSON.stringify({ok:false,error:"input not found"});'
-        + 'el.scrollIntoView({block:"center",behavior:"instant"});'
-        + 'el.focus();'
-        + 'var _s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");'
-        + `if(_s)_s.set.call(el,"${safeText}");else el.value="${safeText}";`
-        + 'el.dispatchEvent(new Event("input",{bubbles:true}));'
-        + 'el.dispatchEvent(new Event("change",{bubbles:true}));'
-        + `return JSON.stringify({ok:true,result:"typed ${safeText.length} chars"});`
-        + '})()';
-      break;
-    }
-    case 'select': {
-      var safeVal = escapeJsString(cmd.value || '', '"');
-      jsCode = '(function(){'
-        + `var el=${finderCode};`
-        + 'if(!el)return JSON.stringify({ok:false,error:"select not found"});'
-        // Native select
-        + 'if(el.tagName==="SELECT"&&el.options){'
-        +   'for(var i=0,optsLen=el.options.length;i<optsLen;i++){'
-        +     `if(el.options[i].value==="${safeVal}"||el.options[i].text.trim().toLowerCase()==="${safeVal.toLowerCase()}"){`
-        +       'el.selectedIndex=i;el.value=el.options[i].value;'
-        +       'el.dispatchEvent(new Event("change",{bubbles:true}));'
-        +       `return JSON.stringify({ok:true,result:"selected ${safeVal}"})`
-        +     '}'
-        +   '}'
-        + '}'
-        // Custom dropdown - click to open, then find option
-        + 'el.click();'
-        + `var _vl="${safeVal}".toLowerCase();`
-        + 'var _opts=document.querySelectorAll("[role=option],li,[data-value],.option,[class*=option],[class*=item]");'
-        + 'for(var j=0,_optsLen=_opts.length;j<_optsLen;j++){'
-        +   'if(_opts[j].textContent&&_opts[j].textContent.trim().toLowerCase().indexOf(_vl)>=0&&_opts[j].offsetParent!==null){'
-        +     '_opts[j].click();'
-        +     `return JSON.stringify({ok:true,result:"selected custom: ${safeVal}"})`
-        +   '}'
-        + '}'
-        // Try aria listbox
-        + 'var _lb=document.querySelector("[role=listbox]");'
-        + 'if(_lb){var _li=_lb.querySelectorAll("[role=option]");for(var k=0,_liLen=_li.length;k<_liLen;k++){'
-        +   `if(_li[k].textContent&&_li[k].textContent.trim().toLowerCase().indexOf(_vl)>=0){_li[k].click();return JSON.stringify({ok:true,result:"selected listbox: ${safeVal}"})}`
-        + '}}'
-        + `return JSON.stringify({ok:false,error:"option not found: ${safeVal}"});`
-        + '})()';
-      break;
-    }
-    case 'check':
-    case 'check_all': {
-      jsCode = `(function(){
-        var el=${finderCode};
-        if(!el)return JSON.stringify({ok:false,error:"checkbox not found"});
-        if(el.type==="checkbox"||el.type==="radio"){el.checked=${cmd.checked !== false};el.dispatchEvent(new Event("change",{bubbles:true}));el.click();return JSON.stringify({ok:true,result:"${cmd.checked !== false ? 'checked' : 'unchecked'}"})}
-        el.click();return JSON.stringify({ok:true,result:"toggled"})
-      })()`;
-      break;
-    }
-    case 'hover': {
-      jsCode = `(function(){
-        var el=${finderCode};
-        if(!el)return JSON.stringify({ok:false,error:"hover target not found"});
-        el.scrollIntoView({block:"center",behavior:"instant"});
-        el.dispatchEvent(new MouseEvent("mouseover",{bubbles:true}));
-        el.dispatchEvent(new MouseEvent("mouseenter",{bubbles:true}));
-        return JSON.stringify({ok:true,result:"hovered"})
-      })()`;
-      break;
-    }
-    case 'scroll_to': {
-      jsCode = `(function(){
-        var el=${finderCode};
-        if(el){el.scrollIntoView({block:"center",behavior:"instant"});return JSON.stringify({ok:true,result:"scrolled to element"})}
-        window.scrollBy(0,window.innerHeight*0.8);
-        return JSON.stringify({ok:true,result:"scrolled down"})
-      })()`;
-      break;
-    }
-    case 'wait_for_element':
-    case 'wait_for_text': {
-      var searchFor = cmd.text || cmd.value || cmd.selector || '';
-      jsCode = `(function(){
-        var body=(document.body&&document.body.innerText)||"";
-        var _s=${JSON.stringify(searchFor)};
-        if(_s&&body.indexOf(_s)>=0)return JSON.stringify({ok:true,result:"found"});
-        if(_s){var _bl=body.toLowerCase(),_sl=_s.toLowerCase();if(_bl.indexOf(_sl)>=0)return JSON.stringify({ok:true,result:"found case-insensitive"})}
-        // Also try finding by selector
-        var _el=document.querySelector(${JSON.stringify(cmd.selector || '')});
-        if(_el&&_el.offsetParent!==null)return JSON.stringify({ok:true,result:"element visible"});
-        return JSON.stringify({ok:false,error:"not found: "+(typeof _s==="string"?_s:String(_s)).slice(0,50)})
-      })()`;
-      break;
-    }
-    case 'extract':
-    case 'extract_list': {
-      jsCode = `(function(){
-        var sel=${JSON.stringify(cmd.selector || '')};
-        if(sel){var els=document.querySelectorAll(sel);if(els.length){
-          var items=[];for(var i=0,elsLen=els.length;i<elsLen;i++){var el=els[i];if(el&&el.textContent)items.push(el.textContent.trim().slice(0,200));}
-          return JSON.stringify({ok:true,result:"extracted "+items.length,value:items})
-        }}
-        return JSON.stringify({ok:false,error:"nothing to extract"})
-      })()`;
-      break;
-    }
-    case 'verify': {
-      jsCode = `(function(){
-        var body=(document.body&&document.body.innerText)||"";
-        var _c=${JSON.stringify(cmd.text || cmd.value || '')};
-        if(_c&&body.indexOf(_c)>=0)return JSON.stringify({ok:true,result:"verified"});
-        if(_c){var _bl=body.toLowerCase(),_cl=_c.toLowerCase();if(_bl.indexOf(_cl)>=0)return JSON.stringify({ok:true,result:"verified case-insensitive"})}
-        return JSON.stringify({ok:false,error:"verification failed"})
-      })()`;
-      break;
-    }
-    default: {
-      if (sel) {
-        jsCode = `(function(){
-          var el=${finderCode};
-          if(!el)return JSON.stringify({ok:false,error:"not found for ${cmd.type}"});
-          el.scrollIntoView({block:"center",behavior:"instant"});
-          el.click();
-          return JSON.stringify({ok:true,result:"generic fallback clicked for ${cmd.type}"})
-        })()`;
-      }
-      break;
-    }
-  }
-  
-  if (!jsCode) return { ok: false, result: `No UFB for: ${cmd.type}` };
-
-  var ufbRes = await cdpExecuteJs(tab, `return ${jsCode}`, { timeout: timeout });
-  if (ufbRes && ufbRes.ok && ufbRes.value != null) {
-    try {
-      var parsed = typeof ufbRes.value === 'string' ? JSON.parse(ufbRes.value) : ufbRes.value;
-      if (!parsed || typeof parsed !== 'object' || parsed === null) return { ok: true, result: String(parsed != null ? parsed : 'UFB done') };
-      return { ok: parsed.ok !== false, result: parsed.result || parsed.error || 'UFB done', value: parsed.value };
-    } catch(_e) {
-      return { ok: true, result: String(ufbRes.value).slice(0, 200) };
-    }
-  }
-  return { ok: false, result: 'UFB returned no result' };
-}
-
-
-async function recoverFromCaptcha(tab, captchaInfo, currentUrl, goal, stepCount = 0) {
-  // Strategy 1: Try to click CAPTCHA checkbox/button via CDP
-  try {
-    const clickCode = `
-      // reCAPTCHA checkbox
-      const rcFrame = document.querySelector('iframe[src*="recaptcha"]');
-      if (rcFrame) {
-        const rcDoc = rcFrame.contentDocument || rcFrame.contentWindow.document;
-        const cb = rcDoc && rcDoc.querySelector('.recaptcha-checkbox');
-        if (cb) { cb.click(); return 'recaptcha_clicked'; }
-      }
-      // hCaptcha checkbox
-      const hcFrame = document.querySelector('iframe[src*="hcaptcha"]');
-      if (hcFrame) {
-        const hcDoc = hcFrame.contentDocument || hcFrame.contentWindow.document;
-        const cb = hcDoc && hcDoc.querySelector('#checkbox');
-        if (cb) { cb.click(); return 'hcaptcha_clicked'; }
-      }
-      // Cloudflare Turnstile
-      const cfChk = document.querySelector('.cf-turnstile input, [name="cf-turnstile-response"]');
-      if (cfChk) { cfChk.click(); return 'turnstile_clicked'; }
-      // Generic checkbox
-      const chk = document.querySelector('input[type="checkbox"]');
-      if (chk && document.body && document.body.innerText && document.body.innerText.length < 500) { chk.click(); return 'generic_checkbox'; }
-      // Amazon CAPTCHA - try the input field
-      const amzInput = document.querySelector('#captchacharacters');
-      if (amzInput) return 'amazon_captcha_needs_input';
-      return null;
-    `;
-    const result = await cdpExecuteJs(tab.id, clickCode, { timeout: THREE_SECONDS_MS });
-    const clickedWhat = (result && result.ok) ? result.value : null;
-    if (clickedWhat && clickedWhat !== 'null' && clickedWhat !== 'amazon_captcha_needs_input') {
-      sendSilentUpdate(`🤖 CAPTCHA auto-solved (${clickedWhat})`, stepCount);
-      try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-      await sleep(TWO_SECONDS_MS); // wait for page to process
-      return 'solved';
-    }
-  } catch (e) {
-    console.warn('[Sentinel/CAPTCHA] Auto-solve attempt failed:', getErrorMessage(e));
-  }
-  
-  // Strategy 2: Navigate to an alternative URL for the same site
-  let host;
-  try { host = new URL(currentUrl).hostname.replace(WWW_PREFIX_RE, ''); } catch (_urlErr) { host = ''; }
-  
-  for (const [key, info] of Object.entries(CAPTCHA_HOST_MAP)) {
-    if (host.includes(key) && goal) {
-      // Try to extract search query from goal and go directly to search results
-      const searchMatch = goal.match(SEARCH_SIMPLE_RE);
-      if (searchMatch && info.searchPath && searchMatch[1]) {
-        const searchUrl = info.altUrl + info.searchPath + encodeURIComponent(searchMatch[1]);
-        sendSilentUpdate('🔄 Bypassing CAPTCHA via direct search URL', stepCount);
-        try {
-          await chrome.tabs.update(tab.id, { url: searchUrl });
-          try { tel.trace('sleep', 'Sleep 3000ms', { ms: THREE_SECONDS_MS }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-          await sleep(THREE_SECONDS_MS);
-        } catch (_navErr) {
-          console.warn('[Sentinel/CAPTCHA] Navigate to search URL failed:', getErrorMessage(_navErr));
-        }
-        return 'bypassed';
-      }
-      // No search query - just go to homepage
-      sendSilentUpdate('🔄 Bypassing CAPTCHA via homepage', stepCount);
-      try {
-        await chrome.tabs.update(tab.id, { url: info.altUrl });
-        try { tel.trace('sleep', 'Sleep 3000ms', { ms: THREE_SECONDS_MS }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(THREE_SECONDS_MS);
-      } catch (_navErr) {
-        console.warn('[Sentinel/CAPTCHA] Navigate to homepage failed:', getErrorMessage(_navErr));
-      }
-      return 'bypassed';
-    }
-  }
-  
-  // Strategy 3: Go back and try again
-  try {
-    sendSilentUpdate('⬅️ CAPTCHA detected, going back', stepCount);
-    await chrome.tabs.goBack(tab.id);
-    try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-    await sleep(TWO_SECONDS_MS);
-    return 'went_back';
-  } catch (e) {
-    console.warn('[Sentinel/CAPTCHA] Go back failed:', getErrorMessage(e));
-  }
-  
-  // Strategy 4: Pause for user
-  return 'needs_user';
-}
-
-
-
-
-// ========== v3.13.0 Auto-Recovery Helpers ==========
-// Engine-side reliability layer. The LLM is good at "what's the next step";
-// it's bad at "did my code actually work, and what should I try instead".
-// These helpers move retry/recovery decisions OUT of the LLM and INTO the
-// engine, which means: fewer wasted steps, fewer hallucinations from
-// retry-go-wrong, and the LLM can focus on planning vs. error handling.
-
-/**
- * Detect whether a raw JS-result string is unproductive (empty, error,
- * non-serializable, parsed-but-empty). Used by the retry ladder and by
- * memory hygiene at write time. Single source of truth for "this didn't work".
- */
-function _isUnproductiveJsResult(raw) {
-  if (raw == null) return true;
-  if (typeof raw !== 'string') raw = String(raw);
-  if (raw === '' || raw === 'Done') return true;
-  if (raw.startsWith('JS Error:')) return true;
-  if (raw.startsWith('Code execution timed out')) return true;
-  if (raw.startsWith('Execution error')) return true;
-
-  let val = raw;
-  if (raw.startsWith('JS Result: ')) val = raw.substring(11);
-  const trim = val.trim();
-
-  if (trim.length < 5) return true;
-  if (trim === 'undefined' || trim === 'null') return true;
-  if (/^\s*\[object\s+\w+\]\s*$/i.test(trim)) return true;
-
-  // Parsed-but-empty check
-  try {
-    const p = JSON.parse(trim);
-    if (p === null) return true;
-    if (Array.isArray(p) && !p.length) return true;
-    if (typeof p === 'object') {
-      let hasOwnProp = false;
-      for (let key in p) {
-        if (Object.prototype.hasOwnProperty.call(p, key)) {
-          hasOwnProp = true;
-          break;
-        }
-      }
-      if (!hasOwnProp) return true;
-    }
-  } catch (_) { /* not JSON, that's fine */ }
-
-  return false;
-}
-
-/**
- * Run a single execute_js attempt via CDP first, falling back to content
- * script if CDP attach is denied (chrome:// pages, devtools, etc.).
- * Returns the raw "JS Result: ..." string or an error string.
- */
-async function _runExecuteJsOnce(tabId, code, timeout) {
-  // CDP path (preferred -- bypasses page CSP)
-  try {
-    const cdpResult = await cdpExecuteJs(tabId, code, { timeout });
-    if (cdpResult && cdpResult.ok) {
-      const valStr = cdpResult.value === undefined || cdpResult.value === null
-        ? ''
-        : (typeof cdpResult.value === 'object'
-            ? JSON.stringify(cdpResult.value).slice(0, MAX_CDP_RESULT_LENGTH)
-            : String(cdpResult.value).slice(0, MAX_CDP_RESULT_LENGTH));
-      return `JS Result: ${valStr}`;
-    } else if (cdpResult && cdpResult.attachDenied) {
-      // Fall through to content-script path
-    } else if (cdpResult && cdpResult.error) {
-      // Fall through too -- content script may succeed where CDP errored
-    }
-  } catch (_) { /* fall through */ }
-
-  // Content-script path (fallback for chrome:// or CDP-failed sites)
-  try {
-    const csRes = await sendMessageWithRetry(tabId, {
-      action: 'execute_command',
-      command: { type: 'execute_js', code, timeout }
-    });
-    return csRes || 'Done';
-  } catch (e) {
-    return `JS Error: ${getErrorMessage(e)}`;
-  }
-}
-
-/**
- * Auto-recovery retry ladder for execute_js. Tries the LLM's original code
- * first; if that returns unproductive (empty / null / [object Object] /
- * non-serializable), automatically retries with progressively more
- * conservative strategies. The LLM is NEVER asked to choose between these --
- * the engine handles it mechanically.
- *
- * Strategies (in order):
- *   1. original   -- LLM's intended code
- *   2. body_text  -- document.body.innerText (covers null-query and
- *                    selector-miss cases; LLM can parse text in finish)
- *   3. visible    -- aggregated innerText from all common visible
- *                    elements (covers SPA pages where body.innerText
- *                    misses lazy-rendered children)
- *
- * Returns { raw, strategy }. raw is the same shape the rest of the
- * pipeline expects; strategy is for logging / forensic run log.
- */
-async function _runExecuteJsWithRetryLadder(tabId, originalCode, timeout) {
-  // Strategy 1: LLM's original code
-  let raw = await _runExecuteJsOnce(tabId, originalCode || '', timeout);
-  if (!_isUnproductiveJsResult(raw)) {
-    return { raw, strategy: 'original' };
-  }
-
-  // Strategy 2: body.innerText fallback (covers most LLM-extraction failures)
-  const FB_BODY_TEXT = 'return (document.body && document.body.innerText) ? document.body.innerText.substring(0, 8000) : "";';
-  raw = await _runExecuteJsOnce(tabId, FB_BODY_TEXT, timeout);
-  if (!_isUnproductiveJsResult(raw)) {
-    return { raw, strategy: 'body_text_fallback' };
-  }
-
-  // Strategy 3: aggregate visible-element text (SPA-heavy sites where
-  // body.innerText returns just the loading state)
-  const FB_VISIBLE = "return Array.from(document.querySelectorAll('h1,h2,h3,h4,p,td,li,a,span,div')).map(e => (e.innerText || '').trim()).filter(t => t && t.length > 3).slice(0, 300).join('\\n').substring(0, 8000);";
-  raw = await _runExecuteJsOnce(tabId, FB_VISIBLE, timeout);
-  if (!_isUnproductiveJsResult(raw)) {
-    return { raw, strategy: 'visible_text_fallback' };
-  }
-
-  return { raw, strategy: 'all_failed' };
-}
-
-/**
- * Memory-hygiene gate: should this candidate value be written to agentMemory?
- * Returns { ok: bool, reason: string }. Reasons help debug / log why a write
- * was rejected. Run BEFORE writing -- prevents garbage from polluting future
- * prompts and the report-generator's memory summary.
- */
-function _shouldAcceptMemoryWrite(key, candidateValue, agentMemory) {
-  if (!key || typeof key !== 'string') return { ok: false, reason: 'empty key' };
-  if (candidateValue == null) return { ok: false, reason: 'null/undefined value' };
-
-  const valStr = typeof candidateValue === 'string'
-    ? candidateValue
-    : (Array.isArray(candidateValue) || typeof candidateValue === 'object'
-        ? JSON.stringify(candidateValue)
-        : String(candidateValue));
-
-  if (valStr.length < 10) return { ok: false, reason: 'value too short' };
-
-  // Reject error-shaped strings
-  if (/^(JS Error|Execution error|Code execution timed out|Element not found|JS execution failed)/i.test(valStr.trim())) {
-    return { ok: false, reason: 'error-shaped value' };
-  }
-
-  // Reject [object Foo] strings
-  if (/^\s*\[object\s+\w+\]\s*$/i.test(valStr.trim())) {
-    return { ok: false, reason: 'non-serialized object' };
-  }
-
-  // Reject duplicates -- if an existing memory key has the EXACT same value,
-  // overwriting it is meaningless and clutters the prompt.
-  for (const [existingKey, ev] of Object.entries(agentMemory || {})) {
-    if (existingKey === key) continue;
-    const evStr = typeof ev === 'string' ? ev : JSON.stringify(ev);
-    if (evStr === valStr) {
-      return { ok: false, reason: `duplicates existing key ${existingKey}` };
-    }
-  }
-
-  return { ok: true, reason: '' };
-}
-
-/**
- * (3.13.0) Pre-finish data-completeness check. Parse the goal text for
- * data fields the user asked for ("extract X, Y, Z for each item"), then
- * verify memory has plausible data for each. Returns null if everything's
- * present, or a string describing the gap so we can block the finish and
- * push the LLM to extract the missing piece.
- *
- * Heuristic, not authoritative -- false positives only delay finish by
- * one step, which is cheap. False negatives let a sparse report through,
- * which is the existing v3.10 hallucination gate's job. This adds a
- * complementary "did you actually get what was asked for" pass.
- */
-function _checkPreFinishCompleteness(goal, agentMemory, history) {
-  if (!goal || typeof goal !== 'string') return null;
-  if (!agentMemory || typeof agentMemory !== 'object' || agentMemory === null) return null;
-  if (!Array.isArray(history)) history = [];
-
-  const memorySerialized = JSON.stringify(agentMemory).toLowerCase();
-  const noteText = history
-    .filter(h => h && h.action && h.action.type === 'note' && h.action.text)
-    .map(h => String(h.action.text).toLowerCase())
-    .join(' ');
-  const allEvidence = `${memorySerialized} ${noteText}`;
-
-  // Patterns we care about: "extract X" / "give me X" / "find X" + commas
-  // For each: the CVE ID, CVSS v3 base score, affected FortiOS versions, ...
-  const fieldListMatch = goal.match(FIELD_LIST_RE);
-  if (!fieldListMatch || !fieldListMatch[1]) return null;
-
-  const fieldList = fieldListMatch[1];
-  // Split on commas / "and" / "&" -- get individual field names
-  const rawFields = fieldList.split(FIELD_LIST_SPLIT_RE)
-    .map(f => f.trim().replace(FIELD_PREFIX_CLEAN_RE, ''))
-    .filter(f => f.length > 3 && f.length < 60);
-
-  if (rawFields.length < 2) return null;  // not a structured field list
-
-  // For each requested field, check whether ANY token from it appears in
-  // memory or notes. This is a deliberately loose heuristic.
-  const missing = [];
-  for (const field of rawFields) {
-    // Pull "key" tokens from the field name (skip filler words)
-    const tokens = typeof field === 'string' ? field.toLowerCase().split(WHITESPACE_SPLIT_RE).filter(t => t.length > 3 && !FILLER_WORDS.has(t)) : [];
-    if (!tokens.length) continue;
-    // Match if ANY meaningful token from this field shows up in evidence
-    const found = typeof allEvidence === 'string' && tokens.some(t => allEvidence.includes(t));
-    if (!found) missing.push(field);
-  }
-
-  if (!missing.length) return null;
-
-  // Don't fire on every gap -- only if MORE THAN HALF of asked fields are
-  // missing. Otherwise the existing hallucination gate handles it via
-  // [unverified] tagging.
-  if (!rawFields.length || missing.length / rawFields.length < 0.5) return null;
-
-  return `Goal asked for: ${rawFields.join(', ')}. Memory is missing token-evidence for: ${missing.join(', ')}. Try one more execute_js or extract pass before finishing -- the retry ladder will auto-fall-back to body.innerText if your selectors miss.`;
-}
-
-/**
- * URL-aware loop detector. Catches "agent did 7 navigates to 7 different
- * pages, none produced a productive memory write". Loop detection that
- * requires repeated EXACT actions is too narrow -- this version says:
- *
- *   "If 3+ of the last 4 actions are the same TYPE, and none of them
- *    resulted in a productive memory write, that is a loop. Force
- *    a strategy shift."
- *
- * Returns { isLoop: bool, type: string, count: number } so the caller can
- * inject a context-specific directive.
- */
-function _detectActionTypeLoop(history, _agentMemory) {
-  if (!Array.isArray(history) || history.length < 4) return { isLoop: false };
-  const recent = history.slice(-4);
-  const types = recent.map(h => (h && h.action && h.action.type) || '');
-  // Most common type in the window
-  const counts = {};
-  for (const t of types) counts[t] = (counts[t] || 0) + 1;
-  let dominantType = null, dominantCount = 0;
-  for (const [t, count] of Object.entries(counts)) {
-    if (count > dominantCount) { dominantType = t; dominantCount = count; }
-  }
-  if (dominantCount < 3) return { isLoop: false };
-
-  // Check whether THIS dominant-type window produced any productive memory.
-  // A "productive" step is one that wrote a key with a usable value to memory.
-  // We can't know which key was written by which step, but we can check:
-  // did the memory keys count GROW during this 4-step window? If not, loop.
-  // (Imperfect but conservative -- false positives only delay the run a bit.)
-  // Implementation: store a memory-key-count snapshot in agent state at each
-  // step and compare. For now we use a simpler heuristic: the dominant type
-  // is non-modifying AND no new note/extract/execute_js-with-key happened.
-  if (!NON_PRODUCTIVE_ACTIONS.has(dominantType)) return { isLoop: false };
-
-  // Count productive actions in the window
-  const recentProductive = recent.filter(h => {
-    if (!h || !h.action) return false;
-    const t = h.action.type;
-    if (t === 'note') return true;
-    if (EXTRACT_TYPE_RE.test(t)) return !!h.action.key;
-    if (t === 'execute_js') return !!h.action.key;
-    return false;
-  });
-  if (!recentProductive.length) {
-    return { isLoop: true, type: dominantType, count: dominantCount };
-  }
-
-  return { isLoop: false };
 }
 
 
@@ -4844,7 +3667,7 @@ async function runAgentLoop(goal, workingTabId) {
       };
 
       const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -7896,6 +6719,40 @@ return { ok: true, value: el.value };
       await markRunCompleted(activeClientId, clientKnowledgeUsedIds);
     }
   } catch (_) { /* non-fatal */ }
+  // (sub-project C) Neuralis brain WRITE path. After a run, ship REDACTED
+  // procedural learning (successful self-heals, scrubbed UI notes) to the brain
+  // as source:"sentinel-override" neurons. Consent-gated (brainProducerEnabled +
+  // last-confirmed freshness), redaction-gated (PII scrub + client denylist,
+  // fail-closed), and FAILS OPEN — same isolation as the client-knowledge block
+  // above. Never breaks the run finish path. No offline queue.
+  try {
+    // Gather run context conservatively — each piece is optional.
+    // Platform id was captured at run start (sub-project B's block) into the
+    // module-level _runStartPlatformId; reuse it as the producer tag here.
+    const _producerPlatformId = (typeof _runStartPlatformId === 'string') ? _runStartPlatformId : '';
+    let _producerNotes = [];
+    try {
+      // `note` actions the agent took during the run -> UI-structure observations.
+      _producerNotes = (history || [])
+        .filter((h) => h && h.action && h.action.type === 'note' && typeof h.action.text === 'string')
+        .map((h) => h.action.text)
+        .filter((t) => t && t.trim());
+    } catch (_) { _producerNotes = []; }
+    let _producerClientIdentity = {};
+    try {
+      // The producer's _loadDenylist reads the full client identity (name,
+      // tenant) + all known clients from chrome.storage.local. We only need to
+      // hand it the active client id as a hint so it can resolve the active one.
+      if (activeClientId) _producerClientIdentity = { id: activeClientId };
+    } catch (_) { _producerClientIdentity = {}; }
+    await publishRunLearning({
+      platformId: _producerPlatformId,
+      healingHistory: Array.isArray(healingHistory) ? healingHistory.slice() : [],
+      recoveryEvents: [],
+      notes: _producerNotes,
+      clientIdentity: _producerClientIdentity,
+    });
+  } catch (_) { /* non-fatal: producer must never break the run finish */ }
   // Phase 8.2: Emit final status narration for popup status bar
   emitAgentStatus(workingTabId, 'complete', `Agent finished — ${stepCount} steps, ${apiCallCount} API calls`);
   // (Phase 5) Final learned patterns emission on run finish
@@ -8082,28 +6939,12 @@ export {
   detectMfaInText,
   detectSignInWall,
   evaluateHallucinationRisk,
-  _isUnproductiveJsResult,
-  _shouldAcceptMemoryWrite,
-  _checkPreFinishCompleteness,
-  _detectActionTypeLoop,
   generateHeuristicPlan,
-  formatTicketOutput,
-  formatTicketFinalNotes,
-  formatTicketKickoff,
-  formatWaitingOnClient,
-  formatWaitingOnVendor,
-  formatItGlueKb,
-  formatClientEmail,
-  summarizeHistoryBatch,
-  maybeRollupHistory,
   detectStall,
   isConfigChangeGoal,
   hasRecentCommitClick,
   hasPostCommitVerification,
   _detectGoalModeDirective,
-  _autoPickFormat,
-  extractTicketNumber,
-  isTicketInvestigationGoal,
   captureReportData,
   _countSummaryClaims,
   _countSpecificClaims,
@@ -8112,7 +6953,6 @@ export {
   describeAction,
   _describeTarget,
   // Additional test-only exports for deep coverage
-  getTechnicianInfo,
   saveLearnedPattern,
   enforceRateLimit,
   sleep,
@@ -8121,8 +6961,6 @@ export {
   _waitForModeMismatchDecision,
   _handleModeMismatchCheck,
   undoStack,
-  _runExecuteJsOnce,
-  _runExecuteJsWithRetryLadder,
   activityStart,
   activityDone,
   activityFail,
@@ -8138,10 +6976,6 @@ export {
   _hostnameOf,
   _updateRunLogIndex,
   // Coverage gap exports
-  detectCaptcha,
-  _generateSmartRecovery,
-  _universalCdpFallback,
-  recoverFromCaptcha,
   _cdpDismissOverlays,
   _cdpObservePage,
   clickAtCoordinates,

@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased — feat/neuralis-brain-integration
+
+### Features
+- **Neuralis brain READ path (sub-project B)** — opt-in `brainEnabled` toggle.
+  At run start the agent recalls shared knowledge by platform id / host and
+  injects a `## BRAIN KNOWLEDGE` section into the system prompt. Off by default.
+- **Neuralis brain WRITE path (sub-project C)** — opt-in `brainProducerEnabled`
+  toggle with three-layer consent. At run end ships **redacted, procedural**
+  learning (successful self-heals, scrubbed UI notes) as `source:"sentinel-override"`
+  neurons. Off by default, confirmation dialog on enable, re-prompt after 7 days.
+
+### Trust / Security
+- **Procedural-only, fail-closed redaction gate** on writes: PII scrub (reused
+  from `agent-reporting.js`) + client-entity denylist + length cap. A candidate
+  still carrying a client name/tenant/id is dropped entirely.
+- **Leak-zero recall keys**: read path recalls by platform id / start-URL host,
+  never client name, tenant, or raw goal text.
+- **Fail-open both paths**: a down/broken brain never breaks a run. One
+  `console.warn` per run ("brain UNREACHABLE") on outage — never spam.
+- **Forward-compat dedupe**: producer attaches a client-side SHA-256
+  `content_hash` to every neuron (API does not dedupe today).
+
+### Tests
+- **37 new tests** across read + write paths + an agent-engine integration test
+  that captures `agentState.brainKnowledgeText` directly. Full suite green
+  (215 suites, 9829+ tests).
+
+### Documentation
+- `docs/NEURALIS-INTEGRATION.md` — what the two toggles do, localhost:8000
+  requirement, off-by-default posture, trust model.
+- `docs/superpowers/specs/NEURALIS-BROWSER-SMOKE-CHECKLIST.md` — human
+  browser-smoke checklist (read/write/fail-open/redaction tests).
+
 ## v20.0.0 — 2026-06-10 (Production Release)
 
 ### Security

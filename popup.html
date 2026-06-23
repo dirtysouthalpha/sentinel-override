@@ -536,6 +536,26 @@
           </div>
 
           <div class="form-row form-field">
+            <label class="form-section-label">🧠 Neuralis Brain (experimental)</label>
+            <label class="check-label-lg">
+              <input type="checkbox" id="brainEnabledToggle" style="width:16px;height:16px;">
+              <span id="brainEnabledLabel">Query a local knowledge brain at the start of each run to inject community wisdom. Requires a Neuralis instance reachable from this machine. No client data is sent.</span>
+            </label>
+            <div style="margin-top:6px;">
+              <label for="brainBaseUrlInput" style="font-size:11px; display:block; margin-bottom:2px;">Brain base URL</label>
+              <input type="text" id="brainBaseUrlInput" class="form-input-sm" style="width:100%;" placeholder="http://localhost:8000">
+            </div>
+          </div>
+
+          <div class="form-row form-field">
+            <label class="form-section-label">🧠 Neuralis Brain Producer (experimental, write)</label>
+            <label class="check-label-lg">
+              <input type="checkbox" id="brainProducerEnabledToggle" style="width:16px;height:16px;">
+              <span id="brainProducerEnabledLabel">After each run, send redacted, platform-level operating notes to your Neuralis brain so future runs benefit. Separate opt-in from reading. No client names, tenants, emails, or IPs are sent.</span>
+            </label>
+          </div>
+
+          <div class="form-row form-field">
             <label class="form-section-label">Expansion Mode</label>
             <select id="adaptiveExpansionModeSelect" class="form-input-sm" style="width:100%;">
               <option value="light">Light (short goals only)</option>
