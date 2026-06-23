@@ -930,59 +930,9 @@ function activityUpdate(stepNumber, key, label) {
   try { sendAgentActivity(stepNumber, key, label, 'in_progress', null); } catch (e) { console.error('[Sentinel] Agent activity send failed:', getErrorMessage(e)); }
 }
 
-// ========== Step Screenshot Capture ==========
-// Lightweight screenshot helper for before/after action capture.
-// Uses chrome.tabs.captureVisibleTab for quick JPEG captures without
-// the full takeScreenshot pipeline (no cache, no CDP, no DPR metadata).
-async function captureStepScreenshot(tabId) {
-  try {
-    const tab = await chrome.tabs.get(tabId);
-    const windowId = tab.windowId;
-    const dataUrl = await new Promise((resolve, reject) => {
-      chrome.tabs.captureVisibleTab(windowId, { format: 'jpeg', quality: 60 }, (result) => {
-        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-        else resolve(result);
-      });
-    });
-    return dataUrl; // base64 data URL
-  } catch (_e) { return null; }
-}
-
-// ========== Zoom & Inspect — Region-of-Interest Markup ==========
-// When the LLM specifies a zoom/inspect region (dense UI where detail matters),
-// this appends region coordinates to the screenshot prompt so the model knows
-// which viewport area to focus on. Service-worker compatible — no canvas needed.
-let _zoomRegion = null; // { x, y, width, height } in viewport coordinates
-
-/**
- * Set the current zoom/inspect region for the next LLM call.
- * @param {Object|null} region - { x, y, width, height } in viewport coords, or null to clear.
- */
-export function setZoomRegion(region) {
-  _zoomRegion = region || null;
-}
-
-/**
- * Get the current zoom region (for status display).
- * @returns {Object|null}
- */
-export function getZoomRegion() {
-  return _zoomRegion;
-}
-
-/**
- * Format zoom region as a text annotation for the LLM prompt.
- * Appended to the user content alongside the screenshot so the model
- * knows which area of the dense UI to focus on.
- * @param {Object|null} region - { x, y, width, height } in viewport coords.
- * @returns {string} Annotation text, or empty string if no region set.
- */
-function formatZoomRegion(region) {
-  if (!region || typeof region !== 'object') return '';
-  const { x, y, width, height } = region;
-  if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return '';
-  return `\n[ZOOM REGION] Focus on viewport area: x=${Math.round(x)}, y=${Math.round(y)}, width=${Math.round(width)}, height=${Math.round(height)}. The relevant content is in this region — pay extra attention to detail here.`;
-}
+// ========== Step Screenshot Capture + Zoom — extracted to agent-screenshot.js ==========
+import { captureStepScreenshot, setZoomRegion, getZoomRegion, formatZoomRegion } from './agent-screenshot.js';
+export { setZoomRegion, getZoomRegion };
 
 // ========== Configuration ==========
 
@@ -1081,7 +1031,7 @@ export function resetAgentState() {
   _activeCanaryDeployment = null;
   selfHealingEnabled = false;
   healingHistory = [];
-  _zoomRegion = null; // reset zoom/inspect region between runs
+  setZoomRegion(null); // reset zoom/inspect region between runs
   resetAllContexts();
 }
 
@@ -2848,8 +2798,8 @@ async function runAgentLoop(goal, workingTabId) {
         previousFailures: consecutiveFailures || 0
       };
 
-      const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const _zoomAnnotation = formatZoomRegion(getZoomRegion());
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -2981,7 +2931,7 @@ async function runAgentLoop(goal, workingTabId) {
           '</visual_grounding>'
         ].join('\n');
 
-        const _zoomAnnotation = formatZoomRegion(_zoomRegion);
+        const _zoomAnnotation = formatZoomRegion(getZoomRegion());
         const _visionUserContent = [
           `Goal: ${goal}`,
           `URL: ${currentUrl}`,
@@ -2997,7 +2947,7 @@ async function runAgentLoop(goal, workingTabId) {
           'What is your next action?'
         ].join('\n');
         // Clear zoom region after consuming it (one-shot)
-        _zoomRegion = null;
+        setZoomRegion(null);
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -3327,7 +3277,7 @@ async function runAgentLoop(goal, workingTabId) {
             // Non-fatal but could affect next action execution
           }
           base64Image = null; // release screenshot memory after LLM call
-          _zoomRegion = null; // clear zoom region after consuming it
+          setZoomRegion(null); // clear zoom region after consuming it
           // Sync apiCallCount — always, even on failure. callLLM increments
           // agentState.apiCallCount before the fetch, so if the call throws the
           // module-level var must still be updated or the final log shows 0.
