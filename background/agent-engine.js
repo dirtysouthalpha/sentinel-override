@@ -638,6 +638,7 @@ let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained bef
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
+import { sharedState } from './agent-shared-state.js';
 // Re-exports from agent-ticket-format.js (backward compatibility)
 export { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat } from './agent-ticket-format.js';
 export { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
@@ -1124,8 +1125,7 @@ export function resetAgentState() {
   _activityStartedAt.clear(); // clear activity start timestamps between runs
   // Reset CDP observe-path optimization flags so a new run always gets a fresh
   // page ready check and overlay nuke on its first observation.
-  _pageWasReady = false;
-  _lastNukeClean = false;
+  sharedState.reset();
   // Phase 5: Reset advanced intelligence state
   _predictiveAnalysisEnabled = false;
   profilingEnabled = false;
@@ -1899,7 +1899,7 @@ async function _cdpObservePage(tabId) {
     + '  url: window.location.href, readyState: document.readyState };';
 
   // SPEED: Skip ready check if previous observe found page was loaded
-  if (_pageWasReady) {
+  if (sharedState.pageWasReady) {
     // Skip page ready check - previous observe confirmed loaded
   } else try {
     const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 2000 });
@@ -1991,13 +1991,13 @@ async function _cdpObservePage(tabId) {
   // In batch mode (queue has items), always use cache if available (no TTL limit)
   const _inBatchMode = _pendingCommandQueue?.length;
   const _cacheTTL = _inBatchMode ? BATCH_MODE_CACHE_TTL_MS : API_CACHE_TTL_MS;
-  if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
+  if (sharedState.cachedObservation && sharedState.cachedObservation.url === currentUrl && (Date.now() - sharedState.cachedObservation.timestamp) < _cacheTTL) {
     _observeCacheHits++;
-    return _cachedObservation;
+    return sharedState.cachedObservation;
   }
   const result = await cdpExecuteJs(tabId, code, { timeout: THREE_SECONDS_MS });
   if (result?.ok && result?.value) {
-    _pageWasReady = true; // Mark page as ready for next step
+    sharedState.pageWasReady = true; // Mark page as ready for next step
     return result.value;
   }
   return null;
@@ -2094,14 +2094,14 @@ async function _cdpDismissOverlays(tabId, overlays) {
       ].join('\n');
 
   // SPEED: Skip nuke entirely when no overlays detected AND last nuke was clean
-  if (!overlays.length && _lastNukeClean) {
+  if (!overlays.length && sharedState.lastNukeClean) {
     // Skip nuke - no overlays and last nuke was clean
   } else try {
     const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: FIVE_SECONDS_MS });
     if (nukeResult && nukeResult.ok) {
       const removed = (nukeResult.value || 0);
       totalRemoved += removed;
-      _lastNukeClean = (removed === 0); // Track for skip optimization
+      sharedState.lastNukeClean = (removed === 0); // Track for skip optimization
       // (v3.59) Post-nuke integrity check: verify page still has content
       if ((nukeResult.value || 0) > 0) {
         const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: THREE_SECONDS_MS });
@@ -2135,10 +2135,6 @@ async function _cdpDismissOverlays(tabId, overlays) {
 }
 
 // Track whether we're in CDP fallback mode for the current step
-let _cdpFallbackActive = false;
-let _lastNukeClean = false; // Track if last nuke found nothing to remove
-let _pageWasReady = false; // Skip ready check if previous observe succeeded
-let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
 let _observeCacheHits = 0;
 
 
@@ -2541,7 +2537,7 @@ async function runAgentLoop(goal, workingTabId) {
   // Observation skip cache — reused when previous step was non-mutating and
   // the URL/SPA-route hasn't changed. DOM content hash catches SPA changes
   // without URL changes.
-  _cachedObservation = null;
+  sharedState.cachedObservation = null;
   let _cachedPageContent = null;
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
@@ -2696,7 +2692,7 @@ async function runAgentLoop(goal, workingTabId) {
           spaCtx.screenshotCache.lastScreenshotUrl = null;
         }
         // Invalidate observation cache so the next step does a full re-scan.
-        _cachedObservation = null;
+        sharedState.cachedObservation = null;
         _cachedPageContent = null;
         _lastObservedUrl = '';
         _lastObservedDomHash = 0;
@@ -2838,7 +2834,7 @@ async function runAgentLoop(goal, workingTabId) {
               await chrome.tabs.update(tab, { url: goalUrl });
               await waitForPageLoad(tab);
               await waitForPageReady(tab);
-              _cachedObservation = null; // Invalidate cache after navigation
+              sharedState.cachedObservation = null; // Invalidate cache after navigation
               const reinjected = await injectContentScript(tab);
               if (reinjected) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: `Navigated to ${goalUrl}` });
@@ -2893,7 +2889,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else {
         console.warn(`[Sentinel/SPEED] Skipping content script injection (${consecutiveInjectionFailures} failures)`);
       }
-      _cdpFallbackActive = false;
+      sharedState.cdpFallbackActive = false;
       if (!scriptReady) {
         consecutiveInjectionFailures++;
         sendSilentUpdate('Content script failed -- trying CDP fallback', stepCount);
@@ -2902,7 +2898,7 @@ async function runAgentLoop(goal, workingTabId) {
         // After 2 failures, switch to CDP mode — observe, dismiss overlays, read page.
         if (consecutiveInjectionFailures >= 2) {
           console.warn(`[Sentinel] Content script failed ${consecutiveInjectionFailures} times — activating CDP fallback`);
-          _cdpFallbackActive = true;
+          sharedState.cdpFallbackActive = true;
           // (v3.57) On first CDP activation, check if page has any DOM at all.
           // If empty (no body, no title), reload the page via CDP.
           if (consecutiveInjectionFailures === 2) {
@@ -2950,7 +2946,7 @@ async function runAgentLoop(goal, workingTabId) {
       } catch (_e) { /* non-fatal */ }
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
-      if (_cdpFallbackActive) {
+      if (sharedState.cdpFallbackActive) {
         // (v3.54→3.55) CDP fallback: always run nuclear overlay removal.
         // Don't wait for overlay detection — just nuke everything that looks like one.
         try {
@@ -2982,7 +2978,7 @@ async function runAgentLoop(goal, workingTabId) {
       const _obsUrl = (tabInfo && tabInfo.url) || '';
 
       // Cache repeated condition for observation skip logic (perf)
-      const _cacheCondition = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation;
+      const _cacheCondition = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!sharedState.cachedObservation;
 
       // Compute a lightweight DOM content hash via the content script to detect
       // SPA content changes that don't alter the URL. The hash is a stable
@@ -3018,7 +3014,7 @@ async function runAgentLoop(goal, workingTabId) {
       const _observedHashBefore = _lastObservedDomHash;
       const _skipObserve = _cacheCondition && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
       if (_skipObserve) {
-        observation = _cachedObservation;
+        observation = sharedState.cachedObservation;
         pageContent = _cachedPageContent;
         activityDone(stepCount, 'observe', '(cached — page unchanged)', null);
       } else {
@@ -3030,7 +3026,7 @@ async function runAgentLoop(goal, workingTabId) {
         sendAgentStatus('observing', 'Reading page structure...');
         activityStart(stepCount, 'observe', 'Observing page');
         try {
-          if (_cdpFallbackActive) {
+          if (sharedState.cdpFallbackActive) {
             // (v3.54) CDP fallback: observe page via DevTools Protocol instead of content script
             const cdpObs = await _cdpObservePage(tab);
             if (cdpObs) {
@@ -3082,7 +3078,7 @@ async function runAgentLoop(goal, workingTabId) {
           const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
           const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
           activityDone(stepCount, 'observe', `Observed ${elemCount} elements, ${textLen} chars of text`, null);
-          _cachedObservation = observation;
+          sharedState.cachedObservation = observation;
           _cachedPageContent = pageContent;
           _lastObservedUrl = _obsUrl;
           // Update DOM hash from the fresh observation
@@ -3667,7 +3663,7 @@ async function runAgentLoop(goal, workingTabId) {
       };
 
       const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -5343,13 +5339,13 @@ async function runAgentLoop(goal, workingTabId) {
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
           await waitForPageReady(tab);
-          _cachedObservation = null; // Invalidate cache after navigate action
+          sharedState.cachedObservation = null; // Invalidate cache after navigate action
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
             try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
             // In CDP mode, content script failure is expected — don't mark as action failure
-            if (_cdpFallbackActive) {
+            if (sharedState.cdpFallbackActive) {
               result = `Navigated to ${command.url}`;
               // Don't set actionFailed — navigation succeeded, CDP will handle observation
             } else {
@@ -5754,7 +5750,7 @@ return { ok: true, value: el.value };
 
       // (v3.54) CDP fallback for click: when content script can't inject and click fails,
       // resolve the element via CDP and click its center coordinates.
-      if (actionFailed && _cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
+      if (actionFailed && sharedState.cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
@@ -5788,7 +5784,7 @@ return { ok: true, value: el.value };
         } catch (_) { /* CDP click fallback non-fatal */ }
       }
       // (v3.66) CDP fallback for select: when content script is dead, set dropdown via CDP JS
-      if (actionFailed && _cdpFallbackActive && command.type === 'select') {
+      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'select') {
         try {
           // Cache JSON.stringify calls to avoid redundant serialization (perf)
           const _selJson = JSON.stringify(command.selector || '');
@@ -5818,7 +5814,7 @@ return { ok: true, value: el.value };
 
       // (v3.66) CDP fallback for type: when content script can't inject,
       // resolve the input element via CDP, focus it, and dispatch keyboard events.
-      if (actionFailed && _cdpFallbackActive && command.type === 'type') {
+      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'type') {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
@@ -5877,7 +5873,7 @@ return { ok: true, value: el.value };
       // Handles: click, type, select, check, hover, scroll_to, wait_for_*,
       // extract, verify, and any unknown action type. Nothing stops the agent.
       // ═══════════════════════════════════════════════════════════════
-      if (actionFailed && _cdpFallbackActive) {
+      if (actionFailed && sharedState.cdpFallbackActive) {
         try {
           const _ufbResult = await _universalCdpFallback(tab, command, { timeout: FIVE_SECONDS_MS });
           if (_ufbResult && _ufbResult.ok) {
@@ -5939,7 +5935,7 @@ return { ok: true, value: el.value };
       // (v3.67) UNIVERSAL CDP fallback — when content script is dead and a specific
       // CDP handler didn't fire, convert the failed action to execute_js via CDP.
       // Covers: select, check, check_all, scroll_to, wait_for_element, hover, wait_for_text
-      if (actionFailed && _cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
+      if (actionFailed && sharedState.cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
         try {
           let _universalJs = '';
           const _sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
@@ -6174,7 +6170,7 @@ return { ok: true, value: el.value };
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
         const _smartStratMsg = _smartStrats.length ? `SMART STRATEGIES for this page:\n${_smartStrats.map(s => `→ ${s}`).join('\n')}\n` : '';
-        const _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row${_pageUnchanged ? ' with NO page change' : ''}. STOP using ${command.type}. ${_cdpFallbackActive ? 'The content script is NOT available on this page (CDP fallback active). ' : ''}Switch to a completely different approach. Examples:\n- Use execute_js to extract data or interact with the DOM directly\n- Use click with a specific selector to interact with elements\n- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n- Read the page text content and extract what you need without interacting\n\n${_smartStratMsg}`;
+        const _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row${_pageUnchanged ? ' with NO page change' : ''}. STOP using ${command.type}. ${sharedState.cdpFallbackActive ? 'The content script is NOT available on this page (CDP fallback active). ' : ''}Switch to a completely different approach. Examples:\n- Use execute_js to extract data or interact with the DOM directly\n- Use click with a specific selector to interact with elements\n- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n- Read the page text content and extract what you need without interacting\n\n${_smartStratMsg}`;
         historyPush({
           step: stepCount,
           action: { type: 'note', text: _recoveryMsg },
