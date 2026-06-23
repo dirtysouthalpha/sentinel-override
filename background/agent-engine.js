@@ -4843,7 +4843,7 @@ return { ok: true, value: el.value };
 
       // (v3.54) CDP fallback for click: when content script can't inject and click fails,
       // resolve the element via CDP and click its center coordinates.
-      if (actionFailed && sharedState.cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
+      if (actionFailed && (/^(click|right_click|double_click)$/.test(command.type))) {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
@@ -4877,7 +4877,7 @@ return { ok: true, value: el.value };
         } catch (_) { /* CDP click fallback non-fatal */ }
       }
       // (v3.66) CDP fallback for select: when content script is dead, set dropdown via CDP JS
-      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'select') {
+      if (actionFailed && command.type === 'select') {
         try {
           // Cache JSON.stringify calls to avoid redundant serialization (perf)
           const _selJson = JSON.stringify(command.selector || '');
@@ -4907,7 +4907,7 @@ return { ok: true, value: el.value };
 
       // (v3.66) CDP fallback for type: when content script can't inject,
       // resolve the input element via CDP, focus it, and dispatch keyboard events.
-      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'type') {
+      if (actionFailed && command.type === 'type') {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {

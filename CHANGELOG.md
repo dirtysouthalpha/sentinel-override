@@ -2697,3 +2697,41 @@ A focused pass on **what the user sees in the popup while the agent runs**. The 
 **Behavior change:**
 - **Before:** Every new tab loaded highlight/cursor/quick-assist scripts immediately
 - **After:** Only agent-attached tabs get these scripts. Quick Assist loads on right-click → Quick Assist
+
+## [21.4.0] — 2026-06-23
+
+### 🔧 Full Audit Closure + CDP Trusted Input
+
+Completed a comprehensive assessment of all 30 items from the May 6 codebase audit. Most items were already fixed in the 18 versions since the audit. This release closes the remaining gaps.
+
+### Fixed This Release
+
+#### #9 CDP Trusted Input — Gate Removed
+- Removed `cdpFallbackActive` gate from CDP click/type/select fallback paths
+- **Before:** Trusted CDP input only fired after 2 consecutive content-script injection failures
+- **After:** Trusted CDP input fires after ANY action failure — sites that reject synthetic events (`isTrusted: false`) now get trusted `Input.dispatchMouseEvent` immediately
+
+#### #6 Prompt Injection Regex Pre-Check
+- Added regex pre-check for common injection phrases in page content
+- Detects: "ignore previous instructions", "disregard prior", "admin override", "new instructions:", "system prompt", "you are now", "forget everything", "DAN", "jailbreak"
+- Prepends warning to page content when detected so the model treats it as untrusted data
+
+### Verified Already Fixed (No Work Needed)
+
+| # | Item | Where |
+|---|------|-------|
+| #3 | execute_js sandbox | `content/index.js:154` — `_EXECUTE_JS_SANDBOX_ENABLED = true` with Proxy-based sandbox + approval gate |
+| #5 | Auto-approve timeout | `agent-approval.js:109` — rejects after timeout, no silent approval |
+| #6 | UNTRUSTED tags | `llm-client.js:1569` — `<UNTRUSTED_PAGE_CONTENT>` tags already wrapping page content |
+| #8 | Typing events | `content/index.js:1798` — full keydown→keypress→beforeinput→input→keyup per char |
+| #10 | ref_id system | `agent-engine.js:204` — Vision [N] index system with `data-sentinel-index` + WeakMap |
+| #11 | DPR screenshots | `tab-manager.js:920` — takeScreenshot returns `{width, height, dpr, scrollX, scrollY}` |
+| #14 | Overlay restraint | `content/index.js:246` — capped dismissals, SPA route reset |
+| #16 | SW persistence | `agent-engine.js:708` — checkpoint to `chrome.storage.session` with restore on SW restart |
+| #19 | Layout stability | `content/index.js:1495` — `waitForStableRect(el, 2, 600)` before click |
+| #20 | Disabled checks | `content/index.js:1466` — `pointer-events`, `disabled`, `aria-disabled` checks |
+| #21 | Hover pointer events | `content/index.js:2122` — full PointerEvent + mouse sequence |
+
+### Test Results
+- 228 suites passed, 0 failed
+- 10,232 tests passing, 0 failures
