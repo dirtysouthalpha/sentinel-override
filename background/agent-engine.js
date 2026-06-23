@@ -2888,25 +2888,7 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
-        const _visionHistoryParts = [];
-        const promptHistLen = promptHistory.length;
-        // (v20.5) Show the last 10 steps (was 6). Weaker vision models (GLM-4.xV)
-        // lose track of what they already tried as earlier attempts scroll out of
-        // context and re-click the same element; a longer window + the explicit
-        // "ALREADY ATTEMPTED" framing below is the "already tried X" signal they
-        // don't infer on their own. The extra ~4 short lines are negligible next
-        // to the screenshot already in the prompt.
-        const visionStart = Math.max(0, promptHistLen - 10);
-        for (let i = visionStart; i < promptHistLen; i++) {
-          const h = promptHistory[i];
-          if (!h || !h.action) continue;
-          const a = h.action;
-          const actionText = a.text ? (typeof a.text === 'string' ? a.text.substring(0, 40) : String(a.text || '').substring(0, 40)) : null;
-          const actionTextStr = actionText ? ` "${actionText}"` : '';
-          const stepResult = typeof h.result === 'string' ? h.result.substring(0, 80) : String(h.result || '').substring(0, 80);
-          _visionHistoryParts.push(`Step ${h.step || '?'}: ${a.type}${a.index ? `(${a.index})` : ''}${actionTextStr} -> ${stepResult}`);
-        }
-        const _visionHistory = _visionHistoryParts.join('\n');
+        const _visionHistory = formatVisionHistory(promptHistory, 10);
 
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
