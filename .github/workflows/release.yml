@@ -1,62 +1,88 @@
-name: Release
-
-# Sentinel Override is a Chrome (MV3) extension — NOT an npm package. On a vX.Y.Z
-# tag this builds the Chrome Web Store .zip, attaches it to a GitHub Release, and
-# (optionally) uploads + submits it to the Chrome Web Store.
-#
-# The Chrome Web Store step only runs when the CWS secrets are configured, so the
-# release never fails for anyone who hasn't set up store automation. Add these repo
-# secrets to enable it (Settings → Secrets and variables → Actions):
-#   CWS_EXTENSION_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
+# Sentinel Override — Auto Release
+# Triggers when a version tag (v*) is pushed. Builds the zip and creates a GitHub release.
+name: Auto Release
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
-    env:
-      # Mirrored to env so the optional CWS step can gate on its presence in `if`.
-      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+    timeout-minutes: 10
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '20'
+          cache: 'npm'
 
-      - run: npm ci
+      - run: npm ci || npm install
 
-      - name: Test
+      # Run tests before releasing
+      - name: Run Tests
         run: npm test
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
 
-      - name: Build Chrome Web Store zip
-        run: npm run build # -> dist/sentinel-override-v<manifest.version>.zip
+      # Extract version from manifest.json
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('manifest.json'))['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
-      - name: Locate built zip
-        id: zip
-        run: echo "path=$(ls dist/*.zip | head -n1)" >> "$GITHUB_OUTPUT"
+      # Build the distribution zip
+      - name: Build Distribution Zip
+        run: |
+          python3 -c "
+          import os, zipfile, json
+          base = os.getcwd()
+          version = '${{ steps.version.outputs.version }}'
+          zip_name = f'sentinel-override-v{version}.zip'
+          include = [
+              'manifest.json', 'package.json', 'CHANGELOG.md',
+              'popup.html', 'popup.css', 'popup-full.js',
+              'popup-modules/', 'background/', 'content/', 'lib/', 'web/',
+              'fonts/', 'icons/',
+              'icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-128.png', 'icon-256.png', 'icon.svg',
+              'report-print.html', 'report-print.js', 'report-view.html', 'report-view.js'
+          ]
+          exclude_dirs = {'node_modules', 'tests', 'coverage', '.git', '__pycache__', 'dist', '.claude', 'docs', '.github'}
+          exclude_exts = {'.test.js', '.spec.js'}
+          count = 0
+          with zipfile.ZipFile(zip_name, 'w', zipfile.ZIP_DEFLATED) as zf:
+              for item in include:
+                  full = os.path.join(base, item)
+                  if os.path.isfile(full):
+                      zf.write(full, item)
+                      count += 1
+                  elif os.path.isdir(full):
+                      for root, dirs, files in os.walk(full):
+                          dirs[:] = [d for d in dirs if d not in exclude_dirs]
+                          for fn in files:
+                              if any(fn.endswith(ext) for ext in exclude_exts):
+                                  continue
+                              filepath = os.path.join(root, fn)
+                              arcname = os.path.relpath(filepath, base)
+                              zf.write(filepath, arcname)
+                              count += 1
+          print(f'Built {zip_name}: {count} files, {os.path.getsize(zip_name)/1024/1024:.2f} MB')
+          "
 
-      - name: GitHub Release
+      # Create GitHub release with the zip attached
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          name: Sentinel Override v${{ steps.version.outputs.version }}
           generate_release_notes: true
-
-      # Uploads the zip and submits it for Chrome Web Store review. Skipped unless
-      # the CWS secrets are set. Google still reviews before it goes live to users.
-      - name: Publish to Chrome Web Store
-        if: ${{ env.CWS_CLIENT_ID != '' }}
-        uses: mnao305/chrome-extension-upload@v5
-        with:
-          file-path: ${{ steps.zip.outputs.path }}
-          extension-id: ${{ secrets.CWS_EXTENSION_ID }}
-          client-id: ${{ secrets.CWS_CLIENT_ID }}
-          client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
-          publish: true
+          files: sentinel-override-v*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

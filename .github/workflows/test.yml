@@ -1,0 +1,68 @@
+# Sentinel Override — CI Test Gate
+# Runs on every push to main and every PR. Blocks merge if any check fails.
+name: Test Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci || npm install
+
+      # ━━━ Step 1: Bare Import Scanner ━━━
+      # Catches bare module specifiers that crash Chrome MV3 service workers
+      - name: Bare Import Scanner
+        run: |
+          echo "Scanning for bare module imports..."
+          RESULTS=$(grep -rn "from '" background/ content/ popup-modules/ popup-full.js --include='*.js' \
+            | grep -v "from '\.\./" \
+            | grep -v "from '\./" \
+            | grep -v "from 'chrome" \
+            | grep -v "from 'crypto'" \
+            || true)
+          if [ -n "$RESULTS" ]; then
+            echo "FAIL: Bare module imports found"
+            echo "$RESULTS"
+            exit 1
+          else
+            echo "PASS: No bare imports detected"
+          fi
+
+      # ━━━ Step 2: Syntax Check ━━━
+      - name: Syntax Check
+        run: |
+          echo "Checking syntax of all JS files..."
+          ERRORS=0
+          while IFS= read -r file; do
+            if ! node --check "$file" 2>/dev/null; then
+              echo "SYNTAX ERROR: $file"
+              node --check "$file" 2>&1 | head -5
+              ERRORS=$((ERRORS + 1))
+            fi
+          done < <(find background/ content/ popup-modules/ -name '*.js' ! -name '*.test.js' ! -name '*.spec.js')
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "FAIL: $ERRORS files with syntax errors"
+            exit 1
+          else
+            echo "PASS: All JS files have valid syntax"
+          fi
+
+      # ━━━ Step 3: Test Suite ━━━
+      - name: Test Suite
+        run: npm test
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules'
