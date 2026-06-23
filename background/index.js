@@ -2,6 +2,7 @@
 // Wires all modules together and handles message routing.
 
 import { startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay } from './agent-engine.js';
+import { getPoolStatus, stopAgent as stopPoolAgent, stopAllAgents } from './agent-pool.js';
 import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
 import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
 import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
@@ -621,6 +622,24 @@ const handleRuntimeMessage = async (request, sender) => {
       const { resumeAgent } = await import('./agent-engine.js');
       return resumeAgent();
     }
+
+    case 'get_pool_status': {
+      const { getPoolStatus: _gps } = await import('./agent-pool.js');
+      return _gps();
+    }
+
+    case 'stop_agent_tab': {
+      const { stopAgent: _stopPool } = await import('./agent-pool.js');
+      const stopped = _stopPool(request.tabId);
+      return { ok: stopped, tabId: request.tabId };
+    }
+
+    case 'stop_all_agents': {
+      const { stopAllAgents: _stopAll } = await import('./agent-pool.js');
+      _stopAll();
+      return { ok: true };
+    }
+
 
     case 'undo_action': {
       const { undoLastAction } = await import('./agent-engine.js');

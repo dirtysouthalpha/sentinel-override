@@ -11,6 +11,8 @@ import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js'
 import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
 import { CONFIG, MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { captureNetworkSnapshot, shouldReportNetwork } from './agent-network.js';
+import { startParallelAgent, stopAgent as stopPoolAgent, getPoolStatus, getActiveAgentCount, getMaxConcurrentAgents } from './agent-pool.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
@@ -1204,6 +1206,13 @@ export async function startAgent(goal, sender) {
     startTabId = sender.tab.id;
   }
 
+  // Register this agent in the multi-tab parallel agent pool (non-fatal)
+  try {
+    startParallelAgent(startTabId, goal);
+  } catch (_poolErr) {
+    // Pool full or duplicate tab — log warning but continue (backward compat)
+    console.warn("[Sentinel/pool] Agent pool registration skipped:", getErrorMessage(_poolErr));
+  }
   agentRunning = true;
   _runStartTime = Date.now();
   // Persist running state so SW restarts can detect an interrupted run
@@ -1510,6 +1519,11 @@ export async function stopAgent() {
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
   try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  // Remove this agent from the parallel agent pool
+  try {
+    const _agentTabId = getAgentTabId();
+    if (_agentTabId) stopPoolAgent(_agentTabId);
+  } catch (_e) { /* pool cleanup failed — non-fatal */ }
   agentRunning = false;
   agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
@@ -2837,6 +2851,19 @@ async function runAgentLoop(goal, workingTabId) {
         }
         promptHistory.push(cleaned);
       }
+      // CDP Network Interception: inject network data when goal is network/API-related
+      try {
+        if (shouldReportNetwork(goal)) {
+          const _netSnapshot = captureNetworkSnapshot(tab, { limit: 30, maxEntries: 15 });
+          if (_netSnapshot) {
+            promptHistory.push({
+              step: stepCount,
+              action: { type: "note" },
+              result: `📡 ${_netSnapshot}`
+            });
+          }
+        }
+      } catch (_netErr) { /* network capture failed — non-fatal */ }
       let _aiCallError = null;
       // Drain one sub-command from the repeat_for_each queue before consulting LLM
       if (_pendingCommandQueue.length) {

@@ -1,5 +1,21 @@
 # Changelog
 
+## v21.0.0 — Modularized Architecture + CDP Network Interception + Multi-Tab Parallel Agents
+
+### Architecture
+- **17 modules extracted from monolith** — agent-engine.js decomposed from 8,219→5,995 lines (-27%) across 3 refactoring loops. Key extractions: agent-tabs.js, agent-shared-state.js, agent-config-gate.js, agent-run-setup.js, agent-approval.js, agent-narration.js, agent-screenshot.js, llm-retry.js, llm-planning.js.
+- **State Manager Pattern** — agent-shared-state.js centralizes 4 shared mutable variables that previously blocked module extraction.
+- **llm-client.js decomposed** — 3,069→2,571 lines (-16%) with LLM modularization complete.
+
+### Features
+- **Neuralis Brain Integration** — opt-in READ (brain-client.js) and WRITE (brain-producer.js) paths for shared agent knowledge. Fail-open design, PII redaction on writes, 37 new tests.
+- **CDP Network Interception** — `agent-network.js` module captures API calls, XHR, and fetch requests via Chrome DevTools Protocol. Auto-detects network/API/debugging goals via keyword matching and injects formatted network snapshots into LLM observation context. Settings toggle for user control.
+- **Multi-Tab Parallel Agents** — `agent-pool.js` enables up to 5 concurrent agent instances, each with independent state, running on separate tabs. Pool status panel with per-agent stop controls.
+
+### Tests
+- **Full suite green** — 216+ suites, 9,854+ tests, 0 failures.
+- New test suites: agent-network.test.js (25 tests), agent-pool.test.js.
+
 ## Unreleased — feat/neuralis-brain-integration
 
 ### Features
