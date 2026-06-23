@@ -15,6 +15,30 @@ window.addEventListener('DOMContentLoaded', () => {
   setupVoiceInput();
   setupApprovalModeToggle();
 
+  // Live Activity Feed toggle button
+  const feedToggleBtn = document.getElementById('feedToggleBtn');
+  if (feedToggleBtn) {
+    feedToggleBtn.addEventListener('click', () => {
+      try {
+        let feed = document.getElementById('activity-feed');
+        if (!feed) {
+          feed = initActivityFeed();
+        }
+        if (!feed) return;
+        const isVisible = feed.style.display === 'block' || feed.classList.contains('visible');
+        if (isVisible) {
+          setFeedVisible(false);
+          feedToggleBtn.classList.remove('active');
+        } else {
+          setFeedVisible(true);
+          feedToggleBtn.classList.add('active');
+        }
+      } catch(e) {
+        console.error('[Sentinel] Feed toggle error:', e);
+      }
+    });
+  }
+
   // Templates button toggle
   const templatesBtn = document.getElementById('templatesBtn');
   if (templatesBtn) {
