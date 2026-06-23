@@ -8,6 +8,7 @@
 // Order matters: more-specific profiles must come before fallback profiles
 // (e.g., sonicwall_nsm before sonicwall_onbox).
 
+import { teamsAdmin } from './teams_admin.js';
 import { sonicwallNsm } from './sonicwall_nsm.js';
 import { sonicwallOnbox } from './sonicwall_onbox.js';
 import { m365Admin } from './m365_admin.js';
@@ -40,6 +41,7 @@ const PROFILES = [
   sonicwallNsm,
   sonicwallOnbox,
   m365Admin,
+  teamsAdmin,
   fortigate,
   itglue,
   aruba,
