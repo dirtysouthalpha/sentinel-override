@@ -6,11 +6,11 @@ import { callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as 
 import { getPlatformProfile } from './platforms/index.js';
 import { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat, getFirstLine, getFirstSentence } from './agent-ticket-format.js';
 import { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
-import { summarizeHistoryBatch, maybeRollupHistory } from './agent-progress.js';
+import { summarizeHistoryBatch, maybeRollupHistory, detectStall } from './agent-progress.js';
 import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
 import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { CONFIG, MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
@@ -451,12 +451,10 @@ const PORTAL_SENTINELONE_RE = /sentinelone/i;
 const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
 
 // Precompile regex for stall detection
-const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
 
 
 
 // Precompile regex for overlay dismissal (hot path in CDP observe)
-const OVERLAY_ACCEPT_RE = /agree|accept|accept all|got it|ok|consent|allow|continue|proceed|yes|sure/i;
 
 
 
@@ -591,7 +589,6 @@ let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in 
 let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
 const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped at 20 entries for replay export
 const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
-let agentTabGroupId = null;     // (3.7.2) chrome.tabGroups id grouping every attached tab — visual "glow" in the tab bar
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
 // (stuck-loop watchdog) The click_at loop detector below fires when a streak of
 // consecutive click_at commands produces no new output AND never moves the page
@@ -619,9 +616,6 @@ let _clickAtStreakSawPageChange = false;
 // from any branch and the run finalize block can read them at the end.
 let failedSteps = 0;            // running count of steps where actionFailed=true
 let consecutiveFailureMax = 0;  // longest streak of consecutive failures seen this run
-let _pageStagnation = 0;      // (3.46.1) Counts consecutive non-mutating clicks on same page state — detects click-spam loops
-const agentAttachedTabs = new Set(); // (3.7.2) tabIds currently in the Sentinel group; used by the side-panel visibility hook
-let primaryPanelTabId = null;   // (v20.1) the single "working" tab the run was launched on — the ONLY tab that shows the side panel during a run
 let expectedTenant = null;      // (3.7.0) chrome.storage.local.expectedTenant — the user's intended tenant for this run
 let activeClientId = null;      // (3.12.0) currently-selected client (sentinelClientKnowledge.activeClientId)
 let clientKnowledgeText = '';   // (3.12.0) pre-formatted system-prompt section listing relevant entries
@@ -638,6 +632,11 @@ let _pendingCommandQueue = [];      // repeat_for_each sub-commands; drained bef
 let undoStack = [];                 // (3.49.1) Undo entries for reversible actions; max 10 entries
 let _verificationFailures = 0;  // (Phase 8.2) Consecutive post-action verification failures; strategy shift after 2
 import { _runRecording, startRunRecording, recordStep, generateRunReplay, emitLearnedPatterns, notifyRunComplete, scoreActionConfidence, saveLearnedPattern } from './agent-reporting.js';
+import { sharedState } from './agent-shared-state.js';
+import { attachTabToSentinelGroup, detachAllSentinelTabs, isAgentAttachedTab, isPrimaryPanelTab, setPrimaryPanelTab, _scopeSidePanelToPrimary, _enableSidePanelEverywhere, _cdpObservePage, _cdpDismissOverlays, clickAtCoordinates, _findElementBbox, enhanceWithVisualProperties, _findElementByDescription, getAttachedTabIds } from './agent-tabs.js';
+
+// Re-export originally-public functions for backward compatibility
+export { isAgentAttachedTab, isPrimaryPanelTab, getAttachedTabIds };
 // Re-exports from agent-ticket-format.js (backward compatibility)
 export { isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat } from './agent-ticket-format.js';
 export { detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop } from './agent-captcha.js';
@@ -986,42 +985,6 @@ function formatZoomRegion(region) {
 }
 
 // ========== Configuration ==========
-const CONFIG = {
-  minDelayBetweenCalls: 500,
-  // (v20.3) Raised 2 → 6. On heavy admin pages a single 429/overload/timeout used
-  // to hard-stop the run; free/community models on OpenRouter rate-limit often, so
-  // a deeper retry budget with a longer backoff cap keeps runs alive across them.
-  maxRetries: 6,
-  retryDelay: TWO_SECONDS_MS,
-  maxRetryDelay: 2 * TEN_SECONDS_MS, // 20s cap (was 10s)
-  // (v20.5) Was 30. The SoM grounding approach lives or dies on the model being
-  // able to READ the small green [N] labels off the screenshot, and JPEG q30
-  // shreds sharp text edges with ringing artifacts — the exact failure mode that
-  // makes GLM-4.xV misread an index. q50 roughly doubles edge fidelity for the
-  // numerals while staying well under half the size of q80. Worth the bytes.
-  screenshotQuality: 50,
-  // (v20.4) Stream LLM responses (per-chunk idle timeout) so slow/thinking models
-  // aren't aborted mid-generation. Set false to force the legacy buffered path.
-  streaming: true,
-  fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
-  pageLoadTimeout: 25000,
-  maxSteps: 100,
-  maxPageContentLength: 16000,
-  maxElements: 80,
-  maxSelectorLength: 200,
-  historyWindow: 15,
-  screenshotCache: true,
-  maxMemoryEntries: 50,
-  maxHistoryEntries: 60,
-  maxStoredHistory: 40,
-  maxLearnedPatterns: 100,
-  strategyShiftThreshold: 3,
-  stallConfig: {
-    similarityWindow: 3,        // Look at last N actions for repeated identical failures
-    maxConsecutiveFailures: 5,  // Hard limit: force recovery after this many total failures
-    stateRecheckSteps: 4,       // (3.46.1) After N non-mutating clicks, force re-scan (stagnation)
-  },
-};
 
 // ========== Live Status Narration (Phase 8.2) ==========
 // Emits structured status messages to the popup for real-time narration.
@@ -1100,7 +1063,7 @@ export function resetAgentState() {
   _clickAtStreakBaseline = 0;
   _clickAtStreakSawPageChange = false;
   consecutiveFailures = 0;
-  _pageStagnation = 0;
+  sharedState.pageStagnation = 0;
   currentStrategies = [];
   agentPlan = null;
   currentPlanStep = 0;
@@ -1124,8 +1087,7 @@ export function resetAgentState() {
   _activityStartedAt.clear(); // clear activity start timestamps between runs
   // Reset CDP observe-path optimization flags so a new run always gets a fresh
   // page ready check and overlay nuke on its first observation.
-  _pageWasReady = false;
-  _lastNukeClean = false;
+  sharedState.reset();
   // Phase 5: Reset advanced intelligence state
   _predictiveAnalysisEnabled = false;
   profilingEnabled = false;
@@ -1332,7 +1294,7 @@ export async function startAgent(goal, sender) {
   registerInitialTab(startTabId, tabInfo?.url || '');
   // (v20.1) This is the "working" tab — the only tab that shows the side panel
   // for the duration of the run. Tabs the agent opens later never show it.
-  primaryPanelTabId = startTabId;
+  setPrimaryPanelTab(startTabId);
 
   // (3.12.0) Load client knowledge for the active client in a single storage
   // round-trip via getClientStartupContext (replaces 3 sequential reads).
@@ -1695,573 +1657,8 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
   } catch (e) { console.warn('[Sentinel] HUD update failed:', getErrorMessage(e)); }
 }
 
-// ========== Stall Detection ==========
-function detectStall(history, consecutiveFailures, _currentStrategies) {
-  const recent = history.slice(-CONFIG.stallConfig.similarityWindow);
-
-  // Check 1: All recent actions are the same type with the same failure result
-  if (recent.length >= CONFIG.stallConfig.similarityWindow) {
-    const first = recent[0];
-    const firstResult = first ? first.result : undefined;
-    const allSameType = first && first.action && recent.every(h => h.action && h.action.type === first.action.type);
-    const allSameResult = recent.every(h => h.result === firstResult);
-    const allFailed = recent.every(h => {
-      const r = typeof h.result === 'string' ? h.result : '';
-      return STALL_ERROR_RE.test(r);
-    });
-
-    if (allSameType && allSameResult && allFailed) {
-      const actionType = first.action.type || 'unknown';
-      const resultStr = typeof firstResult === 'string' ? firstResult : '';
-      return {
-        stalled: true,
-        reason: `Repeated "${actionType}" with same failure: "${resultStr}"`,
-        recoveryAction: 'RESCAN_AND_REPLAN'
-      };
-    }
-  }
-
-  // Check 2: Page stagnation — too many clicks/types without page change
-  if (_pageStagnation >= CONFIG.stallConfig.stateRecheckSteps) {
-    return {
-      stalled: true,
-      reason: `${_pageStagnation} consecutive clicks/types without page change (stagnation)`,
-      recoveryAction: 'RESCAN_AND_REPLAN'
-    };
-  }
-
-  // Check 3: High consecutive failures regardless of action type
-  if (consecutiveFailures >= CONFIG.stallConfig.maxConsecutiveFailures) {
-    return {
-      stalled: true,
-      reason: `${consecutiveFailures} consecutive failures without progress`,
-      recoveryAction: 'FORCE_STRATEGY_SHIFT'
-    };
-  }
-
-  return { stalled: false };
-}
 
 
-// ========== Tab Group Attachment (3.7.2) ==========
-// Visually link every tab the agent operates on into an orange "Sentinel"
-// tab group, so the user sees a clear glowing strip above attached tabs in
-// the Chrome tab bar. Pairs with per-tab sidePanel.setOptions to hide the
-// side panel when the user clicks unrelated tabs.
-
-const SENTINEL_GROUP_TITLE = 'Sentinel';
-const SENTINEL_GROUP_COLOR = 'orange';
-
-async function attachTabToSentinelGroup(tabId) {
-  if (!tabId || typeof tabId !== 'number') return;
-  if (agentAttachedTabs.has(tabId)) return; // already attached
-  try {
-    if (agentTabGroupId === null) {
-      // No group yet — create one containing just this tab.
-      const groupId = await chrome.tabs.group({ tabIds: [tabId] });
-      agentTabGroupId = groupId;
-      try {
-        await chrome.tabGroups.update(groupId, {
-          title: SENTINEL_GROUP_TITLE,
-          color: SENTINEL_GROUP_COLOR,
-          collapsed: false
-        });
-      } catch (e) { console.warn('[Sentinel] Tab group update failed (permission?):', getErrorMessage(e)); }
-    } else {
-      // Add to the existing group. tabs.group with groupId moves them in.
-      try {
-        await chrome.tabs.group({ tabIds: [tabId], groupId: agentTabGroupId });
-      } catch (e) {
-        // Group may have been dissolved by the user — recreate.
-        console.warn('[Sentinel] Tab group failed, recreating:', getErrorMessage(e));
-        const groupId = await chrome.tabs.group({ tabIds: [tabId] });
-        agentTabGroupId = groupId;
-        try {
-          await chrome.tabGroups.update(groupId, {
-            title: SENTINEL_GROUP_TITLE,
-            color: SENTINEL_GROUP_COLOR,
-            collapsed: false
-          });
-        } catch (e2) { console.warn('[Sentinel] Tab group recreate update failed:', getErrorMessage(e2)); }
-      }
-    }
-    agentAttachedTabs.add(tabId);
-    // (v20.1) The side panel is pinned to the single primary working tab. Newly
-    // attached (agent-opened) tabs must NOT show it — enable on the primary tab,
-    // explicitly disable on every other attached tab.
-    try {
-      await chrome.sidePanel.setOptions({ tabId, enabled: isPrimaryPanelTab(tabId), path: 'popup.html' });
-    } catch (e) { console.warn('[Sentinel] Side panel scope failed (API unavailable?):', getErrorMessage(e)); }
-  } catch (e) {
-    console.warn('[Sentinel] attachTabToSentinelGroup failed:', getErrorMessage(e));
-  }
-}
-
-async function detachAllSentinelTabs() {
-  // Ungroup every attached tab. Safe even if some are already gone.
-  const ids = [...agentAttachedTabs];
-  agentAttachedTabs.clear();
-  agentTabGroupId = null;
-  primaryPanelTabId = null; // (v20.1) run is over — release the pinned working tab
-  if (!ids.length) return;
-  try {
-    await chrome.tabs.ungroup(ids);
-  } catch (_e) {
-    // Some tabs may have been closed already; try one-by-one as a fallback.
-    for (const id of ids) {
-      try { await chrome.tabs.ungroup([id]); } catch (_e2) {
-        // Tab was already closed during the run — not an error, expected behavior
-        if (typeof _e2 !== 'object' || _e2 === null || typeof _e2.message !== 'string' || !_e2.message.includes('No tab with id')) {
-          console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(_e2));
-        }
-      }
-    }
-  }
-  // Re-enable the side panel everywhere so non-agent tabs aren't permanently muted.
-  try {
-    await chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' });
-  } catch (_e) { /* side panel API may not be available */ }
-}
-
-// Public accessor so background/index.js can decide side-panel visibility on
-// tab-activation events without importing the full Set.
-/**
- * Check if a tab is currently attached to the agent session.
- * @param {number} tabId - Chrome tab ID to check.
- * @returns {boolean} True if the tab is attached to the agent.
- */
-export function isAgentAttachedTab(tabId) {
-  return agentAttachedTabs.has(tabId);
-}
-
-/**
- * Check if a tab is the primary "working" tab the current run was launched on.
- * (v20.1) During a run this is the ONLY tab that shows the side panel — agent-
- * opened tabs and tabs the user switches to are kept panel-free.
- * @param {number} tabId - Chrome tab ID to check.
- * @returns {boolean} True if tabId is the pinned working tab.
- */
-export function isPrimaryPanelTab(tabId) {
-  return primaryPanelTabId != null && tabId === primaryPanelTabId;
-}
-
-// ========== Side Panel Scoping (v3.53) ==========
-// (v20.1) Enable the side panel only on the primary working tab, and disable it
-// on every other currently-open tab. Called at run start so pre-existing tabs
-// don't keep the panel from before the run began.
-async function _scopeSidePanelToPrimary() {
-  if (primaryPanelTabId == null) return;
-  try {
-    const allTabs = await chrome.tabs.query({});
-    for (const tab of allTabs) {
-      if (!tab.id) continue;
-      try {
-        await chrome.sidePanel.setOptions({
-          tabId: tab.id,
-          enabled: tab.id === primaryPanelTabId,
-          path: 'popup.html'
-        });
-      } catch (_e) { /* side panel may be unavailable in some contexts */ }
-    }
-  } catch (_e) { /* tab query failed non-critically */ }
-}
-
-async function _enableSidePanelEverywhere() {
-  try {
-    const allTabs = await chrome.tabs.query({});
-    for (const tab of allTabs) {
-      if (tab.id) {
-        try {
-          await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
-        } catch (_e) {
-          // Side panel may not be available in all contexts
-        }
-      }
-    }
-  } catch (_e) {
-    // Side panel API call failed non-critically
-  }
-}
-
-
-// ========== CDP Fallback (v3.54) ==========
-// When the content script can't inject (CSP, security headers, etc.), use CDP
-// directly to observe the page, dismiss overlays, and execute commands.
-// CDP bypasses CSP entirely — it's the same channel DevTools uses.
-
-async function _cdpObservePage(tabId) {
-  // (v3.57) Extract interactive elements and page text via CDP Runtime.evaluate
-  // First, wait for DOM to be ready (document.body can be null on slow-loading pages)
-  const waitCode = 'var body = document.body || document.documentElement;'
-    + 'var title = document.title || "";'
-    + 'var childCount = body ? body.childNodes.length : 0;'
-    + 'return { hasBody: !!document.body, title: title, childCount: childCount, '
-    + '  url: window.location.href, readyState: document.readyState };';
-
-  // SPEED: Skip ready check if previous observe found page was loaded
-  if (_pageWasReady) {
-    // Skip page ready check - previous observe confirmed loaded
-  } else try {
-    const readyState = await cdpExecuteJs(tabId, waitCode, { timeout: 2000 });
-    if (readyState && readyState.ok && readyState.value) {
-      const r = readyState.value;
-      // If page has no body and no children, wait a moment and try again
-      if (!r.hasBody && r.childCount === 0) {
-        try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(TWO_SECONDS_MS);
-      }
-      // If title is empty and URL is still about:blank or loading, wait
-      if (!r.title && (r.url === 'about:blank' || r.url === '')) {
-        try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
-        await sleep(TWO_SECONDS_MS);
-      }
-    }
-  } catch(e) {
-    console.warn('[Sentinel/CDP] Ready check failed:', getErrorMessage(e));
-  }
-
-  const code = 'var results = { elements: [], text: "", overlays: [] };'
-    + 'try {'
-    + '  var body = document.body || document.documentElement;'
-    // Page text — use documentElement as fallback if body is null
-    + '  results.text = body ? (body.innerText || "").substring(0, 8000) : "";'
-    // Interactive elements
-    + '  var els = document.querySelectorAll("a[href], button, input, select, textarea, [role=\\"button\\"], [role=\\"link\\"], [onclick]");'
-    + '  var seen = new Set();'
-    + '  for (var i = 0, elsLen = els.length; i < elsLen; i++) {'
-    + '    if (seen.size >= 60) break;'
-    + '    var el = els[i];'
-    + '    var rect = el.getBoundingClientRect();'
-    + '    if (rect.width < 2 || rect.height < 2) continue;'
-    + '    if (rect.bottom < 0 || rect.top > window.innerHeight) continue;'
-    + '    var tag = typeof el.tagName === "string" ? el.tagName.toLowerCase() : "";'
-    + '    var tText = typeof el.textContent === "string" ? el.textContent : "";'
-    + '    var text = tText.trim().substring(0, 50);'
-    + '    var href = el.href || "";'
-    + '    var type = el.type || "";'
-    + '    var id = el.id || "";'
-    + '    var cls = el.className && typeof el.className === "string" ? el.className.substring(0, 80) : "";'
-    + '    var selector = id ? "#" + id : (tag + (cls ? "." + cls.split(" ").filter(function(c){return c;}).slice(0,2).join(".") : "")).substring(0, 80);'
-    + '    var key = selector + text.substring(0, 20);'
-    + '    if (seen.has(key)) continue;'
-    + '    seen.add(key);'
-    + '    results.elements.push({'
-    + '      tag: tag, text: text.substring(0, 40), href: href.substring(0, 100),'
-    + '      type: type, id: id.substring(0, 40),'
-    + '      bbox: { x: Math.round(rect.left), y: Math.round(rect.top), w: Math.round(rect.width), h: Math.round(rect.height) },'
-    + '      selector: selector.substring(0, 100)'
-    + '    });'
-    + '  }'
-    // Detect overlays — only if we have a body
-    + '  if (document.body) {'
-    + '    var overlayEls = document.querySelectorAll("div, section, aside, dialog");'
-    + '    for (var o = 0, overlayElsLen = overlayEls.length; o < overlayElsLen; o++) {'
-    + '      try {'
-    + '        var node = overlayEls[o];'
-    + '        var nst = window.getComputedStyle(node);'
-    + '        if (nst.display === "none" || nst.visibility === "hidden") continue;'
-    + '        var npos = nst.position || "";'
-    + '        var nz = parseInt(nst.zIndex, 10) || 0;'
-    + '        if ((npos === "fixed" || npos === "absolute") && nz >= 100) {'
-    + '          var nrect = node.getBoundingClientRect();'
-    + '          if (nrect.width > 200 && nrect.height > 100) {'
-    + '            var buttons = node.querySelectorAll("button, a, [role=\\"button\\"]");'
-    + '            var btnList = [];'
-    + '            for (var b = 0, buttonsLen = buttons.length; b < buttonsLen; b++) {'
-    + '              var bContent = typeof buttons[b].textContent === "string" ? buttons[b].textContent : "";'
-    + '              var bText = bContent.trim().substring(0, 40);'
-    + '              var bRect = buttons[b].getBoundingClientRect();'
-    + '              if (bRect.width > 0 && bRect.height > 0) {'
-    + '                btnList.push({ text: bText, x: Math.round(bRect.left + bRect.width/2), y: Math.round(bRect.top + bRect.height/2) });'
-    + '              }'
-    + '            }'
-    + '            var nodeText = typeof node.textContent === "string" ? node.textContent : "";'
-    + '            results.overlays.push({ selector: "overlay", text: nodeText.substring(0, 100), buttons: btnList });'
-    + '          }'
-    + '        }'
-    + '      } catch(e) { console.error("[Sentinel] Overlay processing error:", (typeof e === "object" && e !== null && typeof e.message === "string") ? e.message : String(e)); }'
-    + '    }'
-    + '  }'
-    + '} catch(e) { results.error = (typeof e === "object" && e !== null && typeof e.message === "string") ? e.message : String(e); }'
-    + 'return results;';
-
-  // SPEED: Check cache — if same URL observed recently, reuse
-  const tabInfo = await getTabInfo(tabId);
-  const currentUrl = tabInfo ? tabInfo.url : '';
-  // In batch mode (queue has items), always use cache if available (no TTL limit)
-  const _inBatchMode = _pendingCommandQueue?.length;
-  const _cacheTTL = _inBatchMode ? BATCH_MODE_CACHE_TTL_MS : API_CACHE_TTL_MS;
-  if (_cachedObservation && _cachedObservation.url === currentUrl && (Date.now() - _cachedObservation.timestamp) < _cacheTTL) {
-    _observeCacheHits++;
-    return _cachedObservation;
-  }
-  const result = await cdpExecuteJs(tabId, code, { timeout: THREE_SECONDS_MS });
-  if (result?.ok && result?.value) {
-    _pageWasReady = true; // Mark page as ready for next step
-    return result.value;
-  }
-  return null;
-}
-
-async function _cdpDismissOverlays(tabId, overlays) {
-  // (v3.56) Nuclear overlay annihilator — 3 phases, no mercy
-  let totalRemoved = 0;
-
-  // Phase 1: Click accept/agree buttons if we have overlay detection data
-  if (overlays && overlays.length) {
-    for (const overlay of overlays) {
-      const buttons = Array.isArray(overlay.buttons) ? overlay.buttons : [];
-      // Single-pass button selection: prefer accept button, fallback to any button with text
-      let dismissBtn = null;
-      for (const b of buttons) {
-        if (b && OVERLAY_ACCEPT_RE.test(b.text)) {
-          dismissBtn = b;
-          break; // Found accept button, use it immediately
-        }
-        if (!dismissBtn && b && b.text && b.text.length) {
-          dismissBtn = b; // Track first fallback
-        }
-      }
-      // Final fallback: first button if no other found
-      if (!dismissBtn && buttons.length) {
-        dismissBtn = buttons[0];
-      }
-      if (dismissBtn && dismissBtn.x && dismissBtn.y) {
-        const r = await cdpDispatchClick(tabId, dismissBtn.x, dismissBtn.y, { skipVisual: true });
-        if (r && r.ok) totalRemoved++;
-        await new Promise(r => setTimeout(r, SIX_HUNDRED_MS));
-      }
-    }
-  }
-
-  // Phase 2: Remove ALL iframes (consent dialogs are almost always in iframes)
-  // and remove ANY fixed/absolute element with high z-index covering significant screen area
-  const nukeCode = [
-        'var n = 0;',
-        'var btns = document.querySelectorAll("button, a, [role=\\"button\\"], input[type=\\"submit\\"]");',
-        'var consentClicked = false;',
-        'for (var b = 0, btnsLen = btns.length; b < btnsLen; b++) {',
-        '  var btnContent = typeof btns[b].textContent === "string" ? btns[b].textContent : "";',
-        '  var t = btnContent.trim().toLowerCase();',
-        '  if (t === "accept" || t === "agree" || t === "i agree" || t === "ok" || t === "got it" || t === "accept all" || t === "agree all" || t === "consent" || t === "allow all" || t === "yes, i agree" || t.indexOf("accept") === 0 || t.indexOf("agree") === 0) {',
-        '    btns[b].click(); consentClicked = true; n++; break;',
-        '  }',
-        '}',
-        'if (!consentClicked) {',
-        '  var iframes = document.querySelectorAll("iframe");',
-        '  for (var i = iframes.length - 1; i >= 0; i--) {',
-        '    var src = (iframes[i].src || "").toLowerCase();',
-        '    var iid = (iframes[i].id || "").toLowerCase();',
-        '    var icls = (iframes[i].className || "").toLowerCase();',
-        '    var isConsent = src.indexOf("consent") >= 0 || src.indexOf("cookie") >= 0 || src.indexOf("gdpr") >= 0 || src.indexOf("onetrust") >= 0 || src.indexOf("trustarc") >= 0 || src.indexOf("sourcepoint") >= 0 || src.indexOf("privacymgmt") >= 0 || iid.indexOf("consent") >= 0 || iid.indexOf("sp_message") >= 0;',
-        '    var rect = iframes[i].getBoundingClientRect();',
-        '    var isSmall = rect.height < 300 && rect.width < 600;',
-        '    if (isConsent && isSmall) { iframes[i].remove(); n++; }',
-        '  }',
-        '}',
-        'if (!consentClicked && n === 0) {',
-        '  var overlaySels = ["#onetrust-consent-sdk","#onetrust-banner-sdk","#cookieConsent","#cookie-notice","#cookie-banner",".cky-consent-container",".cc-window",".cc-banner",".cc-floating","[aria-modal=true]","[role=dialog]","div[id^=sp_message]",".sp_message",".sp_veil"];',
-        '  for (var s = 0, overlaySelsLen = overlaySels.length; s < overlaySelsLen; s++) {',
-        '    try {',
-        '      var els = document.querySelectorAll(overlaySels[s]);',
-        '      for (var j = 0, elsLen = els.length; j < elsLen; j++) { els[j].remove(); n++; }',
-        '    } catch(e) {}',
-        '  }',
-        '}',
-        'if (!consentClicked && n === 0) {',
-        '  var allDivs = document.querySelectorAll("div, section, aside, dialog");',
-        '  for (var k = 0, allDivsLen = allDivs.length; k < allDivsLen; k++) {',
-        '    try {',
-        '      var st = window.getComputedStyle(allDivs[k]);',
-        '      var pos = st.position || "";',
-        '      var z = parseInt(st.zIndex, 10) || 0;',
-        '      if ((pos === "fixed" || pos === "absolute") && z >= 100) {',
-        '        var r = allDivs[k].getBoundingClientRect();',
-        '        var area = r.width * r.height;',
-        '        var screen = window.innerWidth * window.innerHeight;',
-        '        var divContent = typeof allDivs[k].textContent === "string" ? allDivs[k].textContent : "";',
-        '        var textLen = divContent.trim().length;',
-        '        if (area > screen * 0.3 && textLen < 200) {',
-        '          allDivs[k].remove(); n++;',
-        '        }',
-        '      }',
-        '    } catch(e) {}',
-        '  }',
-        '}',
-        'if (document.body) { document.body.style.overflow = ""; document.body.style.position = ""; document.body.style.width = ""; }',
-        'if (document.documentElement) { document.documentElement.style.overflow = ""; }',
-        'return n;'
-      ].join('\n');
-
-  // SPEED: Skip nuke entirely when no overlays detected AND last nuke was clean
-  if (!overlays.length && _lastNukeClean) {
-    // Skip nuke - no overlays and last nuke was clean
-  } else try {
-    const nukeResult = await cdpExecuteJs(tabId, nukeCode, { timeout: FIVE_SECONDS_MS });
-    if (nukeResult && nukeResult.ok) {
-      const removed = (nukeResult.value || 0);
-      totalRemoved += removed;
-      _lastNukeClean = (removed === 0); // Track for skip optimization
-      // (v3.59) Post-nuke integrity check: verify page still has content
-      if ((nukeResult.value || 0) > 0) {
-        const integrityCheck = await cdpExecuteJs(tabId, 'return { hasBody: !!document.body, title: document.title || "", url: window.location.href };', { timeout: THREE_SECONDS_MS });
-        if (integrityCheck && integrityCheck.ok && integrityCheck.value) {
-          if (!integrityCheck.value.hasBody || !integrityCheck.value.title) {
-            console.warn('[Sentinel/CDP] Nuke destroyed page content — reloading via CDP...');
-            try {
-              await chrome.debugger.sendCommand({ tabId: tabId }, 'Page.reload', { ignoreCache: true });
-              await new Promise(r => setTimeout(r, TWO_SECONDS_MS));
-            } catch(reloadErr) {
-              console.warn('[Sentinel/CDP] Reload failed:', getErrorMessage(reloadErr));
-            }
-          }
-        }
-      }
-    } else {
-      console.warn('[Sentinel/CDP] Phase2 FAILED. error:', (typeof nukeResult === 'object' && nukeResult !== null && typeof nukeResult.error === 'string' ? nukeResult.error : String(nukeResult?.error || 'unknown')));
-    }
-  } catch(e) {
-    console.warn('[Sentinel/CDP] Phase2 threw:', getErrorMessage(e));
-  }
-
-  // Phase 3: Quick scroll test (only if overlays were found)
-  if (totalRemoved > 0) try {
-    await cdpExecuteJs(tabId, 'window.scrollTo(0, 100)', { timeout: 2000 });
-    await new Promise(r => setTimeout(r, TWO_HUNDRED_MS));
-    await cdpExecuteJs(tabId, 'window.scrollTo(0, 0)', { timeout: 2000 });
-  } catch(e) { console.warn('[Sentinel/CDP] Scroll test failed:', getErrorMessage(e)); }
-
-  return totalRemoved;
-}
-
-// Track whether we're in CDP fallback mode for the current step
-let _cdpFallbackActive = false;
-let _lastNukeClean = false; // Track if last nuke found nothing to remove
-let _pageWasReady = false; // Skip ready check if previous observe succeeded
-let _cachedObservation = null; // { url, elementsCount, textLen, elements, text, timestamp }
-let _observeCacheHits = 0;
-
-
-// ═══════════════════════════════════════════════════════════════
-// Coordinate-based click fallback — uses CDP Input.dispatchMouseEvent
-// to click at exact viewport coordinates when selector matching fails.
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Click at exact viewport coordinates using CDP Input.dispatchMouseEvent.
- * Attaches the debugger, dispatches mousePressed + mouseReleased, then detaches.
- * Returns true on success, false on any failure.
- * @param {number} tabId - Chrome tab ID to click in.
- * @param {number} x - X coordinate in CSS pixels.
- * @param {number} y - Y coordinate in CSS pixels.
- * @returns {Promise<boolean>}
- */
-async function clickAtCoordinates(tabId, x, y) {
-  try {
-    const target = { tabId };
-    await chrome.debugger.attach(target, '1.3');
-    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-      type: 'mousePressed', x, y, button: 'left', clickCount: 1
-    });
-    await chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', {
-      type: 'mouseReleased', x, y, button: 'left', clickCount: 1
-    });
-    await chrome.debugger.detach(target);
-    return true;
-  } catch (_e) {
-    try { await chrome.debugger.detach({ tabId }); } catch (_) {}
-    return false;
-  }
-}
-
-/**
- * Find an element's bbox from observed page data by matching selector or text.
- * Searches the elements array from observe_page / _cdpObservePage for an element
- * whose selector, id, or text content matches the given criteria.
- * @param {Array} elements - Array of observed element objects with bbox, text, selector, etc.
- * @param {string} [selector] - CSS selector or ref to match.
- * @param {string} [text] - Text content to match (case-insensitive substring).
- * @returns {{ x: number, y: number, width: number, height: number } | null}
- */
-function _findElementBbox(elements, selector, text) {
-  if (!elements || !Array.isArray(elements)) return null;
-  for (const el of elements) {
-    if (el.bbox && (
-      (selector && (el.selector === selector || el.id === selector)) ||
-      (text && el.text && el.text.toLowerCase().includes(text.toLowerCase()))
-    )) {
-      return el.bbox;
-    }
-  }
-  return null;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Visual Element Matching — enhances elements with visual descriptions
-// and allows the LLM to specify actions by visual description.
-// When vision/screenshot is available, elements get a _visual tag
-// describing their visual properties (size, role, visibility).
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Enhance element descriptions with visual properties when available.
- * Adds a _visual string to each element describing its visual characteristics.
- * @param {Array} elements - Array of observed element objects.
- * @returns {Array} The same array with _visual properties added where applicable.
- */
-function enhanceWithVisualProperties(elements) {
-  if (!elements || !Array.isArray(elements)) return elements;
-  for (const el of elements) {
-    const visual = [];
-    if (el.bbox) {
-      const w = el.bbox.w || el.bbox.width;
-      const h = el.bbox.h || el.bbox.height;
-      if (w && h) {
-        if (w > 200 && h > 40) visual.push('large');
-        else if (w < 50 || h < 20) visual.push('small');
-      }
-    }
-    if (el.role) visual.push('role:' + el.role);
-    if (el.tag) visual.push('tag:' + el.tag);
-    if (el.type && el.type !== el.tag) visual.push('type:' + el.type);
-    if (el.isClickable) visual.push('clickable');
-    if (el.isInput) visual.push('input');
-    if (el.visible === false) visual.push('hidden');
-    if (visual.length > 0) el._visual = visual.join(', ');
-  }
-  return elements;
-}
-
-/**
- * Find an element by natural language description.
- * Searches element text, ariaLabel, placeholder, and title for matches.
- * @param {Array} elements - Array of observed element objects.
- * @param {string} description - Natural language description to match against.
- * @returns {Object|null} The matched element, or null.
- */
-function _findElementByDescription(elements, description) {
-  if (!elements || !description) return null;
-  const desc = description.toLowerCase();
-  for (const el of elements) {
-    const text = (el.text || el.textContent || '').toLowerCase();
-    const ariaLabel = (el.ariaLabel || el['aria-label'] || '').toLowerCase();
-    const placeholder = (el.placeholder || '').toLowerCase();
-    const title = (el.title || '').toLowerCase();
-    if (text.includes(desc) || ariaLabel.includes(desc) || placeholder.includes(desc) || title.includes(desc)) {
-      return el;
-    }
-  }
-  return null;
-}
-
-
-/**
- * Get all tab IDs currently attached to the agent session.
- * @returns {number[]} Array of Chrome tab IDs.
- */
-export function getAttachedTabIds() {
-  return [...agentAttachedTabs];
-}
 
 // (3.40.0) Audit log access — delegated from background/index.js message handler.
 /**
@@ -2541,7 +1938,7 @@ async function runAgentLoop(goal, workingTabId) {
   // Observation skip cache — reused when previous step was non-mutating and
   // the URL/SPA-route hasn't changed. DOM content hash catches SPA changes
   // without URL changes.
-  _cachedObservation = null;
+  sharedState.cachedObservation = null;
   let _cachedPageContent = null;
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
@@ -2696,7 +2093,7 @@ async function runAgentLoop(goal, workingTabId) {
           spaCtx.screenshotCache.lastScreenshotUrl = null;
         }
         // Invalidate observation cache so the next step does a full re-scan.
-        _cachedObservation = null;
+        sharedState.cachedObservation = null;
         _cachedPageContent = null;
         _lastObservedUrl = '';
         _lastObservedDomHash = 0;
@@ -2838,7 +2235,7 @@ async function runAgentLoop(goal, workingTabId) {
               await chrome.tabs.update(tab, { url: goalUrl });
               await waitForPageLoad(tab);
               await waitForPageReady(tab);
-              _cachedObservation = null; // Invalidate cache after navigation
+              sharedState.cachedObservation = null; // Invalidate cache after navigation
               const reinjected = await injectContentScript(tab);
               if (reinjected) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: `Navigated to ${goalUrl}` });
@@ -2893,7 +2290,7 @@ async function runAgentLoop(goal, workingTabId) {
       } else {
         console.warn(`[Sentinel/SPEED] Skipping content script injection (${consecutiveInjectionFailures} failures)`);
       }
-      _cdpFallbackActive = false;
+      sharedState.cdpFallbackActive = false;
       if (!scriptReady) {
         consecutiveInjectionFailures++;
         sendSilentUpdate('Content script failed -- trying CDP fallback', stepCount);
@@ -2902,7 +2299,7 @@ async function runAgentLoop(goal, workingTabId) {
         // After 2 failures, switch to CDP mode — observe, dismiss overlays, read page.
         if (consecutiveInjectionFailures >= 2) {
           console.warn(`[Sentinel] Content script failed ${consecutiveInjectionFailures} times — activating CDP fallback`);
-          _cdpFallbackActive = true;
+          sharedState.cdpFallbackActive = true;
           // (v3.57) On first CDP activation, check if page has any DOM at all.
           // If empty (no body, no title), reload the page via CDP.
           if (consecutiveInjectionFailures === 2) {
@@ -2950,7 +2347,7 @@ async function runAgentLoop(goal, workingTabId) {
       } catch (_e) { /* non-fatal */ }
 
       // Auto-dismiss popups/overlays (cookie consent, ad-blocker warnings, etc.)
-      if (_cdpFallbackActive) {
+      if (sharedState.cdpFallbackActive) {
         // (v3.54→3.55) CDP fallback: always run nuclear overlay removal.
         // Don't wait for overlay detection — just nuke everything that looks like one.
         try {
@@ -2982,7 +2379,7 @@ async function runAgentLoop(goal, workingTabId) {
       const _obsUrl = (tabInfo && tabInfo.url) || '';
 
       // Cache repeated condition for observation skip logic (perf)
-      const _cacheCondition = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!_cachedObservation;
+      const _cacheCondition = _nonMutating && !isSPATransitionPending() && _lastObservedUrl === _obsUrl && !!sharedState.cachedObservation;
 
       // Compute a lightweight DOM content hash via the content script to detect
       // SPA content changes that don't alter the URL. The hash is a stable
@@ -3018,7 +2415,7 @@ async function runAgentLoop(goal, workingTabId) {
       const _observedHashBefore = _lastObservedDomHash;
       const _skipObserve = _cacheCondition && (_currentDomHash !== 0 && _currentDomHash === _lastObservedDomHash);
       if (_skipObserve) {
-        observation = _cachedObservation;
+        observation = sharedState.cachedObservation;
         pageContent = _cachedPageContent;
         activityDone(stepCount, 'observe', '(cached — page unchanged)', null);
       } else {
@@ -3030,9 +2427,9 @@ async function runAgentLoop(goal, workingTabId) {
         sendAgentStatus('observing', 'Reading page structure...');
         activityStart(stepCount, 'observe', 'Observing page');
         try {
-          if (_cdpFallbackActive) {
+          if (sharedState.cdpFallbackActive) {
             // (v3.54) CDP fallback: observe page via DevTools Protocol instead of content script
-            const cdpObs = await _cdpObservePage(tab);
+            const cdpObs = await _cdpObservePage(tab, { inBatchMode: !!_pendingCommandQueue.length });
             if (cdpObs) {
               observation = { elements: cdpObs.elements || [] };
               pageContent = { content: cdpObs.text || '' };
@@ -3043,7 +2440,7 @@ async function runAgentLoop(goal, workingTabId) {
                   sendSilentUpdate(`[CDP] Auto-dismissed ${dismissed} overlay(s) during observation`, stepCount);
                   await sleep(EIGHT_HUNDRED_MS);
                   // Re-observe after dismissal
-                  const cdpObs2 = await _cdpObservePage(tab);
+                  const cdpObs2 = await _cdpObservePage(tab, { inBatchMode: !!_pendingCommandQueue.length });
                   if (cdpObs2) {
                     observation = { elements: cdpObs2.elements || [] };
                     pageContent = { content: cdpObs2.text || '' };
@@ -3082,7 +2479,7 @@ async function runAgentLoop(goal, workingTabId) {
           const elemCount = (observation && observation.elements) ? observation.elements.length : 0;
           const textLen = (pageContent && pageContent.content) ? pageContent.content.length : 0;
           activityDone(stepCount, 'observe', `Observed ${elemCount} elements, ${textLen} chars of text`, null);
-          _cachedObservation = observation;
+          sharedState.cachedObservation = observation;
           _cachedPageContent = pageContent;
           _lastObservedUrl = _obsUrl;
           // Update DOM hash from the fresh observation
@@ -3667,7 +3064,7 @@ async function runAgentLoop(goal, workingTabId) {
       };
 
       const _zoomAnnotation = formatZoomRegion(_zoomRegion);
-      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: _cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
+      const agentState = { apiCallCount, agentMemory, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: _zoomRegion, zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
       // Also strip any base64Image / screenshot fields from past entries -- only the
       // most recent observation needs the image (passed separately as base64Image arg).
@@ -5343,13 +4740,13 @@ async function runAgentLoop(goal, workingTabId) {
           await chrome.tabs.update(tab, { url: command.url });
           await waitForPageLoad(tab);
           await waitForPageReady(tab);
-          _cachedObservation = null; // Invalidate cache after navigate action
+          sharedState.cachedObservation = null; // Invalidate cache after navigate action
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
             try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
             // In CDP mode, content script failure is expected — don't mark as action failure
-            if (_cdpFallbackActive) {
+            if (sharedState.cdpFallbackActive) {
               result = `Navigated to ${command.url}`;
               // Don't set actionFailed — navigation succeeded, CDP will handle observation
             } else {
@@ -5754,7 +5151,7 @@ return { ok: true, value: el.value };
 
       // (v3.54) CDP fallback for click: when content script can't inject and click fails,
       // resolve the element via CDP and click its center coordinates.
-      if (actionFailed && _cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
+      if (actionFailed && sharedState.cdpFallbackActive && (/^(click|right_click|double_click)$/.test(command.type))) {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
@@ -5788,7 +5185,7 @@ return { ok: true, value: el.value };
         } catch (_) { /* CDP click fallback non-fatal */ }
       }
       // (v3.66) CDP fallback for select: when content script is dead, set dropdown via CDP JS
-      if (actionFailed && _cdpFallbackActive && command.type === 'select') {
+      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'select') {
         try {
           // Cache JSON.stringify calls to avoid redundant serialization (perf)
           const _selJson = JSON.stringify(command.selector || '');
@@ -5818,7 +5215,7 @@ return { ok: true, value: el.value };
 
       // (v3.66) CDP fallback for type: when content script can't inject,
       // resolve the input element via CDP, focus it, and dispatch keyboard events.
-      if (actionFailed && _cdpFallbackActive && command.type === 'type') {
+      if (actionFailed && sharedState.cdpFallbackActive && command.type === 'type') {
         try {
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
@@ -5877,7 +5274,7 @@ return { ok: true, value: el.value };
       // Handles: click, type, select, check, hover, scroll_to, wait_for_*,
       // extract, verify, and any unknown action type. Nothing stops the agent.
       // ═══════════════════════════════════════════════════════════════
-      if (actionFailed && _cdpFallbackActive) {
+      if (actionFailed && sharedState.cdpFallbackActive) {
         try {
           const _ufbResult = await _universalCdpFallback(tab, command, { timeout: FIVE_SECONDS_MS });
           if (_ufbResult && _ufbResult.ok) {
@@ -5939,7 +5336,7 @@ return { ok: true, value: el.value };
       // (v3.67) UNIVERSAL CDP fallback — when content script is dead and a specific
       // CDP handler didn't fire, convert the failed action to execute_js via CDP.
       // Covers: select, check, check_all, scroll_to, wait_for_element, hover, wait_for_text
-      if (actionFailed && _cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
+      if (actionFailed && sharedState.cdpFallbackActive && !CDP_FALLBACK_BLOCKED.has(command.type)) {
         try {
           let _universalJs = '';
           const _sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
@@ -6088,9 +5485,9 @@ return { ok: true, value: el.value };
       const _isPageMutating = PAGE_MUTATING_ACTIONS_RE.test(command.type);
       const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
-        _pageStagnation++;
+        sharedState.pageStagnation++;
       } else {
-        _pageStagnation = 0;
+        sharedState.pageStagnation = 0;
       }
 
       // (v3.52) click_at loop detector — catches the pattern where a text-only model
@@ -6174,7 +5571,7 @@ return { ok: true, value: el.value };
         // (v3.69) Smart Recovery: generate site-specific strategies
         const _smartStrats = _generateSmartRecovery(goal, currentUrl, pageText, observation, history, stepCount);
         const _smartStratMsg = _smartStrats.length ? `SMART STRATEGIES for this page:\n${_smartStrats.map(s => `→ ${s}`).join('\n')}\n` : '';
-        const _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row${_pageUnchanged ? ' with NO page change' : ''}. STOP using ${command.type}. ${_cdpFallbackActive ? 'The content script is NOT available on this page (CDP fallback active). ' : ''}Switch to a completely different approach. Examples:\n- Use execute_js to extract data or interact with the DOM directly\n- Use click with a specific selector to interact with elements\n- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n- Read the page text content and extract what you need without interacting\n\n${_smartStratMsg}`;
+        const _recoveryMsg = `SYSTEM: ${command.type} loop detected! You have used ${command.type} ${_sameCmdCount + 1} times in a row${_pageUnchanged ? ' with NO page change' : ''}. STOP using ${command.type}. ${sharedState.cdpFallbackActive ? 'The content script is NOT available on this page (CDP fallback active). ' : ''}Switch to a completely different approach. Examples:\n- Use execute_js to extract data or interact with the DOM directly\n- Use click with a specific selector to interact with elements\n- Use smart_navigate with a direct URL (e.g., sort by adding &s=review-rank to Amazon URL)\n- Read the page text content and extract what you need without interacting\n\n${_smartStratMsg}`;
         historyPush({
           step: stepCount,
           action: { type: 'note', text: _recoveryMsg },
@@ -6196,7 +5593,7 @@ return { ok: true, value: el.value };
           agentPlan = null;
           currentPlanStep = 0;
           consecutiveFailures = 0;
-          _pageStagnation = 0;
+          sharedState.pageStagnation = 0;
           currentStrategies = [];
 
           // Inject stall context into history so the LLM knows what happened
@@ -6614,7 +6011,7 @@ return { ok: true, value: el.value };
       apiCalls: apiCallCount,
       history: history,
       failures: failedSteps,
-      stagnation: _pageStagnation
+      stagnation: sharedState.pageStagnation
     };
     const predictiveInsights = PredictiveEngine.analyze(predictiveData);
     console.log('[Sentinel Phase 5] Predictive analysis complete:', predictiveInsights);

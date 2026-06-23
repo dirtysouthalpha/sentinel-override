@@ -2,6 +2,9 @@
 // Extracted from agent-engine.js for modularity.
 // Rolling history summarization for bounded prompt context.
 
+import { CONFIG } from './constants.js';
+import { sharedState } from './agent-shared-state.js';
+
 const EXTRACT_TYPE_RE = /^extract(_list)?$/;
 const HISTORY_FAILURE_RE = /error|fail|not found|blocked|timed out/i;
 
@@ -79,7 +82,58 @@ function maybeRollupHistory(history) {
 }
 
 
+
+// ========== Stall Detection ==========
+const STALL_ERROR_RE = /^(Error|Timeout)|not found|timed out|Element not found|No element/i;
+
+function detectStall(history, consecutiveFailures, _currentStrategies) {
+  const recent = history.slice(-CONFIG.stallConfig.similarityWindow);
+
+  // Check 1: All recent actions are the same type with the same failure result
+  if (recent.length >= CONFIG.stallConfig.similarityWindow) {
+    const first = recent[0];
+    const firstResult = first ? first.result : undefined;
+    const allSameType = first && first.action && recent.every(h => h.action && h.action.type === first.action.type);
+    const allSameResult = recent.every(h => h.result === firstResult);
+    const allFailed = recent.every(h => {
+      const r = typeof h.result === 'string' ? h.result : '';
+      return STALL_ERROR_RE.test(r);
+    });
+
+    if (allSameType && allSameResult && allFailed) {
+      const actionType = first.action.type || 'unknown';
+      const resultStr = typeof firstResult === 'string' ? firstResult : '';
+      return {
+        stalled: true,
+        reason: `Repeated "${actionType}" with same failure: "${resultStr}"`,
+        recoveryAction: 'RESCAN_AND_REPLAN'
+      };
+    }
+  }
+
+  // Check 2: Page stagnation — too many clicks/types without page change
+  if (sharedState.pageStagnation >= CONFIG.stallConfig.stateRecheckSteps) {
+    return {
+      stalled: true,
+      reason: `${sharedState.pageStagnation} consecutive clicks/types without page change (stagnation)`,
+      recoveryAction: 'RESCAN_AND_REPLAN'
+    };
+  }
+
+  // Check 3: High consecutive failures regardless of action type
+  if (consecutiveFailures >= CONFIG.stallConfig.maxConsecutiveFailures) {
+    return {
+      stalled: true,
+      reason: `${consecutiveFailures} consecutive failures without progress`,
+      recoveryAction: 'FORCE_STRATEGY_SHIFT'
+    };
+  }
+
+  return { stalled: false };
+}
+
 export {
   summarizeHistoryBatch,
   maybeRollupHistory,
+  detectStall,
 };
