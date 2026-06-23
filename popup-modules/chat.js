@@ -1272,6 +1272,7 @@ if (injectContextInput) {
 }
 
 function sendMessage() {
+  try { setFeedVisible(true); clearFeed(); } catch(e) {}
   if (typeof showToast !== 'function') {
     console.error('[Sentinel] showToast not available — initialization incomplete');
     alert('Extension not fully loaded. Please close and reopen the popup.');
@@ -3695,6 +3696,13 @@ chrome.runtime.onMessage.addListener((message) => {
   // (6.0) Live status narration ticker
   if (message.action === 'agent_status') {
     _showStatusTicker(message.state, message.text, message.timestamp);
+    try {
+      if (message.state === 'thinking') {
+        addFeedEvent('thinking', message.text || 'Analyzing...');
+      } else {
+        addFeedEvent('observe', message.text || message.state);
+      }
+    } catch(e) {}
   }
   // Phase 8.2: Live status bar for structured agent_status messages (type-based)
   if (message.type === 'agent_status') {
@@ -3912,14 +3920,28 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.action === 'agent_step_start') {
     if (message.stepNumber && message.stepNumber >= 1) _ensureActivityStream(message.stepNumber);
     updateActiveTabStep(message.stepNumber, message.totalPlannedSteps || 0);
+    try { addFeedEvent('acting', 'Step ' + message.stepNumber + ' starting'); } catch(e) {}
   }
   // (6.0) Activity item upsert (observe / consult-ai / dispatch)
   if (message.action === 'agent_activity') {
     showAgentActivity(message.stepNumber, message.key, message.label, message.status, message.detail);
+    try {
+      if (message.key === 'observe') {
+        addFeedEvent('observe', message.label, message.detail);
+      } else if (message.key === 'consult-ai') {
+        addFeedEvent('thinking', message.label, message.detail);
+      } else if (message.key === 'dispatch') {
+        addFeedEvent('acting', message.label, message.detail);
+      }
+    } catch(e) {}
   }
   // (6.0) Agent action — update step card headline and active tab strip
   if (message.action === 'agent_action') {
     const p = message.payload;
+    try {
+      const _actionType = p && p.type ? p.type : 'action';
+      addFeedEvent(_actionType, _actionType + ': ' + (p && p.description ? p.description : ''), p);
+    } catch(e) {}
     // (7.1) Save click coordinates for crosshair display on next screenshot
     if (p && (p.type === 'click_at' || (p.type === 'click' && typeof p.x === 'number'))) {
       if (typeof p.x === 'number' && typeof p.y === 'number') {
@@ -3982,6 +4004,13 @@ chrome.runtime.onMessage.addListener((message) => {
   // (6.0) Action result — update step card with success/failure
   if (message.action === 'agent_action_result') {
     updateActionCardResult(message.stepNumber, message.result, message.isError);
+    try {
+      if (message.isError || message.error) {
+        addFeedEvent('error', 'Action failed: ' + (message.error || message.result || 'Unknown error'));
+      } else {
+        addFeedEvent('result', 'Result: ' + String(message.result || 'Done').substring(0, 100));
+      }
+    } catch(e) {}
   }
   // (Phase 8.2) Post-action verification badge — green "Verified" or red "Failed — retrying"
   if (message.action === 'agent_verification' && message.verification) {
@@ -4033,6 +4062,7 @@ chrome.runtime.onMessage.addListener((message) => {
     renderTabBar(message.tabs || []);
   }
   if (message.action === 'agent_update') {
+    try { if (message.text) addFeedEvent('observe', message.text); } catch(e) {}
     if (message.stepNumber && message.stepNumber > 0) {
       appendLogLine(message.stepNumber, message.text);
     } else {
@@ -4063,6 +4093,10 @@ chrome.runtime.onMessage.addListener((message) => {
     const _previewPanel = document.getElementById('screenshot-preview');
     if (_previewPanel) _previewPanel.style.display = 'none';
     try { clearActivityState(); } catch { /* activity state may not be initialized */ }
+    try {
+      addFeedEvent('finish', 'Run complete');
+      setTimeout(function() { setFeedVisible(false); }, 5000);
+    } catch(e) {}
     try {
       const summary = String(message.summary || 'Done');
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
