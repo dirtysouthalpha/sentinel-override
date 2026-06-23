@@ -10,7 +10,7 @@ import { summarizeHistoryBatch, maybeRollupHistory } from './agent-progress.js';
 import { getBrainStartupContext, resetBrainRunSignals } from './brain-client.js';
 import { publishRunLearning, resetBrainProducerRunSignals } from './brain-producer.js';
 import { waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests } from './tab-manager.js';
-import { MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
+import { CONFIG, MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_CDP_RESULT_LENGTH, API_CACHE_TTL_MS, BATCH_MODE_CACHE_TTL_MS, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, SIX_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS, ONE_DAY_MS } from './constants.js';
 
 // v4.0 VISION-FIRST MODULES
 const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
@@ -987,42 +987,6 @@ function formatZoomRegion(region) {
 }
 
 // ========== Configuration ==========
-const CONFIG = {
-  minDelayBetweenCalls: 500,
-  // (v20.3) Raised 2 → 6. On heavy admin pages a single 429/overload/timeout used
-  // to hard-stop the run; free/community models on OpenRouter rate-limit often, so
-  // a deeper retry budget with a longer backoff cap keeps runs alive across them.
-  maxRetries: 6,
-  retryDelay: TWO_SECONDS_MS,
-  maxRetryDelay: 2 * TEN_SECONDS_MS, // 20s cap (was 10s)
-  // (v20.5) Was 30. The SoM grounding approach lives or dies on the model being
-  // able to READ the small green [N] labels off the screenshot, and JPEG q30
-  // shreds sharp text edges with ringing artifacts — the exact failure mode that
-  // makes GLM-4.xV misread an index. q50 roughly doubles edge fidelity for the
-  // numerals while staying well under half the size of q80. Worth the bytes.
-  screenshotQuality: 50,
-  // (v20.4) Stream LLM responses (per-chunk idle timeout) so slow/thinking models
-  // aren't aborted mid-generation. Set false to force the legacy buffered path.
-  streaming: true,
-  fetchTimeout: ONE_MINUTE_MS, // (v20.2) was 30s — slow/thinking vision models on heavy admin pages (e.g. SonicWall NSM) routinely exceed 30s, aborting the request ("signal is aborted without reason") and stalling the run. 60s gives them room.
-  pageLoadTimeout: 25000,
-  maxSteps: 100,
-  maxPageContentLength: 16000,
-  maxElements: 80,
-  maxSelectorLength: 200,
-  historyWindow: 15,
-  screenshotCache: true,
-  maxMemoryEntries: 50,
-  maxHistoryEntries: 60,
-  maxStoredHistory: 40,
-  maxLearnedPatterns: 100,
-  strategyShiftThreshold: 3,
-  stallConfig: {
-    similarityWindow: 3,        // Look at last N actions for repeated identical failures
-    maxConsecutiveFailures: 5,  // Hard limit: force recovery after this many total failures
-    stateRecheckSteps: 4,       // (3.46.1) After N non-mutating clicks, force re-scan (stagnation)
-  },
-};
 
 // ========== Live Status Narration (Phase 8.2) ==========
 // Emits structured status messages to the popup for real-time narration.
