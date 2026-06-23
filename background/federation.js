@@ -12,8 +12,11 @@
  * @module background/federation
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import { getErrorMessage } from './error-utils.js';
+// (v21.5.1) Native UUID v4 — replaces bare 'uuid' module (Chrome MV3 compatible)
+const uuidv4 = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
+
+
 
 /**
  * Federation Controller
