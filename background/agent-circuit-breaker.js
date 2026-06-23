@@ -9,7 +9,7 @@
 // This is the "last line of defense" before the LLM wastes another API call.
 // Inspired by Claude Computer Use's loop-guard and Browser Use's max_same_action.
 
-import { sleep } from './error-utils.js';
+;
 
 /**
  * Absolute maximum steps regardless of productiveSteps bumps.

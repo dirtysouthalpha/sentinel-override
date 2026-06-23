@@ -2,7 +2,7 @@
 // Agent-level error recovery policy (ERR-04).
 // Wraps agent operations with auto-retry and error card emission.
 
-import { AgentError, ERROR_CODES, isRetryable, wrapError } from './agent-errors.js';
+import {AgentError, ERROR_CODES, wrapError} from './agent-errors.js';
 
 const MAX_AUTO_RETRIES = 3;
 const RETRY_DELAYS_MS = [2000, 4000, 8000]; // Exponential: 2s, 4s, 8s

@@ -4,13 +4,13 @@
 // Layer 3 module -- imports from agent-engine.js, template-manager.js, tab-context.js, tab-manager.js.
 
 import * as AgentEngine from './agent-engine.js';
-import { resolveTemplateGoal } from './template-manager.js';
-import { getActiveTabId as _getActiveTabId, registerInitialTab } from './tab-context.js';
-import { getTabInfo } from './tab-manager.js';
-import { notifyIfEnabled } from './shared-state.js';
-import { FIVE_HUNDRED_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS } from './constants.js';
-import { tel } from './telemetry.js';
-import { getErrorMessage } from './error-utils.js';
+import {resolveTemplateGoal} from './template-manager.js';
+import {getActiveTabId as _getActiveTabId, registerInitialTab} from './tab-context.js';
+import {getTabInfo} from './tab-manager.js';
+import {notifyIfEnabled} from './shared-state.js';
+import {FIVE_HUNDRED_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
+import {tel} from './telemetry.js';
+import {getErrorMessage} from './error-utils.js';
 
 // ========== Storage Constants ==========
 const SCHEDULES_KEY = 'sentinel_schedules';

@@ -2,19 +2,19 @@
 // API calls, retry logic, response parsing, vision detection, platform context.
 // Imports from message-protocol.js only (no circular dependency risk).
 
-import { sendSilentUpdate } from './message-protocol.js';
-import { getAllTabContexts, getActiveTabId, TAB_LIMIT } from './tab-context.js';
-import { resolveProvider, getActiveProvider, getModelSupportsVision } from './provider-registry.js';
-import { getPlatformProfile } from './platforms/index.js';
-import { getErrorMessage, sleep } from './error-utils.js';
-import { API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS, TWO_SECONDS_MS } from './constants.js';
-import { _rateLimiter, setLLMRateLimit, resetLLMRateLimiter } from './llm-rate-limiter.js';
+;
+import {getAllTabContexts, getActiveTabId, TAB_LIMIT} from './tab-context.js';
+import {resolveProvider, getActiveProvider, getModelSupportsVision} from './provider-registry.js';
+import {getPlatformProfile} from './platforms/index.js';
+import {getErrorMessage} from './error-utils.js';
+import {API_TIMEOUT_MS, PLATFORM_CTX_CACHE_TTL_MS, ONE_SECOND_MS} from './constants.js';
+import {_rateLimiter, setLLMRateLimit, resetLLMRateLimiter} from './llm-rate-limiter.js';
 export { setLLMRateLimit, resetLLMRateLimiter };
-import { estimateCostUsd, isSimpleStep, recordModelUsage, getCostTracker } from './llm-cost-estimation.js';
+import {estimateCostUsd, isSimpleStep, recordModelUsage, getCostTracker} from './llm-cost-estimation.js';
 export { estimateCostUsd, isSimpleStep, recordModelUsage, getCostTracker };
-import { generatePlan } from './llm-planning.js';
+import {generatePlan} from './llm-planning.js';
 export { generatePlan };
-import { callLLMWithRetry } from './llm-retry.js';
+import {callLLMWithRetry} from './llm-retry.js';
 export { callLLMWithRetry };
 
 // Constants for response parsing - avoid recreating on every call

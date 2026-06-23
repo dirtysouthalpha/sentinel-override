@@ -10,16 +10,8 @@
  * @version 1.0.0
  */
 
-import { federation } from './federation.js';
-import {
-  startParallelAgent,
-  stopAgent,
-  getPoolStatus,
-  getAgentByTab,
-  getActiveAgentCount,
-  getMaxConcurrentAgents,
-  stopAllAgents,
-} from './agent-pool.js';
+import {federation} from './federation.js';
+import {startParallelAgent, stopAgent, getAgentByTab, getMaxConcurrentAgents, stopAllAgents, } from './agent-pool.js';
 
 // ── Slot → TabId mapping ──
 const _slotTabs = new Map(); // slot(int) → tabId(int)

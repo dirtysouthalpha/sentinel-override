@@ -3,11 +3,11 @@
 // CAPTCHA detection, smart recovery, universal CDP fallback, and
 // auto-recovery retry ladder helpers.
 
-import { MAX_CDP_RESULT_LENGTH, THREE_SECONDS_MS, TWO_SECONDS_MS, FIVE_SECONDS_MS } from './constants.js';
-import { getErrorMessage, sleep } from './error-utils.js';
-import { sendSilentUpdate } from './message-protocol.js';
-import { cdpExecuteJs, sendMessageWithRetry } from './tab-manager.js';
-import { tel } from './telemetry.js';
+import {MAX_CDP_RESULT_LENGTH, THREE_SECONDS_MS, TWO_SECONDS_MS} from './constants.js';
+import {getErrorMessage, sleep} from './error-utils.js';
+import {sendSilentUpdate} from './message-protocol.js';
+import {cdpExecuteJs, sendMessageWithRetry} from './tab-manager.js';
+import {tel} from './telemetry.js';
 
 // Local copies of shared constants (also in agent-engine.js)
 const EXTRACT_TYPE_RE = /^extract(_list)?$/;

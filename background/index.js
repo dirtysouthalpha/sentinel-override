@@ -1,54 +1,41 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import { startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay } from './agent-engine.js';
-import { getPoolStatus, stopAgent as stopPoolAgent, stopAllAgents } from './agent-pool.js';
-import { wrapMessageHandler, sendSilentUpdate } from './message-protocol.js';
-import { injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees } from './tab-manager.js';
-import { setSPATransitionPending, notifyIfEnabled, stopSwKeepalive } from './shared-state.js';
-import { enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners } from './frame-router.js';
-import { getActiveTabId, handleTabRemoved } from './tab-context.js';
-import { callLLMSimple } from './llm-client.js';
-import { listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal } from './template-manager.js';
-import { PROVIDER_CATALOG, getCatalogProvider, fetchModelsList } from './provider-registry.js';
-import { createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler } from './scheduler.js';
-import { parseNaturalLanguageSchedule } from './scheduler-nlp.js';
-import { exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown } from './collaboration.js';
+import {startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay} from './agent-engine.js';
+import {getPoolStatus, stopAgent as stopPoolAgent, stopAllAgents} from './agent-pool.js';
+import {wrapMessageHandler, sendSilentUpdate} from './message-protocol.js';
+import {injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees} from './tab-manager.js';
+import {setSPATransitionPending, notifyIfEnabled, stopSwKeepalive} from './shared-state.js';
+import {enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners} from './frame-router.js';
+import {getActiveTabId, handleTabRemoved} from './tab-context.js';
+import {callLLMSimple} from './llm-client.js';
+import {listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal} from './template-manager.js';
+import {PROVIDER_CATALOG, getCatalogProvider, fetchModelsList} from './provider-registry.js';
+import {createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler} from './scheduler.js';
+import {parseNaturalLanguageSchedule} from './scheduler-nlp.js';
+import {exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown} from './collaboration.js';
 // (3.26.0) Bridge for content-script telemetry — content/index.js cannot
 // import telemetry.js directly (different context), so it posts a
 // `content_telemetry_event` message and we re-emit via tel.emit() so the
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
-import { tel, listPersistedRuns, loadPersistedRun, deletePersistedRun } from './telemetry.js';
-import { ONE_MINUTE_MS } from './constants.js';
+import {tel, listPersistedRuns, loadPersistedRun, deletePersistedRun} from './telemetry.js';
+import {ONE_MINUTE_MS} from './constants.js';
 
 // Precompute valid log levels for O(1) lookup
 const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
 // Precompute agent-starting actions for O(1) lookup
 const AGENT_STARTING_ACTIONS = new Set(['analyze', 'extract', 'fill_form', 'screenshot', 'summarize']);
-import { getErrorMessage } from './error-utils.js';
-import { federation } from './federation.js';
-import { registerLocalPeers, getLocalPeerStatus } from './federation-local-bridge.js';
+import {getErrorMessage} from './error-utils.js';
+import {federation} from './federation.js';
+import {registerLocalPeers, getLocalPeerStatus} from './federation-local-bridge.js';
 // (3.29.0) Skill outcome stats bridge — popup side reads/resets these.
-import { listSkills, getSkillStats, resetSkillStats } from './skills/index.js';
-import {
-  listClients as ck_listClients,
-  getClient as ck_getClient,
-  getActiveClient as ck_getActiveClient,
-  setActiveClient as ck_setActiveClient,
-  createClient as ck_createClient,
-  updateClient as ck_updateClient,
-  deleteClient as ck_deleteClient,
-  addEntry as ck_addEntry,
-  updateEntry as ck_updateEntry,
-  deleteEntry as ck_deleteEntry,
-  exportClient as ck_exportClient,
-  importClient as ck_importClient
-} from './client-knowledge.js';
-import { handleMenuClick } from './context-menu.js';
-import { createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop } from './page-monitor.js';
-import { startRecording, stopRecording, isRecording, loadMacros } from './macro-recorder.js';
-import { generateHtmlReport, generateReplayReport } from './export-report.js';
+import {listSkills, getSkillStats, resetSkillStats} from './skills/index.js';
+import {listClients as ck_listClients, getClient as ck_getClient, getActiveClient as ck_getActiveClient, setActiveClient as ck_setActiveClient, createClient as ck_createClient, updateClient as ck_updateClient, deleteClient as ck_deleteClient, addEntry as ck_addEntry, updateEntry as ck_updateEntry, deleteEntry as ck_deleteEntry, exportClient as ck_exportClient, importClient as ck_importClient} from './client-knowledge.js';
+import {handleMenuClick} from './context-menu.js';
+import {createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorLoop} from './page-monitor.js';
+import {startRecording, stopRecording, isRecording, loadMacros} from './macro-recorder.js';
+import {generateHtmlReport, generateReplayReport} from './export-report.js';
 import * as pluginRegistry from './plugin-registry.js';
 
 // v10.3.1: Startup diagnostics
