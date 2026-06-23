@@ -64,6 +64,8 @@
         "<all_urls>"
       ],
       "js": [
+        "content/highlight.js",
+        "content/cursor.js",
         "content/quick-assist.js"
       ],
       "run_at": "document_idle",

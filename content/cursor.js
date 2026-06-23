@@ -26,7 +26,7 @@ window.__sentinelUtils = window.__sentinelUtils || {};
   const CURSOR_ID = '__sentinel_cursor__';
   const STYLE_ID = '__sentinel_cursor_style__';
   const HIDE_AFTER_MS = 12000;
-  const DEFAULT_TRAVEL_MS = 380;
+  const DEFAULT_TRAVEL_MS = 450;
 
   function getErrorMessage(e) {
     if (typeof e === 'object' && e !== null && typeof e.message === 'string') return e.message;

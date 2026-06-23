@@ -665,9 +665,10 @@ export async function cdpDispatchClick(tabId, x, y, options = {}) {
           description: (typeof options.description === 'string' ? options.description : `Clicking at (${Math.round(Number(x) || 0)}, ${Math.round(Number(y) || 0)})`)
         });
       } catch (_e) { /* content script may not be ready on first frame */ }
-      // Brief pause so the user sees the cursor arrive + element light up
-      // before the click actually fires.
-      await sleep(220);
+      // Wait for the cursor animation to complete (380ms travel + buffer)
+      // before the click actually fires. This ensures the user SEES the cursor
+      // arrive at the target element before the action happens.
+      await sleep(450);
     }
 
     const base = { x: Number(x) || 0, y: Number(y) || 0, button, clickCount };
