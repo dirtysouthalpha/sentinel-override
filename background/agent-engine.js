@@ -2754,10 +2754,7 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.9.0) Budget hint — tell the LLM how much step room it has left so
       // it can pace itself. Multi-portal investigations especially benefit
       // from knowing they have 200 vs 50 steps remaining.
-      const _stepsRemaining = Math.max(0, dynamicMaxSteps - stepCount);
-      const _budgetHint = `Current step: ${stepCount} of ${dynamicMaxSteps} ` +
-        `(${_stepsRemaining} remaining; ${productiveSteps} productive bumps so far). ` +
-        'Pace your work: extract / note / execute_js with key = productive (extends budget). ' +
+      const _budgetHint = buildBudgetHint(stepCount, dynamicMaxSteps, productiveSteps);
         'Aimless read_page / scroll = unproductive (does not extend).';
       
       // v4.0 Vision-First Observation Override
