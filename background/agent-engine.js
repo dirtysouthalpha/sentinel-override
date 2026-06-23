@@ -1948,9 +1948,7 @@ async function runAgentLoop(goal, workingTabId) {
         // Only auto-navigate when the goal starts with an explicit navigation
         // imperative OR contains a full https:// URL. Avoid triggering on ticket
         // text that mentions a URL in passing (e.g. "user cannot reach admin.microsoft.com").
-        const _isExplicitNav = typeof _goalForUrlExtract === 'string' && (/^(?:go to|navigate to|visit|open|browse to|start at|begin at|check)\b/i.test(_goalForUrlExtract.trimStart())
-          || /\bbegin at:\s*\S/i.test(_goalForUrlExtract)
-          || /\bstart url:\s*\S/i.test(_goalForUrlExtract));
+        const _isExplicitNav = isExplicitNavigation(_goalForUrlExtract);
         let urlMatch = null;
         if (typeof _goalForUrlExtract === 'string') {
           urlMatch = _isExplicitNav
