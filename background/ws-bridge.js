@@ -3,6 +3,15 @@
 // Receives task/query/cancel commands and routes to the agent engine.
 
 import { getErrorMessage } from './error-utils.js';
+// (v21.6) Global unhandled rejection guard — SW context only, skips test envs
+if (typeof self !== 'undefined' && self.addEventListener && typeof window === 'undefined') {
+  self.addEventListener('unhandledrejection', (event) => {
+    console.warn('[Sentinel] Unhandled rejection:', event.reason?.message || event.reason);
+    event.preventDefault();
+  });
+}
+
+
 
 // ========== Configuration ==========
 const BRIDGE_URL = 'ws://localhost:8001/extension-bridge';

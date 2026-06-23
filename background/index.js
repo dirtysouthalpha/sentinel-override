@@ -37,6 +37,15 @@ import {createMonitor, removeMonitor, toggleMonitor, loadMonitors, startMonitorL
 import {startRecording, stopRecording, isRecording, loadMacros} from './macro-recorder.js';
 import {generateHtmlReport, generateReplayReport} from './export-report.js';
 import * as pluginRegistry from './plugin-registry.js';
+// (v21.6) Global unhandled rejection guard — SW context only, skips test envs
+if (typeof self !== 'undefined' && self.addEventListener && typeof window === 'undefined') {
+  self.addEventListener('unhandledrejection', (event) => {
+    console.warn('[Sentinel] Unhandled rejection:', event.reason?.message || event.reason);
+    event.preventDefault();
+  });
+}
+
+
 
 // v10.3.1: Startup diagnostics
 console.log('[Sentinel/SW] Service worker starting...');
@@ -107,12 +116,12 @@ registerLocalPeers().catch(e => console.warn('[Federation] Local peer registrati
           }
         } else {
           // No checkpoint — clear stale session flags so next SW restart doesn't loop
-          await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']);
+          try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch (_) { /* session storage may be empty */ }
         }
       } else {
         // Stale run — clear the flag
         console.log('[Sentinel/self-heal] Stale run detected (', Math.floor(age/ONE_MINUTE_MS), 'min old), clearing');
-        await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']);
+        try { await chrome.storage.session.remove(['agentRunning', 'agentGoal', 'agentStartTime']); } catch (_) { /* session storage may be empty */ }
       }
     }
   } catch (e) {
@@ -618,7 +627,7 @@ const handleRuntimeMessage = async (request, sender) => {
       // Handle navigate inline (no content script needed)
       if (cmd.type === 'navigate') {
         if (!isValidUrl(cmd.url)) throw new Error('Invalid URL provided');
-        await chrome.tabs.update(tab, { url: cmd.url });
+        try { await chrome.tabs.update(tab, { url: cmd.url }); } catch (e) { console.warn('[Sentinel] Navigation failed:', e.message); }
         return `Navigated to ${cmd.url}`;
       }
 

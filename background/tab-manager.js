@@ -613,7 +613,7 @@ async function ensureDebuggerAttached(tabId) {
     return;
   }
   const wasUserDetached = userDetachedTabs.has(tabId);
-  await chrome.debugger.attach({ tabId }, '1.3');
+  try { await chrome.debugger.attach({ tabId }, '1.3'); } catch (e) { if (!String(e?.message || e).includes('Already exists')) throw e; }
   attachedDebuggees.add(tabId);
   await ensureObservabilityListeners(tabId);
   // Warn the user that the debugger re-attached after they dismissed the banner,
@@ -851,7 +851,7 @@ export async function cdpDispatchType(tabId, text, options = {}) {
 
     // Fast path: single Input.insertText call. CDP dispatches trusted
     // input/beforeinput events for the inserted text in one shot.
-    await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text });
+    try { await chrome.debugger.sendCommand({ tabId }, 'Input.insertText', { text }); } catch (e) { console.warn('[Sentinel/tab-manager] CDP insertText failed:', e?.message || e); throw e; }
     return { ok: true };
   } catch (err) {
     return { ok: false, error: getErrorMessage(err) };

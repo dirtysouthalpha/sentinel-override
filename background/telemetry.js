@@ -269,7 +269,7 @@ async function _getRunsIndex() {
  */
 async function _setRunsIndex(index) {
   _runsIndexCache = index;
-  await chrome.storage.local.set({ telemetry_runs_index: index });
+  try { await chrome.storage.local.set({ telemetry_runs_index: index }); } catch (_) { /* storage quota — non-fatal */ }
 }
 
 /**
