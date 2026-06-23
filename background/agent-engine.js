@@ -1,4 +1,5 @@
 // Sentinel Override v3 -- Agent Engine
+import { buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames, formatVisionHistory, buildVisionSystemPrompt, buildVisionUserContent, buildRunLogEntry, isGoalComplete, isExplicitNavigation } from './agent-loop-helpers.js';
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
@@ -4328,21 +4329,12 @@ async function runAgentLoop(goal, workingTabId) {
       // If goal mentions a site+query, construct the direct URL instead of clicking through
       if (command.type === 'smart_navigate' && command.query) {
         const site = command.site || 'google';
-        const q = encodeURIComponent(command.query);
-        let smartUrl = '';
-        if (site === 'google') smartUrl = `https://www.google.com/search?q=${q}`;
-        else if (site === 'weather.gov') smartUrl = `https://forecast.weather.gov/zipcity.php?inputstring=${q}`;
-        else if (site === 'wikipedia') smartUrl = `https://en.wikipedia.org/wiki/Special:Search?search=${q}`;
-        else if (site === 'youtube') smartUrl = `https://www.youtube.com/results?search_query=${q}`;
-        else if (site === 'amazon') smartUrl = `https://www.amazon.com/s?k=${q}`;
-        else if (site === 'reddit') smartUrl = `https://www.reddit.com/search/?q=${q}`;
-        else if (/^(twitter|x)$/.test(site)) smartUrl = `https://x.com/search?q=${q}`;
+        const smartUrl = buildSmartUrl(site, command.query);
         if (smartUrl) {
           command = { type: 'navigate', url: smartUrl };
           console.log(`[Sentinel/SPEED] smart_navigate → ${smartUrl}`);
         } else {
-          // Fallback to Google
-          command = { type: 'navigate', url: `https://www.google.com/search?q=${q}` };
+          command = { type: 'navigate', url: buildGoogleFallbackUrl(command.query) };
         }
       }
 
