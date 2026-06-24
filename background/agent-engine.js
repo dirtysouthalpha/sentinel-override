@@ -1891,16 +1891,38 @@ async function runAgentLoop(goal, workingTabId) {
         _tabUrl.startsWith('chrome://') || _tabUrl.startsWith('edge://') || _tabUrl.startsWith('about:')
       );
       if (_isRestrictedPage) {
-        const _restrictedMsg = `Cannot operate on internal browser page (${_tabUrl}). Switch to a normal web tab or open a new tab before starting the agent.`;
-        historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
-        sendSilentUpdate('⚠️ Cannot operate on internal browser page. Please switch to a normal web tab.', stepCount);
-        finished = true;
-        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-        chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⚠️ ${_restrictedMsg}` }).catch((e) => {
-          console.error('[restrictedPage] Unhandled rejection:', e);
-        });
-        sendReportUpdate('generating');
-        break;
+        // (v21.6.1) Auto-create a new tab instead of failing. The user may
+        // have started the agent from chrome://extensions or another internal
+        // page. Rather than quitting, open a new tab and continue the loop.
+        sendSilentUpdate('Opening a new tab (current page is internal)...', stepCount);
+        try {
+          const _newTab = await chrome.tabs.create({ url: 'about:blank', active: true });
+          if (_newTab && _newTab.id) {
+            tab = _newTab.id;
+            // Wait for the new tab to be ready
+            await sleep(1000);
+            // Register it as an agent tab so content scripts get injected
+            try {
+              const { registerAgentTab } = await import('./agent-tabs.js');
+              if (typeof registerAgentTab === 'function') {
+                await registerAgentTab(_newTab.id, { isPrimary: false, isAgentCreated: true });
+              }
+            } catch (_regE) { /* non-fatal */ }
+            // Continue the loop — the auto-navigate code below will navigate
+            // this blank tab to the goal URL.
+            continue;
+          }
+        } catch (_tabE) {
+          // If tab creation fails, then fail gracefully
+          const _restrictedMsg = `Cannot operate on internal browser page (${_tabUrl}) and failed to create new tab.`;
+          historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
+          sendSilentUpdate(`⚠️ ${_restrictedMsg}`, stepCount);
+          finished = true;
+          reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⚠️ ${_restrictedMsg}` }).catch(() => {});
+          sendReportUpdate('generating');
+          break;
+        }
       }
 
       // Auto-navigate to URL found in goal (first iteration only)
