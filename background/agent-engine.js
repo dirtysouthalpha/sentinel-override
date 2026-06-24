@@ -2614,7 +2614,22 @@ async function runAgentLoop(goal, workingTabId) {
       // 3. (v21.3) HARD CEILING + circuit breaker: force a clean finish
       //    at ABSOLUTE_MAX_STEPS (150) regardless of dynamicMaxSteps bumps.
       //    Also inject circuit breaker directives when degenerate loops detected.
+      // (v21.6.1) Track consecutive LLM failures for early-stop
+      const _recentFailures = history.slice(-6).filter(h => h.result && typeof h.result === 'string' && (h.result.includes('API Error') || h.result.includes('non-ok response'))).length;
       const _cbResult = checkCircuitBreaker(history, stepCount, dynamicMaxSteps);
+      if (_recentFailures >= 5 && !_cbResult.shouldHardStop) {
+        _cbResult.shouldHardStop = true;
+        _cbResult.reason = `5 consecutive LLM failures — likely model/provider incompatibility. Check model supports vision.`;
+        _cbResult.severity = 'critical';
+      }
+      // (v21.6.1) Vision 404 detection — model doesn't support image input
+      const _lastEntry = history[history.length - 1];
+      const _lastErr = _lastEntry && _lastEntry.result ? String(_lastEntry.result) : '';
+      if (_lastErr.includes('No endpoints found that support image input') || _lastErr.includes('support image input')) {
+        _cbResult.shouldHardStop = true;
+        _cbResult.reason = 'Model does not support vision (image input). Switch to a vision-capable model in Settings or Quick Switcher.';
+        _cbResult.severity = 'critical';
+      }
       if (_cbResult.directive) {
         loopDirective += _cbResult.directive;
       }

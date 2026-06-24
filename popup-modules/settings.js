@@ -1705,10 +1705,12 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   // Free OpenRouter models with vision + tool support
   const FREE_MODELS = [
+    // (v21.6.1) VISION-ONLY — Sentinel Override sends screenshots every step.
+    // Non-vision models get 404 on every call. Only list free models with vision support.
     { id: 'nex-agi/nex-n2-pro:free', label: 'Nex-N2-Pro (vision+tools)', vision: true, tools: true },
     { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B (vision+tools)', vision: true, tools: true },
-    { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'Nemotron 3 Super (1M ctx)', vision: false, tools: true },
-    { id: 'poolside/laguna-m.1:free', label: 'Poolside Laguna (coding)', vision: false, tools: true },
+    { id: 'meta-llama/llama-4-scout-17b-16e-instruct:free', label: 'Llama 4 Scout 17B (vision)', vision: true, tools: false },
+    { id: 'opengvlab/internvl2-26b:free', label: 'InternVL2 26B (vision)', vision: true, tools: false },
   ];
 
   // Build dropdown
