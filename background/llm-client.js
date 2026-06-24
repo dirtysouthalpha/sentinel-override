@@ -1945,7 +1945,8 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
   } else {
     requestBody = JSON.stringify(_withStream(provider.buildBody(model, provider.systemPromptTweak, userContent, { maxTokens: 8000, temperature: 0.1 })));
   }
-  const requestHeaders = provider.buildHeaders(apiKey, { thinking: useThinking });
+  // (v21.6.1) Merge provider-specific custom headers (e.g. OpenRouter HTTP-Referer, X-Title)
+  const requestHeaders = { ...provider.buildHeaders(apiKey, { thinking: useThinking }), ...(provider.headers || {}) };
   // Tracks which AbortController owns the response we ultimately parse (the
   // vision fallback below swaps in its own controller).
   let activeController = controller;
@@ -2633,7 +2634,8 @@ export async function callLLMSimple(systemPrompt, userPrompt, maxTokens = 1200) 
   const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const body = JSON.stringify(provider.buildBody(model, systemPrompt, userPrompt, { maxTokens, temperature: 0.4 }));
-    const headers = provider.buildHeaders(apiKey);
+    // (v21.6.1) Merge provider-specific custom headers
+    const headers = { ...provider.buildHeaders(apiKey), ...(provider.headers || {}) };
     const response = await fetch(endpoint, { method: 'POST', headers, body, signal: controller.signal });
     clearTimeout(timeout);
     if (!response.ok) {

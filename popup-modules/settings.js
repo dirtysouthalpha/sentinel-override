@@ -1230,9 +1230,12 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   try {
     // Determine provider format from endpoint (popup context cannot import background modules)
     const isAnthropic = endpoint.includes('api.anthropic.com');
+    const isOpenRouter = endpoint.includes('openrouter.ai');
     const headers = isAnthropic
       ? { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-      : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+      : isOpenRouter
+        ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'HTTP-Referer': 'https://github.com/dirtysouthalpha/sentinel-override', 'X-Title': 'Sentinel Override' }
+        : { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
     const body = JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] });
 
     const controller = new AbortController();
