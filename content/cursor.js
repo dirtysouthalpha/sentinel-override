@@ -1,3 +1,14 @@
+// (CSH-03) Error boundary — catches unhandled errors so cursor doesn't crash the page
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !window.__sentinelCursorErrorBoundary) {
+  window.__sentinelCursorErrorBoundary = true;
+  window.addEventListener('error', (e) => {
+    try { console.warn('[Sentinel/Cursor] Uncaught error:', e.message || e.error); } catch (_) {}
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    try { console.warn('[Sentinel/Cursor] Unhandled rejection:', e.reason); } catch (_) {}
+  });
+}
+
 // Sentinel Override v3 -- Virtual Operator Cursor
 // A persistent, animated cursor that visibly travels to action targets BEFORE
 // the action fires. Pairs with the existing highlight + click-pulse system to

@@ -7,7 +7,7 @@ progress:
   phases_completed: 5
   requirements_completed: 19
   requirements_skipped: 4 (LLM-01-04 — deferred to v18.0)
-last_updated: "2026-06-10"
+last_updated: 2026-06-24 (v21.5.13 — circuit breaker, streaming, CI/CD, OpenRouter fix, tab scoping)
 ---
 
 ## Current Position
@@ -53,3 +53,14 @@ Last activity: 2026-06-10 - All phases shipped
 - tests/agent-reporting.test.js
 - tests/agent-recovery.test.js
 - .planning/REQUIREMENTS-v17.md
+
+
+---
+## v21.x Updates (2026-06-24)
+- CSH-02/CSH-03 error boundaries added to quick-assist.js and cursor.js
+- All LLM-01 through LLM-04 items are COMPLETE (modularization done in v21.0.0)
+- Neuralis brain integration MERGED to main (brain-client.js + brain-producer.js)
+- Ticket output mode SHIPPED (TICKET_KICKOFF, FINAL_NOTES, IT_GLUE_KB)
+- historyWindow IS used (constants.js:77 → CONFIG.historyWindow: 15)
+- execute_js sandbox IS enabled (_EXECUTE_JS_SANDBOX_ENABLED = true)
+- federation-ui.js EXISTS (popup-modules/federation-ui.js, 22 tests)

@@ -1,3 +1,14 @@
+// (CSH-02) Error boundary — catches unhandled errors so Quick Assist doesn't crash the page
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !window.__sentinelQAErrorBoundary) {
+  window.__sentinelQAErrorBoundary = true;
+  window.addEventListener('error', (e) => {
+    try { console.warn('[Sentinel/QuickAssist] Uncaught error:', e.message || e.error); } catch (_) {}
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    try { console.warn('[Sentinel/QuickAssist] Unhandled rejection:', e.reason); } catch (_) {}
+  });
+}
+
 /**
  * Sentinel Quick Assist v3.46.0 — Floating AI Panel Content Script
  * Injects a floating panel on any webpage for inline AI-powered text analysis.
