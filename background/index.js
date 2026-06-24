@@ -278,19 +278,18 @@ try {
 // whether the panel is enabled on a given tab during a run -- those
 // two APIs coexist fine.
 try {
-  // (v21.6) Set global default to disabled — panel only shows per-tab via icon click.
-  chrome.sidePanel.setOptions({ enabled: false, path: 'popup.html' }).catch(() => {});
+  // (v21.6.1) Global enabled: true is REQUIRED for openPanelOnActionClick to work.
+  // enabled controls WHETHER the panel CAN show, not WHETHER it IS showing.
+  // openPanelOnActionClick: true is a toggle — clicking opens, clicking again closes.
+  // The panel does NOT auto-show on tab switches (onActivated fix from v21.5.3).
+  chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' }).catch(() => {});
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', getErrorMessage(e)));
 } catch (_e) { /* non-fatal on older Chrome */ }
 
-// (v3.53) When user opens a new tab during agent run, immediately disable
-// the side panel on it — only agent-attached tabs should show the panel.
-chrome.tabs.onCreated.addListener((tab) => {
-  if (agentRunning && tab.id) {
-    chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' }).catch(() => {});
-  }
-});
+// (v21.6.1) Removed onCreated panel blocker — it was preventing users from
+// opening the panel on any tab created during an agent run. The panel being
+// enabled does NOT mean it auto-shows — openPanelOnActionClick controls that.
 
 
 // ========== Unified Message Handler ==========
