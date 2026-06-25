@@ -125,6 +125,33 @@ export function extractParameters(goalText) {
   return params;
 }
 
+
+/**
+ * (v21.6) Seed built-in MSP templates on first run.
+ * Merges any missing builtins into storage without overwriting user templates.
+ */
+export async function seedBuiltinTemplates() {
+  try {
+    const result = await chrome.storage.local.get([SEED_KEY]);
+    if (result[SEED_KEY]) return;
+    const existing = await loadTemplates();
+    let added = false;
+    for (const tmpl of BUILTIN_TEMPLATES) {
+      if (!existing[tmpl.id]) {
+        existing[tmpl.id] = tmpl;
+        added = true;
+      }
+    }
+    if (added) {
+      await saveTemplates(existing);
+      console.debug('[Sentinel] Seeded ' + BUILTIN_TEMPLATES.length + ' built-in templates');
+    }
+    await chrome.storage.local.set({ [SEED_KEY]: true });
+  } catch (e) {
+    console.warn('[Sentinel] Failed to seed built-in templates:', getErrorMessage(e));
+  }
+}
+
 // ========== Storage Helpers ==========
 
 /**
