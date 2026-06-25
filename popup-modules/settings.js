@@ -1705,12 +1705,14 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
 
   // Free OpenRouter models with vision + tool support
   const FREE_MODELS = [
-    // (v21.6.1) VISION-ONLY — Sentinel Override sends screenshots every step.
-    // Non-vision models get 404 on every call. Only list free models with vision support.
-    { id: 'nex-agi/nex-n2-pro:free', label: 'Nex-N2-Pro (vision+tools)', vision: true, tools: true },
-    { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B (vision+tools)', vision: true, tools: true },
-    { id: 'meta-llama/llama-4-scout-17b-16e-instruct:free', label: 'Llama 4 Scout 17B (vision)', vision: true, tools: false },
-    { id: 'opengvlab/internvl2-26b:free', label: 'InternVL2 26B (vision)', vision: true, tools: false },
+    // (v21.6.2) VERIFIED against live OpenRouter API (2026-06-25).
+    // All models below confirmed FREE + VISION support.
+    // Non-vision models get 404 — Sentinel sends screenshots every step.
+    { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B (vision+tools, 262K ctx)', vision: true, tools: true },
+    { id: 'google/gemma-4-26b-a4b-it:free', label: 'Gemma 4 26B A4B (vision+tools, 262K ctx)', vision: true, tools: true },
+    { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', label: 'Nemotron 3 Nano Omni 30B (vision+tools, 256K ctx)', vision: true, tools: true },
+    { id: 'nvidia/nemotron-nano-12b-v2-vl:free', label: 'Nemotron Nano 12B VL (vision+tools, 128K ctx)', vision: true, tools: true },
+    { id: 'openrouter/free', label: 'Free Models Router (auto-route, vision+tools)', vision: true, tools: true },
   ];
 
   // Build dropdown
@@ -1771,7 +1773,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     const providers = result.providers || {};
     if (providers.openrouter && providers.openrouter.api_key) return; // already configured
     // Check if any other openrouter-compatible provider has a key
-    for (const key of ['nexn2', 'gemma4', 'nemotron', 'poolside']) {
+    for (const key of ['gemma4', 'nemotron', 'openrouter']) {
       if (providers[key] && providers[key].api_key) {
         // Migrate key to openrouter
         providers.openrouter = { ...providers[key], model: select.value };
