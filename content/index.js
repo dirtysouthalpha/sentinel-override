@@ -672,11 +672,9 @@ if (window.__sentinelInitialized) {
           const stepNum = request.step || 0;
 
           // Animate cursor to center of viewport
-          if (window.__sentinelCursor && window.__sentinelCursor.moveTo && window.innerWidth > 0 && window.innerHeight > 0) {
-            const cx = Math.round(window.innerWidth / 2);
-            const cy = Math.round(window.innerHeight / 2);
-            window.__sentinelCursor.moveTo(cx, cy, { duration: 400 });
-          }
+          // (v21.6) REMOVED center-move — was creating a jarring double-cursor-move.
+          // The actual action handlers (click, type, scroll) move the cursor
+          // to the REAL target element. This banner is just a text indicator.
 
           // Show a brief action banner at top of page
           let banner = document.getElementById('__sentinel_action_banner');

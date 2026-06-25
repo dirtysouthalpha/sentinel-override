@@ -41,7 +41,7 @@ async function _initRunState(goal) {
     ticketMode:      stored.ticketMode     ?? false,
     ticketFormat:    stored.ticketFormat   ?? 'standard',
     approvalMode:    stored.approvalMode   ?? false,
-    useTrustedInput: stored.useTrustedInput ?? false,
+    useTrustedInput: stored.useTrustedInput ?? true,
     quickMode:       stored.quickMode      ?? false,
   };
   const _expectedTenant = (stored && typeof stored.expectedTenant === 'string') ? stored.expectedTenant.trim() : null;
