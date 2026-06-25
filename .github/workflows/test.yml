@@ -42,6 +42,13 @@ jobs:
             echo "PASS: No bare imports detected"
           fi
 
+
+      # ━━━ Step 1b: Import Resolution Checker ━━━
+      # Catches missing named exports that crash Chrome MV3 service workers
+      # (e.g. importing seedBuiltinTemplates when it was never exported)
+      - name: Import Resolution Checker
+        run: node scripts/check-imports.cjs
+
       # ━━━ Step 2: Syntax Check ━━━
       - name: Syntax Check
         run: |
