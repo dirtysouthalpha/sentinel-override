@@ -12,7 +12,7 @@ Sentinel Override is a professional AI browser automation agent that sees your p
 
 **How it works:** Tell it what to do in plain English. A vision-powered agent places numbered overlays on every clickable element, reasons about which one to interact with, and executes. Every action is traced. Every claim in the report is source-cited.
 
-**Bring your own LLM.** 16+ providers supported — OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Groq, Mistral, Ollama (local), and more. Or add any OpenAI-compatible endpoint. Your API keys stay in your browser.
+**Bring your own LLM.** 20+ providers including OpenRouter supported — OpenAI, Anthropic, Google Gemini, xAI, DeepSeek, Groq, Mistral, Ollama (local), and more. Or add any OpenAI-compatible endpoint. Your API keys stay in your browser.
 
 ## Key Features
 

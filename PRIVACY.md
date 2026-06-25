@@ -1,6 +1,6 @@
 # Sentinel Override — Privacy Policy
 
-**Last updated:** June 2026
+**Last updated:** June 24, 2026 (v21.5.15)
 
 ## Overview
 

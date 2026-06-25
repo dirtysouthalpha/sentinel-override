@@ -9,7 +9,7 @@ import {setSPATransitionPending, notifyIfEnabled, stopSwKeepalive} from './share
 import {enumerateFrames, executeInFrame, resolveFrameForSelector, addFrameRouterListeners} from './frame-router.js';
 import {getActiveTabId, handleTabRemoved} from './tab-context.js';
 import {callLLMSimple} from './llm-client.js';
-import {listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal} from './template-manager.js';
+import {listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate, resolveTemplateGoal, seedBuiltinTemplates} from './template-manager.js';
 import {PROVIDER_CATALOG, getCatalogProvider, fetchModelsList} from './provider-registry.js';
 import {createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler} from './scheduler.js';
 import {parseNaturalLanguageSchedule} from './scheduler-nlp.js';
@@ -291,6 +291,9 @@ try {
 // opening the panel on any tab created during an agent run. The panel being
 // enabled does NOT mean it auto-shows — openPanelOnActionClick controls that.
 
+
+n// (v21.6) Seed built-in MSP templates on first run
+seedBuiltinTemplates().catch((e) => console.warn("[Sentinel] Template seed failed:", getErrorMessage(e)));
 
 // ========== Unified Message Handler ==========
 // (v10.3.2) This service worker registers several onMessage listeners

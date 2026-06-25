@@ -7,6 +7,67 @@ import { getErrorMessage } from './error-utils.js';
 import { ONE_MINUTE_MS } from './constants.js';
 
 const STORAGE_KEY = 'sentinel_templates';
+const SEED_KEY = 'sentinel_builtins_seeded';
+
+// (v21.6) Built-in MSP workflow templates — seeded on first run.
+const BUILTIN_TEMPLATES = [
+  {
+    id: 'builtin-m365-user-audit',
+    name: 'M365 User Audit',
+    description: 'Audit a user M365 permissions, groups, and sign-in activity',
+    tags: ['m365', 'audit', 'security'],
+    builtin: true,
+    goal: 'Go to admin.microsoft.com, search for user ::email::, then audit their assigned roles, group memberships, and recent sign-in activity. Summarize findings with any security concerns.',
+    params: [{ key: 'email', label: 'Email', defaultValue: '' }],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-teams-guest-review',
+    name: 'Teams Guest Access Review',
+    description: 'Review external guest access in Microsoft Teams',
+    tags: ['teams', 'audit', 'guest'],
+    builtin: true,
+    goal: 'Go to admin.teams.microsoft.com, navigate to Users > Guest Users, and list all external guests with their last activity date. Flag any guests inactive for 90+ days.',
+    params: [],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-cw-ticket-triage',
+    name: 'ConnectWise Ticket Triage',
+    description: 'Triage incoming service tickets and prioritize by urgency',
+    tags: ['connectwise', 'triage', 'psa'],
+    builtin: true,
+    goal: 'Go to the ConnectWise service board, review all new and open tickets, and create a triage summary with priority recommendations based on SLA status and business impact.',
+    params: [],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-itglue-doc-audit',
+    name: 'IT Glue Documentation Audit',
+    description: 'Check documentation completeness for a client organization',
+    tags: ['itglue', 'documentation', 'audit'],
+    builtin: true,
+    goal: 'Go to IT Glue, select organization ::org_name::, and audit their documentation. List any missing or outdated documents including passwords, configurations, and network diagrams.',
+    params: [{ key: 'org_name', label: 'Organization Name', defaultValue: '' }],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-web-research',
+    name: 'Web Research and Summary',
+    description: 'Research any topic and create a structured executive summary',
+    tags: ['research', 'general', 'summary'],
+    builtin: true,
+    goal: 'Research ::topic:: by visiting relevant sources. Create a structured summary with key findings, sources cited, and a brief executive summary suitable for sharing with stakeholders.',
+    params: [{ key: 'topic', label: 'Research Topic', defaultValue: '' }],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  }
+];
+
 const PARAM_REGEX = /:{2}(\w+):{2}/g;
 
 // ========== In-Memory Cache ==========
@@ -74,6 +135,7 @@ export function extractParameters(goalText) {
 export async function loadTemplates() {
   const now = Date.now();
   if (templatesCache && (now - cacheTimestamp) < CACHE_TTL) {
+  // (v21.6) Seed built-in templates on first run
     return templatesCache;
   }
 
