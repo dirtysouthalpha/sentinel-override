@@ -5556,7 +5556,14 @@ return { ok: true, value: el.value };
       } else {
         baseDelay = 150 + Math.random() * 100;    // 150-250ms: default (turbo ~12ms)
       }
-      await sleep(baseDelay * speedMultiplier);
+// (v21.6.3) Free-model rate-limit throttle: enforce minimum 4s between steps
+      // when recently rate-limited to stay under OpenRouter's 16 req/min limit
+      const _finalDelay = baseDelay * speedMultiplier;
+      if (wasRecentlyRateLimited() && _finalDelay < 4000) {
+        await sleep(4000);
+      } else {
+        await sleep(_finalDelay);
+      }
 
     } catch (err) {
       console.error('[Sentinel/Loop] Step error:', getErrorMessage(err), err.stack ? err.stack.substring(0, 200) : '');
@@ -5892,6 +5899,7 @@ function escapeJsString(str, quote = '"') {
 
 // ========== Approval Mode — extracted to agent-approval.js ==========
 import {_describeTarget, describeAction, requestApproval as _requestApprovalImpl} from './agent-approval.js';
+import { wasRecentlyRateLimited } from './llm-retry.js'; // (v21.6.3) Rate-limit throttle
 
 // Wrapper to handle agentPaused mutation locally
 async function requestApproval(command, stepNumber) {

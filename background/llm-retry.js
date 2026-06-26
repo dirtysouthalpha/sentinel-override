@@ -19,6 +19,12 @@ const FREE_FALLBACK_MODELS = [
 // (v21.6) Track 429 count per model to trigger fallback switching
 let _rateLimitHits = {};
 let _triedModels = new Set(); // (v21.6.1) Prevent infinite model cycling
+let _lastRateLimitedAt = 0; // (v21.6.3) Track last 429 timestamp for step throttle
+
+/** (v21.6.3) Check if we were recently rate-limited (within 60s) */
+export function wasRecentlyRateLimited() {
+  return (Date.now() - _lastRateLimitedAt) < 60000;
+}
 
 
 /**
@@ -52,6 +58,7 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
       if (msg.includes('429') && agentState) {
         const currentModel = (agentState.model || '').toLowerCase();
         _rateLimitHits[currentModel] = (_rateLimitHits[currentModel] || 0) + 1;
+        _lastRateLimitedAt = Date.now(); // (v21.6.3) Track for step throttle
         if (_rateLimitHits[currentModel] >= 2 && currentModel.includes(':free')) {
           _triedModels.add(currentModel);
           const nextModel = FREE_FALLBACK_MODELS.find(m => !_triedModels.has(m));
