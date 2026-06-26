@@ -1,5 +1,40 @@
 # Changelog
 
+## v21.6.1 — Overnight Audit Fixes (9 Bugs Fixed)
+
+Critical audit caught 9 bugs in v21.6.0 that would have caused silent failures. All fixed.
+
+### 🚨 SHOWSTOPPER (Critical)
+
+- **All 13 message handlers missing**: Python replace scripts had a logic bug — checked if handler was missing, then tried to replace it (which no-op'd). Every new feature (sessions, undo, gist, proxy, export) would have thrown 'Unknown action'. Now all 13 handlers are correctly inserted before the default case.
+
+### Bug Fixes
+
+- **proxy-manager.js**: Removed dead auth variable — Chrome MV3 chrome.proxy.settings does NOT support inline auth. Added documentation that authenticated proxies require separate onAuthRequired listener
+- **llm-retry.js**: Added _triedModels Set to prevent infinite model cycling when all free vision models hit rate limits simultaneously
+- **shadow-intercept.js**: Removed fake plugins array [1,2,3,4,5] — bare numbers break detection libraries expecting plugin.name/plugin.filename. Left plugins alone (Chrome with extensions has real PluginArray)
+- **tab-manager.js**: Added OOM fallback for captureBeyondViewport — huge pages now fall back to viewport-only capture instead of crashing
+- **tab-manager.js**: Fixed stray 'n' character on line 993 from Python replacement escaping issue
+- **session-manager.js**: Fixed cookie URL protocol — now respects cookie.secure flag instead of hardcoding https://
+- **telemetry-panel.js**: Fixed literal 
+ in button HTML (rendered as visible text between buttons)
+- **telemetry-panel.js**: Removed duplicate event listener wiring (handler fired twice per click)
+- **telemetry-panel.js**: Replaced nonexistent _showToast calls with console.log/warn
+
+### New Test Coverage
+
+- tests/session-manager.test.js: 11 tests covering save/restore/list/delete session
+- tests/proxy-manager.test.js: 6 tests covering set/clear/get/list proxy configs
+
+### Verification
+
+- 133 files syntax-checked, 0 errors
+- 507 imports resolved
+- 13/13 message handlers verified present
+- 10,249 tests passing (up from 10,232), 0 failures
+
+# Changelog
+
 ## v21.6.0 — MSP Workflow Features
 
 - **Per-client memory isolation**: agentMemory now namespaces by expectedTenant — data from Client A can no longer bleed into Client B's context. Auto-saves on run reset, restores on next run for same tenant (1-hour TTL).

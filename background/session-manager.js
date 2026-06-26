@@ -47,7 +47,7 @@ export async function restoreSession(clientId) {
     for (const cookie of data.cookies) {
       try {
         await chrome.cookies.set({
-          url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+          url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
           name: cookie.name,
           value: cookie.value,
           domain: cookie.domain,

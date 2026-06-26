@@ -980,11 +980,22 @@ export async function takeScreenshot(tabId, windowId, currentUrl, screenshotCach
     // (v21.6) Full-page screenshot: captureBeyondViewport stitches entire
     // scrollable page into one image. The agent sees everything, not just
     // the visible viewport — eliminates blind spots on long admin pages.
-    const screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', {
-      format: 'jpeg',
-      quality: CONFIG.screenshotQuality,
-      captureBeyondViewport: true
-    });
+    // Falls back to viewport-only on OOM/capture failure for huge pages.
+    let screenshotResult = null;
+    try {
+      screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: CONFIG.screenshotQuality,
+        captureBeyondViewport: true
+      });
+    } catch (_fullPageErr) {
+      // Full-page capture failed (OOM on huge page, timeout) — fall back to viewport
+      console.warn('[Sentinel/tab-manager] Full-page capture failed, falling back to viewport:', getErrorMessage(_fullPageErr));
+      screenshotResult = await chrome.debugger.sendCommand({ tabId }, 'Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: CONFIG.screenshotQuality
+      });
+    }
     base64Image = (screenshotResult && typeof screenshotResult.data === 'string') ? screenshotResult.data : null;
   } catch {
     // Attachment or capture failed — drop our tracking, attempt a clean detach,

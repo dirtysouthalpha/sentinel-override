@@ -1150,6 +1150,100 @@ const handleRuntimeMessage = async (request, sender) => {
       return { peers: getLocalPeerStatus() };
     }
 
+    case 'export_run_history': {
+      try {
+        const runs = await listPersistedRuns();
+        const exportData = {
+          exportedAt: new Date().toISOString(),
+          version: '21.6.0',
+          totalRuns: runs.length,
+          runs: []
+        };
+        for (const meta of runs) {
+          const full = await loadPersistedRun(meta.id);
+          if (full) exportData.runs.push({
+            id: meta.id,
+            goal: meta.goal || '',
+            startTime: meta.startTime,
+            endTime: meta.endTime,
+            steps: full.steps || [],
+            tokenUsage: full.tokenUsage || {},
+            cost: full.cost || 0,
+            status: meta.status || 'unknown'
+          });
+        }
+        return { ok: true, data: exportData };
+      } catch (e) {
+        return { ok: false, error: getErrorMessage(e) };
+      }
+    }
+    case 'save_session': {
+      try {
+        return await saveSession(request.clientId, request.domain);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'restore_session': {
+      try {
+        return await restoreSession(request.clientId);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'list_sessions': {
+      try {
+        const sessions = await listSessions();
+        return { ok: true, sessions };
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'delete_session': {
+      try {
+        return await deleteSession(request.clientId);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'get_undo_history': {
+      try {
+        const actions = getRecentActions(request.count || 5);
+        return { ok: true, actions };
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'undo_last_action': {
+      try {
+        const undoCmd = generateUndoCommand();
+        if (!undoCmd) return { ok: false, error: 'No undoable action' };
+        const popped = popLastAction();
+        return { ok: true, undoCommand: undoCmd, undoneAction: popped };
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'share_via_gist': {
+      try {
+        return await shareViaGist(request.templateIds, request.githubToken);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'import_from_gist': {
+      try {
+        return await importFromGist(request.gistUrlOrId);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'set_client_proxy': {
+      try {
+        return await setClientProxy(request.clientId, request.proxyConfig);
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'clear_proxy': {
+      try {
+        return await clearProxy();
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'get_active_proxy': {
+      try {
+        return { ok: true, config: getActiveProxy() };
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+    case 'list_proxy_configs': {
+      try {
+        const configs = await listProxyConfigs();
+        return { ok: true, configs };
+      } catch (e) { return { ok: false, error: getErrorMessage(e) }; }
+    }
+
     default:
       throw new Error(`Unknown action: ${request.action}`);
   }

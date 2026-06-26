@@ -18,6 +18,7 @@ const FREE_FALLBACK_MODELS = [
 
 // (v21.6) Track 429 count per model to trigger fallback switching
 let _rateLimitHits = {};
+let _triedModels = new Set(); // (v21.6.1) Prevent infinite model cycling
 
 
 /**
@@ -52,11 +53,16 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
         const currentModel = (agentState.model || '').toLowerCase();
         _rateLimitHits[currentModel] = (_rateLimitHits[currentModel] || 0) + 1;
         if (_rateLimitHits[currentModel] >= 2 && currentModel.includes(':free')) {
-          const nextModel = FREE_FALLBACK_MODELS.find(m => !m.includes(currentModel.split('/')[0]));
+          _triedModels.add(currentModel);
+          const nextModel = FREE_FALLBACK_MODELS.find(m => !_triedModels.has(m));
           if (nextModel && agentState.model !== nextModel) {
             console.warn(`[Sentinel/LLM] Rate limit on ${currentModel} — switching to ${nextModel}`);
             agentState.model = nextModel;
             _rateLimitHits = {}; // reset counter for new model
+          } else if (_triedModels.size >= FREE_FALLBACK_MODELS.length) {
+            // All free models exhausted — reset and let normal retry handle it
+            console.warn('[Sentinel/LLM] All free vision models rate-limited — resetting cycle');
+            _triedModels = new Set();
             // Notify popup of model switch
             try { sendSilentUpdate({ type: 'model_switched', from: currentModel, to: nextModel }); } catch (_) {}
           }

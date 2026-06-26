@@ -12,13 +12,9 @@ try {
   }
   // Also patch common detection vectors
   if (typeof navigator !== 'undefined') {
-    // Remove Headless Chrome indicators
-    if (!navigator.plugins || navigator.plugins.length === 0) {
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5], // fake plugins array
-        configurable: true
-      });
-    }
+    // Do NOT fake plugins — Chrome with extensions has real PluginArray entries.
+    // Faking with bare numbers breaks detection libraries expecting
+    // plugin.name / plugin.filename properties. Leave plugins alone.
     // Add realistic languages
     if (!navigator.languages || navigator.languages.length === 0) {
       Object.defineProperty(navigator, 'languages', {

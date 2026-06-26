@@ -16,9 +16,9 @@ export async function setClientProxy(clientId, proxyConfig) {
   try {
     const scheme = proxyConfig.scheme || 'http';
     const port = proxyConfig.port || 8080;
-    const auth = (proxyConfig.username && proxyConfig.password)
-      ? `${encodeURIComponent(proxyConfig.username)}:${encodeURIComponent(proxyConfig.password)}@`
-      : '';
+    // NOTE: Chrome MV3 chrome.proxy.settings does NOT support inline auth.
+    // For authenticated proxies, a separate chrome.webRequest.onAuthRequired
+    // listener is needed. Unauthenticated proxies work directly here.
     const config = {
       mode: 'fixed_servers',
       rules: {
