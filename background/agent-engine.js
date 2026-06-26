@@ -1732,6 +1732,7 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastCmdType = '';
   let _sameCmdCount = 0;
   let _lastLoopUrl = '';
+  let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 3 total loops
   while (!finished && agentRunning) {
 
     // (v3.60 / fixed): Batch commands are drained just before the LLM consult
@@ -5307,6 +5308,16 @@ return { ok: true, value: el.value };
         _sameCmdCount = 0;
         agentPlan = null;
         currentPlanStep = 0;
+        // (v21.6.6) Hard escalation: after 3 total loop recoveries, force finish
+        _totalLoopRecoveries++;
+        if (_totalLoopRecoveries >= 3) {
+          const _memKeys = Object.keys(agentMemory).filter(k => !k.startsWith('_'));
+          const _memSummary = _memKeys.length > 0
+            ? _memKeys.map(k => { const v = agentMemory[k]; const s = typeof v === 'string' ? v : JSON.stringify(v); return `${k}: ${s ? s.substring(0, 200) : 'empty'}`; }).join('; ')
+            : 'No data extracted';
+          console.warn(`[Sentinel/RECOVERY] HARD STOP: ${_totalLoopRecoveries} total loops. Forcing finish.`);
+          command = { type: 'finish', text: `Task could not be completed fully due to repeated loops. Data collected so far: ${_memSummary}` };
+        }
       }
 
       // Check for stall
