@@ -1041,7 +1041,7 @@ const SENTINEL_TOOLS = [
   { name: 'click_at',        description: 'Click at specific x,y CSS-pixel coordinates (use when element list has no match).',
     input_schema: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, required: ['x', 'y'] } },
   { name: 'repeat_for_each', description: 'Execute a sub-sequence of actions for every item in a memory list.',
-    input_schema: { type: 'object', properties: { items_key: { type: 'string' }, item_var: { type: 'string' }, do: { type: 'array' } }, required: ['items_key', 'item_var', 'do'] } },
+    input_schema: { type: 'object', properties: { items_key: { type: 'string' }, item_var: { type: 'string' }, do: { type: 'array', items: { type: 'object' } } }, required: ['items_key', 'item_var', 'do'] } },
   { name: 'read_network_requests', description: 'Read recent network requests matching a URL pattern; useful for extracting API responses when DOM is blocked.',
     input_schema: { type: 'object', properties: { url_includes: { type: 'string' }, limit: { type: 'number' } } } },
   { name: 'smart_navigate', description: 'Navigate directly to a known site search/forecast page. MUCH faster than clicking through menus. Supported: google, weather.gov, wikipedia, youtube, amazon, reddit, twitter.',
