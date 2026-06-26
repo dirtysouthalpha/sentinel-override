@@ -13,14 +13,17 @@ import {listTemplates, getTemplate, saveTemplate, updateTemplate, deleteTemplate
 import {PROVIDER_CATALOG, getCatalogProvider, fetchModelsList} from './provider-registry.js';
 import {createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler} from './scheduler.js';
 import {parseNaturalLanguageSchedule} from './scheduler-nlp.js';
-import {exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown} from './collaboration.js';
-import {estimateCostUsd} from './llm-cost-estimation.js'; // (v21.6) Provider-aware cost tracking
+import {exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown, shareViaGist, importFromGist} from './collaboration.js';
+import {estimateCostUsd} from './llm-cost-estimation.js';
+import {saveSession, restoreSession, listSessions, deleteSession} from './session-manager.js';
+import {setClientProxy, clearProxy, getActiveProxy, listProxyConfigs} from './proxy-manager.js'; // (v21.6) Provider-aware cost tracking
 // (3.26.0) Bridge for content-script telemetry — content/index.js cannot
 // import telemetry.js directly (different context), so it posts a
 // `content_telemetry_event` message and we re-emit via tel.emit() so the
 // verbosity gate, console mirror, and panel broadcast all apply uniformly.
 // (3.27.0) Also exposes Past Runs queries to the popup-side panel.
 import {tel, listPersistedRuns, loadPersistedRun, deletePersistedRun} from './telemetry.js';
+import {getRecentActions, generateUndoCommand, popLastAction} from './agent-learning.js';
 import {ONE_MINUTE_MS} from './constants.js';
 
 // Precompute valid log levels for O(1) lookup

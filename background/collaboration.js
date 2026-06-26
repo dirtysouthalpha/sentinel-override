@@ -343,3 +343,81 @@ function escapeYaml(str) {
   if (!str) return '""';
   return `"${String(str).replace(/"/g, '\\"')}"`;
 }
+
+
+// ========== (v21.6) Gist-based Team Template Sharing ==========
+
+/**
+ * Export templates to a GitHub Gist and return a shareable URL.
+ * @param {Array<string>} templateIds - Array of template IDs to share (empty = all)
+ * @param {string} githubToken - GitHub personal access token for Gist creation
+ */
+export async function shareViaGist(templateIds, githubToken) {
+  if (!githubToken) return { ok: false, error: 'GitHub token required' };
+  try {
+    let templates;
+    if (!templateIds || templateIds.length === 0) {
+      templates = await exportAllTemplates();
+    } else {
+      templates = [];
+      for (const id of templateIds) {
+        const t = await exportTemplate(id);
+        if (t) templates.push(t);
+      }
+    }
+    if (!templates || templates.length === 0) {
+      return { ok: false, error: 'No templates to share' };
+    }
+    const gistData = {
+      description: `Sentinel Override Templates (${templates.length} templates)`,
+      public: false,
+      files: {
+        'sentinel-templates.json': {
+          content: JSON.stringify(templates, null, 2)
+        }
+      }
+    };
+    const resp = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(gistData)
+    });
+    if (!resp.ok) {
+      const errBody = await resp.text();
+      return { ok: false, error: `GitHub API ${resp.status}: ${errBody.substring(0, 200)}` };
+    }
+    const gist = await resp.json();
+    return { ok: true, url: gist.html_url, gistId: gist.id, templateCount: templates.length };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+/**
+ * Import templates from a GitHub Gist URL.
+ * @param {string} gistUrlOrId - Gist URL or ID
+ */
+export async function importFromGist(gistUrlOrId) {
+  try {
+    let apiUrl = gistUrlOrId;
+    if (!gistUrlOrId.startsWith('https://api.')) {
+      const gistId = gistUrlOrId.match(/([a-f0-9]{20,})/i)?.[1] || gistUrlOrId.split('/').pop();
+      apiUrl = `https://api.github.com/gists/${gistId}`;
+    }
+    const resp = await fetch(apiUrl);
+    if (!resp.ok) return { ok: false, error: `Gist not found (${resp.status})` };
+    const gist = await resp.json();
+    const file = gist.files?.['sentinel-templates.json'];
+    if (!file || !file.content) return { ok: false, error: 'No sentinel-templates.json in gist' };
+    const templates = JSON.parse(file.content);
+    if (!Array.isArray(templates)) return { ok: false, error: 'Invalid template format in gist' };
+    const result = await importTemplates(templates, 'rename');
+    return { ok: true, imported: result?.imported || templates.length, url: gist.html_url };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}

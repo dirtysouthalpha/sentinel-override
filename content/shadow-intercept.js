@@ -1,3 +1,43 @@
+
+// ========== (v21.6) Anti-Detection: Patch navigator.webdriver ==========
+// Many admin panels (M365, SentinelOne, ConnectWise) detect automation
+// via navigator.webdriver === true and block the session. This patch
+// runs in the MAIN world at document_start to remove that fingerprint.
+try {
+  if (typeof navigator !== 'undefined' && 'webdriver' in navigator) {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: () => false,
+      configurable: true
+    });
+  }
+  // Also patch common detection vectors
+  if (typeof navigator !== 'undefined') {
+    // Remove Headless Chrome indicators
+    if (!navigator.plugins || navigator.plugins.length === 0) {
+      Object.defineProperty(navigator, 'plugins', {
+        get: () => [1, 2, 3, 4, 5], // fake plugins array
+        configurable: true
+      });
+    }
+    // Add realistic languages
+    if (!navigator.languages || navigator.languages.length === 0) {
+      Object.defineProperty(navigator, 'languages', {
+        get: () => ['en-US', 'en'],
+        configurable: true
+      });
+    }
+  }
+  // Mask the WebDriver Chrome runtime flag
+  if (typeof window !== 'undefined' && window.chrome) {
+    // Ensure chrome.runtime exists but doesn't expose automation
+    if (!window.chrome.runtime) {
+      window.chrome.runtime = {};
+    }
+  }
+} catch (_e) {
+  // Non-fatal — some pages lock navigator props
+}
+
 // Sentinel Override v3 -- Shadow Root Interception (MAIN world, document_start)
 // Patches Element.prototype.attachShadow as early as possible so that closed
 // shadow roots created by inline <head> scripts are still captured.

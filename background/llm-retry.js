@@ -6,6 +6,20 @@ import { getErrorMessage, sleep } from './error-utils.js';
 import { sendSilentUpdate } from './message-protocol.js';
 import { callLLM } from './llm-client.js';
 
+// (v21.6) Free fallback vision models for auto-switching on repeated 429s
+// Ordered by reliability — first one that responds wins.
+const FREE_FALLBACK_MODELS = [
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'openrouter/free'
+];
+
+// (v21.6) Track 429 count per model to trigger fallback switching
+let _rateLimitHits = {};
+
+
 /**
  * Call the LLM with automatic retry on transient errors (429, 502, 503, timeouts).
  * Uses exponential backoff with jitter. On permanent failure, re-throws.
@@ -32,6 +46,22 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
     // and transient 500s under load; these are retryable just like 429/502/503.
     const isRetryable = (msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('529') || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
+      // (v21.6) Rate-limit model switching: if free model hits 429 twice,
+      // switch to next free vision model instead of just backing off
+      if (msg.includes('429') && agentState) {
+        const currentModel = (agentState.model || '').toLowerCase();
+        _rateLimitHits[currentModel] = (_rateLimitHits[currentModel] || 0) + 1;
+        if (_rateLimitHits[currentModel] >= 2 && currentModel.includes(':free')) {
+          const nextModel = FREE_FALLBACK_MODELS.find(m => !m.includes(currentModel.split('/')[0]));
+          if (nextModel && agentState.model !== nextModel) {
+            console.warn(`[Sentinel/LLM] Rate limit on ${currentModel} — switching to ${nextModel}`);
+            agentState.model = nextModel;
+            _rateLimitHits = {}; // reset counter for new model
+            // Notify popup of model switch
+            try { sendSilentUpdate({ type: 'model_switched', from: currentModel, to: nextModel }); } catch (_) {}
+          }
+        }
+      }
       // (v21.3) Provider-aware backoff: different providers have different rate
       // limit characteristics. GLM/Z.ai 429s need longer backoff than Claude/OpenAI.
       const _model = (agentState && agentState.model) || '';

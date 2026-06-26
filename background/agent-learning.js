@@ -244,3 +244,63 @@ async function _persist() {
     console.warn('[Sentinel/Learn] Persist failed:', getErrorMessage(e));
   }
 }
+
+
+/**
+ * (v21.6) Get the most recent N actions for undo display.
+ */
+export function getRecentActions(count = 10) {
+  return _actionHistory.slice(-count).reverse();
+}
+
+/**
+ * (v21.6) Get the last performed action (for single-step undo).
+ */
+export function getLastAction() {
+  return _actionHistory.length > 0 ? _actionHistory[_actionHistory.length - 1] : null;
+}
+
+/**
+ * (v21.6) Generate an undo command for the last action.
+ * Returns a command object the agent can execute, or null if not undoable.
+ */
+export function generateUndoCommand() {
+  const last = getLastAction();
+  if (!last) return null;
+
+  switch (last.actionType) {
+    case 'navigate':
+      // Undo navigate = go back
+      return { type: 'press_key', key: 'Alt+Left' };
+    case 'click':
+    case 'click_at':
+      // Undo click = click again (toggles checkboxes, closes modals)
+      // Note: Not all clicks are reversible, but this handles common cases
+      return { type: 'click', selector: last.selector, _isUndo: true };
+    case 'type':
+      // Undo type = clear field and type empty
+      return { type: 'type', selector: last.selector, text: '', _isUndo: true };
+    case 'select':
+      // Undo select = can't know previous value, but we note it was undone
+      return null;
+    case 'check':
+    case 'check_all':
+      // Undo check = uncheck
+      return { type: 'click', selector: last.selector, _isUndo: true };
+    default:
+      return null;
+  }
+}
+
+/**
+ * (v21.6) Remove the last action from history (called after undo executes).
+ */
+export function popLastAction() {
+  if (_actionHistory.length > 0) {
+    const removed = _actionHistory.pop();
+    // Persist the updated history
+    chrome.storage.local.set({ [ACTION_HISTORY_KEY]: _actionHistory }).catch(() => {});
+    return removed;
+  }
+  return null;
+}

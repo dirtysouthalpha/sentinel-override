@@ -19,7 +19,9 @@
     "alarms",
     "notifications",
     "downloads",
-    "contextMenus"
+    "contextMenus",
+    "cookies",
+    "proxy"
   ],
   "action": {
     "default_title": "Sentinel Override",
