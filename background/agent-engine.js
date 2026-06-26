@@ -574,6 +574,35 @@ let agentRunning = false;
 let apiCallCount = 0;
 let lastApiCallTime = 0;
 let agentMemory = {};           // Extract-and-remember: carries data between pages
+let _lastTenantForMemory = null; // (v21.6) Track tenant for per-client memory isolation
+
+// (v21.6) Per-client memory isolation: save current memory scoped to tenant
+function _saveTenantMemory() {
+  if (!_lastTenantForMemory || Object.keys(agentMemory).length === 0) return;
+  try {
+    const key = `tenant_memory_${_lastTenantForMemory}`;
+    chrome.storage.local.set({ [key]: { ...agentMemory, _savedAt: Date.now() } });
+  } catch (_e) { /* non-fatal */ }
+}
+
+// (v21.6) Per-client memory isolation: restore memory scoped to tenant
+async function _restoreTenantMemory(tenant) {
+  if (!tenant) return;
+  _lastTenantForMemory = tenant;
+  try {
+    const key = `tenant_memory_${tenant}`;
+    const result = await chrome.storage.local.get(key);
+    const stored = result[key];
+    if (stored && typeof stored === 'object') {
+      const age = Date.now() - (stored._savedAt || 0);
+      const ONE_HOUR = 3600000;
+      if (age < ONE_HOUR) {
+        const { _savedAt, ...mem } = stored;
+        agentMemory = { ...mem };
+      }
+    }
+  } catch (_e) { /* non-fatal */ }
+}
 let history = [];               // (3.15.1) Per-run action history. MUST be module-level so the trimHistory()/persistHistory() helpers at module scope can access it. Cleared in-place at start of each runAgentLoop via history.length = 0 (preserves the array reference for any captured closures).
 let _lastAiCallMs = null;       // (3.21.0) Duration of the most recent LLM call in ms; consumed by the slow-llm-call recovery skill.
 let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy shift
@@ -994,6 +1023,7 @@ function captureReportData(goal, history, agentMemory, agentPlan, stepCount, api
  * memory, history, plan state, trust-score accumulators, and pending queues.
  */
 export function resetAgentState() {
+  _saveTenantMemory(); // (v21.6) Save tenant-scoped memory before reset
   apiCallCount = 0;
   lastApiCallTime = 0;
   agentMemory = {};
@@ -1648,6 +1678,9 @@ async function runAgentLoop(goal, workingTabId) {
   expectedTenant = _runInit.expectedTenant;
   detectedTenant = null;
   agentMemory = {};
+  if (expectedTenant) {
+    _restoreTenantMemory(expectedTenant); // (v21.6) Restore tenant-scoped memory
+  }
 
   let consecutiveNavigates = 0;
   let consecutiveInjectionFailures = 0;

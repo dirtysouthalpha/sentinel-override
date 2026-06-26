@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sentinel Override",
-  "version": "21.5.19",
+  "version": "21.6.0",
   "description": "Universal browser automation agent \u2014 investigates, configures, and collaborates via Universal Agent Protocol",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'"
@@ -81,6 +81,12 @@
     },
     "stealth-mode": {
       "description": "Set speed to stealth (slow, maximum human-like randomness)"
+    },
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "Toggle Sentinel Override side panel"
     }
   }
 }

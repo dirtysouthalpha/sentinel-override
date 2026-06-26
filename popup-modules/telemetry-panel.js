@@ -231,7 +231,7 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
         <button id="telemPauseBtn" title="Pause auto-scroll" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">⏸ Auto-scroll</button>
         <button id="telemCopyBtn" title="Copy filtered events to clipboard" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Copy</button>
         <button id="telemExportBtn" title="Export filtered events as JSON" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Export</button>
-        <button id="telemPastRunsBtn" title="View past persisted runs" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Past Runs ▾</button>
+        <button id="telemPastRunsBtn" title="View past persisted runs" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Past Runs ▾</button>\n        <button id="telemExportHistoryBtn" title="Export all run history as JSON for billing/tracking" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Export ↓</button>
         <button id="telemClearBtn" title="Clear buffer" style="flex-shrink:0; padding:3px 8px; font-size:10px; background:var(--bg-input); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:4px; cursor:pointer;">Clear</button>
         <button id="telemCloseBtn" title="Close panel" style="flex-shrink:0; padding:3px 8px; font-size:14px; background:transparent; color:var(--text-secondary); border:none; cursor:pointer; line-height:1;">×</button>
       </div>
@@ -379,7 +379,8 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
       });
     }
 
-    const pastRunsBtn = document.getElementById('telemPastRunsBtn');
+    const pastRunsBtn = document.getElementById('telemExportHistoryBtn')?.addEventListener('click', _exportRunHistory);
+    document.getElementById('telemPastRunsBtn');
     if (pastRunsBtn) {
       pastRunsBtn.addEventListener('click', _togglePastRunsMenu);
     }
@@ -418,7 +419,8 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
         });
       });
     } catch { /* message may fail if background not ready */ }
-    const btn = document.getElementById('telemPastRunsBtn');
+    const btn = document.getElementById('telemExportHistoryBtn')?.addEventListener('click', _exportRunHistory);
+    document.getElementById('telemPastRunsBtn');
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     const menu = document.createElement('div');
@@ -579,3 +581,24 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
     window.__sentinelTelemetry = { toggle: togglePanel, eventCount: () => events.length };
   } catch { /* window assignment may fail in restricted context */ }
 })();
+
+// (v21.6) Export all run history as JSON
+async function _exportRunHistory() {
+  try {
+    const resp = await chrome.runtime.sendMessage({ action: 'export_run_history' });
+    if (resp && resp.ok && resp.data) {
+      const blob = new Blob([JSON.stringify(resp.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `sentinel-run-history-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      _showToast(`Exported ${resp.data.totalRuns} runs`, 'success');
+    } else {
+      _showToast('Export failed: ' + (resp?.error || 'unknown'), 'error');
+    }
+  } catch (e) {
+    _showToast('Export error: ' + e.message, 'error');
+  }
+}

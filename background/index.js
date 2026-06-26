@@ -14,6 +14,7 @@ import {PROVIDER_CATALOG, getCatalogProvider, fetchModelsList} from './provider-
 import {createSchedule, listSchedules, deleteSchedule, toggleSchedule, executeScheduledTask, getScheduleResults, getRecentResults, clearScheduleResults, initScheduler} from './scheduler.js';
 import {parseNaturalLanguageSchedule} from './scheduler-nlp.js';
 import {exportTemplate, exportAllTemplates, validateImport, importTemplates, exportReportAsMarkdown} from './collaboration.js';
+import {estimateCostUsd} from './llm-cost-estimation.js'; // (v21.6) Provider-aware cost tracking
 // (3.26.0) Bridge for content-script telemetry — content/index.js cannot
 // import telemetry.js directly (different context), so it posts a
 // `content_telemetry_event` message and we re-emit via tel.emit() so the
@@ -433,10 +434,8 @@ const handleRuntimeMessage = async (request, sender) => {
         const usage = stored.credit_usage || {};
         if (!usage[today]) usage[today] = { tokens: 0, cost: 0, calls: 0 };
 
-        // Free models = $0 cost, but track tokens for rate limiting
-        const isFree = (model || '').includes(':free');
-        const costPerToken = isFree ? 0 : 0.000003;
-        const addedCost = (inputTokens + outputTokens) * costPerToken;
+        // (v21.6) Provider-aware cost tracking — uses real per-model pricing tables
+        const addedCost = estimateCostUsd(inputTokens, outputTokens, model);
 
         usage[today].tokens += inputTokens + outputTokens;
         usage[today].cost += addedCost;
