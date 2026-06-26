@@ -1715,8 +1715,16 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     { id: 'openrouter/free', label: 'Free Models Router (auto-route, vision+tools)', vision: true, tools: true },
   ];
 
-  // Build dropdown
+  // Build dropdown — 'Use Settings' is default so it doesn't override provider config
   select.innerHTML = '';
+  const settingsOpt = document.createElement('option');
+  settingsOpt.value = '__use_settings__';
+  settingsOpt.textContent = '⚙️ Use Settings Provider';
+  select.appendChild(settingsOpt);
+  const sep = document.createElement('option');
+  sep.disabled = true;
+  sep.textContent = '── Free Models (OpenRouter) ──';
+  select.appendChild(sep);
   for (const m of FREE_MODELS) {
     const opt = document.createElement('option');
     opt.value = m.id;
@@ -1728,20 +1736,24 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   chrome.storage.local.get(['quick_model', 'active_provider', 'providers'], (result) => {
     if (chrome.runtime.lastError) return;
     const saved = result.quick_model || '';
-    if (saved && FREE_MODELS.some(m => m.id === saved)) {
+    if (saved && (saved === '__use_settings__' || FREE_MODELS.some(m => m.id === saved))) {
       select.value = saved;
     } else {
-      // Default to first model
-      select.value = FREE_MODELS[0].id;
+      // (v21.6.5) Default to 'Use Settings Provider' — don't override configured provider
+      select.value = '__use_settings__';
     }
-    // Ensure provider is set to openrouter with the key
-    _ensureOpenRouterConfig(result);
   });
 
   // On model change: save + update provider config
   select.addEventListener('change', () => {
     const modelId = select.value;
-    if (!modelId) return;
+    if (!modelId || modelId === '__use_settings__') {
+      // (v21.6.5) Don't override provider when 'Use Settings' is selected
+      try { localStorage.setItem('quick_model', '__use_settings__'); } catch (_e) { /* non-fatal */ }
+      chrome.storage.local.set({ quick_model: '__use_settings__' });
+      try { showToast('Using Settings provider configuration', 'info'); } catch (_e) { /* non-fatal */ }
+      return;
+    }
     try { localStorage.setItem('quick_model', modelId); } catch (_e) { /* non-fatal */ }
     chrome.storage.local.set({ quick_model: modelId });
 
