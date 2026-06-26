@@ -48,6 +48,11 @@ jobs:
       # (e.g. importing seedBuiltinTemplates when it was never exported)
       - name: Import Resolution Checker
         run: node scripts/check-imports.cjs
+      # ━━━ Step 1c: Module Loader Check ━━━
+      # Catches runtime ReferenceErrors (stray characters, bare identifiers)
+      # that node --check misses because it only validates syntax
+      - name: Module Loader Check
+        run: node scripts/check-module-load.cjs
 
       # ━━━ Step 2: Syntax Check ━━━
       - name: Syntax Check

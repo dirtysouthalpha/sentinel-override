@@ -296,7 +296,7 @@ try {
 // enabled does NOT mean it auto-shows — openPanelOnActionClick controls that.
 
 
-n// (v21.6) Seed built-in MSP templates on first run
+// (v21.6) Seed built-in MSP templates on first run
 seedBuiltinTemplates().catch((e) => console.warn("[Sentinel] Template seed failed:", getErrorMessage(e)));
 
 // ========== Unified Message Handler ==========
