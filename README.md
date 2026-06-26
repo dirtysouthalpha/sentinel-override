@@ -1,114 +1,189 @@
 # Sentinel Override
 
-> Universal browser automation agent — investigates, configures, and collaborates via Universal Agent Protocol
-
-![Version](https://img.shields.io/badge/version-21.5.8-orange)
+![Version](https://img.shields.io/badge/version-21.6.1-orange)
+![Tests](https://img.shields.io/badge/tests-10,249-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Chrome](https://img.shields.io/badge/chrome-supported-green)
-![Manifest](https://img.shields.io/badge/manifest-v3-blueviolet)
-![Tests](https://img.shields.io/badge/tests-10%2C232%20passing-brightgreen)
-![CI](https://img.shields.io/badge/CI-passing-success)
 
-A self-healing, vision-powered browser agent built for the work technicians actually do — multi-portal investigations, M365 admin, threat hunts, ticket writeups. Watch it see, click, read, think, and produce defensible reports.
+An autonomous browser agent for MSPs and IT professionals. Sentinel Override sees the screen, plans multi-step workflows, and executes them with human-like visual feedback — cursor movement, element highlighting, click pulses, and typing animation.
+
+**Runs on free OpenRouter vision models. No API costs required.**
 
 ---
 
 ## Quick Start
 
-1. Download the [latest release](https://github.com/dirtysouthalpha/sentinel-override/releases/latest)
-2. Extract the ZIP
-3. Go to `chrome://extensions` → **Developer mode** → **Load unpacked** → select folder
-4. Click the Sentinel icon to open the side panel
-5. Enter your LLM provider settings (Claude, GLM, DeepSeek, OpenAI, or 12+ others)
-6. Type a goal in plain English and watch the agent work
+1. **Download** the [latest release](https://github.com/dirtysouthalpha/sentinel-override/releases/latest)
+2. **Load unpacked** in Chrome: `chrome://extensions` → Developer mode → Load unpacked
+3. **Open a web tab** (not chrome://extensions)
+4. **Click the icon** or press **Ctrl+Shift+S** to open the side panel
+5. **Select a model** from the quick switcher (Gemma 4 31B recommended — free + vision)
+6. **Type a goal:** `go to cnn.com and get the top 5 articles`
+7. **Watch it work** — cursor travels to elements, highlights them, clicks, types, and reports back
 
 ---
 
 ## Key Features
 
-### Core Agent
-- **Vision-powered automation** — Takes screenshots, places numbered overlays on every clickable element, reasons about which to interact with
-- **Circuit breaker** — Hard 150-step ceiling, identical-action detection, repeated-target detection — prevents runaway loops
-- **Model-agnostic** — Works with Claude, GLM-4V, DeepSeek, OpenAI, and 12+ other providers. Provider-aware 429 retry backoff
-- **Streaming LLM responses** — Partial AI responses stream to the popup UI in real-time
-- **Cross-origin iframe support** — Interacts with Stripe checkout, OAuth popups, embedded widgets via `chrome.scripting` frame routing
-- **Trusted CDP input** — Uses Chrome DevTools Protocol for trusted mouse events that pass reCAPTCHA, banking, and OAuth consent screens
-- **Tab scoping** — Extension only attaches to tabs where you click the icon. Agent-opened tabs auto-close after the run
+### Autonomous Browser Agent
 
-### Security & Reliability
-- **Prompt injection defense** — Regex pre-check + `<UNTRUSTED_PAGE_CONTENT>` wrapper for page content
-- **XSS prevention** — All innerHTML injections use escapeHtml()
-- **execute_js sandbox** — LLM-generated JavaScript runs in a Proxy sandbox with approval gate
-- **Service worker persistence** — State checkpointed to `chrome.storage.session` with restore on SW restart
-- **Global unhandled rejection guards** — Prevents silent service worker crashes
+| Feature | Description |
+|---------|-------------|
+| **Vision-driven** | Takes full-page screenshots every step. The LLM sees the entire page, not just the viewport. |
+| **Multi-step planning** | Generates execution plans (up to 14 phases) before acting. |
+| **Human-like visuals** | Cursor travels 450ms to targets, elements highlight before clicks, click pulses render at exact coordinates. |
+| **CDP trusted input** | Real keyboard/mouse events via Chrome DevTools Protocol. Not synthetic JS events. |
+| **Circuit breaker** | Stops after 5 consecutive failures or 150 max steps. No infinite loops. |
+| **Cross-origin iframes** | Full support for embedded content and admin panels. |
+| **Prompt injection defense** | Pre-check regex blocks malicious instructions in page content. |
+
+### Security & Anti-Detection
+
+| Feature | Description |
+|---------|-------------|
+| **Anti-detection mode** | Patches `navigator.webdriver`, languages, and chrome.runtime in MAIN world at document_start. Admin panels (M365, SentinelOne, ConnectWise) cannot detect automation. |
+| **CDP trusted input gate** | Removed — fires after any action failure instead of blocking upfront. |
+| **XSS hardening** | All innerHTML calls use escapeHtml() for user-generated content. |
+| **Per-client proxy routing** | Route agent traffic through client-specific proxies for IP allowlisting. |
+| **Session isolation** | Per-client memory namespacing prevents data leakage between tenants. |
 
 ### MSP / IT Pro Features
-- **19 platform profiles** — Teams Admin, M365 Admin, ConnectWise, IT Glue, and more
-- **Investigation checklists** — Auto-appended to prompts for structured workflows
-- **Forensic run logs** — Step-by-step screenshots + actions, exportable reports
-- **Neuralis Brain integration** — Opt-in shared knowledge base (READ + WRITE paths)
-- **Multi-tab parallel agents** — Up to 5 concurrent instances on separate tabs
-- **CDP network interception** — Captures API calls, XHR, fetch for debugging workflows
-- **NLP scheduler** — Natural language scheduled tasks with regex parser
-- **Agent federation** — Peer-to-peer agent collaboration protocol
 
-### Keyboard Shortcuts
+| Feature | Description |
+|---------|-------------|
+| **Session persistence** | Save/restore cookies per client. Log in once, run unlimited tasks (24h TTL). |
+| **Cost tracking** | Real per-model pricing tables. Shows token usage and $ cost per run. |
+| **Run history export** | Download all past runs as JSON for billing and time tracking. |
+| **Undo/rollback** | Reverse the last click/type/navigate action. Safety net for client environments. |
+| **Template library** | 5 built-in MSP presets: M365 User Audit, Teams Guest Review, ConnectWise Triage, IT Glue Doc Audit, Web Research. |
+| **Team template sharing** | Export/import workflows via GitHub Gist. Share with your techs. |
+| **Recurring scheduled runs** | Daily, weekly, or custom recurrence. Automated compliance checks. |
+| **Config change verification** | Agent re-reads after making changes to confirm they worked. Prevents false positives. |
+| **Console/network diagnostics** | `read_console_messages` and `read_network_requests` actions expose client-side errors and failed API calls. |
+| **SSO/MFA handling** | Detects sign-in walls and MFA prompts. Pauses for user intervention. |
+| **19 platform profiles** | Built-in knowledge for M365 Admin, Teams Admin, ConnectWise, IT Glue, SentinelOne, Huntress, and more. |
+
+### Reporting
+
+| Feature | Description |
+|---------|-------------|
+| **Markdown reports** | Structured investigation reports with goals, steps, and findings. |
+| **PDF export** | One-click professional PDF with embedded screenshots. |
+| **Streaming LLM display** | Watch the agent think in real-time — tokens render as they arrive. |
+| **Investigation replay** | Step-by-step replay of any completed run. |
+| **Activity feed** | Real-time event stream with collapsible sections. |
+
+### Voice & Hands-Free
+
+| Feature | Description |
+|---------|-------------|
+| **Voice input** | Speak goals aloud via webkitSpeechRecognition. |
+| **Desktop notifications** | System notification fires when a task completes or hits a wall. |
+| **Keyboard shortcuts** | Toggle panel (Ctrl+Shift+S), start/stop agent (Ctrl+Shift+Space), speed modes. |
+
+### Intelligence
+
+| Feature | Description |
+|---------|-------------|
+| **Neuralis Brain** | Persistent learning across runs. Remembers platform quirks, client environments, and optimal workflows. |
+| **Action learning** | Tracks action success/failure per platform. Builds one-shot playbooks for repeated tasks. |
+| **Federation** | Multi-agent coordination across local and remote peers for parallel work. |
+| **Scheduler** | Natural language scheduling ("every Monday at 9am, audit M365 licenses for Client X"). |
+
+---
+
+## Free Vision Models (OpenRouter)
+
+All models in the quick switcher are verified free + vision-capable:
+
+| Model | Context | Vision | Tools |
+|-------|---------|--------|-------|
+| **Gemma 4 31B** | 262K | ✅ | ✅ |
+| **Gemma 4 26B A4B** | 262K | ✅ | ✅ |
+| **Nemotron 3 Nano Omni 30B** | 256K | ✅ | ✅ |
+| **Nemotron Nano 12B VL** | 128K | ✅ | ✅ |
+| **Free Models Router** | 200K | ✅ | ✅ |
+
+Rate-limit aware: if a free model hits 429 twice, the agent auto-switches to the next available model.
+
+---
+
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+Space` | Toggle agent start/stop |
-| `Ctrl+Shift+P` | Pause/resume running agent |
+| **Ctrl+Shift+S** | Toggle side panel |
+| **Ctrl+Shift+Space** | Start/stop agent |
+| **Ctrl+Shift+P** | Pause/resume running agent |
 
 ---
 
 ## Architecture
 
-| Directory | Purpose |
-|-----------|---------|
-| `background/` | Service worker — agent engine, LLM client, tab management, circuit breaker |
-| `content/` | Content scripts injected into pages (DOM scanning, cursor, overlays, shadow DOM) |
-| `popup-modules/` | UI modules for the side panel (chat, settings, activity feed, federation) |
-| `platforms/` | Platform-specific profiles (Teams Admin, M365, ConnectWise, etc.) |
-| `tests/` | Jest ESM test suites — 228 suites, 10,232 tests |
+```
+┌──────────────────────────────────────────────┐
+│                 Service Worker               │
+│  ┌──────────┐  ┌───────────┐  ┌───────────┐  │
+│  │  Agent   │  │  LLM      │  │  Tab      │  │
+│  │  Engine  │←→│  Client   │  │  Manager  │  │
+│  └────┬─────┘  └───────────┘  └─────┬─────┘  │
+│       │                                  │   │
+│  ┌────▼──────────────────────────────▼─┐  │
+│  │     CDP (Chrome DevTools Protocol)   │  │
+│  │  Screenshots · Trusted Input · Network │  │
+│  └──────────────────────────────────────┘  │
+└──────────────────────────────────────────────┘
+         ↕                           ↕
+┌─────────────────┐         ┌──────────────────┐
+│   Side Panel    │         │  Content Scripts │
+│  Chat · Reports │         │  Cursor · HUD    │
+│  Settings · Telemetry │   │  Shadow Intercept│
+└─────────────────┘         └──────────────────┘
+```
 
-### CI/CD Pipeline
+**31 LLM providers** supported via provider registry (OpenAI, Anthropic, Google, OpenRouter, GLM, DeepSeek, and more).
 
-- **Test Gate** — Runs on every push/PR: bare import scanner + syntax check + 10,232 tests
-- **Auto Release** — Triggered by tag push (`v*`): builds ZIP, creates GitHub release automatically
+---
+
+## CI/CD Pipeline
+
+- **Test gate**: Every PR runs 10,249 tests + import resolution checker (507 imports) + bare import scanner
+- **Auto-release**: Tagged commits automatically build and publish a release zip
+- **Issue templates**: Structured bug reports and feature requests
+- **Import checker**: CI safeguard prevents the recurring "missing export" service worker crash class
 
 ---
 
 ## Development
 
+### Install dependencies
 ```bash
-# Install dependencies
 npm install
-
-# Run tests
-npm test
-
-# Load in Chrome
-# chrome://extensions → Developer mode → Load unpacked
 ```
+
+### Run tests
+```bash
+npm test
+```
+
+### Load in Chrome
+1. `chrome://extensions` → Developer mode → Load unpacked
+2. Select the project root folder
 
 ### Release Process
-
-```bash
-# Bump version in manifest.json + package.json
-git commit -m 'vXX.Y.Z: description'
-git tag vX.Y.Z
-git push origin vX.Y.Z
-# Auto-release workflow handles the rest
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit format, and MV3 rules.
+1. Bump version in `manifest.json` + `package.json`
+2. `git tag vX.Y.Z && git push origin vX.Y.Z`
+3. Auto-release workflow handles the rest
 
 ---
 
 ## Test Results
 
-- **228 suites**, **10,232 tests**, **0 failures**
-- ESM modules via `--experimental-vm-modules`
+```
+Test Suites: 230 passed, 0 failures
+Tests:       10,249 passed
+Imports:     507 resolved
+Files:       133 syntax-checked
+```
 
 ---
 
@@ -116,8 +191,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commit format, and MV3
 
 MIT
 
+---
+
 ## Links
 
 - [Releases](https://github.com/dirtysouthalpha/sentinel-override/releases)
 - [Issues](https://github.com/dirtysouthalpha/sentinel-override/issues)
-- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
