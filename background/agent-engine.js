@@ -4270,9 +4270,19 @@ async function runAgentLoop(goal, workingTabId) {
       }
       // Handle non-indexed vision actions (scroll, navigate, go_back, execute_js, done)
       else if (command._visionAction && command._visionIndex == null) {
-        // These fall through to normal execution — just clear the flag
-        // scroll, navigate, execute_js, done are all handled by the legacy switch
-        command._visionExecuted = false;  // let legacy handle it
+        // (v21.6.11) Block identical execute_js from re-running
+        if (command.type === 'execute_js' && command.code) {
+          const _lastJsRuns = history.slice(-6).filter(h => h && h.action && h.action.type === 'execute_js' && h.action.code === command.code);
+          if (_lastJsRuns.length >= 1) {
+            result = `BLOCKED: This exact JavaScript was already run. The data is in memory. Use done() to finish, or write different code.`;
+            actionFailed = false;
+            command._visionExecuted = true;
+          } else {
+            command._visionExecuted = false;
+          }
+        } else {
+          command._visionExecuted = false;
+        }
       }
       
             // (3.20.1) Fail-fast for targetable actions with NO target. The LLM
@@ -5341,8 +5351,21 @@ return { ok: true, value: el.value };
         const _memSummary = _memKeys.length > 0
           ? _memKeys.map(k => { const v = agentMemory[k]; const s = typeof v === 'string' ? v : JSON.stringify(v); return `${k}: ${s ? s.substring(0, 200) : 'empty'}`; }).join('; ')
           : 'No data extracted';
-        command = { type: 'finish', summary: `Task completed. Data collected: ${_memSummary}`, _forceFinish: true };
-        _totalLoopRecoveries = 99; // prevent re-triggering
+        // BYPASS ALL GUARDS — set finished=true directly and skip to end of loop
+        historyPush({ step: stepCount, action: { type: 'finish', summary: `Task completed. Data collected: ${_memSummary}` }, result: 'Force-finish from alternating loop detector' });
+        await persistHistory();
+        const finalSummary = `Task completed. Data collected: ${_memSummary}`;
+        sendAgentStatus('complete', 'Task completed (force-finish after loop detection)');
+        tel.info('lifecycle', 'Agent finished (force-finish)', { stepCount, reason: 'alternating-loop' });
+        try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel]', getErrorMessage(e)); }
+        try { await closeAttachedTabsExceptPrimary(); } catch (e) { console.warn('[Sentinel]', getErrorMessage(e)); }
+        try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel]', getErrorMessage(e)); }
+        await closeAllAgentTabs();
+        agentRunning = false;
+        agentPaused = false;
+        sendAgentResult(finalSummary, agentMemory);
+        _runAbortController = null;
+        return;
       }
 
       // Check for stall
