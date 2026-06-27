@@ -2962,7 +2962,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation);
+        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective);
 
         // Build messages with screenshot
         const _visionMessages = [

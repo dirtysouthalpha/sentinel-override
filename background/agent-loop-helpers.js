@@ -158,8 +158,8 @@ export function buildVisionSystemPrompt() {
  * @param {string|null} zoomAnnotation - Optional zoom annotation
  * @returns {string} User content string
  */
-export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation) {
-  return [
+export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation, loopDirective) {
+  const parts = [
     `Goal: ${goal}`,
     `URL: ${currentUrl}`,
     `Step: ${stepCount}/${dynamicMaxSteps}`,
@@ -169,10 +169,15 @@ export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSt
     '',
     'ALREADY ATTEMPTED (do NOT repeat an action that did not change the page — try a different element or approach):',
     visionHistory || '(first step — nothing attempted yet)',
-    zoomAnnotation || '',
-    '',
-    'What is your next action?'
-  ].join('\n');
+    zoomAnnotation || ''
+  ];
+  if (loopDirective && loopDirective.trim()) {
+    parts.push('');
+    parts.push(loopDirective.trim());
+  }
+  parts.push('');
+  parts.push('What is your next action?');
+  return parts.join('\n');
 }
 
 // ========== Run Log Entry Builder ==========
