@@ -106,9 +106,7 @@ export function sendSilentUpdate(text, stepNumber) {
     text,
     stepNumber: stepNumber || 0,
     silent: true
-  }).catch((e) => {
-    console.error('[sendSilentUpdate] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -128,9 +126,7 @@ export function sendPageContext(url, pageTitle, stepNumber, tabId, totalSteps) {
     stepNumber: stepNumber || 0,
     tabId: typeof tabId === 'number' ? tabId : null,
     totalSteps: typeof totalSteps === 'number' && totalSteps > 0 ? totalSteps : 0,
-  }).catch((e) => {
-    console.error('[sendPageContext] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 // Precompute interactive command types for O(1) lookup
@@ -226,9 +222,7 @@ export function sendActionMessage(command, stepNumber, observation) {
       confidence: (typeof command.__confidence === 'number')
         ? command.__confidence : undefined
     }
-  }).catch((e) => {
-    console.error('[sendActionMessage] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -246,9 +240,7 @@ export function sendActionResult(stepNumber, result, isError) {
     stepNumber,
     result: resultStr.substring(0, 300),
     isError: !!isError
-  }).catch((e) => {
-    console.error('[sendActionResult] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -263,9 +255,7 @@ export function sendReportUpdate(status, report, error) {
   const message = { action: 'report_update', status };
   if (report) message.report = report;
   if (error) message.error = error;
-  chrome.runtime.sendMessage(message).catch((e) => {
-    console.error('[message] Unhandled rejection:', e);
-  });
+  chrome.runtime.sendMessage(message).catch(() => {});
 }
 
 /**
@@ -283,9 +273,7 @@ export function sendTabStateUpdate(tabs) {
       title: t.title || '',
       isActive: !!t.isActive
     }))
-  }).catch((e) => {
-    console.error('[sendTabStateUpdate] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -309,9 +297,7 @@ export function sendAgentActivity(stepNumber, key, label, status, detail) {
     status: status || 'in_progress',
     detail: detail || null,
     timestamp: Date.now()
-  }).catch((e) => {
-    console.error('[sendAgentActivity] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -328,9 +314,7 @@ export function sendAgentStepStart(stepNumber, totalPlannedSteps) {
     stepNumber: stepNumber || 0,
     totalPlannedSteps: totalPlannedSteps || 0,
     timestamp: Date.now()
-  }).catch((e) => {
-    console.error('[sendAgentStepStart] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
@@ -348,9 +332,7 @@ export function sendScreenshotUpdate(base64Image, stepNumber, viewportMeta) {
     stepNumber: stepNumber || 0,
     viewportW: viewportMeta && viewportMeta.width,
     viewportH: viewportMeta && viewportMeta.height
-  }).catch((e) => {
-    console.error('[sendScreenshotUpdate] Unhandled rejection:', e);
-  });
+  }).catch(() => {});
 }
 
 /**
