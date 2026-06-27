@@ -586,6 +586,7 @@ async function _enforceTabLimit() {
 }
 
 let agentRunning = false;
+let _consecutiveScrolls = 0; // (v21.6.21) Track consecutive scrolls to prevent scroll loops
 let _runAbortController = null;  // (v21.6.8) AbortController for instant stop — aborted in stopAgent()
 let apiCallCount = 0;
 let lastApiCallTime = 0;
@@ -1045,6 +1046,7 @@ export function resetAgentState() {
   agentMemory = {};
   productiveSteps = 0;
   _clickAtLoopFires = 0;
+  _consecutiveScrolls = 0;
   _clickAtStreakBaseline = 0;
   _clickAtStreakSawPageChange = false;
   consecutiveFailures = 0;
@@ -4806,12 +4808,29 @@ async function runAgentLoop(goal, workingTabId) {
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? getObjectLength(savedValue) : null));
                 tel.info('memory', `Wrote "${savedKey}" (execute_js, strategy=${ladder.strategy || 'original'})`, { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
               } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', getErrorMessage(e)); }
-              // (v21.6.17) Duplicate JS detection in MAIN execute_js path
+              // (v21.6.21) Duplicate JS detection — check last 4 history entries
               const preview = String(jsValue).substring(0, 100);
-              const _dupPrev = history.length > 0 ? history[history.length - 1] : null;
-              if (_dupPrev && _dupPrev.result && typeof _dupPrev.result === 'string' &&
-                  String(jsValue).length > 50 && _dupPrev.result.includes(preview.substring(0, 80))) {
-                result = `DUPLICATE: Same JS result as previous step. Data is already in memory under "${savedKey}". Call done() now.`;
+              const _recent4 = history.slice(-4);
+              const _isDup = _recent4.some(h => h && h.result && typeof h.result === 'string' &&
+                String(jsValue).length > 50 && h.result.includes(preview.substring(0, 80)));
+              if (_isDup) {
+                // Count consecutive duplicates
+                const _dupCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('DUPLICATE:')).length;
+                if (_dupCount >= 2) {
+                  // FORCE FINISH after 2 duplicate blocks — don't let it try again
+                  result = `FORCE-FINISH: Agent ran duplicate JS ${_dupCount} times. Data is in memory. Finishing now.`;
+                  historyPush({ step: stepCount, action: command, result });
+                  await persistHistory();
+                  sendActionResult(stepCount, result, false);
+                  const _memKeys = Object.keys(agentMemory || {});
+                  const _memSummary = _memKeys.length > 0 ? _memKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data';
+                  reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+                  chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task completed. Data collected: ${_memSummary}` }).catch(() => {});
+                  sendReportUpdate('generating');
+                  finished = true;
+                  break;
+                }
+                result = `DUPLICATE: Same JS result as recent step. Data is already in memory under "${savedKey}". Call done() now.`;
                 historyPush({ step: stepCount, action: command, result });
                 await persistHistory();
                 sendActionResult(stepCount, result, false);
@@ -5341,6 +5360,21 @@ return { ok: true, value: el.value };
       // or any page-changing action.
       // navigate always changes the page, but its new DOM hash isn't captured until
       // the next iteration's observation phase — exclude it to avoid false stagnation.
+      // (v21.6.21) Consecutive scroll limiter — prevent scroll loops
+      if (command.type === 'scroll') {
+        _consecutiveScrolls++;
+        if (_consecutiveScrolls >= 3) {
+          result = 'BLOCKED: Scrolled 3 times without extracting data. Use extract() or execute_js to read the page, or done() if you have the answer.';
+          historyPush({ step: stepCount, action: command, result });
+          await persistHistory();
+          sendActionResult(stepCount, result, true);
+          _consecutiveScrolls = 0;
+          await sleep(FIVE_HUNDRED_MS);
+          continue;
+        }
+      } else {
+        _consecutiveScrolls = 0;
+      }
       const _isPageMutating = PAGE_MUTATING_ACTIONS_RE.test(command.type);
       const _pageChanged = _observedHashBefore !== _lastObservedDomHash;
       if (_isPageMutating && !_pageChanged && !actionFailed) {
