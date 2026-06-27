@@ -1838,6 +1838,17 @@ async function runAgentLoop(goal, workingTabId) {
       // hanging every run. The "let dynamicMaxSteps" in the outer block-scope
       // is in TDZ until the line that initializes it runs, so the previous
       // ordering blew up before any LLM call could fire.
+      // (v21.6.18) NUCLEAR: If 5+ steps with 0 API calls, abort immediately
+      if (stepCount > 5 && apiCallCount === 0) {
+        const _abortMsg = 'ABORTED: Agent looped 5+ steps without making any LLM calls. This usually means the page is not scriptable. Please start the agent from a normal webpage (not chrome://extensions).';
+        sendSilentUpdate(_abortMsg, stepCount);
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: _abortMsg }).catch(() => {});
+        sendReportUpdate('generating');
+        finished = true;
+        await closeAllAgentTabs();
+        break;
+      }
       tel.info('lifecycle', `Step ${stepCount} starting`, { stepCount, dynamicMaxSteps, productiveSteps, consecutiveFailures });
       if (stepCount > dynamicMaxSteps) {
         sendSilentUpdate(`Reached step limit (${dynamicMaxSteps}, baseline ${CONFIG.maxSteps} + ${productiveSteps} productive bumps). Finishing.`, stepCount);
@@ -1951,9 +1962,15 @@ async function runAgentLoop(goal, workingTabId) {
         // (v21.6.1) Auto-create a new tab instead of failing. The user may
         // have started the agent from chrome://extensions or another internal
         // page. Rather than quitting, open a new tab and continue the loop.
-        sendSilentUpdate('Opening a new tab (current page is internal)...', stepCount);
+        // (v21.6.18) Navigate directly to goal URL instead of about:blank
+        let _targetUrl = 'about:blank';
+        if (goal) {
+          const _goalMatch = goal.match(/https?:\/\/[^\s]+/);
+          if (_goalMatch) _targetUrl = _goalMatch[0];
+        }
+        sendSilentUpdate(`Opening new tab → ${_targetUrl}...`, stepCount);
         try {
-          const _newTab = await chrome.tabs.create({ url: 'about:blank', active: true });
+          const _newTab = await chrome.tabs.create({ url: _targetUrl, active: true });
           if (_newTab && _newTab.id) {
             tab = _newTab.id;
             // Wait for the new tab to be ready
