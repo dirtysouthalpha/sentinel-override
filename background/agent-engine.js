@@ -2849,7 +2849,24 @@ async function runAgentLoop(goal, workingTabId) {
             for (const e of visionResult.elements) {
               _visionElementMap.set(e.index, e);
             }
-            _visionElementTree = visionResult.elementTree;
+            // (v21.6.15) Prune element tree to interactive elements only — saves 60-80% tokens
+            const _allElements = visionResult.elements || [];
+            const _INTERACTIVE_TAGS = new Set(['A','BUTTON','INPUT','SELECT','TEXTAREA','OPTION']);
+            const _prunedElements = _allElements.filter(e =>
+              _INTERACTIVE_TAGS.has((e.tag || '').toUpperCase()) ||
+              (e.role && /button|link|textbox|checkbox|radio|tab|menuitem|option|combobox/i.test(e.role)) ||
+              e.hasOnClick || e.isInteractive
+            );
+            if (_prunedElements.length >= 5 && _prunedElements.length < _allElements.length) {
+              _visionElements = _prunedElements;
+              _visionElementMap = new Map();
+              for (const e of _prunedElements) { _visionElementMap.set(e.index, e); }
+              _visionElementTree = _prunedElements.map(e =>
+                `[${e.index}] <${e.tag}> ${e.text ? e.text.substring(0, 60) : ''}`
+              ).join('\n');
+            } else {
+              _visionElementTree = visionResult.elementTree;
+            }
             _visionMode = true;
             if (visionResult.pageText && visionResult.pageText.length > pageText.length) {
               pageText = visionResult.pageText;
@@ -2984,7 +3001,7 @@ async function runAgentLoop(goal, workingTabId) {
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective);
+        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective, agentMemory);
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -3449,7 +3466,7 @@ async function runAgentLoop(goal, workingTabId) {
 
         // Block finish if no real data was extracted and we haven't tried enough
         const _finishBlockCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('BLOCKED:')).length;
-        if (!hasData && stepCount < 8 && _finishBlockCount < 1) {
+        if (!hasData && Object.keys(agentMemory).length === 0 && stepCount < 8 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);

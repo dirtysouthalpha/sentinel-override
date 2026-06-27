@@ -141,7 +141,17 @@ export function buildVisionSystemPrompt() {
     '- NEVER invent or guess an index. If you are not sure an element exists, scroll or choose a different visible element instead.',
     '- NEGATIVE EXAMPLE (do NOT do this): seeing a button labeled [12] but writing {"action":{"type":"click","index":9}}. A wrong index clicks the wrong thing or wastes the step.',
     '- When unsure which number maps to your target, prefer the entry in the Elements list whose text matches your goal over a number you only half-see on the screenshot.',
-    '</visual_grounding>'
+    '</visual_grounding>',
+    '',
+    '<efficiency_rules>',
+    '- If you have extracted data that answers the goal, call done() IMMEDIATELY — do not extract again.',
+    '- Do NOT run execute_js on the same page more than twice. If you need data, use extract() once.',
+    '- If ALREADY ATTEMPTED shows your action succeeded, do NOT repeat it — move to the next step.',
+    '- If the Current Memory section shows data that answers the goal, call done() right now.',
+    '- Prefer extract() over execute_js for reading page content — it is faster and cheaper.',
+    '- If the goal contains a full URL, navigate DIRECTLY to it. Do NOT go to a homepage and search.',
+    '- Be efficient: 3-5 steps is ideal. If you have the answer, finish.',
+    '</efficiency_rules>'
   ].join('\n');
 }
 
@@ -158,7 +168,7 @@ export function buildVisionSystemPrompt() {
  * @param {string|null} zoomAnnotation - Optional zoom annotation
  * @returns {string} User content string
  */
-export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation, loopDirective) {
+export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation, loopDirective, agentMemory) {
   const parts = [
     `Goal: ${goal}`,
     `URL: ${currentUrl}`,
@@ -171,6 +181,17 @@ export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSt
     visionHistory || '(first step — nothing attempted yet)',
     zoomAnnotation || ''
   ];
+  // (v21.6.15) Show current memory so the model knows what data it already has
+  if (agentMemory && Object.keys(agentMemory).length > 0) {
+    const _memLines = Object.entries(agentMemory).map(([k, v]) => {
+      const _val = typeof v === 'string' ? v : JSON.stringify(v);
+      const _preview = _val.length > 200 ? _val.substring(0, 200) + '...' : _val;
+      return `  ${k}: "${_preview}" (${_val.length} chars)`;
+    });
+    parts.push('');
+    parts.push('Current Memory (you already have this data — use it!):');
+    parts.push(_memLines.join('\n'));
+  }
   if (loopDirective && loopDirective.trim()) {
     parts.push('');
     parts.push(loopDirective.trim());
