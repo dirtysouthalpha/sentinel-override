@@ -570,6 +570,21 @@ import {RuntimeProfiler} from './runtime-profiler.js';
 import {getErrorMessage, sleep} from './error-utils.js';
 import {_tenantsMatch, detectMfaInText, detectSignInWall, evaluateHallucinationRisk, _countSummaryClaims, _countSpecificClaims, _countSourceTags} from './agent-security.js';
 // ========== Agent State ==========
+// (v21.6.14) Hard tab limit — prevents browser crash from tab accumulation
+const MAX_AGENT_TABS = 3;
+async function _enforceTabLimit() {
+  try {
+    if (getTabCount() >= MAX_AGENT_TABS) {
+      const _allTabs = getAllTabContexts();
+      const _agentTabs = _allTabs.filter(t => t.isAgentCreated);
+      if (_agentTabs.length >= 2) {
+        const _toClose = _agentTabs[0];
+        if (_toClose) { await chrome.tabs.remove(_toClose.tabId).catch(() => {}); }
+      }
+    }
+  } catch (_e) { /* non-fatal */ }
+}
+
 let agentRunning = false;
 let _runAbortController = null;  // (v21.6.8) AbortController for instant stop — aborted in stopAgent()
 let apiCallCount = 0;
@@ -4374,6 +4389,7 @@ async function runAgentLoop(goal, workingTabId) {
 
       // Handle open_tab
       if (command.type === 'open_tab') {
+        await _enforceTabLimit();
         if (!isValidUrl(command.url)) {
           result = `Invalid URL: ${command.url}`;
           actionFailed = true;
