@@ -551,7 +551,7 @@ export function buildFallbackReport(executionData) {
     }
     const valStr = (val !== null && typeof val === 'object')
       ? (() => { try { return JSON.stringify(val, null, 2).substring(0, 600); } catch { return '[object]'; } })()
-      : String(val).substring(0, 600);
+      : String(val).substring(0, 2000);
     return `### ${k}\n\n${valStr}`;
   });
 

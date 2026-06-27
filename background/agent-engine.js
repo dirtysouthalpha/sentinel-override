@@ -1717,11 +1717,18 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastObservedUrl = '';
   let _lastObservedDomHash = 0;
 
+  // (v21.6.22) Skip plan generation for simple extraction tasks — saves 1 LLM call + ~15s
+  const _isSimpleTask = /tell me|list the|what is|who (created|made|wrote)|what year|extract|summarize/i.test(goal || '');
+  if (_isSimpleTask && goal && goal.length < 200) {
+    agentPlan = null;
+    sendSilentUpdate('Simple task detected — skipping plan generation', 0);
+  } else {
   try {
     agentPlan = await _generateInitialPlan(goal, workingTabId, _runSettings);
   } catch (e) {
     console.warn('[Sentinel] _generateInitialPlan failed (non-fatal), running without plan:', getErrorMessage(e));
     agentPlan = null;
+  }
   }
   try { sendPlanPreview(agentPlan, agentPlan && agentPlan.length); } catch (_e) {
     // Plan preview send failed non-fatally
@@ -3518,7 +3525,7 @@ async function runAgentLoop(goal, workingTabId) {
 
         // Block finish if no real data was extracted and we haven't tried enough
         const _finishBlockCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('BLOCKED:')).length;
-        if (!hasData && Object.keys(agentMemory).length === 0 && stepCount < 8 && _finishBlockCount < 1) {
+        if (Object.keys(agentMemory).length === 0 && stepCount < 4 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
@@ -3533,7 +3540,7 @@ async function runAgentLoop(goal, workingTabId) {
           const s = typeof v === 'string' ? v : JSON.stringify(v);
           return s.length > 10 && s !== 'Done';
         });
-        if (!hasRealData && hasData && stepCount < 15 && _finishBlockCount < 1) {
+        if (false && !hasRealData && hasData && stepCount < 15 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
