@@ -1830,7 +1830,8 @@ async function runAgentLoop(goal, workingTabId) {
       } catch (_e) {
         // Dynamic baseline calculation failed non-fatally
       }
-      const dynamicMaxSteps = Math.min(300, dynamicBaseline + (productiveSteps * 25));
+      // (v21.6.16) Lower step ceiling — 300 was way too high for browser automation
+      const dynamicMaxSteps = Math.min(60, dynamicBaseline + (productiveSteps * 25));
       // (3.36.1) Hotfix — telemetry emit moved AFTER `const dynamicMaxSteps`
       // declaration. Previously this line was above the const and tripped a
       // temporal-dead-zone ReferenceError every step on the first iteration,
@@ -2996,12 +2997,12 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
-        const _visionHistory = formatVisionHistory(promptHistory, 10);
+        const _visionHistory = formatVisionHistory(promptHistory, 6);
 
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
-        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective, agentMemory);
+        const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective, agentMemory, sharedState.pageStagnation);
 
         // Build messages with screenshot
         const _visionMessages = [
@@ -4901,6 +4902,17 @@ return { ok: true, value: el.value };
                   : (typeof cdpResult.value === 'object'
                       ? JSON.stringify(cdpResult.value).slice(0, 3000)
                       : String(cdpResult.value).slice(0, 3000));
+                // (v21.6.16) Auto-detect duplicate JS results
+                const _prevHist = history.length > 0 ? history[history.length - 1] : null;
+                if (_prevHist && _prevHist.result && typeof _prevHist.result === 'string' &&
+                    valStr.length > 50 && _prevHist.result.includes(valStr.substring(0, 100))) {
+                  result = `DUPLICATE: Same data as previous step. Use done() now — data is in memory.`;
+                  historyPush({ step: stepCount, action: command, result });
+                  await persistHistory();
+                  sendActionResult(stepCount, result, false);
+                  await sleep(FIVE_HUNDRED_MS);
+                  continue;
+                }
                 result = `JS Result: ${valStr}`;
                 actionFailed = false;
               } else if (cdpResult && !cdpResult.attachDenied && cdpResult.error) {

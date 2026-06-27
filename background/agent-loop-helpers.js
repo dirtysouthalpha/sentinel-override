@@ -168,7 +168,7 @@ export function buildVisionSystemPrompt() {
  * @param {string|null} zoomAnnotation - Optional zoom annotation
  * @returns {string} User content string
  */
-export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation, loopDirective, agentMemory) {
+export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, elementTree, visionHistory, zoomAnnotation, loopDirective, agentMemory, pageStagnation) {
   const parts = [
     `Goal: ${goal}`,
     `URL: ${currentUrl}`,
@@ -179,7 +179,9 @@ export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSt
     '',
     'ALREADY ATTEMPTED (do NOT repeat an action that did not change the page — try a different element or approach):',
     visionHistory || '(first step — nothing attempted yet)',
-    zoomAnnotation || ''
+    zoomAnnotation || '',
+    '',
+    pageStagnation > 0 ? `⚠️ STAGATION WARNING: The page did NOT change after your last ${pageStagnation} action(s). Try a completely different approach or call done() if you have the data.` : ''
   ];
   // (v21.6.15) Show current memory so the model knows what data it already has
   if (agentMemory && Object.keys(agentMemory).length > 0) {
