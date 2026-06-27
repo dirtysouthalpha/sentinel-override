@@ -571,6 +571,7 @@ import {getErrorMessage, sleep} from './error-utils.js';
 import {_tenantsMatch, detectMfaInText, detectSignInWall, evaluateHallucinationRisk, _countSummaryClaims, _countSpecificClaims, _countSourceTags} from './agent-security.js';
 // ========== Agent State ==========
 let agentRunning = false;
+let _runAbortController = null;  // (v21.6.8) AbortController for instant stop — aborted in stopAgent()
 let apiCallCount = 0;
 let lastApiCallTime = 0;
 let agentMemory = {};           // Extract-and-remember: carries data between pages
@@ -1546,6 +1547,8 @@ async function _waitForModeMismatchDecision(info) {
  */
 export async function stopAgent() {
   tel.info('lifecycle', 'Agent stopping (user-initiated)');
+  // (v21.6.8) Abort any in-flight fetch requests immediately
+  if (_runAbortController) { _runAbortController.abort(); _runAbortController = null; }
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
@@ -1660,6 +1663,7 @@ import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-
 
 // ========== Main Agent Loop ==========
 async function runAgentLoop(goal, workingTabId) {
+  _runAbortController = new AbortController();  // (v21.6.8) For instant stop
   _lastGoal = goal || '';
   startRunRecording(workingTabId, goal);
   let finished = false;
@@ -3019,6 +3023,9 @@ async function runAgentLoop(goal, workingTabId) {
           const _isTransientStatus = (s) => s === 429 || (s >= 500 && s <= 599);
           for (let _vAttempt = 0; _vAttempt < _VISION_MAX_ATTEMPTS; _vAttempt++) {
             const _vCtrl = new AbortController();
+            // (v21.6.8) Chain run-level abort into this fetch's controller
+            if (_runAbortController?.signal.aborted) _vCtrl.abort();
+            else if (_runAbortController) _runAbortController.signal.addEventListener('abort', () => _vCtrl.abort(), { once: true });
             const _vTimeoutId = setTimeout(() => _vCtrl.abort(), FORTY_FIVE_SECONDS_MS);
             let _vFetchErr = null;
             let _vAborted = false;
@@ -3041,6 +3048,7 @@ async function runAgentLoop(goal, workingTabId) {
             } finally {
               clearTimeout(_vTimeoutId);
             }
+            if (!agentRunning) break; // (v21.6.8) Stop requested during fetch
             if (_vResponse && _vResponse.ok) break; // success
             // A 45s timeout won't get better on retry — treat it as non-transient
             // so we surface it and fall through to legacy instead of waiting again.
