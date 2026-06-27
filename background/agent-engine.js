@@ -1839,7 +1839,7 @@ async function runAgentLoop(goal, workingTabId) {
       // is in TDZ until the line that initializes it runs, so the previous
       // ordering blew up before any LLM call could fire.
       // (v21.6.18) NUCLEAR: If 5+ steps with 0 API calls, abort immediately
-      if (stepCount > 5 && apiCallCount === 0) {
+      if (stepCount > 3 && apiCallCount === 0) {
         const _abortMsg = 'ABORTED: Agent looped 5+ steps without making any LLM calls. This usually means the page is not scriptable. Please start the agent from a normal webpage (not chrome://extensions).';
         sendSilentUpdate(_abortMsg, stepCount);
         reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
@@ -1959,47 +1959,75 @@ async function runAgentLoop(goal, workingTabId) {
         _tabUrl.startsWith('chrome://') || _tabUrl.startsWith('edge://') || _tabUrl.startsWith('about:')
       );
       if (_isRestrictedPage) {
-        // (v21.6.1) Auto-create a new tab instead of failing. The user may
-        // have started the agent from chrome://extensions or another internal
-        // page. Rather than quitting, open a new tab and continue the loop.
-        // (v21.6.18) Navigate directly to goal URL instead of about:blank
-        let _targetUrl = 'about:blank';
+        // (v21.6.19) BULLEPROOF restricted page handler — works from ANY starting page
+        let _targetUrl = null;
         if (goal) {
           const _goalMatch = goal.match(/https?:\/\/[^\s]+/);
           if (_goalMatch) _targetUrl = _goalMatch[0];
         }
-        sendSilentUpdate(`Opening new tab → ${_targetUrl}...`, stepCount);
-        try {
-          const _newTab = await chrome.tabs.create({ url: _targetUrl, active: true });
-          if (_newTab && _newTab.id) {
-            tab = _newTab.id;
-            // Wait for the new tab to be ready
-            await sleep(1000);
-            // Register it as an agent tab so content scripts get injected
-            try {
-              const { registerAgentTab } = await import('./agent-tabs.js');
-              if (typeof registerAgentTab === 'function') {
-                await registerAgentTab(_newTab.id, { isPrimary: false, isAgentCreated: true });
-              }
-            } catch (_regE) { /* non-fatal */ }
-            // Continue the loop — the auto-navigate code below will navigate
-            // this blank tab to the goal URL.
-            continue;
-          }
-        } catch (_tabE) {
-          // If tab creation fails, then fail gracefully
-          const _restrictedMsg = `Cannot operate on internal browser page (${_tabUrl}) and failed to create new tab.`;
-          historyPush({ step: stepCount, action: { type: 'note' }, result: _restrictedMsg });
-          sendSilentUpdate(`⚠️ ${_restrictedMsg}`, stepCount);
-          finished = true;
+
+        if (!_targetUrl) {
+          // No URL in goal — abort immediately, don't create useless about:blank tabs
+          const _noUrlMsg = `Cannot start from internal page (${_tabUrl}) and no URL found in goal. Please start from a normal webpage.`;
+          historyPush({ step: stepCount, action: { type: 'note' }, result: _noUrlMsg });
           reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
-          chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⚠️ ${_restrictedMsg}` }).catch(() => {});
+          chrome.runtime.sendMessage({ action: 'agent_finished', summary: _noUrlMsg }).catch(() => {});
           sendReportUpdate('generating');
+          finished = true;
           break;
+        }
+
+        sendSilentUpdate(`Navigating to goal URL: ${_targetUrl}`, stepCount);
+        try {
+          // Navigate the CURRENT tab to the goal URL (reuse, don't create new tab)
+          await chrome.tabs.update(tab, { url: _targetUrl });
+          await waitForPageLoad(tab);
+          await waitForPageReady(tab);
+          await sleep(1000); // Extra settle time
+
+          // Inject content script on the new page
+          const _injected = await injectContentScript(tab);
+          if (!_injected) {
+            // Retry injection once
+            await sleep(2000);
+            await injectContentScript(tab);
+          }
+
+          // Register tab
+          try { registerInitialTab(tab, _targetUrl); } catch(_re) {}
+
+          historyPush({ step: stepCount, action: { type: 'navigate', url: _targetUrl }, result: `Navigated from ${_tabUrl} to ${_targetUrl}` });
+          await persistHistory();
+          continue;
+        } catch (_navE) {
+          // If navigation fails, try creating a new tab as fallback
+          try {
+            const _newTab = await chrome.tabs.create({ url: _targetUrl, active: true });
+            if (_newTab && _newTab.id) {
+              tab = _newTab.id;
+              await waitForPageLoad(tab);
+              await sleep(1000);
+              await injectContentScript(tab);
+              try {
+                const { registerAgentTab } = await import('./agent-tabs.js');
+                if (typeof registerAgentTab === 'function') {
+                  await registerAgentTab(_newTab.id, { isPrimary: false, isAgentCreated: true });
+                }
+              } catch (_regE) { /* non-fatal */ }
+              continue;
+            }
+          } catch (_tabE2) {
+            const _failMsg = `Failed to navigate from internal page (${_tabUrl}). Please start from a normal webpage.`;
+            reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+            chrome.runtime.sendMessage({ action: 'agent_finished', summary: _failMsg }).catch(() => {});
+            sendReportUpdate('generating');
+            finished = true;
+            break;
+          }
         }
       }
 
-      // Auto-navigate to URL found in goal (first iteration only)
+            // Auto-navigate to URL found in goal (first iteration only)
       // Smart: checks current page hostname before navigating
       if (stepCount === 1 && goal) {
         // Strip email addresses before URL extraction so "support@example.com" is
