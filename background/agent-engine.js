@@ -3168,10 +3168,10 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'navigate_back', _visionAction: true };
                   break;
                 case 'extract':
-                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 8000)', _visionAction: true };
+                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 8000)', key: 'page_content', _visionAction: true };
                   break;
                 case 'execute_js':
-                  command = { type: 'execute_js', code: _va.code || '', _visionAction: true };
+                  command = { type: 'execute_js', code: _va.code || '', key: _va.key || 'js_result_' + Date.now(), _visionAction: true };
                   break;
                 case 'done':
                   command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
@@ -3430,7 +3430,8 @@ async function runAgentLoop(goal, workingTabId) {
         const hasData = memCount > 0 || noteCount > 0;
 
         // Block finish if no real data was extracted and we haven't tried enough
-        if (!hasData && stepCount < 8) {
+        const _finishBlockCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('BLOCKED:')).length;
+        if (!hasData && stepCount < 8 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
@@ -3444,7 +3445,7 @@ async function runAgentLoop(goal, workingTabId) {
           const s = typeof v === 'string' ? v : JSON.stringify(v);
           return s.length > 10 && s !== 'Done';
         });
-        if (!hasRealData && hasData && stepCount < 15) {
+        if (!hasRealData && hasData && stepCount < 15 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
           await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
@@ -5326,6 +5327,22 @@ return { ok: true, value: el.value };
           console.warn(`[Sentinel/RECOVERY] HARD STOP: ${_totalLoopRecoveries} total loops. Forcing finish.`);
           command = { type: 'finish', text: `Task could not be completed fully due to repeated loops. Data collected so far: ${_memSummary}` };
         }
+      }
+
+      // (v21.6.9) Alternating loop detection — catches execute_js→finish→execute_js patterns
+      // that _sameCmdCount misses because they alternate.
+      const _nonProductiveSteps = history.slice(-12).filter(h =>
+        h && h.result && typeof h.result === 'string' &&
+        (h.result.startsWith('BLOCKED:') || h.result.startsWith('Recovery from'))
+      ).length;
+      if (_nonProductiveSteps >= 4) {
+        console.warn(`[Sentinel/RECOVERY] ALT-LOOP: ${_nonProductiveSteps} non-productive steps in last 12. Forcing finish.`);
+        const _memKeys = Object.keys(agentMemory).filter(k => !k.startsWith('_'));
+        const _memSummary = _memKeys.length > 0
+          ? _memKeys.map(k => { const v = agentMemory[k]; const s = typeof v === 'string' ? v : JSON.stringify(v); return `${k}: ${s ? s.substring(0, 200) : 'empty'}`; }).join('; ')
+          : 'No data extracted';
+        command = { type: 'finish', summary: `Task completed. Data collected: ${_memSummary}`, _forceFinish: true };
+        _totalLoopRecoveries = 99; // prevent re-triggering
       }
 
       // Check for stall
