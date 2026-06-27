@@ -1561,9 +1561,15 @@ async function _waitForModeMismatchDecision(info) {
  * @returns {Promise<string>} Status message indicating the agent was stopped.
  */
 export async function stopAgent() {
-  tel.info('lifecycle', 'Agent stopping (user-initiated)');
-  // (v21.6.8) Abort any in-flight fetch requests immediately
+  // (v21.6.20) CRITICAL: Set agentRunning = false FIRST, before any awaits.
+  // Previous code had this AFTER telEndRun and pool cleanup — if those
+  // awaits hung during a chaotic loop state, agentRunning never got set
+  // to false and the stop signal never propagated.
+  agentRunning = false;
+  agentPaused = false;
+  // Abort in-flight fetch requests immediately
   if (_runAbortController) { _runAbortController.abort(); _runAbortController = null; }
+  tel.info('lifecycle', 'Agent stopping (user-initiated)');
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
@@ -1573,8 +1579,6 @@ export async function stopAgent() {
     const _agentTabId = getAgentTabId();
     if (_agentTabId) stopPoolAgent(_agentTabId);
   } catch (_e) { /* pool cleanup failed — non-fatal */ }
-  agentRunning = false;
-  agentPaused = false;
   // Release any CDP attachments held by the screenshot pipeline.
   try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
