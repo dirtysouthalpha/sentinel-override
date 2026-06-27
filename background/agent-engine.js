@@ -4757,7 +4757,18 @@ async function runAgentLoop(goal, workingTabId) {
                 const _len = _isArr ? savedValue.length : (typeof savedValue === 'string' ? savedValue.length : (typeof savedValue === 'object' && savedValue !== null ? getObjectLength(savedValue) : null));
                 tel.info('memory', `Wrote "${savedKey}" (execute_js, strategy=${ladder.strategy || 'original'})`, { key: savedKey, isArray: _isArr, length: _len, strategy: ladder.strategy || 'original', totalKeys: memKeys.length });
               } catch (e) { console.warn('[Sentinel] execute_js telemetry failed:', getErrorMessage(e)); }
+              // (v21.6.17) Duplicate JS detection in MAIN execute_js path
               const preview = String(jsValue).substring(0, 100);
+              const _dupPrev = history.length > 0 ? history[history.length - 1] : null;
+              if (_dupPrev && _dupPrev.result && typeof _dupPrev.result === 'string' &&
+                  String(jsValue).length > 50 && _dupPrev.result.includes(preview.substring(0, 80))) {
+                result = `DUPLICATE: Same JS result as previous step. Data is already in memory under "${savedKey}". Call done() now.`;
+                historyPush({ step: stepCount, action: command, result });
+                await persistHistory();
+                sendActionResult(stepCount, result, false);
+                await sleep(FIVE_HUNDRED_MS);
+                continue;
+              }
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
               // (3.20.0) Surface JS-extraction outcome in activity stream
@@ -5416,9 +5427,13 @@ return { ok: true, value: el.value };
         await closeAllAgentTabs();
         agentRunning = false;
         agentPaused = false;
-        sendAgentResult(finalSummary, agentMemory);
+        // (v21.6.17) Fix: sendAgentResult doesn't exist — use correct finish pattern
+        reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+        chrome.runtime.sendMessage({ action: 'agent_finished', summary: finalSummary }).catch(() => {});
+        sendReportUpdate('generating');
+        finished = true;
         _runAbortController = null;
-        return;
+        break;
       }
 
       // Check for stall
