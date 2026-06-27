@@ -1744,6 +1744,9 @@ async function runAgentLoop(goal, workingTabId) {
     // The early-shift block was removed — it caused a double-pop that dropped
     // commands when two or more were queued simultaneously.
 
+    // (v21.6.13) Nuclear stop check at top of every iteration
+    if (!agentRunning) { console.warn('[Sentinel] Stop detected at loop top — breaking'); break; }
+
     try {
       // Pause check — wait until resumed
       if (agentPaused) {
@@ -3436,6 +3439,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
           await sleep(ONE_SECOND_MS);
+          if (!agentRunning) break;
           continue;
         }
 
@@ -3450,6 +3454,7 @@ async function runAgentLoop(goal, workingTabId) {
           await persistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
           await sleep(ONE_SECOND_MS);
+          if (!agentRunning) break;
           continue;
         }
 
@@ -4156,6 +4161,9 @@ async function runAgentLoop(goal, workingTabId) {
           invalidationCtx.screenshotCache.lastScreenshotUrl = null;
         }
       }
+
+      // (v21.6.13) Stop check before action execution
+      if (!agentRunning) break;
 
       // Execute command
       const urlBeforeCommand = tabInfo.url;
