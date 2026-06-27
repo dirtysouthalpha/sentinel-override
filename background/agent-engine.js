@@ -4719,7 +4719,7 @@ async function runAgentLoop(goal, workingTabId) {
             }
           }
         }
-      } else if (useTrustedInput && (/^(click|click_at|type|press_key|select)$/.test(command.type))) {
+      } else if (useTrustedInput && !command._visionAction && !command._visionExecuted && (/^(click|click_at|type|press_key|select)$/.test(command.type))) {
         // (#9) CDP trusted-input dispatch path. Opt-in via settings.
         // On any CDP failure we fall back to the synthetic content-script
         // path so existing flows aren't broken.
