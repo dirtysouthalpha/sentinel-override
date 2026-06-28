@@ -4122,3 +4122,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+/* v21.6.28: Hide learned patterns panel */
+.message-group:has(.learned-patterns) {
+  display: none !important;
+}
+
+/* v21.6.28: Compact header during inactive state */
+.header {
+  transition: opacity 0.2s ease;
+}

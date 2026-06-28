@@ -1239,22 +1239,28 @@ function setAgentActive(isActive) {
   if (!activeIndicator) return;
   const _goalInput = document.getElementById('goalInput');
   const _toolbar = document.querySelector('.toolbar');
+  const _header = document.querySelector('.header');
   const _welcome = chatContainer ? chatContainer.querySelector('.welcome-message') : null;
-  const _tabStrip = document.getElementById('active-tab-strip');
+  const _planPanel = document.getElementById('plan-preview-panel');
+  const _learnedPatterns = chatContainer ? chatContainer.querySelector('[style*="Learned Patterns"], .learned-patterns') : null;
   if (isActive) {
     activeIndicator.classList.add('active');
     if (injectContextBar) injectContextBar.style.display = 'flex';
     if (_goalInput) _goalInput.placeholder = 'Type a correction or instruction...';
-    // v21.6.27: Hide clutter during runs
+    // v21.6.28: NUCLEAR declutter — hide everything except steps + report
     if (_toolbar) _toolbar.style.display = 'none';
+    if (_header) _header.style.display = 'none';
     if (_welcome) _welcome.style.display = 'none';
+    if (_planPanel) _planPanel.style.display = 'none';
+    if (_learnedPatterns) _learnedPatterns.style.display = 'none';
   } else {
     activeIndicator.classList.remove('active');
     if (injectContextBar) injectContextBar.style.display = 'none';
     if (injectContextInput) injectContextInput.value = '';
     if (_goalInput) _goalInput.placeholder = 'What should I do?';
-    // v21.6.27: Restore toolbar after run
+    // v21.6.28: Restore UI after run
     if (_toolbar) _toolbar.style.display = '';
+    if (_header) _header.style.display = '';
   }
 }
 
