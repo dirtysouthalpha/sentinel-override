@@ -1244,6 +1244,7 @@ function setAgentActive(isActive) {
   const _planPanel = document.getElementById('plan-preview-panel');
   const _learnedPatterns = chatContainer ? chatContainer.querySelector('[style*="Learned Patterns"], .learned-patterns') : null;
   if (isActive) {
+    document.body.classList.add('agent-running');
     activeIndicator.classList.add('active');
     if (injectContextBar) injectContextBar.style.display = 'flex';
     if (_goalInput) _goalInput.placeholder = 'Type a correction or instruction...';
@@ -1254,6 +1255,7 @@ function setAgentActive(isActive) {
     if (_planPanel) _planPanel.style.display = 'none';
     if (_learnedPatterns) _learnedPatterns.style.display = 'none';
   } else {
+    document.body.classList.remove('agent-running');
     activeIndicator.classList.remove('active');
     if (injectContextBar) injectContextBar.style.display = 'none';
     if (injectContextInput) injectContextInput.value = '';
@@ -4083,13 +4085,13 @@ chrome.runtime.onMessage.addListener((message) => {
     if (!previewPanel) {
       previewPanel = document.createElement('div');
       previewPanel.id = 'screenshot-preview';
-      previewPanel.style.cssText = 'position:fixed;bottom:50px;right:8px;width:140px;max-height:90px;overflow:hidden;border-radius:8px;border:1px solid rgba(255,107,0,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;z-index:9999;transition:width 0.2s,height 0.2s;';
+      previewPanel.style.cssText = 'position:fixed;top:8px;right:8px;width:110px;max-height:70px;overflow:hidden;border-radius:8px;border:1px solid rgba(255,107,0,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;z-index:9999;transition:width 0.2s,height 0.2s;';
       previewPanel.title = 'Click to expand';
       const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
       if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
       previewPanel.addEventListener('click', () => {
-        const isExpanded = previewPanel.style.width === '400px';
-        previewPanel.style.width = isExpanded ? '140px' : '400px'; previewPanel.style.maxHeight = isExpanded ? '90px' : '300px';
+        const isExpanded = previewPanel.style.width === '380px';
+        previewPanel.style.width = isExpanded ? '110px' : '380px'; previewPanel.style.maxHeight = isExpanded ? '70px' : '280px';
       });
     }
     previewPanel.textContent = '';

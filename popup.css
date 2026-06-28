@@ -4133,3 +4133,18 @@ body {
 .header {
   transition: opacity 0.2s ease;
 }
+
+/* v21.6.29: CSS-based UI hiding during agent runs — more reliable than JS queries */
+body.agent-running .header,
+body.agent-running .toolbar,
+body.agent-running .welcome-message,
+body.agent-running .plan-preview-card,
+body.agent-running .plan-preview-panel,
+body.agent-running [id='plan-preview-panel'] {
+  display: none !important;
+}
+
+/* Hide learned patterns during runs */
+body.agent-running .message-group:has(> div > div[style*='Learned Patterns']) {
+  display: none !important;
+}
