@@ -4079,29 +4079,7 @@ chrome.runtime.onMessage.addListener((message) => {
       }
     }
   }
-  // Screenshot live preview panel — shows what the agent sees after each action
-  if (message.type === 'agent_step' && message.afterScreenshot) {
-    let previewPanel = document.getElementById('screenshot-preview');
-    if (!previewPanel) {
-      previewPanel = document.createElement('div');
-      previewPanel.id = 'screenshot-preview';
-      previewPanel.style.cssText = 'position:fixed;top:8px;right:8px;width:110px;max-height:70px;overflow:hidden;border-radius:8px;border:1px solid rgba(255,107,0,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;z-index:9999;transition:width 0.2s,height 0.2s;';
-      previewPanel.title = 'Click to expand';
-      const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
-      if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
-      previewPanel.addEventListener('click', () => {
-        const isExpanded = previewPanel.style.width === '380px';
-        previewPanel.style.width = isExpanded ? '110px' : '380px'; previewPanel.style.maxHeight = isExpanded ? '70px' : '280px';
-      });
-    }
-    previewPanel.textContent = '';
-    const img = document.createElement('img');
-    img.src = message.afterScreenshot;
-    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-    img.alt = 'Agent view';
-    previewPanel.appendChild(img);
-    previewPanel.style.display = '';
-  }
+  // v21.6.32: Floating screenshot preview REMOVED — center mini-shot panel is sufficient
   if (message.action === 'tab_state_update') {
     renderTabBar(message.tabs || []);
   }
