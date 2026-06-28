@@ -3262,7 +3262,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'navigate_back', _visionAction: true };
                   break;
                 case 'extract':
-                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 8000)', key: 'page_content', _visionAction: true };
+                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 16000)', key: 'page_content', _visionAction: true };
                   break;
                 case 'execute_js':
                   command = { type: 'execute_js', code: _va.code || '', key: _va.key || 'js_result_' + Date.now(), _visionAction: true };
@@ -5737,7 +5737,7 @@ return { ok: true, value: el.value };
         try {
           const forcedRead = await sendMessageWithRetry(tab, { action: 'read_page' });
           if (forcedRead) {
-            const forcedText = (forcedRead.content || '').substring(0, 8000);
+            const forcedText = (forcedRead.content || '').substring(0, 16000);
             historyPush({ step: stepCount, action: { type: 'read_page' }, result: `Auto-read: ${forcedText.substring(0, 500)}` });
           }
         } catch (_) { /* non-fatal */ }
