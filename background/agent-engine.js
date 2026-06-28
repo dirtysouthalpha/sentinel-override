@@ -3262,7 +3262,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'navigate_back', _visionAction: true };
                   break;
                 case 'extract':
-                  command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 20000)', key: 'page_content', _visionAction: true };
+                  command = { type: 'execute_js', code: 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); } } } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); })()', key: 'page_content', _visionAction: true };
                   break;
                 case 'execute_js':
                   command = { type: 'execute_js', code: _va.code || '', key: _va.key || 'js_result_' + Date.now(), _visionAction: true };
