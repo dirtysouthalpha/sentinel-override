@@ -1444,7 +1444,7 @@ function resetUI() {
   const _goalInput = document.getElementById('goalInput');
   
   if (_sendBtn) _sendBtn.disabled = false;
-  if (_stopBtn) _stopBtn.classList.add('btn-ctrl-disabled');
+  // STOP BUTTON ALWAYS ENABLED — removed disabled class
   if (_pauseBtn) { _pauseBtn.classList.add('btn-ctrl-disabled'); _pauseBtn.dataset.paused = 'false'; }
   if (_undoBtn) { _undoBtn.style.display = 'none'; _undoBtn.disabled = true; }
   if (_goalInput) {

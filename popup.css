@@ -4096,3 +4096,10 @@ body {
   color: var(--accent-color, #4a9eff);
   border-color: var(--accent-color, #4a9eff);
 }
+
+/* v21.6.25: Stop button is ALWAYS clickable — never disabled */
+#stopBtn.btn-ctrl-disabled {
+  opacity: 0.4 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}

@@ -50,7 +50,7 @@
     if (!feed) {
       feed = document.createElement('div');
       feed.id = 'activity-feed';
-      feed.className = 'activity-feed';
+      feed.className = 'activity-feed collapsed';
 
       // Build collapsible header
       const header = document.createElement('div');
