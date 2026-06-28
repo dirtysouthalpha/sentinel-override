@@ -30,6 +30,9 @@ import {ONE_MINUTE_MS} from './constants.js';
 const VALID_LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug', 'trace']);
 // Precompute agent-starting actions for O(1) lookup
 const AGENT_STARTING_ACTIONS = new Set(['analyze', 'extract', 'fill_form', 'screenshot', 'summarize']);
+
+// v21.6.43: Track which tab the user opened the side panel on
+let userPanelTabId = null;
 import {getErrorMessage} from './error-utils.js';
 import {federation} from './federation.js';
 import {registerLocalPeers, getLocalPeerStatus} from './federation-local-bridge.js';
@@ -286,10 +289,32 @@ try {
   // enabled controls WHETHER the panel CAN show, not WHETHER it IS showing.
   // openPanelOnActionClick: true is a toggle — clicking opens, clicking again closes.
   // The panel does NOT auto-show on tab switches (onActivated fix from v21.5.3).
-  chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' }).catch(() => {}); // v21.6.40: must be true for openPanelOnActionClick to work
-  // v21.6.39: Enable panel on action click for the CURRENT tab only
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
+  // v21.6.43: Clean side panel with proper tab scoping
+  // Global enabled MUST be true — Chrome requires it for sidePanel.open() to work.
+  chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' }).catch(() => {});
+  // Manual toggle: openPanelOnActionClick: false so action.onClicked FIRES
+  // (Chrome doesn't fire onClicked when openPanelOnActionClick is true)
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', getErrorMessage(e)));
+  // Manual click handler — track tab and toggle panel
+  chrome.action.onClicked.addListener(async (tab) => {
+    if (!tab || typeof tab.id !== 'number') return;
+    try {
+      if (userPanelTabId === tab.id) {
+        // Same tab — close panel by disabling it on this tab
+        await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: false, path: 'popup.html' });
+        userPanelTabId = null;
+      } else {
+        // Different tab — disable on old tab, enable + open on new tab
+        if (userPanelTabId !== null) {
+          await chrome.sidePanel.setOptions({ tabId: userPanelTabId, enabled: false, path: 'popup.html' }).catch(() => {});
+        }
+        userPanelTabId = tab.id;
+        await chrome.sidePanel.setOptions({ tabId: tab.id, enabled: true, path: 'popup.html' });
+        await chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
+      }
+    } catch (e) { console.warn('[Sentinel] Panel toggle failed:', getErrorMessage(e)); }
+  });
 } catch (_e) { /* non-fatal on older Chrome */ }
 
 // (v21.6.1) Removed onCreated panel blocker — it was preventing users from
@@ -1307,10 +1332,16 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     } else {
-      // (v21.6) No run in progress — do NOT enable the panel on every tab
-      // the user switches to. The panel only opens via explicit icon click
-      // (openPanelOnActionClick handles that). Enabling it here causes the
-      // panel to persist across tabs the user never opened it on.
+      // v21.6.43: No agent running — hide panel on non-panel tabs
+      if (userPanelTabId !== null && activeInfo.tabId !== userPanelTabId) {
+        await chrome.sidePanel.setOptions({
+          tabId: activeInfo.tabId,
+          enabled: false,
+          path: 'popup.html'
+        });
+      }
+// v21.6.43: If switching to panel tab, openPanelOnActionClick handles it
+      // Don't force-enable here — let Chrome's native toggle work
     }
   } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', getErrorMessage(e)); }
 });
@@ -1319,6 +1350,16 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     switch (command) {
+      case 'toggle-panel': {
+        try {
+          const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (activeTab && typeof activeTab.id === 'number') {
+            userPanelTabId = activeTab.id;
+            await chrome.sidePanel.open({ tabId: activeTab.id }).catch(() => {});
+          }
+        } catch (_e) { /* no active tab */ }
+        break;
+      }
       case 'toggle-agent': {
         if (agentRunning) {
           await stopAgent();
