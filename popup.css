@@ -2987,13 +2987,13 @@ input[type="checkbox"] {
 .mini-shot-panel .mini-shot-img-wrap {
   display: block;
   background: #111;
-  max-height: 110px; /* (v20.2) smaller footprint so the screenshot doesn't dominate the narrow side panel — still visible, click to zoom */
+  max-height: 80px; /* (v21.6.26) Floating thumbnail — shrunk to keep steps visible */
   overflow: hidden;
   text-align: center;
 }
 .mini-shot-panel .mini-shot-img-wrap img {
   max-width: 100%;
-  max-height: 110px;
+  max-height: 80px;
   display: inline-block;
   object-fit: contain;
   image-rendering: -webkit-optimize-contrast;

@@ -4069,19 +4069,19 @@ chrome.runtime.onMessage.addListener((message) => {
     if (!previewPanel) {
       previewPanel = document.createElement('div');
       previewPanel.id = 'screenshot-preview';
-      previewPanel.style.cssText = 'position:relative;width:100%;max-height:110px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,0.08);cursor:pointer;';
+      previewPanel.style.cssText = 'position:fixed;bottom:50px;right:8px;width:140px;max-height:90px;overflow:hidden;border-radius:8px;border:1px solid rgba(255,107,0,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;z-index:9999;transition:width 0.2s,height 0.2s;';
       previewPanel.title = 'Click to expand';
       const chatArea = chatContainer; // the chat area is #chat-container (the old 'chatMessages'/'.chat-messages' ids never existed → null → broken panels / crashes)
       if (chatArea) chatArea.parentNode.insertBefore(previewPanel, chatArea);
       previewPanel.addEventListener('click', () => {
-        const isExpanded = previewPanel.style.maxHeight === '380px';
-        previewPanel.style.maxHeight = isExpanded ? '110px' : '380px';
+        const isExpanded = previewPanel.style.width === '400px';
+        previewPanel.style.width = isExpanded ? '140px' : '400px'; previewPanel.style.maxHeight = isExpanded ? '90px' : '300px';
       });
     }
     previewPanel.textContent = '';
     const img = document.createElement('img');
     img.src = message.afterScreenshot;
-    img.style.cssText = 'width:100%;display:block;';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
     img.alt = 'Agent view';
     previewPanel.appendChild(img);
     previewPanel.style.display = '';
