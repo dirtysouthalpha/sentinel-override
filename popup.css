@@ -4103,3 +4103,22 @@ body {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
+
+
+/* v21.6.27: Compact step cards during runs */
+.activity-step-card {
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+.activity-step-card .activity-step-stream {
+  max-height: 60px;
+  overflow: hidden;
+}
+.activity-step-card .activity-step-header {
+  padding: 4px 12px !important;
+}
+.activity-step-card .activity-step-action {
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

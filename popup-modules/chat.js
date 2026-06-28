@@ -1238,15 +1238,23 @@ if (typeof document !== 'undefined' && document.addEventListener && !window.__se
 function setAgentActive(isActive) {
   if (!activeIndicator) return;
   const _goalInput = document.getElementById('goalInput');
+  const _toolbar = document.querySelector('.toolbar');
+  const _welcome = chatContainer ? chatContainer.querySelector('.welcome-message') : null;
+  const _tabStrip = document.getElementById('active-tab-strip');
   if (isActive) {
     activeIndicator.classList.add('active');
     if (injectContextBar) injectContextBar.style.display = 'flex';
     if (_goalInput) _goalInput.placeholder = 'Type a correction or instruction...';
+    // v21.6.27: Hide clutter during runs
+    if (_toolbar) _toolbar.style.display = 'none';
+    if (_welcome) _welcome.style.display = 'none';
   } else {
     activeIndicator.classList.remove('active');
     if (injectContextBar) injectContextBar.style.display = 'none';
     if (injectContextInput) injectContextInput.value = '';
     if (_goalInput) _goalInput.placeholder = 'What should I do?';
+    // v21.6.27: Restore toolbar after run
+    if (_toolbar) _toolbar.style.display = '';
   }
 }
 
@@ -4125,6 +4133,18 @@ chrome.runtime.onMessage.addListener((message) => {
       addFeedEvent('finish', 'Run complete');
       setTimeout(function() { setFeedVisible(false); }, 5000);
     } catch(e) {}
+    // v21.6.27: Collapse all step cards to show report clearly
+    try {
+      const _stepCards = chatContainer.querySelectorAll('.activity-step-card');
+      _stepCards.forEach(card => { card.style.opacity = '0.5'; card.style.maxHeight = '32px'; card.style.overflow = 'hidden'; });
+    } catch(e) {}
+    // Scroll to report card after step cards collapse
+    setTimeout(() => {
+      try {
+        const _reportCard = chatContainer.querySelector('.report-card-header, .report-group');
+        if (_reportCard) _reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch(e) {}
+    }, 300);
     try {
       const summary = String(message.summary || 'Done');
       const prefix = summary.length > 100 ? '' : '✅ Task completed\n\n';
