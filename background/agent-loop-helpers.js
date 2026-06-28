@@ -201,7 +201,7 @@ export function buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSt
   if (agentMemory && Object.keys(agentMemory).length > 0) {
     const _memLines = Object.entries(agentMemory).map(([k, v]) => {
       const _val = typeof v === 'string' ? v : JSON.stringify(v);
-      const _preview = _val.length > 200 ? _val.substring(0, 200) + '...' : _val;
+      const _preview = _val.length > 500 ? _val.substring(0, 500) + '...' : _val;
       return `  ${k}: "${_preview}" (${_val.length} chars)`;
     });
     parts.push('');
@@ -246,7 +246,7 @@ export function buildRunLogEntry(stepCount, currentUrl, command, result, actionF
       key: command.key,
       text: (() => {
         const t = command.text;
-        return (typeof t === 'string') ? t.substring(0, 200) : undefined;
+        return (typeof t === 'string') ? t.substring(0, 500) : undefined;
       })(),
       x: command.x, y: command.y
     },
