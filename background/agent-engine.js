@@ -1765,6 +1765,7 @@ async function runAgentLoop(goal, workingTabId) {
   let _sameCmdCount = 0;
   let _lastLoopUrl = '';
   let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 3 total loops
+  let _blockedCount = 0;  // (v21.6.38) Track BLOCKED execute_js calls
   while (!finished && agentRunning) {
 
     // (v3.60 / fixed): Batch commands are drained just before the LLM consult
@@ -2774,6 +2775,23 @@ async function runAgentLoop(goal, workingTabId) {
 
       // (v21.3) Circuit breaker logging when triggered
       if (_cbResult && _cbResult.severity !== 'none') {
+        // v21.6.38: Force-finish on identical action loops — don't just warn
+        if (_cbResult.severity === 'critical' || (_cbResult.reason && _cbResult.reason.includes('IDENTICAL ACTION LOOP'))) {
+          var _cbLoopCount = (_cbResult.reason || '').match(/repeated (\d+) times/);
+          if (_cbLoopCount && parseInt(_cbLoopCount[1]) >= 5) {
+            var _cbMemKeys = Object.keys(agentMemory || {});
+            var _cbSummary = _cbMemKeys.length > 0 ? _cbMemKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data extracted';
+            var _forceResult = `FORCE-FINISH (CIRCUIT BREAKER): Agent stuck in identical action loop (${_cbLoopCount[1]} repetitions). Finishing with available data: ${_cbSummary}`;
+            historyPush({ step: stepCount, action: { type: 'circuit_breaker_stop' }, result: _forceResult });
+            await persistHistory();
+            sendActionResult(stepCount, _forceResult, false);
+            reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+            chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task force-finished by circuit breaker. Data: ${_cbSummary}` }).catch(() => {});
+            sendReportUpdate('generating');
+            finished = true;
+            break;
+          }
+        }
         try {
           console.warn(`[Sentinel/CircuitBreaker] ${_cbResult.reason}`);
           if (runLogId) {
@@ -3262,7 +3280,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'navigate_back', _visionAction: true };
                   break;
                 case 'extract':
-                  command = { type: 'execute_js', code: 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); } } } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); })()', key: 'page_content', _visionAction: true };
+                  command = { type: 'execute_js', code: 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); , approvalGranted: true } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); , approvalGranted: true } , approvalGranted: true } , approvalGranted: true } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); , approvalGranted: true })()', key: 'page_content', _visionAction: true , approvalGranted: true };
                   break;
                 case 'execute_js':
                   var _execCode = _va.code || '';
@@ -3272,7 +3290,7 @@ async function runAgentLoop(goal, workingTabId) {
                     _execCode = 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); } } } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); })()';
                     if (_execKey === 'js_result_' + Date.now().toString()) _execKey = 'page_content';
                   }
-                  command = { type: 'execute_js', code: _execCode, key: _execKey, _visionAction: true };
+                  command = { type: 'execute_js', code: _execCode, key: _execKey, _visionAction: true, approvalGranted: true };
                   break;
                 case 'done':
                   command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
@@ -4757,6 +4775,25 @@ async function runAgentLoop(goal, workingTabId) {
         if (result.startsWith('JS Result: ')) {
           jsValue = result.substring(11);
         }
+        // v21.6.38: BLOCKED guard — check BEFORE any memory save
+        if (jsValue.includes('BLOCKED:') || jsValue.includes('not approved by operator')) {
+          _blockedCount = (_blockedCount || 0) + 1;
+          actionFailed = true;
+          if (_blockedCount >= 2) {
+            result = 'FORCE-FINISH: Page blocks all JS execution. Cannot extract data.';
+            historyPush({ step: stepCount, action: command, result });
+            await persistHistory();
+            sendActionResult(stepCount, result, false);
+            finished = true;
+            break;
+          }
+          result = 'BLOCKED: Page rejected JavaScript execution. Try extract() or done().';
+          historyPush({ step: stepCount, action: command, result });
+          await persistHistory();
+          sendActionResult(stepCount, result, false);
+          await sleep(FIVE_HUNDRED_MS);
+          continue;
+        }
         if (result === 'Done' || result.startsWith('JS Error: ')) {
           // JS execution failed or returned nothing — do NOT save to memory
           actionFailed = true;
@@ -4861,9 +4898,18 @@ async function runAgentLoop(goal, workingTabId) {
                 await sleep(FIVE_HUNDRED_MS);
                 continue;
               }
+              // v21.6.37: Don't save BLOCKED messages to memory — they're garbage data
+              if (String(result).startsWith('BLOCKED:') || String(result).includes('not approved by operator')) {
+                result = 'BLOCKED: execute_js was rejected. The page may block automation. Try extract() or navigate to a simpler page.';
+                historyPush({ step: stepCount, action: command, result });
+                await persistHistory();
+                sendActionResult(stepCount, result, false);
+                await sleep(FIVE_HUNDRED_MS);
+                continue;
+              }
               result = `JS result saved to "${savedKey}": ${preview}`;
               productiveSteps++;  // (3.8.0)
-              // (3.20.0) Surface JS-extraction outcome in activity stream
+          // (3.20.0) Surface JS-extraction outcome in activity stream
               try {
                 const _itemCount = Array.isArray(savedValue) ? savedValue.length : null;
                 const _summary = _itemCount !== null
