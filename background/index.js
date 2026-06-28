@@ -286,7 +286,7 @@ try {
   // enabled controls WHETHER the panel CAN show, not WHETHER it IS showing.
   // openPanelOnActionClick: true is a toggle — clicking opens, clicking again closes.
   // The panel does NOT auto-show on tab switches (onActivated fix from v21.5.3).
-  chrome.sidePanel.setOptions({ enabled: false, path: 'popup.html' }).catch(() => {}); // v21.6.39: disabled by default, enabled only on primary tab via _scopeSidePanelToPrimary
+  chrome.sidePanel.setOptions({ enabled: true, path: 'popup.html' }).catch(() => {}); // v21.6.40: must be true for openPanelOnActionClick to work
   // v21.6.39: Enable panel on action click for the CURRENT tab only
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((e) => console.warn('[Sentinel] setPanelBehavior failed:', getErrorMessage(e)));
