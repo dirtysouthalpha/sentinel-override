@@ -4155,3 +4155,117 @@ body.agent-running .feed-toggle-btn { display: none !important; }
 body.agent-running .quick-model-switcher { display: none !important; }
 body.agent-running #screenshot-preview { display: none !important; }
 
+
+
+/* ================================================================
+   v21.6.33: PERMANENT UI MINIMIZATION — Clean sidebar always
+   ================================================================ */
+
+/* 1. SHRINK HEADER — Only logo + brand, hide everything else */
+.header-title {
+  gap: 4px !important;
+  padding: 4px 8px !important;
+}
+.header-brand {
+  font-size: 13px !important;
+}
+.header-logo {
+  width: 20px !important;
+  height: 20px !important;
+}
+/* Permanently hide: client chip, quick assist, mode badge, tenant chip */
+#clientChip,
+#quickAssistHeaderBtn,
+#modeBadge,
+#tenantChip {
+  display: none !important;
+}
+
+/* 2. HIDE TOOLBAR by default — search, model switcher, buttons */
+.toolbar {
+  display: none !important;
+}
+
+/* 3. HIDE LEARNED PATTERNS permanently */
+.message-group:has(> div > div[style*='Learned Patterns']) {
+  display: none !important;
+}
+
+/* 4. HIDE PLAN PREVIEW permanently */
+.plan-preview-card,
+#plan-preview-panel {
+  display: none !important;
+}
+
+/* 5. COMPACT STEP CARDS */
+.activity-step-card {
+  padding: 2px 0 !important;
+  margin: 1px 0 !important;
+}
+.activity-step-card .activity-step-stream {
+  max-height: 40px;
+  overflow: hidden;
+}
+.activity-step-card .activity-step-header {
+  padding: 2px 12px !important;
+}
+.activity-step-card .activity-step-action {
+  font-size: 12px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 6. MINIMIZE ACTIVITY FEED */
+.activity-feed {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+.activity-feed-header,
+.feed-toggle-btn {
+  display: none !important;
+}
+
+/* 7. COMPACT INPUT AREA */
+.input-area {
+  padding: 6px 8px !important;
+}
+.input-footer {
+  display: none !important;
+}
+
+/* 8. ACTIVE TAB STRIP — compact */
+.active-tab-strip {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+}
+.active-tab-strip .ats-info {
+  gap: 1px !important;
+}
+.active-tab-strip .ats-title {
+  font-size: 11px !important;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.active-tab-strip .ats-action {
+  display: none !important;
+}
+
+/* 9. REPORT CARDS — prominent */
+.report-card-header {
+  padding: 8px 12px !important;
+}
+.report-card-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+.report-card-body {
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
