@@ -3283,14 +3283,7 @@ async function runAgentLoop(goal, workingTabId) {
                   command = { type: 'execute_js', code: 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); , approvalGranted: true } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); , approvalGranted: true } , approvalGranted: true } , approvalGranted: true } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); , approvalGranted: true })()', key: 'page_content', _visionAction: true , approvalGranted: true };
                   break;
                 case 'execute_js':
-                  var _execCode = _va.code || '';
-                  var _execKey = _va.key || 'js_result_' + Date.now();
-                  // v21.6.35: If GLM writes body.innerText, redirect to smart table-first extraction
-                  if (_execCode.includes('body.innerText') || _execCode.includes('body.textContent')) {
-                    _execCode = 'return (function() { var t = []; var tables = document.querySelectorAll("table"); if (tables.length > 0) { for (var ti = 0; ti < Math.min(tables.length, 3); ti++) { var rows = tables[ti].querySelectorAll("tr"); t.push("--- TABLE " + (ti+1) + " ---"); for (var ri = 0; ri < Math.min(rows.length, 30); ri++) { var cells = rows[ri].querySelectorAll("th, td"); var rowText = []; for (var ci = 0; ci < cells.length; ci++) { rowText.push(cells[ci].innerText.trim()); } if (rowText.join("").length > 0) t.push(rowText.join(" | ")); } } } var main = document.querySelector("main") || document.querySelector("[role=main]") || document.querySelector("#main-content") || document.querySelector(".main-content"); var bodyText = main ? main.innerText : document.body.innerText; return t.length > 0 ? t.join("\n") + "\n\n" + bodyText.substring(0, 8000) : bodyText.substring(0, 20000); })()';
-                    if (_execKey === 'js_result_' + Date.now().toString()) _execKey = 'page_content';
-                  }
-                  command = { type: 'execute_js', code: _execCode, key: _execKey, _visionAction: true, approvalGranted: true };
+                  command = { type: 'execute_js', code: _va.code || '', key: _va.key || 'js_result_' + Date.now(), _visionAction: true, approvalGranted: true };
                   break;
                 case 'done':
                   command = { type: 'finish', summary: _va.text || _vParsed.memory || 'Task complete', _visionAction: true };
