@@ -4569,7 +4569,18 @@ async function runAgentLoop(goal, workingTabId) {
       // no-op, and the result is "Click: undefined" with no useful feedback.
       // Catch it here and return a clear error to the LLM so it picks a
       // different strategy next step.
-      if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
+            // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
+      if (command.type === 'click_at' && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
+        result = 'BLOCKED: click_at requires numeric x/y coordinates. Use click(index) from the observation panel instead. The observation panel lists clickable elements with their index numbers.';
+        activityFail(stepCount, 'dispatch', 'Click at (no target)', { result });
+        sendActionResult(stepCount, result, true);
+        historyPush({ step: stepCount, action: command, result });
+        await persistHistory();
+        await sleep(EIGHT_HUNDRED_MS);
+        continue;
+      }
+
+if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         const _hasSelector = typeof command.selector === 'string' && command.selector;
         const _hasRef      = typeof command.ref === 'string' && command.ref;
         const _hasCoords   = typeof command.x === 'number' && typeof command.y === 'number';
