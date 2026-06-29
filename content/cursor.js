@@ -73,6 +73,8 @@ window.__sentinelUtils = window.__sentinelUtils || {};
           `filter: drop-shadow(0 0 6px #ff0000) drop-shadow(0 0 12px #ff4444) !important;` +
           `animation: sentinelCursorBreathe 2.4s ease-in-out infinite;` +
         `}` +
+        `body[data-sentinel-active="true"] { cursor: none !important; }` +
+        `body[data-sentinel-active="true"] * { cursor: none !important; }` +
         `#${CURSOR_ID}.dimmed { opacity: 0 !important; }` +
         `#${CURSOR_ID} .sentinel-cursor-halo {` +
           `position: absolute;` +
@@ -328,9 +330,14 @@ window.__sentinelUtils = window.__sentinelUtils || {};
      */
     setKeepVisible(on) {
       keepVisibleMode = !!on;
-      if (on) {
-        try { const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed'); } catch (e) { console.warn('[Sentinel] cursor keepVisible un-dim:', getErrorMessage(e)); }
-      }
+      try {
+        if (on) {
+          document.body.setAttribute('data-sentinel-active', 'true');
+          const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed');
+        } else {
+          document.body.removeAttribute('data-sentinel-active');
+        }
+      } catch (e) { console.warn('[Sentinel] cursor keepVisible attr:', e); }
     },
 
     /**

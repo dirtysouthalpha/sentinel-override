@@ -1962,6 +1962,33 @@ async function runAgentLoop(goal, workingTabId) {
         await sleep(FIVE_HUNDRED_MS);
       }
 
+            // (v21.6.48) SPA EXTENDED WAIT
+      const _navUrl = (command.url || tabInfo.url || '').toLowerCase();
+      const _isSPAPortal = _navUrl.includes('microsoft.com') || _navUrl.includes('entra.') ||
+        _navUrl.includes('admin.microsoft') || _navUrl.includes('portal.office');
+      if (_isSPAPortal) {
+        sendSilentUpdate('Waiting for SPA to render...', stepCount);
+        let _spaReady = false;
+        for (let _spaWait = 0; _spaWait < 12; _spaWait++) {
+          await sleep(1000);
+          try {
+            const _spaCheck = await cdpExecuteJs(tab, 'return { bodyLen: (document.body && document.body.innerText || "").length, hasMain: !!document.querySelector("[role=main], main, .main-content, #mainContent, app-root"), title: document.title || "" };', { timeout: 2000 });
+            if (_spaCheck && _spaCheck.ok && _spaCheck.value) {
+              const _bodyLen = _spaCheck.value.bodyLen || 0;
+              const _hasMain = _spaCheck.value.hasMain || false;
+              if (_bodyLen > 500 && _hasMain) { _spaReady = true; break; }
+              if (_bodyLen > 1000) { _spaReady = true; break; }
+            }
+          } catch (_) {}
+        }
+        if (_spaReady) {
+          sendSilentUpdate('SPA content rendered', stepCount);
+          await sleep(1000);
+        } else {
+          sendSilentUpdate('SPA wait timeout', stepCount);
+        }
+      }
+
       // (v21.6.45) CERT WARNING DETECTION — Critical for SonicWall/firewall access
       // Self-signed cert pages stop the agent cold. Detect and auto-bypass via CDP.
       try {
@@ -4933,7 +4960,7 @@ async function runAgentLoop(goal, workingTabId) {
                 // GLM never calls done() on its own — this saves 2-3 wasted steps
                 if (Object.keys(agentMemory).length > 0 && savedKey in agentMemory) {
                   const _memSize = typeof agentMemory[savedKey] === 'string' ? agentMemory[savedKey].length : JSON.stringify(agentMemory[savedKey]).length;
-                  if (_memSize > 100) {
+                  if (_memSize > 500) {
                     const _memKeys = Object.keys(agentMemory || {});
                     const _memSummary = _memKeys.length > 0 ? _memKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data';
                     result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
