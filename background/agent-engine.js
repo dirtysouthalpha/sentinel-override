@@ -6,6 +6,7 @@ import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames
 import {callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
+import { diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl } from './agent-adaptive.js';
 import { isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState } from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
 import {summarizeHistoryBatch, maybeRollupHistory, detectStall} from './agent-progress.js';
@@ -1234,7 +1235,10 @@ export async function startAgent(goal, sender) {
   goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
   _cursorHiderInjected = false;
-let _orchestratorState = null; // v21.6.53: Multi-task orchestrator state
+let _orchestratorState = null;
+let _lastDiagnosis = null; // v21.6.54: Adaptive failure diagnosis
+let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
+ // v21.6.53: Multi-task orchestrator state
 
 
   // Determine which tab to operate on
@@ -1455,6 +1459,18 @@ let _orchestratorState = null; // v21.6.53: Multi-task orchestrator state
       _orchestratorState = null;
     }
   }
+
+  // v21.6.54: Load cross-run domain strategy
+  try {
+    const _startUrl = tabInfo ? tabInfo.url : '';
+    if (_startUrl) {
+      const _domainStrategy = await getDomainStrategy(_startUrl);
+      if (_domainStrategy) {
+        sendSilentUpdate('[ADAPTIVE] Loaded domain strategy for ' + getDomainFromUrl(_startUrl), 0);
+        finalGoal = finalGoal + '\n\n' + _domainStrategy;
+      }
+    }
+  } catch (_stratErr) { /* non-fatal */ }
 
   runAgentLoop(finalGoal, startTabId).catch(err => {
     console.error('[Sentinel/Loop] runAgentLoop crashed unexpectedly:', err);
@@ -3693,6 +3709,25 @@ async function runAgentLoop(goal, workingTabId) {
         if (!selectorExists) {
           sendSilentUpdate('Invalid selector -- re-asking AI', stepCount);
           consecutiveFailures++;
+        // v21.6.54: Adaptive failure diagnosis after 2+ consecutive failures
+        if (consecutiveFailures >= 2 && command && command.type) {
+          try {
+            const _actionType = command.type;
+            const _failKey = _actionType + ':' + String(currentUrl || '').substring(0, 50);
+            _consecutiveFailureTypes[_failKey] = (_consecutiveFailureTypes[_failKey] || 0) + 1;
+            if (_consecutiveFailureTypes[_failKey] >= 2) {
+              _lastDiagnosis = diagnoseFailure(_actionType, String(result || ''), currentUrl || '', stepCount);
+              const _diagMsg = buildDiagnosticMessage(_lastDiagnosis, _actionType, _consecutiveFailureTypes[_failKey]);
+              sendSilentUpdate('[ADAPTIVE] ' + _lastDiagnosis.strategy + ': ' + _lastDiagnosis.suggestion.substring(0, 100), stepCount);
+              // Inject diagnosis into history so the LLM sees it on the next step
+              historyPush({ step: stepCount, action: { type: 'note', text: _diagMsg }, result: 'Adaptive diagnosis: ' + _lastDiagnosis.strategy });
+              await persistHistory();
+              // Reset counter after diagnosis to avoid spamming
+              _consecutiveFailureTypes[_failKey] = 0;
+            }
+          } catch (_diagErr) { /* non-fatal */ }
+        }
+
           historyPush({ step: stepCount, action: command, result: `Invalid selector "${command.selector}" -- not in element list.` });
           await persistHistory();
           await sleep(ONE_SECOND_MS);
@@ -3897,7 +3932,18 @@ async function runAgentLoop(goal, workingTabId) {
           continue;
         }
 
-        finished = true;
+                // v21.6.54: Save winning strategy for cross-run learning
+        try {
+          const _finishDomain = getDomainFromUrl(currentUrl || '');
+          if (_finishDomain) {
+            const _strategy = extractWinningStrategy(_finishDomain, history, agentMemory, stepCount);
+            if (_strategy) {
+              saveDomainStrategy(_finishDomain, _strategy);
+            }
+          }
+        } catch (_saveErr) { /* non-fatal */ }
+
+finished = true;
         consecutiveFailures = 0;
         sendSilentUpdate('Task complete', stepCount);
 

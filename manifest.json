@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sentinel Override",
-  "version": "21.6.53",
-  "description": "Universal browser automation agent — investigates, configures, and collaborates via Universal Agent Protocol",
+  "version": "21.6.54",
+  "description": "Universal browser automation agent \u2014 investigates, configures, and collaborates via Universal Agent Protocol",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'"
   },
