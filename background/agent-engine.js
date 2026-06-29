@@ -1232,6 +1232,7 @@ export async function startAgent(goal, sender) {
   if (typeof goal !== 'string' || !goal.trim()) throw new Error('Goal must be a non-empty string');
   goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
+  _cursorHiderInjected = false;
 
   // Determine which tab to operate on
   let startTabId;
@@ -1683,6 +1684,98 @@ import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, _URL_ANY_RE, _BARE_SITE_R
 import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-setup.js';
 
 // ========== Main Agent Loop ==========
+
+/**
+ * Inject a persistent CSS rule that hides the native cursor during agent runs.
+ * Called once after the debugger attaches at the start of runAgentLoop.
+ * This prevents the "double cursor" effect where both the native OS cursor
+ * and the Sentinel custom cursor are visible simultaneously.
+ */
+let _cursorHiderInjected = false;
+async function _injectCursorHider(tabId) {
+  if (_cursorHiderInjected) return;
+  try {
+    const css = `(function(){var s=document.getElementById('sentinel-cursor-hider');if(s)return'true';s=document.createElement('style');s.id='sentinel-cursor-hider';s.textContent='*,*::before,*::after{cursor:none !important;}';document.head?document.head.appendChild(s):document.documentElement.appendChild(s);return'true';})();`;
+    await cdpExecuteJs(tabId, css, { timeout: 2000 });
+    _cursorHiderInjected = true;
+    console.debug('[Sentinel] Native cursor hidden via CDP CSS injection');
+  } catch (e) {
+    console.warn('[Sentinel] Cursor hider injection failed:', getErrorMessage(e));
+  }
+}
+
+
+/**
+ * Extract text content from cross-origin iframes that document.body.innerText
+ * cannot reach (e.g., Microsoft Entra, Azure Portal, M365 Admin).
+ * Uses chrome.webNavigation to enumerate frames, then chrome.scripting.executeScript
+ * to extract text from each iframe's execution context.
+ *
+ * @param {number} tabId - The active tab ID
+ * @param {string} topFrameText - The text already extracted from the top frame
+ * @returns {Promise<string>} Combined text from all frames, or empty string on failure
+ */
+async function _extractFromIframes(tabId, topFrameText) {
+  const results = [];
+  try {
+    // Only attempt iframe extraction if top frame text is sparse
+    const isSparse = !topFrameText || topFrameText.length < 800;
+    if (!isSparse) return '';
+
+    // Check if this looks like a portal page that uses iframes
+    const isPortal = /entra\.microsoft\.com|admin\.microsoft|portal\.azure|make\.microsoft/.test(topFrameText) ||
+                     /Microsoft Entra|Azure Portal|admin center/i.test(topFrameText);
+    if (!isPortal) return '';
+
+    // Enumerate all frames in the tab
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    if (!frames || frames.length <= 1) return ''; // Only top frame exists
+
+    const childFrames = frames.filter(f => f.frameId !== 0);
+    if (childFrames.length === 0) return '';
+
+    sendSilentUpdate(`[Iframe] Found ${childFrames.length} child frames, extracting...`, 0);
+
+    for (const frame of childFrames) {
+      try {
+        const [result] = await chrome.scripting.executeScript({
+          target: { tabId, frameIds: [frame.frameId] },
+          func: () => {
+            // Try multiple extraction strategies within the iframe
+            let text = '';
+            // Strategy 1: body.innerText
+            if (document.body && document.body.innerText) {
+              text = document.body.innerText.substring(0, 16000);
+            }
+            // Strategy 2: If innerText is sparse, try visible elements
+            if (text.length < 200) {
+              const els = document.querySelectorAll('h1,h2,h3,h4,h5,p,span,td,th,li,a,button,label,div[role],nav');
+              const parts = [];
+              els.forEach(el => {
+                const t = (el.innerText || el.textContent || '').trim();
+                if (t && t.length > 2 && t.length < 500) parts.push(t);
+              });
+              text = parts.slice(0, 200).join('\n').substring(0, 16000);
+            }
+            return { url: location.href, text };
+          },
+          world: 'MAIN'
+        });
+
+        if (result && result.result && result.result.text && result.result.text.length > 50) {
+          results.push(`--- Iframe: ${result.result.url} ---
+${result.result.text}`);
+        }
+      } catch (frameErr) {
+        // Cross-origin frame access may fail silently
+      }
+    }
+  } catch (e) {
+    console.warn('[Sentinel/Iframe] Extraction failed:', getErrorMessage(e));
+  }
+  return results.join('\n\n');
+}
+
 async function runAgentLoop(goal, workingTabId) {
   _runAbortController = new AbortController();  // (v21.6.8) For instant stop
   _lastGoal = goal || '';
@@ -1917,6 +2010,9 @@ async function runAgentLoop(goal, workingTabId) {
         sendReportUpdate('generating');
         break;
       }
+      // v21.6.51: Hide native cursor to prevent double-cursor effect
+      await _injectCursorHider(tab);
+
 
       // Get tab info
       let tabInfo = await getTabInfo(tab);
@@ -4828,6 +4924,15 @@ async function runAgentLoop(goal, workingTabId) {
         }
         let res = ladder.raw;
         result = res || 'Done';
+        // v21.6.51: If result is sparse, try extracting from cross-origin iframes
+        if (result && result.length < 800) {
+          try {
+            const _iframeText = await _extractFromIframes(tab, result);
+            if (_iframeText && _iframeText.length > 100) {
+              result = result + '\n\n' + _iframeText;
+            }
+          } catch (_iframeErr) { /* non-fatal */ }
+        }
         // Extract the JS result value
         let jsValue = result;
         if (result.startsWith('JS Result: ')) {

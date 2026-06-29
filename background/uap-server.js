@@ -9,7 +9,7 @@
  */
 
 import { getErrorMessage } from './error-utils.js';
-import {executeGoal as _uapExecuteGoal} from './agent-engine.js';
+import {startAgent as _uapExecuteGoal} from './agent-engine.js';
 // (v21.5.1) Native UUID v4 — replaces bare 'uuid' module (Chrome MV3 compatible)
 const uuidv4 = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
 
@@ -222,19 +222,19 @@ class UAPServer {
     this.logAudit('goal_request', clientId, { goal, context: validatedContext, runId });
 
     // Execute goal (integrate with agent-engine)
-    this.executeGoal(runId, goal, validatedContext, webhook);
+    this.startAgent(runId, goal, validatedContext, webhook);
   }
 
   /**
    * Execute goal using agent engine
    */
-  async executeGoal(runId, goal, context, webhook) {
+  async startAgent(runId, goal, context, webhook) {
     try {
       const run = this.activeRuns.get(runId);
       if (!run) return;
 
       // Import agent engine dynamically
-      const executeGoal = _uapExecuteGoal;
+      const startAgent = _uapExecuteGoal;
 
       // Setup streaming callback
       const onStep = (stepData) => {
@@ -245,7 +245,7 @@ class UAPServer {
       };
 
       // Execute with streaming
-      const result = await executeGoal(goal, {
+      const result = await startAgent(goal, {
         ...context,
         onStep,
         runId,
