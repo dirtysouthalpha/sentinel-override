@@ -1,7 +1,7 @@
 // Sentinel Override v3 — Service Worker Entry Point
 // Wires all modules together and handles message routing.
 
-import {startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay} from './agent-engine.js';
+import {startAgent, stopAgent, agentRunning, isPrimaryPanelTab, injectContext, applyCorrection, fetchAuditLog, auditLogToCsv, generateRunReplay, pauseAgent, resumeAgent, undoLastAction, setAgentSpeed, restoreFromCheckpoint, clearCheckpoint} from './agent-engine.js';
 import {getPoolStatus, stopAgent as stopPoolAgent, stopAllAgents} from './agent-pool.js';
 import {wrapMessageHandler, sendSilentUpdate} from './message-protocol.js';
 import {injectContentScript, sendMessageWithRetry, isValidUrl, detachAllDebuggees} from './tab-manager.js';
@@ -96,12 +96,10 @@ registerLocalPeers().catch(e => console.warn('[Federation] Local peer registrati
         // Check for checkpoint with more state
         const cp = await chrome.storage.session.get('agent_checkpoint');
         if (cp && cp.agent_checkpoint && cp.agent_checkpoint.lastGoal) {
-          const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
-          const result = await restoreFromCheckpoint();
+                    const result = await restoreFromCheckpoint();
           if (result.restored) {
             await clearCheckpoint();
-            const { startAgent } = await import('./agent-engine.js');
-            // Get any active tab to restart on
+                        // Get any active tab to restart on
             const tabs = await new Promise(resolve => {
               chrome.tabs.query({active: true, currentWindow: true}, (t) => {
                 if (chrome.runtime.lastError) {
@@ -499,8 +497,7 @@ const handleRuntimeMessage = async (request, sender) => {
       // trust counters, and tab contexts from the session checkpoint,
       // then start a new agent run that inherits the restored state.
       try {
-        const { restoreFromCheckpoint, clearCheckpoint } = await import('./agent-engine.js');
-        if (agentRunning) return { ok: false, error: 'Agent already running' };
+                if (agentRunning) return { ok: false, error: 'Agent already running' };
         const result = await restoreFromCheckpoint();
         if (!result.restored) {
           return { ok: false, error: `Cannot resume: ${result.error || 'unknown'}` };
@@ -654,36 +651,30 @@ const handleRuntimeMessage = async (request, sender) => {
     }
 
     case 'pause_agent_loop': {
-      const { pauseAgent } = await import('./agent-engine.js');
-      return pauseAgent();
+            return pauseAgent();
     }
 
     case 'resume_agent_loop': {
-      const { resumeAgent } = await import('./agent-engine.js');
-      return resumeAgent();
+            return resumeAgent();
     }
 
     case 'get_pool_status': {
-      const { getPoolStatus: _gps } = await import('./agent-pool.js');
-      return _gps();
+            return _gps();
     }
 
     case 'stop_agent_tab': {
-      const { stopAgent: _stopPool } = await import('./agent-pool.js');
-      const stopped = _stopPool(request.tabId);
+            const stopped = _stopPool(request.tabId);
       return { ok: stopped, tabId: request.tabId };
     }
 
     case 'stop_all_agents': {
-      const { stopAllAgents: _stopAll } = await import('./agent-pool.js');
-      _stopAll();
+            _stopAll();
       return { ok: true };
     }
 
 
     case 'undo_action': {
-      const { undoLastAction } = await import('./agent-engine.js');
-      return await undoLastAction();
+            return await undoLastAction();
     }
 
     case 'quick_assist_request': {
@@ -748,8 +739,7 @@ const handleRuntimeMessage = async (request, sender) => {
     }
 
     case 'set_agent_speed': {
-      const { setAgentSpeed } = await import('./agent-engine.js');
-      return setAgentSpeed(request.mode);
+            return setAgentSpeed(request.mode);
     }
 
     // SPA messages from content script
@@ -1312,8 +1302,16 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
         path: 'popup.html'
       });
     } else {
-      // v21.6.47: Let Chrome's native toggle handle everything
-      // Don't fight it with manual setOptions on tab switches
+      // (v21.6.50) Tab scoping: disable panel on ALL tabs except the one the
+      // user opened it on. This is the ONLY way to prevent the panel from
+      // following you across tabs without breaking openPanelOnActionClick.
+      if (typeof userPanelTabId === 'number' && activeInfo.tabId !== userPanelTabId) {
+        await chrome.sidePanel.setOptions({
+          tabId: activeInfo.tabId,
+          enabled: false,
+          path: 'popup.html'
+        }).catch(() => {});
+      }
     }
   } catch (e) { console.warn('[Sentinel/index] sidePanel configuration failed:', getErrorMessage(e)); }
 });
@@ -1353,28 +1351,24 @@ chrome.commands.onCommand.addListener(async (command) => {
       }
       case 'pause-agent': {
         if (agentRunning) {
-          const { pauseAgent } = await import('./agent-engine.js');
-          // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
+                    // Simple toggle: pause if running, resume if paused (agentPaused read from module scope won't work)
           // Instead, just send both and let the engine decide
           await pauseAgent(); // Will set agentPaused = true
         }
         break;
       }
       case 'turbo-mode': {
-        const { setAgentSpeed } = await import('./agent-engine.js');
-        setAgentSpeed('turbo');
+                setAgentSpeed('turbo');
         notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🚀 Turbo mode' });
         break;
       }
       case 'normal-mode': {
-        const { setAgentSpeed } = await import('./agent-engine.js');
-        setAgentSpeed('normal');
+                setAgentSpeed('normal');
         notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '👤 Normal mode' });
         break;
       }
       case 'stealth-mode': {
-        const { setAgentSpeed } = await import('./agent-engine.js');
-        setAgentSpeed('stealth');
+                setAgentSpeed('stealth');
         notifyIfEnabled({ type: 'basic', iconUrl: chrome.runtime.getURL('icon-48.png'), title: 'Sentinel Override', message: '🥷 Stealth mode' });
         break;
       }

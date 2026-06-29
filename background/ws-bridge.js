@@ -3,6 +3,8 @@
 // Receives task/query/cancel commands and routes to the agent engine.
 
 import { getErrorMessage } from './error-utils.js';
+import {startAgent as _wsStartAgent, stopAgent as _wsStopAgent, agentRunning as _wsAgentRunning} from './agent-engine.js';
+import {getActiveTabId as _wsGetActiveTabId, getTabContext as _wsGetTabContext} from './tab-context.js';
 // (v21.6) Global unhandled rejection guard — SW context only, skips test envs
 if (typeof self !== 'undefined' && self.addEventListener && typeof window === 'undefined') {
   self.addEventListener('unhandledrejection', (event) => {
@@ -231,7 +233,7 @@ async function handleTask(goal, requestId) {
 
   try {
     // Import and call the agent engine's startAgent function
-    const { startAgent } = await import('./agent-engine.js');
+    const startAgent = _wsStartAgent;
 
     // Send progress update
     sendResponse(requestId, {
@@ -260,7 +262,7 @@ async function handleQuery(queryText, requestId) {
 
   try {
     // Get current page content and answer the query
-    const { getActiveTabId, getTabContext } = await import('./tab-context.js');
+    const getActiveTabId = _wsGetActiveTabId, getTabContext = _wsGetTabContext;
     const tabId = getActiveTabId();
     const ctx = tabId ? getTabContext(tabId) : null;
 
@@ -288,7 +290,7 @@ async function handleQuery(queryText, requestId) {
 
 async function handleCancel(requestId) {
   try {
-    const { stopAgent } = await import('./agent-engine.js');
+    const stopAgent = _wsStopAgent;
     stopAgent();
     sendResponse(requestId, {
       type: 'result',
@@ -318,8 +320,8 @@ function sendStatus() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
   // Get agent state asynchronously
-  import('./agent-engine.js').then(({ agentRunning }) => {
-    return import('./tab-context.js').then(({ getActiveTabId, getTabContext }) => {
+  Promise.resolve({ agentRunning: _wsAgentRunning }).then(({ agentRunning }) => {
+    return Promise.resolve({ getActiveTabId: _wsGetActiveTabId, getTabContext: _wsGetTabContext }).then(({ getActiveTabId, getTabContext }) => {
       const tabId = getActiveTabId();
       const ctx = tabId ? getTabContext(tabId) : null;
 

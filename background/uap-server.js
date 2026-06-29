@@ -9,6 +9,7 @@
  */
 
 import { getErrorMessage } from './error-utils.js';
+import {executeGoal as _uapExecuteGoal} from './agent-engine.js';
 // (v21.5.1) Native UUID v4 — replaces bare 'uuid' module (Chrome MV3 compatible)
 const uuidv4 = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }));
 
@@ -233,7 +234,7 @@ class UAPServer {
       if (!run) return;
 
       // Import agent engine dynamically
-      const { executeGoal } = await import('./agent-engine.js');
+      const executeGoal = _uapExecuteGoal;
 
       // Setup streaming callback
       const onStep = (stepData) => {
