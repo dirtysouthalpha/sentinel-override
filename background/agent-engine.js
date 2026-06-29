@@ -1962,6 +1962,42 @@ async function runAgentLoop(goal, workingTabId) {
         await sleep(FIVE_HUNDRED_MS);
       }
 
+      // (v21.6.45) CERT WARNING DETECTION — Critical for SonicWall/firewall access
+      // Self-signed cert pages stop the agent cold. Detect and auto-bypass via CDP.
+      try {
+        const _certCheck = await cdpExecuteJs(tab, 'return { title: document.title || "", url: window.location.href || "", body: (document.body && document.body.innerText || "").substring(0, 500) };', { timeout: 3000 });
+        if (_certCheck && _certCheck.ok && _certCheck.value) {
+          const _pageTitle = String(_certCheck.value.title || '').toLowerCase();
+          const _pageBody = String(_certCheck.value.body || '').toLowerCase();
+          const _isCertError = _pageTitle.includes('privacy error') ||
+            _pageTitle.includes('not private') ||
+            _pageTitle.includes('not secure') ||
+            _pageTitle.includes('certificate') ||
+            _pageBody.includes('your connection is not private') ||
+            _pageBody.includes('net::err_cert') ||
+            _pageBody.includes(' attackers might be trying') ||
+            _pageBody.includes('this server could not prove');
+          if (_isCertError) {
+            sendSilentUpdate('SSL cert warning detected — auto-bypassing for firewall access...', stepCount);
+            try {
+              // Bypass cert errors via CDP Security domain
+              await chrome.debugger.sendCommand({ tabId: tab }, 'Security.setIgnoreCertificateErrors', { ignore: true });
+              // Re-navigate to the target URL
+              const _targetUrl = command.url || (goal && goal.match(/https?:\/\/[^\s]+/) || [])[0];
+              if (_targetUrl) {
+                await chrome.tabs.update(tab, { url: _targetUrl });
+                await waitForPageLoad(tab);
+                await sleep(1500);
+                await injectContentScript(tab);
+                sendSilentUpdate('SSL cert bypassed — page reloaded', stepCount);
+              }
+            } catch (_certBypassErr) {
+              console.warn('[Sentinel] Cert bypass failed:', getErrorMessage(_certBypassErr));
+            }
+          }
+        }
+      } catch (_certCheckErr) { /* cert detection failed — non-fatal */ }
+
       // Internal browser pages (chrome://, edge://, about:) cannot be scripted.
 	      const _tabUrl = tabInfo.url; // Cache to avoid repeated property access
       // EXCEPTION: chrome://newtab/ is a blank tab — the auto-navigate code below

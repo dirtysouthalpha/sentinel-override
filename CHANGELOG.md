@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [21.6.45] - 2026-06-28
+
+### Added
+- **SSL Cert Warning Auto-Bypass** — Critical for SonicWall/firewall MSP work. When agent detects cert error pages ("Privacy error", "not private", "NET::ERR_CERT"), it automatically bypasses via CDP `Security.setIgnoreCertificateErrors` and re-navigates. No more getting stuck on self-signed cert interstitials.
+
+### Fixed
+- Clipboard promise rejections — Added .catch() to all navigator.clipboard.writeText() calls in chat.js.
+
+
 ## [21.6.44] - 2026-06-28
 
 ### Fixed
