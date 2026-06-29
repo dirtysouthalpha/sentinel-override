@@ -1962,8 +1962,9 @@ async function runAgentLoop(goal, workingTabId) {
         await sleep(FIVE_HUNDRED_MS);
       }
 
-            // (v21.6.48) SPA EXTENDED WAIT
-      const _navUrl = (command.url || tabInfo.url || '').toLowerCase();
+      // (v21.6.49) SPA EXTENDED WAIT — only on navigate
+      if (command && command.type === 'navigate') {
+      const _navUrl = (command.url || currentUrl || '').toLowerCase();
       const _isSPAPortal = _navUrl.includes('microsoft.com') || _navUrl.includes('entra.') ||
         _navUrl.includes('admin.microsoft') || _navUrl.includes('portal.office');
       if (_isSPAPortal) {
@@ -1989,6 +1990,7 @@ async function runAgentLoop(goal, workingTabId) {
         }
       }
 
+      } // end SPA navigate guard
       // (v21.6.45) CERT WARNING DETECTION — Critical for SonicWall/firewall access
       // Self-signed cert pages stop the agent cold. Detect and auto-bypass via CDP.
       try {
