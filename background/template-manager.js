@@ -10,7 +10,7 @@ const STORAGE_KEY = 'sentinel_templates';
 const SEED_KEY = 'sentinel_builtins_seeded';
 
 // (v21.6) Built-in MSP workflow templates — seeded on first run.
-const BUILTIN_TEMPLATES = [
+export const BUILTIN_TEMPLATES = [
   {
     id: 'builtin-m365-user-audit',
     name: 'M365 User Audit',
