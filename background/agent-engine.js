@@ -6,6 +6,7 @@ import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames
 import {callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse} from './llm-client.js';
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
+import { isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTaskGoal, createOrchestratorState } from './agent-orchestrator.js';
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
 import {summarizeHistoryBatch, maybeRollupHistory, detectStall} from './agent-progress.js';
 import {getBrainStartupContext, resetBrainRunSignals} from './brain-client.js';
@@ -1233,6 +1234,8 @@ export async function startAgent(goal, sender) {
   goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
   _cursorHiderInjected = false;
+let _orchestratorState = null; // v21.6.53: Multi-task orchestrator state
+
 
   // Determine which tab to operate on
   let startTabId;
@@ -1395,7 +1398,7 @@ export async function startAgent(goal, sender) {
     }
   }
 
-  const finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
+  let finalGoal = await _applyAdaptivePrompts(goal, tabInfo, startTabId, runLogId, runLogBuffer);
 
   // (hardening 1B) Reset the one-warn-per-run signals so each run gets at most
   // one "brain unreachable" warning per path (read + write), not one per call.
@@ -1427,6 +1430,32 @@ export async function startAgent(goal, sender) {
 
   // Fire-and-forget but catch any unhandled rejection so agentRunning never stays
   // stuck at true if runAgentLoop crashes before its own cleanup runs.
+  // v21.6.53: Multi-task orchestration for complex goals
+  if (isComplexGoal(goal)) {
+    try {
+      sendSilentUpdate('Complex goal detected — decomposing into sub-tasks...', 0);
+      const { callLLMSimple } = await import('./llm-client.js');
+      const decompResponse = await callLLMSimple(
+        'You are a task decomposition engine. Break complex investigation goals into simple sequential sub-tasks.',
+        buildDecompositionPrompt(goal),
+        2000
+      );
+      const subtasks = parseDecomposition(decompResponse);
+      if (subtasks && subtasks.length >= 2) {
+        _orchestratorState = createOrchestratorState();
+        _orchestratorState.subtasks = subtasks;
+        _orchestratorState.originalGoal = goal;
+        _orchestratorState.active = true;
+        finalGoal = buildSubTaskGoal(subtasks[0], goal, 0, subtasks.length, []);
+        sendSilentUpdate(`Orchestrator: ${subtasks.length} sub-tasks planned. Starting task 1: ${subtasks[0].title}`, 0);
+        try { chrome.runtime.sendMessage({ action: 'orchestrator_started', totalSubtasks: subtasks.length, titles: subtasks.map(s => s.title) }).catch(() => {}); } catch (_) {}
+      }
+    } catch (_decompErr) {
+      console.warn('[Sentinel/Orchestrator] Decomposition failed, running as single task:', getErrorMessage(_decompErr));
+      _orchestratorState = null;
+    }
+  }
+
   runAgentLoop(finalGoal, startTabId).catch(err => {
     console.error('[Sentinel/Loop] runAgentLoop crashed unexpectedly:', err);
     console.error('[Sentinel/Loop] Stack:', err && err.stack ? err.stack : '[no stack]');
@@ -1763,8 +1792,7 @@ async function _extractFromIframes(tabId, topFrameText) {
         });
 
         if (result && result.result && result.result.text && result.result.text.length > 50) {
-          results.push(`--- Iframe: ${result.result.url} ---
-${result.result.text}`);
+          results.push(`--- Iframe: ${result.result.url} ---\n${result.result.text}`);
         }
       } catch (frameErr) {
         // Cross-origin frame access may fail silently
@@ -3812,11 +3840,110 @@ async function runAgentLoop(goal, workingTabId) {
           }
         } catch (_) { /* never let the guard itself crash the loop */ }
 
+        // v21.6.53: Multi-task orchestrator — check if more subtasks remain
+        if (_orchestratorState && _orchestratorState.active && _orchestratorState.currentIndex < _orchestratorState.subtasks.length - 1) {
+          // Save current subtask results
+          const _subtaskSummary = String(command.summary || '').substring(0, 2000);
+          const _memSnapshot = {};
+          for (const _k of Object.keys(agentMemory)) {
+            _memSnapshot[_k] = String(agentMemory[_k]).substring(0, 1000);
+          }
+          _orchestratorState.accumulatedResults.push({
+            title: _orchestratorState.subtasks[_orchestratorState.currentIndex].title,
+            summary: _subtaskSummary,
+            memory: _memSnapshot,
+            steps: stepCount,
+            apiCalls: apiCallCount
+          });
+          _orchestratorState.totalSteps += stepCount;
+          _orchestratorState.totalApiCalls += apiCallCount;
+
+          // Advance to next subtask
+          _orchestratorState.currentIndex++;
+          const _nextIdx = _orchestratorState.currentIndex;
+          const _nextTotal = _orchestratorState.subtasks.length;
+          const _nextSubtask = _orchestratorState.subtasks[_nextIdx];
+
+          sendSilentUpdate(`Orchestrator: Starting sub-task ${_nextIdx + 1}/${_nextTotal}: ${_nextSubtask.title}`, 0);
+          try {
+            chrome.runtime.sendMessage({
+              action: 'orchestrator_progress',
+              currentIndex: _nextIdx + 1,
+              totalSubtasks: _nextTotal,
+              title: _nextSubtask.title,
+              completedTitle: _orchestratorState.subtasks[_nextIdx - 1].title
+            }).catch(() => {});
+          } catch (_) {}
+
+          // Reset loop state for next subtask (keep agentMemory!)
+          goal = buildSubTaskGoal(_nextSubtask, _orchestratorState.originalGoal, _nextIdx, _nextTotal, _orchestratorState.accumulatedResults);
+          stepCount = 0;
+          history.length = 0;
+          consecutiveFailures = 0;
+          currentStrategies = [];
+          dynamicMaxSteps = Math.max(15, Math.floor(60 / _nextTotal) + 10);
+          sharedState.cachedObservation = null;
+          _cachedPageContent = null;
+          _lastObservedUrl = '';
+          _lastObservedDomHash = 0;
+          agentPlan = null;
+          currentPlanStep = 0;
+          _blockedCount = 0;
+          _totalLoopRecoveries = 0;
+          finished = false;
+          // DON'T set finished=true or break — let the while loop continue
+          sendAgentStatus('thinking', `Sub-task ${_nextIdx + 1}/${_nextTotal}: ${_nextSubtask.title}`);
+          await sleep(ONE_SECOND_MS);
+          continue;
+        }
+
         finished = true;
         consecutiveFailures = 0;
         sendSilentUpdate('Task complete', stepCount);
 
         let finalSummary = command.summary || '';
+
+        // v21.6.53: If orchestrator completed all subtasks, generate combined report
+        if (_orchestratorState && _orchestratorState.active) {
+          // Save the last subtask's results
+          _orchestratorState.accumulatedResults.push({
+            title: _orchestratorState.subtasks[_orchestratorState.currentIndex].title,
+            summary: String(command.summary || '').substring(0, 2000),
+            steps: stepCount,
+            apiCalls: apiCallCount
+          });
+          _orchestratorState.totalSteps += stepCount;
+          _orchestratorState.totalApiCalls += apiCallCount;
+
+          // Build combined report
+          const _combinedReport = _orchestratorState.accumulatedResults.map((r, i) =>
+            `## ${i + 1}. ${r.title}\n${r.summary}`
+          ).join('\n\n---\n\n');
+
+          finalSummary = `# Multi-Task Investigation Report\n\nCompleted ${_orchestratorState.accumulatedResults.length} of ${_orchestratorState.subtasks.length} sub-tasks.\n\n---\n\n${_combinedReport}`;
+
+
+
+          // Inject combined results into agentMemory for report generation
+          agentMemory['orchestrator_combined_report'] = finalSummary;
+
+          stepCount = _orchestratorState.totalSteps;
+          apiCallCount = _orchestratorState.totalApiCalls;
+
+          try {
+            chrome.runtime.sendMessage({
+              action: 'orchestrator_complete',
+              totalSubtasks: _orchestratorState.subtasks.length,
+              completedSubtasks: _orchestratorState.accumulatedResults.length,
+              totalSteps: stepCount,
+              totalApiCalls: apiCallCount
+            }).catch(() => {});
+          } catch (_) {}
+
+          // Reset orchestrator state
+          _orchestratorState = null;
+        }
+
 
         // Clean up memory — filter out failed/timed-out/empty entries
         const cleanMemory = {};
