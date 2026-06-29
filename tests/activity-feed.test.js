@@ -249,11 +249,13 @@ describe('activity-feed.js', () => {
       const ctx = createFeedContext();
       ctx.initActivityFeed();
       const feed = ctx.document.getElementById('activity-feed');
-      expect(feed.classList.contains('collapsed')).toBe(false);
-      ctx.toggleFeedCollapse();
+      // v21.6.25+: Feed starts collapsed by default (decluttered UI)
+      feed.classList.add('collapsed');
       expect(feed.classList.contains('collapsed')).toBe(true);
       ctx.toggleFeedCollapse();
       expect(feed.classList.contains('collapsed')).toBe(false);
+      ctx.toggleFeedCollapse();
+      expect(feed.classList.contains('collapsed')).toBe(true);
     });
   });
 

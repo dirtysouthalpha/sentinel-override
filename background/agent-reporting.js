@@ -208,7 +208,7 @@ async function saveLearnedPattern(goal, history, success) {
     });
     const maxPatterns = REPORTING_CONFIG.maxLearnedPatterns;
     if (patterns.length > maxPatterns) patterns.splice(0, patterns.length - maxPatterns);
-    await chrome.storage.local.set({ learned_patterns: patterns });
+    try { await chrome.storage.local.set({ learned_patterns: patterns }); } catch (_) { /* storage quota — non-fatal */ }
   } catch (e) { console.warn('Failed to save pattern:', getErrorMessage(e)); }
 }
 

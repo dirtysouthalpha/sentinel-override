@@ -1,5 +1,19 @@
 # Changelog
 
+
+## [21.6.44] - 2026-06-28
+
+### Fixed
+- **Critical: execute_js auto-finish report loss** — Auto-finish block referenced undefined `_va` variable and never called `captureReportData()`, causing reports to be lost when duplicate detection triggered. Now properly captures report data before finishing.
+- **Circuit breaker modernization** — Replaced `var` declarations with `const` in circuit breaker force-finish block.
+- **5 unguarded chrome.* API calls** — Wrapped `chrome.storage.local.set`, `chrome.tabs.create`, and `chrome.tabs.group` calls in try/catch to prevent silent service worker crashes.
+- **Activity feed test** — Updated test to match v21.6.25+ collapsed-by-default UI behavior.
+
+### Changed
+- Side panel tab scoping: Manual toggle with proper `userPanelTabId` tracking.
+- `openPanelOnActionClick: false` so `action.onClicked` fires correctly.
+- Added `Ctrl+Shift+S` keyboard shortcut to toggle/reopen side panel.
+
 ## v21.6.1 — Overnight Audit Fixes (9 Bugs Fixed)
 
 Critical audit caught 9 bugs in v21.6.0 that would have caused silent failures. All fixed.

@@ -2777,11 +2777,11 @@ async function runAgentLoop(goal, workingTabId) {
       if (_cbResult && _cbResult.severity !== 'none') {
         // v21.6.38: Force-finish on identical action loops — don't just warn
         if (_cbResult.severity === 'critical' || (_cbResult.reason && _cbResult.reason.includes('IDENTICAL ACTION LOOP'))) {
-          var _cbLoopCount = (_cbResult.reason || '').match(/repeated (\d+) times/);
+          const _cbLoopCount = (_cbResult.reason || '').match(/repeated (\d+) times/);
           if (_cbLoopCount && parseInt(_cbLoopCount[1]) >= 5) {
-            var _cbMemKeys = Object.keys(agentMemory || {});
-            var _cbSummary = _cbMemKeys.length > 0 ? _cbMemKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data extracted';
-            var _forceResult = `FORCE-FINISH (CIRCUIT BREAKER): Agent stuck in identical action loop (${_cbLoopCount[1]} repetitions). Finishing with available data: ${_cbSummary}`;
+            const _cbMemKeys = Object.keys(agentMemory || {});
+            const _cbSummary = _cbMemKeys.length > 0 ? _cbMemKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data extracted';
+            const _forceResult = `FORCE-FINISH (CIRCUIT BREAKER): Agent stuck in identical action loop (${_cbLoopCount[1]} repetitions). Finishing with available data: ${_cbSummary}`;
             historyPush({ step: stepCount, action: { type: 'circuit_breaker_stop' }, result: _forceResult });
             await persistHistory();
             sendActionResult(stepCount, _forceResult, false);
@@ -4893,16 +4893,24 @@ async function runAgentLoop(goal, workingTabId) {
                   break;
                 }
                 result = `DUPLICATE: Same JS result as recent step. Data is already in memory under "${savedKey}". Call done() now.`;
-          // v21.6.35: Auto-finish after 1 duplicate if we have real data — GLM never calls done() on its own
-          if (Object.keys(agentMemory).length > 0 && savedKey in agentMemory) {
-            var _memSize = typeof agentMemory[savedKey] === 'string' ? agentMemory[savedKey].length : JSON.stringify(agentMemory[savedKey]).length;
-            if (_memSize > 100) {
-              result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
-              finished = true;
-              var _finalSummary = String(_va && _va.text ? _va.text : 'Task completed with extracted data.');
-              break;
-            }
-          }
+                // v21.6.44: Auto-finish after 1 duplicate if we have real data
+                // GLM never calls done() on its own — this saves 2-3 wasted steps
+                if (Object.keys(agentMemory).length > 0 && savedKey in agentMemory) {
+                  const _memSize = typeof agentMemory[savedKey] === 'string' ? agentMemory[savedKey].length : JSON.stringify(agentMemory[savedKey]).length;
+                  if (_memSize > 100) {
+                    const _memKeys = Object.keys(agentMemory || {});
+                    const _memSummary = _memKeys.length > 0 ? _memKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data';
+                    result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
+                    historyPush({ step: stepCount, action: command, result });
+                    await persistHistory();
+                    sendActionResult(stepCount, result, false);
+                    reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
+                    chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task completed. Data collected: ${_memSummary}` }).catch(() => {});
+                    sendReportUpdate('generating');
+                    finished = true;
+                    break;
+                  }
+                }
                 historyPush({ step: stepCount, action: command, result });
                 await persistHistory();
                 sendActionResult(stepCount, result, false);

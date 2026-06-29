@@ -643,7 +643,7 @@ async function _getOrCreateTab() {
     });
   });
   if (tabs?.[0]?.id && typeof tabs[0].id === 'number') return tabs[0].id;
-  const newTab = await chrome.tabs.create({ url: 'about:blank' });
+  let newTab; try { newTab = await chrome.tabs.create({ url: 'about:blank' }); } catch (_) { return; /* tab creation failed */ }
   await new Promise(resolve => setTimeout(resolve, FIVE_HUNDRED_MS));
   if (newTab && newTab.id) return newTab.id;
   throw new Error('Failed to create tab');

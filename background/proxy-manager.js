@@ -35,7 +35,7 @@ export async function setClientProxy(clientId, proxyConfig) {
     });
     _activeProxyConfig = { clientId, ...proxyConfig, setAt: Date.now() };
     // Persist the config
-    await chrome.storage.local.set({ [`proxy_${clientId}`]: _activeProxyConfig });
+    try { await chrome.storage.local.set({ [`proxy_${clientId}`]: _activeProxyConfig }); } catch (_) { /* storage quota — non-fatal */ }
     return { ok: true, message: `Proxy set to ${proxyConfig.host}:${port} for ${clientId}` };
   } catch (e) {
     return { ok: false, error: e.message || String(e) };

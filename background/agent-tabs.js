@@ -35,7 +35,7 @@ export async function attachTabToSentinelGroup(tabId) {
   try {
     if (agentTabGroupId === null) {
       // No group yet — create one containing just this tab.
-      const groupId = await chrome.tabs.group({ tabIds: [tabId] });
+      let groupId; try { groupId = await chrome.tabs.group({ tabIds: [tabId] }); } catch (_) { return null; /* tab grouping failed */ }
       agentTabGroupId = groupId;
       try {
         await chrome.tabGroups.update(groupId, {
