@@ -65,6 +65,50 @@ const BUILTIN_TEMPLATES = [
     params: [{ key: 'topic', label: 'Research Topic', defaultValue: '' }],
     createdAt: 1719200000000,
     updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-sonicwall-rules',
+    name: 'SonicWall Access Rule Audit',
+    description: 'Review firewall access rules on a SonicWall appliance',
+    tags: ['sonicwall', 'firewall', 'audit', 'security'],
+    builtin: true,
+    goal: 'Go to ::firewall_url:: and log in. Navigate to Manage > Rules > Access Rules. List the first 10 access rules with their name, source zone, destination zone, service, and action (allow/deny). Flag any rules that allow ANY source or ANY service.',
+    params: [{ key: 'firewall_url', label: 'Firewall URL', defaultValue: 'https://192.168.168.168' }],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-exchange-mailtrace',
+    name: 'Exchange Mail Trace',
+    description: 'Trace email delivery for a specific sender or recipient',
+    tags: ['exchange', 'mail', 'trace', 'm365'],
+    builtin: true,
+    goal: 'Go to admin.exchange.com, navigate to Mail Flow > Message Trace. Run a trace for sender ::email:: for the last 24 hours. List all messages with their delivery status, subject, recipient, and timestamp. Flag any messages that were rejected or deferred.',
+    params: [{ key: 'email', label: 'Email Address', defaultValue: '' }],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-entra-signin',
+    name: 'Entra ID Sign-In Audit',
+    description: 'Review sign-in logs for suspicious activity in Entra ID (Azure AD)',
+    tags: ['entra', 'azure', 'audit', 'security', 'signin'],
+    builtin: true,
+    goal: 'Go to entra.microsoft.com, navigate to Identity > Monitoring & health > Sign-in logs. Review the last 24 hours of sign-ins. List any failed sign-ins with their user, IP address, location, and failure reason. Flag any sign-ins from unusual locations or repeated failures from the same IP.',
+    params: [],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
+  },
+  {
+    id: 'builtin-cisa-kev',
+    name: 'CISA KEV Vulnerability Check',
+    description: 'Check CISA Known Exploited Vulnerabilities catalog for recent entries',
+    tags: ['cisa', 'vulnerability', 'security', 'compliance'],
+    builtin: true,
+    goal: 'Go to https://www.cisa.gov/known-exploited-vulnerabilities-catalog and list the 5 most recently added vulnerabilities with their vendor, product, vulnerability name, CVE ID, date added, and a short description of the exploit. Note any that affect systems in our environment.',
+    params: [],
+    createdAt: 1719200000000,
+    updatedAt: 1719200000000
   }
 ];
 
