@@ -1,6 +1,6 @@
 {
   "name": "sentinel-override",
-  "version": "21.6.54",
+  "version": "21.6.55",
   "private": true,
   "type": "module",
   "scripts": {
