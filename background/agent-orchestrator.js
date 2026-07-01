@@ -13,7 +13,7 @@ export function isComplexGoal(goal) {
   const trimmed = goal.trim();
 
   // Must be reasonably long
-  if (trimmed.length < 300) return false;
+  if (trimmed.length < 200) return false;
 
   // Check for numbered sections (1. 2. 3. etc.)
   const numberedSections = trimmed.match(/\n\s*\d+[.)]\s+[A-Z]/g);

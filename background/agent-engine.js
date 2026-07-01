@@ -5266,7 +5266,26 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
                   if (_memSize > 500) {
                     const _memKeys = Object.keys(agentMemory || {});
                     const _memSummary = _memKeys.length > 0 ? _memKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data';
-                    result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
+                    // v21.6.56: Analysis-aware auto-finish
+          // If the goal requires analysis (count, compare, find, filter), don't just dump raw data.
+          // Instead, inject a directive telling the model to process the data and answer the questions.
+          const _analysisKeywords = /(count|compare|find\s+(?:the\s+)?(?:newest|oldest|latest)|filter|analy[sz]e|how many|summarize|report\s+findings)/i;
+          const _needsAnalysis = _analysisKeywords.test(goal || '');
+          if (_needsAnalysis && _memSize > 500) {
+            // Don't force-finish — instead tell the model to process and call done()
+            loopDirective = `
+⚡ DATA READY — You have ${_memSize} chars of data in memory under "${savedKey}". 
+STOP extracting. You MUST now call done() with a summary that directly ANSWERS every question in the original goal. 
+Use the data you already extracted — do NOT run execute_js again. Call done() NOW.`;
+            result = `DATA READY: You have ${_memSize} chars. Process the data to answer the goal questions, then call done().`;
+            historyPush({ step: stepCount, action: command, result });
+            await persistHistory();
+            sendActionResult(stepCount, result, false);
+            sendSilentUpdate('[ENGINE] Analysis task detected — instructing model to process data and finish', stepCount);
+            await sleep(FIVE_HUNDRED_MS);
+            continue; // Give the model one more step to process + finish
+          }
+          result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
                     historyPush({ step: stepCount, action: command, result });
                     await persistHistory();
                     sendActionResult(stepCount, result, false);
