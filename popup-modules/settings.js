@@ -1327,8 +1327,28 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
     }
     setTimeout(refreshTextProvider, 800);
 
+    // Load saved text provider key into the input
+    const textKeyInput = document.getElementById('text-provider-key');
+    chrome.storage.local.get(['text_provider'], (result) => {
+      if (result.text_provider && result.text_provider.apiKey) {
+        if (textKeyInput) textKeyInput.value = result.text_provider.apiKey;
+      }
+    });
+
+    // Save API key on blur
+    if (textKeyInput) {
+      textKeyInput.addEventListener('blur', async () => {
+        const saved = await chrome.storage.local.get(['text_provider']);
+        if (saved.text_provider) {
+          saved.text_provider.apiKey = textKeyInput.value || '';
+          await chrome.storage.local.set({ text_provider: saved.text_provider });
+        }
+      });
+    }
+
     textSel.addEventListener('change', async () => {
       const selectedId = textSel.value;
+      const keyVal = textKeyInput ? (textKeyInput.value || '') : '';
       if (!selectedId) {
         await chrome.storage.local.remove(['text_provider']);
         return;
@@ -1341,7 +1361,7 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
         id: entry.id,
         endpoint: entry.endpoint,
         model: entry.defaultModel || entry.model || '',
-        apiKey: (entry.id === state.activeProviderId) ? (visionConfig.api_key || '') : ''
+        apiKey: keyVal || (entry.id === state.activeProviderId ? (visionConfig.api_key || '') : '')
       };
       await chrome.storage.local.set({ text_provider: textConfig });
     });

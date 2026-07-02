@@ -364,11 +364,15 @@
           </div>
 
                   <!-- Dual Provider: Text fallback provider (fires in parallel) -->
-        <div class="modal-field" style="margin-top:10px;padding:8px;background:rgba(255,107,0,0.05);border-radius:6px;">
-          <label style="font-size:11px;color:var(--text-secondary);">⚡ Text Provider (Parallel Fallback — optional)</label>
-          <select id="textProviderSelect" class="form-input" style="margin-top:4px;font-size:11px;">
+        <div class="modal-field" style="margin-top:10px;padding:10px;background:rgba(255,107,0,0.05);border-radius:6px;border:1px solid rgba(255,107,0,0.15);">
+          <label style="font-size:12px;font-weight:600;color:var(--accent-primary);">⚡ Text Provider (Parallel Dual-Provider)</label>
+          <select id="textProviderSelect" class="form-input" style="margin-top:6px;font-size:12px;">
             <option value="">— Same as Vision (default) —</option>
           </select>
+          <div class="modal-field" style="margin-top:6px;">
+            <label style="font-size:11px;color:var(--text-secondary);">Text Provider API Key</label>
+            <input type="password" id="text-provider-key" placeholder="API key for text provider" class="form-input" style="font-size:12px;">
+          </div>
         </div>
 
         <!-- Detect models row -->
