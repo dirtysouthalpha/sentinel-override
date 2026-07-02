@@ -3585,9 +3585,13 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
               if (_va.type === 'click_at') _va.type = 'click';
               switch (_va.type) {
                 case 'click':
-                  command = _validIdx
-                    ? { type: 'click_at', _visionIndex: _validIdx, _visionAction: true }
-                    : { type: 'note', text: `SYSTEM: click needs a valid [index]. ${_badIndexHint(_rawIdx)} Then emit {"action":{"type":"click","index":N}}.`, _visionAction: true };
+                  if (_validIdx) {
+                    command = { type: 'click_at', _visionIndex: _validIdx, _visionAction: true };
+                  } else {
+                    // v21.6.74: No valid index — auto-extract page content instead of looping
+                    command = { type: 'execute_js', code: 'return document.body.innerText.substring(0, 16000)', key: 'page_content', _visionAction: true, approvalGranted: true };
+                    console.info('[Sentinel/v4] Click with no valid index → auto-extracting page content');
+                  }
                   break;
                 case 'input':
                   command = _validIdx
