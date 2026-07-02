@@ -1458,7 +1458,7 @@ function resetUI() {
   const _pauseBtn = document.getElementById('pauseBtn');
   const _undoBtn = document.getElementById('undoBtn');
   const _goalInput = document.getElementById('goalInput');
-  
+
   if (_sendBtn) _sendBtn.disabled = false;
   // STOP BUTTON ALWAYS ENABLED — removed disabled class
   if (_pauseBtn) { _pauseBtn.classList.add('btn-ctrl-disabled'); _pauseBtn.dataset.paused = 'false'; }
@@ -2576,7 +2576,7 @@ copyReportTextBtn && copyReportTextBtn.addEventListener('click', () => {
 });
 
 // ========== MFA Pause Banner (3.7.0) ==========
- 
+
 function showMfaBanner(url, hint, _stepNumber) {
   // Remove any existing MFA banner first so we don't stack them.
   const existing = document.getElementById('mfa-banner');
@@ -2634,7 +2634,7 @@ function showMfaBanner(url, hint, _stepNumber) {
 // Surfaced when the agent hits a login page on a known auth host and can't
 // auto-fill credentials. User signs in manually in the affected tab, then
 // clicks Resume. Re-uses the existing pause/resume_agent_loop infra.
- 
+
 function showSignInWallBanner(url, host, evidence, _stepNumber) {
   const existing = document.getElementById('sign-in-wall-banner');
   if (existing) existing.remove();
@@ -2866,7 +2866,7 @@ function clearActivityState() {
 // Surfaced when the goal text contains a "Mode: APPROVAL" / "Mode: AUTONOMOUS"
 // directive that disagrees with the current Approval Mode setting. Prevents
 // the user-wrote-APPROVAL-but-toggle-was-AUTONOMOUS disaster on live changes.
- 
+
 function showModeMismatchCard(payload) {
   if (!payload) return;
   const existing = document.getElementById('mode-mismatch-card');
@@ -2965,7 +2965,7 @@ function showModeMismatchCard(payload) {
 // by default and informational only. In 'approval' mode the card has three
 // buttons (Use Adapted / Use Original / Edit) and the agent is paused until
 // the user decides.
- 
+
 function showAdaptedGoalCard(payload) {
   if (!payload) return;
   // Remove any prior card so we don't stack on repeated agent starts
@@ -3111,7 +3111,7 @@ function showAdaptedGoalCard(payload) {
 }
 
 // ========== Download Capture (3.9.0) ==========
- 
+
 function showDownloadCaptured(dl) {
   if (!dl) return;
   const filename = (dl.filename || '').split(/[\\/]/).pop() || 'file';
@@ -3137,7 +3137,7 @@ function showDownloadCaptured(dl) {
 
 // ========== Run Log Export (3.9.0) ==========
 let __lastRunLogId = null;
- 
+
 function showRunLogExportButton(runLogId, entryCount) {
   __lastRunLogId = runLogId;
   // Remove any prior export banner
@@ -3576,7 +3576,6 @@ async function toggleSourceChipExpansion(chip) {
 // a Microsoft admin URL whose tenant doesn't match the user's expectedTenant.
 // Career-risk gate: forces an explicit "yes, intentional cross-tenant work"
 // click before dispatching. Forensic log captures the timestamped decision.
-
 
 
 // ========== Paste Ticket Modal ==========

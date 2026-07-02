@@ -3,7 +3,7 @@ import {buildSmartUrl, buildGoogleFallbackUrl, buildBudgetHint, compareHostnames
 // Agent loop, planning, self-healing, state management.
 // Imports from llm-client.js, tab-manager.js, message-protocol.js.
 
-import {callLLMWithRetry, generatePlan as _generatePlan, getPlatformContext as _getPlatformContext, getRelevantPatterns as _getRelevantPatterns, selectModelForStep as _selectModelForStep, getCostTracker as _getCostTracker, parseVisionResponse} from './llm-client.js';
+import {callLLMWithRetry, parseVisionResponse} from "./llm-client.js";
 import {getPlatformProfile} from './platforms/index.js';
 import {isTicketInvestigationGoal, getTechnicianInfo, extractTicketNumber, formatTicketFinalNotes, formatTicketKickoff, formatWaitingOnClient, formatWaitingOnVendor, formatItGlueKb, formatClientEmail, formatTicketOutput, _autoPickFormat} from './agent-ticket-format.js';
 import { diagnoseFailure, buildDiagnosticMessage, saveDomainStrategy, getDomainStrategy, extractWinningStrategy, getDomainFromUrl } from './agent-adaptive.js';
@@ -14,7 +14,7 @@ import {getBrainStartupContext, resetBrainRunSignals} from './brain-client.js';
 import { detectPageType, getPageStrategyHint } from './agent-page-type.js';
 import {publishRunLearning, resetBrainProducerRunSignals} from './brain-producer.js';
 import {waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests} from './tab-manager.js';
-import {CONFIG, MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
+import {CONFIG, MAX_PAGE_TEXT_LENGTH, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from "./constants.js";
 import {captureNetworkSnapshot, shouldReportNetwork} from './agent-network.js';
 import {startParallelAgent, stopAgent as stopPoolAgent} from './agent-pool.js';
 
@@ -548,9 +548,9 @@ import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
 import {generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP} from './agent-planning.js';
 import {appendAuditEntry, getAuditLog, auditLogToCsv} from './audit-log.js';
 import {runRecoverySkills, getSkillStats} from './skills/index.js';
-import {tel, startRun as telStartRun, endRun as telEndRun} from './telemetry.js';
+import {tel} from "./telemetry.js";
 // (Phase 6) UAP bridge — broadcasts agent lifecycle events to external UAP server
-import {broadcast as uapBroadcast, setRunId as uapSetRunId} from './uap-bridge.js';
+import {broadcast as uapBroadcast} from "./uap-bridge.js";
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side
 // effects, no chrome.* deps. We aggregate the run's metrics here at the end
 // of the loop and stamp the result onto both the report card and the
@@ -558,7 +558,7 @@ import {broadcast as uapBroadcast, setRunId as uapSetRunId} from './uap-bridge.j
 import {computeTrustScore, suggestRetryActions} from './trust-score.js';
 // v10.0 Intelligence Systems Integration
 import {captureReasoningStep, getReasoningSummary} from './reasoning-trace.js';
-import {analyzeForBias as _analyzeForBias, analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics} from './bias-detector.js';
+import {analyzeActionForBias, shouldTriggerBiasWarning, logBiasDetection, getBiasStatistics} from "./bias-detector.js";
 import {addKnowledgeNode, persistKnowledgeGraph} from './knowledge-graph.js';
 import {analyzeForContradictions, logContradictionDetection, getContradictionStatistics} from './contradiction-detector.js';
 import {analyzeForNovelty, storeNoveltyResult, getNoveltyStatistics} from './novelty-detector.js';
@@ -1784,7 +1784,7 @@ export async function fetchAuditLog(id) {
 export { auditLogToCsv };
 
 // ========== Configuration Verification Gate — extracted to agent-config-gate.js ==========
-import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, _URL_ANY_RE, _BARE_SITE_RE, _SEARCH_LONG_RE, _ABOUT_RE, _COUNT_RE, ARTICLE_RE, ARTICLE_KEY_RE, isConfigChangeGoal, hasRecentCommitClick, hasPostCommitVerification, MODIFYING_ACTIONS, NON_PRODUCTIVE_READ_ACTIONS, REF_DRIVEN_ACTIONS, TARGETABLE_ACTIONS, LOOP_EXCLUDE_TYPES, DATA_ACTIONS, TAB_ACTIONS, INTERACTIVE_ACTIONS, CDP_FALLBACK_BLOCKED, EXTRACT_ACTIONS, MEMORY_WRITING_ACTIONS, MODIFYING_INTERACTIVE_ACTIONS, OTHER_ACTIONS, _hostnameOf, } from './agent-config-gate.js';
+import {MULTI_PORTAL_RE, MODE_TIER1_RE, MODE_TIER2_RE, ARTICLE_RE, ARTICLE_KEY_RE, isConfigChangeGoal, hasRecentCommitClick, hasPostCommitVerification, MODIFYING_ACTIONS, NON_PRODUCTIVE_READ_ACTIONS, REF_DRIVEN_ACTIONS, TARGETABLE_ACTIONS, LOOP_EXCLUDE_TYPES, DATA_ACTIONS, TAB_ACTIONS, INTERACTIVE_ACTIONS, CDP_FALLBACK_BLOCKED, EXTRACT_ACTIONS, MEMORY_WRITING_ACTIONS, MODIFYING_INTERACTIVE_ACTIONS, OTHER_ACTIONS, _hostnameOf, } from "./agent-config-gate.js";
 
 // ========== Run Setup Helpers — extracted to agent-run-setup.js ==========
 import {_initRunState, _buildPageNarration, narratePageState} from './agent-run-setup.js';

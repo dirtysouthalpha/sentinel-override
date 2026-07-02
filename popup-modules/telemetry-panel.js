@@ -594,7 +594,7 @@ async function _exportRunHistory() {
       a.download = `sentinel-run-history-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      console.log('[Sentinel/Telem] Exported ' + resp.data.totalRuns + ' runs');
+      console.debug('[Sentinel/Telem] Exported ' + resp.data.totalRuns + ' runs');
     } else {
       console.warn('[Sentinel/Telem] Export failed: ' + (resp?.error || 'unknown'));
     }

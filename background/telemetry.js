@@ -414,8 +414,6 @@ export function emit(category, level, message, payload) {
     if (payload) consoleArgs.push(payload);
     if (level === 'error') console.error.apply(console, consoleArgs);
     else if (level === 'warn') console.warn.apply(console, consoleArgs);
-    else if (level === 'debug' || level === 'trace') console.debug.apply(console, consoleArgs);
-    else console.log.apply(console, consoleArgs);
   } catch (_e) { /* console unavailable in some contexts */ }
   try {
     chrome.runtime.sendMessage(event).catch(() => {

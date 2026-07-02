@@ -150,7 +150,7 @@ if (window.__sentinelInitialized) {
   // injected inline into the <script> tag so it runs in the page's MAIN world
   // alongside the user code — no cross-scope reference issues.
   // Defence-in-depth: approval gate + static regex guard still active.
-   
+
   const _EXECUTE_JS_SANDBOX_ENABLED = true;
   const _EXECUTE_JS_MAX_TIMEOUT_MS = 30000; // Maximum timeout for execute_js commands (30 seconds)
   const _PRIV_RE = /\bdocument\.cookie\b|\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\beval\s*\(|\bFunction\s*\(|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bnavigator\.sendBeacon\b/;
@@ -1126,7 +1126,7 @@ if (window.__sentinelInitialized) {
 
   // ========== execute_js Sandbox Helpers ==========
   // API allowlist for execute_js sandboxing
-   
+
   const _EXECUTE_JS_ALLOWED_GLOBALS = new Set([
     'querySelector', 'querySelectorAll', 'getElementById', 'getElementsByClassName',
     'getElementsByTagName', 'getElementsByName',
@@ -1181,7 +1181,7 @@ if (window.__sentinelInitialized) {
   // Creates a Proxy wrapping the document that blocks sensitive properties
   // but allows all normal DOM read/write operations.
   // sandboxedWin is the already-proxied window, returned when code accesses document.defaultView.
-   
+
   function _createSandboxedDocument(doc, sandboxedWin) {
     return new Proxy(doc, {
       get(target, prop, _receiver) {
@@ -1218,7 +1218,7 @@ if (window.__sentinelInitialized) {
 
   // Creates a Proxy wrapping the window that blocks dangerous APIs
   // while allowing safe properties (console, Math, setTimeout, etc.) through.
-   
+
   function _createSandboxedWindow(win) {
     return new Proxy(win, {
       get(target, prop, _receiver) {

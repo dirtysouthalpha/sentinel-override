@@ -70,7 +70,6 @@ class UAPServer {
       // Setup periodic cleanup
       this.setupCleanup();
 
-      console.debug('[UAP] Server initialized on port', this.config.port);
     } catch (error) {
       console.error('[UAP] Initialization failed:', error);
       throw error;
@@ -119,7 +118,6 @@ class UAPServer {
     // For this implementation, we'll use a message-based protocol
     // that simulates WebSocket behavior over chrome.runtime
     
-    console.debug('[UAP] Message-based server started');
     
     // Listen for UAP messages from content scripts or external apps
     chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
