@@ -83,6 +83,7 @@ export function fingerprintCommand(cmd) {
 export function checkCircuitBreaker(history, stepCount, dynamicMaxSteps) {
   const result = {
     shouldBreak: false,
+    tripped: false,
     shouldHardStop: false,
     reason: '',
     directive: '',
@@ -128,6 +129,7 @@ export function checkCircuitBreaker(history, stepCount, dynamicMaxSteps) {
 
   if (consecutiveIdentical >= MAX_IDENTICAL_ACTIONS) {
     result.shouldBreak = true;
+    result.tripped = true;
     result.reason = `IDENTICAL ACTION LOOP: "${lastFp}" repeated ${consecutiveIdentical} times. Agent is stuck.`;
     result.directive = `\n🔴 CIRCUIT BREAKER: You have attempted the exact same action (${lastFp}) ${consecutiveIdentical} times in a row with no progress. This action is NOT working. You MUST:\n1. Choose a COMPLETELY DIFFERENT approach (different selector, different action type, or execute_js).\n2. If you are stuck on a login/auth page, call finish() and report the blocker.\n3. Do NOT repeat the same action again.\n`;
     result.severity = 'critical';
@@ -145,6 +147,7 @@ export function checkCircuitBreaker(history, stepCount, dynamicMaxSteps) {
     if (maxClickRepeat >= MAX_SAME_TARGET_CLICKS) {
       const stuckTarget = Object.entries(clickCounts).find(([_, c]) => c === maxClickRepeat)[0];
       result.shouldBreak = true;
+    result.tripped = true;
       result.reason = `REPEATED TARGET: ${stuckTarget} clicked ${maxClickRepeat} times in last ${SIMILARITY_WINDOW} steps.`;
       result.directive = `\n🔴 CIRCUIT BREAKER: You have clicked the same element (${stuckTarget}) ${maxClickRepeat} times. This element is not responding to clicks. You MUST:\n1. Use execute_js to trigger the action programmatically (element.click() or dispatchEvent).\n2. Try scrolling to reveal a different control, or navigate to a different page section.\n3. If this is a login/auth wall, call finish() and report that manual authentication is required.\n4. Do NOT click this element again.\n`;
       result.severity = 'critical';
@@ -165,6 +168,7 @@ export function checkCircuitBreaker(history, stepCount, dynamicMaxSteps) {
   );
   if (recentWindow.length >= 6 && failures.length >= recentWindow.length * 0.7) {
     result.shouldBreak = true;
+    result.tripped = true;
     result.reason = `HIGH FAILURE RATE: ${failures.length}/${recentWindow.length} recent steps failed (${Math.round(failures.length / recentWindow.length * 100)}%).`;
     result.directive = `\n⚠️ CIRCUIT BREAKER: ${failures.length} of your last ${recentWindow.length} actions failed. Your current strategy is not working. Step back and reconsider:\n1. Is the page fully loaded? Try wait + re-observe.\n2. Are you on the right page? Check the URL.\n3. Are your selectors correct? Re-read the element list.\n4. If nothing works, call finish() with a summary of what you attempted and where you're blocked.\n`;
     result.severity = 'warning';

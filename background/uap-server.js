@@ -306,6 +306,10 @@ class UAPServer {
     }
   }
 
+  async executeGoal(runId, goal, context, webhook) {
+    return this.startAgent(runId, goal, context, webhook);
+  }
+
   /**
    * Broadcast step update to client
    */

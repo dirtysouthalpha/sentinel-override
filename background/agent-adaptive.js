@@ -45,6 +45,7 @@ const DIAGNOSIS_STRATEGIES = [
 ];
 
 export function diagnoseFailure(actionType, errorMessage, pageUrl, stepCount) {
+  if (!actionType && !errorMessage) return null;
   const msg = String(errorMessage || '').toLowerCase();
   const url = String(pageUrl || '').toLowerCase();
 
@@ -188,9 +189,10 @@ export function extractWinningStrategy(domain, history, agentMemory, stepCount) 
 }
 
 export function getDomainFromUrl(url) {
+  if (!url) return 'unknown';
   try {
     return new URL(url).hostname;
   } catch (_) {
-    return '';
+    return 'unknown';
   }
 }

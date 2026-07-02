@@ -42,8 +42,8 @@ export const ONE_HOUR_MS = 3600000; // 1 hour
 export const ONE_DAY_MS = 86400000; // 24 hours
 
 // Page content limits
-export const MAX_PAGE_TEXT_LENGTH = 6000; // Maximum characters to extract from page text
-export const TEXT_SAMPLE_LENGTH = 3000; // Maximum characters for text samples
+export const MAX_PAGE_TEXT_LENGTH = 8000; // Maximum characters to extract from page text
+export const TEXT_SAMPLE_LENGTH = 5000; // Maximum characters for text samples
 
 // Report and log limits
 export const MAX_REPORT_FINDING_LENGTH = 1500; // Maximum characters for report findings before truncation

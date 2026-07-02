@@ -14,7 +14,7 @@ import { jest } from '@jest/globals';
 // ── Mock agent-engine.js before any import of uap-server.js ──────────────────
 jest.unstable_mockModule('../background/agent-engine.js', () => ({
   executeGoal: jest.fn(),
-}));
+  startAgent: jest.fn(async () => {}),}));
 
 // ── Chrome API mock ───────────────────────────────────────────────────────────
 const _startupListeners = [];

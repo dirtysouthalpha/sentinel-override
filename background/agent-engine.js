@@ -548,7 +548,9 @@ import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
 import {generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP} from './agent-planning.js';
 import {appendAuditEntry, getAuditLog, auditLogToCsv} from './audit-log.js';
 import {runRecoverySkills, getSkillStats} from './skills/index.js';
-import {tel} from "./telemetry.js";
+import {tel, startRun, endRun} from "./telemetry.js";
+const telStartRun = startRun;
+const telEndRun = endRun;
 // (Phase 6) UAP bridge — broadcasts agent lifecycle events to external UAP server
 import {broadcast as uapBroadcast} from "./uap-bridge.js";
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side

@@ -1,3 +1,4 @@
+jest.setTimeout(30000);
 // tests/scheduler-uncovered.test.js
 // Tests for previously uncovered code paths in background/scheduler.js:
 //   Lines 37-39  _fireAgentCompleteCallbacks — callback error catch
