@@ -204,7 +204,7 @@ const VISION_DISCOVER = `const __sentinel_discoverElements = function() {
     var r = filtered[i].rect;
 
     window.__sentinelElements.set(index, e);
-    try { e.setAttribute('data-sentinel-index', String(index)); } catch(_ae) {}
+    try { e.setAttribute('data-sentinel-index', String(index)); } catch (_ae) { /* non-fatal: _ae */ }
 
     var tag = e.tagName.toLowerCase();
     var text = getText(e);
@@ -352,7 +352,7 @@ const VISION_SOM = `const __sentinel_drawSoMOverlay = function() {
   (document.body || document.documentElement).appendChild(canvas);
   return 'ok';
 }; __sentinel_drawSoMOverlay();`;
-const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0, _taggedLen = _tagged.length; _ti < _taggedLen; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch(_ae) {} }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
+const VISION_CLEAR = "const __sentinel_clearSoMOverlay = function() {\n  'use strict';\n  var overlay = document.getElementById('sentinel-som-overlay');\n  if (overlay) overlay.remove();\n  var _tagged = document.querySelectorAll('[data-sentinel-index]');\n  for (var _ti = 0, _taggedLen = _tagged.length; _ti < _taggedLen; _ti++) { try { _tagged[_ti].removeAttribute('data-sentinel-index'); } catch (_ae) { /* non-fatal: _ae */ } }\n  return 'ok';\n}; __sentinel_clearSoMOverlay();";
 
 // Precompute valid agent speed modes for O(1) lookup
 const VALID_AGENT_SPEEDS = new Set(['turbo', 'normal', 'stealth']);
@@ -1338,7 +1338,7 @@ let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
             facts: relevantEntries.map(f => typeof f.wisdom === 'string' ? f.wisdom.substring(0, 100) : String(f.wisdom || '').substring(0, 100)),
             timestamp: Date.now()
           }).catch(() => {});
-        } catch (_kcErr) {}
+        } catch (_kcErr) { /* non-fatal: _kcErr */ }
       }
     } else {
       activeClientId = null;
@@ -1468,7 +1468,7 @@ let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
         _orchestratorState.active = true;
         finalGoal = buildSubTaskGoal(subtasks[0], goal, 0, subtasks.length, []);
         sendSilentUpdate(`Orchestrator: ${subtasks.length} sub-tasks planned. Starting task 1: ${subtasks[0].title}`, 0);
-        try { chrome.runtime.sendMessage({ action: 'orchestrator_started', totalSubtasks: subtasks.length, titles: subtasks.map(s => s.title) }).catch(() => {}); } catch (_) {}
+        try { chrome.runtime.sendMessage({ action: 'orchestrator_started', totalSubtasks: subtasks.length, titles: subtasks.map(s => s.title) }).catch(() => {}); } catch (_) { /* non-fatal: _ */ }
       }
     } catch (_decompErr) {
       console.warn('[Sentinel/Orchestrator] Decomposition failed, running as single task:', getErrorMessage(_decompErr));
@@ -1893,7 +1893,7 @@ async function runAgentLoop(goal, workingTabId) {
       totalSteps: (agentPlan || []).length,
       timestamp: Date.now()
     }).catch(() => {});
-  } catch (_e) {}
+  } catch (_e) { /* non-fatal: _e */ }
 
   // (SW keepalive) Pin the service worker for the entire agent loop duration.
   // Without this, the SW can be terminated during long LLM calls or page loads.
@@ -1960,7 +1960,7 @@ async function runAgentLoop(goal, workingTabId) {
             detail: 'Adjusting plan: ' + _correction,
             timestamp: Date.now()
           }).catch(() => {});
-        } catch(_e) {}
+        } catch (_e) { /* non-fatal: _e */ }
         sendSilentUpdate(`🔄 User correction: ${_correction}`, stepCount);
       }
 
@@ -2144,7 +2144,7 @@ async function runAgentLoop(goal, workingTabId) {
               if (_bodyLen > 500 && _hasMain) { _spaReady = true; break; }
               if (_bodyLen > 1000) { _spaReady = true; break; }
             }
-          } catch (_) {}
+          } catch (_) { /* non-fatal: _ */ }
         }
         if (_spaReady) {
           sendSilentUpdate('SPA content rendered', stepCount);
@@ -2237,7 +2237,7 @@ async function runAgentLoop(goal, workingTabId) {
           }
 
           // Register tab
-          try { registerInitialTab(tab, _targetUrl); } catch(_re) {}
+          try { registerInitialTab(tab, _targetUrl); } catch (_re) { /* non-fatal: _re */ }
 
           historyPush({ step: stepCount, action: { type: 'navigate', url: _targetUrl }, result: `Navigated from ${_tabUrl} to ${_targetUrl}` });
           await _guardedPersistHistory();
@@ -2595,7 +2595,7 @@ async function runAgentLoop(goal, workingTabId) {
                 detail: 'I see: ' + _narration,
                 timestamp: Date.now()
               }).catch(() => {});
-            } catch(_e) {}
+            } catch (_e) { /* non-fatal: _e */ }
           } catch (_ne) {
             // narratePageState emission failed non-fatally
           }
@@ -3033,7 +3033,7 @@ async function runAgentLoop(goal, workingTabId) {
             });
             chrome.storage.local.set({ [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() } }).catch(() => {});
           }
-        } catch (_) {}
+        } catch (_) { /* non-fatal: _ */ }
       }
 
       // (3.21.0) Recovery skill library — consult before the LLM call.
@@ -3229,7 +3229,7 @@ async function runAgentLoop(goal, workingTabId) {
             text: partialText.substring(0, 500),
             timestamp: now
           }).catch(() => {});
-        } catch (_) {}
+        } catch (_) { /* non-fatal: _ */ }
       };
       const agentState = { apiCallCount, agentMemory, onStreamChunk: _onStreamChunk, visionMode: _visionMode, visionElementTree: _visionElementTree, visionElements: _visionElements, visionElementMap: _visionElementMap, consecutiveFailures, currentStrategies, agentPlan, currentPlanStep, loopDirective, screenshotMeta, budgetHint: _budgetHint, clientKnowledgeText, brainKnowledgeText, pendingVerification, quickMode: _runSettings.quickMode, cdpFallbackActive: sharedState.cdpFallbackActive, stepContext: _stepContext, zoomRegion: getZoomRegion(), zoomAnnotation: _zoomAnnotation };
       // Cap history window for prompt to control token cost (CONFIG.historyWindow).
@@ -3977,7 +3977,7 @@ Organize findings under clear headers matching the original goal sections. Use t
               title: _nextSubtask.title,
               completedTitle: _orchestratorState.subtasks[_nextIdx - 1].title
             }).catch(() => {});
-          } catch (_) {}
+          } catch (_) { /* non-fatal: _ */ }
 
           // Reset loop state for next subtask (keep agentMemory!)
           goal = buildSubTaskGoal(_nextSubtask, _orchestratorState.originalGoal, _nextIdx, _nextTotal, _orchestratorState.accumulatedResults);
@@ -4052,7 +4052,7 @@ finished = true;
               totalSteps: stepCount,
               totalApiCalls: apiCallCount
             }).catch(() => {});
-          } catch (_) {}
+          } catch (_) { /* non-fatal: _ */ }
 
           // Reset orchestrator state
           _orchestratorState = null;
@@ -4734,7 +4734,7 @@ finished = true;
                 await new Promise(r => setTimeout(r, ONE_HUNDRED_MS));
                 try {
                   const _jsClickRes = await cdpExecuteJs(tab,
-                    `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch(_e){}return"js-clicked";}return"dismissed";})()`,
+                    `return (function(){var e=window.__sentinelElements?window.__sentinelElements.get(${command._visionIndex}):null;if(!e)return"no-ref";var r=e.getBoundingClientRect();var stillVisible=r.width>0&&r.height>0&&document.body.contains(e);if(stillVisible){try{e.click();}catch (_e) { /* non-fatal: _e */ }return"js-clicked";}return"dismissed";})()`,
                     { timeout: THREE_SECONDS_MS });
                   const _val = _jsClickRes && _jsClickRes.value;
                   if (_val === 'js-clicked') {
@@ -5564,7 +5564,7 @@ return { ok: true, value: el.value };
           const sel = command.selector || (command.ref ? command.ref.replace(REF_SELECTOR_RE, '#') : '');
           if (sel) {
             const cdpCode = 'var el = null;'
-              + 'try { el = document.querySelector(' + JSON.stringify(sel) + '); } catch(e) {}'
+              + 'try { el = document.querySelector(' + JSON.stringify(sel) + '); } catch (e) { /* non-fatal: e */ }'
               + 'if (!el) {'
               + '  var allEls = document.querySelectorAll("button, a, [role=\\"button\\"], input, [onclick]");'
               + '  for (var i = 0, allElsLen = allEls.length; i < allElsLen; i++) {'
@@ -5735,7 +5735,7 @@ return { ok: true, value: el.value };
             actionFailed = false;
             sendSilentUpdate(`Selector not found → coordinate fallback click at (${_cx}, ${_cy})`, stepCount);
             sendActionMessage({ ...command, type: 'click_at', x: _cx, y: _cy, _coordFallback: true }, stepCount, observation);
-            try { chrome.runtime.sendMessage({ type: 'agent_status', tabId: tab, status: 'acting', detail: 'Coordinate fallback click at (' + _cx + ',' + _cy + ')' }).catch(() => {}); } catch(_e) {}
+            try { chrome.runtime.sendMessage({ type: 'agent_status', tabId: tab, status: 'acting', detail: 'Coordinate fallback click at (' + _cx + ',' + _cy + ')' }).catch(() => {}); } catch (_e) { /* non-fatal: _e */ }
           }
         }
       }
@@ -5938,7 +5938,7 @@ return { ok: true, value: el.value };
           //      Accept/Agree/OK/Continue/I agree/Got it (handles bespoke
           //      overlays like CNN's that don't use a known framework).
           try {
-            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0,pLen=p.length;i<pLen;i++){var es=document.querySelectorAll(p[i]);for(var j=0,esLen=es.length;j<esLen;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}if(!d){var rx=/^(accept(\\s+all)?|i\\s+agree|agree|allow(\\s+all)?|got\\s+it|ok|okay|continue|yes,?\\s+i\\s+(agree|accept)|consent)$/i;var btns=document.querySelectorAll(\'button, [role="button"], a.button, input[type="submit"], input[type="button"]\');for(var k=0,btnsLen=btns.length;k<btnsLen;k++){var b=btns[k];var t=((b.innerText||b.value||b.getAttribute("aria-label")||"")+"").trim();if(!t||t.length>40)continue;if(!rx.test(t))continue;var br=b.getBoundingClientRect();if(br.width<=0||br.height<=0)continue;var cs=window.getComputedStyle(b);if(cs.visibility==="hidden"||cs.display==="none")continue;try{b.click();d=true;break;}catch(_e){}}}return d?"dismissed":"no-overlay";})()', { timeout: FIVE_SECONDS_MS });
+            await cdpExecuteJs(tab, '(function(){var d=false;var p=["button[aria-label*=Accept]","button[aria-label*=agree]","button[aria-label*=Close]","button[aria-label*=Dismiss]",".consent-accept",".cookie-accept","button.accept","button.acceptAll","button#onetrust-accept-btn-handler",".didomi-accept-btn","[class*=accept]","[class*=agree]","[class*=consent] button","[class*=overlay] button","dialog button","[role=dialog] button",".fc-button.fc-cta-consent",".sp_choice_type_11"];for(var i=0,pLen=p.length;i<pLen;i++){var es=document.querySelectorAll(p[i]);for(var j=0,esLen=es.length;j<esLen;j++){if(es[j].offsetParent!==null||window.getComputedStyle(es[j]).position==="fixed"){es[j].click();d=true;break;}}if(d)break;}if(!d){var rx=/^(accept(\\s+all)?|i\\s+agree|agree|allow(\\s+all)?|got\\s+it|ok|okay|continue|yes,?\\s+i\\s+(agree|accept)|consent)$/i;var btns=document.querySelectorAll(\'button, [role="button"], a.button, input[type="submit"], input[type="button"]\');for(var k=0,btnsLen=btns.length;k<btnsLen;k++){var b=btns[k];var t=((b.innerText||b.value||b.getAttribute("aria-label")||"")+"").trim();if(!t||t.length>40)continue;if(!rx.test(t))continue;var br=b.getBoundingClientRect();if(br.width<=0||br.height<=0)continue;var cs=window.getComputedStyle(b);if(cs.visibility==="hidden"||cs.display==="none")continue;try{b.click();d=true;break;}catch (_e) { /* non-fatal: _e */ }}}return d?"dismissed":"no-overlay";})()', { timeout: FIVE_SECONDS_MS });
           } catch(_oe) { /* non-fatal */ }
           historyPush({
             step: stepCount,

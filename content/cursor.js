@@ -332,10 +332,10 @@ window.__sentinelUtils = window.__sentinelUtils || {};
       keepVisibleMode = !!on;
       try {
         if (on) {
-          document.body.setAttribute('data-sentinel-active', 'true');
           const c = document.getElementById(CURSOR_ID); if (c) c.classList.remove('dimmed');
+          try { document.body.setAttribute('data-sentinel-active', 'true'); } catch (_) {}
         } else {
-          document.body.removeAttribute('data-sentinel-active');
+          try { document.body.removeAttribute('data-sentinel-active'); } catch (_) {}
         }
       } catch (e) { console.warn('[Sentinel] cursor keepVisible attr:', e); }
     },
@@ -344,6 +344,17 @@ window.__sentinelUtils = window.__sentinelUtils || {};
      * Gets the current cursor position in viewport coordinates.
      * @returns {{x: number, y: number}} Current cursor position, or (-1, -1) if cursor not found
      */
+    /**
+     * Destroys the cursor, removing the element and cleaning up resources.
+     */
+    destroy() {
+      try {
+        const c = document.getElementById(CURSOR_ID);
+        if (c && c.remove) c.remove();
+        keepVisibleMode = false;
+      } catch (_) {}
+    },
+
     getPosition() {
       try {
         const c = document.getElementById(CURSOR_ID);
