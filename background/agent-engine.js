@@ -402,7 +402,6 @@ const WWW_PREFIX_RE = /^www\./;
 const TRAILING_SLASH_RE = /\/$/;
 
 
-
 // Precompile regex for domain cleaning
 const DOMAIN_CLEAN_RE = /^https?:\/\/|\/.*$/gi;
 const DMARC_PREFIX_RE = /^_dmarc\./i;
@@ -442,7 +441,6 @@ const getObjectLength = (obj) => {
 };
 
 
-
 // Precompile regex for PII redaction (error logging)
 const _PII_IP_RE = /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g;
 const _PII_EMAIL_RE = /[\w.+-]+@[\w.-]+/g;
@@ -459,9 +457,7 @@ const PORTAL_VIRUSTOTAL_RE = /virustotal/i;
 // Precompile regex for stall detection
 
 
-
 // Precompile regex for overlay dismissal (hot path in CDP observe)
-
 
 
 // Precompile regex for incomplete marker detection (hot path in reporting)
@@ -588,11 +584,71 @@ async function _enforceTabLimit() {
   } catch (_e) { /* non-fatal */ }
 }
 
+// v21.6.59: Throttle silent updates to prevent popup IPC flooding
+let _lastSilentUpdate = 0;
+const _SILENT_UPDATE_INTERVAL = 200; // min 200ms between silent updates
+
+async function sendSilentUpdateThrottled(data) {
+  const now = Date.now();
+  if (now - _lastSilentUpdate < _SILENT_UPDATE_INTERVAL) return; // throttle
+  _lastSilentUpdate = now;
+  try {
+    await chrome.runtime.sendMessage({ type: 'AGENT_SILENT_UPDATE', ...data });
+  } catch (e) { /* popup closed */ }
+}
+const _ERR_PREFIX = '[Sentinel] Error in agent-engine.js:';
 let agentRunning = false;
 let _consecutiveScrolls = 0; // (v21.6.21) Track consecutive scrolls to prevent scroll loops
 let _runAbortController = null;  // (v21.6.8) AbortController for instant stop — aborted in stopAgent()
 let apiCallCount = 0;
 let lastApiCallTime = 0;
+// v21.6.59: Deduplicate memory keys to prevent accumulation
+// v21.6.59: Maximum memory keys guard
+const _MAX_MEMORY_KEYS = 15;
+function _enforceMemoryLimit() {
+  const keys = Object.keys(agentMemory || {});
+  if (keys.length > _MAX_MEMORY_KEYS) {
+    const excess = keys.length - _MAX_MEMORY_KEYS;
+    for (let i = 0; i < excess; i++) delete agentMemory[keys[i]];
+  }
+}
+function dedupeMemoryKeys() {
+  const keys = Object.keys(agentMemory || {});
+  if (keys.length < 5) return;
+  // Remove keys that are substrings of other keys (likely duplicates)
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const a = agentMemory[keys[i]] || '';
+      const b = agentMemory[keys[j]] || '';
+      if (a.length > 50 && b.length > 50) {
+        const shorter = a.length < b.length ? a : b;
+        const longer = a.length < b.length ? b : a;
+        if (longer.includes(shorter.substring(0, 100))) {
+          // Delete the shorter duplicate
+          delete agentMemory[keys[i]];
+          break;
+        }
+      }
+    }
+  }
+}
+// v21.6.59: Smarter JS duplicate detection
+let _consecutiveJsDuplicates = 0;
+let _lastJsCode = '';
+function _checkJsDuplicate(code) {
+  const normalized = code.replace(/\s+/g, ' ').substring(0, 200);
+  if (normalized === _lastJsCode) {
+    _consecutiveJsDuplicates++;
+    if (_consecutiveJsDuplicates >= 2) {
+      _consecutiveJsDuplicates = 0;
+      return true; // force finish
+    }
+  } else {
+    _consecutiveJsDuplicates = 0;
+    _lastJsCode = normalized;
+  }
+  return false;
+}
 let agentMemory = {};           // Extract-and-remember: carries data between pages
 let _lastTenantForMemory = null; // (v21.6) Track tenant for per-client memory isolation
 
@@ -623,7 +679,7 @@ async function _restoreTenantMemory(tenant) {
     }
   } catch (_e) { /* non-fatal */ }
 }
-let history = [];               // (3.15.1) Per-run action history. MUST be module-level so the trimHistory()/persistHistory() helpers at module scope can access it. Cleared in-place at start of each runAgentLoop via history.length = 0 (preserves the array reference for any captured closures).
+let history = [];               // (3.15.1) Per-run action history. MUST be module-level so the trimHistory()/_guardedPersistHistory() helpers at module scope can access it. Cleared in-place at start of each runAgentLoop via history.length = 0 (preserves the array reference for any captured closures).
 let _lastAiCallMs = null;       // (3.21.0) Duration of the most recent LLM call in ms; consumed by the slow-llm-call recovery skill.
 let consecutiveFailures = 0;    // Self-healing: tracks failures for strategy shift
 let currentStrategies = [];     // Self-healing: remembers tried approaches
@@ -854,7 +910,7 @@ export async function restoreFromCheckpoint() {
 
     // Persist restored history to chrome.storage.local so it survives across
     // the boundary. The run loop reads it from there on the first step.
-    try { await persistHistory(); } catch (e) { console.error('[Sentinel] History persistence failed:', getErrorMessage(e)); }
+    try { await _guardedPersistHistory(); } catch (e) { console.error('[Sentinel] History persistence failed:', getErrorMessage(e)); }
 
     return {
       restored: true,
@@ -1005,6 +1061,12 @@ function trimHistory() {
   }
 }
 
+let _lastPersistedHistoryLen = -1;
+async function persistHistory_guarded() {
+  if (history.length === _lastPersistedHistoryLen) return; // skip if unchanged
+  _lastPersistedHistoryLen = history.length;
+  return _guardedPersistHistory();
+}
 async function persistHistory() {
   // (3.41.0) Dirty-bit guard: skip the storage write when nothing has
   // changed since the last persist. Eliminates ~30 redundant writes per run
@@ -1018,12 +1080,12 @@ async function persistHistory() {
   } catch (e) {
     console.warn('[Sentinel] persistHistory storage write failed:', getErrorMessage(e));
   }
-  try { tel.trace('storage', `agent_history persisted (${slice.length} entries)`, { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { tel.trace('storage', `agent_history persisted (${slice.length} entries)`, { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 }
 
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
-  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   return {
     goal,
     history: history.slice(),
@@ -1364,16 +1426,16 @@ let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
     } catch (_) { /* non-fatal */ }
     // (3.25.1) Storage telemetry: run-log opened. Brackets every run; useful
     // for matching telemetry events to forensic log entries during postmortems.
-    try { tel.info('storage', `Run log opened: ${runLogId}`, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+    try { tel.info('storage', `Run log opened: ${runLogId}`, { runLogId, goalLen: (goal || '').length }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
     // (3.27.0) Tell the telemetry persistence layer this is a new run. If the
     // user has telemetryPersist enabled in settings, events start streaming
     // to chrome.storage.local from this point onward.
-    try { telStartRun(runLogId, goal); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+    try { telStartRun(runLogId, goal); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   } catch (_) { runLogId = null; runLogBuffer = []; }
 
   // (3.7.2) Visually attach the working tab to the orange "Sentinel" group.
   // Subsequent open_tab handlers add their tabs to the same group.
-  try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await attachTabToSentinelGroup(startTabId); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 
   // (v20.1) Pin the side panel to the single working tab. The agent may open
   // additional tabs during the run, but the panel only ever shows on the tab
@@ -1395,7 +1457,7 @@ let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
     // (v3.53) Re-enable side panel on all tabs now that agent stopped
     try { await _enableSidePanelEverywhere(); } catch (_sidePanelErr) {
       /* Non-fatal: side panel re-enable failed */
-    } } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+    } } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
       chrome.runtime.sendMessage({ action: 'agent_finished', summary: `⏹ Run cancelled — mode mismatch between goal directive ("${modeDirective.wants}") and current Approval Mode setting.` }).catch((e) => {
         console.error('[startAgent] mode mismatch cancel sendMessage failed:', getErrorMessage(e));
       });
@@ -1567,10 +1629,10 @@ function _detectGoalModeDirective(goal) {
 async function _waitForModeMismatchDecision(info) {
   const requestId = crypto.randomUUID();
   const kaName = `mode_mismatch_${requestId}`;
-  try { startSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { startSwKeepalive(kaName); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   return new Promise((resolve) => {
     const finish = (payload) => {
-      try { stopSwKeepalive(kaName); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      try { stopSwKeepalive(kaName); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
       resolve(payload);
     };
     chrome.runtime.sendMessage({
@@ -1622,18 +1684,18 @@ export async function stopAgent() {
   // (3.27.0) End the telemetry persistence run on user-initiated stop, not
   // just on natural finish. Otherwise the buffer dangles until the next run
   // starts, and the "finishedAt" field never gets stamped.
-  try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await telEndRun(runLogId); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   // Remove this agent from the parallel agent pool
   try {
     const _agentTabId = getAgentTabId();
     if (_agentTabId) stopPoolAgent(_agentTabId);
   } catch (_e) { /* pool cleanup failed — non-fatal */ }
   // Release any CDP attachments held by the screenshot pipeline.
-  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await detachAllDebuggees(); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   // (3.7.2) Dissolve the visual tab group + reset side-panel availability.
   // (v21.5.4) Close agent-opened tabs BEFORE detaching (detach clears the set)
   try { await closeAttachedTabsExceptPrimary(); } catch (e) { console.warn('[Sentinel] Close attached tabs failed:', getErrorMessage(e)); }
-  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
   await closeAllAgentTabs();
   return 'Agent stopped';
 }
@@ -1708,8 +1770,6 @@ function maybePostProgressUpdate(stepCount, history, agentMemory) {
     sendSilentUpdate(lines.join(' | '), stepCount);
   } catch (e) { console.warn('[Sentinel] HUD update failed:', getErrorMessage(e)); }
 }
-
-
 
 
 // (3.40.0) Audit log access — delegated from background/index.js message handler.
@@ -1902,7 +1962,7 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastCmdType = '';
   let _sameCmdCount = 0;
   let _lastLoopUrl = '';
-  let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 3 total loops
+  let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 2 total loops
   let _blockedCount = 0;  // (v21.6.38) Track BLOCKED execute_js calls
   while (!finished && agentRunning) {
 
@@ -1955,7 +2015,7 @@ async function runAgentLoop(goal, workingTabId) {
       stepCount++;
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
-      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
       // v21.6.58: Progressive summarization every 8 steps
       if (stepCount > 0 && stepCount % 8 === 0 && history.length > 6) {
         try {
@@ -2227,7 +2287,7 @@ async function runAgentLoop(goal, workingTabId) {
           try { registerInitialTab(tab, _targetUrl); } catch(_re) {}
 
           historyPush({ step: stepCount, action: { type: 'navigate', url: _targetUrl }, result: `Navigated from ${_tabUrl} to ${_targetUrl}` });
-          await persistHistory();
+          await _guardedPersistHistory();
           continue;
         } catch (_navE) {
           // If navigation fails, try creating a new tab as fallback
@@ -2305,7 +2365,7 @@ async function runAgentLoop(goal, workingTabId) {
               const reinjected = await injectContentScript(tab);
               if (reinjected) {
                 historyPush({ step: stepCount, action: { type: 'navigate', url: goalUrl }, result: `Navigated to ${goalUrl}` });
-                await persistHistory();
+                await _guardedPersistHistory();
               }
               // Defensive: re-register the tab after navigation in case the tab
               // lifecycle events cleared the context during page load
@@ -2403,7 +2463,7 @@ async function runAgentLoop(goal, workingTabId) {
               role: 'user',
               content: `[SYSTEM RECOVERY] The action "${stuckAction}" has failed ${lastActionTypes.length} times in a row. You are stuck in a loop. Try a COMPLETELY DIFFERENT approach. If close_tab isn't working, try navigate to the main page instead. If you can't close a tab, just navigate away from it. Do NOT repeat "${stuckAction}" again.`
             });
-            try { await persistHistory(); } catch (_e) {
+            try { await _guardedPersistHistory(); } catch (_e) {
               // History persist failed non-fatally during recovery
             }
           }
@@ -2667,7 +2727,7 @@ async function runAgentLoop(goal, workingTabId) {
             scrollY: shotResult.scrollY
           };
           // (3.7.1) Forward to the popup for the live mini-shot panel + crosshair coords.
-          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { sendScreenshotUpdate(base64Image, stepCount, screenshotMeta); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           // (9.3) Store screenshot for replay export (ring-cap at 20)
           _stepScreenshots.set(stepCount, base64Image);
           if (_stepScreenshots.size > 20) {
@@ -2951,7 +3011,7 @@ async function runAgentLoop(goal, workingTabId) {
       const _cbResult = checkCircuitBreaker(history, stepCount, dynamicMaxSteps);
       if (_recentFailures >= 5 && !_cbResult.shouldHardStop) {
         _cbResult.shouldHardStop = true;
-        _cbResult.reason = `5 consecutive LLM failures — likely model/provider incompatibility. Check model supports vision.`;
+        _cbResult.reason = `3 consecutive LLM failures — likely model/provider incompatibility. Check model supports vision.`;
         _cbResult.severity = 'critical';
       }
       // (v21.6.1) Vision 404 detection — model doesn't support image input
@@ -2977,7 +3037,7 @@ async function runAgentLoop(goal, workingTabId) {
         }).join('\n');
         const summary = memCount > 0
           ? `Task completed after ${stepCount} steps with ${memCount} data points extracted:\n\n${memLines}${memCount > 10 ? `\n...and ${memCount - 10} more items.` : ''}`
-          : `Task timed out after ${stepCount} steps. ${_hardReason}`;
+          : `Timed out after ${stepCount} steps. ${_hardReason}`;
         finished = true;
         sendActionResult(stepCount, { type: 'finish', summary }, false);
         historyPush({ step: stepCount, action: { type: 'finish', summary }, result: summary });
@@ -2999,7 +3059,7 @@ async function runAgentLoop(goal, workingTabId) {
             const _cbSummary = _cbMemKeys.length > 0 ? _cbMemKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data extracted';
             const _forceResult = `FORCE-FINISH (CIRCUIT BREAKER): Agent stuck in identical action loop (${_cbLoopCount[1]} repetitions). Finishing with available data: ${_cbSummary}`;
             historyPush({ step: stepCount, action: { type: 'circuit_breaker_stop' }, result: _forceResult });
-            await persistHistory();
+            await _guardedPersistHistory();
             sendActionResult(stepCount, _forceResult, false);
             reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
             chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task force-finished by circuit breaker. Data: ${_cbSummary}` }).catch(() => {});
@@ -3042,7 +3102,7 @@ async function runAgentLoop(goal, workingTabId) {
           lastCommand: _lastHistEntry ? _lastHistEntry.action : null,
           lastResult: _lastResult,
           lastActionFailed: _lastFailed,
-          history: history.slice(-5),
+          history: history.slice(-4),
           consecutiveFailures,
           agentMemory,
           stepCount,
@@ -3310,6 +3370,10 @@ async function runAgentLoop(goal, workingTabId) {
         }
       } catch(_pte) { /* best-effort */ }
       
+        // v21.6.59: Step budget urgency at 75%
+        const _budgetRatio = stepCount / dynamicMaxSteps;
+        const _budgetUrgency = _budgetRatio >= 0.75 ? `[URGENCY] ${stepCount}/${dynamicMaxSteps} steps used. Wrap up NOW.` : '';
+        if (_budgetUrgency) loopDirective = (loopDirective || '') + '\n' + _budgetUrgency;
         const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective, agentMemory, sharedState.pageStagnation);
 
         // Build messages with screenshot
@@ -3719,7 +3783,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
           // No match — tell the LLM so it can adjust
           const _noMatchMsg = `BLOCKED: No element found matching description "${command.description}". Try using a selector or ref from the AVAILABLE INTERACTIVE ELEMENTS list instead.`;
           historyPush({ step: stepCount, action: command, result: _noMatchMsg });
-          await persistHistory();
+          await _guardedPersistHistory();
           sendSilentUpdate(`No visual match for "${command.description}"`, stepCount);
           await sleep(ONE_SECOND_MS);
           continue;
@@ -3761,7 +3825,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
               sendSilentUpdate('[ADAPTIVE] ' + _lastDiagnosis.strategy + ': ' + _lastDiagnosis.suggestion.substring(0, 100), stepCount);
               // Inject diagnosis into history so the LLM sees it on the next step
               historyPush({ step: stepCount, action: { type: 'note', text: _diagMsg }, result: 'Adaptive diagnosis: ' + _lastDiagnosis.strategy });
-              await persistHistory();
+              await _guardedPersistHistory();
               // Reset counter after diagnosis to avoid spamming
               _consecutiveFailureTypes[_failKey] = 0;
             }
@@ -3769,7 +3833,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
         }
 
           historyPush({ step: stepCount, action: command, result: `Invalid selector "${command.selector}" -- not in element list.` });
-          await persistHistory();
+          await _guardedPersistHistory();
           await sleep(ONE_SECOND_MS);
           continue;
         }
@@ -3821,7 +3885,7 @@ Organize findings under clear headers matching the original goal sections. Use t
         const _finishBlockCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('BLOCKED:')).length;
         if (Object.keys(agentMemory).length === 0 && stepCount < 4 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: Cannot finish without extracting data first. Read the page or use execute_js to get real data.' });
-          await persistHistory();
+          await _guardedPersistHistory();
           sendSilentUpdate('Finish blocked — must extract real data first', stepCount);
           await sleep(ONE_SECOND_MS);
           if (!agentRunning) break;
@@ -3836,7 +3900,7 @@ Organize findings under clear headers matching the original goal sections. Use t
         });
         if (false && !hasRealData && hasData && stepCount < 15 && _finishBlockCount < 1) {
           historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
-          await persistHistory();
+          await _guardedPersistHistory();
           sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
           await sleep(ONE_SECOND_MS);
           if (!agentRunning) break;
@@ -3858,7 +3922,7 @@ Organize findings under clear headers matching the original goal sections. Use t
             if (_openTabs === 0 && !_summaryKeys.length && noteCount === 0) {
               console.warn('[Sentinel/multi-article] Blocking premature finish —', _targetN, 'articles requested, 0 opened/read');
               historyPush({ step: stepCount, action: command, result: `BLOCKED: premature finish — goal asks for ${_targetN} articles. Must open_tab article URLs and read each page before finishing.` });
-              await persistHistory();
+              await _guardedPersistHistory();
               sendSilentUpdate('Finish blocked — must read articles first', stepCount);
               await sleep(ONE_SECOND_MS);
               continue;
@@ -3880,7 +3944,7 @@ Organize findings under clear headers matching the original goal sections. Use t
             if (!hasRecentCommitClick(history)) {
               const blockMsg = 'BLOCKED: configuration change detected but no Save/Apply/Commit click in recent history. Find and click the Apply/Save/Commit/Deploy button before finishing.';
               historyPush({ step: stepCount, action: command, result: blockMsg });
-              await persistHistory();
+              await _guardedPersistHistory();
               sendSilentUpdate('Finish blocked — change not yet committed', stepCount);
               await sleep(ONE_SECOND_MS);
               continue;
@@ -3888,7 +3952,7 @@ Organize findings under clear headers matching the original goal sections. Use t
             if (!hasPostCommitVerification(history)) {
               const blockMsg = 'BLOCKED: change committed but not verified. Re-read the page or extract from the relevant table to confirm the change is active before finishing.';
               historyPush({ step: stepCount, action: command, result: blockMsg });
-              await persistHistory();
+              await _guardedPersistHistory();
               sendSilentUpdate('Finish blocked — change not verified', stepCount);
               await sleep(ONE_SECOND_MS);
               continue;
@@ -3920,7 +3984,7 @@ Organize findings under clear headers matching the original goal sections. Use t
               '  4. Log Analytics KQL for >60-day windows that the UI doesn\'t support.\n' +
               'Re-attempt the investigation using one of these paths before calling finish again.';
             historyPush({ step: stepCount, action: command, result: blockMsg });
-            await persistHistory();
+            await _guardedPersistHistory();
             sendSilentUpdate('Finish blocked — try Graph API or alternate URL before giving up', stepCount);
             await sleep(ONE_SECOND_MS);
             continue;
@@ -4021,7 +4085,6 @@ finished = true;
           finalSummary = `# Multi-Task Investigation Report\n\nCompleted ${_orchestratorState.accumulatedResults.length} of ${_orchestratorState.subtasks.length} sub-tasks.\n\n---\n\n${_combinedReport}`;
 
 
-
           // Inject combined results into agentMemory for report generation
           agentMemory['orchestrator_combined_report'] = finalSummary;
 
@@ -4087,7 +4150,7 @@ finished = true;
             if (_risk && _risk.risky) {
               const blockMsg = `BLOCKED: hallucination risk detected — ${_risk.reason} Either: (a) trim the summary to ONLY items you actually read/extracted, or (b) clearly tag unread items with "headline only — not read in this run". Then call finish again.`;
               historyPush({ step: stepCount, action: command, result: blockMsg });
-              await persistHistory();
+              await _guardedPersistHistory();
               sendSilentUpdate('Finish blocked — claim density exceeds evidence', stepCount);
               await sleep(ONE_SECOND_MS);
               continue;
@@ -4131,12 +4194,12 @@ finished = true;
             // (3.25.1) Storage telemetry: run-log finalized. Bracketing pair
             // with the run_log_opened event so postmortem export pulls the
             // full slice between them.
-            try { tel.info('storage', `Run log finalized: ${runLogId} (${runLogBuffer.length} entries)`, { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+            try { tel.info('storage', `Run log finalized: ${runLogId} (${runLogBuffer.length} entries)`, { runLogId, entries: runLogBuffer.length, stepCount, apiCallCount }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
             // (3.27.0) Tell the persistence layer this run is done. Flushes
             // the buffer one last time and stamps finishedAt on the index.
             // Awaited so the storage write completes before the SW potentially
             // suspends after agent_finished fires.
-            try { await telEndRun(runLogId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+            try { await telEndRun(runLogId); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
             // (3.14.0) Stamp the index entry as completed with final step count.
             // (3.30.0) Compute the trust score and attach it to the index entry
             // so the popup-side Run Log list can render it without recomputing.
@@ -4205,7 +4268,7 @@ finished = true;
           } catch (_) { return null; }
         })();
         const _retrySuggestions = (function () {
-          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); return []; }
+          try { return suggestRetryActions(_finalTrustScore); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); return []; }
         })();
         // Telemetry for the suggestions emitted — useful for "did anyone
         // actually use these?" questions later. One info event with the
@@ -4257,7 +4320,7 @@ finished = true;
         const doActions = Array.isArray(command.do) ? command.do : [];
         if (!items.length || !doActions.length) {
           historyPush({ step: stepCount, action: command, result: `repeat_for_each: nothing to iterate (items=${items.length}, actions=${doActions.length})` });
-          await persistHistory();
+          await _guardedPersistHistory();
           continue;
         }
         const MAX_REPEAT_ITEMS = 50;
@@ -4281,7 +4344,7 @@ finished = true;
             );
             let _resolved;
             try { _resolved = JSON.parse(_resolvedStr); } catch (e) {
-              console.error('[Sentinel] Error in agent-engine.js:', e);
+              console.error(_ERR_PREFIX, e);
               historyPush({ step: stepCount, action: _act, result: `repeat_for_each: skipping malformed item — JSON parse failed: ${getErrorMessage(e)}` });
               continue;
             }
@@ -4290,7 +4353,7 @@ finished = true;
         }
         historyPush({ step: stepCount, action: command, result: `repeat_for_each queued ${_pendingCommandQueue.length} sub-actions for ${items.length} items` });
         productiveSteps++;
-        await persistHistory();
+        await _guardedPersistHistory();
         continue;
       }
 
@@ -4339,7 +4402,7 @@ finished = true;
         activityDone(stepCount, 'verify', _verifyOutcome.slice(0, 100), null);
         historyPush({ step: stepCount, action: command, result: _verifyOutcome });
         productiveSteps++;
-        await persistHistory();
+        await _guardedPersistHistory();
         await sleep(FOUR_HUNDRED_MS);
         continue;
       }
@@ -4349,7 +4412,7 @@ finished = true;
         sendSilentUpdate(`Waiting ${waitMs}ms...`, stepCount);
         await sleep(waitMs);
         historyPush({ step: stepCount, action: command, result: `Waited ${waitMs}ms` });
-        await persistHistory();
+        await _guardedPersistHistory();
         continue;
       }
 
@@ -4366,7 +4429,7 @@ finished = true;
         } catch (e) { console.warn('[Sentinel] note-content activity failed:', getErrorMessage(e)); }
         historyPush({ step: stepCount, action: command, result: `Note recorded: ${noteText}` });
         productiveSteps++;  // (3.8.0) every recorded finding extends the run
-        await persistHistory();
+        await _guardedPersistHistory();
         await sleep(FIVE_HUNDRED_MS);
         continue;
       }
@@ -4392,11 +4455,11 @@ finished = true;
           // (3.25.1) Telemetry: surface what the LLM asked for + what it got.
           // tab-manager already emits a debug-level read summary; this one is
           // at info level because the LLM explicitly chose to consume it.
-          try { tel.info('network', `Agent read console: ${entries.length} entries`, { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.info('network', `Agent read console: ${entries.length} entries`, { stepCount, filter: command.filter || null, returned: entries.length }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           historyPush({ step: stepCount, action: command, result });
-          await persistHistory();
+          await _guardedPersistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading console', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.error('network', 'Error reading console', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           sendActionResult(stepCount, `Error reading console: ${getErrorMessage(e || 'unknown')}`, true);
         }
         await sleep(THREE_HUNDRED_MS);
@@ -4420,9 +4483,9 @@ finished = true;
             tel.info('network', `Agent read network: ${entries.length} requests (${_failed} failed)`, { stepCount, filter: command.filter || null, urlIncludes: command.url_includes || null, returned: entries.length, failed: _failed });
           } catch (_e) { console.warn('[Sentinel] Telemetry failed (non-critical):', getErrorMessage(_e)); }
           historyPush({ step: stepCount, action: command, result });
-          await persistHistory();
+          await _guardedPersistHistory();
         } catch (e) {
-          try { tel.error('network', 'Error reading network', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.error('network', 'Error reading network', { stepCount, error: getErrorMessage(e) }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           sendActionResult(stepCount, `Error reading network: ${getErrorMessage(e || 'unknown')}`, true);
         }
         await sleep(THREE_HUNDRED_MS);
@@ -4457,7 +4520,7 @@ finished = true;
           const _r = 'lookup: domain is required';
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
-          await persistHistory();
+          await _guardedPersistHistory();
           continue;
         }
         sendSilentUpdate(`DNS lookup: ${_domain} (${_type})${_preset ? ` [${_preset}]` : ''}`, stepCount);
@@ -4474,12 +4537,12 @@ finished = true;
           if (_answers.length) productiveSteps++;
           sendActionResult(stepCount, `DNS ${_type} ${_domain}: ${_answers.length} record(s)`, false);
           historyPush({ step: stepCount, action: command, result: _result });
-          await persistHistory();
+          await _guardedPersistHistory();
         } catch (e) {
           const _r = `lookup failed: ${getErrorMessage(e)}`;
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
-          await persistHistory();
+          await _guardedPersistHistory();
         }
         await sleep(THREE_HUNDRED_MS);
         continue;
@@ -4493,7 +4556,7 @@ finished = true;
           const _r = 'run_remote_command: command is required';
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
-          await persistHistory();
+          await _guardedPersistHistory();
           continue;
         }
         sendSilentUpdate(`Remote command (${_cmdType}): ${_cmd.slice(0, 60)}`, stepCount);
@@ -4555,12 +4618,12 @@ finished = true;
           if (_output && !_output.startsWith('(output element not found')) productiveSteps++;
           sendActionResult(stepCount, `Command ran on ${_profile ? _profile.label : 'remote machine'}`, false);
           historyPush({ step: stepCount, action: command, result: _result });
-          await persistHistory();
+          await _guardedPersistHistory();
         } catch (e) {
           const _r = `run_remote_command failed: ${getErrorMessage(e)}`;
           sendActionResult(stepCount, _r, true);
           historyPush({ step: stepCount, action: command, result: _r });
-          await persistHistory();
+          await _guardedPersistHistory();
         }
         await sleep(FIVE_HUNDRED_MS);
         continue;
@@ -4580,11 +4643,10 @@ finished = true;
         const result = waitResult || 'Wait completed';
         sendActionResult(stepCount, result, false);
         historyPush({ step: stepCount, action: command, result });
-        await persistHistory();
+        await _guardedPersistHistory();
         await sleep(FIVE_HUNDRED_MS);
         continue;
       }
-
 
 
       sendAgentStatus('executing', describeAction(command));
@@ -4620,12 +4682,12 @@ finished = true;
         const approval = await requestApproval(command, stepCount);
         if (approval.rejected) {
           historyPush({ step: stepCount, action: command, result: 'Rejected by user' });
-          await persistHistory();
+          await _guardedPersistHistory();
           await sleep(ONE_SECOND_MS); continue;
         }
         if (approval.skipped) {
           historyPush({ step: stepCount, action: command, result: 'Skipped by user' });
-          await persistHistory();
+          await _guardedPersistHistory();
           await sleep(ONE_SECOND_MS); continue;
         }
         // User explicitly approved — mark so content-script guards pass.
@@ -4800,7 +4862,7 @@ finished = true;
         activityFail(stepCount, 'dispatch', 'Click at (no target)', { result });
         sendActionResult(stepCount, result, true);
         historyPush({ step: stepCount, action: command, result });
-        await persistHistory();
+        await _guardedPersistHistory();
         await sleep(EIGHT_HUNDRED_MS);
         continue;
       }
@@ -4814,7 +4876,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
           sendActionResult(stepCount, _msg, true);
           historyPush({ step: stepCount, action: command, result: _msg });
-          await persistHistory();
+          await _guardedPersistHistory();
           await sleep(EIGHT_HUNDRED_MS);
           continue;
         }
@@ -4871,7 +4933,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             activityFail(stepCount, 'dispatch', describeAction(command), { result: _msg });
             sendActionResult(stepCount, _msg, true);
             historyPush({ step: stepCount, action: command, result: _msg });
-            await persistHistory();
+            await _guardedPersistHistory();
             await sleep(EIGHT_HUNDRED_MS);
             continue;
           }
@@ -4894,9 +4956,9 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           } else {
           // (3.7.2) Attach the new tab to the Sentinel group so the user
           // sees it linked in the tab bar.
-          try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { await attachTabToSentinelGroup(ctx.tabId); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           await switchToTab(ctx.tabId);
-          try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.trace('sleep', 'Sleep 2000ms', { ms: 2000 }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           await sleep(TWO_SECONDS_MS);
           await injectContentScript(ctx.tabId);
           // (3.50.1) Validate we landed where we intended.
@@ -4920,7 +4982,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
-        await persistHistory();
+        await _guardedPersistHistory();
         continue;
       }
 
@@ -4941,7 +5003,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
-        await persistHistory();
+        await _guardedPersistHistory();
         continue;
       }
 
@@ -4976,7 +5038,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         }
         sendActionResult(stepCount, result, actionFailed);
         historyPush({ step: stepCount, action: command, result });
-        await persistHistory();
+        await _guardedPersistHistory();
         continue;
       }
 
@@ -4984,7 +5046,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
         if (!isValidUrl(command.url)) {
           // (3.25.1) Telemetry: invalid navigate URL — usually means the LLM
           // hallucinated a URL or pasted a fragment without a scheme.
-          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          try { tel.warn('page', 'Navigate rejected (invalid URL)', { stepCount, url: command.url }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           result = `Invalid URL: ${command.url}`;
           actionFailed = true;
         } else {
@@ -4993,7 +5055,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           try {
             const targetUrl = command.url;
             tel.info('page', `Navigating → ${typeof targetUrl === 'string' ? targetUrl.substring(0, 100) : String(targetUrl).substring(0, 100)}`, { stepCount, target: targetUrl, fromUrl: currentUrl });
-          } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+          } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
           // (3.49.1) Push undo entry before navigating so we can go back.
           try {
             undoStack.push({ type: 'navigate', tabId: tab, previousUrl: currentUrl || '' });
@@ -5008,7 +5070,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           // Re-inject content script on the new page
           const reinjected = await injectContentScript(tab);
           if (!reinjected) {
-            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+            try { tel.warn('page', 'Navigate: content script failed to load', { stepCount, url: command.url, durationMs: Date.now() - _navStart }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
             // In CDP mode, content script failure is expected — don't mark as action failure
             if (sharedState.cdpFallbackActive) {
               result = `Navigated to ${command.url}`;
@@ -5028,10 +5090,10 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
                 try {
                   const displayUrl = typeof arrivedUrl === 'string' ? arrivedUrl.substring(0, 100) : String(arrivedUrl).substring(0, 100);
                   tel.info('page', `Navigate ok → ${displayUrl}`, { stepCount, arrivedUrl, durationMs: Date.now() - _navStart });
-                } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+                } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
                 result = `Navigated to ${arrivedUrl}`;
               } else {
-                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+                try { tel.warn('page', 'Navigate landed elsewhere', { stepCount, intended: command.url, arrivedUrl, durationMs: Date.now() - _navStart }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
                 result = `Navigated but landed on ${arrivedUrl} instead of ${command.url}`;
                 actionFailed = true;
               }
@@ -5197,7 +5259,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           if (_blockedCount >= 2) {
             result = 'FORCE-FINISH: Page blocks all JS execution. Cannot extract data.';
             historyPush({ step: stepCount, action: command, result });
-            await persistHistory();
+            await _guardedPersistHistory();
             sendActionResult(stepCount, result, false);
             finished = true;
             break;
@@ -5205,7 +5267,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
           if (jsValue.includes('BLOCKED:')) {
             result = 'BLOCKED: Page rejected JavaScript execution. Try extract() or done().';
             historyPush({ step: stepCount, action: command, result });
-            await persistHistory();
+            await _guardedPersistHistory();
             sendActionResult(stepCount, result, false);
             await sleep(FIVE_HUNDRED_MS);
             continue;
@@ -5287,7 +5349,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
                   // FORCE FINISH after 2 duplicate blocks — don't let it try again
                   result = `FORCE-FINISH: Agent ran duplicate JS ${_dupCount} times. Data is in memory. Finishing now.`;
                   historyPush({ step: stepCount, action: command, result });
-                  await persistHistory();
+                  await _guardedPersistHistory();
                   sendActionResult(stepCount, result, false);
                   const _memKeys = Object.keys(agentMemory || {});
                   const _memSummary = _memKeys.length > 0 ? _memKeys.map(k => `${k}: ${String(agentMemory[k]).substring(0, 80)}`).join(', ') : 'no data';
@@ -5318,7 +5380,7 @@ STOP extracting. You MUST now call done() with a summary that directly ANSWERS e
 Use the data you already extracted — do NOT run execute_js again. Call done() NOW.`;
             result = `DATA READY: You have ${_memSize} chars. Process the data to answer the goal questions, then call done().`;
             historyPush({ step: stepCount, action: command, result });
-            await persistHistory();
+            await _guardedPersistHistory();
             sendActionResult(stepCount, result, false);
             sendSilentUpdate('[ENGINE] Analysis task detected — instructing model to process data and finish', stepCount);
             await sleep(FIVE_HUNDRED_MS);
@@ -5326,7 +5388,7 @@ Use the data you already extracted — do NOT run execute_js again. Call done() 
           }
           result = `AUTO-FINISH: You already have ${_memSize} chars of data in memory. Finishing now.`;
                     historyPush({ step: stepCount, action: command, result });
-                    await persistHistory();
+                    await _guardedPersistHistory();
                     sendActionResult(stepCount, result, false);
                     reportData = captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount);
                     chrome.runtime.sendMessage({ action: 'agent_finished', summary: `Task completed. Data collected: ${_memSummary}` }).catch(() => {});
@@ -5336,7 +5398,7 @@ Use the data you already extracted — do NOT run execute_js again. Call done() 
                   }
                 }
                 historyPush({ step: stepCount, action: command, result });
-                await persistHistory();
+                await _guardedPersistHistory();
                 sendActionResult(stepCount, result, false);
                 await sleep(FIVE_HUNDRED_MS);
                 continue;
@@ -5345,7 +5407,7 @@ Use the data you already extracted — do NOT run execute_js again. Call done() 
               if (String(result).startsWith('BLOCKED:') || String(result).includes('not approved by operator')) {
                 result = 'BLOCKED: execute_js was rejected. The page may block automation. Try extract() or navigate to a simpler page.';
                 historyPush({ step: stepCount, action: command, result });
-                await persistHistory();
+                await _guardedPersistHistory();
                 sendActionResult(stepCount, result, false);
                 await sleep(FIVE_HUNDRED_MS);
                 continue;
@@ -5390,7 +5452,7 @@ Use the data you already extracted — do NOT run execute_js again. Call done() 
               const bbox = await sendMessageWithRetry(tab, { action: 'get_bbox', ref: command.ref, selector: command.selector }, 1);
               if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
                 // Make sure the element is in view, then click via CDP at its center.
-                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+                try { await sendMessageWithRetry(tab, { action: 'execute_command', command: { type: 'scroll_to', ref: command.ref, selector: command.selector } }, 1); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
                 // Re-query bbox after scroll
                 let cx = bbox.x, cy = bbox.y;
                 try {
@@ -5500,7 +5562,7 @@ return { ok: true, value: el.value };
                     valStr.length > 50 && _prevHist.result.includes(valStr.substring(0, 100))) {
                   result = `DUPLICATE: Same data as previous step. Use done() now — data is in memory.`;
                   historyPush({ step: stepCount, action: command, result });
-                  await persistHistory();
+                  await _guardedPersistHistory();
                   sendActionResult(stepCount, result, false);
                   await sleep(FIVE_HUNDRED_MS);
                   continue;
@@ -5791,9 +5853,9 @@ return { ok: true, value: el.value };
               const newCtx = getTabContext(newTab.id);
               if (newCtx) newCtx.isAgentCreated = true;
               // (3.7.2) Attach the click-opened new tab to the Sentinel group.
-              try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+              try { await attachTabToSentinelGroup(newTab.id); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); _host = newUrl || 'new page'; }
               result = `Clicked -> new tab opened: ${_host}`;
             } else {
               // Single tab mode: capture URL, close new tab, navigate original (backward compat)
@@ -5804,7 +5866,7 @@ return { ok: true, value: el.value };
               await waitForPageLoad(tab);
               await sleep(FIVE_HUNDRED_MS);
               let _host;
-              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); _host = newUrl || 'new page'; }
+              try { _host = newUrl ? new URL(newUrl).hostname : 'new page'; } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); _host = newUrl || 'new page'; }
               result = `Clicked -> navigated to ${_host}`;
             }
           } else {
@@ -5824,7 +5886,7 @@ return { ok: true, value: el.value };
                 } else {
                   result = `Clicked -> navigated to ${_clickedHost}`;
                 }
-              } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); result = 'Clicked -> page navigated'; }
+              } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); result = 'Clicked -> page navigated'; }
             }
           }
         } catch (e) { console.warn('[Sentinel] click handler failed:', getErrorMessage(e)); }
@@ -5879,7 +5941,7 @@ return { ok: true, value: el.value };
         if (_consecutiveScrolls >= 3) {
           result = 'BLOCKED: Scrolled 3 times without extracting data. Use extract() or execute_js to read the page, or done() if you have the answer.';
           historyPush({ step: stepCount, action: command, result });
-          await persistHistory();
+          await _guardedPersistHistory();
           sendActionResult(stepCount, result, true);
           _consecutiveScrolls = 0;
           await sleep(FIVE_HUNDRED_MS);
@@ -5933,7 +5995,7 @@ return { ok: true, value: el.value };
               '(3) Try scrolling to reveal the button.' },
             result: 'Recovery from click_at loop + auto-overlay-dismiss'
           });
-          await persistHistory();
+          await _guardedPersistHistory();
           _clickAtLoopCount = 0;
           agentPlan = null;
           currentPlanStep = 0;
@@ -5983,7 +6045,7 @@ return { ok: true, value: el.value };
           action: { type: 'note', text: _recoveryMsg },
           result: `Recovery from ${command.type} loop`
         });
-        await persistHistory();
+        await _guardedPersistHistory();
         _sameCmdCount = 0;
         agentPlan = null;
         currentPlanStep = 0;
@@ -6013,7 +6075,7 @@ return { ok: true, value: el.value };
           : 'No data extracted';
         // BYPASS ALL GUARDS — set finished=true directly and skip to end of loop
         historyPush({ step: stepCount, action: { type: 'finish', summary: `Task completed. Data collected: ${_memSummary}` }, result: 'Force-finish from alternating loop detector' });
-        await persistHistory();
+        await _guardedPersistHistory();
         const finalSummary = `Task completed. Data collected: ${_memSummary}`;
         sendAgentStatus('complete', 'Task completed (force-finish after loop detection)');
         tel.info('lifecycle', 'Agent finished (force-finish)', { stepCount, reason: 'alternating-loop' });
@@ -6051,7 +6113,7 @@ return { ok: true, value: el.value };
             action: { type: 'note', text: `STALL RECOVERY: Re-assessing page state. Previous approach: ${stall.reason}` },
             result: 'Stall detected -- forcing page re-scan and strategy change'
           });
-          await persistHistory();
+          await _guardedPersistHistory();
 
           // Skip the normal sleep to recover faster
           continue;
@@ -6251,16 +6313,16 @@ return { ok: true, value: el.value };
       }
       // (3.8.2) Roll up old history into a single summary entry so the
       // LLM prompt stays bounded on long multi-portal runs.
-      try { maybeRollupHistory(history); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      try { maybeRollupHistory(history); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 
       // (3.8.2) Periodic progress checkpoint chat message.
-      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      try { maybePostProgressUpdate(stepCount, history, agentMemory); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 
       // Cap in-memory history
       if (history.length > CONFIG.maxHistoryEntries) {
         history.splice(0, history.length - CONFIG.maxHistoryEntries);
       }
-      await persistHistory();
+      await _guardedPersistHistory();
       // Service-worker resilience checkpoint (#16, full). State is persisted
       // to chrome.storage.session every step; restoreFromCheckpoint() in
       // index.js can reconstruct the full in-memory state on SW restart.
@@ -6406,7 +6468,7 @@ return { ok: true, value: el.value };
   }
 
   // Release any CDP debugger attachments held during the run.
-  try { await detachAllDebuggees(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await detachAllDebuggees(); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 
   // (v21.5.4) Close agent-opened tabs BEFORE detaching (detach clears the set)
   try { await closeAttachedTabsExceptPrimary(); } catch (e) { console.warn('[Sentinel] Close attached tabs failed:', getErrorMessage(e)); }
@@ -6414,7 +6476,7 @@ return { ok: true, value: el.value };
   await closeAllAgentTabs();
 
   // (3.7.2) Dissolve the visual tab group at natural loop end too.
-  try { await detachAllSentinelTabs(); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+  try { await detachAllSentinelTabs(); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 
   agentRunning = false;
   console.debug(`[Sentinel] Agent completed. Total API calls: ${apiCallCount}`);
