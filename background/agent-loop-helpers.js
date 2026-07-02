@@ -119,7 +119,7 @@ export function buildVisionSystemPrompt() {
     '<actions>',
     'RESPONSE FORMAT (JSON):',
     '{"thinking":"brief reasoning","tool":"click|extract|execute_js|done","args":{}}',
-    'click: {"index":N} | extract: {} | execute_js: {"code":"..."} | done: {"text":"answer"}',
+    'click: {"tool":"click","args":{"index":N}} | extract: {"tool":"extract","args":{}} | execute_js: {"tool":"execute_js","args":{"code":"..."}} | done: {"tool":"done","args":{"text":"answer"}}',
     '</actions>',
     '<output_format>',
     '<visual_grounding>'

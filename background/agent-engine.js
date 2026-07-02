@@ -3496,7 +3496,16 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
             // parseVisionResponse mirrors the legacy path's multi-tier hardening
             // (strip <think>/fences → sanitize → balanced-object extraction →
             // regex salvage) so a single malformed brace doesn't cost a step.
-            const _vParsed = parseVisionResponse(_vRaw);
+            const _vParsed = (() => {
+              const raw = parseVisionResponse(_vRaw);
+              if (!raw) return null;
+              // (v21.6.67) Normalize flat {tool, args} format to {action: {type, ...args}}
+              // GLM follows the prompt format which uses "tool"/"args" instead of "action.type"
+              if (!raw.action && raw.tool) {
+                return { action: { type: raw.tool, ...(raw.args || {}) }, thinking: raw.thinking, evaluation: raw.evaluation };
+              }
+              return raw;
+            })();
             if (!_vParsed) console.warn('[Sentinel/v4] Vision: response not parseable:', (_vRaw || '').slice(0, 200));
 
             if (_vParsed && _vParsed.action) {
@@ -3620,7 +3629,7 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
           const contradictionCheck = analyzeForContradictions(historyText);
           if (contradictionCheck.hasContradictions) {
             logContradictionDetection(contradictionCheck, stepCount);
-            console.warn('[Sentinel] Contradictions detected in prompt history:', contradictionCheck);
+            console.debug('[Sentinel] Contradiction check (non-blocking):', contradictionCheck.contradictions?.length || 0, 'found');
           }
         }
         try {
