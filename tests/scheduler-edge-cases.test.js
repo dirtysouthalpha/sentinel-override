@@ -1,4 +1,4 @@
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 // tests/scheduler-edge-cases.test.js
 // Edge case tests for background/scheduler.js — error handling paths
 

@@ -60,7 +60,7 @@ globalThis.chrome = {
 
 // ── Import module and mock after mocks are set up ─────────────────────────────
 const { uapServer } = await import('../background/uap-server.js');
-const { executeGoal: mockExecuteGoal } = await import('../background/agent-engine.js');
+const { startAgent: mockExecuteGoal } = await import('../background/agent-engine.js');
 
 beforeEach(() => {
   jest.clearAllMocks();

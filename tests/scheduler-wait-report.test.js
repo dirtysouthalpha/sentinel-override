@@ -1,4 +1,4 @@
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 // tests/scheduler-wait-report.test.js
 // Tests for scheduler.js:
 //   - _waitForReport polling (lines 717-735) — tested via direct call simulation

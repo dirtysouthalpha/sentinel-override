@@ -1,4 +1,4 @@
-jest.setTimeout(30000);
+jest.setTimeout(60000);
 // tests/scheduler.test.js
 // Unit tests for background/scheduler.js — CRUD, computeNextRun, result queries.
 

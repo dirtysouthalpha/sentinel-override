@@ -384,7 +384,7 @@ export async function storeNoveltyResult(runId, data, result) {
 
     // Persist
     const key = `${STORAGE_KEY}_${runId}`;
-    try { await chrome.storage.local.set({ [key]: history }); } catch (_) { /* storage quota — non-fatal */ }
+    try { await chrome.storage.local.set({ [key]: history }); } catch (e) { console.error('Failed to store novelty result:', e && e.message ? e.message : String(e)); }
   } catch (e) {
     console.error('[Sentinel] Failed to store novelty result:', getErrorMessage(e));
   }
