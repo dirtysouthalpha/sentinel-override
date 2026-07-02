@@ -132,7 +132,7 @@ function _buildMemorySummary(agentMemory) {
   // (3.50.0) Hard-cap each memory entry at 400 chars — keeps report prompt
   // small enough to avoid timeouts on slower models.
   const memorySummary = usableKeys.length
-    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 3000)}`).join('\n')
+    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 4000)}`).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
   const citableKeysList = usableKeys.length
     ? usableKeys.map(k => `\`${k}\``).join(', ')
@@ -160,92 +160,30 @@ function _buildMemorySummary(agentMemory) {
 // Build the report-generation prompt from execution data pieces.
 // Returns the user-content prompt string for the LLM report writer.
 function _buildReportPrompt(goal, planContext, stepCount, apiCallCount, timestamp, condensedHistory, memorySummary, tabReferences, citableKeysList) {
-  return `You are a brilliant research analyst and writer — think Claude-quality output. Your job is to take raw data collected by a browser agent and produce a polished, insightful report that the user actually WANTS to read.
-
-## Original Goal
-${goal}
-
-${planContext}
-
-## How the Agent Collected Data
-- Total steps: ${stepCount}
-- API calls: ${apiCallCount}
-- Timestamp: ${timestamp}
-
-## Raw Action History
-${condensedHistory.map(h => `[${h.action}] ${h.result}`).join('\n')}
-
-## Raw Extracted Data
-${memorySummary}
-
-${tabReferences}
-
----
-
-## YOUR TASK
-
-**First, answer the user's original goal directly.** The goal was: "${goal}". Scan the raw extracted data for specific facts, names, numbers, and dates that answer this goal. Lead your report with the direct answer.
-
-Then synthesize the raw extracted data into a clean, compelling report. Follow these principles:
-
-### Writing Style
-- **Conversational but authoritative** — like a knowledgeable colleague briefing you over coffee, not a robot reading a list
-- **Lead with insight** — open with a 1-2 sentence executive summary that answers the user's core question
-- **Specific > vague** — use actual names, numbers, dates, quotes, URLs. "3.2 million users" not "a large number of users"
-- **Contextualize** — don't just list facts; explain WHY they matter. Connect dots between data points
-- **Structured for scanning** — use headers, numbered lists, bold key terms. The user should find any detail in <5 seconds
-
-### Output Format
-Adapt to the task type:
-
-**For news briefings (top N articles):**
-→ Lead with "Here's your briefing on [topic]..."
-→ Each item: **numbered headline** → 2-3 sentence summary of what happened and why it matters → source link
-→ End with "Bottom line:" — one sentence takeaway
-
-**For research/analysis tasks:**
-→ Lead with the answer/conclusion upfront
-→ Then support with evidence in structured sections
-→ End with recommendations or next steps
-
-**For comparisons:**
-→ Side-by-side format with specific data points
-→ Clear verdict with reasoning
-
-**For data extraction (configs, logs, etc.):**
-→ Clean structured format (tables, key-value pairs)
-→ Anomalies or notable findings highlighted
-→ Summary of what was found
-
-### Rules
-- ONLY use data that was actually extracted — NEVER fabricate, infer, or use training data
-- If data is incomplete or missing, say so explicitly rather than guessing
-- If extracted data contains errors/failed extractions, skip those and work with what succeeded
-- Keep the report tight — every sentence should earn its place
-- Use proper markdown formatting (headers, bold, lists, links)
-- Do NOT wrap in code fences or JSON
-- Return ONLY the report, nothing else
-
-### Source-Cited Outputs (MANDATORY)
-Every specific factual claim in your report — numbers, prices, dates, statistics, named quotes, named people / companies / IPs, URLs you actually visited — MUST end with an inline tag in the form **\`[src:memory_key]\`** where \`memory_key\` is one of the keys listed below in "Available memory keys to cite from". The popup renders these as clickable orange chips that expand the underlying data, so the reader can audit any claim back to its source.
-
-**Available memory keys to cite from:** ${citableKeysList}
-
-Examples of correctly cited claims:
-
-- "M4 Max Mac Studio starts at $1,999 [src:apple_store_pricing]"
-- "47 sign-ins from IP 203.0.113.42 [src:entra_signins]"
-- "Repository has 110,000 stars [src:github_repo_meta]"
-
-Hard rules:
-
-1. **Every** number, price, date, percentage, statistic, named entity, named quote, or specific URL needs a \`[src:key]\` tag pointing to a real memory key from the list above.
-2. If a claim has NO supporting memory key (e.g., it's general framing or your interpretation), either drop the specific number / leave it un-cited as prose, OR tag it \`[unverified]\` and move it to a "Caveats" section.
-3. Do NOT invent memory keys. If you can't find a real key for a claim, either remove the claim or mark it \`[unverified]\`.
-4. Headers, transitions, and structural prose do not need tags — only specific factual claims do.
-5. Cite generously — overcitation is acceptable; under-citation is not.
-
-This is not optional. A report with specific numbers but no \`[src:*]\` tags is broken, even if the prose looks polished.`;
+  const historyText = condensedHistory.map(function(h) { return '[' + h.action + '] ' + h.result; }).join('\n');
+  return [
+    'Answer the user\'s goal using the extracted data below. Be direct, specific, and concise.',
+    '',
+    '## Goal',
+    goal,
+    '',
+    planContext ? planContext : '',
+    '',
+    '## Extracted Data',
+    memorySummary,
+    '',
+    '## Action History',
+    historyText,
+    '',
+    tabReferences ? tabReferences : '',
+    '',
+    '## Instructions',
+    '1. Answer the goal FIRST with specific facts (names, dates, numbers) from the data',
+    '2. Use markdown headers, bold, and lists for readability',
+    '3. Cite specific claims with [src:key] tags. Available keys: ' + citableKeysList,
+    '4. If data is missing, say so. Never fabricate.',
+    '5. Return ONLY the report, no code fences'
+  ].join('\n');
 }
 
 export async function generateReport(executionData, CONFIG) {
@@ -266,7 +204,7 @@ export async function generateReport(executionData, CONFIG) {
     step: h.step,
     action: h.action ? h.action.type : 'unknown',
     detail: (function() { const a = h.action; return a && a.selector && typeof a.selector === 'string' ? a.selector.substring(0, 80) : (a && (a.url || a.text) || ''); })(),
-    result: typeof h.result === 'string' ? h.result.substring(0, 150) : (h.result != null ? String(h.result).substring(0, 150) : '')
+    result: typeof h.result === 'string' ? h.result.substring(0, 400) : (h.result != null ? String(h.result).substring(0, 150) : '')
   }));
   // Collapse consecutive duplicate steps so loop noise — e.g. the same
   // execute_js fired dozens of times when the agent is stuck — doesn't dominate
@@ -337,7 +275,13 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const providerConfig = await getActiveProvider();
+      const providerConfig = await (async () => {
+        try {
+          const tp = await getTextProvider();
+          if (tp && tp.apiKey) return tp;
+        } catch (_) {}
+        return await getActiveProvider();
+      })();
       if (!providerConfig) throw new Error('No active provider configured');
       const { endpoint, apiKey, model } = providerConfig;
       if (!apiKey) throw new Error('API key not configured');
@@ -424,6 +368,37 @@ async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   }
   throw lastError;
 }
+// ========== Fallback Report Formatter ==========
+function _formatFallbackReport(fb) {
+  const lines = [];
+  lines.push('## Investigation Report');
+  lines.push('');
+  if (fb.meta && fb.meta.goal) {
+    lines.push('**Goal:** ' + fb.meta.goal);
+    lines.push('');
+  }
+  if (fb.findings && Object.keys(fb.findings).length > 0) {
+    lines.push('### Extracted Data');
+    lines.push('');
+    for (const [key, val] of Object.entries(fb.findings)) {
+      const valStr = typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+      const display = valStr.length > 4000 ? valStr.substring(0, 4000) + '... [truncated]' : valStr;
+      lines.push('**' + key + ':**');
+      lines.push(display);
+      lines.push('');
+    }
+  } else {
+    lines.push('No structured data was extracted during this run.');
+    lines.push('');
+  }
+  if (fb.meta) {
+    lines.push('### Run Details');
+    lines.push('- Steps: ' + (fb.meta.totalSteps || 0));
+    lines.push('- API calls: ' + (fb.meta.apiCallCount || 0));
+  }
+  return lines.join('\n');
+}
+
 // ========== Structured Data Builder ==========
 /**
  * Builds a machine-readable JSON object from raw execution data.

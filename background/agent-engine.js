@@ -1922,7 +1922,9 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastLoopUrl = '';
   let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 2 total loops
   let _blockedCount = 0;  // (v21.6.38) Track BLOCKED execute_js calls
-let _clickAtBlockCount = 0;  // (v21.6.71) Track consecutive click_at blocks
+let _clickAtBlockCount = 0;
+    _executeJsDataExtracted = false;
+let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at blocks
   while (!finished && agentRunning) {
 
     // (v3.60 / fixed): Batch commands are drained just before the LLM consult
@@ -4903,7 +4905,7 @@ finished = true;
             // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
       // v21.6.71: Force-finish after 2 consecutive click_at blocks
       // v21.6.72: Auto-extract page content on first click_at block
-      if (command.type === 'click_at' && Object.keys(agentMemory).length > 0 && Object.values(agentMemory).some(v => v && String(v).length > 500)) {
+      if ((command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref && typeof command.x !== 'number')) && Object.keys(agentMemory).length > 0 && Object.values(agentMemory).some(v => v && String(v).length > 500)) {
         _clickAtBlockCount = 2;
         result = 'FORCE-FINISH: Data already in memory — no need to click. Finishing now.';
         activityDone(stepCount, 'dispatch', 'Instant finish: data exists + click_at attempted', null);
@@ -4913,7 +4915,7 @@ finished = true;
         finished = true;
         break;
       }
-      if (command.type === 'click_at' && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
+      if ((command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref)) && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
         _clickAtBlockCount++;
 
         // On first block, auto-extract page content so we have data even if model keeps trying click_at
