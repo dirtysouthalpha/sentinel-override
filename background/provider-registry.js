@@ -917,6 +917,30 @@ export async function getActiveProvider() {
  *
  * This is idempotent: if the new structure already exists, it does nothing.
  */
+// (v21.6.68) Returns text provider config if configured separately
+export async function getTextProvider() {
+  try {
+    const result = await chrome.storage.local.get(['text_provider']);
+    const tp = result.text_provider;
+    if (!tp || !tp.id || !tp.endpoint) return null;
+
+    // Look up provider definition for body/parsing builders
+    const providerDef = PROVIDERS[tp.id] || PROVIDERS.openai;
+    return {
+      id: tp.id,
+      ...providerDef,
+      endpoint: tp.endpoint,
+      apiKey: tp.apiKey || '',
+      model: tp.model || providerDef.defaultModel || '',
+      maxTokens: 8000,
+      temperature: 0.3
+    };
+  } catch (e) {
+    console.warn('[Sentinel/provider-registry] getTextProvider failed:', getErrorMessage(e));
+    return null;
+  }
+}
+
 export async function migrateLegacySettings() {
   let stored;
   try {

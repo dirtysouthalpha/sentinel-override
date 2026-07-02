@@ -1308,6 +1308,45 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   }
   refreshCatalog();
 
+  // (v21.6.68) Populate text provider dropdown
+  const textSel = document.getElementById('textProviderSelect');
+  if (textSel) {
+    function refreshTextProvider() {
+      textSel.innerHTML = '<option value="">- Same as Vision (default) -</option>';
+      for (const p of catalog) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.label;
+        textSel.appendChild(opt);
+      }
+      chrome.storage.local.get(['text_provider'], (result) => {
+        if (result.text_provider && result.text_provider.id) {
+          textSel.value = result.text_provider.id;
+        }
+      });
+    }
+    setTimeout(refreshTextProvider, 800);
+
+    textSel.addEventListener('change', async () => {
+      const selectedId = textSel.value;
+      if (!selectedId) {
+        await chrome.storage.local.remove(['text_provider']);
+        return;
+      }
+      const entry = catalog.find(p => p.id === selectedId);
+      if (!entry) return;
+      const state = getState();
+      const visionConfig = (state.providerConfigs || {})[state.activeProviderId] || {};
+      const textConfig = {
+        id: entry.id,
+        endpoint: entry.endpoint,
+        model: entry.defaultModel || entry.model || '',
+        apiKey: (entry.id === state.activeProviderId) ? (visionConfig.api_key || '') : ''
+      };
+      await chrome.storage.local.set({ text_provider: textConfig });
+    });
+  }
+
   sel.addEventListener('change', () => {
     const id = sel.value;
     if (!id) return;

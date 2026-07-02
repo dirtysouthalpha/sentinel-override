@@ -541,7 +541,7 @@ const textResult = await cdpExecuteJs(tab,
 
 import {sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate} from './message-protocol.js';
 import {generateReport, buildFallbackReport} from './report-generator.js';
-import {getActiveProvider} from './provider-registry.js';
+import {getActiveProvider, getTextProvider} from './provider-registry.js';
 import {isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive} from './shared-state.js';
 import {getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount} from './tab-context.js';
 import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
@@ -3346,6 +3346,50 @@ async function runAgentLoop(goal, workingTabId) {
           }
         ];
 
+        // (v21.6.68) PARALLEL DUAL-PROVIDER: Fire text call simultaneously
+        let _parallelTextPromise = null;
+        try {
+          const _tp = await getTextProvider().catch(() => null);
+          if (_tp && _tp.apiKey) {
+            const _textMessages = [
+              { role: 'system', content: 'You are a browser automation agent. Respond with a JSON action object.' },
+              { role: 'user', content: _visionUserContent }
+            ];
+            const _textBody = JSON.stringify({
+              model: _tp.model,
+              messages: _textMessages,
+              max_tokens: 1200,
+              temperature: 0
+            });
+            _parallelTextPromise = (async () => {
+              const _ctrl = new AbortController();
+              const _timeoutId = setTimeout(() => _ctrl.abort(), FORTY_FIVE_SECONDS_MS);
+              try {
+                const _resp = await fetch(_tp.endpoint, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${_tp.apiKey}` },
+                  body: _textBody,
+                  signal: _ctrl.signal
+                });
+                if (_resp.ok) {
+                  const _data = await _resp.json();
+                  const _msg = _data.choices && _data.choices[0] ? _data.choices[0].message : null;
+                  const _raw = (_msg && _msg.content) || (_msg && _msg.reasoning_content) || '';
+                  const _parsed = parseVisionResponse(_raw);
+                  console.info('[Sentinel/parallel] Text provider responded in parallel');
+                  return _parsed;
+                }
+                return null;
+              } catch (_te) {
+                console.debug('[Sentinel/parallel] Text provider error (non-fatal):', getErrorMessage(_te));
+                return null;
+              } finally {
+                clearTimeout(_timeoutId);
+              }
+            })();
+          }
+        } catch (_tpErr) { /* text provider init failed — non-fatal */ }
+
         try {
           const _vProviderConfig = await getActiveProvider().catch(() => null);
           const _vEndpoint = (_vProviderConfig && _vProviderConfig.endpoint) || 'https://api.z.ai/api/coding/paas/v4/chat/completions';
@@ -3580,6 +3624,31 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
         } catch (e) {
           console.warn('[Sentinel/v4] Vision LLM call failed, falling back:', getErrorMessage(e));
           try { await cdpExecuteJs(tab, VISION_CLEAR, { timeout: THREE_SECONDS_MS }); } catch (_e) { /* vision cleanup failed - non-fatal */ }
+        }
+      }
+
+      // (v21.6.68) PARALLEL DUAL-PROVIDER: Check if text provider already responded
+      if (!command || !command.type) {
+        if (_parallelTextPromise) {
+          try {
+            const _parallelTextResult = await _parallelTextPromise;
+            if (_parallelTextResult && _parallelTextResult.action) {
+              command = _parallelTextResult.action;
+              console.info('[Sentinel/parallel] Using text provider result (vision failed/empty)', JSON.stringify(command).substring(0, 100));
+              agentState.apiCallCount++;
+              apiCallCount = agentState.apiCallCount;
+              _lastAiCallMs = Date.now() - _aiStart;
+              activityDone(stepCount, 'consult-ai', `Parallel text decided: ${command.type}`, null);
+              tel.info('llm', `Parallel text LLM decided: ${command.type}`, { durationMs: _lastAiCallMs, commandType: command.type });
+            } else if (_parallelTextResult && _parallelTextResult.type) {
+              command = _parallelTextResult;
+              console.info('[Sentinel/parallel] Using text provider result (alt format)', JSON.stringify(command).substring(0, 100));
+              agentState.apiCallCount++;
+              apiCallCount = agentState.apiCallCount;
+            }
+          } catch (_ptErr) {
+            console.debug('[Sentinel/parallel] Text provider await failed (non-fatal):', getErrorMessage(_ptErr));
+          }
         }
       }
 
