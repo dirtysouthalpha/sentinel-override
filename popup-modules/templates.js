@@ -39,13 +39,7 @@ function _getLastErrorMessage() {
 }
 
 // eslint-disable-next-line no-unused-vars
-function showTemplatesPanel() {
-  _setDisplay('templates-panel', 'flex');
-  _setDisplay('chat-container', 'none');
-  _setDisplay('input-area', 'none');
-  _toggleClass('templatesBtn', 'active', true);
-  loadTemplates();
-}
+
 
 function hideTemplatesPanel() {
   _setDisplay('templates-panel', 'none');

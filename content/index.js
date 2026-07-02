@@ -1182,72 +1182,12 @@ if (window.__sentinelInitialized) {
   // but allows all normal DOM read/write operations.
   // sandboxedWin is the already-proxied window, returned when code accesses document.defaultView.
 
-  function _createSandboxedDocument(doc, sandboxedWin) {
-    return new Proxy(doc, {
-      get(target, prop, _receiver) {
-        // Block sensitive document properties (cookie, domain, referrer, location, write, writeln)
-        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) {
-          console.warn(`[Sentinel Sandbox] Blocked access to document.${String(prop)} in execute_js`);
-          return undefined;
-        }
-        // When code asks for document.defaultView, return the sandboxed window proxy
-        if (prop === 'defaultView') {
-          return sandboxedWin;
-        }
-        // Pass through everything else, binding methods to the real document
-        const value = target[prop];
-        if (typeof value === 'function') {
-          return value.bind(target);
-        }
-        return value;
-      },
-      set(target, prop, value) {
-        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) {
-          console.warn(`[Sentinel Sandbox] Blocked write to document.${String(prop)} in execute_js`);
-          return true; // silently swallow the write
-        }
-        target[prop] = value;
-        return true;
-      },
-      has(target, prop) {
-        if (EXECUTE_JS_BLOCKED_DOC_PROPS.has(prop)) return false;
-        return prop in target;
-      }
-    });
-  }
+
 
   // Creates a Proxy wrapping the window that blocks dangerous APIs
   // while allowing safe properties (console, Math, setTimeout, etc.) through.
 
-  function _createSandboxedWindow(win) {
-    return new Proxy(win, {
-      get(target, prop, _receiver) {
-        // Block all dangerous window APIs
-        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) {
-          console.warn(`[Sentinel Sandbox] Blocked access to window.${String(prop)} in execute_js`);
-          return undefined;
-        }
-        // Pass through safe properties, binding methods to the real window
-        const value = target[prop];
-        if (typeof value === 'function') {
-          return value.bind(target);
-        }
-        return value;
-      },
-      set(target, prop, value) {
-        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) {
-          console.warn(`[Sentinel Sandbox] Blocked write to window.${String(prop)} in execute_js`);
-          return true; // silently swallow the write
-        }
-        target[prop] = value;
-        return true;
-      },
-      has(target, prop) {
-        if (EXECUTE_JS_BLOCKED_APIS.has(prop)) return false;
-        return prop in target;
-      }
-    });
-  }
+
 
   // ========== Ref / Selector Element Resolution (#10) ==========
   // Single entry point for resolving a command's target element. Prefers

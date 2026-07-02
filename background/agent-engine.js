@@ -588,14 +588,7 @@ async function _enforceTabLimit() {
 let _lastSilentUpdate = 0;
 const _SILENT_UPDATE_INTERVAL = 200; // min 200ms between silent updates
 
-async function sendSilentUpdateThrottled(data) {
-  const now = Date.now();
-  if (now - _lastSilentUpdate < _SILENT_UPDATE_INTERVAL) return; // throttle
-  _lastSilentUpdate = now;
-  try {
-    await chrome.runtime.sendMessage({ type: 'AGENT_SILENT_UPDATE', ...data });
-  } catch (e) { /* popup closed */ }
-}
+
 const _ERR_PREFIX = '[Sentinel] Error in agent-engine.js:';
 let agentRunning = false;
 let _consecutiveScrolls = 0; // (v21.6.21) Track consecutive scrolls to prevent scroll loops
@@ -605,50 +598,12 @@ let lastApiCallTime = 0;
 // v21.6.59: Deduplicate memory keys to prevent accumulation
 // v21.6.59: Maximum memory keys guard
 const _MAX_MEMORY_KEYS = 15;
-function _enforceMemoryLimit() {
-  const keys = Object.keys(agentMemory || {});
-  if (keys.length > _MAX_MEMORY_KEYS) {
-    const excess = keys.length - _MAX_MEMORY_KEYS;
-    for (let i = 0; i < excess; i++) delete agentMemory[keys[i]];
-  }
-}
-function dedupeMemoryKeys() {
-  const keys = Object.keys(agentMemory || {});
-  if (keys.length < 5) return;
-  // Remove keys that are substrings of other keys (likely duplicates)
-  for (let i = 0; i < keys.length; i++) {
-    for (let j = i + 1; j < keys.length; j++) {
-      const a = agentMemory[keys[i]] || '';
-      const b = agentMemory[keys[j]] || '';
-      if (a.length > 50 && b.length > 50) {
-        const shorter = a.length < b.length ? a : b;
-        const longer = a.length < b.length ? b : a;
-        if (longer.includes(shorter.substring(0, 100))) {
-          // Delete the shorter duplicate
-          delete agentMemory[keys[i]];
-          break;
-        }
-      }
-    }
-  }
-}
+
+
 // v21.6.59: Smarter JS duplicate detection
 let _consecutiveJsDuplicates = 0;
 let _lastJsCode = '';
-function _checkJsDuplicate(code) {
-  const normalized = code.replace(/\s+/g, ' ').substring(0, 200);
-  if (normalized === _lastJsCode) {
-    _consecutiveJsDuplicates++;
-    if (_consecutiveJsDuplicates >= 2) {
-      _consecutiveJsDuplicates = 0;
-      return true; // force finish
-    }
-  } else {
-    _consecutiveJsDuplicates = 0;
-    _lastJsCode = normalized;
-  }
-  return false;
-}
+
 let agentMemory = {};           // Extract-and-remember: carries data between pages
 let _lastTenantForMemory = null; // (v21.6) Track tenant for per-client memory isolation
 
@@ -1062,11 +1017,7 @@ function trimHistory() {
 }
 
 let _lastPersistedHistoryLen = -1;
-async function persistHistory_guarded() {
-  if (history.length === _lastPersistedHistoryLen) return; // skip if unchanged
-  _lastPersistedHistoryLen = history.length;
-  return _guardedPersistHistory();
-}
+
 async function persistHistory() {
   // (3.41.0) Dirty-bit guard: skip the storage write when nothing has
   // changed since the last persist. Eliminates ~30 redundant writes per run
