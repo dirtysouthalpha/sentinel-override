@@ -4895,8 +4895,32 @@ finished = true;
       // different strategy next step.
             // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
       // v21.6.71: Force-finish after 2 consecutive click_at blocks
+      // v21.6.72: Auto-extract page content on first click_at block
       if (command.type === 'click_at' && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
         _clickAtBlockCount++;
+
+        // On first block, auto-extract page content so we have data even if model keeps trying click_at
+        if (_clickAtBlockCount === 1) {
+          try {
+            const [{ result: extractResult }] = await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => document.body.innerText.substring(0, 16000)
+            });
+            if (extractResult && extractResult.length > 100) {
+              const savedKey = 'page_content';
+              agentMemory[savedKey] = extractResult;
+              result = `AUTO-EXTRACTED: ${extractResult.length} chars saved to page_content. click_at is not supported — use done() to finish or extract() for structured data.`;
+              activityDone(stepCount, 'dispatch', `Auto-extracted ${extractResult.length} chars (click_at fallback)`, null);
+              sendActionResult(stepCount, result, false);
+              historyPush({ step: stepCount, action: { type: 'execute_js', key: savedKey }, result });
+              await _guardedPersistHistory();
+              await sleep(EIGHT_HUNDRED_MS);
+              continue;
+            }
+          } catch (_extractErr) { /* fall through to normal block */ }
+        }
+
+        // Second block: force-finish with whatever data we have
         if (_clickAtBlockCount >= 2) {
           result = `FORCE-FINISH: click_at blocked ${_clickAtBlockCount} times. Data extraction preferred — finishing now.`;
           activityDone(stepCount, 'dispatch', 'Force-finish: click_at loop detected', null);
@@ -4906,7 +4930,7 @@ finished = true;
           finished = true;
           break;
         }
-        result = 'BLOCKED: click_at requires numeric x/y coordinates. Use click(index) from the observation panel instead. The observation panel lists clickable elements with their index numbers.';
+        result = 'BLOCKED: click_at requires numeric x/y coordinates. Data already auto-extracted to page_content — use done() to finish.';
         activityFail(stepCount, 'dispatch', 'Click at (no target)', { result });
         sendActionResult(stepCount, result, true);
         historyPush({ step: stepCount, action: command, result });
