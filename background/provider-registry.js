@@ -619,6 +619,15 @@ Object.assign(PROVIDERS.zai, {
   buildBodyWithTools: PROVIDERS.openai.buildBodyWithTools
 });
 
+// LongCat inherits OpenAI-compatible body/vision/tool builders
+Object.assign(PROVIDERS.longcat, {
+  buildBody: PROVIDERS.openai.buildBody,
+  buildVisionContent: PROVIDERS.openai.buildVisionContent,
+  convertToolsToOpenAIFormat: PROVIDERS.openai.convertToolsToOpenAIFormat,
+  buildBodyWithTools: PROVIDERS.openai.buildBodyWithTools
+});
+
+
 // ========== Vision Capability Registry ==========
 // Per-provider/model vision (image input) support. Used by getModelSupportsVision()
 // to give a deterministic answer for known models, with regex fallback for
@@ -1196,7 +1205,15 @@ export const PROVIDER_CATALOG = [
     defaultModel: '',
     auth: 'bearer',
     docsUrl: ''
-  }
+  },
+  // ── LongCat AI ──
+  {
+    id: 'longcat', label: 'LongCat AI', kind: 'openai',
+    endpoint: 'https://api.longcat.chat/openai/v1/chat/completions',
+    defaultModel: 'LongCat-2.0',
+    auth: 'bearer',
+    docsUrl: 'https://longcat.chat/platform/docs/'
+  },
 ];
 
 /**
