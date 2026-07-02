@@ -1,0 +1,31 @@
+import { diagnoseFailure, getDomainFromUrl, extractWinningStrategy } from '../background/agent-adaptive.js';
+
+describe('agent-adaptive', () => {
+  describe('getDomainFromUrl', () => {
+    test('extracts domain from URL', () => {
+      expect(getDomainFromUrl('https://www.example.com/page')).toBe('example.com');
+    });
+    test('handles subdomain', () => {
+      expect(getDomainFromUrl('https://portal.microsoft.com/dashboard')).toBe('portal.microsoft.com');
+    });
+    test('handles null', () => {
+      expect(getDomainFromUrl(null)).toBe('unknown');
+      expect(getDomainFromUrl('')).toBe('unknown');
+    });
+  });
+
+  describe('diagnoseFailure', () => {
+    test('returns null for null input', () => {
+      expect(diagnoseFailure(null, null)).toBeNull();
+    });
+  });
+
+  describe('extractWinningStrategy', () => {
+    test('returns null for empty history', () => {
+      expect(extractWinningStrategy([], 'test.com')).toBeNull();
+    });
+    test('returns null for null history', () => {
+      expect(extractWinningStrategy(null, 'test.com')).toBeNull();
+    });
+  });
+});

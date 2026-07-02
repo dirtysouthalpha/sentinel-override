@@ -11,6 +11,7 @@ import { isComplexGoal, buildDecompositionPrompt, parseDecomposition, buildSubTa
 import {detectCaptcha, _generateSmartRecovery, _universalCdpFallback, recoverFromCaptcha, _isUnproductiveJsResult, _runExecuteJsOnce, _runExecuteJsWithRetryLadder, _shouldAcceptMemoryWrite, _checkPreFinishCompleteness, _detectActionTypeLoop} from './agent-captcha.js';
 import {summarizeHistoryBatch, maybeRollupHistory, detectStall} from './agent-progress.js';
 import {getBrainStartupContext, resetBrainRunSignals} from './brain-client.js';
+import { detectPageType, getPageStrategyHint } from './agent-page-type.js';
 import {publishRunLearning, resetBrainProducerRunSignals} from './brain-producer.js';
 import {waitForPageLoad, waitForPageReady, injectContentScript, sendMessageWithRetry, takeScreenshot, isValidUrl, getTabInfo, detachAllDebuggees, cdpDispatchClick, cdpDispatchType, cdpDispatchKey, cdpExecuteJs, readConsoleMessages, readNetworkRequests} from './tab-manager.js';
 import {CONFIG, MAX_PAGE_TEXT_LENGTH, TEXT_SAMPLE_LENGTH as _TEXT_SAMPLE_LENGTH, MAX_WAIT_TIME_MS, ONE_HUNDRED_MS, ONE_HUNDRED_FIFTY_MS, TWO_HUNDRED_MS, THREE_HUNDRED_MS, FOUR_HUNDRED_MS, FIVE_HUNDRED_MS, EIGHT_HUNDRED_MS, ONE_SECOND_MS, TWO_SECONDS_MS, THREE_SECONDS_MS, FIVE_SECONDS_MS, TEN_SECONDS_MS, FIFTEEN_SECONDS_MS, TWENTY_SECONDS_MS, FORTY_FIVE_SECONDS_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
@@ -1955,6 +1956,16 @@ async function runAgentLoop(goal, workingTabId) {
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
       try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error('[Sentinel] Error in agent-engine.js:', getErrorMessage(e)); }
+      // v21.6.58: Progressive summarization every 8 steps
+      if (stepCount > 0 && stepCount % 8 === 0 && history.length > 6) {
+        try {
+          const _psum = buildProgressSummary(history, agentMemory, stepCount);
+          if (_psum) {
+            loopDirective = (loopDirective || '') + '\n' + _psum;
+            sendSilentUpdate('[ENGINE] Progress summary injected', stepCount);
+          }
+        } catch(_se) { /* best-effort */ }
+      }
       
       // Phase 5: Take profiling sample periodically (every _profilingInterval steps)
       if (profilingEnabled && stepCount % _profilingInterval === 0) {
@@ -3114,6 +3125,12 @@ async function runAgentLoop(goal, workingTabId) {
       // it can pace itself. Multi-portal investigations especially benefit
       // from knowing they have 200 vs 50 steps remaining.
       const _budgetHint = buildBudgetHint(stepCount, dynamicMaxSteps, productiveSteps);
+      // v21.6.58: Enhanced budget awareness — show what data we have vs what we need
+      const _memKeys = Object.keys(agentMemory || {});
+      if (_memKeys.length > 0 && stepCount > 3) {
+        const _memHint = "\n[STEP " + stepCount + "/" + dynamicMaxSteps + "] " + (dynamicMaxSteps - stepCount) + " steps remaining. Data: " + _memKeys.length + " key(s) collected. Prioritize remaining goals.";
+        loopDirective = (loopDirective || '') + _memHint;
+      }
         'Aimless read_page / scroll = unproductive (does not extend).';
       
       // v4.0 Vision-First Observation Override
@@ -3278,11 +3295,21 @@ async function runAgentLoop(goal, workingTabId) {
       // v4.0 VISION-FIRST LLM CALL (Browser Use architecture)
       // ═══════════════════════════════════════════════════════════
       if (_visionMode && _visionElements) {
-        const _visionHistory = formatVisionHistory(promptHistory, 6);
+        const _visionHistory = formatVisionHistory(promptHistory, 5);
 
         const _visionSystemPrompt = buildVisionSystemPrompt();
 
         const _zoomAnnotation = formatZoomRegion(getZoomRegion());
+      // v21.6.58: Page-type detection for smarter strategies
+      let _pageTypeHint = '';
+      try {
+        const _pageType = await detectPageType(tab);
+        if (_pageType && _pageType.confidence > 0.6) {
+          _pageTypeHint = getPageStrategyHint(_pageType);
+          if (_pageTypeHint) loopDirective = (loopDirective || '') + '\n' + _pageTypeHint;
+        }
+      } catch(_pte) { /* best-effort */ }
+      
         const _visionUserContent = buildVisionUserContent(goal, currentUrl, stepCount, dynamicMaxSteps, _visionElementTree, _visionHistory, _zoomAnnotation, loopDirective, agentMemory, sharedState.pageStagnation);
 
         // Build messages with screenshot
@@ -3393,7 +3420,8 @@ async function runAgentLoop(goal, workingTabId) {
             sendSilentUpdate('[ADAPTIVE] Content safety triggered — switching to minimal extraction', stepCount);
           }
         }
-Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorMessage(_vFetchErr)}); retrying in ${_backoffMs}ms`);
+Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorMessage(_vFetchErr)}); retrying in ${_backoffMs}ms`);;
+        sendSilentUpdate('[RATE LIMIT] API rate limited — retrying with backoff. This is normal for free-tier models.', stepCount);
             _vResponse = null;
             await sleep(_backoffMs);
           }
@@ -3748,6 +3776,18 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
       }
 
       // Handle finish — but block premature finishes (model giving up without trying)
+      // v21.6.58: Output schema enforcement for structured reports
+      if (command.type === 'finish' && command.summary) {
+        // Check if goal requires structured output
+        const _needsStructure = /\b(list|table|report|findings|results|inventory|audit|status)\b/i.test(goal || '');
+        if (_needsStructure && agentMemory && Object.keys(agentMemory).length > 0) {
+          const _keys = Object.keys(agentMemory).map(k => `"${k}"`).join(', ');
+          command.summary = `STRUCTURED REPORT REQUIRED. Data keys collected: [${_keys}]. 
+Organize findings under clear headers matching the original goal sections. Use tables for tabular data. Do NOT dump raw text.
+
+` + (command.summary || '');
+        }
+      }
       if (command.type === 'finish') {
         // (3.13.0) Pre-finish data completeness check. Parses the goal
         // text for "extract X, Y, Z" patterns and verifies memory has
@@ -5191,7 +5231,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             // The wrapper already does that; the bug is usually returning a
             // DOM node, a null query, or an unawaited Promise.
             result = `JS returned a non-serializable value ("${_trim.slice(0, 60)}"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: \`return document.body.innerText.substring(0, 5000)\` and parse in finish. (2) Use regex on body text: \`const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;\`. (3) Fall back to \`read_page\` action. (4) If you returned a DOM element, change to \`el.innerText\` instead. (5) If you returned a query that may be null, guard with \`(document.querySelector(sel) || {}).innerText || null\`.`;
-          } econst parsed = (() => { try { return JSON.parse(jsValue); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();mmand.key;
+          } else if (jsValue && command.key) {
             let savedValue = jsValue;
             try {
               const parsed = JSON.parse(jsValue);
