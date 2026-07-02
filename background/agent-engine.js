@@ -3580,6 +3580,9 @@ Vision transient failure (${_vResponse ? `HTTP ${_vResponse.status}` : getErrorM
                 return `${_lead} Valid indices on this page: ${_keys[0]}–${_keys[_keys.length - 1]} (${_keys.length} elements). Re-read the green labels / Elements list and pick a number that actually exists.`;
               };
               // Map vision action types to legacy command format
+              // v21.6.73: Convert click_at to click — GLM sometimes sends click_at directly
+              if (_va.type === 'click_at') _va.type = 'click';
+              if (_va.type === 'click_at') _va.type = 'click';
               switch (_va.type) {
                 case 'click':
                   command = _validIdx
@@ -4901,11 +4904,27 @@ finished = true;
 
         // On first block, auto-extract page content so we have data even if model keeps trying click_at
         if (_clickAtBlockCount === 1) {
+          let extractResult = null;
+          // Try chrome.scripting first
           try {
-            const [{ result: extractResult }] = await chrome.scripting.executeScript({
+            const [{ result: _r }] = await chrome.scripting.executeScript({
               target: { tabId: tab.id },
               func: () => document.body.innerText.substring(0, 16000)
             });
+            extractResult = _r;
+          } catch (_scriptErr) { /* try CDP next */ }
+          // Fallback: CDP Runtime.evaluate
+          if (!extractResult || extractResult.length < 100) {
+            try {
+              const _cdpResult = await cdpExecuteJs(tab, 'return document.body.innerText.substring(0, 16000)', { timeout: 5000 });
+              if (_cdpResult && _cdpResult.result && _cdpResult.result.value) {
+                extractResult = _cdpResult.result.value;
+              } else if (typeof _cdpResult === 'string') {
+                extractResult = _cdpResult;
+              }
+            } catch (_cdpErr) { /* both failed */ }
+          }
+          try {
             if (extractResult && extractResult.length > 100) {
               const savedKey = 'page_content';
               agentMemory[savedKey] = extractResult;
