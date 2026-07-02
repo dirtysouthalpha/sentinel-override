@@ -332,7 +332,7 @@ export async function generateReport(executionData, CONFIG) {
  */
 async function generateReportViaLLM(prompt, CONFIG, systemPrompt) {
   const MAX_ATTEMPTS = 2;
-  const REPORT_TIMEOUT = CONFIG.reportTimeout || 90000;
+  const REPORT_TIMEOUT = CONFIG.reportTimeout || 120000;
   let lastError = new Error('Report generation failed');
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

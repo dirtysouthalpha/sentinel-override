@@ -4903,6 +4903,16 @@ finished = true;
             // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
       // v21.6.71: Force-finish after 2 consecutive click_at blocks
       // v21.6.72: Auto-extract page content on first click_at block
+      if (command.type === 'click_at' && Object.keys(agentMemory).length > 0 && Object.values(agentMemory).some(v => v && String(v).length > 500)) {
+        _clickAtBlockCount = 2;
+        result = 'FORCE-FINISH: Data already in memory — no need to click. Finishing now.';
+        activityDone(stepCount, 'dispatch', 'Instant finish: data exists + click_at attempted', null);
+        sendActionResult(stepCount, result, false);
+        historyPush({ step: stepCount, action: command, result });
+        await _guardedPersistHistory();
+        finished = true;
+        break;
+      }
       if (command.type === 'click_at' && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
         _clickAtBlockCount++;
 
