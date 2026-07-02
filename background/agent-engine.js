@@ -1036,6 +1036,11 @@ async function persistHistory() {
   try { tel.trace('storage', `agent_history persisted (${slice.length} entries)`, { entries: slice.length, totalInMemory: history.length }); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
 }
 
+// (v21.6.66) Guarded wrapper — safe to call anywhere in the loop
+async function _guardedPersistHistory() {
+  try { await persistHistory(); } catch (e) { console.warn('[Sentinel] _guardedPersistHistory:', getErrorMessage(e)); }
+}
+
 function captureReportData(goal, history, agentMemory, agentPlan, stepCount, apiCallCount) {
   let tabCtxData = [];
   try { tabCtxData = (getAllTabContexts() || []).map(tc => ({ label: tc.label, url: tc.url, hasScreenshot: !!tc.snapshot })); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
@@ -5247,6 +5252,8 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             // DOM node, a null query, or an unawaited Promise.
             result = `JS returned a non-serializable value ("${_trim.slice(0, 60)}"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: \`return document.body.innerText.substring(0, 5000)\` and parse in finish. (2) Use regex on body text: \`const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;\`. (3) Fall back to \`read_page\` action. (4) If you returned a DOM element, change to \`el.innerText\` instead. (5) If you returned a query that may be null, guard with \`(document.querySelector(sel) || {}).innerText || null\`.`;
           } else if (jsValue && command.key) {
+
+              const savedKey = command.save_as || command.key || 'page_content';
             let savedValue = jsValue;
             try {
               const parsed = JSON.parse(jsValue);
