@@ -656,6 +656,82 @@ export const PROVIDERS = {
 
     systemPromptTweak: 'You are Sentinel Override, a professional web automation agent. Use the provided tools to take browser actions one step at a time. Never fabricate data. Never act outside the safety boundaries described in the prompt.'
   },
+  // (v21.6.70) Local/self-hosted providers
+  ollama: {
+    label: 'Ollama (Local)',
+    defaultEndpoint: 'http://localhost:11434/v1/chat/completions',
+    defaultModel: 'llama3.2',
+    maxTokens: 8000,
+    temperature: 0.3,
+    buildBody: (messages, system, prompt, opts) => ({
+      model: (opts && opts.model) || 'llama3.2',
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: (opts && opts.max_tokens) || 8000,
+      temperature: (opts && opts.temperature) ?? 0.3
+    }),
+    buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
+    parseResponse: (data) => {
+      const msg = data?.choices?.[0]?.message || {};
+      return msg.content || msg.reasoning_content || '';
+    },
+    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: [
+        { type: 'text', text: userContent },
+        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
+      ]}
+    ]
+  },
+  lmstudio: {
+    label: 'LM Studio (Local)',
+    defaultEndpoint: 'http://localhost:1234/v1/chat/completions',
+    defaultModel: 'local-model',
+    maxTokens: 8000,
+    temperature: 0.3,
+    buildBody: (messages, system, prompt, opts) => ({
+      model: (opts && opts.model) || 'local-model',
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: (opts && opts.max_tokens) || 8000,
+      temperature: (opts && opts.temperature) ?? 0.3
+    }),
+    buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
+    parseResponse: (data) => {
+      const msg = data?.choices?.[0]?.message || {};
+      return msg.content || msg.reasoning_content || '';
+    },
+    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: [
+        { type: 'text', text: userContent },
+        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
+      ]}
+    ]
+  },
+  vllm: {
+    label: 'vLLM (Local)',
+    defaultEndpoint: 'http://localhost:8000/v1/chat/completions',
+    defaultModel: 'llava-v1.6',
+    maxTokens: 8000,
+    temperature: 0.3,
+    buildBody: (messages, system, prompt, opts) => ({
+      model: (opts && opts.model) || 'llava-v1.6',
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: (opts && opts.max_tokens) || 8000,
+      temperature: (opts && opts.temperature) ?? 0.3
+    }),
+    buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
+    parseResponse: (data) => {
+      const msg = data?.choices?.[0]?.message || {};
+      return msg.content || msg.reasoning_content || '';
+    },
+    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: [
+        { type: 'text', text: userContent },
+        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
+      ]}
+    ]
+  },
 };
 // Inherit shared functions from openai to reduce duplication
 // zai uses the same buildBody, buildVisionContent, convertToolsToOpenAIFormat, and buildBodyWithTools
@@ -1284,6 +1360,34 @@ export const PROVIDER_CATALOG = [
     defaultModel: 'LongCat-2.0',
     auth: 'bearer',
     docsUrl: 'https://longcat.chat/platform/docs/'
+  },
+  // (v21.6.70) Local/self-hosted providers
+  {
+    id: 'ollama',
+    label: 'Ollama (Local)',
+    endpoint: 'http://localhost:11434/v1/chat/completions',
+    defaultModel: 'llama3.2',
+    category: 'Local',
+    docs: 'https://ollama.ai',
+    note: 'Runs on your machine. No API key needed.'
+  },
+  {
+    id: 'lmstudio',
+    label: 'LM Studio (Local)',
+    endpoint: 'http://localhost:1234/v1/chat/completions',
+    defaultModel: 'local-model',
+    category: 'Local',
+    docs: 'https://lmstudio.ai',
+    note: 'Runs on your machine. No API key needed.'
+  },
+  {
+    id: 'vllm',
+    label: 'vLLM (Local)',
+    endpoint: 'http://localhost:8000/v1/chat/completions',
+    defaultModel: 'llava-v1.6',
+    category: 'Local',
+    docs: 'https://docs.vllm.ai',
+    note: 'High-throughput local inference server.'
   },
 ];
 

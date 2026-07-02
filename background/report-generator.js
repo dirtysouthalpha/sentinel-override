@@ -132,7 +132,7 @@ function _buildMemorySummary(agentMemory) {
   // (3.50.0) Hard-cap each memory entry at 400 chars — keeps report prompt
   // small enough to avoid timeouts on slower models.
   const memorySummary = usableKeys.length
-    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 400)}`).join('\n')
+    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 2000)}`).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
   const citableKeysList = usableKeys.length
     ? usableKeys.map(k => `\`${k}\``).join(', ')
@@ -184,7 +184,9 @@ ${tabReferences}
 
 ## YOUR TASK
 
-Synthesize the raw extracted data into a clean, compelling report. Follow these principles:
+**First, answer the user's original goal directly.** The goal was: "${goal}". Scan the raw extracted data for specific facts, names, numbers, and dates that answer this goal. Lead your report with the direct answer.
+
+Then synthesize the raw extracted data into a clean, compelling report. Follow these principles:
 
 ### Writing Style
 - **Conversational but authoritative** — like a knowledgeable colleague briefing you over coffee, not a robot reading a list
