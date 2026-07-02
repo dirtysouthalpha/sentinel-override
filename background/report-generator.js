@@ -132,7 +132,7 @@ function _buildMemorySummary(agentMemory) {
   // (3.50.0) Hard-cap each memory entry at 400 chars — keeps report prompt
   // small enough to avoid timeouts on slower models.
   const memorySummary = usableKeys.length
-    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 2000)}`).join('\n')
+    ? usableKeys.map(k => `- ${k}: ${_truncateMemoryValue(agentMemory[k], 3000)}`).join('\n')
     : 'No usable data was extracted (all extractions failed or timed out).';
   const citableKeysList = usableKeys.length
     ? usableKeys.map(k => `\`${k}\``).join(', ')

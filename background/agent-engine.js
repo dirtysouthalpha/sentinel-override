@@ -1922,6 +1922,7 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastLoopUrl = '';
   let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 2 total loops
   let _blockedCount = 0;  // (v21.6.38) Track BLOCKED execute_js calls
+let _clickAtBlockCount = 0;  // (v21.6.71) Track consecutive click_at blocks
   while (!finished && agentRunning) {
 
     // (v3.60 / fixed): Batch commands are drained just before the LLM consult
@@ -4893,7 +4894,18 @@ finished = true;
       // Catch it here and return a clear error to the LLM so it picks a
       // different strategy next step.
             // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
+      // v21.6.71: Force-finish after 2 consecutive click_at blocks
       if (command.type === 'click_at' && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
+        _clickAtBlockCount++;
+        if (_clickAtBlockCount >= 2) {
+          result = `FORCE-FINISH: click_at blocked ${_clickAtBlockCount} times. Data extraction preferred — finishing now.`;
+          activityDone(stepCount, 'dispatch', 'Force-finish: click_at loop detected', null);
+          sendActionResult(stepCount, result, false);
+          historyPush({ step: stepCount, action: command, result });
+          await _guardedPersistHistory();
+          finished = true;
+          break;
+        }
         result = 'BLOCKED: click_at requires numeric x/y coordinates. Use click(index) from the observation panel instead. The observation panel lists clickable elements with their index numbers.';
         activityFail(stepCount, 'dispatch', 'Click at (no target)', { result });
         sendActionResult(stepCount, result, true);
@@ -5282,7 +5294,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
               if (_cdpVal && !_cdpVal.includes('BLOCKED') && _cdpVal.length > 5) {
                 jsValue = _cdpVal;
                 result = 'JS Result: ' + _cdpVal;
-                _blockedCount = 0; // reset on success
+                _blockedCount = 0; _clickAtBlockCount = 0; // reset on success
               } else {
                 _blockedCount = (_blockedCount || 0) + 1;
               }
