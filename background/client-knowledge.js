@@ -140,6 +140,8 @@ export async function setActiveClient(id) {
  * @returns {Promise<{ok: boolean, client?: object, error?: string}>}
  */
 export async function createClient({ displayName, tenant }) {
+  try {
+
   if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
     return { ok: false, error: 'Display name is required' };
   }
@@ -165,6 +167,10 @@ export async function createClient({ displayName, tenant }) {
   const written = await _write(state);
   if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, client: state.clients[id] };
+  } catch (e) {
+    console.error('[Sentinel] Error in createClient:', e);
+    throw e;
+  }
 }
 
 /**
@@ -174,6 +180,8 @@ export async function createClient({ displayName, tenant }) {
  * @returns {Promise<{ok: boolean, client?: object, error?: string}>}
  */
 export async function updateClient(id, updates) {
+  try {
+
   if (!id) return { ok: false, error: 'Client id required' };
   if (!updates || typeof updates !== 'object' || updates === null) return { ok: false, error: 'Updates required' };
   const state = await _read();
@@ -184,6 +192,10 @@ export async function updateClient(id, updates) {
   const written = await _write(state);
   if (!written) return { ok: false, error: 'Storage write failed' };
   return { ok: true, client: c };
+  } catch (e) {
+    console.error('[Sentinel] Error in updateClient:', e);
+    throw e;
+  }
 }
 
 /**
@@ -331,6 +343,8 @@ export async function getRelevantEntries(clientId, currentUrl) {
  * Returns an empty string when there's no client / no relevant entries.
  */
 export async function formatPromptSection(clientId, currentUrl) {
+  try {
+
   if (!clientId) return '';
   const state = await _read();
   const c = state.clients[clientId];
@@ -339,6 +353,10 @@ export async function formatPromptSection(clientId, currentUrl) {
   if (!relevant.length) return '';
   const lines = relevant.map((e, i) => `${i + 1}. ${e.wisdom}`).join('\n');
   return `\n## CLIENT-SPECIFIC KNOWLEDGE for ${c.displayName}\nThese are facts learned from previous runs for this specific client. Treat as authoritative for THIS run unless the page actively contradicts them:\n\n${lines}\n`;
+  } catch (e) {
+    console.error('[Sentinel] Error in formatPromptSection:', e);
+    throw e;
+  }
 }
 
 /**
@@ -346,6 +364,8 @@ export async function formatPromptSection(clientId, currentUrl) {
  * and formatted prompt section in one storage round-trip.
  */
 export async function getClientStartupContext(currentUrl) {
+  try {
+
   const state = await _read();
   if (!state.activeClientId) return { client: null, relevantEntries: [], promptSection: '' };
   const c = state.clients[state.activeClientId];
@@ -357,6 +377,10 @@ export async function getClientStartupContext(currentUrl) {
     promptSection = `\n## CLIENT-SPECIFIC KNOWLEDGE for ${c.displayName}\nThese are facts learned from previous runs for this specific client. Treat as authoritative for THIS run unless the page actively contradicts them:\n\n${lines}\n`;
   }
   return { client: c, relevantEntries, promptSection };
+  } catch (e) {
+    console.error('[Sentinel] Error in getClientStartupContext:', e);
+    throw e;
+  }
 }
 
 /**

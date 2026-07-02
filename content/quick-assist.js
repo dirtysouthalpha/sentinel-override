@@ -263,6 +263,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
    * Simple markdown-like rendering: bold, code, lists.
    */
   function renderMarkdown(text) {
+    text = escapeHtml(text);
     if (!text) return '';
     var html = text
       // Escape HTML

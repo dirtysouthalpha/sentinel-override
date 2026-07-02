@@ -211,6 +211,8 @@ export async function checkMonitor(monitor) {
  * Sends Chrome notifications for any detected changes.
  */
 export async function runMonitorCycle() {
+  try {
+
   const monitors = await loadMonitors();
   const active = monitors.filter(m => m.active);
 
@@ -225,6 +227,10 @@ export async function runMonitorCycle() {
         priority: 2,
       });
     }
+  }
+  } catch (e) {
+    console.error('[Sentinel] Error in runMonitorCycle:', e);
+    throw e;
   }
 }
 

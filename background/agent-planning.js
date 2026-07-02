@@ -204,6 +204,8 @@ export function generateHeuristicPlan(goal, currentUrl) {
 // @returns {Promise<string[]|null>} Plan steps or null
 
 export async function _generateInitialPlan(goal, workingTabId, runSettings) {
+  try {
+
   if (runSettings.quickMode) {
     sendSilentUpdate('⚡ Quick Mode — executing directly');
     return null;
@@ -260,6 +262,10 @@ export async function _generateInitialPlan(goal, workingTabId, runSettings) {
     sendSilentUpdate('Running in direct mode');
   }
   return plan;
+  } catch (e) {
+    console.error('[Sentinel] Error in _generateInitialPlan:', e);
+    throw e;
+  }
 }
 
 // ========== Adaptive Prompts ==========

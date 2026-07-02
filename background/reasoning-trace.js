@@ -89,6 +89,8 @@ export async function initReasoningTrace(metadata = {}, goal = '', model = '') {
  * @param {object} data - Additional context data
  */
 export async function captureReasoningStep(phase, direction, data = {}) {
+  try {
+
   if (!_currentRunId) return;
   const trace = _traceCache.get(_currentRunId);
   if (!trace) {
@@ -110,6 +112,10 @@ export async function captureReasoningStep(phase, direction, data = {}) {
   }
 
   await _persistTrace(_currentRunId);
+  } catch (e) {
+    console.error('[Sentinel] Error in captureReasoningStep:', e);
+    throw e;
+  }
 }
 
 /**

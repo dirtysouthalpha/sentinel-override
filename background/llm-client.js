@@ -2394,7 +2394,7 @@ export function parseLLMResponse(content) {
     if (typeof content === 'string' && content) {
       try {
         const sanitized = sanitizeLlmJson(content.trim());
-        const parsed = JSON.parse(sanitized);
+        const parsed = (() => { try { return JSON.parse(sanitized); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
         if (parsed && parsed.type && VALID_ACTION_TYPES.has(parsed.type)) return parsed;
       } catch (e) { console.warn('[Sentinel/llm] Regex salvage failed:', getErrorMessage(e)); }
       try {

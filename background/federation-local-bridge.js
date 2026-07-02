@@ -36,6 +36,8 @@ const LOCAL_CAPABILITIES = [
  * @returns {Promise<number>} Number of peers registered.
  */
 export async function registerLocalPeers() {
+  try {
+
   const maxAgents = getMaxConcurrentAgents();
 
   for (let i = 0; i < maxAgents; i++) {
@@ -57,6 +59,10 @@ export async function registerLocalPeers() {
   }
 
   return maxAgents;
+  } catch (e) {
+    console.error('[Sentinel] Error in registerLocalPeers:', e);
+    throw e;
+  }
 }
 
 /**
@@ -68,6 +74,8 @@ export async function registerLocalPeers() {
  * @returns {Promise<{peerId: string, tabId: number, instance: object}>}
  */
 export async function sendGoalToLocalPeer(peerId, subGoal) {
+  try {
+
   // Extract slot number from peerId: 'local-agent-0' → slot 0
   const slotMatch = peerId.match(/local-agent-(\d+)/);
   if (!slotMatch) throw new Error(`Invalid local peer ID: ${peerId}`);
@@ -97,6 +105,10 @@ export async function sendGoalToLocalPeer(peerId, subGoal) {
   console.warn(`[Federation-Bridge] Started local agent on slot ${slot} (tab ${tabId}) for: ${goalStr}`);
 
   return { peerId, tabId, instance };
+  } catch (e) {
+    console.error('[Sentinel] Error in sendGoalToLocalPeer:', e);
+    throw e;
+  }
 }
 
 /**

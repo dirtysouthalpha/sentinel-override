@@ -92,7 +92,7 @@ export function parseDecomposition(response) {
   const jsonMatch = response.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
     try {
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = (() => { try { return JSON.parse(jsonMatch[0]); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
       if (parsed.subtasks && Array.isArray(parsed.subtasks)) {
         return parsed.subtasks.map((s, i) => ({
           title: s.title || `Task ${i + 1}`,

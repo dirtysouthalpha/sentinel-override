@@ -172,6 +172,8 @@ function scheduleReconnect() {
 // ========== Message Handling ==========
 
 async function handleMessage(message) {
+  try {
+
   const msgType = message.type;
   const requestId = message.request_id;
 
@@ -210,6 +212,10 @@ async function handleMessage(message) {
 
     default:
       console.warn(`[WS-BRIDGE] Unknown message type: ${msgType}`);
+  }
+  } catch (e) {
+    console.error('[Sentinel] Error in handleMessage:', e);
+    throw e;
   }
 }
 

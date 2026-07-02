@@ -26,6 +26,8 @@ const ACTION_RE = /\b(click|type|navigate|scroll|extract|wait)\b/g;
  * @returns {Promise<object>} Novelty analysis results
  */
 export async function analyzeForNovelty(runId, data) {
+  try {
+
   const { type = 'generic', content = '', context = {} } = data;
 
   if (!content || typeof content !== 'string') {
@@ -104,6 +106,10 @@ export async function analyzeForNovelty(runId, data) {
     noveltyScore,
     reasons
   };
+  } catch (e) {
+    console.error('[Sentinel] Error in analyzeForNovelty:', e);
+    throw e;
+  }
 }
 
 /**

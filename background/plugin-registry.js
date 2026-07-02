@@ -94,6 +94,8 @@ function validateManifest(manifest) {
 }
 
 export async function installPlugin(manifestUrl) {
+  try {
+
   const response = await fetch(manifestUrl);
   if (!response.ok) {
     throw new Error('Failed to fetch manifest: ' + response.status);
@@ -116,6 +118,10 @@ export async function installPlugin(manifestUrl) {
 
   await storageSet({ [STORAGE_KEY]: plugins });
   return manifest.id;
+  } catch (e) {
+    console.error('[Sentinel] Error in installPlugin:', e);
+    throw e;
+  }
 }
 
 export async function uninstallPlugin(pluginId) {
@@ -167,6 +173,8 @@ export async function deactivatePlugin(pluginId) {
 // ========== Conflict detection (PLG-05) ==========
 
 export async function detectConflicts(pluginId) {
+  try {
+
   const result = await storageGet([STORAGE_KEY]);
   const plugins = result[STORAGE_KEY] || {};
   const newPlugin = plugins[pluginId];
@@ -211,6 +219,10 @@ export async function detectConflicts(pluginId) {
     console.warn('[PLUGIN-REGISTRY] Conflicts detected for', pluginId + ':', conflicts.length);
   }
   return conflicts;
+  } catch (e) {
+    console.error('[Sentinel] Error in detectConflicts:', e);
+    throw e;
+  }
 }
 
 // ========== Query helpers ==========

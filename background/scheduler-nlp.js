@@ -229,7 +229,7 @@ function _generateAlternatives(input, primary) {
   const alternatives = [];
 
   if (primary.type === 'recurring' && primary.recurrence && primary.recurrence.interval === 'daily') {
-    const alt = JSON.parse(JSON.stringify(primary));
+    const alt = (() => { try { return JSON.parse(JSON.stringify(primary)); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
     alt.recurrence.interval = 'weekly';
     alt.recurrence.periodInMinutes = 10080;
     alt.recurrence.dayOfWeek = 1;
@@ -237,14 +237,14 @@ function _generateAlternatives(input, primary) {
   }
 
   if (primary.type === 'recurring' && primary.recurrence && primary.recurrence.interval === 'weekly' && primary.recurrence.dayOfWeek != null && !primary.recurrence.daysOfWeek) {
-    const alt = JSON.parse(JSON.stringify(primary));
+    const alt = (() => { try { return JSON.parse(JSON.stringify(primary)); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
     alt.recurrence.daysOfWeek = [1, 2, 3, 4, 5];
     delete alt.recurrence.dayOfWeek;
     alternatives.push(alt);
   }
 
   if (primary.type === 'once') {
-    const alt = JSON.parse(JSON.stringify(primary));
+    const alt = (() => { try { return JSON.parse(JSON.stringify(primary)); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
     alt.type = 'recurring';
     alt.recurrence = {
       interval: 'daily',
@@ -260,7 +260,7 @@ function _generateAlternatives(input, primary) {
     const altTimes = ['08:00', '12:00', '17:00'];
     for (const t of altTimes) {
       if (t !== (primary._time || '09:00')) {
-        const alt = JSON.parse(JSON.stringify(primary));
+        const alt = (() => { try { return JSON.parse(JSON.stringify(primary)); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
         if (alt.recurrence) alt.recurrence.time = t;
         alternatives.push(alt);
       }

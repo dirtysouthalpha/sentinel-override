@@ -18,6 +18,8 @@ const WHITESPACE_SPLIT_RE = /\s+/;
  * @returns {Promise<object>} Synthesized knowledge with summary string
  */
 export async function synthesizeKnowledge(sources) {
+  try {
+
   // Accept run-summary object form (agent-engine.js usage)
   if (sources && !Array.isArray(sources) && typeof sources === 'object') {
     const runData = sources;
@@ -70,6 +72,10 @@ export async function synthesizeKnowledge(sources) {
 
   await storeSynthesis(synthesis);
   return synthesis;
+  } catch (e) {
+    console.error('[Sentinel] Error in synthesizeKnowledge:', e);
+    throw e;
+  }
 }
 
 /**

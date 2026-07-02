@@ -600,7 +600,7 @@ function _saveTenantMemory() {
   if (!_lastTenantForMemory || Object.keys(agentMemory).length === 0) return;
   try {
     const key = `tenant_memory_${_lastTenantForMemory}`;
-    chrome.storage.local.set({ [key]: { ...agentMemory, _savedAt: Date.now() } });
+    chrome.storage.local.set({ [key]: { ...agentMemory, _savedAt: Date.now() } }).catch(() => {});
   } catch (_e) { /* non-fatal */ }
 }
 
@@ -4274,7 +4274,7 @@ finished = true;
           // Parse JSON result from extract action: { key, value }
           const _parseExtract = (r) => {
             if (!r || typeof r !== 'string') return '';
-            try { const p = JSON.parse(r); return (p && typeof p.value === 'string') ? p.value.trim() : ''; } catch (_parseErr) { return ''; }
+            try { const p = (() => { try { return JSON.parse(r); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })(); return (p && typeof p.value === 'string') ? p.value.trim() : ''; } catch (_parseErr) { return ''; }
           };
           const _textVal = _parseExtract(_extractText);
           const _inputVal = _parseExtract(_extractValue);
@@ -5034,7 +5034,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             throw new Error('Invalid result for extract');
           }
           const _resultToParse = result.startsWith('JS Result: ') ? result.replace('JS Result: ', '') : result;
-          const parsed = JSON.parse(_resultToParse);
+          const parsed = (() => { try { return JSON.parse(_resultToParse); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
           if (parsed.key !== undefined && parsed.value !== undefined) {
             // Reject error-shaped values so failure strings ("Element not found",
             // "JS Error: ...", etc.) are never stored as real data in memory.
@@ -5191,8 +5191,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
             // The wrapper already does that; the bug is usually returning a
             // DOM node, a null query, or an unawaited Promise.
             result = `JS returned a non-serializable value ("${_trim.slice(0, 60)}"). DO NOT retry the same code -- it will fail again. Recovery options: (1) Return text only: \`return document.body.innerText.substring(0, 5000)\` and parse in finish. (2) Use regex on body text: \`const t = document.body.innerText; const m = t.match(/<your_pattern>/); return m ? m[1] : null;\`. (3) Fall back to \`read_page\` action. (4) If you returned a DOM element, change to \`el.innerText\` instead. (5) If you returned a query that may be null, guard with \`(document.querySelector(sel) || {}).innerText || null\`.`;
-          } else {
-            let savedKey = command.key;
+          } econst parsed = (() => { try { return JSON.parse(jsValue); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();mmand.key;
             let savedValue = jsValue;
             try {
               const parsed = JSON.parse(jsValue);

@@ -263,6 +263,8 @@ export async function getTemplate(id) {
  * @returns {Promise<object>} The complete template object
  */
 export async function saveTemplate(templateData) {
+  try {
+
   if (!templateData || typeof templateData !== 'object' || Array.isArray(templateData)) {
     throw new Error('Template data must be an object');
   }
@@ -297,6 +299,10 @@ export async function saveTemplate(templateData) {
   await saveTemplates(templates);
 
   return template;
+  } catch (e) {
+    console.error('[Sentinel] Error in saveTemplate:', e);
+    throw e;
+  }
 }
 
 /**
@@ -306,6 +312,8 @@ export async function saveTemplate(templateData) {
  * @returns {Promise<object>} The updated template
  */
 export async function updateTemplate(id, updates) {
+  try {
+
   if (!id || typeof id !== 'string') {
     throw new Error('Template ID is required');
   }
@@ -354,6 +362,10 @@ export async function updateTemplate(id, updates) {
   await saveTemplates(templates);
 
   return existing;
+  } catch (e) {
+    console.error('[Sentinel] Error in updateTemplate:', e);
+    throw e;
+  }
 }
 
 /**
@@ -386,6 +398,8 @@ export async function deleteTemplate(id) {
  * @returns {Promise<string>} The resolved goal string
  */
 export async function resolveTemplateGoal(templateId, paramValues) {
+  try {
+
   if (!templateId || typeof templateId !== 'string') {
     throw new Error('Template ID is required');
   }
@@ -423,6 +437,10 @@ export async function resolveTemplateGoal(templateId, paramValues) {
   await saveTemplates(templates);
 
   return resolvedGoal;
+  } catch (e) {
+    console.error('[Sentinel] Error in resolveTemplateGoal:', e);
+    throw e;
+  }
 }
 
 // ========== Usage Tracking ==========

@@ -593,6 +593,8 @@ async function _runExecuteJsOnce(tabId, code, timeout) {
  * pipeline expects; strategy is for logging / forensic run log.
  */
 async function _runExecuteJsWithRetryLadder(tabId, originalCode, timeout) {
+  try {
+
   // Strategy 1: LLM's original code
   let raw = await _runExecuteJsOnce(tabId, originalCode || '', timeout);
   if (!_isUnproductiveJsResult(raw)) {
@@ -615,6 +617,10 @@ async function _runExecuteJsWithRetryLadder(tabId, originalCode, timeout) {
   }
 
   return { raw, strategy: 'all_failed' };
+  } catch (e) {
+    console.error('[Sentinel] Error in _runExecuteJsWithRetryLadder:', e);
+    throw e;
+  }
 }
 
 /**

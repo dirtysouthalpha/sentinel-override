@@ -230,7 +230,7 @@ export function getActionHistorySummary() {
 let _persistTimer = null;
 function _schedulePersist() {
   if (_persistTimer) clearTimeout(_persistTimer);
-  _persistTimer = setTimeout(_persist, 5000);
+  _persistTimer = setTimeout(_persist, 5000) // v21.6.57: 5s debounce for learning persistence;
 }
 
 async function _persist() {

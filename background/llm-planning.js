@@ -285,7 +285,7 @@ export async function generatePlan(goal, settings, context = {}) {
       const objStart = contentNoThink.indexOf('{');
       const objEnd = contentNoThink.lastIndexOf('}');
       if (objStart !== -1 && objEnd > objStart) {
-        const parsed = JSON.parse(contentNoThink.slice(objStart, objEnd + 1));
+        const parsed = (() => { try { return JSON.parse(contentNoThink.slice(objStart, objEnd + 1)); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
         if (Array.isArray(parsed.plan) && parsed.plan.length) { const r = _normalizeSteps(parsed.plan); if (r.length) return r; }
         if (Array.isArray(parsed.steps) && parsed.steps.length) { const r = _normalizeSteps(parsed.steps); if (r.length) return r; }
       }

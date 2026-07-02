@@ -326,6 +326,8 @@ function _buildScheduleTiming(data, now) {
  * @returns {Promise<object>} The created schedule object with its generated id.
  */
 export async function createSchedule(data) {
+  try {
+
   _validateScheduleData(data);
 
   const id = crypto.randomUUID();
@@ -353,6 +355,10 @@ export async function createSchedule(data) {
   registerAlarm(schedule);
 
   return schedule;
+  } catch (e) {
+    console.error('[Sentinel] Error in createSchedule:', e);
+    throw e;
+  }
 }
 
 /**
@@ -382,6 +388,8 @@ export async function listSchedules() {
  * @returns {Promise<void>}
  */
 export async function deleteSchedule(id) {
+  try {
+
   if (!id || typeof id !== 'string') {
     throw new Error('Schedule ID is required');
   }
@@ -404,6 +412,10 @@ export async function deleteSchedule(id) {
   if (resultIds.length) {
     await saveResults(results);
   }
+  } catch (e) {
+    console.error('[Sentinel] Error in deleteSchedule:', e);
+    throw e;
+  }
 }
 
 /**
@@ -413,6 +425,8 @@ export async function deleteSchedule(id) {
  * @returns {Promise<object>} The updated schedule
  */
 export async function toggleSchedule(id, enabled) {
+  try {
+
   if (!id || typeof id !== 'string') {
     throw new Error('Schedule ID is required');
   }
@@ -444,6 +458,10 @@ export async function toggleSchedule(id, enabled) {
   await saveSchedules(schedules);
 
   return schedule;
+  } catch (e) {
+    console.error('[Sentinel] Error in toggleSchedule:', e);
+    throw e;
+  }
 }
 
 /**
@@ -698,6 +716,8 @@ function _waitForAgentCompletion(timeoutMs) {
  * @param {object} resultPartial - { id?, startedAt, error } for storeResult
  */
 async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial) {
+  try {
+
   await storeResult(schedule, {
     id: resultPartial.id,
     status: 'failure',
@@ -716,6 +736,10 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
   }
   sendNotification(schedule, { id: resultPartial.id, status: 'failure', error: resultPartial.error, completedAt: Date.now() });
   setBadge('failure');
+  } catch (e) {
+    console.error('[Sentinel] Error in _handleTaskFailure:', e);
+    throw e;
+  }
 }
 
 /**
@@ -724,6 +748,8 @@ async function _handleTaskFailure(schedule, scheduleId, schedules, resultPartial
  * @param {object} result
  */
 async function storeResult(schedule, result) {
+  try {
+
   const results = await loadResults();
 
   // Ensure result has all required fields
@@ -756,6 +782,10 @@ async function storeResult(schedule, result) {
 
   await saveResults(results);
   return fullResult;
+  } catch (e) {
+    console.error('[Sentinel] Error in storeResult:', e);
+    throw e;
+  }
 }
 
 // ========== Result Queries ==========

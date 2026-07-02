@@ -30,6 +30,8 @@ const DANGEROUS_PATTERNS = [
  * @returns {Promise<object>} Exportable template package
  */
 export async function exportTemplate(templateId) {
+  try {
+
   if (!templateId || typeof templateId !== 'string') {
     throw new Error('Template ID is required');
   }
@@ -50,6 +52,10 @@ export async function exportTemplate(templateId) {
       tags: template.tags || [],
     },
   };
+  } catch (e) {
+    console.error('[Sentinel] Error in exportTemplate:', e);
+    throw e;
+  }
 }
 
 /**
@@ -180,6 +186,8 @@ export function validateImport(importedData) {
  * @returns {Promise<{ imported: number, skipped: number, renamed: number, overwritten: number, results: Array }>}
  */
 export async function importTemplates(templates, conflictMode = 'skip') {
+  try {
+
   if (!Array.isArray(templates)) return { imported: 0, skipped: 0, renamed: 0, overwritten: 0, results: [] };
   const existing = await loadTemplates();
   const existingNames = new Map();
@@ -271,6 +279,10 @@ export async function importTemplates(templates, conflictMode = 'skip') {
 
   await saveTemplates(existing);
   return { imported, skipped, renamed, overwritten, results };
+  } catch (e) {
+    console.error('[Sentinel] Error in importTemplates:', e);
+    throw e;
+  }
 }
 
 // ========== Report Export ==========
@@ -413,7 +425,7 @@ export async function importFromGist(gistUrlOrId) {
     const gist = await resp.json();
     const file = gist.files?.['sentinel-templates.json'];
     if (!file || !file.content) return { ok: false, error: 'No sentinel-templates.json in gist' };
-    const templates = JSON.parse(file.content);
+    const templates = (() => { try { return JSON.parse(file.content); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
     if (!Array.isArray(templates)) return { ok: false, error: 'Invalid template format in gist' };
     const result = await importTemplates(templates, 'rename');
     return { ok: true, imported: result?.imported || templates.length, url: gist.html_url };

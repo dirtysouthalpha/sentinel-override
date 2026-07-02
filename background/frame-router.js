@@ -120,6 +120,8 @@ export async function enumerateFrames(tabId) {
  * @returns {Promise<number|null>} The Chrome frameId, or null if not found.
  */
 export async function resolveFrameForSelector(tabId, frameIndex) {
+  try {
+
   if (tabId == null || frameIndex == null || frameIndex < 0) return null;
 
   const cached = frameIdsByTab.get(tabId);
@@ -141,6 +143,10 @@ export async function resolveFrameForSelector(tabId, frameIndex) {
   frameIdsByTab.set(tabId, positional);
 
   return positional.has(frameIndex) ? positional.get(frameIndex) : null;
+  } catch (e) {
+    console.error('[Sentinel] Error in resolveFrameForSelector:', e);
+    throw e;
+  }
 }
 
 // ========== Execute In Frame ==========

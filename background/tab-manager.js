@@ -113,7 +113,7 @@ async function _checkDomReadyState(tabId) {
       if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
     } else if (typeof data === 'string') {
       try {
-        const parsed = JSON.parse(data);
+        const parsed = (() => { try { return JSON.parse(data); } catch(_e) { console.warn("[Sentinel] JSON.parse failed:", _e.message); return null; } })();
         if (parsed && parsed.readyState === 'complete' && parsed.bodyLen > 50 && !parsed.hasSpinner) return true;
       } catch (_e) { /* parse failed */ }
     }
@@ -132,6 +132,8 @@ async function _checkDomReadyState(tabId) {
  * @returns {Promise<void>}
  */
 export async function waitForPageReady(tabId, maxWaitMs = FIVE_SECONDS_MS) {
+  try {
+
   const cap = Math.min(Math.max(0, Number(maxWaitMs) || FIVE_SECONDS_MS), pageLoadConfig.pageLoadTimeout);
   const startTime = Date.now();
   const pollInterval = 200;
@@ -164,6 +166,10 @@ export async function waitForPageReady(tabId, maxWaitMs = FIVE_SECONDS_MS) {
     await sleep(pollInterval);
   }
   // Timeout — proceed anyway (same behavior as the old fixed 1500ms sleep)
+  } catch (e) {
+    console.error('[Sentinel] Error in waitForPageReady:', e);
+    throw e;
+  }
 }
 
 // ========== Content Script Injection ==========
