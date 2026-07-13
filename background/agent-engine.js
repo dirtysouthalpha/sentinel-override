@@ -4911,7 +4911,13 @@ finished = true;
             // v21.6.52: Hard block click_at with undefined coordinates — GLM bug
       // v21.6.71: Force-finish after 2 consecutive click_at blocks
       // v21.6.72: Auto-extract page content on first click_at block
-      if ((command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref && typeof command.x !== 'number')) && Object.keys(agentMemory).length > 0 && Object.values(agentMemory).some(v => v && String(v).length > 500)) {
+      // (audit) Exclude vision-converted/executed commands. Vision mode is always
+      // on and turns valid indexed clicks into {type:'click_at', _visionAction:true}
+      // which are physically executed above (_visionExecuted). Without this guard
+      // the executed click's real result was overwritten with FORCE-FINISH and the
+      // run ended after ~2 clicks, making multi-click tasks impossible and feeding
+      // the model falsified results. These guards target only the bare GLM click_at.
+      if (!command._visionAction && !command._visionExecuted && (command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref && typeof command.x !== 'number')) && Object.keys(agentMemory).length > 0 && Object.values(agentMemory).some(v => v && String(v).length > 500)) {
         _clickAtBlockCount = 2;
         result = 'FORCE-FINISH: Data already in memory — no need to click. Finishing now.';
         activityDone(stepCount, 'dispatch', 'Instant finish: data exists + click_at attempted', null);
@@ -4921,26 +4927,28 @@ finished = true;
         finished = true;
         break;
       }
-      if ((command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref)) && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
+      if (!command._visionAction && !command._visionExecuted && (command.type === 'click_at' || (command.type === 'click' && !command.selector && !command.ref)) && (typeof command.x !== 'number' || typeof command.y !== 'number')) {
         _clickAtBlockCount++;
 
         // On first block, auto-extract page content so we have data even if model keeps trying click_at
         if (_clickAtBlockCount === 1) {
           let extractResult = null;
-          // Try chrome.scripting first
+          // Try chrome.scripting first. (audit) `tab` is a numeric tabId, not an
+          // object, so the previous `tab.id` was undefined and this call always threw.
           try {
             const [{ result: _r }] = await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
+              target: { tabId: tab },
               func: () => document.body.innerText.substring(0, 16000)
             });
             extractResult = _r;
           } catch (_scriptErr) { /* try CDP next */ }
-          // Fallback: CDP Runtime.evaluate
+          // Fallback: CDP Runtime.evaluate. (audit) cdpExecuteJs returns { ok, value },
+          // not { result: { value } } — the previous shape was always undefined.
           if (!extractResult || extractResult.length < 100) {
             try {
               const _cdpResult = await cdpExecuteJs(tab, 'return document.body.innerText.substring(0, 16000)', { timeout: 5000 });
-              if (_cdpResult && _cdpResult.result && _cdpResult.result.value) {
-                extractResult = _cdpResult.result.value;
+              if (_cdpResult && _cdpResult.ok && typeof _cdpResult.value === 'string') {
+                extractResult = _cdpResult.value;
               } else if (typeof _cdpResult === 'string') {
                 extractResult = _cdpResult;
               }

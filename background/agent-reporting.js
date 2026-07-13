@@ -5,6 +5,15 @@
 import { getErrorMessage } from './error-utils.js';
 import { notifyIfEnabled } from './shared-state.js';
 
+// (audit) The run replay is downloaded and opened OUTSIDE the extension CSP, so
+// unescaped goal/action/result strings (LLM- and page-derived) were a stored XSS.
+// Escape every interpolated value before it enters the HTML.
+function _escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
 // ========== Module State ==========
 
 // Lightweight in-memory run recorder that captures every step for instant
@@ -80,7 +89,7 @@ body{font-family:system-ui;background:#0a0a1a;color:#ccc;margin:0;padding:20px;}
 </style></head><body>
 <div class="header">
 <h1>Sentinel Override Run Replay</h1>
-<div class="goal">Goal: ${_runRecording.goal || 'N/A'}</div>
+<div class="goal">Goal: ${_escHtml(_runRecording.goal) || 'N/A'}</div>
 <div class="meta">${_runRecording.startTime ? new Date(_runRecording.startTime).toLocaleString() : 'N/A'} &middot; ${Math.round(duration/1000)}s &middot; ${_runRecording.steps.length} steps</div>
 </div>
 <div class="stats">
@@ -88,8 +97,11 @@ body{font-family:system-ui;background:#0a0a1a;color:#ccc;margin:0;padding:20px;}
 <div>Duration: ${Math.round(duration/1000)}s</div>
 </div>
 ${_runRecording.steps.map((s,i) => {
-  const screenshotHtml = s.screenshot ? '<img class="screenshot" src="data:image/jpeg;base64,' + s.screenshot + '" alt="Step ' + (i+1) + '" />' : '';
-  return '<div class="step ' + (s.actionType || '') + '"><div class="step-header"><span>Step ' + (i+1) + '</span><span>' + (s.actionType || 'unknown') + '</span><span>' + new Date(s.timestamp).toLocaleTimeString() + '</span></div><div class="step-action">' + (s.action || 'No action recorded') + '</div>' + (s.result ? '<div class="step-result">' + s.result + '</div>' : '') + screenshotHtml + '</div>';
+  // (audit) Only accept a base64-looking screenshot payload; escape all
+  // LLM/page-derived strings (actionType, action, result) before interpolation.
+  const _shot = (typeof s.screenshot === 'string' && /^[A-Za-z0-9+/=]+$/.test(s.screenshot)) ? s.screenshot : '';
+  const screenshotHtml = _shot ? '<img class="screenshot" src="data:image/jpeg;base64,' + _shot + '" alt="Step ' + (i+1) + '" />' : '';
+  return '<div class="step ' + _escHtml(s.actionType || '') + '"><div class="step-header"><span>Step ' + (i+1) + '</span><span>' + _escHtml(s.actionType || 'unknown') + '</span><span>' + _escHtml(new Date(s.timestamp).toLocaleTimeString()) + '</span></div><div class="step-action">' + _escHtml(s.action || 'No action recorded') + '</div>' + (s.result ? '<div class="step-result">' + _escHtml(s.result) + '</div>' : '') + screenshotHtml + '</div>';
 }).join('')}
 </body></html>`;
   return html;

@@ -60,7 +60,16 @@ function getImports(filePath) {
 function checkDir(dir) {
   const fullDir = path.join(ROOT, dir);
   if (!fs.existsSync(fullDir)) return;
-  const files = fs.readdirSync(fullDir).filter(f => f.endsWith('.js') && !f.endsWith('.test.js'))
+  const entries = fs.readdirSync(fullDir);
+  // (audit) Recurse into subdirectories (e.g. background/skills, background/platforms)
+  // — previously skipped, exempting ~30 files from the missing-export check.
+  for (const entry of entries) {
+    if (entry === 'node_modules' || entry === '__pycache__') continue;
+    if (fs.statSync(path.join(fullDir, entry)).isDirectory()) {
+      checkDir(path.join(dir, entry));
+    }
+  }
+  const files = entries.filter(f => f.endsWith('.js') && !f.endsWith('.test.js'))
     .filter(f => !fs.statSync(path.join(fullDir, f)).isDirectory());
 
   for (const file of files) {

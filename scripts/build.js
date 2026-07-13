@@ -84,8 +84,14 @@ function collectFiles(dir, base) {
 //
 // This is intentionally regex-based — no AST dependency needed for a Chrome extension.
 
-const CONSOLE_LOG_RE = /^\s*console\.log\([^;]*\);?\s*$/gm;
-const CONSOLE_WARN_RE = /^\s*console\.warn\([^;]*\);?\s*$/gm;
+// (audit) The `[^;]` class matches newlines, so the old `[^;]*` let a
+// console.log() WITHOUT a trailing semicolon greedily consume following
+// statements up to the next `;`, deleting real code. Restrict the argument
+// match to a single line with no semicolons (`[^;\n]*`) so only self-contained
+// `console.log(...)` / `console.warn(...)` statements are stripped; multi-line
+// or multi-statement lines are left intact rather than mangled.
+const CONSOLE_LOG_RE = /^[ \t]*console\.log\([^;\n]*\);?[ \t]*$/gm;
+const CONSOLE_WARN_RE = /^[ \t]*console\.warn\([^;\n]*\);?[ \t]*$/gm;
 const TEMP_DIAG_COMMENT_RE = /^\s*\/\/\s*(TEMP|HACK|DEBUG|DIAGNOSTIC)[^\n]*$/gim;
 const MULTI_BLANK_RE = /\n{3,}/g;
 
@@ -100,6 +106,22 @@ function transformJs(source) {
   // Collapse excessive blank lines from removals
   out = out.replace(MULTI_BLANK_RE, '\n\n');
   return out;
+}
+
+// (audit) Validate that the debug-strip transform produced syntactically valid
+// JS. Previously nothing checked the output, so a bad transform could silently
+// ship a broken bundle. `node --check` on the written temp file fails the build
+// loudly instead. The temp dir gets a package.json {"type":"module"} so ESM
+// syntax (import/export) is checked as modules, matching this project.
+function assertValidJs(relPath, tmpPath) {
+  const require = createRequire(import.meta.url);
+  const { execFileSync } = require('child_process');
+  try {
+    execFileSync(process.execPath, ['--check', tmpPath], { stdio: 'pipe' });
+  } catch (err) {
+    const detail = (err.stderr ? err.stderr.toString() : err.message).split('\n').slice(0, 5).join('\n');
+    throw new Error(`Debug-strip transform produced invalid JS for ${relPath}:\n${detail}`);
+  }
 }
 
 async function build() {
@@ -126,6 +148,9 @@ async function build() {
 
   // Create temp dir for transformed JS files
   const tmpDir = await mkdtemp(join(tmpdir(), 'sentinel-build-'));
+  // (audit) Mark the temp dir as ESM so `node --check` validates import/export
+  // as modules (this project is "type":"module").
+  writeFileSync(join(tmpDir, 'package.json'), '{"type":"module"}', 'utf-8');
   let transformedCount = 0;
   let savedBytes = 0;
 
@@ -138,6 +163,8 @@ async function build() {
       if (diff > 0) {
         const tmpPath = join(tmpDir, f.relPath.replace(/[/\\]/g, '_'));
         writeFileSync(tmpPath, transformed, 'utf-8');
+        // (audit) Fail the build if the transform produced invalid JS.
+        assertValidJs(f.relPath, tmpPath);
         transformedCount++;
         savedBytes += diff;
         return { ...f, fullPath: tmpPath };

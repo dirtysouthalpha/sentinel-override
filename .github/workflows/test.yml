@@ -28,11 +28,12 @@ jobs:
       - name: Bare Import Scanner
         run: |
           echo "Scanning for bare module imports..."
-          RESULTS=$(grep -rn "from '" background/ content/ popup-modules/ popup-full.js --include='*.js' \
-            | grep -v "from '\.\./" \
-            | grep -v "from '\./" \
-            | grep -v "from 'chrome" \
-            | grep -v "from 'crypto'" \
+          # Match a bare specifier in either quote style (the codebase uses both;
+          # the old single-quote-only scanner missed double-quoted bare imports).
+          # A bare specifier starts with a letter/@ and has no spaces, so this also
+          # naturally skips relative imports (./ ../) and the word "from" in prose.
+          RESULTS=$(grep -rnE "from ['\"][a-zA-Z@][a-zA-Z0-9@/._-]*['\"]" background/ content/ popup-modules/ popup-full.js --include='*.js' \
+            | grep -vE "from ['\"](chrome|crypto|node:)" \
             || true)
           if [ -n "$RESULTS" ]; then
             echo "FAIL: Bare module imports found"
