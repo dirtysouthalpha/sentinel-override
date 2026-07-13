@@ -552,7 +552,7 @@ import {tel, startRun, endRun} from "./telemetry.js";
 const telStartRun = startRun;
 const telEndRun = endRun;
 // (Phase 6) UAP bridge — broadcasts agent lifecycle events to external UAP server
-import {broadcast as uapBroadcast} from "./uap-bridge.js";
+import {broadcast as uapBroadcast, setRunId as uapSetRunId} from "./uap-bridge.js";
 // (3.30.0) Trust-score computation at run finalize. Pure function — no side
 // effects, no chrome.* deps. We aggregate the run's metrics here at the end
 // of the loop and stamp the result onto both the report card and the
@@ -654,6 +654,15 @@ let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to stora
 const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped at 20 entries for replay export
 const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
+// (audit) Multi-task orchestrator + adaptive-diagnosis state. These MUST be
+// module-level: startAgent() populates them but the runAgentLoop() finish/failure
+// paths read them. They were previously declared inside startAgent(), so every
+// reference in runAgentLoop threw ReferenceError (swallowed by the loop's catch),
+// silently killing the orchestrator and adaptive-diagnosis features and burning
+// every run to its step limit. Reset per run in startAgent()/runAgentLoop().
+let _orchestratorState = null;
+let _lastDiagnosis = null;       // v21.6.54: Adaptive failure diagnosis
+let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
 // (stuck-loop watchdog) The click_at loop detector below fires when a streak of
 // consecutive click_at commands produces no new output AND never moves the page
 // — the "weak vision model fixates on one element" failure (e.g. CNN with
@@ -1256,9 +1265,10 @@ export async function startAgent(goal, sender) {
   goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
   _cursorHiderInjected = false;
-let _orchestratorState = null;
-let _lastDiagnosis = null; // v21.6.54: Adaptive failure diagnosis
-let _consecutiveFailureTypes = {}; // v21.6.54: Track failure types per action
+  // (audit) Reset per-run orchestrator/diagnosis state (declared at module scope).
+  _orchestratorState = null;
+  _lastDiagnosis = null;
+  _consecutiveFailureTypes = {};
  // v21.6.53: Multi-task orchestrator state
 
 
@@ -1922,9 +1932,12 @@ async function runAgentLoop(goal, workingTabId) {
   let _lastLoopUrl = '';
   let _totalLoopRecoveries = 0;  // (v21.6.6) Hard escalation after 2 total loops
   let _blockedCount = 0;  // (v21.6.38) Track BLOCKED execute_js calls
-let _clickAtBlockCount = 0;
-    _executeJsDataExtracted = false;
-let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at blocks
+  let _clickAtBlockCount = 0;
+  let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at blocks
+  // (audit) Declared at loop scope so the vision→text fallback (set deep in the
+  // vision block) and the progressive-summary/loop-detector paths can see them.
+  let _parallelTextPromise = null;
+  let loopDirective = '';
   while (!finished && agentRunning) {
 
     // (v3.60 / fixed): Batch commands are drained just before the LLM consult
@@ -1974,20 +1987,18 @@ let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at b
 
       _lastLoopUrl = _lastObservedUrl;
       stepCount++;
+      // (audit) Reset per-iteration loop-scoped directives so no value leaks
+      // from a previous step into this step's LLM prompt.
+      _parallelTextPromise = null;
+      loopDirective = '';
       // (3.16.0) Signal new step to the popup so it can create a fresh
       // activity stream container BEFORE observation/AI consultation begin.
       try { sendAgentStepStart(stepCount, agentPlan ? agentPlan.length : 0); } catch (e) { console.error(_ERR_PREFIX, getErrorMessage(e)); }
-      // v21.6.58: Progressive summarization every 8 steps
-      if (stepCount > 0 && stepCount % 8 === 0 && history.length > 6) {
-        try {
-          const _psum = buildProgressSummary(history, agentMemory, stepCount);
-          if (_psum) {
-            loopDirective = (loopDirective || '') + '\n' + _psum;
-            sendSilentUpdate('[ENGINE] Progress summary injected', stepCount);
-          }
-        } catch(_se) { /* best-effort */ }
-      }
-      
+      // (audit) Removed the v21.6.58 progressive-summarization block: it called an
+      // unimported buildProgressSummary (threw, swallowed) and even when fixed its
+      // output was immediately overwritten by the loopDirective reset below, so it
+      // never reached the prompt. Removed rather than shipped as wasted work.
+
       // Phase 5: Take profiling sample periodically (every _profilingInterval steps)
       if (profilingEnabled && stepCount % _profilingInterval === 0) {
         try {
@@ -2014,7 +2025,8 @@ let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at b
         // Dynamic baseline calculation failed non-fatally
       }
       // (v21.6.16) Lower step ceiling — 300 was way too high for browser automation
-      const dynamicMaxSteps = Math.min(60, dynamicBaseline + (productiveSteps * 25));
+      // (audit) `let`, not `const`: the orchestrator subtask-advance path reassigns it.
+      let dynamicMaxSteps = Math.min(60, dynamicBaseline + (productiveSteps * 25));
       // (3.36.1) Hotfix — telemetry emit moved AFTER `const dynamicMaxSteps`
       // declaration. Previously this line was above the const and tripped a
       // temporal-dead-zone ReferenceError every step on the first iteration,
@@ -2864,7 +2876,9 @@ let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at b
       await enforceRateLimit();
 
       // Anti-loop directives: force the model to make progress
-      let loopDirective = '';
+      // (audit) Assign the loop-scoped var (declared at the top of runAgentLoop);
+      // a nested `let` here shadowed it and put the progressive-summary write in TDZ.
+      loopDirective = '';
 
       // Cache history length once per iteration (perf: accessed many times below)
       const _histLen = history.length;
@@ -3350,7 +3364,9 @@ let _executeJsDataExtracted = false;  // (v21.6.71) Track consecutive click_at b
         ];
 
         // (v21.6.68) PARALLEL DUAL-PROVIDER: Fire text call simultaneously
-        let _parallelTextPromise = null;
+        // (audit) Assign the loop-scoped var (declared at the top of runAgentLoop)
+        // so the vision→text fallback at the end of this block can read it.
+        _parallelTextPromise = null;
         try {
           const _tp = await getTextProvider().catch(() => null);
           if (_tp && _tp.apiKey) {
@@ -3925,7 +3941,6 @@ Organize findings under clear headers matching the original goal sections. Use t
         const memKeys = Object.keys(agentMemory || {});
         const memCount = memKeys.length;
         const noteCount = history.reduce((acc, h) => acc + (h.action && h.action.type === 'note' ? 1 : 0), 0);
-        const hasData = memCount > 0 || noteCount > 0;
 
         // Block finish if no real data was extracted and we haven't tried enough
         const _finishBlockCount = history.filter(h => h && h.result && typeof h.result === 'string' && h.result.startsWith('BLOCKED:')).length;
@@ -3938,20 +3953,8 @@ Organize findings under clear headers matching the original goal sections. Use t
           continue;
         }
 
-        // Block finish if memory only contains failed results ("Done", empty strings)
-        const hasRealData = memCount > 0 && Object.keys(agentMemory).some(k => {
-          const v = agentMemory[k];
-          const s = typeof v === 'string' ? v : JSON.stringify(v);
-          return s.length > 10 && s !== 'Done';
-        });
-        if (false && !hasRealData && hasData && stepCount < 15 && _finishBlockCount < 1) {
-          historyPush({ step: stepCount, action: command, result: 'BLOCKED: No real data in memory. Use execute_js with key to extract actual page content.' });
-          await _guardedPersistHistory();
-          sendSilentUpdate('Finish blocked — extracted data is empty', stepCount);
-          await sleep(ONE_SECOND_MS);
-          if (!agentRunning) break;
-          continue;
-        }
+        // (audit) Removed a permanently-disabled `if (false && ...)` finish-gate
+        // (dead since a hotfix) plus its now-unused hasRealData computation.
 
 
         // (3.50.0) Multi-article completion guard: don't let the agent finish
@@ -5479,7 +5482,7 @@ if (TARGETABLE_ACTIONS.has(command.type) && !command._visionAction) {
                     // v21.6.56: Analysis-aware auto-finish
           // If the goal requires analysis (count, compare, find, filter), don't just dump raw data.
           // Instead, inject a directive telling the model to process the data and answer the questions.
-          const _analysisKeywords = /(count|compare|find\s+(?:the\s+)?(?:newest|oldest|latest)|filter|analy[sz]e|how many|summarize|report\s+findings)/i;
+          const _analysisKeywords = /(count|compare|find\s+(?:the\s+)?(?:newest|oldest|latest)|filter|analy[sz]e|how many|summarize|report\s+findings)/i;
           const _needsAnalysis = _analysisKeywords.test(goal || '');
           if (_needsAnalysis && _memSize > 500) {
             // Don't force-finish — instead tell the model to process and call done()

@@ -8,6 +8,8 @@ export default [
       sourceType: 'module',
       globals: {
         chrome: 'readonly',
+        self: 'readonly',
+        module: 'writable',
         window: 'writable',
         document: 'writable',
         console: 'readonly',
@@ -144,6 +146,14 @@ export default [
         getEventListeners: 'readonly',
         sendMessage: 'readonly',
         addMessage: 'readonly',
+        // activity-feed.js attaches these to window; other popup modules call them.
+        initActivityFeed: 'readonly',
+        addFeedEvent: 'readonly',
+        clearFeed: 'readonly',
+        setFeedVisible: 'readonly',
+        toggleFeedCollapse: 'readonly',
+        getFeedEntryCount: 'readonly',
+        __showBootBanner: 'readonly',
       },
     },
   },

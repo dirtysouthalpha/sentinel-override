@@ -204,7 +204,9 @@ function computeNextRun(recurrence) {
     return candidate.getTime();
   }
 
-  if (recurrence.interval === 'custom') {
+  if (recurrence.interval === 'custom' || recurrence.interval === 'hourly') {
+    // (audit) 'hourly' had no branch and fell through to the +1h default, ignoring
+    // its periodInMinutes. It is a fixed-period recurrence like 'custom'; handle both.
     const periodMs = (recurrence.periodInMinutes || 60) * ONE_MINUTE_MS;
     if (periodMs <= 0) return now.getTime() + ONE_HOUR_MS;
     const nowMs = now.getTime();
@@ -213,6 +215,20 @@ function computeNextRun(recurrence) {
     const nextPeriod = midnight + (periodsElapsed + 1) * periodMs;
     if (nextPeriod <= nowMs + ONE_MINUTE_MS) return midnight + (periodsElapsed + 2) * periodMs;
     return nextPeriod;
+  }
+
+  if (recurrence.interval === 'monthly') {
+    // (audit) 'monthly' had no branch and re-fired every hour. Fire on dayOfMonth
+    // (clamped to the target month's length) at the configured time.
+    const reqDom = (Number.isFinite(recurrence.dayOfMonth) && recurrence.dayOfMonth >= 1) ? recurrence.dayOfMonth : 1;
+    const atMonth = (year, month) => {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const dom = Math.min(reqDom, lastDay);
+      return new Date(year, month, dom, finalHours, finalMinutes, 0, 0).getTime();
+    };
+    let t = atMonth(now.getFullYear(), now.getMonth());
+    if (t <= now.getTime()) t = atMonth(now.getFullYear(), now.getMonth() + 1);
+    return t;
   }
 
   return now.getTime() + ONE_HOUR_MS;
@@ -661,7 +677,12 @@ async function _getOrCreateTab() {
     });
   });
   if (tabs?.[0]?.id && typeof tabs[0].id === 'number') return tabs[0].id;
-  let newTab; try { newTab = await chrome.tabs.create({ url: 'about:blank' }); } catch (_) { return; /* tab creation failed */ }
+  // (audit) Throw on failure instead of returning undefined. The caller
+  // (executeScheduledTask) catches this to record a task failure; returning
+  // undefined let it proceed to startAgent + a 5-minute completion wait that
+  // never resolves, hanging the run (and the scheduler test to its timeout).
+  let newTab;
+  try { newTab = await chrome.tabs.create({ url: 'about:blank' }); } catch (err) { throw new Error(`Failed to create tab: ${getErrorMessage(err)}`); }
   await new Promise(resolve => setTimeout(resolve, FIVE_HUNDRED_MS));
   if (newTab && newTab.id) return newTab.id;
   throw new Error('Failed to create tab');

@@ -22,6 +22,7 @@ jest.unstable_mockModule('../background/adaptive-prompts.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getTextProvider: jest.fn(async () => null),
   getActiveProvider: jest.fn(async () => ({
     endpoint: 'http://llm.internal',
     apiKey: 'test-key',

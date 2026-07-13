@@ -18,6 +18,7 @@ const mockResolveProvider = jest.fn(() => ({
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getTextProvider: jest.fn(async () => null),
   getActiveProvider: mockGetActiveProvider,
   resolveProvider: mockResolveProvider,
 }));

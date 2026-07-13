@@ -4,6 +4,7 @@
 import { jest } from '@jest/globals';
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getTextProvider: jest.fn(async () => null),
   getActiveProvider: jest.fn(async () => ({
     endpoint: 'https://api.test.com/v1',
     apiKey: 'test-key',

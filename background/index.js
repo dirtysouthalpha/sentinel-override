@@ -322,13 +322,14 @@ const handleRuntimeMessage = async (request, sender) => {
       return { pong: true, ts: Date.now(), agentRunning: typeof agentRunning !== 'undefined' ? agentRunning : 'unknown' };
     }
     case 'parse_schedule_nl': {
+      // (audit) This is an async handler whose return value is the response; it
+      // has no sendResponse parameter. Calling sendResponse threw ReferenceError,
+      // so natural-language scheduling always errored. Return the result directly.
       try {
-        const result = parseNaturalLanguageSchedule(request.input);
-        sendResponse(result);
+        return parseNaturalLanguageSchedule(request.input);
       } catch (err) {
-        sendResponse({ schedule: null, error: getErrorMessage(err) });
+        return { schedule: null, error: getErrorMessage(err) };
       }
-      return true;
     }
     // (3.26.0) Content-script telemetry bridge. The content script can't
     // import telemetry.js (different execution context, no module access in
@@ -659,16 +660,16 @@ const handleRuntimeMessage = async (request, sender) => {
     }
 
     case 'get_pool_status': {
-            return _gps();
+            return getPoolStatus();
     }
 
     case 'stop_agent_tab': {
-            const stopped = _stopPool(request.tabId);
+            const stopped = stopPoolAgent(request.tabId);
       return { ok: stopped, tabId: request.tabId };
     }
 
     case 'stop_all_agents': {
-            _stopAll();
+            stopAllAgents();
       return { ok: true };
     }
 

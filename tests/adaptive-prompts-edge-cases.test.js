@@ -23,7 +23,8 @@ const providerRegistryMock = {
     apiKey: 'test-key',
     endpoint: 'https://api.example.com/v1',
     model: 'test-model'
-  }))
+  })),
+  getTextProvider: jest.fn(async () => null)
 };
 
 jest.unstable_mockModule('../background/platforms/index.js', () => ({

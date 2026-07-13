@@ -108,6 +108,7 @@ jest.unstable_mockModule('../background/report-generator.js', () => ({
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
   getActiveProvider: jest.fn(async () => ({ endpoint: 'https://api.test.com', apiKey: 'key', model: 'test' })),
+  getTextProvider: jest.fn(async () => null),
   migrateLegacySettings: jest.fn(async () => {}),
 }));
 

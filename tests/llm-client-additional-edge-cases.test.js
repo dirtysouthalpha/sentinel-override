@@ -30,6 +30,7 @@ jest.unstable_mockModule('../background/audit-log.js', () => ({
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
   getActiveProvider: jest.fn(async () => ({ endpoint: 'https://api.test.com', apiKey: 'key', model: 'test' })),
+  getTextProvider: jest.fn(async () => null),
 }));
 
 jest.unstable_mockModule('../background/shared-state.js', () => ({

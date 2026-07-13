@@ -3,7 +3,7 @@
 // Imports from llm-client.js for LLM calls and message-protocol.js for popup messaging.
 
 import { sendSilentUpdate } from './message-protocol.js';
-import { getActiveProvider, resolveProvider } from './provider-registry.js';
+import { getActiveProvider, resolveProvider, getTextProvider } from './provider-registry.js';
 import { getErrorMessage } from './error-utils.js';
 import { ONE_SECOND_MS, MAX_REPORT_FINDING_LENGTH } from './constants.js';
 

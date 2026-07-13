@@ -197,7 +197,9 @@ describe('agent-loop-helpers', () => {
     test('contains actions section', () => {
       const prompt = buildVisionSystemPrompt();
       expect(prompt).toContain('<actions>');
-      expect(prompt).toContain('click(index)');
+      // Vision prompt uses the JSON tool format and documents click-by-index.
+      expect(prompt).toContain('"tool":"click"');
+      expect(prompt).toContain('"index":N');
     });
 
     test('contains output format section', () => {

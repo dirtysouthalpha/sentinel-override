@@ -60,7 +60,7 @@ let __currentReport = null;
     // Decorate [src:key] / [unverified] markers as inline chips for
     // audit trail visibility.
     const decorated = html
-      .replace(/\[src:([a-z0-9_\-]+)\]/gi, '<span class="src-chip" title="Source: $1">$1</span>')
+      .replace(/\[src:([a-z0-9_-]+)\]/gi, '<span class="src-chip" title="Source: $1">$1</span>')
       .replace(/\[unverified\]/gi, '<span class="src-unverified">unverified</span>');
 
     document.getElementById('reportBody').innerHTML = decorated;
