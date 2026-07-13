@@ -58,6 +58,10 @@ describe('UAP Server', () => {
     // Clear audit log before each test
     uapServer.auditLog = [];
 
+    // (audit) authenticate() fails closed unless a shared secret is configured.
+    // Set a known secret so auth-dependent tests can present a valid token.
+    uapServer.config.secretKey = 'test-shared-secret';
+
     // Initialize keypair for federation tests
     await uapServer.generateKeyPair();
   });
@@ -131,7 +135,7 @@ describe('UAP Server', () => {
         payload: {
           goal: 'Navigate to example.com and verify page loads',
           context: { budget: 50 },
-          authToken: 'valid_token'
+          authToken: 'test-shared-secret'
         }
       };
 
@@ -153,7 +157,7 @@ describe('UAP Server', () => {
         payload: {
           goal: 'short',
           context: {},
-          authToken: 'valid_token'
+          authToken: 'test-shared-secret'
         }
       };
 
@@ -474,31 +478,38 @@ describe('UAP Server', () => {
   });
 
   describe('Authentication', () => {
-    test('authenticate returns true for valid_token', () => {
-      expect(uapServer.authenticate('client1', 'valid_token')).toBe(true);
+    // (audit) authenticate() now requires an exact match against the configured
+    // shared secret (set to 'test-shared-secret' in beforeEach). The old
+    // 'valid_token'/'test_token' backdoors and unsigned-JWT acceptance are gone.
+    test('authenticate returns true only for the configured shared secret', () => {
+      expect(uapServer.authenticate('client1', 'test-shared-secret')).toBe(true);
+    });
+
+    test('authenticate returns false for the removed backdoor tokens', () => {
+      expect(uapServer.authenticate('client1', 'valid_token')).toBe(false);
+      expect(uapServer.authenticate('client1', 'test_token')).toBe(false);
     });
 
     test('authenticate returns false for null token', () => {
       expect(uapServer.authenticate('client1', null)).toBe(false);
     });
 
-    test('authenticate returns false for malformed JWT (not 3 parts)', () => {
-      expect(uapServer.authenticate('client1', 'bad.token')).toBe(false);
+    test('authenticate returns false for a wrong secret', () => {
+      expect(uapServer.authenticate('client1', 'wrong-secret')).toBe(false);
     });
 
-    test('authenticate returns false for JWT with expired exp', () => {
-      // Create a JWT-like token with exp in the past
+    test('authenticate rejects an unsigned/forged JWT (no signature bypass)', () => {
       const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 3600 }));
+      const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
       const token = `${header}.${payload}.fakeSignature`;
       expect(uapServer.authenticate('client1', token)).toBe(false);
     });
 
-    test('authenticate returns true for JWT with future exp', () => {
-      const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-      const token = `${header}.${payload}.fakeSignature`;
-      expect(uapServer.authenticate('client1', token)).toBe(true);
+    test('authenticate fails closed when no secret is configured', () => {
+      const saved = uapServer.config.secretKey;
+      uapServer.config.secretKey = null;
+      expect(uapServer.authenticate('client1', 'anything')).toBe(false);
+      uapServer.config.secretKey = saved;
     });
   });
 
@@ -541,7 +552,7 @@ describe('UAP Server', () => {
       const message = {
         type: 'goal_request',
         id: 'rl-test-1',
-        payload: { goal: 'Navigate to example.com and verify page loads', context: {}, authToken: 'valid_token' }
+        payload: { goal: 'Navigate to example.com and verify page loads', context: {}, authToken: 'test-shared-secret' }
       };
 
       await uapServer.handleMessage(message, mockSender, mockSendResponse);
@@ -688,24 +699,24 @@ describe('UAP Server', () => {
     });
   });
 
-  describe('authenticate() JWT return path (line 509)', () => {
+  describe('authenticate() rejects forged JWTs (no signature-bypass path)', () => {
     const makeJWT = (payload) => {
       const header = btoa(JSON.stringify({ alg: 'HS256' }));
       const body = btoa(JSON.stringify(payload));
       return `${header}.${body}.sig`;
     };
 
-    test('returns true for JWT with future exp', () => {
+    test('rejects a JWT with future exp (unsigned tokens are not accepted)', () => {
       const token = makeJWT({ exp: Math.floor(Date.now() / 1000) + 3600 });
-      expect(uapServer.authenticate('client1', token)).toBe(true);
+      expect(uapServer.authenticate('client1', token)).toBe(false);
     });
 
-    test('returns false for JWT with no exp field', () => {
+    test('rejects a JWT with no exp field', () => {
       const token = makeJWT({ sub: 'user' });
       expect(uapServer.authenticate('client1', token)).toBe(false);
     });
 
-    test('returns false for JWT with invalid base64', () => {
+    test('rejects a JWT with invalid base64', () => {
       expect(uapServer.authenticate('client1', 'x.!!!.y')).toBe(false);
     });
   });

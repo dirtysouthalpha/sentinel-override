@@ -33,6 +33,10 @@ class UAPServer {
     this.config = {
       enabled: false,
       port: 8765,
+      // (audit) Shared secret required to authenticate clients. Null by default:
+      // authenticate() fails closed until an operator configures a real secret
+      // (e.g. via uapConfig in chrome.storage). No hardcoded/backdoor tokens.
+      secretKey: null,
       maxConnections: 100,
       rateLimit: {
         requestsPerHour: 100,
@@ -502,27 +506,21 @@ class UAPServer {
    * Authenticate client
    */
   authenticate(clientId, authToken) {
-    // In production, verify JWT or API key
-    // For now, accept if token exists and is not expired
-    if (!authToken) return false;
-
-    try {
-      // Allow simple test tokens for development/testing
-      if (authToken === 'valid_token' || authToken === 'test_token') {
-        return true;
-      }
-
-      // Basic token validation
-      const parts = authToken.split('.');
-      if (parts.length !== 3) return false; // JWT format
-
-      const payload = JSON.parse(atob(parts[1]));
-      const now = Date.now() / 1000;
-
-      return payload.exp > now;
-    } catch {
-      return false;
+    // (audit) Fail closed. Previously this accepted the hardcoded tokens
+    // 'valid_token'/'test_token' and any well-formed JWT WITHOUT verifying its
+    // signature (it only base64-decoded the payload and checked exp), so any
+    // client could forge access. There is no token issuer/signer in this
+    // codebase, so authentication is a match against the server's configured
+    // shared secret, compared in constant time. No backdoor tokens.
+    if (!authToken || typeof authToken !== 'string') return false;
+    const expected = this.config && this.config.secretKey;
+    if (!expected || typeof expected !== 'string' || expected.length === 0) return false;
+    if (authToken.length !== expected.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) {
+      diff |= authToken.charCodeAt(i) ^ expected.charCodeAt(i);
     }
+    return diff === 0;
   }
 
   /**

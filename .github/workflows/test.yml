@@ -54,6 +54,13 @@ jobs:
       - name: Module Loader Check
         run: node scripts/check-module-load.cjs
 
+      # ━━━ Step 1d: Lint ━━━
+      # ESLint catches undeclared identifiers, const reassignment, and other
+      # runtime-fatal mistakes that syntax-only checks miss. This gate was absent,
+      # which is how a batch of ReferenceError bugs reached production.
+      - name: Lint
+        run: npm run lint
+
       # ━━━ Step 2: Syntax Check ━━━
       - name: Syntax Check
         run: |

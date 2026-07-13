@@ -650,7 +650,8 @@ let mfaAckUrl = null;           // (3.7.0) URL where the user last acknowledged 
 let signInWallAckUrls = new Set(); // (3.14.1) URLs where the user has acknowledged a sign-in wall this run — prevents re-pausing after manual sign-in
 let detectedTenant = null;      // (3.7.0) {tid, onmicrosoft, chipText, hostname} most recently detected on a Microsoft admin URL
 let runLogId = null;            // (3.9.0) per-run UUID; keys runLog entries in storage
-let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage every step
+let runLogBuffer = [];          // (3.9.0) in-memory log buffer flushed to storage (throttled)
+let _lastRunLogPersistStep = -999; // (audit) throttle key for the per-step forensic write
 const _stepScreenshots = new Map(); // (9.3) step# → base64Image; ring-capped at 20 entries for replay export
 const _dkimDomainKeyCache = new Map(); // (10.0.1) Cache for DKIM domain key regex patterns — avoids repeated RegExp creation
 let productiveSteps = 0;        // (3.8.0) dynamic step-limit driver — every successful extract/note/finish-blocker bumps this so productive runs get more oxygen
@@ -1370,6 +1371,7 @@ export async function startAgent(goal, sender) {
   // every step to chrome.storage.local.run_logs[runLogId] for export.
   try {
     runLogId = crypto.randomUUID();
+    _lastRunLogPersistStep = -999; // (audit) reset per-run so the throttle writes early
     _runLogQuotaPruned = false;
     runLogBuffer = [{
       step: 0,
@@ -4078,6 +4080,7 @@ Organize findings under clear headers matching the original goal sections. Use t
           // Reset loop state for next subtask (keep agentMemory!)
           goal = buildSubTaskGoal(_nextSubtask, _orchestratorState.originalGoal, _nextIdx, _nextTotal, _orchestratorState.accumulatedResults);
           stepCount = 0;
+          _lastRunLogPersistStep = -999; // (audit) stepCount reset — reset throttle too
           history.length = 0;
           consecutiveFailures = 0;
           currentStrategies = [];
@@ -6377,7 +6380,14 @@ return { ok: true, value: el.value };
           if (runLogBuffer.length > 200) {
             runLogBuffer.splice(0, runLogBuffer.length - 200);
           }
-          // Persist to storage every step.
+          // (audit) Throttle the per-step persist. Each entry carries a base64
+          // screenshot, so rewriting the whole 200-entry buffer to chrome.storage
+          // every step was O(n²) and filled storage (which silently broke report
+          // writes — see the quota self-heal below). Write at most every 5 steps;
+          // the run-completion path persists the full log for export/replay.
+          if (stepCount - _lastRunLogPersistStep >= 5) {
+          _lastRunLogPersistStep = stepCount;
+          // Persist to storage (throttled).
           chrome.storage.local.set({
             [`run_log_${runLogId}`]: { goal, runLogId, entries: runLogBuffer, lastUpdate: Date.now() }
           }).catch(async (e) => {
@@ -6401,6 +6411,7 @@ return { ok: true, value: el.value };
             }
             console.error('[agent-engine] Run log persist failed:', msg);
           });
+          } // end throttle guard
         }
       } catch (_) { /* never crash the loop on logging */ }
 
