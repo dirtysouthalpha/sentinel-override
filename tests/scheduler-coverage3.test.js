@@ -75,6 +75,8 @@ jest.unstable_mockModule('../background/template-manager.js', () => ({
   resolveTemplateGoal: jest.fn(async (id) => `Goal for ${id}`),
 }));
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   notifyIfEnabled: jest.fn(),
 }));
 jest.unstable_mockModule('../background/error-utils.js', () => ({

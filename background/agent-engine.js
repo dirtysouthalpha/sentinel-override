@@ -542,7 +542,7 @@ const textResult = await cdpExecuteJs(tab,
 import {sendSilentUpdate, sendActionMessage, sendActionResult, sendReportUpdate, sendPageContext, sendTabStateUpdate, sendScreenshotUpdate, sendAgentActivity, sendAgentStepStart, sendAgentStatus, sendHeartbeat, sendPlanPreview, sendClientKnowledgePreview, sendCostUpdate} from './message-protocol.js';
 import {generateReport, buildFallbackReport} from './report-generator.js';
 import {getActiveProvider, getTextProvider} from './provider-registry.js';
-import {isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive} from './shared-state.js';
+import {isSPATransitionPending, clearSPATransition, notifyIfEnabled, startSwKeepalive, stopSwKeepalive, emitAgentCompletion} from './shared-state.js';
 import {getActiveTabId, getTabContext, getAllTabContexts, openTab, switchToTab, closeTab, closeAllAgentTabs, updateSnapshot, resetAllContexts, findTabByLabel, registerInitialTab, getTabCount} from './tab-context.js';
 import {getClientStartupContext, markRunCompleted} from './client-knowledge.js';
 import {generateHeuristicPlan, _generateInitialPlan, _applyAdaptivePrompts, _waitForAdaptedGoalDecision, BARE_SITE_MAP} from './agent-planning.js';
@@ -1516,6 +1516,10 @@ export async function startAgent(goal, sender) {
     console.error('[Sentinel/Loop] Stack:', err && err.stack ? err.stack : '[no stack]');
     emitAgentStatus(startTabId, 'error', `Agent crashed: ${getErrorMessage(err)}`);
     agentRunning = false;
+    // (audit) Notify in-SW subscribers (scheduler) of the crash so they don't
+    // wait out the full timeout — the runtime message below isn't delivered to
+    // the SW's own listeners.
+    try { emitAgentCompletion({ status: 'failure', error: `Agent crashed: ${getErrorMessage(err)}`, report: null }); } catch (_e) { /* non-fatal */ }
     // (Phase 6) UAP bridge: notify external server of crash
     try { uapBroadcast('agent.error', { error: getErrorMessage(err) }); } catch (_uapErr) { /* UAP bridge unavailable */ }
     chrome.runtime.sendMessage({
@@ -6775,7 +6779,11 @@ return { ok: true, value: el.value };
   const _runDuration = Date.now() - _loopStartTime;
   notifyRunComplete(_lastGoal, !!finished, stepCount, _runDuration);
 
-  // Signal completion via messaging (replaces polling for scheduler)
+  // Signal completion. (audit) Emit an in-SW event FIRST — the scheduler runs in
+  // this same service worker and never receives the runtime.sendMessage below
+  // (Chrome doesn't deliver a SW's own message back to it). The runtime message
+  // still goes out for the popup / side panel, which are separate contexts.
+  try { emitAgentCompletion({ status: 'success', error: null, report: agentReport }); } catch (_e) { /* non-fatal */ }
   chrome.runtime.sendMessage({ action: 'agent_loop_complete', report: agentReport }).catch((e) => {
     console.error('[agentReport] Unhandled rejection:', e);
   });

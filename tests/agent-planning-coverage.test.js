@@ -50,6 +50,8 @@ jest.unstable_mockModule('../background/bias-detector.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   startSwKeepalive: jest.fn(),
   stopSwKeepalive: jest.fn(),
 }));

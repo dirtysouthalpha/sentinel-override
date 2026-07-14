@@ -7,7 +7,7 @@ import * as AgentEngine from './agent-engine.js';
 import {resolveTemplateGoal} from './template-manager.js';
 import {getActiveTabId as _getActiveTabId, registerInitialTab} from './tab-context.js';
 import {getTabInfo} from './tab-manager.js';
-import {notifyIfEnabled} from './shared-state.js';
+import {notifyIfEnabled, onAgentCompletion} from './shared-state.js';
 import {FIVE_HUNDRED_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
 import {tel} from './telemetry.js';
 import {getErrorMessage} from './error-utils.js';
@@ -698,32 +698,53 @@ async function _getOrCreateTab() {
  */
 function _waitForAgentCompletion(timeoutMs) {
   let _resolve;
+  let _settled = false;
+  let timer = null;
+  let unsubscribe = () => {};
   const promise = new Promise((resolve) => { _resolve = resolve; });
-
-  const timer = setTimeout(() => {
-    chrome.runtime.onMessage.removeListener(listener);
-    _resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
-  }, timeoutMs);
 
   const listener = (msg) => {
     if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
     if (msg.action === 'agent_loop_complete') {
-      clearTimeout(timer);
-      chrome.runtime.onMessage.removeListener(listener);
-      _resolve({ status: 'success', error: null, report: msg.report || null });
+      _finish({ status: 'success', error: null, report: msg.report || null });
     } else if (msg.action === 'agent_finished' && msg.summary && CRASH_SUMMARY_RE.test(msg.summary)) {
-      // runAgentLoop crashed — agent_loop_complete will never come; fail fast instead of waiting 5 min
-      clearTimeout(timer);
-      chrome.runtime.onMessage.removeListener(listener);
-      _resolve({ status: 'failure', error: msg.summary || 'Agent crashed unexpectedly', report: null });
+      // runAgentLoop crashed — fail fast instead of waiting out the timeout.
+      _finish({ status: 'failure', error: msg.summary || 'Agent crashed unexpectedly', report: null });
     }
   };
+
+  const _cleanup = () => {
+    clearTimeout(timer);
+    try { chrome.runtime.onMessage.removeListener(listener); } catch (_) { /* ignore */ }
+    try { unsubscribe(); } catch (_) { /* ignore */ }
+  };
+  const _finish = (result) => {
+    if (_settled) return;
+    _settled = true;
+    _cleanup();
+    _resolve(result);
+  };
+
+  timer = setTimeout(() => {
+    _finish({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
+  }, timeoutMs);
+
+  // (audit) Primary, reliable path: the agent engine runs in this same service
+  // worker and emits completion in-process. The runtime.onMessage listener below
+  // cannot fire for the engine's own SW-scoped sendMessage, so without this the
+  // scheduler always fell through to the 5-minute timeout.
+  unsubscribe = onAgentCompletion((res) => {
+    if (res && res.status === 'failure') {
+      _finish({ status: 'failure', error: res.error || 'Agent failed', report: res.report || null });
+    } else {
+      _finish({ status: 'success', error: null, report: (res && res.report) || null });
+    }
+  });
+
+  // Fallback for any genuinely cross-context delivery; harmless in-SW.
   chrome.runtime.onMessage.addListener(listener);
 
-  const cancel = () => {
-    clearTimeout(timer);
-    chrome.runtime.onMessage.removeListener(listener);
-  };
+  const cancel = () => { _settled = true; _cleanup(); };
 
   return { promise, cancel };
 }

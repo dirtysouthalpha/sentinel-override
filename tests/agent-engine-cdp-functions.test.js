@@ -94,6 +94,8 @@ jest.unstable_mockModule('../background/provider-registry.js', () => ({
   migrateLegacySettings: jest.fn(async () => {}),
 }));
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   isSPATransitionPending: jest.fn(() => false),
   clearSPATransition: jest.fn(),
   notifyIfEnabled: jest.fn(async () => {}),
