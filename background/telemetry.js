@@ -51,6 +51,10 @@ let _runBuffer = [];
 let _persistEnabled = false;
 let _persistFlushTimer = null;
 let _pendingPersistFlush = false;
+// (audit) Serializes _flushRunBuffer so the three call sites (200-event threshold,
+// interval timer, run-end) can't run overlapping read-modify-write cycles that
+// lose or duplicate events.
+let _flushInFlight = null;
 
 // In-memory cache for runs index to eliminate repetitive I/O
 let _runsIndexCache = null;
@@ -220,22 +224,36 @@ function _scheduleFlush() {
 
 async function _flushRunBuffer() {
   if (!_persistEnabled || !_currentRunId || !_runBuffer.length) return;
-  const key = `telemetry_run_${_currentRunId}`;
-  try {
-    const stored = await chrome.storage.local.get(key);
-    const existing = Array.isArray(stored[key]) ? stored[key] : [];
-    const merged = [...existing, ..._runBuffer];
-    const capped = merged.length > PERSIST_MAX_EVENTS_PER_RUN
-      ? merged.slice(-PERSIST_MAX_EVENTS_PER_RUN)
-      : merged;
-    await chrome.storage.local.set({ [key]: capped });
-    _pendingPersistFlush = false;
+  // (audit) Serialize: if a flush is already running, coalesce onto it rather than
+  // starting a second overlapping read-modify-write (which lost/duplicated events).
+  if (_flushInFlight) return _flushInFlight;
+  const runId = _currentRunId;
+  _flushInFlight = (async () => {
+    // Capture and clear synchronously BEFORE any await, so events pushed during
+    // the async read/write land in a fresh buffer instead of being dropped by the
+    // clear that previously happened after the write.
+    const toFlush = _runBuffer;
     _runBuffer = [];
-  } catch (e) {
-    // Re-enable so the interval timer retries on the next tick
-    _pendingPersistFlush = true;
-    console.warn('[Sentinel/telemetry] flush error (will retry):', getErrorMessage(e));
-  }
+    const key = `telemetry_run_${runId}`;
+    try {
+      const stored = await chrome.storage.local.get(key);
+      const existing = Array.isArray(stored[key]) ? stored[key] : [];
+      const merged = [...existing, ...toFlush];
+      const capped = merged.length > PERSIST_MAX_EVENTS_PER_RUN
+        ? merged.slice(-PERSIST_MAX_EVENTS_PER_RUN)
+        : merged;
+      await chrome.storage.local.set({ [key]: capped });
+      if (!_runBuffer.length) _pendingPersistFlush = false;
+    } catch (e) {
+      // Re-queue the events we pulled (oldest first) and retry on the next tick.
+      _runBuffer = [...toFlush, ..._runBuffer];
+      _pendingPersistFlush = true;
+      console.warn('[Sentinel/telemetry] flush error (will retry):', getErrorMessage(e));
+    } finally {
+      _flushInFlight = null;
+    }
+  })();
+  return _flushInFlight;
 }
 
 /**
