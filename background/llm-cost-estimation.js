@@ -15,6 +15,7 @@ const _PRICING = {
   'claude-sonnet-4-5': [3.00, 15.00],
   'claude-3-5-sonnet': [3.00, 15.00],
   'claude-3-sonnet': [3.00, 15.00],
+  'claude-opus-4-8': [15.00, 75.00],
   'claude-opus-4-6': [15.00, 75.00],
   'claude-opus-4-7': [15.00, 75.00],
   'claude-opus-4-5': [15.00, 75.00],
@@ -42,9 +43,18 @@ const _PRICING_SORTED = Object.entries(_PRICING).sort((a, b) => b[0].length - a[
 export function estimateCostUsd(inputTokens, outputTokens, modelName) {
   const m = (modelName || '').toLowerCase();
   if (!m) return ((inputTokens || 0) * 3.00 + (outputTokens || 0) * 15.00) / 1_000_000;
-  let rates = [3.00, 15.00]; // default: Sonnet-class
+  let rates = null;
   for (const [key, r] of _PRICING_SORTED) {
     if (m.includes(key) || m.startsWith(key)) { rates = r; break; }
+  }
+  if (!rates) {
+    // (audit) Family-aware fallback so unlisted new versions (e.g. the default
+    // claude-opus-4-8) aren't silently priced at the Sonnet-class default —
+    // opus is 5x sonnet. Exact entries above still win; this only refines the
+    // fallback. Anything not clearly opus/haiku keeps the Sonnet-class estimate.
+    if (/opus/.test(m)) rates = [15.00, 75.00];
+    else if (/haiku/.test(m)) rates = [0.80, 4.00];
+    else rates = [3.00, 15.00];
   }
   return ((inputTokens || 0) * (rates[0] || 0) + (outputTokens || 0) * (rates[1] || 0)) / 1_000_000;
 }

@@ -3338,7 +3338,12 @@ async function exportRunLog(format) {
       const headers = ['step', 'timestamp', 'kind', 'url', 'tenant', 'action_type', 'selector_or_ref', 'text_preview', 'result', 'failed'];
       const escape = (v) => {
         if (v == null) return '';
-        const s = String(v).replace(/"/g, '""');
+        let s = String(v);
+        // (audit) Neutralize spreadsheet formula injection: a cell beginning with
+        // =, +, -, @, tab, or CR is executed as a formula by Excel/Sheets, and
+        // these cells hold untrusted page/LLM-derived text. Prefix a single quote.
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        s = s.replace(/"/g, '""');
         return CSV_QUOTE_RE.test(s) ? `"${s}"` : s;
       };
       const rows = (log.entries || []).map(e => [

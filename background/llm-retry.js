@@ -45,7 +45,11 @@ export async function callLLMWithRetry(trimmedElements, totalElementCount, pageC
     const msg = (typeof err.message === 'string' ? err.message : String(err));
     // (v20.3) Added 500 / 529 / "overloaded" — Anthropic returns 529 overloaded_error
     // and transient 500s under load; these are retryable just like 429/502/503.
-    const isRetryable = (msg.includes('429') || msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('529') || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
+    // (audit) Match status codes on digit boundaries so incidental digits don't
+    // trigger retries — e.g. `msg.includes('500')` used to treat a permanent 400
+    // whose message mentioned "5000ms" or "max 500 tokens" as retryable.
+    const _retryableStatus = /(?<![0-9])(429|500|502|503|529)(?![0-9])/.test(msg);
+    const isRetryable = (_retryableStatus || msg.includes('overloaded') || msg.includes('timed out') || msg.includes('AbortError') || msg.includes('Failed to fetch')) && retryCount < CONFIG.maxRetries;
     if (isRetryable) {
       // (v21.6) Rate-limit model switching: if free model hits 429 twice,
       // switch to next free vision model instead of just backing off

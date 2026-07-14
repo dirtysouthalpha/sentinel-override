@@ -5,7 +5,11 @@
 
 import { getErrorMessage } from '../error-utils.js';
 
-const _LOGIN_URL_RE = /\/login|\/signin|\/sign-in|\/auth|\/sso|\/oauth|\/saml|\/adfs|\/mfa|\/verify|microsoftonline\.com|accounts\.google\.com|login\.live\.com|okta\.com|auth0\.com|duosecurity\.com|\.ping(?:identity|federate)|duo\.com/i;
+// (audit) `\/auth` matched /author(s) and `\/verify` matched ordinary doc pages,
+// injecting "wait for MFA" directives on non-auth pages. Anchor those segments:
+// /auth as a whole segment, plus explicit /authenticat* and /authoriz* for the
+// real auth endpoints; /verify as a whole segment plus /verificat*.
+const _LOGIN_URL_RE = /\/login|\/signin|\/sign-in|\/auth\b|\/authenticat|\/authoriz|\/sso\b|\/oauth|\/saml|\/adfs|\/mfa\b|\/verify\b|\/verificat|microsoftonline\.com|accounts\.google\.com|login\.live\.com|okta\.com|auth0\.com|duosecurity\.com|\.ping(?:identity|federate)|duo\.com/i;
 const _LOGIN_TEXT_RE = /\b(sign\s*in|log\s*in|enter\s*your\s*(email|password|username)|forgot\s*password|two.?factor|authenticat(?:or|ion)\s*code|verification\s*code|send\s*code|approve\s*sign.?in|mfa\s*required|session\s*(expired|timed?\s*out)|please\s*(sign|log)\s*in|identity\s*verification)\b/i;
 const _MFA_TEXT_RE = /mfa|two.?factor|verif|authenticat|duo|approve/i;
 const _SSO_DOMAIN_RE = /microsoftonline|okta|ping|auth0|saml|adfs/i;

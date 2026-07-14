@@ -2030,10 +2030,20 @@ You are executing a structured, multi-phase IT investigation. Rules for this mod
         : new Error(`API stream read failed: ${getErrorMessage(e)}`);
     }
   } else {
+    // (audit) The fetch timeout was cleared once headers arrived, and the
+    // streaming path has its own idle timeout — but this non-streaming body read
+    // had none, so a server that sends 200 + headers then stalls the body would
+    // hang the step forever. Abort the owning controller if the read stalls.
+    const _bodyTimeout = setTimeout(() => { try { activeController.abort(); } catch (_) { /* already settled */ } }, CONFIG.fetchTimeout);
     try {
       data = await response.json();
     } catch (e) {
-      throw new Error(`API returned invalid JSON: ${getErrorMessage(e)}`);
+      const aborted = typeof e === 'object' && e !== null && e.name === 'AbortError';
+      throw aborted
+        ? new Error(`API body read timed out after ${CONFIG.fetchTimeout / ONE_SECOND_MS}s`)
+        : new Error(`API returned invalid JSON: ${getErrorMessage(e)}`);
+    } finally {
+      clearTimeout(_bodyTimeout);
     }
   }
 

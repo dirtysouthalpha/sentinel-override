@@ -1621,6 +1621,11 @@ if (testConnectionBtn) testConnectionBtn.addEventListener('click', async () => {
   ];
 
   function doExportSettings() {
+    // (audit) EXPORT_KEYS includes `providers`, which holds API keys in plaintext.
+    // Warn before writing them to a downloaded file so the user consents knowingly.
+    try {
+      if (!window.confirm('This settings file includes your provider API keys in plaintext. Anyone who obtains the file can use them. Export anyway?')) return;
+    } catch (_e) { /* confirm unavailable — proceed */ }
     chrome.storage.local.get(EXPORT_KEYS, (data) => {
       if (chrome.runtime.lastError) {
         showToast('Export failed', 'error');
