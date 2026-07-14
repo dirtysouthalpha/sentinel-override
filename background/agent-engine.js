@@ -949,7 +949,13 @@ async function _updateRunLogIndex(runLogId, fields) {
       // Single-pass optimization: filter and map in one loop
       const evictKeys = [];
       for (const e of evict) {
-        if (e && e.runLogId) evictKeys.push(`run_log_${e.runLogId}`);
+        if (e && e.runLogId) {
+          evictKeys.push(`run_log_${e.runLogId}`);
+          // (audit) Also evict the sibling per-run keys that share runLogId and
+          // were previously never garbage-collected (unbounded storage growth).
+          evictKeys.push(`audit_${e.runLogId}`);
+          evictKeys.push(`novelty_history_${e.runLogId}`);
+        }
       }
       try { await chrome.storage.local.remove(evictKeys); } catch (e) { console.error('[Sentinel] History eviction failed:', getErrorMessage(e)); }
     }
