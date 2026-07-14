@@ -589,6 +589,10 @@ export async function detachAllDebuggees() {
   attachedDebuggees.clear();
   for (const tabId of ids) {
     try { await chrome.debugger.detach({ tabId }); } catch (_e) { /* may already be gone */ }
+    // (audit) Reset observability capture state on programmatic detach too — the
+    // user-initiated onDetach path clears these, but agent-cleanup detach did not,
+    // so console/network buffers leaked and capture broke after the next attach.
+    try { clearObservabilityBuffers(tabId); } catch (_e) { /* non-fatal */ }
   }
 }
 

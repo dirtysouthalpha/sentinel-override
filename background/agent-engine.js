@@ -1271,6 +1271,10 @@ export async function startAgent(goal, sender) {
   if (typeof goal !== 'string' || !goal.trim()) throw new Error('Goal must be a non-empty string');
   goal = goal.trim().substring(0, 4000);
   if (agentRunning) throw new Error('Agent already running');
+  // (audit) Claim the run synchronously, before any await, so two near-simultaneous
+  // startAgent calls can't both pass the guard and launch concurrent runs. Released
+  // on the early throw path below (no active tab).
+  agentRunning = true;
   _cursorHiderInjected = false;
   // (audit) Reset per-run orchestrator/diagnosis state (declared at module scope).
   _orchestratorState = null;
@@ -1295,6 +1299,7 @@ export async function startAgent(goal, sender) {
     if (Array.isArray(tabs) && tabs[0] != null && tabs[0].id) {
       startTabId = tabs[0].id;
     } else {
+      agentRunning = false; // (audit) release the claim taken above before bailing
       throw new Error('No active tab found');
     }
   } else {
@@ -1308,7 +1313,7 @@ export async function startAgent(goal, sender) {
     // Pool full or duplicate tab — log warning but continue (backward compat)
     console.warn("[Sentinel/pool] Agent pool registration skipped:", getErrorMessage(_poolErr));
   }
-  agentRunning = true;
+  // agentRunning was already claimed synchronously after the guard above.
   _runStartTime = Date.now();
   // Persist running state so SW restarts can detect an interrupted run
   try { await chrome.storage.session.set({ agentRunning: true, agentGoal: goal, agentStartTime: _runStartTime }); } catch(_sessionErr) {
