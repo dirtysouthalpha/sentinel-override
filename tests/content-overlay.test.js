@@ -135,7 +135,10 @@ describe('ov.isOverlayBlocking', () => {
       getBoundingClientRect: () => ({ left: 10, top: 10, width: 100, height: 30 }),
       contains: () => false,
     };
-    const blocker = { tagName: 'DIV' };
+    // A real blocking overlay is a separate subtree: it does not contain the
+    // target (and the target does not contain it). Real DOM nodes always expose
+    // contains(); the mock must too now that isOverlayBlocking checks both ways.
+    const blocker = { tagName: 'DIV', contains: () => false };
     const doc = {
       defaultView: { innerWidth: 1024, innerHeight: 768 },
       elementFromPoint: () => blocker,

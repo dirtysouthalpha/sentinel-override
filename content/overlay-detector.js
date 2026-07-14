@@ -255,8 +255,12 @@ window.__sentinelUtils.overlay = window.__sentinelUtils.overlay || {};
       const topElement = doc.elementFromPoint(centerX, centerY);
       if (!topElement) return null;
 
-      // If the topmost element IS the target (or a child of it), not blocked
-      if (topElement === targetEl || targetEl.contains(topElement)) {
+      // If the topmost element IS the target, a descendant of it, or one of its
+      // own ancestors/wrappers, it is not a blocking overlay.
+      // (audit) The ancestor case (topElement.contains(targetEl)) was missing, so a
+      // target sitting behind its own wrapper (e.g. pointer-events routing) was
+      // mistaken for a blocked target and triggered a destructive overlay dismissal.
+      if (topElement === targetEl || targetEl.contains(topElement) || topElement.contains(targetEl)) {
         return null;
       }
 
