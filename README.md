@@ -1,7 +1,7 @@
 # Sentinel Override
 
-![Version](https://img.shields.io/badge/version-21.6.1-orange)
-![Tests](https://img.shields.io/badge/tests-10,249-brightgreen)
+![Version](https://img.shields.io/badge/version-21.6.76-orange)
+![Tests](https://img.shields.io/badge/tests-10,249+-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 An autonomous browser agent for MSPs and IT professionals. Sentinel Override sees the screen, plans multi-step workflows, and executes them with human-like visual feedback — cursor movement, element highlighting, click pulses, and typing animation.
@@ -88,6 +88,20 @@ An autonomous browser agent for MSPs and IT professionals. Sentinel Override see
 | **Action learning** | Tracks action success/failure per platform. Builds one-shot playbooks for repeated tasks. |
 | **Federation** | Multi-agent coordination across local and remote peers for parallel work. |
 | **Scheduler** | Natural language scheduling ("every Monday at 9am, audit M365 licenses for Client X"). |
+
+
+### v21.x Intelligence Upgrades
+
+| Feature | Description |
+|---------|-------------|
+| **Circuit Breaker** | ABSOLUTE_MAX_STEPS=150 ceiling, identical-action detection, repeated target click prevention, stale-page detection, 70%+ failure rate trigger |
+| **Dual-Provider Architecture** | Vision + text providers fire simultaneously for faster processing; LongCat, Ollama, LM Studio, vLLM presets |
+| **Federation Controller** | 706-line FederationController with peer discovery, zero-trust auth, goal decomposition for multi-agent orchestration |
+| **Prompt Injection Defense** | Regex pre-check for injection patterns before page content processing |
+| **Adaptive Intelligence** | Cross-run domain learning — agent remembers solutions from prior sessions |
+| **100-Iteration Hardening** | 27 try/catch wraps, 12 JSON.parse guards, XSS fixes, provider-aware 429 retry (GLM/DeepSeek 2x, free/OpenRouter 1.5x) |
+| **50-Iteration Improvement** | Page-type detection, progressive summarizer, output schema compliance, budget awareness |
+| **Investigation Checklist** | 86-test suite for MSP investigation workflows with Teams Admin integration |
 
 ---
 
