@@ -1,5 +1,210 @@
 # Changelog
 
+## [21.6.76] - 2026-07-02
+
+### Added
+- Report Generator Overhaul: route reports to TEXT provider (LongCat) when available, shorten report prompt ~60%, increase history truncation 150-400 chars, increase memory summary 3000-4000 chars, add _formatFallbackReport for clean markdown fallbacks
+- Enhanced Auto-Extract: auto-extract page content on first click block (not just click_at)
+- click vs click_at Fix: instant-finish now catches click (not just click_at) when data exists in memory
+
+### Changed
+- 50-iteration flow improvements across agent loop
+
+
+## [21.6.75] - 2026-07-02
+
+### Fixed
+- Report Timeout: increased to 120s to prevent premature timeout
+- Instant-Finish on click_at: now triggers when click_at has data in memory
+
+
+## [21.6.74] - 2026-07-02
+
+### Fixed
+- Nuclear Fix: click with no index auto-converts to execute_js to prevent undefined coordinate crashes
+
+
+## [21.6.73] - 2026-07-02
+
+### Fixed
+- Ban click_at in Vision Prompt: auto-convert click_at to click in vision output
+
+
+## [21.6.72] - 2026-07-02
+
+### Added
+- Auto-Extract on First click_at: automatically extract page content when first click_at block is encountered
+
+
+## [21.6.71] - 2026-07-02
+
+### Fixed
+- click_at Force-Finish Guard: prevents infinite loops on click_at actions
+- Report Memory: truncated to 3000 chars to reduce token usage
+
+
+## [21.6.70] - 2026-07-02
+
+### Added
+- Local Model Presets: support for Ollama, LM Studio, and vLLM as text providers
+- Report Truncation Fix: prevents oversized report generation
+
+
+## [21.6.69] - 2026-07-02
+
+### Added
+- Text Provider API Key Field: separate API key input for dual-provider setup
+
+
+## [21.6.68] - 2026-07-02
+
+### Added
+- Parallel Dual-Provider Architecture: vision and text providers fire simultaneously
+
+
+## [21.6.67] - 2026-07-02
+
+### Fixed
+- Vision Parser Format Mismatch: fixed parsing discrepancies between vision and text provider outputs
+- Console Noise Reduction: reduced unnecessary console output
+
+
+## [21.6.66] - 2026-07-02
+
+### Fixed
+- HOTFIX: fixed 3 runtime ReferenceErrors from v21.6.65
+- Added safety guards for LongCat provider configuration
+
+
+## [21.6.65] - 2026-07-02
+
+### Fixed
+- HOTFIX: moved LongCat inside PROVIDERS object (scope fix)
+
+
+## [21.6.64] - 2026-07-02
+
+### Added
+- LongCat AI Provider: added LongCat-2.0 as a provider option
+
+
+## [21.6.63] - 2026-07-02
+
+### Fixed
+- All Remaining Test Failures: cleaned up empty catch blocks, fixed 3 pre-existing test failures
+
+
+## [21.6.62] - 2026-07-02
+
+### Fixed
+- Test Regressions: fixed all test failures introduced during optimization rounds
+
+
+## [21.6.61] - 2026-07-02
+
+### Changed
+- Round 3 Optimization: removed 8 dead functions
+
+
+## [21.6.60] - 2026-07-02
+
+### Changed
+- Round 2 Efficiency: CSS optimization, import consolidation, dead code removal
+
+
+## [21.6.59] - 2026-07-02
+
+### Changed
+- 100-Iteration Efficiency Loop: systematic performance improvements
+
+
+## [21.6.58] - 2026-07-02
+
+### Added
+- 50-Iteration Improvement Loop: page-type detection, progressive summarizer, output schema compliance, budget awareness
+- 5 new test files
+
+
+## [21.6.57] - 2026-07-02
+
+### Fixed
+- 100-Iteration Hardening Sweep: 27 try/catch wraps, 12 JSON.parse guards, 1 XSS fix, error handling
+
+
+## [21.6.56] - 2026-07-01
+
+### Fixed
+- Orchestrator Threshold: adjusted 300-200 for better multi-task handling
+- Analysis-Aware Auto-Finish: smarter completion detection
+
+
+## [21.6.55] - 2026-06-30
+
+### Fixed
+- Z.ai Content Safety: capped observation text to 12K max, detect error code 1301
+
+
+## [21.6.54] - 2026-06-29
+
+### Added
+- Adaptive Intelligence: failure diagnosis system + cross-run domain learning
+
+
+## [21.6.53] - 2026-06-29
+
+### Added
+- Multi-Task Orchestrator: click_at guard, cursor hider, iframe extraction for MS portals
+
+
+## [21.6.52] - 2026-06-29
+
+### Fixed
+- Hard Block click_at: prevents execution with undefined coordinates
+
+
+## [21.6.51] - 2026-06-29
+
+### Added
+- Cursor Hider: CDP CSS injection to hide cursor during automation
+- iframe Extraction: support for MS portal iframe content
+
+
+## [21.6.50] - 2026-06-29
+
+### Fixed
+- Tab Scoping: per-tab setOptions for MV3 isolation
+- MV3 Compliance: converted all dynamic import() to static imports
+
+
+## [21.6.49] - 2026-06-29
+
+### Fixed
+- SPA Code Crash: guard against tabInfo.url undefined
+- Navigate-only fallback for SPA timing issues
+
+
+## [21.6.48] - 2026-06-29
+
+### Fixed
+- Double Cursor: fixed duplicate cursor in MS portals
+- SPA Timing: improved wait logic for single-page applications
+- Auto-Finish Threshold: adjusted for SPA-heavy workflows
+
+
+## [21.6.47] - 2026-06-29
+
+### Fixed
+- EMERGENCY FIX: side panel open regression causing UI lockup
+
+
+## [21.6.46] - 2026-06-29
+
+### Added
+- 4 MSP Templates: SonicWall, Microsoft Exchange, Microsoft Entra, CISA KEV
+- Test coverage for cert detection and MSP templates
+
+
+
 
 ## [21.6.45] - 2026-06-28
 
