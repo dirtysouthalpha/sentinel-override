@@ -1,7 +1,7 @@
 # Sentinel Override
 
 ![Version](https://img.shields.io/badge/version-21.6.76-orange)
-![Tests](https://img.shields.io/badge/tests-10,249+-brightgreen)
+![Tests](https://img.shields.io/badge/tests-10,249++-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 An autonomous browser agent for MSPs and IT professionals. Sentinel Override sees the screen, plans multi-step workflows, and executes them with human-like visual feedback — cursor movement, element highlighting, click pulses, and typing animation.
