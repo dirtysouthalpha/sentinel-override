@@ -1,0 +1,5 @@
+name: _neuralis_bridge
+title: Neuralis Brain Bridge v2
+description: Auto-sync conversation knowledge to Sentinel Prime Neuralis Brain with PII redaction, region intelligence, and read-back.
+version: 2.0.0
+always_enabled: true

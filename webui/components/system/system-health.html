@@ -1,0 +1,204 @@
+<!-- System Health Widget - Self-contained -->
+<div class="system-health-panel" id="system-health-panel">
+  <div class="panel-header">
+    <h4>System Health</h4>
+    <span class="last-update" id="health-last-update">Loading...</span>
+  </div>
+
+  <div id="health-status">
+    <div class="health-metric">
+      <div class="metric-label status-disconnected">
+        <span>Loading...</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="health-metrics" style="display:none;">
+    <div class="health-metric">
+      <div class="metric-label">
+        <span>VRAM</span>
+        <span id="vram-status">0MB / 4096MB</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="vram-bar" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <div class="health-metric">
+      <div class="metric-label">
+        <span>Workers</span>
+        <span id="workers-status">0 / 4</span>
+      </div>
+    </div>
+
+    <div class="health-metric">
+      <div class="metric-label">
+        <span>Cache</span>
+        <span id="cache-status">0%</span>
+      </div>
+      <small class="metric-detail" id="cache-detail">0 hits / 0 misses</small>
+    </div>
+
+    <div class="health-actions">
+      <button onclick="fetchHealthData()" class="btn-refresh">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div id="health-error" style="display:none;" class="health-metric">
+    <div class="metric-label status-error">
+      <span>❌ Error</span>
+      <small id="error-message"></small>
+    </div>
+    <button onclick="fetchHealthData()" class="btn-reconnect">Reconnect</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  let refreshInterval = null;
+
+  async function fetchHealthData() {
+    try {
+      const response = await fetch('/api/health');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === "ok") {
+          const metrics = data.metrics || data.system || {};
+          if (Object.keys(metrics).length > 0) {
+            updateMetrics(metrics);
+          }
+          document.getElementById('health-status').innerHTML = '<div class="metric-label"><span style="color:#10b981">● Connected</span><span>Git: ' + (data.gitinfo ? data.gitinfo.branch : 'unknown') + '</span></div>';
+          document.getElementById('health-status').style.display = 'block';
+          document.getElementById('health-metrics').style.display = Object.keys(metrics).length > 0 ? 'block' : 'none';
+          document.getElementById('health-error').style.display = 'none';
+          document.getElementById('health-last-update').textContent = new Date().toLocaleTimeString();
+        } else {
+          showError(data.error || 'Invalid response');
+        }
+        }
+      } else {
+        showError('HTTP ' + response.status);
+      }
+    } catch (error) {
+      showError(error.message);
+    }
+  }
+
+  function updateMetrics(metrics) {
+    // VRAM
+    if (metrics.vram) {
+      const vram = metrics.vram.usage_mb;
+      const vramPercent = metrics.vram.usage_percent;
+      document.getElementById('vram-status').textContent = vram + 'MB / 4096MB';
+      document.getElementById('vram-bar').style.width = vramPercent + '%';
+      document.getElementById('vram-bar').className = 'progress-fill ' + getVramClass(vramPercent);
+    }
+
+    // Workers
+    if (metrics.workers) {
+      document.getElementById('workers-status').textContent = metrics.workers.active + ' / ' + metrics.workers.max;
+    }
+
+    // Cache
+    if (metrics.cache) {
+      const hitRate = metrics.cache.hit_rate || 0;
+      document.getElementById('cache-status').textContent = (hitRate * 100).toFixed(1) + '%';
+      document.getElementById('cache-detail').textContent = metrics.cache.hits + ' hits / ' + metrics.cache.misses + ' misses';
+    }
+  }
+
+  function getVramClass(percent) {
+    if (percent >= 80) return 'bg-danger';
+    if (percent >= 50) return 'bg-warning';
+    return 'bg-success';
+  }
+
+  function showError(message) {
+    document.getElementById('health-status').style.display = 'none';
+    document.getElementById('health-metrics').style.display = 'none';
+    document.getElementById('health-error').style.display = 'block';
+    document.getElementById('error-message').textContent = message;
+  }
+
+  // Initial fetch and refresh every 5 seconds
+  fetchHealthData();
+  refreshInterval = setInterval(fetchHealthData, 5000);
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', function() {
+    if (refreshInterval) clearInterval(refreshInterval);
+  });
+})();
+</script>
+
+<style>
+.system-health-panel {
+  padding: 12px;
+  font-size: 12px;
+}
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border, #444);
+}
+.panel-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.last-update {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.health-metric {
+  margin-bottom: 12px;
+}
+.metric-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.metric-detail {
+  display: block;
+  opacity: 0.6;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.progress-bar {
+  height: 6px;
+  background: var(--color-border, #444);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.bg-success { background-color: #10b981; }
+.bg-warning { background-color: #f59e0b; }
+.bg-danger { background-color: #ef4444; }
+.status-error { color: #ef4444; }
+.status-disconnected { color: #6b7280; }
+.health-actions {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border, #444);
+}
+.btn-refresh, .btn-reconnect {
+  width: 100%;
+  padding: 6px 12px;
+  background: var(--color-accent, #007acc);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 11px;
+}
+.btn-refresh:hover, .btn-reconnect:hover {
+  opacity: 0.9;
+}
+</style>

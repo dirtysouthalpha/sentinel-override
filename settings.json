@@ -1,0 +1,20 @@
+{
+  "version": "v0.9.8.2",
+  "chat_model_provider": "zai",
+  "chat_model_name": "glm-4.5-air",
+  "chat_model_api_base": "https://api.z.ai/api/coding/paas/v4",
+  "chat_model_kwargs": {"request_timeout": 30},
+  "chat_model_ctx_length": 100000,
+  "chat_model_ctx_history": 0.7,
+  "chat_model_vision": true,
+  "util_model_provider": "zai",
+  "util_model_name": "glm-4.5-air",
+  "util_model_api_base": "https://api.z.ai/api/coding/paas/v4",
+  "util_model_kwargs": {"request_timeout": 15},
+  "util_model_ctx_length": 100000,
+  "util_model_ctx_input": 0.5,
+  "browser_model_provider": "zai",
+  "browser_model_name": "glm-4.5-air",
+  "browser_model_api_base": "https://api.z.ai/api/coding/paas/v4",
+  "browser_model_vision": true
+}

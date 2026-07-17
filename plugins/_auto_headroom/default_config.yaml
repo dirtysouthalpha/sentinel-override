@@ -1,0 +1,21 @@
+# Auto Headroom Configuration
+# These values control when automatic compaction triggers.
+
+# Compact when token usage reaches this fraction of ctx_length (0.0-1.0)
+# Default: 0.75 means compact at 75% of context window (150K of 200K for GLM-5.2)
+compact_threshold: 0.75
+
+# Warn when token usage reaches this fraction (0.0-1.0)
+# Default: 0.50 means warn at 50% of context window
+warn_threshold: 0.50
+
+# Minimum messages before auto-compaction can trigger
+# Prevents compaction on very short conversations
+min_messages: 6
+
+# Whether to use the chat model (true) or utility model (false) for compaction
+# Chat model produces better summaries but costs more tokens
+use_chat_model_for_compaction: false
+
+# Whether to log warnings to the chat log
+log_warnings: true

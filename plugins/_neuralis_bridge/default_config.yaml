@@ -1,0 +1,13 @@
+# Neuralis Brain Bridge v2 Configuration
+brain_url: "http://100.70.240.55:8001"
+auto_sync_enabled: true
+min_turns: 2
+default_region: "knowledge"
+source: "agent-zero"
+timeout: 15
+readback_enabled: true
+readback_top_k: 3
+readback_min_score: 0.65
+pii_redaction: true
+dedup_check: true
+batch_sync: true

@@ -1,0 +1,49 @@
+{
+    "allow_chat_override": false,
+    "blocked_providers": [
+        "nvidia",
+        "build.nvidia.com",
+        "nemotron",
+        "openai",
+        "anthropic"
+    ],
+    "chat_model": {
+        "provider": "zai_coding",
+        "name": "glm-5.2",
+        "api_base": "https://api.z.ai/api/coding/paas/v4",
+        "api_key": "d120d04790f54ce788e8a1bfbbb19f1f.TAssEoF2oIhxIppE",
+        "ctx_length": 200000,
+        "ctx_history": 0.7,
+        "vision": false,
+        "rl_requests": 30,
+        "rl_input": 60000,
+        "rl_output": 40000,
+        "kwargs": {
+            "a0_retry_attempts": 5,
+            "a0_retry_delay_seconds": 4
+        }
+    },
+    "utility_model": {
+        "provider": "zai_coding",
+        "name": "glm-5.2",
+        "api_base": "https://api.z.ai/api/coding/paas/v4",
+        "api_key": "d120d04790f54ce788e8a1bfbbb19f1f.TAssEoF2oIhxIppE",
+        "ctx_length": 200000,
+        "ctx_history": 0.7,
+        "rl_requests": 30,
+        "rl_input": 60000,
+        "rl_output": 40000,
+        "kwargs": {
+            "a0_retry_attempts": 5,
+            "a0_retry_delay_seconds": 4
+        }
+    },
+    "embedding_model": {
+        "provider": "huggingface",
+        "name": "sentence-transformers/all-MiniLM-L6-v2",
+        "api_base": "",
+        "rl_requests": 0,
+        "rl_input": 0,
+        "kwargs": {}
+    }
+}

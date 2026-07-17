@@ -1,0 +1,5 @@
+name: _auto_headroom
+title: Auto Headroom
+description: Automatically compacts chat history when token usage approaches the context window limit. Prevents token waste and saves costs.
+version: 1.0.0
+always_enabled: true
