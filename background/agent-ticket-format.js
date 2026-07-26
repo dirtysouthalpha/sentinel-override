@@ -70,7 +70,7 @@ function extractTicketNumber(goal) {
 }
 
 // ── FINAL_NOTES format ───────────────────────────────────────────────────
-import { parseInvestigationChecklist, formatFindingsForReport } from './investigation-checklist.js';
+import { formatFindingsForReport } from './investigation-checklist.js';
 
 function formatTicketFinalNotes(summary, goal, tech, options) {
   const ticketNum = extractTicketNumber(goal);
@@ -120,7 +120,13 @@ function formatTicketFinalNotes(summary, goal, tech, options) {
     '',
     (() => {
       try {
-        const checklist = (options && options.investigationChecklist) || parseInvestigationChecklist(goal);
+        // (audit) Only render a checklist that reflects real progress. The engine
+        // does not track investigation-checklist state during a run, so the old
+        // `|| parseInvestigationChecklist(goal)` fallback produced a fresh
+        // all-pending checklist and appended "0% sections complete" to every
+        // finished ticket — falsely reporting no progress. Show it only when a
+        // caller supplies an actual (progressed) checklist.
+        const checklist = options && options.investigationChecklist;
         if (checklist && checklist.isInvestigation && checklist.sections.length > 0) {
           return formatFindingsForReport(checklist) + '\n---';
         }

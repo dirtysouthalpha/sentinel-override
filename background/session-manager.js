@@ -46,16 +46,25 @@ export async function restoreSession(clientId) {
     let restored = 0;
     for (const cookie of data.cookies) {
       try {
-        await chrome.cookies.set({
+        const details = {
           url: `${cookie.secure ? 'https' : 'http'}://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
           name: cookie.name,
           value: cookie.value,
-          domain: cookie.domain,
           path: cookie.path,
           secure: cookie.secure,
           httpOnly: cookie.httpOnly,
           sameSite: cookie.sameSite || 'unspecified'
-        });
+        };
+        // (audit) Preserve the original cookie's scope and lifetime:
+        //  - Only set `domain` for non-host-only cookies; passing a domain for a
+        //    host-only cookie widens it to every subdomain.
+        //  - Carry over expirationDate for persistent cookies; without it the
+        //    restored cookie silently becomes a browser-session cookie.
+        if (!cookie.hostOnly) details.domain = cookie.domain;
+        if (!cookie.session && typeof cookie.expirationDate === 'number') {
+          details.expirationDate = cookie.expirationDate;
+        }
+        await chrome.cookies.set(details);
         restored++;
       } catch (_) { /* individual cookie failures are non-fatal */ }
     }

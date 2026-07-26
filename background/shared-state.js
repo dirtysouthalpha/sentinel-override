@@ -24,6 +24,28 @@ export function isSPATransitionPending() { return _spaTransitionPending; }
 /** Clear the SPA transition flag after it has been handled. */
 export function clearSPATransition() { _spaTransitionPending = false; }
 
+// (audit) In-process agent-completion notifier. chrome.runtime.sendMessage sent
+// from the service worker is NOT delivered to onMessage listeners in that SAME
+// worker, so the scheduler (which runs in the SW alongside the agent engine)
+// could never observe agent_loop_complete and always fell through to its 5-minute
+// timeout. This event bus gives same-context consumers a reliable signal.
+// The engine keeps emitting the runtime message too (for the popup/side panel).
+const _agentCompletionListeners = new Set();
+
+/** Subscribe to agent-run completion within the service worker. Returns an unsubscribe fn. */
+export function onAgentCompletion(fn) {
+  if (typeof fn !== 'function') return () => {};
+  _agentCompletionListeners.add(fn);
+  return () => _agentCompletionListeners.delete(fn);
+}
+
+/** Notify in-SW subscribers that an agent run finished. `result` = { status, error?, report? }. */
+export function emitAgentCompletion(result) {
+  for (const fn of [..._agentCompletionListeners]) {
+    try { fn(result); } catch (e) { console.warn('[Sentinel] agent completion listener failed:', getErrorMessage(e)); }
+  }
+}
+
 // (3.14.0) Service-worker keepalive helper. MV3 SWs are terminated after ~30s
 // of idle. While the agent is awaiting human input (approval prompts, tenant
 // overrides, long human-delay sleeps), nothing else may be poking the SW —

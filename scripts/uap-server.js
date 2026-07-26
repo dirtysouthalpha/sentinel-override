@@ -69,8 +69,12 @@ function authenticate(req) {
   const auth = req.headers['authorization'];
   if (!auth) return false;
   const token = auth.replace(/^Bearer\s+/i, '');
-  // Accept the configured token or test tokens
-  return token === authToken || token === 'test_token' || token === 'valid_token';
+  // (audit) Only the configured token is accepted; the hardcoded 'test_token'/
+  // 'valid_token' backdoors were removed. Constant-time comparison.
+  if (typeof token !== 'string' || token.length !== authToken.length) return false;
+  let diff = 0;
+  for (let i = 0; i < authToken.length; i++) diff |= token.charCodeAt(i) ^ authToken.charCodeAt(i);
+  return diff === 0;
 }
 
 function sendJSON(res, statusCode, data) {

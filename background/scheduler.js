@@ -7,7 +7,7 @@ import * as AgentEngine from './agent-engine.js';
 import {resolveTemplateGoal} from './template-manager.js';
 import {getActiveTabId as _getActiveTabId, registerInitialTab} from './tab-context.js';
 import {getTabInfo} from './tab-manager.js';
-import {notifyIfEnabled} from './shared-state.js';
+import {notifyIfEnabled, onAgentCompletion} from './shared-state.js';
 import {FIVE_HUNDRED_MS, ONE_MINUTE_MS, FIVE_MINUTES_MS, ONE_HOUR_MS} from './constants.js';
 import {tel} from './telemetry.js';
 import {getErrorMessage} from './error-utils.js';
@@ -204,7 +204,9 @@ function computeNextRun(recurrence) {
     return candidate.getTime();
   }
 
-  if (recurrence.interval === 'custom') {
+  if (recurrence.interval === 'custom' || recurrence.interval === 'hourly') {
+    // (audit) 'hourly' had no branch and fell through to the +1h default, ignoring
+    // its periodInMinutes. It is a fixed-period recurrence like 'custom'; handle both.
     const periodMs = (recurrence.periodInMinutes || 60) * ONE_MINUTE_MS;
     if (periodMs <= 0) return now.getTime() + ONE_HOUR_MS;
     const nowMs = now.getTime();
@@ -213,6 +215,20 @@ function computeNextRun(recurrence) {
     const nextPeriod = midnight + (periodsElapsed + 1) * periodMs;
     if (nextPeriod <= nowMs + ONE_MINUTE_MS) return midnight + (periodsElapsed + 2) * periodMs;
     return nextPeriod;
+  }
+
+  if (recurrence.interval === 'monthly') {
+    // (audit) 'monthly' had no branch and re-fired every hour. Fire on dayOfMonth
+    // (clamped to the target month's length) at the configured time.
+    const reqDom = (Number.isFinite(recurrence.dayOfMonth) && recurrence.dayOfMonth >= 1) ? recurrence.dayOfMonth : 1;
+    const atMonth = (year, month) => {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      const dom = Math.min(reqDom, lastDay);
+      return new Date(year, month, dom, finalHours, finalMinutes, 0, 0).getTime();
+    };
+    let t = atMonth(now.getFullYear(), now.getMonth());
+    if (t <= now.getTime()) t = atMonth(now.getFullYear(), now.getMonth() + 1);
+    return t;
   }
 
   return now.getTime() + ONE_HOUR_MS;
@@ -661,7 +677,12 @@ async function _getOrCreateTab() {
     });
   });
   if (tabs?.[0]?.id && typeof tabs[0].id === 'number') return tabs[0].id;
-  let newTab; try { newTab = await chrome.tabs.create({ url: 'about:blank' }); } catch (_) { return; /* tab creation failed */ }
+  // (audit) Throw on failure instead of returning undefined. The caller
+  // (executeScheduledTask) catches this to record a task failure; returning
+  // undefined let it proceed to startAgent + a 5-minute completion wait that
+  // never resolves, hanging the run (and the scheduler test to its timeout).
+  let newTab;
+  try { newTab = await chrome.tabs.create({ url: 'about:blank' }); } catch (err) { throw new Error(`Failed to create tab: ${getErrorMessage(err)}`); }
   await new Promise(resolve => setTimeout(resolve, FIVE_HUNDRED_MS));
   if (newTab && newTab.id) return newTab.id;
   throw new Error('Failed to create tab');
@@ -677,32 +698,53 @@ async function _getOrCreateTab() {
  */
 function _waitForAgentCompletion(timeoutMs) {
   let _resolve;
+  let _settled = false;
+  let timer = null;
+  let unsubscribe = () => {};
   const promise = new Promise((resolve) => { _resolve = resolve; });
-
-  const timer = setTimeout(() => {
-    chrome.runtime.onMessage.removeListener(listener);
-    _resolve({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
-  }, timeoutMs);
 
   const listener = (msg) => {
     if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
     if (msg.action === 'agent_loop_complete') {
-      clearTimeout(timer);
-      chrome.runtime.onMessage.removeListener(listener);
-      _resolve({ status: 'success', error: null, report: msg.report || null });
+      _finish({ status: 'success', error: null, report: msg.report || null });
     } else if (msg.action === 'agent_finished' && msg.summary && CRASH_SUMMARY_RE.test(msg.summary)) {
-      // runAgentLoop crashed — agent_loop_complete will never come; fail fast instead of waiting 5 min
-      clearTimeout(timer);
-      chrome.runtime.onMessage.removeListener(listener);
-      _resolve({ status: 'failure', error: msg.summary || 'Agent crashed unexpectedly', report: null });
+      // runAgentLoop crashed — fail fast instead of waiting out the timeout.
+      _finish({ status: 'failure', error: msg.summary || 'Agent crashed unexpectedly', report: null });
     }
   };
+
+  const _cleanup = () => {
+    clearTimeout(timer);
+    try { chrome.runtime.onMessage.removeListener(listener); } catch (_) { /* ignore */ }
+    try { unsubscribe(); } catch (_) { /* ignore */ }
+  };
+  const _finish = (result) => {
+    if (_settled) return;
+    _settled = true;
+    _cleanup();
+    _resolve(result);
+  };
+
+  timer = setTimeout(() => {
+    _finish({ status: 'failure', error: 'Agent execution timed out after 5 minutes', report: null });
+  }, timeoutMs);
+
+  // (audit) Primary, reliable path: the agent engine runs in this same service
+  // worker and emits completion in-process. The runtime.onMessage listener below
+  // cannot fire for the engine's own SW-scoped sendMessage, so without this the
+  // scheduler always fell through to the 5-minute timeout.
+  unsubscribe = onAgentCompletion((res) => {
+    if (res && res.status === 'failure') {
+      _finish({ status: 'failure', error: res.error || 'Agent failed', report: res.report || null });
+    } else {
+      _finish({ status: 'success', error: null, report: (res && res.report) || null });
+    }
+  });
+
+  // Fallback for any genuinely cross-context delivery; harmless in-SW.
   chrome.runtime.onMessage.addListener(listener);
 
-  const cancel = () => {
-    clearTimeout(timer);
-    chrome.runtime.onMessage.removeListener(listener);
-  };
+  const cancel = () => { _settled = true; _cleanup(); };
 
   return { promise, cancel };
 }

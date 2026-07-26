@@ -135,16 +135,22 @@ describe('formatTicketFinalNotes with investigation checklist', () => {
     expect(notes).toContain('Nick Givens');
   });
 
-  test('auto-parses checklist from goal when not provided in options', () => {
+  test('does not append a fabricated all-pending checklist when none is provided', () => {
+    // (audit) Previously this auto-parsed the goal into a fresh all-pending
+    // checklist and appended "0% sections complete" to every finished ticket,
+    // falsely reporting no progress (the engine tracks no live checklist state).
+    // The findings report is now rendered only when a real checklist is supplied.
     const notes = formatTicketFinalNotes(
       'Investigation complete',
       NICK_GIVENS_GOAL,
       TECH,
       {}
     );
-    
-    expect(notes).toContain('Investigation Findings Report');
-    expect(notes).toContain('Required Documentation');
+
+    expect(notes).not.toContain('Investigation Findings Report');
+    expect(notes).not.toContain('sections complete');
+    // The ticket body itself (and the run summary) are still present.
+    expect(notes).toContain('Investigation complete');
   });
 
   test('does not include findings report for non-investigation goals', () => {

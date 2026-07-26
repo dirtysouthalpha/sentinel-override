@@ -420,7 +420,7 @@ const ERROR_WARN_LEVEL_RE = /^(error|warn)$/;
         });
       });
     } catch { /* message may fail if background not ready */ }
-    document.getElementById('telemPastRunsBtn');
+    const btn = document.getElementById('telemPastRunsBtn');
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     const menu = document.createElement('div');

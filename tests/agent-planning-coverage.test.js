@@ -22,6 +22,7 @@ jest.unstable_mockModule('../background/adaptive-prompts.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getTextProvider: jest.fn(async () => null),
   getActiveProvider: jest.fn(async () => ({
     endpoint: 'http://llm.internal',
     apiKey: 'test-key',
@@ -49,6 +50,8 @@ jest.unstable_mockModule('../background/bias-detector.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   startSwKeepalive: jest.fn(),
   stopSwKeepalive: jest.fn(),
 }));

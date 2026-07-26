@@ -28,11 +28,12 @@ jobs:
       - name: Bare Import Scanner
         run: |
           echo "Scanning for bare module imports..."
-          RESULTS=$(grep -rn "from '" background/ content/ popup-modules/ popup-full.js --include='*.js' \
-            | grep -v "from '\.\./" \
-            | grep -v "from '\./" \
-            | grep -v "from 'chrome" \
-            | grep -v "from 'crypto'" \
+          # Match a bare specifier in either quote style (the codebase uses both;
+          # the old single-quote-only scanner missed double-quoted bare imports).
+          # A bare specifier starts with a letter/@ and has no spaces, so this also
+          # naturally skips relative imports (./ ../) and the word "from" in prose.
+          RESULTS=$(grep -rnE "from ['\"][a-zA-Z@][a-zA-Z0-9@/._-]*['\"]" background/ content/ popup-modules/ popup-full.js --include='*.js' \
+            | grep -vE "from ['\"](chrome|crypto|node:)" \
             || true)
           if [ -n "$RESULTS" ]; then
             echo "FAIL: Bare module imports found"
@@ -53,6 +54,13 @@ jobs:
       # that node --check misses because it only validates syntax
       - name: Module Loader Check
         run: node scripts/check-module-load.cjs
+
+      # ━━━ Step 1d: Lint ━━━
+      # ESLint catches undeclared identifiers, const reassignment, and other
+      # runtime-fatal mistakes that syntax-only checks miss. This gate was absent,
+      # which is how a batch of ReferenceError bugs reached production.
+      - name: Lint
+        run: npm run lint
 
       # ━━━ Step 2: Syntax Check ━━━
       - name: Syntax Check

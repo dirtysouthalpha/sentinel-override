@@ -123,6 +123,7 @@ describe('report-generator.js — executionData validation (line 27)', () => {
     };
 
     jest.unstable_mockModule('../background/provider-registry.js', () => ({
+      getTextProvider: jest.fn(async () => null),
       getActiveProvider: jest.fn(() => Promise.resolve({ endpoint: 'https://api.test.com', apiKey: 'k', model: 'm' })),
       resolveProvider: jest.fn(() => ({
         buildBody: (m, s, p, o) => ({ messages: [] }),

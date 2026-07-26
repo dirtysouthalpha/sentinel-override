@@ -79,6 +79,8 @@ jest.unstable_mockModule('../background/tab-manager.js', () => ({
   getTabInfo: jest.fn(async () => ({ url: 'https://example.com', title: 'Test' })),
 }));
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   notifyIfEnabled: jest.fn(),
 }));
 jest.unstable_mockModule('../background/error-utils.js', () => ({

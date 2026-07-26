@@ -657,30 +657,22 @@ export const PROVIDERS = {
     systemPromptTweak: 'You are Sentinel Override, a professional web automation agent. Use the provided tools to take browser actions one step at a time. Never fabricate data. Never act outside the safety boundaries described in the prompt.'
   },
   // (v21.6.70) Local/self-hosted providers
+  // (audit) Local/self-hosted providers. buildBody/buildVisionContent are
+  // inherited from openai below (Object.assign) so they conform to the caller
+  // contract buildBody(model, systemPrompt, userContent, opts) and expose the
+  // standard buildVisionContent. They keep their own optional-auth buildHeaders
+  // (no API key required for a local server) and a lenient parseResponse.
   ollama: {
     label: 'Ollama (Local)',
     defaultEndpoint: 'http://localhost:11434/v1/chat/completions',
     defaultModel: 'llama3.2',
     maxTokens: 8000,
     temperature: 0.3,
-    buildBody: (messages, system, prompt, opts) => ({
-      model: (opts && opts.model) || 'llama3.2',
-      messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: (opts && opts.max_tokens) || 8000,
-      temperature: (opts && opts.temperature) ?? 0.3
-    }),
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
     parseResponse: (data) => {
       const msg = data?.choices?.[0]?.message || {};
       return msg.content || msg.reasoning_content || '';
-    },
-    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: [
-        { type: 'text', text: userContent },
-        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
-      ]}
-    ]
+    }
   },
   lmstudio: {
     label: 'LM Studio (Local)',
@@ -688,24 +680,11 @@ export const PROVIDERS = {
     defaultModel: 'local-model',
     maxTokens: 8000,
     temperature: 0.3,
-    buildBody: (messages, system, prompt, opts) => ({
-      model: (opts && opts.model) || 'local-model',
-      messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: (opts && opts.max_tokens) || 8000,
-      temperature: (opts && opts.temperature) ?? 0.3
-    }),
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
     parseResponse: (data) => {
       const msg = data?.choices?.[0]?.message || {};
       return msg.content || msg.reasoning_content || '';
-    },
-    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: [
-        { type: 'text', text: userContent },
-        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
-      ]}
-    ]
+    }
   },
   vllm: {
     label: 'vLLM (Local)',
@@ -713,24 +692,11 @@ export const PROVIDERS = {
     defaultModel: 'llava-v1.6',
     maxTokens: 8000,
     temperature: 0.3,
-    buildBody: (messages, system, prompt, opts) => ({
-      model: (opts && opts.model) || 'llava-v1.6',
-      messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: (opts && opts.max_tokens) || 8000,
-      temperature: (opts && opts.temperature) ?? 0.3
-    }),
     buildHeaders: (apiKey) => ({ 'Content-Type': 'application/json', ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}) }),
     parseResponse: (data) => {
       const msg = data?.choices?.[0]?.message || {};
       return msg.content || msg.reasoning_content || '';
-    },
-    buildVisionMessages: (systemPrompt, userContent, base64Image) => [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: [
-        { type: 'text', text: userContent },
-        ...(base64Image ? [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }] : [])
-      ]}
-    ]
+    }
   },
 };
 // Inherit shared functions from openai to reduce duplication
@@ -749,6 +715,19 @@ Object.assign(PROVIDERS.longcat, {
   convertToolsToOpenAIFormat: PROVIDERS.openai.convertToolsToOpenAIFormat,
   buildBodyWithTools: PROVIDERS.openai.buildBodyWithTools
 });
+
+// (audit) Local providers (ollama/lmstudio/vllm) are OpenAI-compatible: inherit the
+// standard buildBody(model, systemPrompt, userContent, opts) + buildVisionContent so
+// they work with the real call path in llm-client.js (they previously had a wrong
+// buildBody arg order and exposed buildVisionMessages instead of buildVisionContent).
+for (const _localId of ['ollama', 'lmstudio', 'vllm']) {
+  Object.assign(PROVIDERS[_localId], {
+    buildBody: PROVIDERS.openai.buildBody,
+    buildVisionContent: PROVIDERS.openai.buildVisionContent,
+    convertToolsToOpenAIFormat: PROVIDERS.openai.convertToolsToOpenAIFormat,
+    buildBodyWithTools: PROVIDERS.openai.buildBodyWithTools
+  });
+}
 
 
 // ========== Vision Capability Registry ==========
@@ -1343,6 +1322,14 @@ export const PROVIDER_CATALOG = [
     auth: 'none',
     docsUrl: 'https://jan.ai/docs/'
   },
+  {
+    id: 'vllm', label: 'vLLM (local)', kind: 'openai',
+    endpoint: 'http://localhost:8000/v1/chat/completions',
+    modelsUrl: 'http://localhost:8000/v1/models',
+    defaultModel: 'auto',
+    auth: 'none',
+    docsUrl: 'https://docs.vllm.ai'
+  },
 
   // ── Custom ──
   {
@@ -1361,34 +1348,11 @@ export const PROVIDER_CATALOG = [
     auth: 'bearer',
     docsUrl: 'https://longcat.chat/platform/docs/'
   },
-  // (v21.6.70) Local/self-hosted providers
-  {
-    id: 'ollama',
-    label: 'Ollama (Local)',
-    endpoint: 'http://localhost:11434/v1/chat/completions',
-    defaultModel: 'llama3.2',
-    category: 'Local',
-    docs: 'https://ollama.ai',
-    note: 'Runs on your machine. No API key needed.'
-  },
-  {
-    id: 'lmstudio',
-    label: 'LM Studio (Local)',
-    endpoint: 'http://localhost:1234/v1/chat/completions',
-    defaultModel: 'local-model',
-    category: 'Local',
-    docs: 'https://lmstudio.ai',
-    note: 'Runs on your machine. No API key needed.'
-  },
-  {
-    id: 'vllm',
-    label: 'vLLM (Local)',
-    endpoint: 'http://localhost:8000/v1/chat/completions',
-    defaultModel: 'llava-v1.6',
-    category: 'Local',
-    docs: 'https://docs.vllm.ai',
-    note: 'High-throughput local inference server.'
-  },
+  // (audit) Removed the v21.6.70 local-provider block: it re-declared 'ollama'
+  // and 'lmstudio' (already defined above) and added 'vllm' using an inconsistent
+  // schema (category/docs/note instead of kind/auth/modelsUrl/docsUrl). The
+  // duplicates lacked auth/modelsUrl, breaking model listing and the no-key hint.
+  // 'vllm' is now a canonical entry in the Local section above.
 ];
 
 /**

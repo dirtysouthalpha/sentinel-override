@@ -1528,8 +1528,11 @@ if (window.__sentinelInitialized) {
       }
 
       case 'click_at': {
-        const x = cmd.x;
-        const y = cmd.y;
+        // (audit) `let`, not `const`: after scrollIntoView below moves the target,
+        // we recompute x/y from the element's current rect so the dispatched
+        // coordinates and cursor don't drift to a stale on-screen position.
+        let x = cmd.x;
+        let y = cmd.y;
         if (typeof x !== 'number' || Number.isNaN(x) || typeof y !== 'number' || Number.isNaN(y)) return 'click_at requires numeric x and y coordinates';
 
         // (#11) DPR sanity check. Coordinates from the agent are expected to be
@@ -1567,6 +1570,17 @@ if (window.__sentinelInitialized) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // (#19) Layout-stability wait instead of fixed 400ms.
         await waitForStableRect(el, 2, 600);
+        // (audit) scrollIntoView may have scrolled the page, so the original
+        // (x, y) no longer lands on el. Recompute from el's current rect — the
+        // same approach the drag_and_drop case uses — so the cursor and the
+        // dispatched clientX/clientY match where the element actually is now.
+        try {
+          const _liveRect = el.getBoundingClientRect();
+          if (_liveRect && _liveRect.width > 0 && _liveRect.height > 0) {
+            x = Math.round(_liveRect.left + _liveRect.width / 2);
+            y = Math.round(_liveRect.top + _liveRect.height / 2);
+          }
+        } catch (e) { console.warn('[Sentinel] click_at rect refresh:', getErrorMessage(e)); }
 
         // (G3) Virtual cursor travels to the click coordinates first, so the
         // user sees where the click is going before the pulse fires.

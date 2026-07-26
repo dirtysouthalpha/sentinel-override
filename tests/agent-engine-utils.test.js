@@ -118,11 +118,14 @@ jest.unstable_mockModule('../background/report-generator.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/provider-registry.js', () => ({
+  getTextProvider: jest.fn(async () => null),
   getActiveProvider: jest.fn(() => ({ id: 'test', name: 'Test Provider' })),
   migrateLegacySettings: jest.fn(async () => {}),
 }));
 
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   isSPATransitionPending: jest.fn(() => false),
   clearSPATransition: jest.fn(),
   notifyIfEnabled: jest.fn(async () => {}),

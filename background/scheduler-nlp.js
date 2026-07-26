@@ -34,7 +34,7 @@ const STOPWORDS = new Set([
 
 function _normalizeTime(hour, minute, meridiem) {
   let h = parseInt(hour, 10);
-  const m = minute ? parseInt(minute, 10) : 0;
+  let m = minute ? parseInt(minute, 10) : 0;
 
   if (meridiem) {
     const mer = meridiem.toLowerCase().replace(/\./g, '');

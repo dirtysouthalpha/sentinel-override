@@ -46,7 +46,10 @@ afterEach(() => {
 describe('initReasoningTrace', () => {
   test('creates a new trace and persists it', async () => {
     await initReasoningTrace({ goal: 'test goal', model: 'gpt-4' });
-    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+    // First set() persists the trace; a second set() updates the capped
+    // reasoning_trace_index (GC bookkeeping) — assert the trace write, not an
+    // exact call count.
+    expect(chrome.storage.local.set).toHaveBeenCalled();
     const [[stored]] = chrome.storage.local.set.mock.calls;
     const trace = Object.values(stored)[0];
     expect(trace.goal).toBe('test goal');
@@ -57,7 +60,7 @@ describe('initReasoningTrace', () => {
 
   test('creates trace with no metadata', async () => {
     await initReasoningTrace();
-    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+    expect(chrome.storage.local.set).toHaveBeenCalled();
     const [[stored]] = chrome.storage.local.set.mock.calls;
     const trace = Object.values(stored)[0];
     expect(trace.goal).toBe('');

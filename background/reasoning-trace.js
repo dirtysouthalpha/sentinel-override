@@ -6,6 +6,11 @@ import { getErrorMessage } from './error-utils.js';
 
 const MAX_TRACE_ENTRIES = 1000; // Per-run limit
 const STORAGE_KEY_PREFIX = 'reasoning_trace_';
+// (audit) reasoning_trace_ keys use their own run id (not runLogId), so they
+// aren't covered by the agent-engine run-log-index eviction. Keep a small index
+// and prune old traces on init to bound chrome.storage growth across runs.
+const TRACE_INDEX_KEY = 'reasoning_trace_index';
+const TRACE_INDEX_MAX = 20;
 
 // In-memory cache for active run
 const _traceCache = new Map(); // runId → trace object
@@ -18,6 +23,22 @@ let _currentRunId = null;
 
 function _storageKey(runId) {
   return STORAGE_KEY_PREFIX + String(runId).replace(/[^a-z0-9_-]/gi, '_');
+}
+
+// (audit) Record this run in a capped index and remove the trace storage for any
+// runs that fall off the end — bounds unbounded reasoning_trace_ growth. Cheap:
+// touches only the small index, never a full storage scan.
+async function _indexAndPrune(runId) {
+  try {
+    const stored = await chrome.storage.local.get(TRACE_INDEX_KEY);
+    const list = Array.isArray(stored[TRACE_INDEX_KEY]) ? stored[TRACE_INDEX_KEY].slice() : [];
+    if (!list.includes(runId)) list.unshift(runId);
+    const evict = list.splice(TRACE_INDEX_MAX);
+    if (evict.length) {
+      await chrome.storage.local.remove(evict.map((id) => _storageKey(id)));
+    }
+    await chrome.storage.local.set({ [TRACE_INDEX_KEY]: list });
+  } catch (_e) { /* best effort — GC is non-critical */ }
 }
 
 /**
@@ -77,6 +98,7 @@ export async function initReasoningTrace(metadata = {}, goal = '', model = '') {
   _traceCache.set(_currentRunId, trace);
   try {
     await chrome.storage.local.set({ [_storageKey(_currentRunId)]: trace });
+    await _indexAndPrune(_currentRunId);
   } catch (e) {
     console.error('[Sentinel] Failed to initialize reasoning trace:', getErrorMessage(e));
   }

@@ -29,6 +29,29 @@ function escapeHtml(s) {
   })[c]);
 }
 
+// (audit) The report body is built from LLM/page-derived text (untrusted) and
+// rendered via marked into innerHTML. The extension CSP blocks inline script,
+// but injected elements that auto-load external resources (e.g. <img src>) can
+// still exfiltrate data under a permissive img-src, and injected markup can spoof
+// the report. Strip code-executing / resource-loading elements and dangerous
+// attributes before insertion.
+function sanitizeReportHtml(dirty) {
+  if (!dirty) return '';
+  const doc = new DOMParser().parseFromString(String(dirty), 'text/html');
+  doc.querySelectorAll('script,iframe,object,embed,form,link,base,meta,svg,math,img,source,video,audio,track,input,button,textarea,style').forEach((el) => el.remove());
+  const URL_ATTR = /^(href|src|srcset|action|formaction|xlink:href|background|poster)$/i;
+  const BAD_PROTO = /^\s*(javascript|data|vbscript)\s*:/i;
+  doc.querySelectorAll('*').forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on')) { el.removeAttribute(attr.name); continue; }
+      if (name === 'style') { el.removeAttribute(attr.name); continue; }
+      if (URL_ATTR.test(name) && BAD_PROTO.test(attr.value)) el.removeAttribute(attr.name);
+    }
+  });
+  return doc.body.innerHTML;
+}
+
 let __currentReport = null;
 
 (async function loadReport() {
@@ -60,10 +83,10 @@ let __currentReport = null;
     // Decorate [src:key] / [unverified] markers as inline chips for
     // audit trail visibility.
     const decorated = html
-      .replace(/\[src:([a-z0-9_\-]+)\]/gi, '<span class="src-chip" title="Source: $1">$1</span>')
+      .replace(/\[src:([a-z0-9_-]+)\]/gi, '<span class="src-chip" title="Source: $1">$1</span>')
       .replace(/\[unverified\]/gi, '<span class="src-unverified">unverified</span>');
 
-    document.getElementById('reportBody').innerHTML = decorated;
+    document.getElementById('reportBody').innerHTML = sanitizeReportHtml(decorated);
     document.title = 'Sentinel Override — ' + (data.goal ? data.goal.substring(0, 60) : 'Investigation Report');
   } catch (e) {
     document.getElementById('reportBody').innerHTML =

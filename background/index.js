@@ -137,21 +137,24 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const { action, params } = result;
   const message = { action: `context_menu_${action}`, params };
 
-  // Direct invocation for agent-starting actions
+  // (audit) These context_menu_* / export actions are handled by this service
+  // worker's own message switch (handleRuntimeMessage). chrome.runtime.sendMessage
+  // from the SW is NOT delivered to the SW's own onMessage, so routing them that
+  // way silently did nothing. Invoke the handler directly instead.
   if (AGENT_STARTING_ACTIONS.has(action)) {
-    chrome.runtime.sendMessage(message).catch(() => {});
+    Promise.resolve(handleRuntimeMessage(message, { tab })).catch(() => {});
   } else if (action === 'monitor_changes') {
     // Use selected text as selector hint, prompt via side panel
-    chrome.runtime.sendMessage({
+    Promise.resolve(handleRuntimeMessage({
       action: 'context_menu_monitor_changes',
       params: {
         selector: params.selectionText ? `*:contains('${String(params.selectionText || '').substring(0, 50).replace(/'/g, "\\'")}')` : 'body',
         label: params.selectionText ? `Monitor: "${String(params.selectionText || '').substring(0, 30)}"` : 'Page Monitor',
         url: params.pageUrl,
       },
-    }).catch(() => {});
+    }, { tab })).catch(() => {});
   } else if (action === 'start_recording') {
-    chrome.runtime.sendMessage({ action: 'context_menu_start_recording' })
+    Promise.resolve(handleRuntimeMessage({ action: 'context_menu_start_recording' }, { tab }))
       .then(() => {
         chrome.action.setBadgeText({ text: 'REC' });
         chrome.action.setBadgeBackgroundColor({ color: '#FF0000' });
@@ -162,7 +165,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.sidePanel.open({ tabId: tab?.id }).catch(() => {});
     chrome.runtime.sendMessage({ action: 'macro_list' }).catch(() => {});
   } else if (action === 'export_report') {
-    chrome.runtime.sendMessage({ action: 'export_html_report', params: {} })
+    Promise.resolve(handleRuntimeMessage({ action: 'export_html_report', params: {} }, { tab }))
       .then((resp) => {
         if (resp?.ok && resp.data?.html) {
           const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(resp.data.html)}`;
@@ -322,13 +325,14 @@ const handleRuntimeMessage = async (request, sender) => {
       return { pong: true, ts: Date.now(), agentRunning: typeof agentRunning !== 'undefined' ? agentRunning : 'unknown' };
     }
     case 'parse_schedule_nl': {
+      // (audit) This is an async handler whose return value is the response; it
+      // has no sendResponse parameter. Calling sendResponse threw ReferenceError,
+      // so natural-language scheduling always errored. Return the result directly.
       try {
-        const result = parseNaturalLanguageSchedule(request.input);
-        sendResponse(result);
+        return parseNaturalLanguageSchedule(request.input);
       } catch (err) {
-        sendResponse({ schedule: null, error: getErrorMessage(err) });
+        return { schedule: null, error: getErrorMessage(err) };
       }
-      return true;
     }
     // (3.26.0) Content-script telemetry bridge. The content script can't
     // import telemetry.js (different execution context, no module access in
@@ -659,16 +663,16 @@ const handleRuntimeMessage = async (request, sender) => {
     }
 
     case 'get_pool_status': {
-            return _gps();
+            return getPoolStatus();
     }
 
     case 'stop_agent_tab': {
-            const stopped = _stopPool(request.tabId);
+            const stopped = stopPoolAgent(request.tabId);
       return { ok: stopped, tabId: request.tabId };
     }
 
     case 'stop_all_agents': {
-            _stopAll();
+            stopAllAgents();
       return { ok: true };
     }
 

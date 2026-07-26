@@ -119,7 +119,7 @@ Findings: ${r.summary.substring(0, 500)}`).join('\n\n---\n\n')
     : 'None yet (this is the first task).';
 
   // Extract any URL hints from the original goal
-  const urls = originalGoal.match(/https?:\/\/[^\s\)]+/g);
+  const urls = originalGoal.match(/https?:\/\/[^\s)]+/g);
   const urlHint = urls && urls.length > 0 ? urls[0] : '';
 
   return `ORCHESTRATED SUB-TASK ${index + 1} of ${total}: ${subtask.title}

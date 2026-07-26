@@ -87,6 +87,8 @@ jest.unstable_mockModule('../background/tab-manager.js', () => ({
 }));
 
 jest.unstable_mockModule('../background/shared-state.js', () => ({
+  onAgentCompletion: jest.fn(() => () => {}),
+  emitAgentCompletion: jest.fn(),
   notifyIfEnabled: jest.fn(),
 }));
 
