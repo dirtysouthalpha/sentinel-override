@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased] - Web dashboards v9
+
+### Added
+- `web/dashboard-prime.html` — the Sentinel Prime Dashboard, previously untracked at `C:\Users\Administrator\dashboard-v8.html`, now under version control alongside `web/dashboard.html`
+- `web/lib/dash-escape.js` — shared, tested escaping + `data:` URI validation helpers for both dashboards
+- Neuralis brain panel in the Prime dashboard, live from the brain API on `:8001` (`/health`, `/brain/stats`, `/brain/diagnostics`)
+- `scripts/check-web-dashboards.cjs` + `npm run test:web` + a CI "Web Dashboard Load Gate" step: parses every `web/*.html`, compiles each inline script, and verifies the element ids the scripts drive exist
+- `tests/web-dash-escape.test.js` and `tests/web-dashboard-prime-load.test.js` (55 tests)
+
+### Fixed
+- **XSS in the Prime dashboard sanitizer**: `esc()` was `textContent`-then-`innerHTML`, which escapes only `& < >`. It was used inside double-quoted HTML attributes and inside single-quoted JS string literals in `onclick=` handlers, where it neutralised nothing. Replaced with `escHtml`/`escAttr` (also escapes `"`, `'`, backtick) and every JS-code-context call site converted to `addEventListener` + closures
+- **XSS in the Prime file viewer**: `data_uri` from the file-content API went into `<img src="${...}">` with no escaping or validation; now validated as a base64 raster data URI (SVG rejected) and assigned through the DOM
+- **XSS in `web/dashboard.js`**: agent-run `goal` and web-learned playbook `platform` / `goalKey` were interpolated raw into `innerHTML`
+- Composer could wedge permanently: the message-save `fetch` in `sendMsg()` sat outside any try/catch, so a network blip left `streaming = true` with Run hidden and the send button disabled until reload. UI reset now lives in `finally`
+- Brain Lab panel never worked: it parsed the response then ignored it, hardcoded the version, and only wrote Neurons/Synapses/Regions in the `catch`
+- Unbounded DOM growth in `#msgs` from `appendMsg` and every inbound WebSocket message
+- Error messages rendered with assistant styling, so failures looked like model replies; they now have their own `.msg.e` style
+- `openConv` depended on the non-standard implicit global `event`
+- `web/dashboard.js`: no `res.ok` check before `res.json()`, no timeout on the fetch fallback, a `setInterval` that was never cleared and could overlap indefinitely, and blocking `alert()` error UX
+
+### Changed
+- Prime dashboard version strings bumped to v9
+- All dashboard requests go through a helper that always applies a timeout and an explicit `res.ok` check, and distinguishes 503 ("reachable but unhealthy", per fleet convention) from unreachable
+
+
 ## [21.6.76] - 2026-07-02
 
 ### Added
